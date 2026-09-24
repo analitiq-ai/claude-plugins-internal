@@ -1,0 +1,434 @@
+#!/usr/bin/env python3
+"""Hook entrypoint: one Claude Code hook payload on stdin, at most one decision on stdout.
+
+In `log` mode every refusal is recorded and nothing is blocked. Two things act in both modes,
+because the workflows cannot run without them: argument injection at workflow launch, and
+validation of the structured output that lands in the ledger.
+"""
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import re
+import subprocess
+import sys
+import traceback
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import assessment
+import briefs
+import facts
+import github
+import ledger
+import policy
+import shell
+import worktree
+
+REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round"
+REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
+INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
+# Anchored at the prompt's start by match(): the cron bot's prompts quote issue and PR text anyone can write.
+UNLOCK = re.compile(r"unlock\s+(?:(?P<repo>[\w.-]+/[\w.-]+)?#(?P<pr>\d+)|(?P<branch>\S+))")
+
+
+def mode() -> str:
+    config = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text())
+    chosen = os.environ.get("ALQ_REVIEW_MODE") or config["mode"]
+    if chosen not in ("log", "enforce"):
+        raise ValueError(f"alq-review mode must be log or enforce, not {chosen!r}")
+    return chosen
+
+
+def deny(reason: str) -> dict:
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                                   "permissionDecisionReason": f"[alq-review] {reason}"}}
+
+
+def record(payload: dict, action: str, decision: str, reason: str = "", where: worktree.Worktree | None = None) -> None:
+    entry = {"at": ledger.stamp(datetime.now(timezone.utc)), "session": payload.get("session_id"), "action": action,
+             "decision": decision, "repo": where.slug if where else None, "branch": where.branch if where else None,
+             "agent_type": payload.get("agent_type"), "reason": reason}
+    root = ledger.state_root()
+    root.mkdir(parents=True, exist_ok=True)
+    with open(root / "gate.log", "a") as log:
+        log.write(json.dumps(entry) + "\n")
+
+
+def refuse(payload: dict, action: str, reason: str, where: worktree.Worktree | None = None) -> dict | None:
+    """A process refusal: blocks in enforce mode, is only recorded in log mode."""
+    enforcing = mode() == "enforce"
+    record(payload, action, "deny" if enforcing else "would_deny", reason, where)
+    return deny(reason) if enforcing else None
+
+
+# --- reviewer subagents in flight, per session -------------------------------------------------
+
+def _session_file(payload: dict, kind: str = "") -> Path:
+    directory = ledger.state_root() / "sessions"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / f"{payload['session_id']}{kind}.json"
+
+
+@contextmanager
+def _session_state(payload: dict, kind: str = ""):
+    """The session's `kind` record, read and written back under one lock."""
+    path = _session_file(payload, kind)
+    with open(path.with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        held = json.loads(path.read_text()) if path.exists() else {}
+        yield held
+        path.write_text(json.dumps(held))
+
+
+def track_subagent(payload: dict, now: datetime) -> None:
+    if payload.get("agent_type") not in briefs.REVIEWERS:
+        return
+    with _session_state(payload) as inflight:
+        if payload["hook_event_name"] == "SubagentStart":
+            inflight[payload["agent_id"]] = ledger.stamp(now)
+        else:
+            inflight.pop(payload["agent_id"], None)
+
+
+def inflight_count(payload: dict, now: datetime) -> int:
+    path = _session_file(payload)
+    if not path.exists():
+        return 0
+    oldest = ledger.stamp(now - INFLIGHT_TTL)
+    return sum(1 for started in json.loads(path.read_text()).values() if started > oldest)
+
+
+# --- branch-level decisions --------------------------------------------------------------------
+
+def decide(payload: dict, slug: str, branch: str, rule, **facts_for_rule) -> policy.Decision:
+    now = datetime.now(timezone.utc)
+    with ledger.open_state(slug, branch) as state:
+        ledger.ingest_inbox(state, now)
+        return rule(state, inflight=inflight_count(payload, now), **facts_for_rule)
+
+
+# --- the user hands a locked branch back ---------------------------------------------------------
+
+def _names(state: dict, typed: re.Match) -> bool:
+    if typed["pr"]:
+        return state["pr"] == int(typed["pr"]) and typed["repo"] in (None, state["repo"])
+    return state["branch"] == typed["branch"]
+
+
+def on_prompt(payload: dict) -> dict | None:
+    typed = UNLOCK.match(payload.get("prompt", "").lstrip())
+    if not typed:
+        return None
+    held = [state for state in ledger.all_states() if policy.locked(state)]
+    named = [state for state in held if _names(state, typed)]
+
+    def refs(states):
+        return ", ".join(f"{s['repo']}{policy.unlock_ref(s) if s['pr'] else ' ' + s['branch']}" for s in states)
+    if len(named) == 1:
+        with ledger.open_state(named[0]["repo"], named[0]["branch"]) as state:
+            ledger.unlock(state, f"user prompt: {payload['prompt'].strip().splitlines()[0][:200]}", datetime.now(timezone.utc))
+        said = f"The user unlocked {state['repo']} {state['branch']}; its code may change again."
+    elif named:
+        said = (f"`unlock` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
+                "repo: `unlock <owner>/<repo>#<number>`.")
+    else:
+        said = f"`{typed.group(0)}` names no locked branch, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
+    return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}
+
+
+# --- a held branch does not move, whichever tool moves it ------------------------------------------
+
+def _held() -> list[tuple[dict, str]]:
+    """(state, checkout) of every branch whose code may not move now. Reviewers in flight are left out:
+    they hold every branch of their session, and only for minutes."""
+    found = []
+    for state in ledger.all_states():
+        rnd = ledger.current_round(state)
+        root = rnd and rnd.get("root")
+        if root and os.path.isdir(root) and not policy.mutation(state, inflight=0).allow:
+            found.append((state, root))
+    return found
+
+
+def hold(payload: dict) -> dict | None:
+    """Before a Bash command: what every held checkout looks like, to compare against afterwards. A
+    checkout git cannot read is reported, not refused: the command itself was allowed."""
+    held, unreadable = {}, []
+    for _, root in _held():
+        try:
+            held[root] = worktree.contents(root)
+        except (subprocess.CalledProcessError, OSError) as exc:
+            unreadable.append(f"{root}: {exc}")
+    if held:
+        with _session_state(payload, ".held") as pending:
+            pending[payload["tool_use_id"]] = held
+    if unreadable:
+        return {"systemMessage": f"alq-review cannot watch these locked checkouts: {'; '.join(unreadable)}"}
+    return None
+
+
+def after_bash(payload: dict) -> dict | None:
+    with _session_state(payload, ".held") as pending:
+        before = pending.pop(payload["tool_use_id"], None)
+    if not before:
+        return None
+    moved = []
+    for state, root in _held():
+        if root not in before:
+            continue
+        changed = sorted(p for p, h in worktree.contents(root).items() if before[root].get(p) != h)
+        if changed:
+            head = f" (HEAD was {before[root]['HEAD'][:10]})" if "HEAD" in changed else ""
+            moved.append(f"{state['repo']} {state['branch']} at {root}: {', '.join(changed)}{head}. "
+                         f"{policy.mutation(state, inflight=0).reason}")
+    if not moved:
+        return None
+    record(payload, "bash-write", "caught", " | ".join(moved))
+    return {"decision": "block", "reason": "[alq-review] That command changed a branch whose code may not move. " +
+            " ".join(moved) + " Put it back now: restore changed tracked files with `git checkout -- <file>`, delete "
+            "new untracked ones, and reset to the old HEAD if it moved. Do not look for another way around the lock."}
+
+
+# --- PreToolUse handlers -----------------------------------------------------------------------
+
+def _inside(path: str, directory: Path) -> bool:
+    return Path(path).resolve().is_relative_to(directory.resolve())
+
+
+def on_edit(payload: dict) -> dict | None:
+    path = payload["tool_input"].get("file_path") or payload["tool_input"].get("notebook_path")
+    if not path:
+        return None
+    if _inside(path, ledger.state_root()):
+        return refuse(payload, "state", "The review ledger is written by the gate only.")
+    where = worktree.locate(path)
+    if where is None:
+        return None
+    decision = decide(payload, where.slug, where.branch, policy.mutation)
+    if decision.allow or worktree.is_ignored(where.root, path):
+        return None
+    return refuse(payload, "edit", decision.reason, where)
+
+
+def _branch_of(action: shell.Action) -> tuple[str, str, str | None] | None:
+    """(slug, branch, checkout if it is the session's directory) that a gated shell action targets."""
+    here = worktree.locate(action.cwd)
+    repo = action.repo or (here.slug if here else None)
+    if repo and action.pr:
+        branch = ledger.branch_for_pr(repo, action.pr) or (github.pr_head(repo, action.pr) or (None,))[0]
+        if branch is None:
+            return None
+        return repo, branch, here.root if here and (here.slug, here.branch) == (repo, branch) else None
+    return (here.slug, here.branch, here.root) if here else None
+
+
+def on_bash(payload: dict) -> dict | None:
+    command = payload["tool_input"].get("command", "")
+    for action in shell.classify(command, payload.get("cwd") or os.getcwd()):
+        if action.kind == "unlock":
+            return refuse(payload, "unlock", "Only the user unlocks a branch. Tell them why it is locked and stop.")
+        target = _branch_of(action)
+        if target is None:
+            continue
+        slug, branch, root = target
+        if action.kind == "ready":
+            commit = worktree.head_sha(root) if root else (github.pr_head(slug, action.pr) or ("", ""))[1]
+            decision = decide(payload, slug, branch, policy.mark_ready, head_sha=commit,
+                              released=bool(commit) and github.released(slug, commit) is not None)
+        elif action.kind == "rerequest":
+            decision = decide(payload, slug, branch, policy.rerequest)
+        else:
+            decision = decide(payload, slug, branch, policy.mutation)
+        if not decision.allow:
+            refused = refuse(payload, action.kind, decision.reason, worktree.Worktree("", slug, branch))
+            if refused:
+                return refused
+    return hold(payload)
+
+
+def on_agent(payload: dict) -> dict | None:
+    if payload.get("agent_id") or payload["tool_input"].get("subagent_type") not in briefs.INTERNAL_REVIEWERS:
+        return None
+    return refuse(payload, "dispatch",
+                  "Reviewers run together behind a barrier and are assessed as one round; dispatched one by one, the "
+                  f"first report gets fixed before the rest arrive. Next step: {policy.REVIEW_CALL % 'internal'}.")
+
+
+def on_skill(payload: dict) -> dict | None:
+    stage = REVIEW_SKILLS.get(payload["tool_input"].get("skill"))
+    if stage is None:
+        return None
+    return refuse(payload, "dispatch", f"The {stage} review runs as a workflow, so its findings are assessed as one round "
+                                       f"before anything is fixed. Next step: {policy.REVIEW_CALL % stage}.")
+
+
+def _review_base(where: worktree.Worktree) -> tuple[str | None, str]:
+    """The commit a round's change is measured from, or None and why it cannot be known."""
+    target = github.base_branch(where.slug, where.branch)
+    if target is None:
+        return None, (f"gh could not say which branch {where.slug} {where.branch} merges into, so the change under "
+                      "review cannot be measured. Next step: check `gh auth status`, then launch again.")
+    try:
+        return worktree.review_base(where.root, target), ""
+    except RuntimeError as exc:
+        return None, f"The change under review is measured from {target} as the remote has it, and it could not be read: {exc}"
+
+
+def on_workflow(payload: dict) -> dict | None:
+    call = payload["tool_input"]
+    if call.get("name") not in (REVIEW_ROUND, ASSESS_ROUND):
+        return None
+    args = call.get("args") if isinstance(call.get("args"), dict) else {}
+    root, stage = args.get("worktree"), args.get("stage", "internal")
+    where = worktree.locate(root) if isinstance(root, str) and os.path.isabs(root) else None
+    if where is None or stage not in ("internal", "audit"):
+        return deny(f"{call['name']} needs args.worktree: the absolute path of the checkout under review, on its PR "
+                    "branch, with a GitHub origin. For review-round, args.stage is 'internal' (default) or 'audit'.")
+    now = datetime.now(timezone.utc)
+    with ledger.open_state(where.slug, where.branch) as state:
+        ledger.ingest_inbox(state, now)
+        if call["name"] == ASSESS_ROUND:
+            decision = policy.launch_assess(state)
+            if not decision.allow:
+                return deny(decision.reason)
+            rnd = ledger.current_round(state)
+            if rnd["base_sha"] is None:
+                rnd["base_sha"], why_not = _review_base(where)
+                if rnd["base_sha"] is None:
+                    return refuse(payload, "assess", why_not, where)
+            rnd["root"] = where.root
+            injected = briefs.assess_args(state, rnd, where)
+        else:
+            decision = policy.launch_round(state, stage, head_sha=worktree.head_sha(where.root),
+                                           dirty=worktree.is_dirty(where.root), inflight=inflight_count(payload, now))
+            if not decision.allow:
+                refused = refuse(payload, "launch", decision.reason, where)
+                if refused:
+                    return refused
+            base, why_not = _review_base(where)
+            if base is None:
+                return refuse(payload, "launch", why_not, where)
+            waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
+            rnd = ledger.open_round(state, stage, head_sha=worktree.head_sha(where.root),
+                                    base_sha=base, scope=decision.scope or "full",
+                                    expected=[t for wave in waves for t in wave], escalation=decision.escalation, now=now)
+            rnd["root"] = where.root
+            injected = briefs.review_args(state, rnd, where, decision)
+    record(payload, "launch", "allow", rnd["ref"], where)
+    # "allow" doubles as the permission a headless run needs to start a workflow at all.
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
+                                   "updatedInput": dict(call, args=injected)}}
+
+
+def _round_output(payload: dict) -> tuple[str, str] | None:
+    """(round_ref, agent_type) when this StructuredOutput call belongs to a review round."""
+    ref = payload["tool_input"].get("round_ref")
+    if isinstance(ref, str) and ref.count(":") == 2:
+        return ref, str(payload.get("agent_type"))
+    return None
+
+
+def on_structured_output(payload: dict) -> dict | None:
+    found = _round_output(payload)
+    if found is None:
+        return None
+    ref, agent_type = found
+    body = payload["tool_input"]
+    with ledger.open_state(*ledger.parse_ref(ref)) as state:
+        rnd = ledger.find_round(state, ref)
+        is_assessment = agent_type == briefs.ASSESSOR and rnd["status"] == "awaiting_assessment"
+        measured = facts.round_facts(state, rnd, rnd["root"]) if is_assessment else {}
+        try:
+            if is_assessment:
+                admissible = policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"]))
+                errors = assessment.validate_assessment(body, rnd, admissible, burden=measured["burden"],
+                                                        token=briefs.brief_token(rnd))
+            elif agent_type in rnd["expected"] and rnd["status"] == "collecting":
+                errors = assessment.validate_report(body, briefs.short(agent_type))
+            else:
+                errors = [f"{agent_type} has nothing to submit to {ref} while it is {rnd['status']}"]
+        except (KeyError, TypeError):
+            # Ill-shaped output: the harness checks the JSON Schema after this hook and sends it back itself.
+            return None
+    if not errors:
+        return None
+    record(payload, "output", "deny", "; ".join(errors))
+    return deny("Your output was rejected. Correct it and submit again:\n- " + "\n- ".join(errors))
+
+
+def after_structured_output(payload: dict) -> None:
+    found = _round_output(payload)
+    if found is None:
+        return
+    ref, agent_type = found
+    now = datetime.now(timezone.utc)
+    with ledger.open_state(*ledger.parse_ref(ref)) as state:
+        if agent_type == briefs.ASSESSOR:
+            rnd = ledger.record_assessment(state, ref, payload["tool_input"], now)
+        else:
+            rnd = ledger.record_report(state, ref, agent_type, payload["tool_input"], now)
+    record(payload, "output", "recorded", f"{ref} is {rnd['status']}")
+
+
+PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_bash, "Agent": on_agent,
+       "Skill": on_skill, "Workflow": on_workflow, "StructuredOutput": on_structured_output}
+
+
+def handle(payload: dict) -> dict | None:
+    event = payload["hook_event_name"]
+    if event == "UserPromptSubmit":
+        return on_prompt(payload)
+    if event == "PostToolUse" and payload["tool_name"] == "Bash":
+        return after_bash(payload)
+    if event in ("SubagentStart", "SubagentStop"):
+        return track_subagent(payload, datetime.now(timezone.utc))
+    if event == "PreToolUse" and payload["tool_name"] in PRE:
+        return PRE[payload["tool_name"]](payload)
+    if event == "PostToolUse" and payload["tool_name"] == "StructuredOutput":
+        return after_structured_output(payload)
+    return None
+
+
+def _refuses(payload: dict) -> bool:
+    """Whether this call was one the gate might have refused.
+
+    Everywhere else the gate only records, so a crash there must not stand between a session and
+    its work. Here it was deciding, and a decision it never reached must not be read as a yes.
+    """
+    if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") not in PRE:
+        return False
+    try:
+        return mode() == "enforce"
+    except Exception:
+        return True  # a gate that cannot read its own mode is not one to trust with a yes
+
+
+def main() -> None:
+    payload = json.load(sys.stdin)
+    try:
+        out = handle(payload)
+    except Exception as exc:  # a broken gate must never stall a session; it says so instead
+        trace = traceback.format_exc()
+        print(trace, file=sys.stderr)
+        try:
+            ledger.state_root().mkdir(parents=True, exist_ok=True)
+            with open(ledger.state_root() / "errors.log", "a") as log:
+                log.write(f"{ledger.stamp(datetime.now(timezone.utc))} {payload.get('tool_name')}\n{trace}\n")
+        except OSError:
+            pass  # the trace is already on stderr
+        where = payload.get("tool_name") or payload.get("hook_event_name")
+        if _refuses(payload):
+            out = deny(f"the gate crashed deciding this {where}, so it refuses rather than letting it through "
+                       f"unchecked: {type(exc).__name__}: {exc}. The trace is in "
+                       f"{ledger.state_root() / 'errors.log'}. To work while it is broken, set ALQ_REVIEW_MODE=log.")
+        else:
+            out = {"systemMessage": f"alq-review gate failed open on {where}: {type(exc).__name__}: {exc}"}
+    if out:
+        print(json.dumps(out))
+
+
+if __name__ == "__main__":
+    main()

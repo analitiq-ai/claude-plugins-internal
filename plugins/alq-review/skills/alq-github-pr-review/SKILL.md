@@ -1,0 +1,94 @@
+---
+name: alq-github-pr-review
+description: Use when a PR needs a Codex review requested (or re-requested after pushing fixes), when you must poll/wait for a review response, when review feedback needs to be triaged, answered, and resolved, and when checking that DeepSource graded the PR A. NEVER poll a PR for review feedback with ad-hoc gh loops (gh pr checks / gh api + sleep / for / while) — always this skill; a hand-rolled loop only sees the one reviewer you wrote it for and reports a PR clean while DeepSource, CodeRabbit or human threads sit unresolved.
+colour: yellow
+---
+
+# Requesting a Codex PR review
+
+A new non-draft PR (or a PR moved from DRAFT to READY) triggers a Codex review automatically — no manual step needed.
+Re-reviews are requested by posting a `@codex review` comment **after** all fixes are pushed. Every time the PR changes, request the review again once all changes are pushed.
+
+Codex (`chatgpt-codex-connector[bot]`) answers ~10–15 min later. Its verdict is not yours to read: the org-wide pr-gate workflow reads it and posts the `codex-review` commit status on the head —
+- `success` when a Codex verdict comment names the head commit and is clean, when Codex's 👍 on the PR description is tied to the head (`… (thumbs-up on the PR)`), or `WAIVED: …` when Codex was out of credits after the head was pushed (the commit was not reviewed);
+- `pending` otherwise, with a description saying what is missing.
+
+**A 👍 on the PR description can be Codex's verdict.** When Codex reviews a PR unasked (opened ready for review, or marked ready) and finds nothing, its only answer is a 👍 on the description. The gate counts it when it can tie it to the head, and otherwise says why in the `codex-review` description. Re-request with `@codex review` only when that description says to. A reaction triggers no workflow, so the poller dispatches a gate sweep when `codex-review` is older than the 👍.
+
+**Codex is not the only reviewer.** CodeRabbit, DeepSource and humans leave inline threads too, and an unresolved thread blocks the PR whoever left it. CodeRabbit also puts findings it cannot anchor to the diff ("Outside diff range comments") in its review body only; they have no thread to resolve and still need triage.
+
+**Review threads are not the only blocker.** Check runs and commit statuses (`DeepSource: Python`, `CodeRabbit`, `codex-review`, `internal-review`) block the PR too. The DeepSource *grade* blocks it as well, and no status carries that — see *DeepSource grade* below.
+
+# Waiting for the response: run the poller
+
+After opening a PR or posting `@codex review`, launch the poller. Never hand-roll a `gh` + `sleep`/`for` watcher — a PreToolUse hook rejects those.
+
+Paths below are relative to this skill directory.
+
+```bash
+# poll-pr-review.sh <owner/repo> <pr-number> [trigger-comment-id]
+./poll-pr-review.sh analitiq-ai/analitiq-engine 331
+```
+
+- The trigger is the given comment id, else the newest `@codex review` comment, else the PR's creation.
+- Defaults: polls every 60s for up to 15 min. Override with `--interval <seconds>` / `--minutes <n>`.
+- `--ignore-check <name>` (repeatable) leaves a check out for this run only — for a check red for reasons outside the PR and outside the branch's required set. It is announced, and every report lists the ignored checks that are not passing. GitHub then reports `UNSTABLE`, which counts as clean when only ignored checks are not passing; an ignored *required* check still leaves the PR `BLOCKED`.
+
+The poller waits until the round has **settled** — Codex answered since the trigger, no check is still running, and GitHub has computed mergeability — then prints one complete report: `mergeStateStatus`, the gate statuses verbatim (a `WAIVED:` shows here), every failing check, and every unresolved finding from every reviewer with severity, gist and URL. A draft settles at once, because Codex does not review drafts.
+
+Exit codes drive the next step:
+
+| Exit | Meaning | Do next |
+|------|---------|---------|
+| `0`  | **Clean** — GitHub reports `mergeStateStatus=CLEAN` and nothing is left to triage | Run `deepsource-pr-gate.sh`; if it passes, proceed to merge/next step. |
+| `2`  | **Findings** — failing checks and/or unresolved findings printed | Go to *Triaging* below. |
+| `4`  | **Blocked** — nothing to triage, but GitHub does not report CLEAN | Act on the gate statuses and notes printed: re-request when `codex-review` says to, attest the internal review (see *Attesting the internal review*), approve, update the branch, leave draft. |
+| `3`  | **Timeout** — not settled in time; the report says what it was still waiting on | Re-run the poller, or act on what it names. |
+
+Exit `2` fires on *any* unresolved finding or failing check, including ones left before this review round — a stale finding still blocks the PR.
+
+Requires the `gh` CLI authenticated for the target repo (`gh auth status`).
+
+# Attesting the internal review
+
+`internal-review` turns `success` only on an `Analitiq-Bot` PR comment in the format defined by the shared gate's README, section [The internal-review attestation](https://github.com/analitiq-ai/.github#the-internal-review-attestation). Take the marker and body from there, not from memory. It must name the full head SHA, so re-attest after every push.
+
+The `alq-review` gate refuses the attestation until its internal round is clean at the head. After fixes from a GitHub round move the head, run a delta internal round before attesting again.
+
+# DeepSource grade
+
+The DeepSource Code Review grade must be A for a PR to merge. It lives only in DeepSource's PR summary comment, which names the commit range it reviewed.
+
+```bash
+# deepsource-pr-gate.sh <owner/repo> <pr-number>
+./deepsource-pr-gate.sh analitiq-ai/claude-code-plugins 352
+```
+
+| Exit | Meaning |
+|------|---------|
+| `0`  | Overall Grade A and every analyzer passed, on the head commit |
+| `2`  | Below A, or an analyzer failed or timed out — the dimension grades, analyzer statuses and run URL are printed |
+| `3`  | No summary for the head yet — DeepSource has not finished; run it again later |
+| `1`  | Usage error, or a summary whose format the script cannot read — read the comment by hand |
+
+On exit `2`, find what to fix with the deepsource MCP tools:
+1. `get_pull_request` for the PR, to get its latest run.
+2. `get_run_report` for that run — the grade per dimension (security, reliability, complexity, hygiene) and per analyzer.
+3. `list_analysis_issues` with the `pr_number` — the occurrences behind the grade, with file, line and issue shortcode; `get_issue` explains a shortcode.
+
+Fix the occurrences that are real. A false positive is reported or ignored at the source (`report_false_positive`, `create_ignore_rule`), never worked around in code.
+
+# Triaging PR review comments
+
+When the poller exits `2`, triage everything it printed:
+
+**Failing CI checks** — open the details URL to see what failed. Fix legitimate failures and push.
+
+**Unresolved findings** — the poller hands them to the `alq-review` gate as one review round, and code stays locked until that round is assessed. Run `Workflow(name='alq-review:assess-round', args={worktree: '<absolute worktree path>'})`; it rules on every reviewer's findings — CodeRabbit, DeepSource and human ones as well as Codex's. Then act on each as ruled:
+- PUSH_BACK → reply on the comment with the ruling's reason, resolve it.
+- FIX → fix it, reply with a fix summary, resolve the comment.
+- DEFER → reply naming the issue it moved to, resolve it.
+
+A CodeRabbit outside-diff finding has no thread: its URL points at the review. Answer it in a PR comment that quotes its URL — that is what marks it answered. The poller reports every outside-diff finding, from any commit's review, until a PR comment quotes it — CodeRabbit does not repeat a finding on a later commit.
+
+Every thread must end resolved; that is what lets the poller reach exit `0`. Repeat until all are resolved. If you changed the PR, push, post a fresh `@codex review`, and run the poller again.
