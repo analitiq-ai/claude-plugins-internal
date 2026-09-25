@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from helpers import T0
 
@@ -42,11 +43,12 @@ class PollerDrop(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads((Path(self.tmp.name) / "state" / "inbox" / "acme__demo__7.json").read_text())
 
-    def test_findings_drop_opens_a_github_round(self):
+    def test_findings_drop_opens_a_github_round_in_the_ledger_of_its_pr(self):
         drop = self.hand_to_gate("findings")
-        state = ledger.new_state("acme/demo", drop["head_ref"])
-        rnd = ledger.ingest_poll(state, drop, now=T0)
-        self.assertEqual((rnd["stage"], rnd["head_sha"], state["pr"]), ("github", "abc123", 7))
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": self.env["ALQ_REVIEW_STATE_DIR"]}):
+            with ledger.open_ledger(drop["repo"], drop["pr"]) as state:
+                rnd = ledger.ingest_poll(state, drop, now=T0)
+        self.assertEqual((rnd["ref"], rnd["head_sha"]), ("acme/demo#7:github-0.1", "abc123"))
         self.assertEqual([f["id"] for f in rnd["findings"]], [THREADS[0]["url"], COMMENTS[0]["url"]])
         self.assertEqual(rnd["failing_checks"], CHECKS["failing"])
 

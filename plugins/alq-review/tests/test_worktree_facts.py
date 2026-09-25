@@ -1,7 +1,9 @@
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from helpers import REVIEWERS, T0, assess, finding
 
@@ -69,6 +71,125 @@ class Locate(Repo):
         self.assertTrue(worktree.is_dirty(str(self.root)))
 
 
+class Contents(Repo):
+    def test_a_deleted_branch_reads_as_deleted(self):
+        git(self.root, "checkout", "-q", "main")
+        git(self.root, "branch", "-q", "-D", "feat/1-demo")
+        self.assertEqual(worktree.contents(str(self.root), "feat/1-demo"),
+                         worktree.Snapshot(tip="deleted", digests={}, unverified=frozenset()))
+
+    def test_a_removed_checkout_is_an_error_not_a_deleted_branch(self):
+        root = str(self.root)
+        self.tmp.cleanup()
+        with self.assertRaises(RuntimeError):
+            worktree.contents(root, "feat/1-demo")
+
+    def test_a_directory_that_is_no_repo_is_an_error(self):
+        with self.assertRaises(RuntimeError):
+            worktree.contents(self.tmp.name, "feat/1-demo")
+
+    def test_a_checkout_git_cannot_read_is_an_error(self):
+        (self.root / ".git" / "index").write_bytes(b"not an index")
+        with self.assertRaises(RuntimeError):
+            worktree.contents(str(self.root), "feat/1-demo")
+
+    def test_a_nested_checkout_whose_git_is_gone_is_an_error_not_the_outer_repo(self):
+        nested = self.root / ".git" / "wt" / "2-other"
+        git(self.root, "worktree", "add", "-q", "-b", "feat/2-other", str(nested))
+        (nested / ".git").unlink()
+        with self.assertRaises(RuntimeError):
+            worktree.contents(str(nested), "feat/2-other")
+
+    def test_a_checkout_nested_in_a_work_tree_whose_git_is_gone_is_an_error_not_the_outer_repo(self):
+        nested = self.root / "vendored"
+        git(self.root, "worktree", "add", "-q", "-b", "feat/2-other", str(nested))
+        (nested / ".git").unlink()
+        with self.assertRaises(RuntimeError):
+            worktree.contents(str(nested), "feat/2-other")
+
+    def test_git_timing_out_is_an_error(self):
+        with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 30)), \
+                self.assertRaises(RuntimeError):
+            worktree.review_base(str(self.root), "main")
+        with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 30)), \
+                self.assertRaises(RuntimeError):
+            worktree.git(str(self.root), "status")
+
+    def test_no_git_to_run_is_an_error(self):
+        with mock.patch.dict(os.environ, {"PATH": ""}), self.assertRaises(RuntimeError):
+            worktree.contents(str(self.root), "feat/1-demo")
+
+    def test_an_unreadable_file_is_unverified_not_a_digest(self):
+        unreadable = self.root / "z.py"
+        unreadable.write_text("x")
+        unreadable.chmod(0)
+        snapshot = worktree.contents(str(self.root), "feat/1-demo")
+        self.assertEqual(snapshot.unverified, {"z.py"})
+        self.assertNotIn("z.py", snapshot.digests)
+
+    def test_paths_git_status_cannot_read_are_unverified(self):
+        """git status exits 0 on these and names them only on stderr."""
+        (self.root / "d").mkdir()
+        self.commit("d/t.py", "t\n", "tracked in d")
+        (self.root / "u").mkdir()
+        (self.root / "u" / "new.py").write_text("n")
+        for directory in ("d", "u"):
+            (self.root / directory).chmod(0)
+            self.addCleanup((self.root / directory).chmod, 0o755)
+        self.assertEqual(worktree.contents(str(self.root), "feat/1-demo").unverified, {"d/t.py", "d/", "u/"})
+
+
+    def test_an_unreadable_gitignore_is_unverified(self):
+        (self.root / "e").mkdir()
+        (self.root / "e" / ".gitignore").write_text("*.log\n")
+        (self.root / "e" / ".gitignore").chmod(0)
+        self.addCleanup((self.root / "e" / ".gitignore").chmod, 0o644)
+        self.assertEqual(worktree.contents(str(self.root), "feat/1-demo").unverified, {"e/.gitignore"})
+
+    def test_git_status_complaining_of_what_it_names_no_path_for_leaves_the_files_unverified(self):
+        run = worktree._run
+
+        def status_complains(root, *args, **kw):
+            done = run(root, *args, **kw)
+            if args[0] == "status":
+                done.stderr += 'error: open("x"): Permission denied\n'
+            return done
+        with mock.patch.object(worktree, "_run", status_complains):
+            snapshot = worktree.contents(str(self.root), "feat/1-demo")
+        self.assertEqual(snapshot.contents_unverified, 'error: open("x"): Permission denied')
+        self.assertEqual(snapshot.tip, git(self.root, "rev-parse", "feat/1-demo"))
+
+    def test_git_speaks_untranslated(self):
+        """The watch reads git's messages, so they must not depend on the user's language."""
+        fake = Path(self.tmp.name) / "bin"
+        fake.mkdir()
+        (fake / "git").write_text('#!/bin/sh\necho "$LC_ALL"\n')
+        (fake / "git").chmod(0o755)
+        with mock.patch.dict(os.environ, {"PATH": str(fake), "LC_ALL": "de_DE.UTF-8"}):
+            self.assertEqual(worktree.git(str(self.root), "status"), "C")
+
+
+class Compare(unittest.TestCase):
+    def snap(self, tip="t1", unverified=(), **digests):
+        return worktree.Snapshot(tip=tip, digests=digests, unverified=frozenset(unverified))
+
+    def test_a_moved_tip_and_changed_known_content_are_moves(self):
+        moved, unverified = worktree.compare(self.snap(**{"a.py": "1"}), self.snap(tip="t2", **{"a.py": "2", "n.py": "3"}))
+        self.assertEqual((moved, unverified), (["tip", "a.py", "n.py"], []))
+
+    def test_a_path_unverified_on_either_side_is_reported_never_moved(self):
+        for before, after in ((self.snap(unverified={"z.py"}), self.snap(**{"z.py": "1"})),
+                              (self.snap(**{"z.py": "1"}), self.snap(unverified={"z.py"}))):
+            with self.subTest(before=before, after=after):
+                self.assertEqual(worktree.compare(before, after), ([], ["z.py"]))
+
+    def test_files_unverified_on_either_side_leave_only_the_tip_compared(self):
+        for side in ("before", "after"):
+            with self.subTest(side=side):
+                snaps = {"before": self.snap(**{"a.py": "1"}), "after": self.snap(tip="t2", **{"a.py": "2"})}
+                snaps[side] = worktree.Snapshot(snaps[side].tip, snaps[side].digests, frozenset(), "warning: odd")
+                self.assertEqual(worktree.compare(snaps["before"], snaps["after"]), (["tip"], []))
+
 
 class ReviewBase(Repo):
     def setUp(self):
@@ -108,7 +229,7 @@ class RoundFacts(Repo):
         return rnd
 
     def test_second_round_landing_on_fix_written_lines_shifts_the_burden_of_proof(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
         self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5)], first)
         assess(state, "PATCH")
@@ -125,7 +246,7 @@ class RoundFacts(Repo):
 
     def test_the_brief_diffs_from_the_base_of_the_round_being_assessed(self):
         """A branch that merged its base since round one must not be judged on commits the base already had."""
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "x\n", "feat: b")
         self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], first)
         assess(state, "PATCH")
@@ -139,13 +260,13 @@ class RoundFacts(Repo):
         self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
 
     def test_first_round_never_carries_a_burden(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         head = self.commit("b.py", "x\n", "feat: b")
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], head)
         self.assertFalse(facts.round_facts(state, rnd, str(self.root))["burden"])
 
     def test_falling_count_carries_no_burden(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
         self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5), finding("code-reviewer-2", file="b.py", line=15)], first)
         assess(state, "PATCH")
@@ -154,7 +275,7 @@ class RoundFacts(Repo):
         self.assertFalse(facts.round_facts(state, rnd, str(self.root))["burden"])
 
     def test_files_edited_by_three_fix_commits_are_counted(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "0\n", "feat: b")
         self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], first)
         assess(state, "PATCH")
@@ -165,7 +286,7 @@ class RoundFacts(Repo):
 
     def test_a_finding_that_names_no_line_is_measured_like_any_other(self):
         """`line` is not required of a finding, and a whole-branch judgement never carries one."""
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "0\n", "feat: b")
         whole_branch = {k: v for k, v in finding("history-shape-1", file="b.py").items() if k != "line"}
         self.round_with(state, [whole_branch], first)
@@ -179,7 +300,7 @@ class RoundFacts(Repo):
 
     def test_a_round_still_opens_after_an_audit_that_judged_the_whole_branch(self):
         """The launch path measures churn, so an unguarded field there stops every later round."""
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         head = self.commit("b.py", "0\n", "feat: b")
         whole_branch = {k: v for k, v in finding("history-shape-1", file="b.py").items() if k != "line"}
         self.round_with(state, [whole_branch], head)
@@ -193,7 +314,7 @@ class RoundFacts(Repo):
 
     def test_the_churned_round_cannot_be_handed_a_verdict_that_edits_again(self):
         """Through the real assessor args: the schema the model answers in is where this has to bind."""
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         first = self.commit("b.py", "0\n", "feat: b")
         self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], first)
         assess(state, "PATCH")
@@ -210,7 +331,7 @@ class RoundFacts(Repo):
         self.assertIn("REDESIGN", offered)
 
     def test_an_unchurned_round_is_still_offered_every_verdict(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         head = self.commit("b.py", "0\n", "feat: b")
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], head)
         rnd["root"] = str(self.root)

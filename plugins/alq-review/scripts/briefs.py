@@ -156,7 +156,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Print the assessor's brief for one review round.")
     parser.add_argument("--ref", required=True)
     ref = parser.parse_args().ref
-    with ledger.open_state(*ledger.parse_ref(ref)) as state:
+    with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
         rnd = ledger.find_round(state, ref)
         if rnd["status"] != "awaiting_assessment":
             sys.exit(f"{ref} is {rnd['status']}, not awaiting assessment")

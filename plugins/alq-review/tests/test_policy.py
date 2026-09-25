@@ -26,10 +26,10 @@ def spend_audits(state, verdict="CLASS_FIX"):
 
 class Mutation(unittest.TestCase):
     def test_branch_without_rounds_is_free(self):
-        self.assertTrue(mutation(ledger.new_state("acme/demo", "feat/1-demo")).allow)
+        self.assertTrue(mutation(ledger.new_state("acme/demo", "feat/1-demo", pr=7)).allow)
 
     def test_denied_while_reviewers_are_still_reporting(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         rnd = ledger.open_round(state, "internal", head_sha=HEAD_A, base_sha="0" * 40, scope="full",
                                 expected=REVIEWERS, escalation=False, now=T0)
         ledger.record_report(state, rnd["ref"], REVIEWERS[0], {"round_ref": rnd["ref"], "findings": []}, now=T0)
@@ -75,6 +75,7 @@ class Mutation(unittest.TestCase):
 
     def test_spent_audits_lock_the_branch_and_ask_the_user_for_the_unlock(self):
         """Nothing else hands a non-converging branch back: without a lock, no unlock can release it."""
+        # Unbound (no pr): the unlock target falls back to the branch name, which this test asserts on.
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))
         self.assertTrue(policy.locked(state))
         reason = mutation(state).reason
@@ -83,17 +84,17 @@ class Mutation(unittest.TestCase):
         self.assertIn("ask the user", reason)
 
     def test_a_spent_audit_lock_puts_each_audits_ruling_to_the_user(self):
-        reason = mutation(spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))).reason
+        reason = mutation(spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))).reason
         self.assertEqual(reason.count("CLASS_FIX: do the thing"), policy.MAX_AUDITS)
 
     def test_an_audit_that_found_the_branch_converged_spends_nothing(self):
         """The budget stops a branch that is not converging; an audit that says it has converged is not that."""
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"), verdict="CONVERGED_PUSHBACK")
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7), verdict="CONVERGED_PUSHBACK")
         self.assertFalse(policy.locked(state))
         self.assertTrue(mutation(state).allow)
 
     def test_an_audit_with_no_findings_spends_nothing(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         for _ in range(policy.MAX_AUDITS):
             add_round(state, stage="audit", findings_per_reviewer=(0, 0), escalation=True)
         self.assertFalse(policy.locked(state))
@@ -111,7 +112,7 @@ class Mutation(unittest.TestCase):
         self.assertIn("do the thing", mutation(state).reason)
 
     def test_an_unlock_grants_a_fresh_audit_budget(self):
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         ledger.unlock(state, "user decided", now=T0 + timedelta(hours=1))
         self.assertTrue(mutation(state).allow)
         self.assertTrue(policy.launch_round(state, "internal", head_sha=HEAD_B, dirty=False, inflight=0).allow)
@@ -120,12 +121,12 @@ class Mutation(unittest.TestCase):
 
     def test_a_ledger_saved_before_unlocks_granted_audits_counts_every_audit(self):
         """Ledgers written before 0.1.8 have no unlocked_epoch; their earlier unlocks granted no audits."""
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         state.pop("unlocked_epoch", None)
         self.assertTrue(policy.locked(state))
 
     def test_denied_while_any_reviewer_subagent_is_in_flight(self):
-        decision = mutation(ledger.new_state("acme/demo", "feat/1-demo"), inflight=3)
+        decision = mutation(ledger.new_state("acme/demo", "feat/1-demo", pr=7), inflight=3)
         self.assertFalse(decision.allow)
         self.assertIn("3", decision.reason)
 
@@ -135,12 +136,12 @@ class LaunchRound(unittest.TestCase):
         return policy.launch_round(state, stage, head_sha=head, dirty=dirty, inflight=inflight)
 
     def test_first_round_is_full_scope(self):
-        decision = self.launch(ledger.new_state("acme/demo", "feat/1-demo"))
+        decision = self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         self.assertTrue(decision.allow)
         self.assertEqual(decision.scope, "full")
 
     def test_uncommitted_work_is_refused_because_rounds_are_pinned_to_commits(self):
-        self.assertFalse(self.launch(ledger.new_state("acme/demo", "feat/1-demo"), dirty=True).allow)
+        self.assertFalse(self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7), dirty=True).allow)
 
     def test_second_round_reviews_only_the_delta_since_the_first(self):
         state = state_with_round(head=HEAD_A)
@@ -162,14 +163,14 @@ class LaunchRound(unittest.TestCase):
         self.assertIn("alq-review:assess-round", decision.reason)
 
     def test_dead_run_may_be_relaunched_but_a_live_one_may_not(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         ledger.open_round(state, "internal", head_sha=HEAD_A, base_sha="0" * 40, scope="full",
                           expected=REVIEWERS, escalation=False, now=T0)
         self.assertFalse(self.launch(state, head=HEAD_A, inflight=2).allow)
         self.assertTrue(self.launch(state, head=HEAD_A, inflight=0).allow)
 
     def capped_state(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         for i in range(policy.CAP):
             add_round(state, head=str(i) * 40)
             assess(state, "PATCH")
@@ -197,13 +198,13 @@ class LaunchRound(unittest.TestCase):
 
     def test_the_last_audit_is_itself_terminal(self):
         """Its budget must not refill: the rounds after it are the ones the audit just judged futile."""
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         decision = self.launch(state, stage="internal")
         self.assertFalse(decision.allow)
         self.assertIn("not converging", decision.reason)
 
     def test_cap_hit_after_two_audits_hands_off_to_the_user(self):
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo"))
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         for i in range(policy.CAP):
             add_round(state, head=str(i) * 40)
             assess(state, "PATCH")
@@ -218,7 +219,7 @@ class Rerequest(unittest.TestCase):
         self.assertFalse(policy.rerequest(state_with_round(stage="github"), inflight=0).allow)
 
     def test_refused_at_the_cap_until_the_audit_has_run(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo")
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         for i in range(policy.CAP):
             add_round(state, stage="github", head=str(i) * 40)
             assess(state, "PATCH")
@@ -237,7 +238,7 @@ class MarkReady(unittest.TestCase):
         state = state_with_round(head=HEAD_A)
         assess(state, "PATCH")
         self.assertFalse(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).allow)
-        self.assertFalse(policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo"), head_sha=HEAD_A, inflight=0, released=False).allow)
+        self.assertFalse(policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0, released=False).allow)
 
     def test_allowed_when_the_round_at_head_came_back_clean(self):
         state = state_with_round(findings_per_reviewer=(0, 0), head=HEAD_A)
@@ -245,7 +246,7 @@ class MarkReady(unittest.TestCase):
         self.assertFalse(policy.mark_ready(state, head_sha=HEAD_B, inflight=0, released=False).allow)
 
     def test_a_version_only_release_needs_no_round(self):
-        fresh = ledger.new_state("acme/demo", "feat/1-demo")
+        fresh = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
         self.assertTrue(policy.mark_ready(fresh, head_sha=HEAD_A, inflight=0, released=True).allow)
 
     def test_a_version_only_release_still_waits_for_a_round_in_flight(self):

@@ -1,10 +1,16 @@
 import os
+import sqlite3
 import tempfile
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 
 from helpers import REVIEWERS, T0, add_round, assess, finding, state_with_round
 
 import ledger
+import policy
 
 
 def drop(urls, status="findings", head="a" * 40):
@@ -18,9 +24,10 @@ def drop(urls, status="findings", head="a" * 40):
 class Rounds(unittest.TestCase):
     def test_round_collects_until_every_expected_reviewer_has_reported(self):
         state = ledger.new_state("acme/demo", "feat/1-demo")
+        state["pr"] = 7
         rnd = ledger.open_round(state, "internal", head_sha="a" * 40, base_sha="0" * 40, scope="full",
                                 expected=REVIEWERS, escalation=False, now=T0)
-        self.assertEqual(rnd["ref"], "acme/demo:feat/1-demo:internal-0.1")
+        self.assertEqual(rnd["ref"], "acme/demo#7:internal-0.1")
         ledger.record_report(state, rnd["ref"], REVIEWERS[0],
                              {"round_ref": rnd["ref"], "findings": [finding("code-reviewer-1")]}, now=T0)
         self.assertEqual(rnd["status"], "collecting")
@@ -56,7 +63,7 @@ class Rounds(unittest.TestCase):
         state = state_with_round(stage="audit", escalation=True)
         assess(state, "CLASS_FIX")
         self.assertEqual(state["epoch"], 1)
-        self.assertEqual(add_round(state, head="b" * 40)["ref"], "acme/demo:feat/1-demo:internal-1.1")
+        self.assertTrue(add_round(state, head="b" * 40)["ref"].endswith(":internal-1.1"))
 
     def test_clean_escalation_audit_also_starts_a_new_epoch(self):
         state = state_with_round(stage="audit", findings_per_reviewer=(0, 0), escalation=True)
@@ -66,9 +73,6 @@ class Rounds(unittest.TestCase):
         state = state_with_round()
         assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
         self.assertEqual([(a["id"], a["verdict"]) for a in ledger.adjudicated(state)], [("code-reviewer-1", "PUSH_BACK")])
-
-    def test_ref_round_trips_to_its_branch(self):
-        self.assertEqual(ledger.parse_ref("acme/demo:feat/1-demo:internal-0.1"), ("acme/demo", "feat/1-demo"))
 
 
 class Polls(unittest.TestCase):
@@ -99,33 +103,95 @@ class Polls(unittest.TestCase):
         self.assertEqual(state["github_clean_sha"], "c" * 40)
 
 
-class Storage(unittest.TestCase):
+class Store(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         os.environ["ALQ_REVIEW_STATE_DIR"] = self.tmp.name
         self.addCleanup(self.tmp.cleanup)
         self.addCleanup(os.environ.pop, "ALQ_REVIEW_STATE_DIR")
 
+    def primary_key(self, table):
+        with ledger.open_ledger("acme/demo", 7):
+            pass
+        with closing(sqlite3.connect(ledger.state_root() / "ledger.db")) as conn:
+            columns = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return [name for _, name, _, _, _, pk in sorted(columns, key=lambda c: c[5]) if pk]
+
+    def test_a_ledger_is_keyed_by_its_pr(self):
+        self.assertEqual(self.primary_key("ledgers"), ["repo", "pr"])
+
+    def test_githubs_open_pr_is_kept_per_commit(self):
+        self.assertEqual(self.primary_key("open_prs"), ["repo", "branch", "head"])
+        asked = []
+
+        def ask():
+            asked.append(1)
+            return 7
+        self.assertEqual([ledger.open_pr("acme/demo", "feat/1-demo", head, ask) for head in "aab"], [7, 7, 7])
+        self.assertEqual(len(asked), 2)
+
+    def test_github_not_answering_is_not_kept(self):
+        def unanswered():
+            raise RuntimeError("no answer")
+        with self.assertRaises(RuntimeError):
+            ledger.open_pr("acme/demo", "feat/1-demo", "a", unanswered)
+        self.assertIsNone(ledger.open_pr("acme/demo", "feat/1-demo", "a", lambda: None))
+
     def test_state_survives_between_openings(self):
-        with ledger.open_state("acme/demo", "feat/1-demo") as state:
+        with ledger.open_ledger("acme/demo", 7) as state:
             add_round(state)
-        with ledger.open_state("acme/demo", "feat/1-demo") as state:
-            self.assertEqual(len(state["rounds"]), 1)
+        with ledger.open_ledger("acme/demo", 7) as state:
+            self.assertEqual((state["repo"], state["pr"], len(state["rounds"])), ("acme/demo", 7, 1))
 
     def test_failed_transaction_writes_nothing(self):
+        with ledger.open_ledger("acme/demo", 7) as state:
+            add_round(state)
         with self.assertRaises(RuntimeError):
-            with ledger.open_state("acme/demo", "feat/1-demo") as state:
-                add_round(state)
+            with ledger.open_ledger("acme/demo", 7) as state:
+                add_round(state, head="b" * 40)
                 raise RuntimeError("boom")
-        with ledger.open_state("acme/demo", "feat/1-demo") as state:
-            self.assertEqual(state["rounds"], [])
+        with ledger.open_ledger("acme/demo", 7) as state:
+            self.assertEqual(len(state["rounds"]), 1)
 
-    def test_two_branches_flattening_to_one_directory_fail_loudly(self):
-        with ledger.open_state("acme/demo", "feat/1__demo"):
-            pass
-        with self.assertRaises(ledger.LedgerError):
-            with ledger.open_state("acme/demo", "feat/1/demo"):
+    def test_a_ledger_whose_first_opening_failed_does_not_exist(self):
+        with self.assertRaises(RuntimeError):
+            with ledger.open_ledger("acme/demo", 7):
+                raise RuntimeError("boom")
+        self.assertEqual(list(ledger.all_states()), [])
+
+    def test_two_writers_to_one_ledger_take_turns(self):
+        """The second reads only after the first has written, so neither change is lost."""
+        first_inside = threading.Event()
+
+        def first():
+            with ledger.open_ledger("acme/demo", 7) as state:
+                first_inside.set()
+                time.sleep(0.3)
+                ledger.unlock(state, "first", T0)
+
+        def second():
+            first_inside.wait(5)
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.unlock(state, "second", T0)
+
+        with ThreadPoolExecutor(2) as pool:
+            for done in [pool.submit(first), pool.submit(second)]:
+                done.result()
+        with ledger.open_ledger("acme/demo", 7) as state:
+            self.assertEqual([u["reason"] for u in state["unlocks"]], ["first", "second"])
+
+    def test_every_ledger_is_listed(self):
+        for repo, pr in [("acme/demo", 7), ("acme/demo", 8), ("acme/other", 7)]:
+            with ledger.open_ledger(repo, pr):
                 pass
+        self.assertEqual(sorted((s["repo"], s["pr"]) for s in ledger.all_states()),
+                         [("acme/demo", 7), ("acme/demo", 8), ("acme/other", 7)])
+
+    def test_a_round_ref_names_the_pr_and_parses_back_to_it(self):
+        with ledger.open_ledger("acme/demo", 7) as state:
+            ref = add_round(state)["ref"]
+        self.assertEqual(ref, "acme/demo#7:internal-0.1")
+        self.assertEqual(ledger.parse_ref(ref), ("acme/demo", 7))
 
     def test_inbox_drop_is_consumed_once(self):
         inbox = ledger.state_root() / "inbox"
@@ -133,11 +199,11 @@ class Storage(unittest.TestCase):
         import json
         (inbox / "acme__demo__7.json").write_text(json.dumps(drop(["https://x/1"])))
         (inbox / "acme__demo__8.json").write_text(json.dumps(dict(drop(["https://x/9"]), head_ref="feat/2-other", pr=8)))
-        with ledger.open_state("acme/demo", "feat/1-demo") as state:
-            ledger.ingest_inbox(state, now=T0)
-            self.assertEqual(len(state["rounds"]), 1)
-        self.assertFalse((inbox / "acme__demo__7.json").exists())
-        self.assertTrue((inbox / "acme__demo__8.json").exists())
+        ledger.ingest_inbox(now=T0)
+        ledger.ingest_inbox(now=T0)
+        rounds = {s["pr"]: len(s["rounds"]) for s in ledger.all_states()}
+        self.assertEqual(rounds, {7: 1, 8: 1})
+        self.assertEqual(list(inbox.iterdir()), [])
 
 
 if __name__ == "__main__":

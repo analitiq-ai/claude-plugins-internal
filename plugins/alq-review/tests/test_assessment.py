@@ -125,7 +125,7 @@ class ValidateReport(unittest.TestCase):
 
 class Schemas(unittest.TestCase):
     def test_schemas_pin_the_round_so_output_cannot_land_on_another_round(self):
-        ref = "acme/demo:feat/1-demo:internal-0.1"
+        ref = "acme/demo#7:internal-0.1"
         self.assertEqual(assessment.findings_schema(ref, "code-reviewer")["properties"]["round_ref"]["enum"], [ref])
         schema = assessment.assessment_schema(ref, ["CLASS_FIX", "ESCALATE"])
         self.assertEqual(schema["properties"]["round_verdict"]["enum"], ["CLASS_FIX", "ESCALATE"])

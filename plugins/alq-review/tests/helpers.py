@@ -16,7 +16,7 @@ def finding(fid, file="src/a.py", line=10, title="t"):
 
 def state_with_round(stage="internal", findings_per_reviewer=(1, 0), head="a" * 40, escalation=False):
     """A branch whose latest round has every reviewer reported."""
-    state = ledger.new_state("acme/demo", "feat/1-demo")
+    state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
     add_round(state, stage, findings_per_reviewer, head, escalation)
     return state
 

@@ -17,8 +17,21 @@ that is under review.
    `ESCALATE` hand the branch to the user: it stays locked until the user starts a prompt with
    `unlock #<pr>` (or `unlock <branch>`, or `unlock <owner>/<repo>#<pr>` when two repos share the number),
    and the refusal tells the agent to ask for exactly that. A spec edit does not release it: the agent can
-   make one. While a branch is held, every Bash command is checked against its checkout, HEAD included,
-   so a file written or a commit made by any route is caught and the agent told to put it back.
+   make one. While a branch is held, every Bash command of the session that launched its round is checked
+   against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
+   change there, as they stood before the command. A file written or a commit made by any route is caught
+   and the agent told to put it back, even if the command then leaves the branch; checking another branch
+   out is not a move. If that checkout cannot be read — its `.git` is gone, corrupted, or the directory
+   itself was removed — the command is not blocked on it; alq-review reports `cannot verify <root>` and
+   that nothing there is watched, instead of silently treating it as unchanged. A file or directory in it
+   that cannot be read is reported as `cannot verify <paths> in <root>` and is never counted as a change,
+   while the branch tip and every other change there are still watched; when git complains without naming
+   a path, no file there is compared (`cannot verify files in <root>`) and the tip still is. A ledger
+   belongs to one PR, and a checkout means its branch's open PR on GitHub - nothing local decides it.
+   GitHub is asked only for a branch some ledger names, once per commit once it names a PR; a round
+   launch records the PR it names at that commit. A merged or closed PR holds
+   nothing from the next commit on; a new PR on the same branch name has a ledger of its own. When GitHub
+   cannot say which PR is open, the call is refused with GitHub's error rather than guessed.
 3. **The order of the stages.** Declaring the internal review done is refused until it came back clean
    (no findings, or every finding pushed back) at the current commit: `gh pr ready`, `gh pr create`
    without `--draft`, and any comment carrying the `internal-review` attestation marker the org pr-gate
@@ -54,9 +67,14 @@ can be checked against real sessions before they can stall one.
 
 `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
 
-- `<owner>__<repo>/<branch>/state.json` - the branch's rounds, findings and assessments
+- `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
+  concurrent writers take turns on it instead of losing each other's update the way a bare JSON file or a
+  stale flock would:
+  - `ledgers (repo, pr) -> doc` - one row per PR: its rounds, findings, assessments, epoch and unlocks
+  - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
+    kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
-  FINDINGS; consumed by the gate (`tests/test_poller_contract.py` pins the two ends together)
+  FINDINGS; stored under its PR once per hook event, before anything is judged (`tests/test_poller_contract.py` pins the two ends together)
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
 
 ```

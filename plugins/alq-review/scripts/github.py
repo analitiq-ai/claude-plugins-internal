@@ -1,6 +1,7 @@
 """The GitHub lookups the gate needs, through the gh CLI (which carries the bot's token).
 
-Each returns None when gh cannot answer; the caller decides what an unknown means there.
+Each returns None when gh cannot answer, and the caller decides what an unknown means there; except
+pr_target, whose unknown no caller may read as an answer.
 """
 from __future__ import annotations
 
@@ -16,12 +17,22 @@ RELEASE_CREATOR = "github-actions[bot]"
 RELEASE_PREFIX = "version-only release:"
 
 
-def _gh(*args: str) -> str | None:
+def _answer(*args: str) -> str:
+    """gh's answer; RuntimeError in gh's own words when it gives none."""
     try:
         done = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=20)
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"gh {' '.join(args[:2])} could not run: {exc}") from exc
+    if done.returncode != 0:
+        raise RuntimeError(f"gh {' '.join(args[:2])} failed: {done.stderr.strip() or f'exit {done.returncode}'}")
+    return done.stdout.strip()
+
+
+def _gh(*args: str) -> str | None:
+    try:
+        return _answer(*args)
+    except RuntimeError:
         return None
-    return done.stdout.strip() if done.returncode == 0 else None
 
 
 def repo_visibility(slug: str) -> str | None:
@@ -36,16 +47,14 @@ def pr_head(slug: str, pr: int) -> tuple[str, str] | None:
     return tuple(found.split(" ")) if found else None
 
 
-def base_branch(slug: str, branch: str) -> str | None:
-    """The branch `branch`'s open PR merges into; with no open PR, the repo's default branch, which a new
-    PR targets."""
-    target = _gh("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "baseRefName",
-                 "--jq", '.[0].baseRefName // ""')
-    if target:
-        return target
-    if target is None:
+def pr_target(slug: str, branch: str) -> tuple[int, str] | None:
+    """(number, branch it merges into) of `branch`'s open PR; None when it has none."""
+    found = _answer("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "number,baseRefName",
+                    "--jq", '.[0] | if . then "\\(.number) \\(.baseRefName)" else "" end')
+    if not found:
         return None
-    return _gh("repo", "view", slug, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name") or None
+    number, target = found.split(" ")
+    return int(number), target
 
 
 def version_only_release(statuses: list[dict]) -> str | None:
