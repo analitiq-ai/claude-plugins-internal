@@ -57,8 +57,10 @@ A verdict is the user's decision. Never pass `approve` without the user saying s
 ## Stops
 
 `DRIVE` exiting non-zero, or a report other than the one the step expects: show the user the message or the
-report (`stderr` included) and stop. One exception: `open_markers: true` goes back to step 2, then
-`python3 DRIVE resume <run_id>`.
+report (`stderr` included) and stop. Two exceptions, each resumed with `python3 DRIVE resume <run_id>`:
+- `open_markers: true` goes back to step 2 first.
+- `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
+  decision for them.
 
 On a rescope, every stop after a successful release, including an abort, tells the user that the branch is
 already released and the open decision is still unanswered.

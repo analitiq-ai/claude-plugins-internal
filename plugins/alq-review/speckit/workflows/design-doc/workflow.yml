@@ -2,7 +2,7 @@ schema_version: "1.0"
 workflow:
   id: "design-doc"
   name: "Design Document Cycle"
-  version: "1.3.0"
+  version: "1.4.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: specify → grill → plan → critique → tasks"
 
@@ -85,6 +85,14 @@ steps:
     integration: "{{ inputs.integration }}"
     input:
       args: "{{ inputs.spec }}"
+
+  # Every mechanism the plan lists cites a research decision naming the existing tools looked at.
+  - id: settled-design
+    type: shell
+    run: |
+      set -eu
+      dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+      python3 .claude/plugins/alq-review/scripts/settled_design.py "$dir"
 
   - id: mark-critiques
     type: shell

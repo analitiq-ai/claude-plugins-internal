@@ -48,6 +48,11 @@ that is under review.
    round whose base cannot be read is refused. Later rounds review only what changed since the
    previous round, and reviewers are told what has already been ruled on. Re-running a round on an
    unchanged commit is refused.
+6. **A settled design before the first round.** The first internal round on a branch that changes a
+   spec folder (`specs/<feature>/`) runs `scripts/settled_design.py` on each such folder: every
+   mechanism under `plan.md`'s `## Mechanisms` cites a `research.md` decision with Decision, Rationale
+   and Existing tools (or `None fit. Looked at: <where>`). A folder that fails refuses the round and is
+   named with each problem. Run it by hand with `python3 scripts/settled_design.py <spec folder>`.
 
 ## How an agent uses it
 
@@ -64,6 +69,9 @@ Agents do not need to be told any of this: every refusal names the next legal st
 `config.json` holds `{"mode": "log"}` or `{"mode": "enforce"}`; `ALQ_REVIEW_MODE` overrides it.
 In `log` mode nothing is blocked; each refusal is written as `would_deny` to `gate.log` so the rules
 can be checked against real sessions before they can stall one.
+
+The spec-folder checks (6) have their own `spec_checks` setting, overridden by `ALQ_REVIEW_SPEC_CHECKS`.
+It stays `log` until every existing spec folder passes; they refuse only when both settings enforce.
 
 ## State
 
@@ -93,6 +101,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
+| `scripts/settled_design.py` | the settled-design check over one spec folder |
 | `scripts/gate.py` | hook entrypoint |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |

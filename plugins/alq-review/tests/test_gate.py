@@ -19,6 +19,7 @@ import helpers
 import ledger
 import policy
 import test_policy
+import test_settled_design
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 GATE = SCRIPTS / "gate.py"
@@ -961,6 +962,93 @@ class OpenPrOnGithub(Gate):
         self.assertNotEqual(self.decision(out), "deny")
         logged = json.loads((self.state_dir / "gate.log").read_text().splitlines()[-1])
         self.assertEqual((logged["action"], logged["decision"]), ("assess", "would_deny"))
+
+
+class SettledDesign(Gate):
+    """The first internal round on a branch that changes a spec folder runs the settled-design check."""
+
+    def setUp(self):
+        super().setUp()
+        self.env["ALQ_REVIEW_SPEC_CHECKS"] = "enforce"
+
+    def commit_spec(self, plan):
+        folder = self.root / "specs" / "004-demo"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "plan.md").write_text(plan)
+        (folder / "research.md").write_text(test_settled_design.RESEARCH)
+        git(self.root, "add", "specs")
+        git(self.root, "commit", "-q", "-m", "docs: plan")
+
+    def test_an_unsettled_folder_refuses_the_first_round_and_names_the_problem(self):
+        self.commit_spec("# Plan\n")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("specs/004-demo/plan.md", self.reason(out))
+        self.assertIn("## Mechanisms", self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
+    def test_a_settled_folder_launches(self):
+        self.commit_spec(test_settled_design.PLAN)
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_a_branch_that_changes_no_spec_folder_is_not_checked(self):
+        folder = self.root / "specs" / "004-demo"
+        folder.mkdir(parents=True)
+        (folder / "plan.md").write_text("# Plan\n")
+        git(self.root, "add", "specs")
+        git(self.root, "commit", "-q", "-m", "docs: unsettled plan")
+        git(self.root, "push", "-q", "origin", "HEAD:main")
+        git(self.root, "fetch", "-q", "origin")
+        (self.root / "docs" / "guide").mkdir(parents=True)
+        (self.root / "docs" / "guide" / "a.md").write_text("prose\n")
+        git(self.root, "add", "docs")
+        git(self.root, "commit", "-q", "-m", "docs: a nested folder that is not a spec folder")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_a_branch_that_deletes_a_spec_folder_is_not_checked_for_it(self):
+        folder = self.root / "specs" / "004-demo"
+        folder.mkdir(parents=True)
+        (folder / "plan.md").write_text("# Plan\n")
+        git(self.root, "add", "specs")
+        git(self.root, "commit", "-q", "-m", "docs: unsettled plan")
+        git(self.root, "push", "-q", "origin", "HEAD:main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "rm", "-q", "-r", "specs")
+        git(self.root, "commit", "-q", "-m", "docs: drop the folder")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_a_check_that_cannot_run_refuses_the_round(self):
+        self.commit_spec(test_settled_design.PLAN)
+        (self.root / "specs" / "004-demo" / "plan.md").write_bytes(b"\xff\xfe not utf-8\n")
+        git(self.root, "commit", "-q", "-am", "docs: unreadable plan")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("could not run", self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
+    def test_an_audit_round_is_not_checked(self):
+        self.commit_spec("# Plan\n")
+        self.assertEqual(self.decision(self.launch(stage="audit")[0]), "allow")
+
+    def test_later_rounds_are_not_checked(self):
+        self.commit_spec(test_settled_design.PLAN)
+        _, args = self.launch()
+        self.run_reviewers(args, [])
+        self.commit_spec("# Plan\n")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_in_log_mode_the_problem_is_recorded_and_the_round_launches(self):
+        self.env["ALQ_REVIEW_SPEC_CHECKS"] = "log"
+        self.commit_spec("# Plan\n")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+        entries = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        [logged] = [e for e in entries if e["decision"] == "would_deny"]
+        self.assertEqual(logged["action"], "launch")
+        self.assertIn("## Mechanisms", logged["reason"])
+
+    def test_the_checks_ship_in_log_mode(self):
+        config = json.loads((SCRIPTS.parent / "config.json").read_text())
+        self.assertEqual(config["spec_checks"], "log")
 
 
 if __name__ == "__main__":

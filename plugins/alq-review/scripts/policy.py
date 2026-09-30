@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ledger import counted, current_round
+from ledger import COUNTED, counted, current_round
 
 CAP = 4          # rounds a stage may take before the anti-pattern audit is mandatory
 MAX_AUDITS = 2   # escalation audits before the work goes back to the user; each unlock grants this many more
@@ -150,6 +150,11 @@ def launch_round(state: dict, stage: str, *, head_sha: str, dirty: bool, infligh
                                "same code would only re-sample the reviewers. Next step: apply the assessment, or if the "
                                "round was clean or fully pushed back, move on (gh pr ready).")
     return Decision(True, scope="delta", delta_from=done[-1]["head_sha"])
+
+
+def first_internal_round(state: dict) -> bool:
+    """No internal round of this PR has completed, whatever audits reset since."""
+    return not any(r["stage"] == "internal" and r["status"] in COUNTED for r in state["rounds"])
 
 
 def launch_assess(state: dict) -> Decision:

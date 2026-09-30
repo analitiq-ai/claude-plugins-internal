@@ -24,6 +24,7 @@ import facts
 import github
 import ledger
 import policy
+import settled_design
 import shell
 import worktree
 
@@ -36,12 +37,22 @@ UNLOCK = re.compile(rf"unlock\s+{_REF}")
 RESCOPE = re.compile(rf"{re.escape(policy.RESCOPE)}\s+{_REF}")
 
 
-def mode() -> str:
+def _setting(key: str, env: str) -> str:
     config = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text())
-    chosen = os.environ.get("ALQ_REVIEW_MODE") or config["mode"]
+    chosen = os.environ.get(env) or config[key]
     if chosen not in ("log", "enforce"):
-        raise ValueError(f"alq-review mode must be log or enforce, not {chosen!r}")
+        raise ValueError(f"alq-review {key} must be log or enforce, not {chosen!r}")
     return chosen
+
+
+def mode() -> str:
+    return _setting("mode", "ALQ_REVIEW_MODE")
+
+
+def spec_checks_mode() -> str:
+    """The spec-folder checks' own setting (spec 004 FR-006): they stay in log until every existing spec
+    folder passes them (FR-023), while the rest of the plugin enforces."""
+    return _setting("spec_checks", "ALQ_REVIEW_SPEC_CHECKS")
 
 
 def deny(reason: str) -> dict:
@@ -74,6 +85,14 @@ def refuse(payload: dict, action: str, reason: str, target: Target | None = None
     enforcing = mode() == "enforce"
     record(payload, action, "deny" if enforcing else "would_deny", reason, target)
     return deny(reason) if enforcing else None
+
+
+def refuse_spec(payload: dict, action: str, reason: str, target: Target) -> dict | None:
+    """A spec-folder check's refusal: it blocks only when both the plugin and the spec checks enforce."""
+    if spec_checks_mode() == "enforce":
+        return refuse(payload, action, reason, target)
+    record(payload, action, "would_deny", reason, target)
+    return None
 
 
 # --- reviewer subagents in flight, per session -------------------------------------------------
@@ -386,6 +405,21 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
                            f"not be read: {exc}") from exc
 
 
+def _unsettled_design(root: str, base: str) -> str | None:
+    """Why the spec folders this branch changes are not settled (spec 004 FR-017/018); None when they are."""
+    try:
+        folders = sorted({Path(*Path(f).parts[:2]) for f in worktree.changed_files(root, base)
+                          if f.startswith("specs/") and len(Path(f).parts) > 2})
+        found = [p for folder in folders if (Path(root) / folder).is_dir()
+                 for p in settled_design.problems(Path(root) / folder)]
+    except Exception as exc:  # FR-021: a check that cannot run refuses what it was deciding
+        return f"The settled-design check could not run: {type(exc).__name__}: {exc}"
+    if not found:
+        return None
+    return ("The first internal round needs a settled design: every mechanism plan.md lists cites a research.md "
+            "decision that says what was chosen, why, and the existing tools looked at.\n" + "\n".join(found))
+
+
 def on_workflow(payload: dict) -> dict | None:
     call = payload["tool_input"]
     if call.get("name") not in (REVIEW_ROUND, ASSESS_ROUND):
@@ -428,6 +462,12 @@ def on_workflow(payload: dict) -> dict | None:
                 base = _review_base(where, merges_into)
             except RuntimeError as exc:
                 return refuse(payload, action, str(exc), event)
+            if stage == "internal" and policy.first_internal_round(state):
+                unsettled = _unsettled_design(where.root, base)
+                if unsettled:
+                    refused = refuse_spec(payload, action, unsettled, event)
+                    if refused:
+                        return refused
             waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
