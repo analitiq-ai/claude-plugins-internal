@@ -31,7 +31,9 @@ REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round
 REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
 INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
 # Anchored at the prompt's start by match(): the cron bot's prompts quote issue and PR text anyone can write.
-UNLOCK = re.compile(r"unlock\s+(?:(?P<repo>[\w.-]+/[\w.-]+)?#(?P<pr>\d+)|(?P<branch>\S+))")
+_REF = r"(?:(?P<repo>[\w.-]+/[\w.-]+)?#(?P<pr>\d+)|(?P<branch>\S+))"
+UNLOCK = re.compile(rf"unlock\s+{_REF}")
+RESCOPE = re.compile(rf"{re.escape(policy.RESCOPE)}\s+{_REF}")
 
 
 def mode() -> str:
@@ -160,22 +162,36 @@ def _names(state: dict, typed: re.Match) -> bool:
     return state["branch"] == typed["branch"]
 
 
+def _rescope_brief(state: dict, ruling: dict) -> str:
+    """What the design-doc skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
+    gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
+    return (f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {ledger.current_round(state)['root']}. Open decision: "
+            f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")
+
+
 def on_prompt(payload: dict) -> dict | None:
-    typed = UNLOCK.match(payload.get("prompt", "").lstrip())
+    prompt = payload.get("prompt", "").lstrip()
+    typed = UNLOCK.match(prompt) or RESCOPE.match(prompt)
     if not typed:
         return None
+    rescope = typed.re is RESCOPE
     held = [state for state in ledger.all_states() if policy.locked(state)]
     named = [state for state in held if _names(state, typed)]
 
     def refs(states):
         return ", ".join(f"{s['repo']}#{s['pr']}" for s in states)
-    if len(named) == 1:
+    if len(named) == 1 and rescope and not policy.reshape_spec_ruling(named[0]):
+        said = (f"`{typed.group(0)}` releases only a RESHAPE_SPEC lock, and {refs(named)} is held for another reason, "
+                f"so nothing was unlocked. Its release is `unlock {policy.unlock_ref(named[0])}`.")
+    elif len(named) == 1:
+        brief = _rescope_brief(named[0], policy.reshape_spec_ruling(named[0])) if rescope else ""
         with ledger.open_ledger(named[0]["repo"], named[0]["pr"]) as state:
             ledger.unlock(state, f"user prompt: {payload['prompt'].strip().splitlines()[0][:200]}", datetime.now(timezone.utc))
-        said = f"The user unlocked {state['repo']}#{state['pr']} ({state['branch']}); its code may change again."
+        said = f"The user unlocked {state['repo']}#{state['pr']} ({state['branch']}); its code may change again. {brief}".rstrip()
     elif named:
-        said = (f"`unlock` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
-                "repo: `unlock <owner>/<repo>#<number>`.")
+        command = policy.RESCOPE if rescope else "unlock"
+        said = (f"`{command}` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
+                f"repo: `{command} <owner>/<repo>#<number>`.")
     else:
         said = f"`{typed.group(0)}` names no locked PR, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}

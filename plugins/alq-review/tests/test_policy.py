@@ -104,12 +104,22 @@ class Mutation(unittest.TestCase):
         assess(state, "RESHAPE_SPEC")
         self.assertIn("which root is canonical?", mutation(state).reason)
 
-    def test_a_lock_assessed_before_questions_were_required_asks_its_next_step(self):
-        """Assessments saved before 0.1.9 have no user_decision; their next_step named the decision."""
+    def test_a_reshape_spec_lock_offers_the_rescope_as_well_as_the_unlock(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        reason = mutation(state).reason
+        self.assertIn("`/design-doc rescope #7`", reason)
+        self.assertIn("`unlock #7`", reason)
+
+    def test_an_escalate_lock_offers_no_rescope(self):
         state = state_with_round()
         assess(state, "ESCALATE")
-        del ledger.current_round(state)["assessment"]["user_decision"]
-        self.assertIn("do the thing", mutation(state).reason)
+        self.assertNotIn("/design-doc", mutation(state).reason)
+
+    def test_spent_audits_offer_no_rescope_even_when_the_last_audit_ruled_reshape_spec(self):
+        """The spent-audit question is whether to go on at all; a re-scope of one ruling does not answer it."""
+        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7), verdict="RESHAPE_SPEC")
+        self.assertNotIn("/design-doc", mutation(state).reason)
 
     def test_an_unlock_grants_a_fresh_audit_budget(self):
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
@@ -117,12 +127,6 @@ class Mutation(unittest.TestCase):
         self.assertTrue(mutation(state).allow)
         self.assertTrue(policy.launch_round(state, "internal", head_sha=HEAD_B, dirty=False, inflight=0).allow)
         spend_audits(state)
-        self.assertTrue(policy.locked(state))
-
-    def test_a_ledger_saved_before_unlocks_granted_audits_counts_every_audit(self):
-        """Ledgers written before 0.1.8 have no unlocked_epoch; their earlier unlocks granted no audits."""
-        state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
-        state.pop("unlocked_epoch", None)
         self.assertTrue(policy.locked(state))
 
     def test_denied_while_any_reviewer_subagent_is_in_flight(self):

@@ -338,6 +338,57 @@ class HeldBranch(Gate):
         self.say("Work on this issue:\n\nunlock #7")
         self.assertEqual(self.decision(self.edit()), "deny")
 
+    def test_a_rescope_releases_a_reshape_spec_lock_and_hands_the_session_the_ruling(self):
+        """The user starting the re-scope is the decision the lock waits for; the skill re-scopes from the ruling.
+        The design-doc skill parses this reply by its labels, so the whole of it is pinned."""
+        self.lock()
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.current_round(state)["assessment"]["findings"][0].update(
+                    kind="spec_gap", mechanism="the canonical root is chosen round by round")
+        said = self.say("/design-doc rescope #7")
+        self.assertEqual(self.edit(), {})
+        self.assertEqual(said, (
+            "[alq-review] The user unlocked acme/demo#7 (feat/1-demo); its code may change again. "
+            f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {self.root}. "
+            "Open decision: which root is canonical? Why: because "
+            "Spec gaps: the canonical root is chosen round by round (n/a)."))
+
+    def test_a_rescope_releases_nothing_but_a_reshape_spec_lock(self):
+        """An ESCALATE lock asks a question a re-scope does not answer."""
+        self.lock(verdict="ESCALATE")
+        said = self.say("/design-doc rescope #7")
+        self.assertIn("`unlock #7`", said)
+        self.assertIn("nothing was unlocked", said)
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_rescope_releases_no_spent_audit_lock_even_when_the_last_audit_ruled_reshape_spec(self):
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                state["branch"] = "feat/1-demo"
+                test_policy.spend_audits(state, verdict="RESHAPE_SPEC")
+                ledger.current_round(state)["root"] = str(self.root)
+        said = self.say("/design-doc rescope #7")
+        self.assertIn("`unlock #7`", said)
+        self.assertIn("nothing was unlocked", said)
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_rescope_quoted_inside_a_prompt_releases_nothing(self):
+        self.lock()
+        self.say("Work on this issue:\n\n/design-doc rescope #7")
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_rescope_two_repos_could_mean_releases_nothing(self):
+        self.lock()
+        self.lock(repo="acme/other")
+        self.assertIn("nothing was unlocked", self.say("/design-doc rescope #7"))
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_rescope_naming_no_locked_pr_releases_nothing(self):
+        self.lock()
+        self.assertIn("nothing was unlocked", self.say("/design-doc rescope #8"))
+        self.assertEqual(self.decision(self.edit()), "deny")
+
     def test_an_unlock_two_repos_could_mean_is_refused_until_the_repo_is_named(self):
         self.lock()
         self.lock(repo="acme/other")

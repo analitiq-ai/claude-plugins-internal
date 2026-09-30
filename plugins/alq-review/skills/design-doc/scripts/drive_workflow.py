@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Start or resume the design-doc workflow from the checkout, then print where the run stands as JSON.
+
+    drive_workflow.py start <spec file> [<spec dir>]
+    drive_workflow.py resume <run id> [<input>=<value>]
+
+Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks.
+The report is read from the run's state.json because the specify CLI prints only a generic error for a
+failed step; the step's own stderr is recorded nowhere else.
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+RUNS = Path(".specify/workflows/runs")
+# The headless agent steps get only what they need to write the spec folder.
+AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Edit Bash(bash .specify/*) '
+              'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
+OPEN_MARKERS = "Open clarification markers remain"
+
+
+def report(state):
+    step = state["current_step_id"]
+    out = {"run_id": state["run_id"], "status": state["status"], "step": step}
+    # The engine records nothing for a step that raises, and a resumed step keeps its previous
+    # attempt's record until it returns, so a record counts only if it matches the run's own outcome.
+    record = state["step_results"].get(step)
+    if state["status"] == "failed":
+        current = record is not None and record["status"] == "failed" and record["error"] == state["error"]
+        out["error"] = state["error"]
+        out["stderr"] = record["output"].get("stderr", "") if current else ""
+        out["open_markers"] = step == "no-open-markers" and OPEN_MARKERS in out["stderr"]
+    if state["status"] == "paused" and record is not None and record["output"].get("show_file"):
+        out["critique"] = record["output"]["show_file"]
+    return out
+
+
+def _specify(args, env):
+    proc = subprocess.run(["specify", "workflow", *args, "--json"], capture_output=True, text=True,
+                          env={**os.environ, "SPECKIT_INTEGRATION_CLAUDE_EXTRA_ARGS": AGENT_ARGS, **env})
+    return proc
+
+
+def _state(run_id):
+    return json.loads((RUNS / run_id / "state.json").read_text())
+
+
+def start(spec_file, spec_dir):
+    spec = Path(spec_file).read_text()
+    if not spec.strip():
+        sys.exit(f"{spec_file} is empty")
+    inputs, env = ["-i", f"spec={spec}"], {}
+    if spec_dir is not None:
+        if not spec_dir:
+            sys.exit("the spec folder is empty")
+        # select-spec reads the folder from the environment; the input only picks the rescope branch.
+        inputs += ["-i", f"spec_dir={spec_dir}"]
+        env["SPEC_DIR"] = spec_dir
+    before = set(RUNS.iterdir()) if RUNS.is_dir() else set()
+    proc = _specify(["run", "design-doc", *inputs], env)
+    new = set(RUNS.iterdir()) - before if RUNS.is_dir() else set()
+    if len(new) != 1:
+        sys.exit(f"specify started no run:\n{proc.stdout}{proc.stderr}")
+    return _state(new.pop().name)
+
+
+def resume(run_id, verdict):
+    if not (RUNS / run_id / "state.json").is_file():
+        sys.exit(f"no run {run_id} under {RUNS}")
+    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], {})
+    state = _state(run_id)
+    if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
+        sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")
+    return state
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="action", required=True)
+    s = sub.add_parser("start")
+    s.add_argument("spec_file")
+    s.add_argument("spec_dir", nargs="?")
+    r = sub.add_parser("resume")
+    r.add_argument("run_id")
+    r.add_argument("verdict", nargs="?")
+    args = parser.parse_args()
+    state = start(args.spec_file, args.spec_dir) if args.action == "start" else resume(args.run_id, args.verdict)
+    print(json.dumps(report(state)))
+
+
+if __name__ == "__main__":
+    main()

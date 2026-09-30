@@ -16,6 +16,8 @@ LOCKING = ("RESHAPE_SPEC", "ESCALATE")
 MOVING = ("PATCH", "CLASS_FIX")
 
 REVIEW_CALL = "Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: '%s'})"
+# The design-doc skill's re-scope entry point: typed by the user, it answers a RESHAPE_SPEC lock.
+RESCOPE = "/design-doc rescope"
 ASSESS_CALL = "Workflow(name='alq-review:assess-round', args={worktree: '<absolute worktree path>'})"
 
 
@@ -41,8 +43,7 @@ def _verdict_locked(state: dict) -> bool:
 def _unconverged_audits(state: dict) -> list[dict]:
     """Escalation audits since the user last handed the branch back that ruled something must change. One that
     found the branch converged is not evidence it is failing to."""
-    # A ledger saved before unlocks granted audits (0.1.8) has no unlocked_epoch: none of its unlocks did.
-    since = state.get("unlocked_epoch", 0)
+    since = state["unlocked_epoch"]
     return [r for r in state["rounds"] if r["escalation"] and r["epoch"] >= since and r["status"] == "assessed"
             and r["assessment"]["round_verdict"] != "CONVERGED_PUSHBACK"]
 
@@ -51,6 +52,14 @@ def _audits_spent(state: dict) -> bool:
     """Lands when the last audit ends, not a cap later: the rounds a refilled budget would buy are the ones
     that audit just judged futile."""
     return len(_unconverged_audits(state)) >= MAX_AUDITS
+
+
+def reshape_spec_ruling(state: dict) -> dict | None:
+    """The assessment holding the branch, when the hold is a RESHAPE_SPEC ruling: the one lock a re-scope answers."""
+    if _audits_spent(state) or not _verdict_locked(state):
+        return None
+    ruling = current_round(state)["assessment"]
+    return ruling if ruling["round_verdict"] == "RESHAPE_SPEC" else None
 
 
 def locked(state: dict) -> bool:
@@ -92,12 +101,13 @@ def _lock_reason(state: dict) -> str | None:
         rnd = current_round(state)
         ruling = rnd["assessment"]
         why = f"The {_label(rnd)} was assessed {ruling['round_verdict']}."
-        # Assessments saved before 0.1.9 have no user_decision; their next_step named the decision.
-        question = ruling.get("user_decision") or ruling["next_step"]
+        question = ruling["user_decision"]
     else:
         return None
+    rescope = (f" To re-scope the spec instead, they start it with `{RESCOPE} {unlock_ref(state)}`, which also "
+               "releases the branch." if reshape_spec_ruling(state) else "")
     return (f"{why} The branch is locked until the user releases it. Stop and ask the user: {question} Once they "
-            f"have decided, they start their next prompt with `unlock {unlock_ref(state)}`. "
+            f"have decided, they start their next prompt with `unlock {unlock_ref(state)}`.{rescope} "
             "Editing the spec comment or changing files another way does not release it.")
 
 

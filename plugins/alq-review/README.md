@@ -17,7 +17,9 @@ that is under review.
    `ESCALATE` hand the branch to the user: it stays locked until the user starts a prompt with
    `unlock #<pr>` (or `unlock <branch>`, or `unlock <owner>/<repo>#<pr>` when two repos share the number),
    and the refusal tells the agent to ask for exactly that. A spec edit does not release it: the agent can
-   make one. While a branch is held, every Bash command of the session that launched its round is checked
+   make one. A `RESHAPE_SPEC` lock is also released by a prompt starting `/design-doc rescope <same ref>`: the
+   session is handed the ruling (open decision, rationale, `spec_gap` findings) and the round's worktree, and
+   the `design-doc` skill re-scopes that worktree's spec folder. Any other lock refuses it and names `unlock`. While a branch is held, every Bash command of the session that launched its round is checked
    against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
    change there, as they stood before the command. A file written or a commit made by any route is caught
    and the agent told to put it back, even if the command then leaves the branch; checking another branch
