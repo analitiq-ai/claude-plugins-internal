@@ -1051,9 +1051,9 @@ class SettledDesign(SpecChecks):
         self.assertEqual(logged["action"], "launch")
         self.assertIn("## Mechanisms", logged["reason"])
 
-    def test_the_checks_ship_in_log_mode(self):
+    def test_the_checks_ship_in_enforce_mode(self):
         config = json.loads((SCRIPTS.parent / "config.json").read_text())
-        self.assertEqual(config["spec_checks"], "log")
+        self.assertEqual(config["spec_checks"], "enforce")
 
 
 class DesignDocuments(SpecChecks):
