@@ -74,7 +74,7 @@ In `log` mode nothing is blocked; each refusal is written as `would_deny` to `ga
 can be checked against real sessions before they can stall one.
 
 The spec-folder checks (6) have their own `spec_checks` setting, overridden by `ALQ_REVIEW_SPEC_CHECKS`.
-It stays `log` until every existing spec folder passes; they refuse only when both settings enforce.
+It ships `enforce`; the checks refuse only when both settings enforce.
 
 ## State
 
