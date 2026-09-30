@@ -20,6 +20,7 @@ from pathlib import Path
 
 import assessment
 import briefs
+import config
 import facts
 import github
 import ledger
@@ -38,8 +39,7 @@ RESCOPE = re.compile(rf"{re.escape(policy.RESCOPE)}\s+{_REF}")
 
 
 def _setting(key: str, env: str) -> str:
-    config = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text())
-    chosen = os.environ.get(env) or config[key]
+    chosen = os.environ.get(env) or config.load()[key]
     if chosen not in ("log", "enforce"):
         raise ValueError(f"alq-review {key} must be log or enforce, not {chosen!r}")
     return chosen
@@ -405,19 +405,17 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
                            f"not be read: {exc}") from exc
 
 
-def _unsettled_design(root: str, base: str) -> str | None:
-    """Why the spec folders this branch changes are not settled (spec 004 FR-017/018); None when they are."""
+def _spec_problems(root: str, base: str) -> str | None:
+    """Why this branch's design is not settled (spec 004 FR-004); None when it is."""
     try:
-        folders = sorted({Path(*Path(f).parts[:2]) for f in worktree.changed_files(root, base)
-                          if f.startswith("specs/") and len(Path(f).parts) > 2})
-        found = [p for folder in folders if (Path(root) / folder).is_dir()
-                 for p in settled_design.problems(Path(root) / folder)]
+        found = settled_design.branch_problems(root, base, config.load()["design_documents"])
     except Exception as exc:  # FR-021: a check that cannot run refuses what it was deciding
         return f"The settled-design check could not run: {type(exc).__name__}: {exc}"
     if not found:
         return None
-    return ("The first internal round needs a settled design: every mechanism plan.md lists cites a research.md "
-            "decision that says what was chosen, why, and the existing tools looked at.\n" + "\n".join(found))
+    return ("The first internal round needs a settled design: a design-document change comes with a spec folder, "
+            "and every mechanism its plan.md lists cites a research.md decision that says what was chosen, why, and "
+            "the existing tools looked at. Then launch again.\n" + "\n".join(found))
 
 
 def on_workflow(payload: dict) -> dict | None:
@@ -463,7 +461,7 @@ def on_workflow(payload: dict) -> dict | None:
             except RuntimeError as exc:
                 return refuse(payload, action, str(exc), event)
             if stage == "internal" and policy.first_internal_round(state):
-                unsettled = _unsettled_design(where.root, base)
+                unsettled = _spec_problems(where.root, base)
                 if unsettled:
                     refused = refuse_spec(payload, action, unsettled, event)
                     if refused:

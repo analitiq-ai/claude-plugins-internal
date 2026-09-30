@@ -52,7 +52,10 @@ that is under review.
    spec folder (`specs/<feature>/`) runs `scripts/settled_design.py` on each such folder: every
    mechanism under `plan.md`'s `## Mechanisms` cites a `research.md` decision with Decision, Rationale
    and Existing tools (or `None fit. Looked at: <where>`). A folder that fails refuses the round and is
-   named with each problem. Run it by hand with `python3 scripts/settled_design.py <spec folder>`.
+   named with each problem. A branch that changes a design document (the `design_documents` path
+   patterns in `config.json`: README, CLAUDE.md, AGENTS.md, ADRs, rule files) and no spec folder is
+   refused too. Run it by hand with `python3 scripts/settled_design.py <spec folder>`, or as the gate
+   runs it with `python3 scripts/settled_design.py --branch <checkout> <branch it merges into>`.
 
 ## How an agent uses it
 
@@ -101,7 +104,8 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
-| `scripts/settled_design.py` | the settled-design check over one spec folder |
+| `scripts/settled_design.py` | the settled-design check over one spec folder or a branch |
+| `scripts/config.py` | reads `config.json` |
 | `scripts/gate.py` | hook entrypoint |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |

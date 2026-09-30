@@ -14,6 +14,7 @@ from unittest import mock
 from test_worktree_facts import Repo, git
 
 import briefs
+import config
 import gate
 import helpers
 import ledger
@@ -964,8 +965,8 @@ class OpenPrOnGithub(Gate):
         self.assertEqual((logged["action"], logged["decision"]), ("assess", "would_deny"))
 
 
-class SettledDesign(Gate):
-    """The first internal round on a branch that changes a spec folder runs the settled-design check."""
+class SpecChecks(Gate):
+    """Spec-folder checks run at the first internal round, in enforce."""
 
     def setUp(self):
         super().setUp()
@@ -978,6 +979,10 @@ class SettledDesign(Gate):
         (folder / "research.md").write_text(test_settled_design.RESEARCH)
         git(self.root, "add", "specs")
         git(self.root, "commit", "-q", "-m", "docs: plan")
+
+
+class SettledDesign(SpecChecks):
+    """The first internal round on a branch that changes a spec folder runs the settled-design check."""
 
     def test_an_unsettled_folder_refuses_the_first_round_and_names_the_problem(self):
         self.commit_spec("# Plan\n")
@@ -1049,6 +1054,93 @@ class SettledDesign(Gate):
     def test_the_checks_ship_in_log_mode(self):
         config = json.loads((SCRIPTS.parent / "config.json").read_text())
         self.assertEqual(config["spec_checks"], "log")
+
+
+class DesignDocuments(SpecChecks):
+    """Spec 004 FR-004: a branch that changes a design document must also change a spec folder."""
+
+    def commit_file(self, name):
+        (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+        self.commit(name, "prose\n", f"docs: {name}")
+
+    def test_a_design_document_without_a_spec_folder_refuses_the_first_round(self):
+        for name in ("README.md", ".claude/plugins/x/README.md", "CLAUDE.md", "AGENTS.md",
+                     "docs/adr/0001-a.md", ".claude/rules/a.md"):
+            with self.subTest(name=name):
+                self.setUp()
+                self.commit_file(name)
+                out, _ = self.launch()
+                self.assertEqual(self.decision(out), "deny")
+                self.assertIn(f"{name}:1: ", self.reason(out))
+                self.assertIn("a design-document change comes with a spec folder", self.reason(out))
+                self.assertIn("Next step: settle the design in a spec folder (/design-doc", self.reason(out))
+                self.assertEqual(self.saved()["rounds"], [])
+
+    def test_a_design_document_with_a_settled_spec_folder_launches(self):
+        self.commit_file("README.md")
+        self.commit_spec(test_settled_design.PLAN)
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_the_spec_folder_that_comes_with_it_is_still_graded(self):
+        self.commit_file("README.md")
+        self.commit_spec("# Plan\n")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("## Mechanisms", self.reason(out))
+
+    def test_deleting_a_spec_folder_does_not_stand_in_for_one(self):
+        self.commit_spec(test_settled_design.PLAN)
+        git(self.root, "push", "-q", "origin", "HEAD:main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "rm", "-q", "-r", "specs")
+        git(self.root, "commit", "-q", "-m", "docs: drop the finished spec")
+        self.commit_file("README.md")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("README.md:1: ", self.reason(out))
+
+    def test_other_documents_are_not_design_documents(self):
+        for name in ("docs/guide/a.md", "READMEx.md", "rules/a.md"):
+            with self.subTest(name=name):
+                self.setUp()
+                self.commit_file(name)
+                self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_in_log_mode_the_problem_is_recorded_and_the_round_launches(self):
+        self.env["ALQ_REVIEW_SPEC_CHECKS"] = "log"
+        self.commit_file("README.md")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+        entries = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        [logged] = [e for e in entries if e["decision"] == "would_deny"]
+        self.assertIn("README.md", logged["reason"])
+
+    def test_a_malformed_pattern_list_refuses_the_round(self):
+        self.commit_file("README.md")
+        with mock.patch.object(config, "load", return_value={"design_documents": "README.md"}):
+            reason = gate._spec_problems(str(self.root), git(self.root, "rev-parse", "main"))
+        self.assertIn("could not run", reason)
+
+    def run_by_hand(self):
+        return subprocess.run([sys.executable, str(SCRIPTS / "settled_design.py"), "--branch", str(self.root), "main"],
+                              capture_output=True, text=True)
+
+    def test_run_by_hand_against_the_checkout_it_gives_the_gates_result_and_changes_nothing(self):
+        self.commit_file("README.md")
+        before = git(self.root, "status", "--porcelain", "--ignored")
+        done = self.run_by_hand()
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertEqual(git(self.root, "status", "--porcelain", "--ignored"), before)
+        reason = self.reason(self.launch()[0])
+        lines = done.stderr.splitlines()
+        self.assertTrue(lines)
+        for line in lines:
+            self.assertIn(line, reason)
+
+    def test_run_by_hand_against_a_settled_branch_passes(self):
+        self.commit_file("README.md")
+        self.commit_spec(test_settled_design.PLAN)
+        done = self.run_by_hand()
+        self.assertEqual((done.returncode, done.stderr), (0, ""))
 
 
 if __name__ == "__main__":

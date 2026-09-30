@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""The settled-design check (spec 004 FR-017/018) over one spec folder.
+"""The settled-design check (spec 004 FR-004/005/017/018), over one spec folder or a whole branch.
 
 plan.md lists its mechanisms under `## Mechanisms`, one `- <mechanism>: R<n>` bullet each. Each cited
 decision is a `## R<n>: <title>` section of research.md carrying non-empty Decision, Rationale and
 Existing tools fields. Whether the choice is right is for critique and review; this only proves it
 was recorded.
 
-Usage: settled_design.py <spec folder>. Prints one problem per line and exits 1 when there are any.
+A branch is graded as the gate grades it at the first internal round: each spec folder it changes, or, when it
+changes none, each design document it changes, which needs one.
+
+Usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into>. Prints one problem per line
+and exits 1 when there are any, 2 when the check cannot run.
 """
 from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+import config
+import worktree
 
 FIELDS = ("Decision", "Rationale", "Existing tools")
 LIST_FORMAT = "`## Mechanisms` section listing each mechanism as `- <mechanism>: R<n>`"
@@ -109,14 +116,45 @@ def problems(folder: Path) -> list[str]:
     return found
 
 
+def design_documents(changed: list[str], patterns: list[str]) -> list[str]:
+    """The changed files that match a design-document path pattern."""
+    if not isinstance(patterns, list) or not all(isinstance(p, str) and p for p in patterns):
+        raise ValueError(f"alq-review design_documents must be a list of path patterns, not {patterns!r}")
+    return [f for f in changed if any(PurePosixPath(f).full_match(p) for p in patterns)]
+
+
+def branch_problems(root: str, base: str, patterns: list[str]) -> list[str]:
+    """Problems with the branch checked out at `root`, measured from `base`."""
+    changed = worktree.changed_files(root, base)
+    # A folder the branch deleted cannot be graded, so it does not stand in for the one a design document needs.
+    touched = {Path(*Path(f).parts[:2]) for f in changed if f.startswith("specs/") and len(Path(f).parts) > 2}
+    folders = sorted(f for f in touched if (Path(root) / f).is_dir())
+    if not folders:
+        return [f"{doc}:1: a design document changed and no spec folder did; a design-document change comes with a "
+                "spec folder. Next step: settle the design in a spec folder (/design-doc #<issue>)."
+                for doc in design_documents(changed, patterns)]
+    return [p for folder in folders for p in problems(Path(root) / folder)]
+
+
+def _run(argv: list[str]) -> list[str]:
+    if len(argv) == 3 and argv[0] == "--branch" and all(argv[1:]):
+        root, target = argv[1:]
+        return branch_problems(root, worktree.review_base(root, target), config.load()["design_documents"])
+    if len(argv) == 1 and argv[0] and not argv[0].startswith("-"):
+        folder = Path(argv[0])
+        if not folder.is_dir():
+            raise ValueError(f"{folder}: not a spec folder")
+        return problems(folder)
+    print("usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into>", file=sys.stderr)
+    sys.exit(2)
+
+
 def main() -> None:
-    if len(sys.argv) != 2 or not sys.argv[1]:
-        print("usage: settled_design.py <spec folder>", file=sys.stderr)
+    try:
+        found = _run(sys.argv[1:])
+    except (OSError, ValueError, RuntimeError, UnicodeDecodeError) as exc:
+        print(f"The settled-design check could not run: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(2)
-    folder = Path(sys.argv[1])
-    if not folder.is_dir():
-        sys.exit(f"{folder}: not a spec folder")
-    found = problems(folder)
     for problem in found:
         print(problem, file=sys.stderr)
     sys.exit(1 if found else 0)
