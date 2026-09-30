@@ -114,9 +114,10 @@ is refused and names the earlier commit that changed the definition.
 
 ### User Story 4: An unsettled design does not reach reviewers (Priority: P4)
 
-Before the first internal review round on a branch that changes a spec folder, every mechanism the plan lists
-has a recorded decision, each decision names the existing tools looked at or says none fit and where it looked,
-and no open question is left in the folder. Otherwise the round is refused.
+Before the first internal review round on a branch that changes a spec folder or a design document, the branch
+must change a spec folder, every mechanism the plan lists must have a recorded decision, each decision must name
+the existing tools looked at or say none fit and where it looked, and no open question may be left in the folder.
+Otherwise the round is refused.
 
 **Why this priority**: an unsettled design was the primary cause in about 24 of 30 cases, so its value is the
 highest. It ranks last because the check depends on the plan listing its mechanisms, which authors write by hand
@@ -134,8 +135,14 @@ review round. The round is refused and the refusal names the file and line.
    refusal says what the list must contain.
 4. **Given** a half-written plan with open questions, **When** the author commits it, **Then** the commit is not
    refused by this check.
-5. **Given** a branch that changes no spec folder, **When** the first round is launched, **Then** this check
-   does not run.
+5. **Given** a branch that changes no spec folder and no design document, **When** the first round is launched,
+   **Then** this check does not run.
+6. **Given** a branch that changes `README.md` and no spec folder, **When** the first round is launched, **Then**
+   it is refused, and the refusal names `README.md` and says to add a spec folder.
+7. **Given** a branch that changes `README.md` and a settled spec folder, **When** the first round is launched,
+   **Then** it is not refused.
+8. **Given** the checks are in `log` and a branch changes `README.md` and no spec folder, **When** the first
+   round is launched, **Then** it is not refused and the failure is logged.
 
 ### Edge Cases
 
@@ -143,7 +150,8 @@ review round. The round is refused and the refusal names the file and line.
 - A tick cites the commit that contains it. That commit does not exist yet, so the citation is refused.
 - A spec folder is renamed or moved in the change. Both the old and new paths are checked as one folder.
 - A commit touches two spec folders. Each is checked, and the refusal lists the failures per folder.
-- A commit touches a spec folder that git ignores in that repo. Nothing is committed, so nothing is checked.
+- A repo git-ignores `specs/`. The checks cannot see its spec folders, so every repo they cover commits
+  `specs/` (see Assumptions).
 - A branch has no PR yet. The change set is compared against the repo's default branch.
 - A check crashes. The commit or round it was deciding is refused, and the refusal names the error and the log.
 - The checks are in `log` mode while the rest of the plugin enforces. The checks refuse nothing, and the
@@ -160,9 +168,12 @@ review round. The round is refused and the refusal names the file and line.
 - **FR-002**: The checks MUST NOT depend on speckit being installed in the repo.
 - **FR-003**: The owned-facts, evidence and change-kind checks MUST refuse a commit that touches a spec folder.
 - **FR-004**: The settled-design check MUST refuse the first internal review round on a branch that changes a
-  spec folder, and MUST NOT refuse a commit.
-- **FR-005**: An author MUST be able to run each check on demand against a named spec folder. It MUST change
-  nothing and give the same result as the gate.
+  spec folder or a design document, and MUST NOT refuse a commit. A branch that changes a design document and
+  no spec folder is refused. The refusal names the design document at line 1, the rule, and the next step:
+  settle the design in a spec folder.
+- **FR-005**: An author MUST be able to run each check on demand against a named spec folder, and the
+  settled-design check also against a checkout and the branch it merges into. It MUST change nothing and give
+  the same result as the gate.
 - **FR-006**: The checks MUST have their own `log` and `enforce` setting, separate from the plugin's. In `log`
   nothing is refused and each failure is logged as one that would have refused.
 
@@ -222,6 +233,8 @@ review round. The round is refused and the refusal names the file and line.
 - **Evidence reference**: a PR, run ID or commit cited by a tick or a `facts.md` entry.
 - **Change set**: everything a branch changes in a spec folder since its merge base, plus what is staged.
 - **Refusal**: the result of a failed check. It carries the file, line, rule and next step.
+- **Design document**: a file whose change needs a spec folder. By default, at any depth, `README.md`,
+  `CLAUDE.md` and `AGENTS.md`, plus everything under `docs/adr/` and `.claude/rules/`.
 
 ## Success Criteria *(mandatory)*
 
@@ -258,8 +271,10 @@ review round. The round is refused and the refusal names the file and line.
   refuse that as a mixed change, so the clean-up is done while the checks are in `log` mode.
 - The checks run inside a Claude session. Hand edits and commits made outside one are not covered.
 - The bot container has its own copy of the plugin and gets the checks only when its image is rebuilt.
-- Spec folders that a repo ignores in git (the plugins repo ignores `specs/`) are never committed, so the commit
-  gate never sees them.
+- Every repo the checks cover commits `specs/` (user decision, 2026-09-30). Today the plugins and engine repos
+  ignore it in `.gitignore` and the infrastructure checkout in a local exclude. Un-ignoring it there is part of
+  this feature's delivery and is done before the checks are switched to `enforce`. Spec folders in the public
+  repos hold no internal or cloud-specific detail.
 
 ## Out of Scope
 
