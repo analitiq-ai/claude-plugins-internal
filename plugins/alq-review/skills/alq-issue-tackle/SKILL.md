@@ -7,7 +7,7 @@ You will be given a number that represents an issue open in GitHub. Call it `<n>
 
 ## Step 1 - worktree
 
-Create a worktree under `.git/wt/<n>` on a branch named `<type>/<n>-<short-description>` per
+Create a worktree at `.claude/worktrees/<n>` on a branch named `<type>/<n>-<short-description>` per
 the branch-naming rules. All work happens there. Never work on main.
 
 ## Step 2 - materialise the spec into the worktree
