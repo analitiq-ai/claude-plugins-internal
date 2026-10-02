@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _GITHUB_REMOTE = re.compile(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
-_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
 @dataclass(frozen=True)
@@ -162,18 +162,129 @@ def changed_files(root: str, base: str) -> list[str]:
     return [f for f in git(root, "diff", "--name-only", f"{base}...HEAD").split("\n") if f]
 
 
+@dataclass(frozen=True)
+class Hunk:
+    """One `@@` of a -U0 diff. Counts git omits are 1; `removed` and `added` are the body lines without their sign."""
+    file: str
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    removed: tuple[str, ...]
+    added: tuple[str, ...]
+    header: str  # the file's `diff --git` block, so a hunk can be fingerprinted on its own
+
+    def patch(self) -> str:
+        body = [f"-{line}" for line in self.removed] + [f"+{line}" for line in self.added]
+        return "\n".join([self.header, f"@@ -{self.old_start},{self.old_count} +{self.new_start},{self.new_count} @@",
+                          *body, ""])
+
+
+def _hunks(diff: str) -> list[Hunk]:
+    """Every hunk of a -U0 diff of files git reads as text; a file with no `+++` side (deleted) has none."""
+    found: list[Hunk] = []
+    header: list[str] = []
+    path, current = None, None
+    for line in diff.split("\n"):
+        if line.startswith("diff --git "):
+            header, path, current = [line], None, None
+        elif current is None and not line.startswith("@@"):
+            header.append(line)
+            if line.startswith("+++ "):
+                path = line[6:] if line.startswith("+++ b/") else None
+        elif hunk := _HUNK.match(line):
+            current = None
+            if path:
+                current = Hunk(path, int(hunk[1]), int(hunk[2] or 1), int(hunk[3]), int(hunk[4] or 1), (), (),
+                               "\n".join(header))
+                found.append(current)
+        elif current is not None and line[:1] in ("-", "+"):
+            side = "removed" if line[0] == "-" else "added"
+            found[-1] = current = _extend(current, side, line[1:])
+    return found
+
+
+def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
+    return Hunk(**{**hunk.__dict__, side: getattr(hunk, side) + (line,)})
+
+
 def added_lines(root: str, since: str) -> dict[str, list[tuple[int, int]]]:
     """Per file, the line ranges (in today's numbering) written after `since`."""
     ranges: dict[str, list[tuple[int, int]]] = {}
-    path = None
-    for line in git(root, "diff", "-U0", f"{since}..HEAD").split("\n"):
-        if line.startswith("+++ "):
-            path = line[6:] if line.startswith("+++ b/") else None
-        elif path and (hunk := _HUNK.match(line)):
-            start, count = int(hunk.group(1)), int(hunk.group(2) or 1)
-            if count:
-                ranges.setdefault(path, []).append((start, start + count - 1))
+    for hunk in _hunks(git(root, "diff", "-U0", f"{since}..HEAD")):
+        if hunk.new_count:
+            ranges.setdefault(hunk.file, []).append((hunk.new_start, hunk.new_start + hunk.new_count - 1))
     return ranges
+
+
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # `git hash-object -t tree /dev/null`
+
+
+def head_tree(root: str) -> str:
+    """The tree a commit made now would be measured against: HEAD's, or the empty tree before the first commit."""
+    found = _run(root, "rev-parse", "--verify", "--quiet", "HEAD^{tree}")
+    return found.stdout.strip() if found.returncode == 0 else EMPTY_TREE
+
+
+def staged_tree(root: str) -> str:
+    return git(root, "write-tree")
+
+
+def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
+    """The hunks that turn tree `base` into tree `tree`, each with git's whitespace-blind fingerprint of its own text
+    (`git patch-id --stable`). Files marked linguist-generated are left out; binary files have no hunks."""
+    hunks = _hunks(git(root, "diff", "-U0", "-M", base, tree))
+    generated = _generated(root, tree, sorted({h.file for h in hunks}))
+    hunks = [h for h in hunks if h.file not in generated]
+    if not hunks:
+        return []
+    # One patch-id call for all hunks: each is fed as its own "commit", named by its index.
+    stream = "".join(f"commit {i:040x}\n{h.patch()}" for i, h in enumerate(hunks))
+    ids = dict(reversed(row.split()) for row in _stdin(root, stream, "patch-id", "--stable").split("\n") if row)
+    return [{"id": f"h{i + 1}", "file": h.file, "old_start": h.old_start, "old_count": h.old_count,
+             "new_start": h.new_start, "new_count": h.new_count, "removed": list(h.removed), "added": list(h.added),
+             "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
+
+
+def tree_text(root: str, tree: str, path: str) -> str | None:
+    """`path` as tree `tree` records it; None when the tree has no such file."""
+    found = _run(root, "cat-file", "blob", f"{tree}:{path}")
+    return found.stdout if found.returncode == 0 else None
+
+
+def tree_blob(root: str, tree: str, path: str) -> str | None:
+    found = _run(root, "rev-parse", "--verify", "--quiet", f"{tree}:{path}")
+    return found.stdout.strip() if found.returncode == 0 else None
+
+
+def unstaged(root: str) -> list[str]:
+    """Tracked files whose checkout differs from the index."""
+    return [p for p in git(root, "diff", "--name-only").split("\n") if p]
+
+
+def concluding(root: str) -> bool:
+    """Whether the next commit concludes a merge, cherry-pick or revert: its content was settled by that operation."""
+    return any(os.path.exists(git(root, "rev-parse", "--path-format=absolute", "--git-path", ref))
+               for ref in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"))
+
+
+def _generated(root: str, tree: str, paths: list[str]) -> set[str]:
+    if not paths:
+        return set()
+    out = _stdin(root, "\0".join(paths) + "\0", "check-attr", "--source", tree, "-z", "--stdin", "linguist-generated")
+    fields = out.split("\0")
+    return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] in ("set", "true")}
+
+
+def _stdin(root: str, text: str, *args: str) -> str:
+    try:
+        done = subprocess.run(["git", "-C", root, *args], input=text, capture_output=True, text=True,
+                              env=dict(os.environ, LC_ALL="C"))
+    except OSError as exc:
+        raise RuntimeError(f"git {' '.join(args)} could not run in {root}: {exc}") from exc
+    if done.returncode != 0:
+        raise _failure(root, args, done)
+    return done.stdout
 
 
 def additions(root: str, since: str, until: str) -> int:

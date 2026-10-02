@@ -80,12 +80,13 @@ def validate_report(report: dict, short: str) -> list[str]:
     return errors
 
 
-def validate_assessment(assessment: dict, rnd: dict, admissible: list[str], *, burden: bool, token: str) -> list[str]:
+def validate_assessment(assessment: dict, finding_ids: list[str], admissible: list[str], *, burden: bool,
+                        token: str) -> list[str]:
     if assessment["brief_token"] != token:
         return ["brief_token does not match: run the brief command from your instructions first; it prints the "
                 "token together with the facts this assessment must build on"]
     errors = []
-    expected = sorted(f["id"] for f in rnd["findings"])
+    expected = sorted(finding_ids)
     got = sorted(e["id"] for e in assessment["findings"])
     if got != expected:
         errors.append(f"findings must hold exactly one entry per finding of the round; expected ids {expected}, got {got}")

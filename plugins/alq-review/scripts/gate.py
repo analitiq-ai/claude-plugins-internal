@@ -7,22 +7,23 @@ validation of the structured output that lands in the ledger.
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import re
 import sys
 import traceback
-from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import assessment
 import briefs
+import claimgate
 import config
 import facts
 import github
+from hookio import deny, mode, record, refuse, refuse_spec, session_file, session_state
 import ledger
 import policy
 import settled_design
@@ -38,28 +39,6 @@ UNLOCK = re.compile(rf"unlock\s+{_REF}")
 RESCOPE = re.compile(rf"{re.escape(policy.RESCOPE)}\s+{_REF}")
 
 
-def _setting(key: str, env: str) -> str:
-    chosen = os.environ.get(env) or config.load()[key]
-    if chosen not in ("log", "enforce"):
-        raise ValueError(f"alq-review {key} must be log or enforce, not {chosen!r}")
-    return chosen
-
-
-def mode() -> str:
-    return _setting("mode", "ALQ_REVIEW_MODE")
-
-
-def spec_checks_mode() -> str:
-    """The spec-folder checks' own setting (spec 004 FR-006): they stay in log until every existing spec
-    folder passes them (FR-023), while the rest of the plugin enforces."""
-    return _setting("spec_checks", "ALQ_REVIEW_SPEC_CHECKS")
-
-
-def deny(reason: str) -> dict:
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                                   "permissionDecisionReason": f"[alq-review] {reason}"}}
-
-
 @dataclass(frozen=True)
 class Target:
     """What one gate event is judged against: the PR a checkout's branch means, or the PR a command names.
@@ -70,54 +49,10 @@ class Target:
     root: str | None = None
 
 
-def record(payload: dict, action: str, decision: str, reason: str = "", target: Target | None = None) -> None:
-    entry = {"at": ledger.stamp(datetime.now(timezone.utc)), "session": payload.get("session_id"), "action": action,
-             "decision": decision, "repo": target and target.repo, "branch": target and target.branch,
-             "pr": target and target.pr, "agent_type": payload.get("agent_type"), "reason": reason}
-    root = ledger.state_root()
-    root.mkdir(parents=True, exist_ok=True)
-    with open(root / "gate.log", "a") as log:
-        log.write(json.dumps(entry) + "\n")
-
-
-def refuse(payload: dict, action: str, reason: str, target: Target | None = None) -> dict | None:
-    """A process refusal: blocks in enforce mode, is only recorded in log mode."""
-    enforcing = mode() == "enforce"
-    record(payload, action, "deny" if enforcing else "would_deny", reason, target)
-    return deny(reason) if enforcing else None
-
-
-def refuse_spec(payload: dict, action: str, reason: str, target: Target) -> dict | None:
-    """A spec-folder check's refusal: it blocks only when both the plugin and the spec checks enforce."""
-    if spec_checks_mode() == "enforce":
-        return refuse(payload, action, reason, target)
-    record(payload, action, "would_deny", reason, target)
-    return None
-
-
-# --- reviewer subagents in flight, per session -------------------------------------------------
-
-def _session_file(payload: dict, kind: str = "") -> Path:
-    directory = ledger.state_root() / "sessions"
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory / f"{payload['session_id']}{kind}.json"
-
-
-@contextmanager
-def _session_state(payload: dict, kind: str = ""):
-    """The session's `kind` record, read and written back under one lock."""
-    path = _session_file(payload, kind)
-    with open(path.with_suffix(".lock"), "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        held = json.loads(path.read_text()) if path.exists() else {}
-        yield held
-        path.write_text(json.dumps(held))
-
-
 def track_subagent(payload: dict, now: datetime) -> None:
     if payload.get("agent_type") not in briefs.REVIEWERS:
         return
-    with _session_state(payload) as inflight:
+    with session_state(payload) as inflight:
         if payload["hook_event_name"] == "SubagentStart":
             inflight[payload["agent_id"]] = ledger.stamp(now)
         else:
@@ -125,7 +60,7 @@ def track_subagent(payload: dict, now: datetime) -> None:
 
 
 def inflight_count(payload: dict, now: datetime) -> int:
-    path = _session_file(payload)
+    path = session_file(payload)
     if not path.exists():
         return 0
     oldest = ledger.stamp(now - INFLIGHT_TTL)
@@ -190,6 +125,9 @@ def _rescope_brief(state: dict, ruling: dict) -> str:
 
 def on_prompt(payload: dict) -> dict | None:
     prompt = payload.get("prompt", "").lstrip()
+    claim = claimgate.UNLOCK_CLAIM.match(prompt)
+    if claim:
+        return claimgate.on_prompt(payload, claim)
     typed = UNLOCK.match(prompt) or RESCOPE.match(prompt)
     if not typed:
         return None
@@ -278,13 +216,13 @@ def hold(payload: dict) -> dict | None:
         held[root] = {"repo": state["repo"], "branch": state["branch"], "why": policy.mutation(state, inflight=0).reason,
                       "snapshot": snapshot.to_json()}
     if held:
-        with _session_state(payload, ".held") as pending:
+        with session_state(payload, ".held") as pending:
             pending[payload["tool_use_id"]] = held
     return _report(messages) or None
 
 
 def after_bash(payload: dict) -> dict | None:
-    with _session_state(payload, ".held") as pending:
+    with session_state(payload, ".held") as pending:
         before = pending.pop(payload["tool_use_id"], None)
     if not before:
         return None
@@ -340,6 +278,10 @@ def on_bash(payload: dict) -> dict | None:
     for action in shell.classify(command, payload.get("cwd") or os.getcwd()):
         if action.kind == "unlock":
             return refuse(payload, "unlock", "Only the user unlocks a branch. Tell them why it is locked and stop.")
+        # A commit is claim-checked whether or not a PR is open.
+        refused = action.kind == "commit" and claimgate.on_commit(payload, action)
+        if refused:
+            return refused
         where = worktree.locate(action.cwd)
         try:
             event = target(where, action.repo, action.pr)
@@ -420,6 +362,8 @@ def _spec_problems(root: str, base: str) -> str | None:
 
 def on_workflow(payload: dict) -> dict | None:
     call = payload["tool_input"]
+    if call.get("name") == claimgate.CHECK:
+        return claimgate.on_launch(payload, call)
     if call.get("name") not in (REVIEW_ROUND, ASSESS_ROUND):
         return None
     args = call.get("args") if isinstance(call.get("args"), dict) else {}
@@ -487,6 +431,8 @@ def _round_output(payload: dict) -> tuple[str, str] | None:
 
 
 def on_structured_output(payload: dict) -> dict | None:
+    if claimgate.owns(payload):
+        return claimgate.on_output(payload)
     found = _round_output(payload)
     if found is None:
         return None
@@ -494,19 +440,22 @@ def on_structured_output(payload: dict) -> dict | None:
     body = payload["tool_input"]
     with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
         rnd = ledger.find_round(state, ref)
-        is_assessment = agent_type == briefs.ASSESSOR and rnd["status"] == "awaiting_assessment"
-        measured = facts.round_facts(state, rnd, rnd["root"]) if is_assessment else {}
+        if agent_type == briefs.ASSESSOR and rnd["status"] == "awaiting_assessment":
+            measured = facts.round_facts(state, rnd, rnd["root"])
+            admissible = policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"]))
+            finding_ids, token = [f["id"] for f in rnd["findings"]], briefs.brief_token(rnd)
+            validate = partial(assessment.validate_assessment, finding_ids=finding_ids, admissible=admissible,
+                               burden=measured["burden"], token=token)
+        elif agent_type in rnd["expected"] and rnd["status"] == "collecting":
+            validate = partial(assessment.validate_report, short=briefs.short(agent_type))
+        else:
+            validate, errors = None, [f"{agent_type} has nothing to submit to {ref} while it is {rnd['status']}"]
+    if validate:
         try:
-            if is_assessment:
-                admissible = policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"]))
-                errors = assessment.validate_assessment(body, rnd, admissible, burden=measured["burden"],
-                                                        token=briefs.brief_token(rnd))
-            elif agent_type in rnd["expected"] and rnd["status"] == "collecting":
-                errors = assessment.validate_report(body, briefs.short(agent_type))
-            else:
-                errors = [f"{agent_type} has nothing to submit to {ref} while it is {rnd['status']}"]
-        except (KeyError, TypeError):
-            # Ill-shaped output: the harness checks the JSON Schema after this hook and sends it back itself.
+            errors = validate(body)
+        except (KeyError, TypeError) as exc:
+            # The harness checks the JSON Schema after this hook and sends an ill-shaped body back itself.
+            record(payload, "output", "ill-shaped", f"{type(exc).__name__}: {exc}")
             return None
     if not errors:
         return None
@@ -515,6 +464,8 @@ def on_structured_output(payload: dict) -> dict | None:
 
 
 def after_structured_output(payload: dict) -> None:
+    if claimgate.owns(payload):
+        return claimgate.after_output(payload)
     found = _round_output(payload)
     if found is None:
         return
@@ -529,7 +480,8 @@ def after_structured_output(payload: dict) -> None:
 
 
 PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_bash, "Agent": on_agent,
-       "Skill": on_skill, "Workflow": on_workflow, "StructuredOutput": on_structured_output}
+       "Skill": on_skill, "Workflow": on_workflow, "StructuredOutput": on_structured_output,
+       "WebFetch": claimgate.on_webfetch}
 
 
 def handle(payload: dict) -> dict | None:

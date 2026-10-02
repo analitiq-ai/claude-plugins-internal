@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 REVIEW_TRIGGER = "@codex review"
@@ -22,6 +22,8 @@ class Action:
     cwd: str
     repo: str | None = None
     pr: int | None = None
+    staging: bool = False  # commit only: it adds files to the index itself, so the checked index is not what lands
+    alone: bool = True  # commit only: nothing but `cd` shares its command, so nothing else can restage first
 
 
 def _segments(command: str) -> list[str]:
@@ -67,9 +69,42 @@ def _git(words: list[str], cwd: str) -> Action | None:
         if words[i] == "-C" and i + 1 < len(words):
             cwd = os.path.normpath(os.path.join(cwd, words[i + 1]))
         i += 2 if words[i] in _GIT_OPTIONS_WITH_VALUE else 1
-    if i < len(words) and words[i] in ("commit", "push"):
-        return Action(words[i], cwd)
+    if i < len(words) and words[i] == "commit":
+        return Action("commit", cwd, staging=_stages(words[i + 1:]))
+    if i < len(words) and words[i] == "push":
+        return Action("push", cwd)
     return None
+
+
+# git commit's options that take a value, short (also at the end of a cluster like -qm) and long.
+_COMMIT_SHORT_VALUED = "mFCct"
+_COMMIT_LONG_VALUED = ("--message", "--file", "--reuse-message", "--reedit-message", "--author", "--date", "--cleanup",
+                       "--template", "--fixup", "--squash", "--trailer")
+_COMMIT_SHORT_STAGING = "aio"
+
+
+def _stages(words: list[str]) -> bool:
+    """Whether a `git commit` with these arguments puts anything into the index: -a, -i, -o or a pathspec."""
+    i = 0
+    while i < len(words):
+        word = words[i]
+        if word == "--" or word.startswith("--pathspec-from-file") or word in ("--all", "--include", "--only"):
+            return True
+        if word.startswith("--"):
+            i += 2 if word in _COMMIT_LONG_VALUED else 1
+            continue
+        if word.startswith("-") and len(word) > 1:
+            for at, flag in enumerate(word[1:]):
+                if flag in _COMMIT_SHORT_STAGING:
+                    return True
+                if flag in _COMMIT_SHORT_VALUED:
+                    i += 1 if at + 2 < len(word) else 2  # the value is the rest of the word, or the next word
+                    break
+            else:
+                i += 1
+            continue
+        return True  # a bare word is a pathspec
+    return False
 
 
 def _values(words: list[str], *names: str):
@@ -130,15 +165,16 @@ def _gh(words: list[str], cwd: str, command: str) -> Action | None:
 
 def classify(command: str, cwd: str) -> list[Action]:
     actions = []
-    for segment in _segments(_HEREDOC.sub(r"\3", command)):
-        words = _words(segment)
-        if not words:
-            continue
+    segments = [words for words in map(_words, _segments(_HEREDOC.sub(r"\3", command))) if words]
+    alone = sum(1 for words in segments if words[0] != "cd") == 1
+    for words in segments:
         action = None
         if words[0] == "cd" and len(words) > 1:
             cwd = os.path.normpath(os.path.join(cwd, os.path.expanduser(words[1])))
         elif words[0] == "git":
             action = _git(words, cwd)
+            if action and action.kind == "commit" and not alone:
+                action = replace(action, alone=False)
         elif words[0] == "gh":
             action = _gh(words, cwd, command)
         elif any(w.endswith("ledger.py") for w in words) and "unlock" in words:

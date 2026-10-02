@@ -12,6 +12,7 @@ import re
 import sys
 
 import assessment
+import claimcheck
 import facts
 import github
 import ledger
@@ -150,6 +151,144 @@ def brief(state: dict, rnd: dict) -> dict:
         "rulings_so_far": ledger.adjudicated(state),
         "reviewer_verdicts": {t: rep["verdict"] for t, rep in rnd["reports"].items() if rep.get("verdict")},
     }
+
+
+# --- the claim check -------------------------------------------------------------------------------
+
+CLAIM_READER, CLAIM_JUDGE, CLAIM_CONTEST_JUDGE = ("alq-review:claim-reader", "alq-review:claim-judge",
+                                                  "alq-review:claim-contest-judge")
+READ_BATCH = 16  # hunks per reader, in the order git lists them; a larger commit gets more readers
+# The categories of the plugins-random-commits study (specs/005-claim-check-gate); only K1 is judged.
+CATEGORY_MEANINGS = {
+    "K1": "what our own code, contracts, validator or CI does",
+    "K2": "how a vendor tool, cloud platform, language or standard behaves",
+    "K3": 'a list, a count, or an "every / the only / complete" claim',
+    "K4": "a task tick or a PASS/FAIL status mark",
+    "K5": "a recorded observation, such as a date, run ID, commit, count or approval",
+    "K6": "a command or code block and what it does",
+    "K7": "a citation of a file, field, symbol, rule or requirement",
+    "K8": "planned behaviour, meaning what a proposal or design says the system will do once it's built",
+}
+# The judge prompt the study's 30-claim replay ran (spec SC-001), unchanged below its first paragraph, which names
+# the staged checkout instead of a commit. {{file}}, {{line}} and {{claim}} are filled in per claim by the workflow.
+_JUDGE_TAIL = """
+Readers will rely on every word of this claim, so a claim that is mostly
+true is not correct. Past checkers failed by confirming the easiest part
+of a claim (a library is used, a model exists, a counter starts at 1) and
+marking the whole claim correct. Your job is to try to break the claim,
+and to call it correct only if you can't.
+
+Work in this order:
+
+1. Split the claim into every separate assertion it makes. Include the
+   implied ones: words like "exactly", "always", "the same", "already",
+   "not", or a list of items each assert something, and so does naming
+   which component does the work. If the claim has the form "X, so Y",
+   X and Y are separate assertions and Y is the one that matters.
+
+2. For each assertion, read the code that implements the behaviour. Names,
+   docstrings, comments and other docs are not evidence: open the function
+   or test body and read what it does. If a docstring or comment disagrees
+   with the claim, treat that as a lead to follow, not something to explain
+   away.
+
+3. For each assertion, look for the case where it fails: empty or zero
+   input, optional or omitted fields, items in a list that are handled
+   differently from the others, a different component doing the work than
+   the one named, paths that skip the check.
+
+4. Give your verdict last, after the evidence:
+   - CORRECT: every assertion is confirmed by code you read, and you found
+     no failing case.
+   - WRONG: at least one assertion is false or has a failing case.
+   - UNSURE: you could not find or read the code that would settle at
+     least one assertion.
+
+For each assertion, give the file and line that settle it, and for WRONG,
+the failing case."""
+_EVIDENCE_RULE = ("\n\nRead and search only, never modify files. Evidence is a path:line of a file the commit will "
+                  "record, relative to the checkout root; an untracked or ignored file is not evidence.")
+
+
+def _reader_prompt(check: dict, hunks: list[dict]) -> str:
+    shown = "\n\n".join(
+        f"{h['id']}: {h['file']}, staged lines {h['new_start']}-{h['new_start'] + max(h['new_count'], 1) - 1}\n"
+        + "".join(f"- {line}\n" for line in h["removed"]) + "".join(f"+ {line}\n" for line in h["added"])
+        for h in hunks)
+    kinds = "\n".join(f"- {k}: {meaning}" for k, meaning in CATEGORY_MEANINGS.items())
+    return (f"These are hunks of a change staged for commit in the checkout at {check['root']} ({check['repo']}). "
+            "The files there are as they will be committed.\n\n"
+            f"{shown}\n\n"
+            "For each hunk, read its file around the hunk, then:\n"
+            "1. Label it CODE (only code), PROSE (only text for people: docs, comments, docstrings, messages) or MIXED "
+            "(code with comments or docstrings in it), judging by its content, not the file's extension.\n"
+            "2. List the claims its text makes: every statement a reader could rely on and that could be false. A "
+            "removed line counts through the sentence it leaves behind. Quote each claim verbatim from the staged file, "
+            "give the line it starts on, and give it the one category that fits best:\n"
+            f"{kinds}\n"
+            "Code itself states no claim; its comments and docstrings do. A hunk with no claim has an empty list.\n\n"
+            "Read only, never modify files. Answer through StructuredOutput.")
+
+
+def _reader_schema(check: dict, batch: int, hunks: list[dict]) -> dict:
+    claim = {"type": "object", "additionalProperties": False, "required": ["line", "quote", "category"],
+             "properties": {"line": {"type": "integer", "minimum": 1}, "quote": {"type": "string", "minLength": 1},
+                            "category": {"enum": list(claimcheck.CATEGORIES)}}}
+    hunk = {"type": "object", "additionalProperties": False, "required": ["id", "kind", "claims"],
+            "properties": {"id": {"enum": [h["id"] for h in hunks]}, "kind": {"enum": list(claimcheck.KINDS)},
+                           "claims": {"type": "array", "items": claim}}}
+    return {"type": "object", "additionalProperties": False, "required": ["check_ref", "batch", "hunks"],
+            "properties": {"check_ref": {"enum": [check["ref"]]}, "batch": {"enum": [batch]},
+                           "hunks": {"type": "array", "items": hunk}}}
+
+
+def verdict_schema(check: dict, file: str | None = None, quote: str | None = None) -> dict:
+    """A judge's answer; the workflow pins `file` and `quote` to the claim it hands each judge."""
+    assertion = {"type": "object", "additionalProperties": False, "required": ["text", "confirmed", "evidence"],
+                 "properties": {"text": {"type": "string"}, "confirmed": {"type": "boolean"},
+                                "evidence": {"type": "string"}}}
+    pinned = (lambda value: {"enum": [value]} if value is not None else {"type": "string"})
+    return {"type": "object", "additionalProperties": False,
+            "required": ["check_ref", "file", "quote", "verdict", "basis", "assertions"],
+            "properties": {"check_ref": {"enum": [check["ref"]]}, "file": pinned(file), "quote": pinned(quote),
+                           "verdict": {"enum": list(claimcheck.VERDICTS)}, "basis": {"type": "string"},
+                           "assertions": {"type": "array", "minItems": 1, "items": assertion},
+                           "failing_case": {"type": "string"}, "gap": {"type": "string"}}}
+
+
+def _judge_prompt(check: dict) -> str:
+    return ("You are checking a claim made in the documentation of the codebase checked\n"
+            f"out at {check['root']} ({check['repo']}), as staged for its next commit.\n"
+            "That checkout is the source of truth. The claim comes from `{{file}}`\n"
+            "line {{line}}.\n\nClaim: {{claim}}\n" + _JUDGE_TAIL + _EVIDENCE_RULE)
+
+
+def _contest_prompt(check: dict, claim: dict, contest: dict) -> str:
+    ruled = check["verdicts"][claim["id"]]
+    return (_judge_prompt(check).replace("{{file}}", claim["file"]).replace("{{line}}", str(claim["line"]))
+            .replace("{{claim}}", claim["quote"])
+            + f"\n\nAn earlier checker ruled this claim WRONG. Its failing case: {ruled['failing_case']}. Its basis: "
+            f"{ruled['basis']}\nThe author contests that ruling with this evidence: {contest['evidence']}\n"
+            "Weigh the evidence against the code yourself; it decides nothing by being offered. You may read a cited "
+            "https:// page, and cite it as evidence beside the path:line it bears on.")
+
+
+def claim_check_args(check: dict, *, to_read: list[dict], contests: list[dict], warn_over: int) -> dict:
+    """What the claim-check workflow runs: readers for the hunks no earlier check read, a judge for each K1 claim
+    with no verdict, and a fresh judge per contest."""
+    batches = [to_read[i:i + READ_BATCH] for i in range(0, len(to_read), READ_BATCH)]
+    check["batches"] = [[h["id"] for h in batch] for batch in batches]
+    by_id = {c["id"]: c for c in check["claims"].values()}
+    return {"worktree": check["root"], "check_ref": check["ref"], "warn_over": warn_over,
+            "reader_type": CLAIM_READER, "judge_type": CLAIM_JUDGE, "contest_type": CLAIM_CONTEST_JUDGE,
+            "readers": [{"batch": i, "hunks": batch, "prompt": _reader_prompt(check, batch),
+                         "schema": _reader_schema(check, i, batch)} for i, batch in enumerate(batches)],
+            "judge": {"prompt": _judge_prompt(check), "schema": verdict_schema(check)},
+            "claims": [{"file": c["file"], "line": c["line"], "quote": c["quote"]} for c in claimcheck.to_judge(check)],
+            "contests": [{"claim_id": c["claim"], "prompt": _contest_prompt(check, by_id[c["claim"]], c),
+                          "schema": verdict_schema(check, by_id[c["claim"]]["file"], by_id[c["claim"]]["quote"])}
+                         for c in contests],
+            "not_judged": claimcheck.not_judged(check)}
 
 
 def main() -> None:

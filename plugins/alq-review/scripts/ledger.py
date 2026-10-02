@@ -34,6 +34,31 @@ CREATE TABLE IF NOT EXISTS open_prs (
   pr     INTEGER NOT NULL,
   PRIMARY KEY (repo, branch, head)
 );
+CREATE TABLE IF NOT EXISTS claim_checks (
+  repo TEXT NOT NULL,
+  tree TEXT NOT NULL,
+  doc  TEXT NOT NULL,
+  PRIMARY KEY (repo, tree)
+);
+CREATE TABLE IF NOT EXISTS claim_reads (
+  repo     TEXT NOT NULL,
+  patch_id TEXT NOT NULL,
+  doc      TEXT NOT NULL,
+  PRIMARY KEY (repo, patch_id)
+);
+CREATE TABLE IF NOT EXISTS claim_verdicts (
+  repo     TEXT NOT NULL,
+  claim_id TEXT NOT NULL,
+  doc      TEXT NOT NULL,
+  PRIMARY KEY (repo, claim_id)
+);
+CREATE TABLE IF NOT EXISTS claim_holds (
+  repo TEXT NOT NULL,
+  base TEXT NOT NULL,
+  file TEXT NOT NULL,
+  doc  TEXT NOT NULL,
+  PRIMARY KEY (repo, base, file)
+);
 """
 
 
@@ -152,6 +177,67 @@ def open_pr(repo: str, branch: str, head: str, ask) -> int | None:
         with _transaction() as conn:
             _keep_open_pr(conn, repo, branch, head, pr)
     return pr
+
+
+class Claims:
+    """One repo's claim-check records, read and written inside the transaction that opened them. A commit has no PR,
+    so these are keyed by repo, by git's own fingerprints (a tree id, a hunk's patch-id), and by a claim id."""
+
+    def __init__(self, conn: sqlite3.Connection, repo: str):
+        self._conn, self.repo = conn, repo
+
+    def _get(self, table: str, column: str, key: str):
+        row = self._conn.execute(f"SELECT doc FROM {table} WHERE repo = ? AND {column} = ?", (self.repo, key)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def _put(self, table: str, columns: tuple[str, ...], keys: tuple[str, ...], doc) -> None:
+        names = ", ".join(("repo", *columns, "doc"))
+        marks = ", ".join("?" * (len(columns) + 2))
+        self._conn.execute(f"INSERT OR REPLACE INTO {table} ({names}) VALUES ({marks})",
+                           (self.repo, *keys, json.dumps(doc)))
+
+    def check(self, tree: str) -> dict | None:
+        return self._get("claim_checks", "tree", tree)
+
+    def save_check(self, check: dict) -> None:
+        self._put("claim_checks", ("tree",), (check["tree"],), check)
+
+    def read(self, patch_id: str) -> dict | None:
+        return self._get("claim_reads", "patch_id", patch_id)
+
+    def save_read(self, patch_id: str, read: dict) -> None:
+        self._put("claim_reads", ("patch_id",), (patch_id,), read)
+
+    def verdict(self, claim_id: str) -> dict | None:
+        return self._get("claim_verdicts", "claim_id", claim_id)
+
+    def save_verdict(self, claim_id: str, entry: dict) -> None:
+        self._put("claim_verdicts", ("claim_id",), (claim_id,), entry)
+
+    def holds(self, base: str, file: str) -> list[dict]:
+        row = self._conn.execute("SELECT doc FROM claim_holds WHERE repo = ? AND base = ? AND file = ?",
+                                 (self.repo, base, file)).fetchone()
+        return json.loads(row[0]) if row else []
+
+    def save_holds(self, base: str, file: str, holds: list[dict]) -> None:
+        self._put("claim_holds", ("base", "file"), (base, file), holds)
+
+
+@contextmanager
+def open_claims(repo: str):
+    """`repo`'s claim-check records; no other writer reads them until the block ends, and they are saved only if it
+    completes."""
+    with _transaction() as conn:
+        yield Claims(conn, repo)
+
+
+def claim_holders(claim_id: str) -> list[tuple[str, str, str]]:
+    """(repo, base, file) of every hold that names `claim_id`, which is how a user's `unlock claim-<id>` finds it."""
+    with closing(_connect()) as conn:
+        rows = conn.execute("SELECT repo, base, file FROM claim_holds, json_each(claim_holds.doc) AS hold, "
+                            "json_each(hold.value, '$.claims') AS named WHERE named.value = ? ORDER BY repo, base, file",
+                            (claim_id,))
+        return sorted(set(rows))
 
 
 def parse_ref(ref: str) -> tuple[str, int]:

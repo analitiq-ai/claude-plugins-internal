@@ -342,5 +342,78 @@ class RoundFacts(Repo):
         self.assertIn("CLASS_FIX", offered)
 
 
+class StagedHunks(Repo):
+    def stage(self, name, text):
+        (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / name).write_text(text)
+        git(self.root, "add", name)
+        return worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)))
+
+    def test_one_hunk_per_header_with_both_sides(self):
+        lines = [f"line{i}\n" for i in range(30)]
+        lines[3], lines[20] = "changed three\n", "changed twenty\n"
+        first, second = self.stage("a.py", "".join(lines))
+        self.assertEqual((first["file"], first["old_start"], first["old_count"], first["new_start"], first["new_count"]),
+                         ("a.py", 4, 1, 4, 1))
+        self.assertEqual((first["removed"], first["added"]), (["line3"], ["changed three"]))
+        self.assertEqual((second["old_start"], second["added"]), (21, ["changed twenty"]))
+        self.assertNotEqual(first["id"], second["id"])
+
+    def test_a_removal_is_a_hunk_with_nothing_added(self):
+        [hunk] = self.stage("a.py", "".join(f"line{i}\n" for i in range(30) if i != 7))
+        self.assertEqual((hunk["old_start"], hunk["old_count"], hunk["new_count"], hunk["removed"], hunk["added"]),
+                         (8, 1, 0, ["line7"], []))
+
+    def test_a_new_file_is_one_hunk(self):
+        [hunk] = self.stage("docs/new.md", "one\n\ntwo\n\nthree\n")
+        self.assertEqual((hunk["file"], hunk["old_start"], hunk["old_count"], hunk["new_count"]), ("docs/new.md", 0, 0, 5))
+
+    def test_generated_and_binary_files_have_no_hunks(self):
+        (self.root / ".gitattributes").write_text("gen.txt linguist-generated\n")
+        git(self.root, "add", ".gitattributes")
+        (self.root / "blob.bin").write_bytes(b"\x00\x01\x02")
+        git(self.root, "add", "blob.bin")
+        self.assertEqual([h["file"] for h in self.stage("gen.txt", "generated\n")], [".gitattributes"])
+
+    def test_the_fingerprint_ignores_spacing_and_follows_words(self):
+        self.commit("doc.md", "intro\n", "doc")
+        [plain] = self.stage("doc.md", "intro\nthe validator rejects an empty list\n")
+        [spaced] = self.stage("doc.md", "intro\n  the validator   rejects an empty list\n")
+        [reworded] = self.stage("doc.md", "intro\nthe validator accepts an empty list\n")
+        self.assertEqual(plain["patch_id"], spaced["patch_id"])
+        self.assertNotEqual(plain["patch_id"], reworded["patch_id"])
+
+    def test_a_renamed_file_keeps_its_text_as_added(self):
+        self.commit("old.md", "".join(f"para {i}\n" for i in range(10)), "doc")
+        git(self.root, "mv", "old.md", "new.md")
+        hunks = self.stage("new.md", "".join(f"para {i}\n" for i in range(10)) + "a new claim\n")
+        self.assertEqual([(h["file"], h["added"]) for h in hunks], [("new.md", ["a new claim"])])
+
+    def test_nothing_staged_is_no_hunks(self):
+        self.assertEqual(worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root))), [])
+
+
+class StagedTree(Repo):
+    def test_a_file_is_read_from_the_tree_not_the_checkout(self):
+        (self.root / "a.py").write_text("staged\n")
+        git(self.root, "add", "a.py")
+        (self.root / "a.py").write_text("unstaged\n")
+        tree = worktree.staged_tree(str(self.root))
+        self.assertEqual(worktree.tree_text(str(self.root), tree, "a.py"), "staged\n")
+        self.assertIsNone(worktree.tree_text(str(self.root), tree, "notes/x.md"))
+        self.assertEqual(worktree.tree_blob(str(self.root), tree, "a.py"), git(self.root, "rev-parse", ":a.py"))
+        self.assertIsNone(worktree.tree_blob(str(self.root), tree, "missing.py"))
+
+    def test_unstaged_tracked_changes_are_named(self):
+        (self.root / "a.py").write_text("edited\n")
+        (self.root / "new.py").write_text("untracked\n")
+        self.assertEqual(worktree.unstaged(str(self.root)), ["a.py"])
+
+    def test_a_commit_that_concludes_a_merge_is_known(self):
+        self.assertFalse(worktree.concluding(str(self.root)))
+        Path(git(self.root, "rev-parse", "--absolute-git-dir"), "CHERRY_PICK_HEAD").write_text("x\n")
+        self.assertTrue(worktree.concluding(str(self.root)))
+
+
 if __name__ == "__main__":
     unittest.main()

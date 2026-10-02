@@ -21,7 +21,7 @@ class ValidateAssessment(unittest.TestCase):
         body = {"round_ref": self.rnd["ref"], "brief_token": "tok", "round_verdict": "PATCH",
                 "findings": [entry(i) for i in self.ids], "rationale": "x", "next_step": "y"}
         body.update(overrides)
-        return assessment.validate_assessment(body, self.rnd, policy.admissible_verdicts(self.rnd), burden=burden, token="tok")
+        return assessment.validate_assessment(body, self.ids, policy.admissible_verdicts(self.rnd), burden=burden, token="tok")
 
     def test_complete_consistent_patch_is_valid(self):
         self.assertEqual(self.check(), [])
@@ -38,7 +38,8 @@ class ValidateAssessment(unittest.TestCase):
         rnd = ledger.current_round(state)
         body = {"round_ref": rnd["ref"], "brief_token": "tok", "round_verdict": "PATCH",
                 "findings": [entry(rnd["findings"][0]["id"])], "rationale": "x", "next_step": "y"}
-        errors = assessment.validate_assessment(body, rnd, policy.admissible_verdicts(rnd), burden=False, token="tok")
+        errors = assessment.validate_assessment(body, [f["id"] for f in rnd["findings"]], policy.admissible_verdicts(rnd),
+                                                burden=False, token="tok")
         self.assertTrue(any("PATCH" in e for e in errors))
 
     def test_class_fix_must_state_invariant_sites_and_how_they_were_enumerated(self):

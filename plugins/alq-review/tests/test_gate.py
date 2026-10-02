@@ -43,7 +43,9 @@ class Gate(Repo):
                                                                   '  "repo view"*) echo main ;;\n  *) exit 1 ;;\nesac\n')
         (stub / "gh").chmod(0o755)
         self.env = dict(os.environ, ALQ_REVIEW_STATE_DIR=str(self.state_dir), PATH=f"{stub}{os.pathsep}{os.environ['PATH']}",
-                        GH_OPEN_PR="7 main", GH_LOG=str(Path(self.tmp.name) / "gh.log"))
+                        GH_OPEN_PR="7 main", GH_LOG=str(Path(self.tmp.name) / "gh.log"),
+                        # The claim check has its own tests (test_claim_gate.py); here a commit is judged by the review alone.
+                        ALQ_REVIEW_CLAIM_CHECKS="log")
 
     def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": self.tmp.name, **extra}
@@ -284,6 +286,25 @@ class BrokenGate(Gate):
         out = self.edit(mode="nonsense")
         self.assertEqual(self.decision(out), "deny")
         self.assertIn("ALQ_REVIEW_MODE=log", self.reason(out))
+
+    def test_a_fault_in_the_round_refuses_a_report(self):
+        _, args = self.launch()
+        reviewer = args["waves"][0][0]
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.current_round(state)["expected"] = None
+        out = self.report(reviewer, [], args["round_ref"])
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("crashed", self.reason(out))
+
+    def test_an_ill_shaped_report_is_left_to_the_schema_and_logged(self):
+        _, args = self.launch()
+        reviewer = args["waves"][0][0]
+        out = self.hook("PreToolUse", "StructuredOutput", {"round_ref": args["round_ref"], "findings": [{}]},
+                        agent_id="a1", agent_type=reviewer["type"])
+        self.assertNotEqual(self.decision(out), "deny")
+        logged = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        self.assertEqual((logged[-1]["action"], logged[-1]["decision"]), ("output", "ill-shaped"))
 
     def test_a_crash_doing_bookkeeping_still_fails_open(self):
         """Nothing is being guarded here, so a crash must not stand between a session and its work."""

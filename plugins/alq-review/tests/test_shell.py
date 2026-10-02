@@ -88,6 +88,30 @@ class Classify(unittest.TestCase):
                 command = f"gh api {read}repos/acme/demo/issues/12/comments --jq '.[] | select(.body | contains(\"{text}\"))'"
                 self.assertEqual(kinds(command), [], command)
 
+    def test_a_commit_that_stages_is_marked(self):
+        for command in ("git commit -a -m x", "git commit --all -m x", "git commit -am x", "git commit -i a.py -m x",
+                        "git commit --include -m x a.py", "git commit -o a.py -m x", "git commit --only -m x a.py",
+                        "git commit -m x a.py", "git commit -m x -- a.py", "git commit --pathspec-from-file=f -m x"):
+            [action] = shell.classify(command, "/work")
+            self.assertTrue(action.staging, command)
+
+    def test_option_values_are_not_paths(self):
+        for command in ("git commit -m x", "git commit -m 'a b'", "git commit -F msg.txt", "git commit --amend --no-edit",
+                        "git commit -qm x", "git commit --author 'A <a@b>' -m x", "git commit -C HEAD",
+                        "git commit --message=x", "git commit --fixup HEAD", "git commit -F - <<'EOF'\nx a.py\nEOF"):
+            [action] = shell.classify(command, "/work")
+            self.assertFalse(action.staging, command)
+
+    def test_a_commit_stands_alone_only_after_cd(self):
+        for command in ("git add -A && git commit -m x", "git commit -m x; echo done", "true && git commit -m x",
+                        "git commit -m x 2>&1 | tail -3"):
+            commits = [a for a in shell.classify(command, "/work") if a.kind == "commit"]
+            self.assertEqual([a.alone for a in commits], [False], command)
+        [action] = shell.classify("cd /x && git commit -m y", "/work")
+        self.assertEqual((action.alone, action.cwd), (True, "/x"))
+        [action] = shell.classify("git commit -m y", "/work")
+        self.assertTrue(action.alone)
+
     def test_agent_unlocking_its_own_gate_is_recognised(self):
         self.assertEqual(kinds("python3 /p/alq-review/scripts/ledger.py unlock --worktree /w --reason x"), [("unlock", "/work")])
 

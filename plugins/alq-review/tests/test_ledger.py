@@ -159,6 +159,51 @@ class Store(unittest.TestCase):
                 raise RuntimeError("boom")
         self.assertEqual(list(ledger.all_states()), [])
 
+    def test_claim_tables_are_keyed_by_repo_and_what_they_fingerprint(self):
+        self.assertEqual(self.primary_key("claim_checks"), ["repo", "tree"])
+        self.assertEqual(self.primary_key("claim_reads"), ["repo", "patch_id"])
+        self.assertEqual(self.primary_key("claim_verdicts"), ["repo", "claim_id"])
+        self.assertEqual(self.primary_key("claim_holds"), ["repo", "base", "file"])
+
+    def test_claim_records_round_trip_inside_one_transaction(self):
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertIsNone(claims.check("t1"))
+            claims.save_check({"tree": "t1", "status": "reading"})
+            claims.save_read("p1", {"kind": "PROSE", "claims": []})
+            claims.save_verdict("c1", {"evidence_blobs": {"a.py": "b1"}})
+            claims.save_holds("base1", "README.md", [{"refusals": 1}])
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertEqual(claims.check("t1")["status"], "reading")
+            self.assertEqual(claims.read("p1")["kind"], "PROSE")
+            self.assertEqual(claims.verdict("c1")["evidence_blobs"], {"a.py": "b1"})
+            self.assertEqual(claims.holds("base1", "README.md"), [{"refusals": 1}])
+            self.assertEqual(claims.holds("base1", "other.md"), [])
+        with ledger.open_claims("other/repo") as claims:
+            self.assertIsNone(claims.check("t1"))
+
+    def test_a_failed_claims_transaction_writes_nothing(self):
+        with self.assertRaises(RuntimeError):
+            with ledger.open_claims("acme/demo") as claims:
+                claims.save_check({"tree": "t1", "status": "reading"})
+                raise RuntimeError("boom")
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertIsNone(claims.check("t1"))
+
+    def test_an_older_ledger_file_gains_the_claim_tables(self):
+        self.tmp_root = ledger.state_root()
+        self.tmp_root.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(self.tmp_root / "ledger.db")) as conn:
+            conn.execute("CREATE TABLE ledgers (repo TEXT NOT NULL, pr INTEGER NOT NULL, doc TEXT NOT NULL, "
+                         "PRIMARY KEY (repo, pr))")
+        with ledger.open_claims("acme/demo") as claims:
+            claims.save_check({"tree": "t1", "status": "reading"})
+
+    def test_held_claims_are_found_by_query(self):
+        with ledger.open_claims("acme/demo") as claims:
+            claims.save_holds("base1", "README.md", [{"claims": ["abc"], "refusals": 3}])
+        self.assertEqual(ledger.claim_holders("abc"), [("acme/demo", "base1", "README.md")])
+        self.assertEqual(ledger.claim_holders("zzz"), [])
+
     def test_two_writers_to_one_ledger_take_turns(self):
         """The second reads only after the first has written, so neither change is lost."""
         first_inside = threading.Event()

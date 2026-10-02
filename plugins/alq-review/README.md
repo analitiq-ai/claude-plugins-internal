@@ -56,6 +56,21 @@ that is under review.
    patterns in `config.json`: README, CLAUDE.md, AGENTS.md, ADRs, rule files) and no spec folder is
    refused too. Run it by hand with `python3 scripts/settled_design.py <spec folder>`, or as the gate
    runs it with `python3 scripts/settled_design.py --branch <checkout> <branch it merges into>`.
+7. **Claims are checked before they are committed.** Every `git commit` an agent runs, with or without a PR,
+   is refused until the `claim-check` workflow has checked that exact staged tree. Readers label each hunk
+   code, prose or mixed and quote each claim its text makes, in one of eight categories; a judge per claim
+   about this repo's own behaviour (K1) tries to break it against the code and rules it `CORRECT`, `WRONG` or
+   `UNSURE`, citing `path:line` evidence the gate checks against the staged tree. A `WRONG` refuses the
+   commit with the claim, its failing case and its evidence; `UNSURE` is a note, also when every verdict is
+   one. A check whose readers or judges did not all report refuses as a failed check, never as a wrong claim. The commit
+   must run alone (only `cd` before it) and stage nothing itself (`-a`, `-i`, `-o`, pathspecs), since what was
+   checked must be what lands; an empty commit or one that concludes a merge, cherry-pick or revert passes.
+   A hunk with the same words keeps its read, and a `CORRECT` stands while every file it cited is unchanged
+   (not for every/only/all/exactly/always/never claims). An author who thinks a verdict is wrong contests it
+   with a `path:line` or an `https://` page; a fresh judge, which may read only the cited hosts, upholds it or
+   rejects it, and a rejection counts as a refusal. After 3 refusals of one hunk the agent must stop and ask
+   the user, who lets the words stand by typing `unlock claim-<id>`. What the repo's own commit hook changes
+   during the commit is cosmetic and is not checked again.
 
 ## How an agent uses it
 
@@ -63,6 +78,8 @@ that is under review.
 Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout'})                  # internal review
 Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', stage: 'audit'})  # anti-pattern audit
 Workflow(name='alq-review:assess-round', args={worktree: '/abs/checkout'})                  # after the poller reports findings
+Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout'})                   # before git commit
+Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout', contests: [{claim: '<id>', evidence: 'path:line'}]})
 ```
 
 Agents do not need to be told any of this: every refusal names the next legal step.
@@ -76,6 +93,10 @@ can be checked against real sessions before they can stall one.
 The spec-folder checks (6) have their own `spec_checks` setting, overridden by `ALQ_REVIEW_SPEC_CHECKS`.
 It ships `enforce`; the checks refuse only when both settings enforce.
 
+The claim check (7) has its own `claim_checks` setting, overridden by `ALQ_REVIEW_CLAIM_CHECKS`, and refuses
+only when both settings enforce. `claim_warn_over` (20) is the number of judged claims above which the
+workflow's result suggests splitting the change.
+
 ## State
 
 `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
@@ -86,6 +107,8 @@ It ships `enforce`; the checks refuse only when both settings enforce.
   - `ledgers (repo, pr) -> doc` - one row per PR: its rounds, findings, assessments, epoch and unlocks
   - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
+  - `claim_checks (repo, tree)`, `claim_reads (repo, patch_id)`, `claim_verdicts (repo, claim_id)`,
+    `claim_holds (repo, base, file)` - the claim checks, keyed by repo, git's own fingerprints and the claim id, since a commit has no PR
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`tests/test_poller_contract.py` pins the two ends together)
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
@@ -106,9 +129,13 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
 | `scripts/settled_design.py` | the settled-design check over one spec folder or a branch |
 | `scripts/config.py` | reads `config.json` |
+| `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |
+| `scripts/claimgate.py` | the claim check's hook handlers |
+| `scripts/hookio.py` | settings, refusals, `gate.log` and session state, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
+| `agents/claim-*.md` | the claim reader, judge and contest judge |
 
 Tests: `python3 -m unittest discover -s tests`
 
