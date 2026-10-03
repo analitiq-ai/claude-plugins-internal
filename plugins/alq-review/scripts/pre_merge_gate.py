@@ -26,8 +26,10 @@ for the reason codex-gate gives: a 7-character prefix is cheap enough to collide
 on purpose.
 
 A PR the org pr-gate passed as a version-only release (its `internal-review`
-status, created by the Actions app, reads "version-only release: OLD -> NEW")
-needs no attestation: it only moves its package's own version up.
+check run, posted by the analitiq-pr-gate App, is titled "version-only release:
+OLD -> NEW") needs no attestation: it only moves its package's own version up.
+alq-review's github.py reads that verdict; this hook imports it from the same
+checkout rather than keeping a copy that drifts when the gate changes.
 
 The user can overrule the reviewers. Analitiq-Bot is an org admin, and the user and
 every agent session act as it, so GitHub cannot tell the user's override from an
@@ -60,12 +62,6 @@ MARKER = "<!-- analitiq-internal-review -->"
 # reason. Ten hex digits minimum -- see the module docstring.
 REVIEWED_COMMIT = re.compile(r"\*{0,2}Reviewed commit:\*{0,2}\s*[`'\"]?([0-9a-f]{10,40})", re.I)
 
-# How the org pr-gate (analitiq-org-github) marks a version-only release on `internal-review`: a PR that only moves
-# its package's own version up needs no internal review. Only a status the Actions app created is its word: an
-# agent's token could post the same text. Kept equal to alq-review's github.py by test_pre_merge_gate.py.
-RELEASE_CONTEXT = "internal-review"
-RELEASE_CREATOR = "github-actions[bot]"
-RELEASE_PREFIX = "version-only release:"
 PR_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/pull/\d+$")
 
 GATED = {"merge", "ready"}
@@ -260,30 +256,14 @@ def attested(comments: list[dict], head: str) -> bool:
     return False
 
 
-def version_only_release(statuses: list[dict]) -> str | None:
-    """pr-gate's version-only release description among a commit's statuses (newest first), or None. Only the
-    newest status of the context counts: a later push re-evaluation may have demoted it."""
-    newest = next((s for s in statuses if s.get("context") == RELEASE_CONTEXT), None)
-    if (newest is None or newest.get("state") != "success"
-            or (newest.get("creator") or {}).get("login") != RELEASE_CREATOR
-            or not (newest.get("description") or "").startswith(RELEASE_PREFIX)):
-        return None
-    return newest["description"]
-
-
 def released(pr: dict, head: str) -> bool:
     """Did pr-gate pass the head as a version-only release? An unreadable answer is no."""
+    # Imported here, under main()'s refuse-on-error guard: a reader that fails to load must close the gate, not crash
+    # the hook, which Claude Code treats as a non-blocking error.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plugins" / "alq-review" / "scripts"))
+    import github
     repo = PR_URL.match(pr.get("url") or "")
-    if repo is None:
-        return False
-    try:
-        done = subprocess.run(["gh", "api", f"repos/{repo.group(1)}/commits/{head}/statuses"],
-                              capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    if done.returncode != 0:
-        return False
-    return version_only_release(json.loads(done.stdout)) is not None
+    return repo is not None and github.released(repo.group(1), head) is not None
 
 
 def how_to_attest(number: int, head: str, verb: str) -> str:

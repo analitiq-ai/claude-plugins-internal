@@ -3,21 +3,22 @@
 # blocks it, once.
 #
 # This script decides nothing about Codex's verdict and nothing about merging.
-# The org-wide pr-gate workflow turns Codex's answer into the `codex-review`
-# status (WAIVED included) and an internal-review attestation into
-# `internal-review`; GitHub's mergeStateStatus weighs those against the branch
-# rules. The poller waits for that picture to be complete and prints it.
+# The org-wide pr-gate turns Codex's answer into the `codex-review` check run
+# (WAIVED included) and an internal-review attestation into `internal-review`,
+# both posted by the analitiq-pr-gate App; GitHub's mergeStateStatus weighs
+# those against the branch rules. The poller waits for that picture to be complete and prints it.
 #
 # SETTLED means every one of:
 #   - Codex answered since the trigger: a comment, a review, or a 👍 on the PR
 #     description or on the `@codex review` comment;
-#   - no check is running (the gate statuses are verdicts, not work, so their
-#     pending state is reported rather than waited on);
+#   - no check is running except the gate runs and those passed to
+#     --ignore-check (a gate run is a verdict, not work: its pending state is
+#     waited on only under the next rule);
 #   - with nothing to triage, `codex-review` is not older than Codex's answer
 #     on the PR (a comment, a review, or a 👍 on the description), so a verdict
 #     has reached the gate before the round is judged — for GATE_SWEEP_MINUTES
-#     after the answer only: pr-gate does not re-post an unchanged status, so
-#     past that an older status is the verdict;
+#     after the answer only: pr-gate does not re-post an unchanged run, so
+#     past that an older run is the verdict;
 #   - GitHub has finished computing mergeability.
 # A draft settles at once: Codex does not review drafts.
 #
@@ -27,7 +28,7 @@
 # reviews each push incrementally and does not repeat it on a later commit.
 #
 # Everything comes from one GraphQL snapshot per poll, so the threads, the
-# statuses and Codex's answer in a report are one consistent picture.
+# checks and Codex's answer in a report are one consistent picture.
 #
 # Usage: poll-pr-review.sh <owner/repo> <pr-number> [trigger-comment-id]
 #                          [--minutes N] [--interval S] [--ignore-check <name>]...
@@ -47,6 +48,8 @@ set -euo pipefail
 CODEX="chatgpt-codex-connector"
 TRIGGER_TEXT="@codex review"
 GATE_CONTEXTS='["codex-review","internal-review"]'
+# Only the App's runs are the gate's word: anything else may carry the same name.
+GATE_APP="analitiq-pr-gate"
 # Codex's verdict comment triggers pr-gate within minutes; a 👍 or a PR review
 # triggers nothing, so for those the poller dispatches a sweep. Its 15-min
 # schedule is not relied on: GitHub runs it hours apart.
@@ -108,7 +111,7 @@ query($owner:String!, $name:String!, $pr:Int!) {
           pageInfo { hasNextPage }
           nodes {
             __typename
-            ... on CheckRun { name status conclusion detailsUrl }
+            ... on CheckRun { name status conclusion detailsUrl title startedAt checkSuite { app { slug } } }
             ... on StatusContext { context state description targetUrl createdAt }
           }
         } } } }
@@ -170,18 +173,21 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | ([$codex_said_at, $thumbs_on_body[].createdAt] | max) as $codex_answered_at
 
 | [ $rollup.nodes[]
-    | if .__typename == "CheckRun"
-      then { name, url: (.detailsUrl // ""), description: null, createdAt: null,
+    | if .__typename == "CheckRun" and .checkSuite.app.slug == $gate_app and (.name as $n | $gates | index($n))
+      then { name, url: (.detailsUrl // ""), description: .title, createdAt: .startedAt, gate: true,
+             state: (if .status == "COMPLETED" then (.conclusion // "UNKNOWN") else "PENDING" end) }
+      elif .__typename == "CheckRun"
+      then { name, url: (.detailsUrl // ""), description: null, createdAt: null, gate: false,
              state: (if .status == "COMPLETED" then (.conclusion // "UNKNOWN") else "RUNNING" end) }
-      else { name: .context, url: (.targetUrl // ""), description, createdAt, state } end
+      else { name: .context, url: (.targetUrl // ""), description, createdAt, state, gate: false } end
     | .ignored = (.name as $n | $ignore | index($n) != null)
     | .passing = (.state | IN("SUCCESS", "NEUTRAL", "SKIPPED"))
     | .unfinished = (.state | IN("RUNNING", "PENDING", "EXPECTED")) ] as $all_contexts
 | [$all_contexts[] | select(.ignored | not)] as $contexts
 | [$all_contexts[] | select(.ignored and (.passing | not)) | {name, state, url}] as $ignored_not_passing
-| [$contexts[] | select(.name as $n | $gates | index($n))] as $gate_statuses
-| ($gate_statuses | map(select(.name == "codex-review")) | first) as $codex_gate
-| [$contexts[] | select(.unfinished) | select(.name as $n | $gates | index($n) | not)] as $running
+| [$contexts[] | select(.gate)] as $gate_runs
+| ($gate_runs | map(select(.name == "codex-review")) | first) as $codex_gate
+| [$contexts[] | select(.unfinished) | select(.gate | not)] as $running
 | [$contexts[] | select((.passing or .unfinished) | not) | {name, state, url}] as $failing
 
 | [ $pr.reviewThreads.nodes[]
@@ -207,8 +213,8 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
     gate_lags: ($codex_answered_at != null and $codex_gate != null and $codex_gate.state == "PENDING"
                 and $codex_gate.createdAt < $codex_answered_at
                 and (now - ($codex_answered_at | fromdateiso8601)) < $sweep_minutes * 60),
-    codex_gate_missing: ($codex_gate == null),
-    gates: $gate_statuses, running: $running, failing: $failing, ignored: $ignored_not_passing, threads: $threads,
+    codex_gate_missing: ([$all_contexts[] | select(.gate and .name == "codex-review")] | length == 0),
+    gates: $gate_runs, running: $running, failing: $failing, ignored: $ignored_not_passing, threads: $threads,
     gate_comments: [ $codex_comments[] | { url, at: .createdAt, gist: (.body | strip_markup | first_line | clip),
                                           approves: ($codex_gate.state == "SUCCESS") } ],
     errors: ($overflow + $unparsed
@@ -226,8 +232,8 @@ end'
 
 REPORT='
 "== \($repo)#\($pr) @ \(.head[0:10]): mergeStateStatus=\(.merge), reviewDecision=\(.decision // "none")",
-(if (.gates | length) > 0 then "Gate statuses:", (.gates[] | "  \(.name): \(.state) — \(.description // "")") else empty end),
-(if .codex_gate_missing then "WARNING: no codex-review status on \(.head[0:10]); the pr-gate workflow is not posting on this repo." else empty end),
+(if (.gates | length) > 0 then "Gate check runs:", (.gates[] | "  \(.name): \(.state) — \(.description // "")") else empty end),
+(if .codex_gate_missing then "WARNING: no codex-review check run from the \($gate_app) App on \(.head[0:10])." else empty end),
 (if .thumbs_on_trigger_only then "Codex answered with only a 👍 on the @codex review comment. The gate reads Codex'"'"'s reactions on the PR description only: comment `@codex review` to get a verdict comment." else empty end),
 (.gate_comments | map(select(.approves | not)) | if length > 0 then
    "Codex comments since the trigger (codex-review is not success):",
@@ -245,12 +251,12 @@ REPORT='
 snapshot() {
   gh api graphql -f query="$SNAPSHOT_QUERY" -F owner="$owner" -F name="$name" -F pr="$pr" \
     | jq --arg codex "$CODEX" --arg trigger_text "$TRIGGER_TEXT" --arg trigger_id "$trigger_id" \
-         --argjson gates "$GATE_CONTEXTS" --argjson ignore "$ignore_json" \
+         --argjson gates "$GATE_CONTEXTS" --arg gate_app "$GATE_APP" --argjson ignore "$ignore_json" \
          --argjson sweep_minutes "$GATE_SWEEP_MINUTES" "$ANALYZE"
 }
 
 report() {
-  jq -r --arg repo "$repo" --arg pr "$pr" "$REPORT" <<<"$1"
+  jq -r --arg repo "$repo" --arg pr "$pr" --arg gate_app "$GATE_APP" "$REPORT" <<<"$1"
 }
 
 # Hand the outcome to the alq-review gate (.claude/plugins/alq-review), which
@@ -303,7 +309,7 @@ settle() {
     hand_over "$state" clean
     exit 0
   fi
-  echo "BLOCKED: nothing to triage, but GitHub reports mergeStateStatus=$merge. Act on the gate statuses and notes above."
+  echo "BLOCKED: nothing to triage, but GitHub reports mergeStateStatus=$merge. Act on the gate check runs and notes above."
   exit 4
 }
 

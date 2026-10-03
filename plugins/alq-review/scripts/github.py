@@ -10,10 +10,10 @@ import subprocess
 
 SPEC_MARKER = "<!-- analitiq-spec -->"
 
-# How the org pr-gate (analitiq-org-github) marks a version-only release on `internal-review`. Only a status the
-# Actions app created is its word: an agent's token could post the same text.
-RELEASE_CONTEXT = "internal-review"
-RELEASE_CREATOR = "github-actions[bot]"
+# How the org pr-gate (analitiq-ai/.github pr-gate.js) marks a version-only release: the title of its
+# `internal-review` check run. Only a run the App posted is its word: an agent's token could post the same text.
+GATE_APP = "analitiq-pr-gate"
+RELEASE_CHECK = "internal-review"
 RELEASE_PREFIX = "version-only release:"
 
 
@@ -62,18 +62,22 @@ def pr_target(slug: str, branch: str) -> tuple[int, str] | None:
     return int(number), target
 
 
-def version_only_release(statuses: list[dict]) -> str | None:
-    """pr-gate's version-only release description among a commit's statuses (newest first), or None. Only the
-    newest status of the context counts: a later push re-evaluation may have demoted it."""
-    newest = next((s for s in statuses if s.get("context") == RELEASE_CONTEXT), None)
-    if (newest is None or newest.get("state") != "success"
-            or (newest.get("creator") or {}).get("login") != RELEASE_CREATOR
-            or not (newest.get("description") or "").startswith(RELEASE_PREFIX)):
+def version_only_release(runs: list[dict]) -> str | None:
+    """pr-gate's version-only release title among a commit's check runs, or None. Only the App's newest
+    `internal-review` run counts, since a later re-evaluation may have demoted it. Newest is ordered as pr-gate's own
+    newestRun orders it: by start, then by id, which GitHub hands out in order."""
+    own = [r for r in runs if r["name"] == RELEASE_CHECK and (r.get("app") or {}).get("slug") == GATE_APP]
+    if not own:
         return None
-    return newest["description"]
+    newest = max(own, key=lambda r: (r["started_at"], r["id"]))
+    title = (newest.get("output") or {}).get("title") or ""
+    if newest["status"] != "completed" or newest["conclusion"] != "success" or not title.startswith(RELEASE_PREFIX):
+        return None
+    return title
 
 
 def released(slug: str, commit: str) -> str | None:
     """Whether pr-gate passed `commit` as a version-only release; None also when gh cannot answer."""
-    found = _gh("api", f"repos/{slug}/commits/{commit}/statuses")
-    return version_only_release(json.loads(found)) if found else None
+    found = _gh("api", "--paginate", f"repos/{slug}/commits/{commit}/check-runs?check_name={RELEASE_CHECK}",
+                "--jq", ".check_runs[]")
+    return version_only_release([json.loads(line) for line in found.splitlines()]) if found else None

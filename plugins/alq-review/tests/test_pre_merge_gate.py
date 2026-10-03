@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import importlib.util
 import unittest
 from pathlib import Path
 
@@ -96,72 +95,57 @@ class MergeOverride(Hook):
         self.assertEqual(self.merge(), "deny")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-def load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
 
 RELEASE = "version-only release: 1.0.0 → 1.0.1"
 
 
-def status(state="success", creator="github-actions[bot]", description=RELEASE, context="internal-review"):
-    return {"context": context, "state": state, "description": description, "creator": {"login": creator}}
+def gate_run(title=RELEASE, app="analitiq-pr-gate", conclusion="success", started="2026-10-01T10:00:00Z", run_id=1):
+    return {"id": run_id, "name": "internal-review", "app": {"slug": app}, "started_at": started,
+            "status": "completed" if conclusion else "in_progress", "conclusion": conclusion,
+            "output": {"title": title}}
 
 
 class VersionOnlyRelease(Hook):
-    """pr-gate passes a version-only release PR without review; it may merge and leave draft with no attestation."""
+    """pr-gate passes a version-only release PR without review; it may merge and leave draft with no attestation.
+    The reading of the gate's check runs is alq-review's (github.py), tested there; this only proves the hook uses it."""
 
-    def github_has_release(self, *statuses, draft=False):
+    def github_has_release(self, *runs, draft=False):
         view = {"number": 12, "headRefOid": HEAD, "isDraft": draft, "url": "https://github.com/acme/demo/pull/12",
                 "comments": []}
         (self.bin / "view.json").write_text(json.dumps(view))
-        (self.bin / "statuses.json").write_text(json.dumps(list(statuses)))
-        self.gh(f'case "$*" in *repos/acme/demo/commits/{HEAD}/statuses*) cat {self.bin}/statuses.json ;; '
-                f'"pr view"*) cat {self.bin}/view.json ;; *) exit 1 ;; esac')
+        runs_json = self.bin / "runs.json"
+        runs_json.write_text(json.dumps({"total_count": len(runs), "check_runs": list(runs)}))
+        self.gh(f'case "$*" in "pr view"*) exec cat {self.bin}/view.json ;; '
+                f'*repos/acme/demo/commits/{HEAD}/check-runs?check_name=internal-review*) ;; *) exit 1 ;; esac\n'
+                f'while [ $# -gt 0 ]; do [ "$1" = --jq ] && exec jq -c "$2" {runs_json}; shift; done\ncat {runs_json}')
 
     def test_a_version_only_release_merges_without_an_attestation(self):
-        self.github_has_release(status())
+        self.github_has_release(gate_run())
         self.assertIsNone(self.merge("gh pr merge 12 --merge"))
 
     def test_a_version_only_release_leaves_draft_without_an_attestation(self):
-        self.github_has_release(status(), draft=True)
+        self.github_has_release(gate_run(), draft=True)
         self.assertIsNone(self.merge("gh pr ready 12"))
 
-    def test_the_same_words_from_any_other_creator_are_not_trusted(self):
-        self.github_has_release(status(creator="Analitiq-Bot"))
-        self.assertEqual(self.merge("gh pr merge 12 --merge"), "deny")
-
-    def test_a_newer_status_that_demoted_the_release_wins(self):
-        self.github_has_release(status(state="pending", description="Waiting for an internal review"), status())
+    def test_the_same_words_from_any_other_app_are_not_trusted(self):
+        self.github_has_release(gate_run(app="github-actions"))
         self.assertEqual(self.merge("gh pr merge 12 --merge"), "deny")
 
     def test_a_release_does_not_license_an_admin_merge(self):
-        self.github_has_release(status())
+        self.github_has_release(gate_run())
         self.assertEqual(self.merge("gh pr merge 12 --admin --merge"), "deny")
 
+    def test_a_hook_that_cannot_load_the_release_reader_refuses(self):
+        self.github_has_release(gate_run())
+        moved = Path(self.tmp.name) / "hooks" / GATE.name
+        moved.parent.mkdir()
+        moved.write_text(GATE.read_text())
+        done = subprocess.run([sys.executable, str(moved)], capture_output=True, text=True, env=self.env,
+                              input=json.dumps({"hook_event_name": "PreToolUse", "session_id": "s1", "tool_name": "Bash",
+                                                "tool_input": {"command": "gh pr merge 12 --merge"}}))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
 
-class SameReleaseVerdict(unittest.TestCase):
-    """The plugin runs from its install cache, so this hook keeps its own copy of the release check; they must agree."""
 
-    def test_the_merge_gate_and_the_review_gate_read_a_release_the_same_way(self):
-        hook = load("pre_merge_gate", GATE)
-        plugin = load("alq_github", GATE.parent.parent / "plugins" / "alq-review" / "scripts" / "github.py")
-        cases = [
-            [status()],
-            [status(creator="Analitiq-Bot")],
-            [status(state="pending"), status()],
-            [status(description="Internal review clean on 0123456789")],
-            [status(context="codex-review"), status()],
-            [status(context="codex-review")],
-            [{"context": "internal-review", "state": "success", "description": RELEASE, "creator": None}],
-            [],
-        ]
-        for statuses in cases:
-            self.assertEqual(hook.version_only_release(statuses) is not None,
-                             plugin.version_only_release(statuses) is not None, statuses)
+if __name__ == "__main__":
+    unittest.main()

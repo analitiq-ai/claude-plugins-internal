@@ -229,33 +229,49 @@ class InternalRound(Gate):
 class ReleaseReady(Gate):
     """pr-gate passes a version-only release PR without review; the gate lets it out of draft on that alone."""
 
-    def github_statuses(self, *statuses):
-        path = Path(self.tmp.name) / "statuses.json"
-        path.write_text(json.dumps(list(statuses)))
+    def github_runs(self, *runs):
+        """The head's `internal-review` check runs as the API returns them, filtered by real jq when gh is given --jq."""
+        path = Path(self.tmp.name) / "runs.json"
+        path.write_text(json.dumps({"total_count": len(runs), "check_runs": list(runs)}))
         (Path(self.tmp.name) / "bin" / "gh").write_text(
-            f'#!/bin/sh\ncase "$*" in *commits/{self.head}/statuses*) cat {path} ;; *) exit 1 ;; esac\n')
+            f'#!/bin/sh\ncase "$*" in *commits/{self.head}/check-runs?check_name=internal-review*) ;; *) exit 1 ;; esac\n'
+            f'while [ $# -gt 0 ]; do [ "$1" = --jq ] && exec jq -c "$2" {path}; shift; done\ncat {path}\n')
 
-    def status(self, state="success", creator="github-actions[bot]", description="version-only release: 1.0.0 → 1.0.1",
-               context="internal-review"):
-        return {"context": context, "state": state, "description": description, "creator": {"login": creator}}
+    def gate_run(self, title="version-only release: 1.0.0 → 1.0.1", app="analitiq-pr-gate", conclusion="success",
+            started="2026-10-01T10:00:00Z", run_id=1):
+        return {"id": run_id, "name": "internal-review", "app": {"slug": app}, "started_at": started,
+                "status": "completed" if conclusion else "in_progress", "conclusion": conclusion,
+                "output": {"title": title}}
 
     def ready(self):
         return self.decision(self.hook("PreToolUse", "Bash", {"command": f"cd {self.root} && gh pr ready"}))
 
     def test_a_version_only_release_on_the_head_may_be_marked_ready_without_a_round(self):
-        self.github_statuses(self.status())
+        self.github_runs(self.gate_run())
         self.assertIsNone(self.ready())
 
-    def test_the_same_words_posted_by_anyone_but_the_actions_bot_are_not_trusted(self):
-        self.github_statuses(self.status(creator="Analitiq-Bot"))
+    def test_the_same_words_from_any_other_app_are_not_trusted(self):
+        self.github_runs(self.gate_run(app="github-actions"))
         self.assertEqual(self.ready(), "deny")
 
-    def test_only_the_newest_internal_review_status_counts(self):
-        self.github_statuses(self.status(state="pending", description="Waiting for an internal review"), self.status())
+    def test_an_unfinished_run_is_not_a_release(self):
+        self.github_runs(self.gate_run(conclusion=None))
         self.assertEqual(self.ready(), "deny")
 
-    def test_an_ordinary_clean_internal_review_status_is_not_a_release(self):
-        self.github_statuses(self.status(description="Internal review clean on 0123456789"))
+    def test_the_newest_run_by_start_counts_wherever_the_api_lists_it(self):
+        demoted = self.gate_run(title="Waiting for an internal review", conclusion=None, started="2026-10-01T11:00:00Z",
+                           run_id=2)
+        self.github_runs(self.gate_run(), demoted)
+        self.assertEqual(self.ready(), "deny")
+        self.github_runs(demoted | {"started_at": "2026-10-01T09:00:00Z"}, self.gate_run())
+        self.assertIsNone(self.ready())
+
+    def test_runs_started_together_are_ordered_by_id(self):
+        self.github_runs(self.gate_run(title="Waiting for an internal review", conclusion=None, run_id=2), self.gate_run(run_id=1))
+        self.assertEqual(self.ready(), "deny")
+
+    def test_an_ordinary_clean_internal_review_is_not_a_release(self):
+        self.github_runs(self.gate_run(title="Internal review clean on 0123456789"))
         self.assertEqual(self.ready(), "deny")
 
 

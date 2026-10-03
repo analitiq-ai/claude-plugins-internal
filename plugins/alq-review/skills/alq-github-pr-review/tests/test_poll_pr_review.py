@@ -94,15 +94,17 @@ def check(name, status="COMPLETED", conclusion="SUCCESS"):
             "detailsUrl": f"https://ci.example/{name}"}
 
 
-def status(context, state, description, created):
-    return {"__typename": "StatusContext", "context": context, "state": state, "description": description,
-            "targetUrl": "", "createdAt": created}
+def gate(name, state, title, started, app="analitiq-pr-gate"):
+    """A pr-gate verdict as the App posts it: a check run, in progress until it passes or fails."""
+    return {"__typename": "CheckRun", "name": name, "status": "IN_PROGRESS" if state == "PENDING" else "COMPLETED",
+            "conclusion": None if state == "PENDING" else state, "title": title, "startedAt": started,
+            "detailsUrl": "", "checkSuite": {"app": {"slug": app}}}
 
 
 TRIGGER = comment(100, "Analitiq-Bot", "@codex review", TRIGGER_AT)
-WAITING = status("codex-review", "PENDING", "Waiting for a Codex review of abc1234567", at(0))
-ATTESTED = status("internal-review", "SUCCESS", "Internal review clean on abc1234567", at(0))
-CODEX_CLEAN = status("codex-review", "SUCCESS", "Codex found no major issues in abc1234567", at(12))
+WAITING = gate("codex-review", "PENDING", "Waiting for a Codex review of abc1234567", at(0))
+ATTESTED = gate("internal-review", "SUCCESS", "Internal review clean on abc1234567", at(0))
+CODEX_CLEAN = gate("codex-review", "SUCCESS", "Codex found no major issues in abc1234567", at(12))
 BODY_THUMBS = [(f"{CODEX}[bot]", at(12))]
 DISPATCH = f"api repos/{REPO}/dispatches -f event_type=pr-gate"
 
@@ -216,7 +218,7 @@ class Poller(unittest.TestCase):
         # Codex's answer may be final. Past the sweep it is reported, not awaited.
         long_ago = [comment(98, "Analitiq-Bot", "@codex review", at(-50)),
                     comment(101, CODEX, "Codex Review: Didn't find any major issues.", at(-40))]
-        unchanged = status("codex-review", "PENDING", "No Codex verdict names abc1234567", at(-55))
+        unchanged = gate("codex-review", "PENDING", "No Codex verdict names abc1234567", at(-55))
         done = self.poll(snapshot(comments=long_ago, contexts=[check("pytest"), unchanged, ATTESTED]), minutes="0")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertEqual(self.polls, 1)
@@ -254,15 +256,29 @@ class Poller(unittest.TestCase):
 
     def test_blocked_without_findings_names_the_pending_gate(self):
         codex = [TRIGGER, comment(101, CODEX, "Codex Review: Didn't find any major issues.", at(12))]
-        pending = status("internal-review", "PENDING", "Waiting for an internal review of abc1234567", at(0))
+        pending = gate("internal-review", "PENDING", "Waiting for an internal review of abc1234567", at(0))
         done = self.poll(snapshot(comments=codex, contexts=[check("pytest"), CODEX_CLEAN, pending]))
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn("BLOCKED", done.stdout)
         self.assertIn("Waiting for an internal review of abc1234567", done.stdout)
+        self.assertNotIn("WARNING: no codex-review", done.stdout)
         self.assertIsNone(self.drop())
 
+    def test_a_same_named_run_from_another_app_is_not_the_gate(self):
+        codex = [TRIGGER, comment(101, CODEX, "Codex Review: Didn't find any major issues.", at(12))]
+        forged = gate("codex-review", "SUCCESS", "Codex found no major issues in abc1234567", at(13), app="github-actions")
+        done = self.poll(snapshot(comments=codex, contexts=[check("pytest"), forged, ATTESTED]), minutes="0")
+        self.assertIn("WARNING: no codex-review check run", done.stdout)
+        self.assertNotIn("codex-review: SUCCESS", done.stdout)
+
+    def test_an_ignored_codex_review_run_is_not_reported_missing(self):
+        codex = [TRIGGER, comment(101, CODEX, "Codex Review: Didn't find any major issues.", at(12))]
+        done = self.poll(snapshot(comments=codex, contexts=[check("pytest"), CODEX_CLEAN, ATTESTED]), minutes="0",
+                         args=("--ignore-check", "codex-review"))
+        self.assertNotIn("WARNING: no codex-review", done.stdout)
+
     def test_the_waiver_is_printed(self):
-        waived = status("codex-review", "SUCCESS", "WAIVED: Codex is out of credits; abc1234567 was not reviewed", at(13))
+        waived = gate("codex-review", "SUCCESS", "WAIVED: Codex is out of credits; abc1234567 was not reviewed", at(13))
         codex = [TRIGGER, comment(101, CODEX, USAGE_LIMIT, at(12))]
         done = self.poll(snapshot(merge="CLEAN", comments=codex, contexts=[check("pytest"), waived, ATTESTED]))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -271,7 +287,7 @@ class Poller(unittest.TestCase):
     def test_a_thumbs_up_on_the_pr_body_is_waited_on_with_one_dispatched_sweep(self):
         # A reaction triggers no pr-gate run, so the gate is asked for a sweep,
         # once however long it takes to catch up.
-        counted = status("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
+        counted = gate("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
         lagging = snapshot(body_thumbs=BODY_THUMBS)
         caught_up = snapshot(merge="CLEAN", body_thumbs=BODY_THUMBS, contexts=[check("pytest"), counted, ATTESTED])
         done = self.poll(lagging, lagging, caught_up)
@@ -280,7 +296,7 @@ class Poller(unittest.TestCase):
         self.assertEqual(self.dispatches(), [DISPATCH])
 
     def test_a_thumbs_up_the_gate_does_not_count_is_reported_by_the_gates_reason(self):
-        not_tied = status("codex-review", "PENDING", "Codex's thumbs-up is not tied to abc1234567; comment @codex review", at(13))
+        not_tied = gate("codex-review", "PENDING", "Codex's thumbs-up is not tied to abc1234567; comment @codex review", at(13))
         done = self.poll(snapshot(body_thumbs=BODY_THUMBS, contexts=[check("pytest"), not_tied, ATTESTED]))
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn("Codex's thumbs-up is not tied to abc1234567; comment @codex review", done.stdout)
@@ -288,7 +304,7 @@ class Poller(unittest.TestCase):
         self.assertEqual(self.dispatches(), [])
 
     def test_a_failed_dispatch_is_announced_and_the_wait_goes_on(self):
-        counted = status("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
+        counted = gate("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
         done = self.poll(snapshot(body_thumbs=BODY_THUMBS),
                          snapshot(merge="CLEAN", body_thumbs=BODY_THUMBS, contexts=[check("pytest"), counted, ATTESTED]),
                          env_extra={"FAKE_GH_DISPATCH_FAILS": "1"})
@@ -302,7 +318,7 @@ class Poller(unittest.TestCase):
         self.assertEqual(self.dispatches(), [])
 
     def test_a_thumbs_up_on_the_pr_body_silences_the_trigger_comment_note(self):
-        counted = status("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
+        counted = gate("codex-review", "SUCCESS", "Codex found no major issues in abc1234567 (thumbs-up on the PR)", at(13))
         request = comment(100, "Analitiq-Bot", "@codex review", TRIGGER_AT, thumbs_up=BODY_THUMBS)
         done = self.poll(snapshot(merge="CLEAN", comments=[request], body_thumbs=BODY_THUMBS,
                                   contexts=[check("pytest"), counted, ATTESTED]))
@@ -403,7 +419,7 @@ class Poller(unittest.TestCase):
 
     def test_unstable_from_a_check_not_ignored_is_blocked(self):
         codex = [TRIGGER, comment(101, CODEX, "Codex Review: Didn't find any major issues.", at(12))]
-        pending = status("internal-review", "PENDING", "Waiting for an internal review of abc1234567", at(0))
+        pending = gate("internal-review", "PENDING", "Waiting for an internal review of abc1234567", at(0))
         ctx = [check("pytest"), check("flaky", conclusion="FAILURE"), CODEX_CLEAN, pending]
         done = self.poll(snapshot(merge="UNSTABLE", comments=codex, contexts=ctx), args=("--ignore-check", "flaky"))
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
@@ -423,7 +439,7 @@ class Poller(unittest.TestCase):
 
     def test_codex_comments_reach_the_drop_as_gate_comments(self):
         codex = [TRIGGER, comment(101, CODEX, USAGE_LIMIT, at(12))]
-        predates = status("codex-review", "PENDING", "Codex's out-of-credits answer predates abc1234567; comment @codex review", at(13))
+        predates = gate("codex-review", "PENDING", "Codex's out-of-credits answer predates abc1234567; comment @codex review", at(13))
         done = self.poll(snapshot(comments=codex, contexts=[check("pytest", conclusion="FAILURE"), predates, ATTESTED]))
         self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
         [said] = self.drop()["gate_comments"]
