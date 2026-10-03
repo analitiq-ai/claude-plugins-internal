@@ -38,7 +38,8 @@ that is under review.
    (no findings, or every finding pushed back) at the current commit: `gh pr ready`, `gh pr create`
    without `--draft`, and any comment carrying the `internal-review` attestation marker the org pr-gate
    reads. A comment is judged by what it posts, body files included, however `gh` posts or edits it.
-4. **The cap.** A stage gets 4 rounds. The fifth is refused and the anti-pattern audit is required;
+4. **The cap.** A stage gets 4 rounds without settling (a round settles when it is clean or ruled
+   `CONVERGED_PUSHBACK`, and the count starts again after it). The fifth is refused and the audit is required;
    its assessment may not be `PATCH`. The second such audit that rules something must change locks the
    branch the same way `RESHAPE_SPEC` does; an audit ruled `CONVERGED_PUSHBACK` does not count. The user
    decides whether to go on and unlocks it, which grants 2 more audits. Every lock puts a question to the

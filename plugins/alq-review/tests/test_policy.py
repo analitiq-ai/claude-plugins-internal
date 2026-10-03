@@ -207,6 +207,35 @@ class LaunchRound(unittest.TestCase):
         self.assertFalse(decision.allow)
         self.assertIn("not converging", decision.reason)
 
+    def converged_at_the_cap(self):
+        """Three rounds with findings, then a clean fourth at HEAD_A: the case of engineering#50."""
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        for i in range(policy.CAP - 1):
+            add_round(state, head=str(i) * 40)
+            assess(state, "PATCH")
+        add_round(state, findings_per_reviewer=(0, 0), head=HEAD_A)
+        return state
+
+    def test_a_round_after_a_clean_fourth_round_is_a_delta_round_not_the_cap(self):
+        decision = self.launch(self.converged_at_the_cap(), head=HEAD_B)
+        self.assertTrue(decision.allow, decision.reason)
+        self.assertEqual((decision.scope, decision.delta_from), ("delta", HEAD_A))
+
+    def test_an_audit_after_a_clean_fourth_round_is_not_an_escalation(self):
+        decision = self.launch(self.converged_at_the_cap(), stage="audit")
+        self.assertTrue(decision.allow)
+        self.assertFalse(decision.escalation)
+
+    def test_the_cap_counts_again_from_the_last_settled_round(self):
+        state = self.converged_at_the_cap()
+        for i in range(policy.CAP):
+            self.assertTrue(self.launch(state, head=str(i + 5) * 40).allow)
+            add_round(state, head=str(i + 5) * 40)
+            assess(state, "PATCH")
+        decision = self.launch(state, head="f" * 40)
+        self.assertFalse(decision.allow)
+        self.assertIn("stage: 'audit'", decision.reason)
+
     def test_cap_hit_after_two_audits_hands_off_to_the_user(self):
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))
         for i in range(policy.CAP):
@@ -230,6 +259,14 @@ class Rerequest(unittest.TestCase):
         decision = policy.rerequest(state, inflight=0)
         self.assertFalse(decision.allow)
         self.assertIn("stage: 'audit'", decision.reason)
+
+    def test_allowed_when_the_round_at_the_cap_converged_on_pushback(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        for i in range(policy.CAP):
+            add_round(state, stage="github", head=str(i) * 40)
+            assess(state, "PATCH" if i < policy.CAP - 1 else "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
+        decision = policy.rerequest(state, inflight=0)
+        self.assertTrue(decision.allow, decision.reason)
 
     def test_allowed_after_an_assessed_round_below_the_cap(self):
         state = state_with_round(stage="github")

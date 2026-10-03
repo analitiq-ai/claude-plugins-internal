@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from ledger import COUNTED, counted, current_round
 
-CAP = 4          # rounds a stage may take before the anti-pattern audit is mandatory
+CAP = 4          # rounds a stage may take without settling before the anti-pattern audit is mandatory
 MAX_AUDITS = 2   # escalation audits before the work goes back to the user; each unlock grants this many more
 VERDICTS = ["PATCH", "CLASS_FIX", "REDESIGN", "RESHAPE_SPEC", "CONVERGED_PUSHBACK", "ESCALATE"]
 # Verdicts that hand a decision to the user: the spec is wrong, or the work is theirs to judge. Code
@@ -116,11 +116,22 @@ def mutation(state: dict, *, inflight: int) -> Decision:
     return Decision(False, obstacle) if obstacle else Decision(True)
 
 
+def _settled(rnd: dict) -> bool:
+    """The round ended the review: nothing was found, or the assessor ruled the round converged."""
+    return rnd["status"] == "clean" or (rnd["status"] == "assessed"
+                                        and rnd["assessment"]["round_verdict"] == "CONVERGED_PUSHBACK")
+
+
+def _capped(state: dict, stage: str) -> bool:
+    """CAP rounds since the stage last settled or the last escalation audit, whichever is later. A settled round
+    ends the run the cap measures, so a change pushed after it starts a new one."""
+    rounds = counted(state, stage)
+    last_settled = max((i for i, r in enumerate(rounds) if _settled(r)), default=-1)
+    return len(rounds) - last_settled - 1 >= CAP
+
+
 def _cap_reached(state: dict) -> str | None:
-    for stage in ("internal", "github"):
-        if len(counted(state, stage)) >= CAP:
-            return stage
-    return None
+    return next((stage for stage in ("internal", "github") if _capped(state, stage)), None)
 
 
 def _cap_refusal(state: dict, stage: str) -> Decision:
@@ -168,7 +179,7 @@ def rerequest(state: dict, *, inflight: int) -> Decision:
     obstacle = _obstacle(state, inflight)
     if obstacle:
         return Decision(False, obstacle)
-    if len(counted(state, "github")) >= CAP:
+    if _capped(state, "github"):
         return _cap_refusal(state, "github")
     return Decision(True)
 
@@ -180,10 +191,9 @@ def mark_ready(state: dict, *, head_sha: str, inflight: int, released: bool) -> 
         return Decision(False, obstacle)
     if released:
         return Decision(True)
-    internal = [r for r in state["rounds"] if r["stage"] == "internal" and r["status"] in ("assessed", "clean")]
+    internal = [r for r in state["rounds"] if r["stage"] == "internal" and r["status"] in COUNTED]
     last = internal[-1] if internal else None
-    settled = last is not None and (last["status"] == "clean" or last["assessment"]["round_verdict"] == "CONVERGED_PUSHBACK")
-    if settled and last["head_sha"] == head_sha:
+    if last is not None and _settled(last) and last["head_sha"] == head_sha:
         return Decision(True)
     return Decision(False, f"The internal review has not come back clean at {head_sha[:7]}; the GitHub review comes after it. "
                            "Until then the PR stays a draft and the internal review is not attested: no gh pr ready, no "
