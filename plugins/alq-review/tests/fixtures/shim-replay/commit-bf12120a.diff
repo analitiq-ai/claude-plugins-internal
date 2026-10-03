@@ -1,0 +1,344 @@
+diff --git a/packages/validator/src/analitiq/validator/_core.py b/packages/validator/src/analitiq/validator/_core.py
+index cfc6d7d6..78acd0a0 100644
+--- a/packages/validator/src/analitiq/validator/_core.py
++++ b/packages/validator/src/analitiq/validator/_core.py
+@@ -113,10 +113,10 @@ def _bounded(text: str, limit: int = 200) -> str:
+ 
+ 
+ # Every way reading a JSON document off disk fails on what the file holds
+-# rather than on this package. OSError covers a missing, directory or
+-# unreadable path; RecursionError is valid JSON nested deeper than the parser
+-# will descend, which `json` raises instead of a decode error.
+-_JSON_READ_ERRORS = (OSError, json.JSONDecodeError, UnicodeDecodeError, RecursionError)
++# rather than on this package. OSError is the path; ValueError is text that is
++# not UTF-8, not JSON, or JSON with an integer past the parser's digit limit;
++# RecursionError is JSON nested deeper than the parser descends.
++_JSON_READ_ERRORS = (OSError, ValueError, RecursionError)
+ 
+ 
+ # Pydantic error types whose sentence renders a value taken from the failing
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index d091e68e..0039e061 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -984,9 +984,8 @@ def _load_json_sibling(
+ 
+     `rule` is a parameter because the callers are different checks, each
+     attributing an unreadable sibling to whichever obligation it was reading
+-    that sibling to satisfy — RULE-PKG-030 for a type-map load, `None` where
+-    the read precedes any rule evaluation — rather than a shared default that
+-    could name the wrong one.
++    that sibling to satisfy, rather than a shared default that could name the
++    wrong one.
+     """
+     if not path.is_file():
+         # The pattern collects directory entries, not documents, so the read is
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index 60146e0e..765b3373 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -1439,14 +1439,23 @@ def test_an_unparseable_sibling_is_reported_as_unparseable_and_nothing_else(tmp_
+     (tmp_path / "type-map-read.json").write_text("[ not json")
+     (tmp_path / "connector.json").write_text("{}")
+     findings = validator.check_coverage(_min_connector("file"), tmp_path / "connector.json")
+-    assert [f["message_id"] for f in findings] == ["type-map-unparseable"], findings
++    assert [(f["message_id"], f.get("rule")) for f in findings] == [
++        ("type-map-unparseable", "RULE-PKG-030")], findings
+ 
+ 
+-def test_a_sibling_nested_past_the_parser_is_reported_as_unparseable(tmp_path, validator):
+-    # Deep nesting is valid JSON the parser gives up on with a RecursionError,
+-    # not a decode error. Uncaught it ends the whole coverage check, so one
+-    # sibling costs the package every other finding about its maps.
+-    (tmp_path / "type-map-read.json").write_text("[" * 100_000 + "]" * 100_000)
++# Text the parser refuses without raising a decode error: nesting deeper than
++# it descends, and an integer longer than its digit limit.
++_PARSER_REFUSALS = {
++    "nested past the parser": "[" * 100_000 + "]" * 100_000,
++    "integer past the digit limit": '{"n": 1' + "0" * 5_000 + "}",
++}
++
++
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++def test_a_sibling_the_parser_refuses_is_reported_as_unparseable(tmp_path, validator, text):
++    # Uncaught, the refusal ends the whole coverage check, so one sibling costs
++    # the package every other finding about its maps.
++    (tmp_path / "type-map-read.json").write_text(text)
+     (tmp_path / "type-map-write.json").write_text(json.dumps(_type_map_doc(
+         [{"match": "exact", "native_type": "citext", "arrow_type": "utf8"}], "write")))
+     (tmp_path / "connector.json").write_text("{}")
+@@ -1456,11 +1465,12 @@ def test_a_sibling_nested_past_the_parser_is_reported_as_unparseable(tmp_path, v
+     assert any(f["path"].startswith("/rules/") for f in findings), findings
+ 
+ 
+-def test_cli_reports_a_document_nested_past_the_parser_as_unreadable(
+-        tmp_path, monkeypatch, capsys):
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++def test_cli_reports_a_document_the_parser_refuses_as_unreadable(
++        tmp_path, monkeypatch, capsys, text):
+     from analitiq.validator import _core
+     document = tmp_path / "connector.json"
+-    document.write_text("[" * 100_000 + "]" * 100_000)
++    document.write_text(text)
+     monkeypatch.setattr("sys.argv", ["validator", "--document", str(document)])
+     assert _core.main() == 1
+     out = json.loads(capsys.readouterr().out)
+@@ -2396,6 +2406,21 @@ def test_collect_type_maps_reports_every_later_declaration_against_the_first(val
+     assert all("type-map-a.json" in message for _, message in duplicated), duplicated
+ 
+ 
++def test_collect_type_maps_attributes_every_finding_about_the_siblings_to_the_rule_given(
++        validator, tmp_path):
++    (tmp_path / "type-map.json").write_text(json.dumps(_read_doc()))
++    (tmp_path / "type-map-a.json").write_text(json.dumps(_read_doc()))
++    (tmp_path / "type-map-b.json").write_text(json.dumps(_read_doc()))
++    (tmp_path / "type-map-c.json").write_text("[ not json")
++    (tmp_path / "type-map-d.json").mkdir()
++    collection = validator.collect_type_maps(tmp_path, rule="RULE-PKG-030")
++    assert sorted((name, f["message_id"], f.get("rule")) for name, f in collection.findings) == [
++        ("type-map-b.json", "type-map-direction-duplicated", "RULE-PKG-030"),
++        ("type-map-c.json", "type-map-unparseable", "RULE-PKG-030"),
++        ("type-map-d.json", "type-map-unparseable", "RULE-PKG-030"),
++        ("type-map.json", "legacy-type-map-filename", "RULE-PKG-030")]
++
++
+ @pytest.mark.parametrize("payload", [
+     *(pytest.param(_unusable(bad), id=repr(bad)) for bad in ["Write", "", None, 5]),
+     pytest.param(_unusable(_ABSENT), id="absent"),
+diff --git a/plugins/analitiq-pipeline-builder/scripts/validate.py b/plugins/analitiq-pipeline-builder/scripts/validate.py
+index 8219bed9..df8732b0 100644
+--- a/plugins/analitiq-pipeline-builder/scripts/validate.py
++++ b/plugins/analitiq-pipeline-builder/scripts/validate.py
+@@ -231,9 +231,10 @@ def _at_site(site: str, findings: list[dict]) -> list[dict]:
+     A document graded on its own reports a pointer into itself (`/scope`), which
+     is the whole address when that document is what was validated. A bundle
+     holds many, so the same pointer names none of them — the reader is told
+-    what is wrong and not which file to open. Same shape
+-    `_connection_type_map_findings` uses for the maps beside a connection."""
+-    return [{**f, "path": f"{site}{f.get('path', '')}"} for f in findings]
++    what is wrong and not which file to open. A finding about the whole
++    document (`/`) is addressed at the file itself."""
++    return [{**f, "path": site if f.get("path", "") in ("", "/") else f"{site}{f['path']}"}
++            for f in findings]
+ 
+ 
+ def _read_bundle_member(path: Path, findings: list[dict]) -> dict | None:
+@@ -241,9 +242,10 @@ def _read_bundle_member(path: Path, findings: list[dict]) -> dict | None:
+     non-object payload, append an error finding and return None — so a malformed
+     sibling becomes a clear diagnostic instead of an uncaught traceback or a
+     silently dropped document."""
++    from analitiq.validator._core import _JSON_READ_ERRORS
+     try:
+         doc = _read_json(path)
+-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
++    except _JSON_READ_ERRORS as exc:
+         findings.append(_finding("document", "error", "", f"Cannot read {path.name}: {exc}"))
+         return None
+     if not isinstance(doc, dict):
+@@ -267,6 +269,7 @@ def _assemble_bundle(pipeline_doc: dict, document_path: Path,
+     whether that exclusion came from an actual crash (worth its own labeled
+     finding) or an already-reported ordinary read error (which needs no second,
+     misleading one)."""
++    from analitiq.validator._core import _JSON_READ_ERRORS
+     # `validate_pipeline_bundle` takes filename-less dicts, so every check that
+     # needs a name — RULE-PKG-031, on where an endpoint document ships — is run
+     # here, per file, where the names are known.
+@@ -402,7 +405,7 @@ def _assemble_bundle(pipeline_doc: dict, document_path: Path,
+             with _contained(findings, f"connectors/{conn_json.parent.parent.name}") as outcome:
+                 try:
+                     cid = _read_json(conn_json).get("connector_id")
+-                except (OSError, json.JSONDecodeError, UnicodeDecodeError, AttributeError):
++                except (*_JSON_READ_ERRORS, AttributeError):
+                     cid = None
+                 if isinstance(cid, str) and cid:
+                     connectors.add(cid)
+@@ -444,6 +447,7 @@ def _connector_endpoint_sets(root: Path, findings: list[dict]) -> dict[str, set[
+     a filesystem failure there would otherwise escape every per-connector
+     guard below and return nothing at all, rather than whatever connectors
+     were already found before it."""
++    from analitiq.validator._core import _JSON_READ_ERRORS
+     sets: dict[str, set[str]] = {}
+     with _contained(findings, "connectors"):
+         for ep_dir in sorted(root.glob("connectors/*/definition/endpoints")):
+@@ -456,7 +460,7 @@ def _connector_endpoint_sets(root: Path, findings: list[dict]) -> dict[str, set[
+                     ids.add(ep_json.stem)
+                     try:
+                         eid = _read_json(ep_json).get("endpoint_id")
+-                    except (OSError, json.JSONDecodeError, UnicodeDecodeError, AttributeError):
++                    except (*_JSON_READ_ERRORS, AttributeError):
+                         eid = None
+                     if isinstance(eid, str) and eid:
+                         ids.add(eid)
+@@ -464,7 +468,7 @@ def _connector_endpoint_sets(root: Path, findings: list[dict]) -> dict[str, set[
+                     keys = {slug_dir.name}
+                     try:
+                         cid = _read_json(slug_dir / "definition" / "connector.json").get("connector_id")
+-                    except (OSError, json.JSONDecodeError, UnicodeDecodeError, AttributeError):
++                    except (*_JSON_READ_ERRORS, AttributeError):
+                         cid = None
+                     if isinstance(cid, str) and cid:
+                         keys.add(cid)
+@@ -595,9 +599,10 @@ def diagnostics_for(entity: str, document_path: Path, bundle_root: Path | None =
+     """Validate one document and return the Diagnostics envelope. Raises nothing
+     for validation failures — those become findings; only a genuinely unreadable
+     document short-circuits."""
++    from analitiq.validator._core import _JSON_READ_ERRORS
+     try:
+         doc = _read_json(document_path)
+-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
++    except _JSON_READ_ERRORS as exc:
+         return _diagnostics([_finding("document", "error", "", f"Cannot read document: {exc}")])
+ 
+     if entity == "database-endpoint":
+diff --git a/tests/pipeline_builder/test_type_map_gaps.py b/tests/pipeline_builder/test_type_map_gaps.py
+index 109856c5..5b9c3933 100644
+--- a/tests/pipeline_builder/test_type_map_gaps.py
++++ b/tests/pipeline_builder/test_type_map_gaps.py
+@@ -207,21 +207,28 @@ def test_cli_missing_map_names_the_file(tmp_path, capsys):
+     assert str(missing) in err.err
+ 
+ 
+-@pytest.mark.parametrize("nested", ["map", "probes"])
+-def test_cli_rejects_input_nested_past_the_parser(tmp_path, capsys, nested):
+-    # Valid JSON nested deeper than the parser descends raises RecursionError,
+-    # not a decode error; it is unreadable input like any other, not a crash.
+-    deep = "[" * 100_000 + "]" * 100_000
++# Text the parser refuses without raising a decode error: nesting deeper than
++# it descends, and an integer longer than its digit limit.
++_PARSER_REFUSALS = {
++    "nested past the parser": "[" * 100_000 + "]" * 100_000,
++    "integer past the digit limit": '{"n": 1' + "0" * 5_000 + "}",
++}
++
++
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++@pytest.mark.parametrize("refused", ["map", "probes"])
++def test_cli_rejects_input_the_parser_refuses(tmp_path, capsys, refused, text):
++    # Unreadable input like any other, not a crash, and named like any other.
+     m = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+-    if nested == "map":
+-        m.write_text(deep)
++    if refused == "map":
++        m.write_text(text)
+     probes = tmp_path / "probes.json"
+-    probes.write_text(deep if nested == "probes" else '["citext"]')
++    probes.write_text(text if refused == "probes" else '["citext"]')
+     rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 2
+     err = capsys.readouterr()
+     assert not err.out
+-    assert "recursion" in err.err
++    assert (str(m) if refused == "map" else "cannot read probes") in err.err
+ 
+ 
+ def test_duplicate_probes_deduped(tmp_path):
+diff --git a/tests/pipeline_builder/test_validate.py b/tests/pipeline_builder/test_validate.py
+index 2947b1e7..44d514e6 100644
+--- a/tests/pipeline_builder/test_validate.py
++++ b/tests/pipeline_builder/test_validate.py
+@@ -705,6 +705,14 @@ def test_bundle_grades_a_connection_map_under_any_collected_filename(tmp_path):
+         for f in diag["findings"]), diag["findings"]
+ 
+ 
++# Text the parser refuses without raising a decode error: nesting deeper than
++# it descends, and an integer longer than its digit limit.
++_PARSER_REFUSALS = {
++    "nested past the parser": "[" * 100_000 + "]" * 100_000,
++    "integer past the digit limit": '{"n": 1' + "0" * 5_000 + "}",
++}
++
++
+ def _plant(definition: Path, scenario: str) -> None:
+     """Lay out one way a connection's or a connector's type-map siblings can be."""
+     read = json.dumps(_tm(TYPE_MAP_READ, "read"))
+@@ -722,8 +730,8 @@ def _plant(definition: Path, scenario: str) -> None:
+         target.write_text("[ not valid json")
+     elif scenario == "not utf-8":
+         target.write_bytes(b"\xff\xfe")
+-    elif scenario == "nested past the parser":
+-        target.write_text("[" * 100_000 + "]" * 100_000)
++    elif scenario in _PARSER_REFUSALS:
++        target.write_text(_PARSER_REFUSALS[scenario])
+     elif scenario == "no direction":
+         target.write_text(json.dumps({"rules": TYPE_MAP_READ}))
+     elif scenario == "no object":
+@@ -739,7 +747,7 @@ def _plant(definition: Path, scenario: str) -> None:
+ 
+ 
+ @pytest.mark.parametrize("scenario", [
+-    "duplicated", "unparseable", "not utf-8", "nested past the parser", "no direction",
++    "duplicated", "unparseable", "not utf-8", *_PARSER_REFUSALS, "no direction",
+     "no object", "directory", "dangling symlink", "fifo",
+     "legacy directory", "legacy dangling symlink", "legacy no object",
+ ])
+@@ -763,7 +771,11 @@ def test_connection_type_maps_are_collected_as_a_connector_collects_its_own(tmp_
+     assert not any("rule" in f for f in connection), connection
+     assert [{k: v for k, v in f.items() if k not in ("rule", "path")} for f in connection] == [
+         {k: v for k, v in f.items() if k not in ("rule", "path")} for f in connector]
+-    assert [f["path"].split(".json", 1)[1] for f in connection] == [f["path"] for f in connector]
++    # A finding about a whole file is addressed at the file: the pointer to a
++    # document's root joined onto it would name a key "" inside it.
++    assert not any(f["path"].endswith("/") for f in connection), connection
++    assert [f["path"].split(".json", 1)[1] or "/" for f in connection] == [
++        f["path"] for f in connector]
+ 
+ 
+ def test_bundle_flags_type_map_that_is_not_a_file(tmp_path):
+@@ -997,14 +1009,14 @@ def test_type_map_entity_crash_preserves_legacy_finding_and_sibling_direction(tm
+     assert bad_write, diag["findings"]  # processed after the crash, still got its turn
+ 
+ 
+-def test_type_map_nested_past_the_parser_preserves_legacy_finding_and_sibling_direction(tmp_path):
+-    # Valid JSON nested deeper than the parser descends is an unreadable map
+-    # like any other: it costs the legacy-name finding nothing, and the write
+-    # map beside it is still graded.
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++def test_type_map_the_parser_refuses_preserves_legacy_finding_and_sibling_direction(
++        tmp_path, text):
++    # A map the parser refuses is an unreadable map like any other: it costs the
++    # legacy-name finding nothing, and the write map beside it is still graded.
+     doc = _build_bundle(tmp_path)
+     _write(tmp_path, "connections/postgresql/definition/type-map.json", TYPE_MAP_READ)
+-    (tmp_path / "connections/postgresql/definition/type-map-read.json").write_text(
+-        "[" * 100_000 + "]" * 100_000)
++    (tmp_path / "connections/postgresql/definition/type-map-read.json").write_text(text)
+     _write(tmp_path, "connections/postgresql/definition/type-map-write.json",
+            _tm([{"match": "exact", "native_type": "citext", "arrow_type": "utf8"}], "write"))  # invalid casing
+     diag = V.diagnostics_for("pipeline", doc, bundle_root=tmp_path)
+@@ -1018,10 +1030,35 @@ def test_type_map_nested_past_the_parser_preserves_legacy_finding_and_sibling_di
+     assert bad_write, diag["findings"]
+ 
+ 
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++def test_a_document_the_parser_refuses_is_reported_as_unreadable(tmp_path, text):
++    (tmp_path / "connection.json").write_text(text)
++    diag = V.diagnostics_for("connection", tmp_path / "connection.json")
++    assert [(f["validator"], f["message"].split(":")[0]) for f in diag["findings"]] == [
++        ("document", "Cannot read document")], diag["findings"]
++
++
++@pytest.mark.parametrize("text", list(_PARSER_REFUSALS.values()), ids=list(_PARSER_REFUSALS))
++@pytest.mark.parametrize("member", [
++    "pipelines/p/streams/orders.json",
++    "connectors/postgresql/definition/connector.json",
++    "connectors/postgresql/definition/endpoints/orders.json",
++])
++def test_a_bundle_member_the_parser_refuses_costs_no_crash(tmp_path, text, member):
++    # Each is read by the adapter itself, not the validator; a refusal it does
++    # not catch ends the section reading it as an adapter crash. The connector
++    # ships an endpoint so its connector.json is read for the endpoint's owner too.
++    doc = _build_bundle(tmp_path)
++    _write(tmp_path, "connectors/postgresql/definition/endpoints/orders.json", {"endpoint_id": "orders"})
++    (tmp_path / member).write_text(text)
++    diag = V.diagnostics_for("pipeline", doc, bundle_root=tmp_path)
++    assert "adapter-crash" not in _ids(diag["findings"]), diag["findings"]
++
++
+ def test_bundle_findings_crash_unrelated_to_exclusion_does_not_mislabel_it(tmp_path, monkeypatch):
+     # an ordinary, already-reported read error (no guard fired) can exclude a
+     # bundle member in the same run a completely unrelated guard elsewhere
+-    # (the connection-type-map check) genuinely crashes in. The exclusion and
++    # (grading the type maps beside a connection) genuinely crashes in. The exclusion and
+     # the crash are unrelated: `crashed` must reflect only the four
+     # bundle-assembly sites that can actually exclude a member, not "any
+     # adapter-crash finding anywhere", or the ordinary exclusion gets

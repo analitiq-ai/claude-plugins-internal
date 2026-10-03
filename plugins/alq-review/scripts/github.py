@@ -35,6 +35,11 @@ def _gh(*args: str) -> str | None:
         return None
 
 
+def issue_state(slug: str, number: int) -> str | None:
+    """`OPEN` or `CLOSED`."""
+    return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
+
+
 def repo_visibility(slug: str) -> str | None:
     private = _gh("api", f"repos/{slug}", "--jq", ".private")
     return {"true": "private", "false": "public"}.get(private or "")

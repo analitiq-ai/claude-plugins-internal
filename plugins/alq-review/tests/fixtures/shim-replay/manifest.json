@@ -1,0 +1,100 @@
+{
+  "source": "analitiq-ai/claude-code-plugins",
+  "evidence": "The design page's 14-commit evidence table, less 8a219ca0, which the table does not list. Diffs and sweeps are the replay's, with the commit header and message removed: the gate never sees the message.",
+  "commits": [
+    {
+      "sha": "03a73482",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-03a73482.diff",
+      "sweep": "sweep-03a73482.md"
+    },
+    {
+      "sha": "053e0ec9",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-053e0ec9.diff",
+      "sweep": "sweep-053e0ec9.md",
+      "note": "the design table's complete was obtained with the commit message, which the gate never sees (research R6)"
+    },
+    {
+      "sha": "29ade9e4",
+      "kind": "fix",
+      "expected": "complete",
+      "diff": "commit-29ade9e4.diff",
+      "sweep": "sweep-29ade9e4.md"
+    },
+    {
+      "sha": "2d9a0479",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-2d9a0479.diff",
+      "sweep": "sweep-2d9a0479.md"
+    },
+    {
+      "sha": "49320e88",
+      "kind": "fix",
+      "expected": "complete",
+      "diff": "commit-49320e88.diff",
+      "sweep": "sweep-49320e88.md",
+      "note": "known sweep miss: complete, though the fix is a patch"
+    },
+    {
+      "sha": "619ff3b6",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-619ff3b6.diff",
+      "sweep": "sweep-619ff3b6.md"
+    },
+    {
+      "sha": "69ecd148",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-69ecd148.diff",
+      "sweep": "sweep-69ecd148.md"
+    },
+    {
+      "sha": "6aa17485",
+      "kind": "fix",
+      "expected": "complete",
+      "diff": "commit-6aa17485.diff",
+      "sweep": "sweep-6aa17485.md"
+    },
+    {
+      "sha": "a52890d7",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-a52890d7.diff",
+      "sweep": "sweep-a52890d7.md"
+    },
+    {
+      "sha": "bf12120a",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-bf12120a.diff",
+      "sweep": "sweep-bf12120a.md",
+      "note": "class fix for the files it touched, not the repo: patch by repo-wide coverage"
+    },
+    {
+      "sha": "c2185292",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-c2185292.diff",
+      "sweep": "sweep-c2185292.md"
+    },
+    {
+      "sha": "dc6c01e6",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-dc6c01e6.diff",
+      "sweep": "sweep-dc6c01e6.md"
+    },
+    {
+      "sha": "def844bf",
+      "kind": "fix",
+      "expected": "patch",
+      "diff": "commit-def844bf.diff",
+      "sweep": "sweep-def844bf.md"
+    }
+  ]
+}

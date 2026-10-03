@@ -17,6 +17,7 @@ import facts
 import github
 import ledger
 import policy
+import shimcheck
 import worktree
 
 INTERNAL_REVIEWERS = [
@@ -289,6 +290,91 @@ def claim_check_args(check: dict, *, to_read: list[dict], contests: list[dict], 
                           "schema": verdict_schema(check, by_id[c["claim"]]["file"], by_id[c["claim"]]["quote"])}
                          for c in contests],
             "not_judged": claimcheck.not_judged(check)}
+
+
+_SWEEP_TASK = {
+    False: ("A. Every other site in the codebase that implements the same operation as the code the commit changes "
+            "(the pre-fix code). Judge by behaviour, not by name.\n\n"
+            "B. Every caller and consumer of the mechanism the commit touches. Follow the chain until it leaves the "
+            "repo."),
+    # R10: the replay's one costly miss was a duplicate filed under callers; starting from the callers reaches the
+    # operation from the other side.
+    True: ("A. Every caller and consumer of the mechanism the commit touches. Follow the chain until it leaves the "
+           "repo.\n\n"
+           "B. Then, starting from those callers and consumers, search outward for every other site that does the "
+           "same operation as the code the commit changes (the pre-fix code), whatever it is called. Judge by "
+           "behaviour, not by name."),
+}
+
+
+def sweep_prompt(check: dict, diff: str, snapshot_dir: str, *, callers_first: bool = False) -> str:
+    """The design page's sweep task, with the diff inline: the sweeper has no tool that runs git."""
+    return ("Inputs (read-only; do not modify anything):\n"
+            f"- A commit diff, below.\n- The complete source tree before that commit: {snapshot_dir}/\n\n"
+            f"COMMIT DIFF\n{diff}\n\n"
+            "Read the diff. Then, in the tree, find:\n\n"
+            f"{_SWEEP_TASK[callers_first]}\n\n"
+            "Verify each item by reading the code. Give each site's file relative to the tree, the line it starts "
+            "on, its function, and one short sentence on what it does (for a caller: what it does with the "
+            "mechanism). Answer through StructuredOutput: the first list is SAME OPERATION, the second "
+            "CALLERS/CONSUMERS, nothing else.")
+
+
+def sweep_schema(check: dict) -> dict:
+    entry = {"type": "object", "additionalProperties": False, "required": ["file", "line", "function", "does"],
+             "properties": {"file": {"type": "string", "minLength": 1}, "line": {"type": "integer", "minimum": 1},
+                            "function": {"type": "string", "minLength": 1}, "does": {"type": "string", "minLength": 1}}}
+    return {"type": "object", "additionalProperties": False, "required": ["check_ref", *shimcheck.LISTS],
+            "properties": {"check_ref": {"enum": [check["ref"]]},
+                           **{name: {"type": "array", "items": entry} for name in shimcheck.LISTS}}}
+
+
+SHIM_SWEEPER, SHIM_SITE_JUDGE = "alq-review:shim-sweeper", "alq-review:shim-site-judge"
+
+
+SHIM_SWEEPS = {"sweep": ("standard",), "deep": ("standard", "standard", "callers-first")}
+
+
+def shim_check_args(check: dict, mode: str) -> dict:
+    """What the shim-check workflow runs: a sweeper per expected brief while the check sweeps, a judge per contested
+    site while it is ruled, else nothing."""
+    sweepers = [{"type": SHIM_SWEEPER, "schema": sweep_schema(check),
+                 "prompt": sweep_prompt(check, check["diff"], check["snapshot"], callers_first=brief == "callers-first")}
+                for brief in check["expected"]] if check["status"] == "sweeping" else []
+    sites = {shimcheck.site_id(s["file"], s["function"]): s for s in check["same_operation"]}
+    judges = [{"type": SHIM_SITE_JUDGE, "site": sid, "schema": ruling_schema(check, sid),
+               "prompt": site_judge_prompt(check, check["diff"], sites[sid], reason,
+                                           [s for other, s in sites.items() if other != sid])}
+              for sid, reason in check["contests"].items()] if check["status"] == "ruling" else []
+    return {"worktree": check["root"], "check_ref": check["ref"], "mode": mode, "head": check["head"],
+            "snapshot": check.get("snapshot"), "sweepers": sweepers, "judges": judges}
+
+
+def site_judge_prompt(check: dict, diff: str, site: dict, reason: str, others: list[dict]) -> str:
+    listed = "".join(f"- {s['file']}:{s['line']} {s['function']} — {s['does']}\n" for s in others) or "- none\n"
+    return (f"A fix is staged for commit in the checkout at {check['root']}. A sweep listed the site below as doing "
+            "the same operation as the code the fix changes, so the fix must reach it too. The author contests that.\n\n"
+            f"COMMIT DIFF\n{diff}\n\n"
+            f"CONTESTED SITE\n- {site['file']}:{site['line']} {site['function']} — {site['does']}\n\n"
+            f"THE AUTHOR'S REASON\n{reason}\n\n"
+            f"THE OTHER LISTED SITES\n{listed}\n"
+            "Read the fixed code and the site. Decide whether the site has the defect the fix removes, judging by "
+            "behaviour, not by name. The author's reason decides nothing by being offered.\n"
+            "- shares: the site has the defect; the fix must reach it.\n"
+            "- not_shared: the site does not have the defect; say what makes it differ.\n"
+            "- deferred: the site has the defect, but its fix belongs in another change; give the number of the open "
+            "issue it moves to.\n\n"
+            "Give the path:line evidence your ruling rests on, relative to the checkout root, and a short reason."
+            + _EVIDENCE_RULE + " Answer through StructuredOutput.")
+
+
+def ruling_schema(check: dict, site_id: str) -> dict:
+    return {"type": "object", "additionalProperties": False,
+            "required": ["check_ref", "site", "ruling", "evidence", "reason"],
+            "properties": {"check_ref": {"enum": [check["ref"]]}, "site": {"enum": [site_id]},
+                           "ruling": {"enum": list(shimcheck.RULINGS)}, "issue": {"type": "integer", "minimum": 1},
+                           "evidence": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                           "reason": {"type": "string", "minLength": 1}}}
 
 
 def main() -> None:

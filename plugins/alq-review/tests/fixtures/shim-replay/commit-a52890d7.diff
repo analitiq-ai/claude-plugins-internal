@@ -1,0 +1,243 @@
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index 37ff755e..02a78ebb 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -1390,7 +1390,8 @@ def check_coverage(doc: dict, doc_path: Path | None) -> list[dict]:
+             # the actionable findings with a generic "validator bug" via _run_guarded).
+             continue
+         # The rendering is the one check here that needs the sibling map; a map
+-        # that did not load skips it, and the connector-level warning says so.
++        # that did not load skips it, and the notApplicable finding raised beside
++        # the connector says the coverage question went unanswered.
+         if isinstance(read_rules, list):
+             for native, arrow, pointer in _collect_native_arrow_pairs(ep_doc):
+                 rendered = _render_arrow_type(native, read_rules)
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index e18c9060..b8549335 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -25,6 +25,7 @@ from analitiq.validator.connectors import (
+     _DATABASE_KINDS,
+     _READ_MAP_FILENAME,
+     _STORAGE_KINDS,
++    _TYPE_MAP_GLOB,
+     _WRITE_MAP_FILENAME,
+ )
+ 
+@@ -1267,17 +1268,24 @@ def test_coverage_reads_a_type_map_under_any_matching_filename(tmp_path, kind, v
+     assert [e["path"] for e in errors] == ["/rules/0/exact/arrow_type"], errors
+ 
+ 
+-def test_a_coverage_finding_names_the_map_it_was_rendered_from(tmp_path, connector_base, validator):
++@pytest.mark.parametrize("native_type, arrow_type, message_id", [
++    ("UNCOVERED", "Utf8", "native-type-unresolved"),
++    ("BIGINT", "Utf8", "native-type-arrow-mismatch"),
++])
++def test_a_coverage_finding_names_the_map_it_was_rendered_from(
++        tmp_path, connector_base, native_type, arrow_type, message_id, validator):
+     # The message sends an author to a file, so it names the one the rules came
+     # from. Naming the conventional filename instead would send them to a
+-    # document the package does not carry.
++    # document the package does not carry. Every verdict the endpoint walk
++    # renders off the read map sends the author to it, not only the one where no
++    # rule matched.
+     _write_tree(tmp_path, connector_base, _read_rules(),
+-                {"widgets.json": _endpoint("UNCOVERED", "Utf8")})
++                {"widgets.json": _endpoint(native_type, arrow_type)})
+     (tmp_path / "type-map-read.json").rename(tmp_path / "type-map-natives.json")
+     errors = _errors(validator.check_coverage(connector_base, tmp_path / "connector.json"))
+-    unresolved = [e for e in errors if e["message_id"] == "native-type-unresolved"]
+-    assert unresolved, errors
+-    assert "type-map-natives.json" in unresolved[0]["message"], unresolved[0]
++    named = [e for e in errors if e["message_id"] == message_id]
++    assert named, errors
++    assert "type-map-natives.json" in named[0]["message"], named[0]
+ 
+ 
+ def test_coverage_rejects_two_maps_declaring_one_direction(tmp_path, validator):
+@@ -2260,7 +2268,7 @@ def test_type_map_sibling_paths_orders_what_the_directory_hands_back(validator):
+     # a real one cannot be made to hand back an unsorted listing on demand.
+     class _Scrambled:
+         def glob(self, pattern):
+-            assert pattern == "type-map-*.json"
++            assert pattern == _TYPE_MAP_GLOB
+             return iter(Path(f"/d/type-map-{c}.json") for c in "cabd")
+ 
+     assert [p.name for p in validator.type_map_sibling_paths(_Scrambled())] == [
+diff --git a/plugins/analitiq-connector-builder/README.md b/plugins/analitiq-connector-builder/README.md
+index c321c109..53805ae8 100644
+--- a/plugins/analitiq-connector-builder/README.md
++++ b/plugins/analitiq-connector-builder/README.md
+@@ -85,9 +85,9 @@ Schemas are generated from — so there is no schema fetch. It runs:
+    Discriminating keys in the document body select the model — a type map by its
+    own `direction`, not by its filename and not by its `$schema`. A connector
+    package's maps are collected by pattern and counted toward the directions
+-   they declare, so a name says which siblings are maps and the slot names for
+-   each direction are a convention an author follows (`RULE-PKG-030`)
+-   (`skills/connector-builder/references/metadata-and-versioning.md`). Each kind
++   they declare (`RULE-PKG-030`), so a name says which siblings are maps and
++   nothing more; the slot name each direction is authored under is a convention,
++   stated per scope in `skills/shared/type-maps.md`. Each kind
+    is graded against the model behind this schema:
+    - Connector → `https://schemas.analitiq.ai/connector/latest.json`
+    - Read map (`direction: "read"`) → `https://schemas.analitiq.ai/type-map-read/latest.json`
+diff --git a/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py b/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
+index 916bb730..3d8f9a46 100644
+--- a/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
++++ b/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
+@@ -63,9 +63,13 @@ def _declared_direction(path: Path) -> str:
+         raise ValueError(f"{path}: {exc}") from exc
+     declared = doc.get("direction") if isinstance(doc, dict) else None
+     if declared not in ("read", "write"):
++        # The rejected value is whatever the document held, so it is clipped to
++        # the width the validator clips every borrowed diagnostic to.
++        from analitiq.validator._core import _bounded
++
+         raise ValueError(
+-            f"{path} declares direction {declared!r}; a type-map document declares "
+-            "'read' or 'write', and nothing else says which vocabulary to probe")
++            f"{path} declares direction {_bounded(repr(declared))}; a type-map document "
++            "declares 'read' or 'write', and nothing else says which vocabulary to probe")
+     return declared
+ 
+ 
+diff --git a/plugins/analitiq-pipeline-builder/scripts/validate.py b/plugins/analitiq-pipeline-builder/scripts/validate.py
+index d97a0c09..a081122b 100644
+--- a/plugins/analitiq-pipeline-builder/scripts/validate.py
++++ b/plugins/analitiq-pipeline-builder/scripts/validate.py
+@@ -209,9 +209,9 @@ def _endpoint_findings(doc, document_path: Path) -> list[dict]:
+     return validate_document(doc, doc_path=_authored_path(document_path))
+ 
+ 
+-def _type_map_findings(doc, document_path: Path) -> list[dict]:  # skipcq: PYL-W0613 — uniform per-entity signature
++def _type_map_findings(doc) -> list[dict]:
+     """Validate a connection-scoped type-map document as the direction it
+-    declares. The path is not read: a name selects which files are type-map
++    declares. It takes no path: a name selects which files are type-map
+     documents and nothing further, so the declaration is the only direction a
+     document has.
+ 
+@@ -269,7 +269,7 @@ def _connection_type_map_findings(conn_dir: Path, findings: list[dict]) -> None:
+     # the whole directory says it is the map for its direction: a second
+     # declaration arriving later takes the direction from both, and a defect
+     # already reported against the earlier one could not be taken back.
+-    collected: list[tuple[str, Path, object, str | None]] = []
++    collected: list[tuple[str, object, str | None]] = []
+     for path in type_map_sibling_paths(definition):
+         fname = path.name
+         with _contained(findings, f"{site}/{fname}"):
+@@ -291,18 +291,18 @@ def _connection_type_map_findings(conn_dir: Path, findings: list[dict]) -> None:
+                 continue
+             declared, held_by = directions.claim(fname, doc)
+             if held_by is not None:
+-                collected[:] = [e for e in collected if e[3] != declared]
++                collected[:] = [e for e in collected if e[2] != declared]
+                 findings.append(_finding(
+                     "connection-type-map", "error", f"{site}/{fname}",
+                     f"{held_by} and {fname} both declare direction {declared!r}; a "
+                     "connection carries one type-map document per direction, and "
+                     "neither of these is it."))
+                 continue
+-            collected.append((fname, path, doc, declared))
+-    for fname, path, doc, _ in collected:
++            collected.append((fname, doc, declared))
++    for fname, doc, _ in collected:
+         with _contained(findings, f"{site}/{fname}"):
+             findings.extend({**f, "path": f"{site}/{fname}{f.get('path', '')}"}
+-                            for f in _type_map_findings(doc, path))
++                            for f in _type_map_findings(doc))
+ 
+ 
+ def _at_site(site: str, findings: list[dict]) -> list[dict]:
+@@ -686,7 +686,7 @@ def diagnostics_for(entity: str, document_path: Path, bundle_root: Path | None =
+     if entity == "database-endpoint":
+         findings = _endpoint_findings(doc, document_path)
+     elif entity == "type-map":
+-        findings = _type_map_findings(doc, document_path)
++        findings = _type_map_findings(doc)
+     else:
+         findings = _model_findings(entity, doc)
+         if entity == "pipeline" and bundle_root is not None:
+diff --git a/tests/pipeline_builder/test_type_map_gaps.py b/tests/pipeline_builder/test_type_map_gaps.py
+index da191b4b..5585a5e1 100644
+--- a/tests/pipeline_builder/test_type_map_gaps.py
++++ b/tests/pipeline_builder/test_type_map_gaps.py
+@@ -321,6 +321,24 @@ def test_cli_rejects_a_map_declaring_no_usable_direction(tmp_path, capsys):
+     assert "declares direction 'sideways'" in err.err
+ 
+ 
++def test_cli_bounds_the_direction_it_echoes(tmp_path, capsys):
++    # The rejected value is whatever the document held, so echoing it whole puts
++    # an attacker-sized string on the operator's terminal. Clipped to the one
++    # width every borrowed diagnostic in the validator is clipped to.
++    from analitiq.validator._core import _bounded
++
++    oversized = "s" * 5000
++    m = tmp_path / "type-map-read.json"
++    m.write_text(json.dumps({**_tm_doc(CONNECTOR_READ, "read"), "direction": oversized}))
++    probes = tmp_path / "probes.json"
++    probes.write_text('["citext"]')
++    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    assert rc == 2
++    err = capsys.readouterr().err
++    assert oversized not in err, len(err)
++    assert _bounded(repr(oversized)) in err, err
++
++
+ def test_cli_rejects_maps_holding_different_directions(tmp_path, capsys):
+     r = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+     (tmp_path / "w").mkdir()
+@@ -338,6 +356,26 @@ def test_cli_rejects_maps_holding_different_directions(tmp_path, capsys):
+     assert str(r) in err.err and str(w) in err.err, err.err
+ 
+ 
++def test_cli_names_the_first_map_that_declared_a_direction(tmp_path, capsys):
++    # Precedence order is the argument order, so the map an author is pointed at
++    # for a direction is the one that claimed it first. A later map declaring the
++    # same direction is the fallback, not the document whose declaration created
++    # the conflict, and naming it would send the author to the wrong file.
++    primary = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
++    (tmp_path / "fallback").mkdir()
++    fallback = _map(tmp_path / "fallback", "type-map-read.json", CONNECTOR_READ)
++    (tmp_path / "w").mkdir()
++    w = _map(tmp_path / "w", "type-map-write.json", CONNECTOR_WRITE, "write")
++    probes = tmp_path / "probes.json"
++    probes.write_text('["citext"]')
++    rc = G.main(["--map", str(primary), "--map", str(fallback), "--map", str(w),
++                 "--probes-file", str(probes)])
++    assert rc == 2
++    err = capsys.readouterr().err
++    assert str(primary) in err, err
++    assert str(fallback) not in err, err
++
++
+ def test_cli_parse_error_names_the_file(tmp_path, capsys):
+     bad = tmp_path / "type-map-read.json"
+     bad.write_text("[ not json")
+diff --git a/tests/pipeline_builder/test_validate.py b/tests/pipeline_builder/test_validate.py
+index 63e94f01..884b9c6d 100644
+--- a/tests/pipeline_builder/test_validate.py
++++ b/tests/pipeline_builder/test_validate.py
+@@ -897,10 +897,10 @@ def test_type_map_entity_crash_preserves_legacy_finding_and_sibling_direction(tm
+ 
+     original = V._type_map_findings
+ 
+-    def boom(doc_, document_path):
+-        if document_path.name == "type-map-read.json":
++    def boom(doc_):
++        if doc_.get("direction") == "read":
+             raise TypeError("simulated crash")
+-        return original(doc_, document_path)
++        return original(doc_)
+ 
+     monkeypatch.setattr(V, "_type_map_findings", boom)
+     diag = V.diagnostics_for("pipeline", doc, bundle_root=tmp_path)
+@@ -961,7 +961,7 @@ def test_bundle_findings_crash_unrelated_to_exclusion_does_not_mislabel_it(tmp_p
+     (tmp_path / "pipelines/p/streams/orphan.json").write_text("{not valid json")  # ordinary error
+     _write(tmp_path, "connections/postgresql/definition/type-map-read.json", TYPE_MAP_READ)
+ 
+-    def boom(entity, doc_, path):
++    def boom(doc_):
+         raise TypeError("simulated crash")
+ 
+     monkeypatch.setattr(V, "_type_map_findings", boom)

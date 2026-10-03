@@ -178,6 +178,27 @@ class Completion(unittest.TestCase):
         self.assertEqual(claimcheck.to_judge(current), [])
 
 
+class CommitPreconditions(unittest.TestCase):
+    """What every commit check decides before reading its own record (shared with the shim check)."""
+
+    def decide(self, **facts):
+        return claimcheck.commit_preconditions(**{"empty": False, "concluding": False, "staging": False, "alone": True,
+                                                  **facts})
+
+    def test_nothing_to_commit_or_a_concluding_commit_is_let_through(self):
+        self.assertTrue(self.decide(empty=True).allow)
+        self.assertTrue(self.decide(concluding=True).allow)
+
+    def test_a_commit_that_stages_or_shares_its_command_is_refused(self):
+        for facts in ({"staging": True}, {"alone": False}):
+            refused = self.decide(**facts)
+            self.assertFalse(refused.allow)
+            self.assertIn("then run `git commit` alone", refused.reason)
+
+    def test_otherwise_the_check_decides(self):
+        self.assertIsNone(self.decide())
+
+
 class CommitDecision(unittest.TestCase):
     def decide(self, current, **facts):
         given = {"empty": False, "concluding": False, "staging": False, "alone": True, "held": [], "released": set(),

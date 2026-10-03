@@ -27,6 +27,7 @@ from hookio import deny, mode, record, refuse, refuse_spec, session_file, sessio
 import ledger
 import policy
 import settled_design
+import shimgate
 import shell
 import worktree
 
@@ -128,6 +129,9 @@ def on_prompt(payload: dict) -> dict | None:
     claim = claimgate.UNLOCK_CLAIM.match(prompt)
     if claim:
         return claimgate.on_prompt(payload, claim)
+    override = shimgate.OVERRIDE.match(prompt)
+    if override:
+        return shimgate.on_prompt(payload, override)
     typed = UNLOCK.match(prompt) or RESCOPE.match(prompt)
     if not typed:
         return None
@@ -279,7 +283,8 @@ def on_bash(payload: dict) -> dict | None:
         if action.kind == "unlock":
             return refuse(payload, "unlock", "Only the user unlocks a branch. Tell them why it is locked and stop.")
         # A commit is claim-checked whether or not a PR is open.
-        refused = action.kind == "commit" and claimgate.on_commit(payload, action)
+        refused = action.kind == "commit" and (claimgate.on_commit(payload, action)
+                                               or shimgate.on_commit(payload, action))
         if refused:
             return refused
         where = worktree.locate(action.cwd)
@@ -364,6 +369,8 @@ def on_workflow(payload: dict) -> dict | None:
     call = payload["tool_input"]
     if call.get("name") == claimgate.CHECK:
         return claimgate.on_launch(payload, call)
+    if call.get("name") == shimgate.CHECK:
+        return shimgate.on_launch(payload, call)
     if call.get("name") not in (REVIEW_ROUND, ASSESS_ROUND):
         return None
     args = call.get("args") if isinstance(call.get("args"), dict) else {}
@@ -433,6 +440,8 @@ def _round_output(payload: dict) -> tuple[str, str] | None:
 def on_structured_output(payload: dict) -> dict | None:
     if claimgate.owns(payload):
         return claimgate.on_output(payload)
+    if shimgate.owns(payload):
+        return shimgate.on_output(payload)
     found = _round_output(payload)
     if found is None:
         return None
@@ -466,6 +475,8 @@ def on_structured_output(payload: dict) -> dict | None:
 def after_structured_output(payload: dict) -> None:
     if claimgate.owns(payload):
         return claimgate.after_output(payload)
+    if shimgate.owns(payload):
+        return shimgate.after_output(payload)
     found = _round_output(payload)
     if found is None:
         return

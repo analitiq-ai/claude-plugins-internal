@@ -1,0 +1,366 @@
+diff --git a/packages/contract-models/src/analitiq/contracts/shared/rules.json b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+index f6fd6b9f..391ff2bf 100644
+--- a/packages/contract-models/src/analitiq/contracts/shared/rules.json
++++ b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+@@ -5696,7 +5696,7 @@
+    "mechanism": null,
+    "symbol": null,
+    "fixture_model": null,
+-   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author. The pre-split single-map filename is rejected outright rather than read as a read map, because a connector that still carries it has a write direction nobody has looked at. That name is a fact about the package rather than about the document under it — what it says is that a direction was never split out, and the missing sibling is the evidence — so it is graded here, where the package is in hand, and a map handed to the validator on its own is graded on the direction it declares.\n",
++   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author. The pre-split single-map filename is rejected outright rather than read as a read map, because a connector that still carries it has a write direction nobody has looked at. Carrying that name is the whole of what this rule reads — it is a fact about the package, not about the document under it, and a document standing on its own has no siblings for a name to be wrong relative to. So the name is read where the package is in hand, and this rule reaches nowhere else.\n",
+    "status": "active",
+    "superseded_by": null
+   },
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index 5351b769..4f595c2a 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -1396,10 +1396,27 @@ def _validate_type_map(doc: Any, doc_path: Path | None) -> list[dict]:  # skipcq
+     # the wrong one.
+     declared = doc.get("direction")
+     if declared not in ("read", "write"):
+-        return _model_findings(doc, _TYPE_MAP_ADAPTER)
++        return _type_map_discriminator_findings(doc)
+     return type_map_findings(doc, declared)
+ 
+ 
++# Pydantic locates a discriminator failure at the document root: no member was
++# entered, so there is no member field to locate it inside. The finding is about
++# `direction` all the same, and `path` is what a consumer routes on — an editor
++# placing a marker, an adapter re-rooting the finding onto a file site. Leaving
++# it at the root would point the same class of defect at two different places
++# depending on whether the direction was wrong or unusable.
++_DISCRIMINATOR_MESSAGE_IDS = ("union_tag_not_found", "union_tag_invalid")
++
++
++def _type_map_discriminator_findings(doc: Any) -> list[dict]:
++    findings = _model_findings(doc, _TYPE_MAP_ADAPTER)
++    for f in findings:
++        if f.get("message_id") in _DISCRIMINATOR_MESSAGE_IDS and f.get("path") == "/":
++            f["path"] = "/direction"
++    return findings
++
++
+ def _validate_kindless_connector(doc: Any, doc_path: Path | None) -> list[dict]:  # skipcq: PYL-W0613 — uniform registered-validator signature
+     # A dict carrying connector sentinels but no `kind` is a connector missing
+     # its discriminator — hand it to the model so the missing `kind` is reported
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index 6fa9b994..f8b36dd0 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -1302,11 +1302,17 @@ def test_the_declared_direction_decides_whatever_the_filename_says(
+         assert any(f.get("rule") == "RULE-TMAP-017" for f in findings), findings
+ 
+ 
+-def test_a_document_with_no_path_is_graded_the_same_way(validator):
++def test_a_document_with_no_path_is_graded_the_same_way(validator, tmp_path):
+     # The route takes a path only because its callers have one; nothing here
+     # reads it, so a document handed over without one is graded identically.
++    # A map earning a warning is used: a route that skipped a pathless document
++    # altogether would also return no errors, and only the findings it does
++    # produce separate grading from not grading.
+     doc = _type_map_doc([{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}], "write")
+-    assert not _errors(validator.validate_document(doc))
++    pathless = validator.validate_document(doc)
++    assert any(f.get("rule") == "RULE-TMAP-017" for f in pathless), pathless
++    assert pathless == validator.validate_document(
++        doc, doc_path=tmp_path / "type-map-write.json")
+ 
+ 
+ def test_direction_disagreeing_with_schema_is_a_model_error(validator, tmp_path):
+@@ -1341,22 +1347,45 @@ def _unusable(bad):
+     return doc
+ 
+ 
+-@pytest.mark.parametrize("bad", ["Write", "", None, 5, _ABSENT])
++@pytest.mark.parametrize("bad,message_id", [
++    ("Write", "union_tag_invalid"),
++    ("", "union_tag_invalid"),
++    (None, "union_tag_invalid"),
++    (5, "union_tag_invalid"),
++    (_ABSENT, "union_tag_not_found"),
++])
+ @pytest.mark.parametrize("filename", ["generic.json", "type-map-write.json"])
+ def test_an_unusable_direction_is_answered_on_the_discriminator(
+-        validator, tmp_path, bad, filename):
++        validator, tmp_path, bad, message_id, filename):
+     # With no usable `direction` there is no direction to grade against, and the
+     # filename supplies none either, so the document is handed to the
+     # discriminated union and answered once, on the discriminator. Picking a
+     # direction to report through would tell the author of a write map that its
+     # correct `$schema` is the wrong one.
++    #
++    # A value present but outside the vocabulary is separated from one missing
++    # altogether, because only the first can name the values it should have been
++    # among. The pointer is the field either way: a consumer routes on `path`,
++    # and every other direction defect reports the field there.
+     errors = _errors(validator.validate_document(
+         _unusable(bad), doc_path=tmp_path / filename))
+-    assert [f["message_id"] for f in errors] in (
+-        ["union_tag_invalid"], ["union_tag_not_found"]), errors
++    assert [(f["path"], f["message_id"]) for f in errors] == [
++        ("/direction", message_id)], errors
+     assert "direction" in errors[0]["message"], errors
+ 
+ 
++def test_an_envelope_declaring_nothing_is_still_answered_on_the_discriminator(validator):
++    # `$schema` is the other field that names a direction, so a document
++    # carrying it could be answered by its Literal rather than by the
++    # discriminator. Without it there is nothing left in the envelope to stand
++    # in, and the answer is the same one.
++    doc = _unusable(_ABSENT)
++    del doc["$schema"]
++    errors = _errors(validator.validate_document(doc))
++    assert [(f["path"], f["message_id"]) for f in errors] == [
++        ("/direction", "union_tag_not_found")], errors
++
++
+ @pytest.mark.parametrize("kind", (*_DATABASE_KINDS, *_STORAGE_KINDS))
+ @pytest.mark.parametrize("slot,declared", [("read", "write"), ("write", "read")])
+ def test_sibling_type_map_is_graded_by_the_slot_it_fills(
+@@ -1388,96 +1417,29 @@ def test_sibling_type_map_is_graded_by_the_slot_it_fills(
+ 
+ # --- type_map_findings, the definition every direction-holding caller shares ---
+ 
+-def test_type_map_findings_grades_as_the_direction_the_caller_names(validator):
+-    # `native_type` is read as a render template only under write grading, so a
+-    # malformed placeholder is a defect no read grading can produce.
+-    doc = _type_map_doc(
+-        [{"match": "exact", "native_type": "VARCHAR${", "arrow_type": "Utf8"}], "write")
+-    assert [f["message_id"] for f in _errors(validator.type_map_findings(doc, "write"))] == [
+-        "write-exact-malformed-placeholder"]
+-
+-
+-def test_type_map_findings_reports_a_mismatched_direction_among_the_other_defects(validator):
+-    # Naming the direction is the assertion, so a document declaring the other
+-    # one earns the `direction` Literal error without withholding the rest: a
+-    # caller holding a slot sees everything wrong with the file in one pass.
+-    doc = _type_map_doc(
+-        [{"match": "exact", "native_type": "STRING", "arrow_type": "NotAnArrowFamily"}], "write")
+-    paths = {f["path"] for f in _errors(validator.type_map_findings(doc, "read"))}
+-    assert {"/direction", "/rules/0/exact/arrow_type"} <= paths, paths
+-
+-
+-def test_type_map_findings_scope_decides_the_write_vocabulary_check(validator):
+-    # A connection map is gap-only by rule, so grading it as a connector's would
+-    # earn it the coverage finding forever.
+-    doc = _type_map_doc([{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}], "write")
+-    assert any(f.get("rule") == "RULE-TMAP-017"
+-               for f in validator.type_map_findings(doc, "write", scope="connector"))
+-    assert not any(f.get("rule") == "RULE-TMAP-017"
+-                   for f in validator.type_map_findings(doc, "write", scope="connection"))
+-
+-
+-def test_type_map_findings_contains_a_crash_as_one_pass_costing_finding(validator, monkeypatch):
+-    # The guard is what keeps a grading bug from taking the whole run down with
+-    # it, so what it substitutes has to still fail the document: `notApplicable`
+-    # naming no rule says nothing here decided whether any rule holds, and
+-    # `finding_costs_a_pass` reads that as costing. A crash reported as anything
+-    # that clears the bar would publish an ungraded map as a graded one.
+-    monkeypatch.setattr(
+-        "analitiq.validator.connectors._type_map_document_findings",
+-        lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
+-    doc = _type_map_doc([{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}], "write")
+-    findings = validator.type_map_findings(doc, "write")
+-    assert [(f["message_id"], f["kind"], f.get("rule")) for f in findings] == [
+-        ("check-crashed", "notApplicable", None)]
+-    assert validator.finding_costs_a_pass(findings[0])
+-
+-
+-@pytest.mark.parametrize("param,kwargs", [
+-    ("direction", {"direction": "Write"}),
+-    ("scope", {"direction": "write", "scope": "conector"}),
+-    ("scope", {"direction": "read", "scope": "conector"}),
+-])
+-def test_type_map_findings_rejects_an_unsupported_direction_or_scope(validator, param, kwargs):
+-    # Each parameter selects one of two branches by inequality, so an
+-    # unrecognized value would silently grade the document as the other one.
+-    # `scope` is rejected under either direction: only the write branch reads it,
+-    # and a guard sitting inside that branch would pass a read map anything.
+-    doc = _type_map_doc([{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}], "write")
+-    with pytest.raises(ValueError, match=rf"{param}.*{re.escape(repr(kwargs[param]))}"):
+-        validator.type_map_findings(doc, **kwargs)
+-
+-
+-def test_every_registered_kind_is_reached_by_a_document_here(validator, tmp_path):
++def test_every_registered_kind_is_reached_by_a_document_here():
+     # Coverage is derived from `_KIND_REGISTRY`, not listed: a hand-written set
+     # would leave a newly registered kind silently ungraded, and a kind no
+     # document here reaches is a detector nothing in this file exercises.
+     from analitiq.validator._core import _KIND_REGISTRY
+ 
+     docs = {
+-        "connector": (_connector_doc(), None),
+-        "api-endpoint": (_endpoint("TEXT", "Utf8"), None),
+-        "database-endpoint": (_db_endpoint(derive_db_endpoint_id(None, "public", "orders")),
+-                              tmp_path / "orders.json"),
+-        "type-map": (_type_map_doc(
++        "connector": _connector_doc(),
++        "api-endpoint": _endpoint("TEXT", "Utf8"),
++        "database-endpoint": _db_endpoint(derive_db_endpoint_id(None, "public", "orders")),
++        "type-map": _type_map_doc(
+             [{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}], "write"),
+-            tmp_path / "type-map-read.json"),
+-        "type-map-declaring-no-direction": (
+-            {"$schema": _TM_READ_SCHEMA,
+-             "rules": [{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}]},
+-            tmp_path / "type-map-read.json"),
+         # `auth` is a connector sentinel and there is no `kind`, so this reaches
+         # the kindless-connector fallback rather than the connector proper.
+-        "kindless-connector": ({"$schema": CONNECTOR_SCHEMA_URL, "auth": {}}, None),
+-        "pipeline-bundle": ({"pipeline": _pipeline_doc(), "streams": [], "connections": []}, None),
+-        "connection": (_connection_doc(), None),
+-        "stream": (_stream_doc(), None),
+-        "pipeline": (_pipeline_doc(), None),
+-        "unrecognized": ({"nothing": "claims this"}, None),
++        "kindless-connector": {"$schema": CONNECTOR_SCHEMA_URL, "auth": {}},
++        "pipeline-bundle": {"pipeline": _pipeline_doc(), "streams": [], "connections": []},
++        "connection": _connection_doc(),
++        "stream": _stream_doc(),
++        "pipeline": _pipeline_doc(),
++        "unrecognized": {"nothing": "claims this"},
+     }
+     reached = set()
+-    for doc, doc_path in docs.values():
+-        validator.validate_document(doc, doc_path=doc_path)
++    for doc in docs.values():
+         # `_dispatch` takes the first matching detector, so that is the one graded.
+         reached.add(next((i for i, (d, _) in enumerate(_KIND_REGISTRY) if d(doc)), None))
+     assert reached == set(range(len(_KIND_REGISTRY))) | {None}, sorted(
+@@ -1771,11 +1733,11 @@ def test_validating_a_connector_with_no_path_fails_closed(validator):
+     a sibling file located by path — and those are all `error`-tier, so a check
+     that could not even attempt them is not one that found them satisfied:
+     `passed` must be `False`. Reporting the skipped question as a `warning`
+-    instead would leave `passed` true, which is the failure this pins. A model-valid connector is used so this is the ONLY
+-    finding in play, unlike `test_endpoint_checks_run_when_read_map_is_broken`'s
+-    fixtures, which also carry unrelated error findings and so cannot
+-    isolate this one. Deliberate: see `rules/SCHEMA.md`'s Findings section and
+-    the amended Acceptance 4 recorded on the issue this stack implements.
++    instead would leave `passed` true, which is the failure this pins. A
++    model-valid connector is used so this is the ONLY finding in play, unlike
++    `test_endpoint_checks_run_when_read_map_is_broken`'s fixtures, which also
++    carry unrelated error findings and so cannot isolate this one.
++    `rules/SCHEMA.md`'s Findings section owns what each finding costs the pass.
+     """
+     from analitiq.validator._core import _passed
+ 
+@@ -1922,6 +1884,15 @@ def test_endpoint_findings_name_the_file_on_both_routes(tmp_path, connector_base
+ # what direction a document is meant to be.
+ # ---------------------------------------------------------------------------
+ 
++def test_type_map_findings_grades_as_the_direction_the_caller_names(validator):
++    # `native_type` is read as a render template only under write grading, so a
++    # malformed placeholder is a defect no read grading can produce.
++    doc = _type_map_doc(
++        [{"match": "exact", "native_type": "VARCHAR${", "arrow_type": "Utf8"}], "write")
++    assert [f["message_id"] for f in _errors(validator.type_map_findings(doc, "write"))] == [
++        "write-exact-malformed-placeholder"]
++
++
+ def test_type_map_findings_scope_decides_the_write_vocabulary_alone(validator):
+     # the whole reason `scope` exists: a connector write map must render the
+     # canonical vocabulary, a connection map is gap-only and would earn
+diff --git a/plugins/analitiq-connector-builder/README.md b/plugins/analitiq-connector-builder/README.md
+index d8734078..04a81094 100644
+--- a/plugins/analitiq-connector-builder/README.md
++++ b/plugins/analitiq-connector-builder/README.md
+@@ -80,8 +80,11 @@ contract models (`analitiq-contract-models`), the same models the published JSON
+ Schemas are generated from — so there is no schema fetch. It runs:
+ 
+ 1. **Contract-model validation** — structure, plus the cross-field rules the
+-   models themselves apply. Discriminating keys in the document body select the
+-   model; the `$schema` each kind declares is a field that model then checks:
++   models themselves apply.
++   <!-- PROBE: type-map-direction-from-document, type-map-direction-not-schema-url -->
++   Discriminating keys in the document body select the model — a type map by its
++   own `direction`, never by its filename or its `$schema`. Each kind is graded
++   against the model behind this schema:
+    - Connector → `https://schemas.analitiq.ai/connector/latest.json`
+    - Read map (`direction: "read"`) → `https://schemas.analitiq.ai/type-map-read/latest.json`
+    - Write map (`direction: "write"`, database only) → `https://schemas.analitiq.ai/type-map-write/latest.json`
+diff --git a/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md b/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
+index 924e92c3..9d22c8a9 100644
+--- a/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
++++ b/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
+@@ -131,9 +131,11 @@ either kind.
+ ### 4. Validate the domain (barrier)
+ 
+ Invoke `connector-schema-validator` over the connector body and type
+-map(s); it detects each document's kind from its own shape. Validate each
+-map the connector's `kind` calls for, under the filename that kind requires
+-(`RULE-PKG-030`), so the connector's sibling walk can find it.
++map(s); it detects each document's kind from its own shape, and grades a map
++as the direction the map itself declares. Author each map the connector's
++`kind` calls for under the filename that kind requires (`RULE-PKG-030`) — the
++name is read when the connector is validated and its siblings are in hand,
++not when a map is validated on its own.
+ 
+ Validation covers the JSON documents above; the package files are
+ governed by rules of their own (`RULE-PKG-007`, `RULE-PKG-009`,
+diff --git a/rules/SCHEMA.md b/rules/SCHEMA.md
+index 4c3e4ca9..cbbde310 100644
+--- a/rules/SCHEMA.md
++++ b/rules/SCHEMA.md
+@@ -178,7 +178,7 @@ it.
+ |---|---|
+ | `fail` | the document violates the rule; `severity` names the cost |
+ | `notApplicable` | the check knew which rule it was evaluating but could not evaluate the document against it — a sibling file was unreachable, a path could not be resolved — and reports nothing about whether that rule holds. It still carries `rule`: a consumer that cannot tell which obligation went unchecked cannot route or count it. |
+-| `informational` | something worth surfacing whose cost is not `error`/`warning` — either nothing here violates a rule at all, or the violated rule is `info`-tier, whose citation carries what a `severity` field would |
++| `informational` | something worth surfacing whose cost is not `error`/`warning` — either nothing here violates a rule at all (a default was silently applied, say), or the violated rule is `info`-tier, whose citation carries what a `severity` field would |
+ 
+ A `notApplicable` or `informational` finding never carries a `severity` of
+ its own, but a `notApplicable` finding is not costless: an unchecked
+@@ -201,7 +201,7 @@ could not run it this time:
+ | A structural precondition rejected the document before any rule-specific check could run, and no record claims it — a contract model's own field constraint, or a hand-written shape guard ahead of a check with no model behind it (a pipeline bundle malformed enough that no referential check could run over it, say) | `fail` | `error` |
+ | No detector recognised the document | `fail` | `error` |
+ | A check failed before it identified which rule applies | `notApplicable` | none |
+-| Something worth surfacing about how a check proceeded, with no rule to bind it. No shipped check emits one; the kind is reserved for the type-map gap report `analitiq.validator.document_set.resolve_type_map_gaps` specifies, which names the probes no map rendered. | `informational` | none |
++| Something worth surfacing about how a check proceeded, with no rule to bind it | `informational` | none |
+ 
+ The rows above are the framework reporting something no rule describes, not a
+ new kind of rule — and not license to leave `rule` off anywhere else a check
+diff --git a/rules/records/RULE-PKG-030.yaml b/rules/records/RULE-PKG-030.yaml
+index 409d3953..289bdcbc 100644
+--- a/rules/records/RULE-PKG-030.yaml
++++ b/rules/records/RULE-PKG-030.yaml
+@@ -17,10 +17,10 @@ rationale: >
+   capability, and the rules in it are graded by nobody and trusted by the next
+   author. The pre-split single-map filename is rejected outright rather than
+   read as a read map, because a connector that still carries it has a write
+-  direction nobody has looked at. That name is a fact about the package rather
+-  than about the document under it — what it says is that a direction was never
+-  split out, and the missing sibling is the evidence — so it is graded here,
+-  where the package is in hand, and a map handed to the validator on its own is
+-  graded on the direction it declares.
++  direction nobody has looked at. Carrying that name is the whole of what this
++  rule reads — it is a fact about the package, not about the document under it,
++  and a document standing on its own has no siblings for a name to be wrong
++  relative to. So the name is read where the package is in hand, and this rule
++  reaches nowhere else.
+ status: active
+ superseded_by: null
+diff --git a/scripts/render_validator_claims.py b/scripts/render_validator_claims.py
+index 9821ae63..b0c73067 100644
+--- a/scripts/render_validator_claims.py
++++ b/scripts/render_validator_claims.py
+@@ -614,14 +614,15 @@ def _p_type_map_schema_required() -> list[dict]:
+ 
+ 
+ def _p_type_map_direction_from_document() -> list[dict]:
+-    # A self-consistent WRITE document under a filename naming no slot. Nothing
+-    # but `direction` can have selected a model here, and the read model would
+-    # reject this document's write `$schema`, so a clean verdict is the
+-    # document's own declaration choosing and the path contributing nothing.
++    # A self-consistent WRITE document written under the READ slot's filename.
++    # Grading by name would measure it against the read model, which rejects
++    # this document's write `$schema`; both `direction` and `$schema` land on
++    # write. So a clean verdict is the name contributing nothing — which a name
++    # naming no slot at all could not have shown.
+     rules = [{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}]
+     doc = _wrap_type_map(rules, "write")
+     with tempfile.TemporaryDirectory() as tmp:
+-        path = Path(tmp) / "generic.json"
++        path = Path(tmp) / "type-map-read.json"
+         path.write_text(json.dumps(doc))
+         return _validate(doc, doc_path=path)
+ 

@@ -1,0 +1,91 @@
+diff --git a/packages/contract-models/src/analitiq/contracts/shared/json_schema.py b/packages/contract-models/src/analitiq/contracts/shared/json_schema.py
+index efb1d5b7..ff395a46 100644
+--- a/packages/contract-models/src/analitiq/contracts/shared/json_schema.py
++++ b/packages/contract-models/src/analitiq/contracts/shared/json_schema.py
+@@ -273,7 +273,8 @@ def escape_pointer_token(name: str) -> str:
+     Not the inverse of :func:`_unescape_pointer_token`, and deliberately so —
+     they meet at the §3 layer only. Unescaping percent-decodes first
+     because a `$ref` is a URI fragment (§6); escaping percent-encodes nothing
+-    because a finding's `path` is a JSON-string pointer (§5) a consumer
++    because the pointer in a finding's `path` (the whole of a bare path, or
++    what follows a reference's `#`) is a JSON-string pointer (§5) a consumer
+     resolves directly, never a URI. Symmetrising them would either encode a
+     path nothing URI-decodes, or stop decoding refs a stock resolver decodes.
+ 
+diff --git a/packages/validator/src/analitiq/validator/_core.py b/packages/validator/src/analitiq/validator/_core.py
+index a4dea375..654b31a3 100644
+--- a/packages/validator/src/analitiq/validator/_core.py
++++ b/packages/validator/src/analitiq/validator/_core.py
+@@ -255,7 +255,7 @@ def _model_findings(doc: Any, adapter: TypeAdapter) -> list[dict]:
+     existing, already-stable vocabulary reused rather than a second one
+     invented beside it.
+     """
+-    from analitiq.contracts.shared.json_schema import escape_pointer_token
++    from analitiq.contracts.shared.json_schema import pointer_position
+     from analitiq.contracts.shared.rules import rule_violations
+     try:
+         adapter.validate_python(doc)
+@@ -263,7 +263,7 @@ def _model_findings(doc: Any, adapter: TypeAdapter) -> list[dict]:
+     except ValidationError as exc:
+         findings: list[dict] = []
+         for err in exc.errors():
+-            base_path = "".join(f"/{escape_pointer_token(str(p))}" for p in err["loc"])
++            base_path = pointer_position(err["loc"])
+             violations = rule_violations(err)
+             if not violations:
+                 findings.append(finding(
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index ecd63fad..1d732db9 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -708,7 +708,8 @@ def _api_operation_paths(ep_doc: dict) -> list[tuple[str, str]]:
+         for mode, block in write.items():
+             if isinstance(block, dict) and isinstance(block.get("request"), dict) \
+                     and isinstance(block["request"].get("path"), str):
+-                out.append((f"/operations/write/{mode}/request/path", block["request"]["path"]))
++                out.append((f"/operations/write/{escape_pointer_token(mode)}/request/path",
++                            block["request"]["path"]))
+     return out
+ 
+ 
+@@ -738,7 +739,7 @@ def _api_operation_transport_refs(ep_doc: dict) -> list[tuple[str, Any]]:
+     write = ops.get("write")
+     if isinstance(write, dict):
+         for mode, block in write.items():
+-            _collect(block, f"/operations/write/{mode}")
++            _collect(block, f"/operations/write/{escape_pointer_token(mode)}")
+     return out
+ 
+ 
+diff --git a/packages/validator/tests/test_finding_paths.py b/packages/validator/tests/test_finding_paths.py
+index 8dba475c..5d522b6e 100644
+--- a/packages/validator/tests/test_finding_paths.py
++++ b/packages/validator/tests/test_finding_paths.py
+@@ -197,6 +197,27 @@ def test_a_model_error_escapes_the_keys_on_its_pointer(validator):
+     assert any("/headers/A~1b~0c" in p for p in paths), paths
+ 
+ 
++def _write_mode(endpoint, mode, request):
++    endpoint["operations"]["write"] = {mode: {"request": request}}
++    return endpoint
++
++
++def test_an_unresolved_transport_ref_escapes_its_write_mode(tmp_path, validator):
++    endpoint = _write_mode(_endpoint(), "a/b", {"transport_ref": "nope", "path": "/v1/records"})
++    _package(tmp_path, endpoints={"v1__records.json": endpoint})
++    [found] = _graded(validator, tmp_path, "transport-ref-undeclared")
++    assert found["path"] == (
++        "endpoints/v1__records.json#/operations/write/a~1b/request/transport_ref"), found
++
++
++def test_an_unstable_locator_escapes_its_write_mode(validator):
++    endpoint = _write_mode(_endpoint(), "a/b", {"path": "/records.json"})
++    del endpoint["operations"]["read"]
++    [found] = [f for f in validator.validate_document(endpoint)
++               if f["message_id"] == "locator-unstable"]
++    assert found["path"] == "/operations/write/a~1b/request/path", found
++
++
+ # ---------------------------------------------------------------------------
+ # The reference: one computation, the same on disk and in memory.
+ # ---------------------------------------------------------------------------

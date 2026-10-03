@@ -1,0 +1,333 @@
+diff --git a/packages/contract-models/src/analitiq/contracts/shared/rules.json b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+index 391ff2bf..58970b98 100644
+--- a/packages/contract-models/src/analitiq/contracts/shared/rules.json
++++ b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+@@ -5696,7 +5696,7 @@
+    "mechanism": null,
+    "symbol": null,
+    "fixture_model": null,
+-   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author. The pre-split single-map filename is rejected outright rather than read as a read map, because a connector that still carries it has a write direction nobody has looked at. Carrying that name is the whole of what this rule reads — it is a fact about the package, not about the document under it, and a document standing on its own has no siblings for a name to be wrong relative to. So the name is read where the package is in hand, and this rule reaches nowhere else.\n",
++   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author. The pre-split single-map filename is rejected outright rather than read as a read map, because a connector that still carries it has a write direction nobody has looked at. About that name the rule reads only whether the package carries it: it is a fact about the package, not about the document under it, and a document standing on its own has no siblings for a name to be wrong relative to. So the name is read where the package is in hand, and this rule reaches nowhere else.\n",
+    "status": "active",
+    "superseded_by": null
+   },
+diff --git a/packages/validator/src/analitiq/validator/_core.py b/packages/validator/src/analitiq/validator/_core.py
+index 6ed844e8..6dfaddde 100644
+--- a/packages/validator/src/analitiq/validator/_core.py
++++ b/packages/validator/src/analitiq/validator/_core.py
+@@ -227,7 +227,7 @@ def _model_findings(doc: Any, adapter: TypeAdapter) -> list[dict]:
+                     message_id=err["type"],
+                     kind="fail",
+                     path=base_path,
+-                    message=err["msg"],
++                    message=_bounded(err["msg"]),
+                 ))
+             for v in violations:
+                 findings.append(finding(
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index 4f595c2a..1e7d0aba 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -1400,20 +1400,39 @@ def _validate_type_map(doc: Any, doc_path: Path | None) -> list[dict]:  # skipcq
+     return type_map_findings(doc, declared)
+ 
+ 
+-# Pydantic locates a discriminator failure at the document root: no member was
+-# entered, so there is no member field to locate it inside. The finding is about
+-# `direction` all the same, and `path` is what a consumer routes on — an editor
+-# placing a marker, an adapter re-rooting the finding onto a file site. Leaving
+-# it at the root would point the same class of defect at two different places
+-# depending on whether the direction was wrong or unusable.
+ _DISCRIMINATOR_MESSAGE_IDS = ("union_tag_not_found", "union_tag_invalid")
+ 
++# Pydantic's sentence for an absent discriminator names the field and stops: it
++# does not say the field is missing, and it does not name the values that would
++# resolve it. For a tag that is present and wrong it already names both, so only
++# the absent case is replaced.
++_TAG_NOT_FOUND_MESSAGE = "no `direction`; a type map declares 'read' or 'write'"
++
++# Either way nothing past the discriminator was measured, and a report that does
++# not say so reads as one defect rather than one defect so far.
++_UNGRADED_TAIL = (". Nothing else in the document was graded — `direction` "
++                  "selects the model the rest is measured against.")
++
+ 
+ def _type_map_discriminator_findings(doc: Any) -> list[dict]:
++    """The answer for a type map whose `direction` resolves to no model.
++
++    Pydantic locates a discriminator failure at the document root: no member was
++    entered, so there is no member field to locate it inside. The finding is
++    about `direction` all the same, and `path` is what a consumer routes on —
++    the pipeline plugin's validate script concatenates it onto a file site to
++    place the finding. Leaving it at the root would point the same class of
++    defect at two different places depending on whether the direction was wrong
++    or unusable."""
+     findings = _model_findings(doc, _TYPE_MAP_ADAPTER)
+     for f in findings:
+-        if f.get("message_id") in _DISCRIMINATOR_MESSAGE_IDS and f.get("path") == "/":
++        if f.get("message_id") not in _DISCRIMINATOR_MESSAGE_IDS:
++            continue
++        if f.get("path") == "/":
+             f["path"] = "/direction"
++        if f["message_id"] == "union_tag_not_found":
++            f["message"] = _TAG_NOT_FOUND_MESSAGE
++        f["message"] += _UNGRADED_TAIL
+     return findings
+ 
+ 
+diff --git a/packages/validator/tests/test_type_map_model.py b/packages/validator/tests/test_type_map_model.py
+index e2a43d65..4b3482a7 100644
+--- a/packages/validator/tests/test_type_map_model.py
++++ b/packages/validator/tests/test_type_map_model.py
+@@ -121,8 +121,10 @@ def test_direction_literal_must_match_the_adapter():
+     """The invariant `direction` exists to express: a document graded against
+     one direction's adapter whose own `direction` names the other is a model
+     error, not a silent resolution. That is what lets a caller holding a
+-    direction of its own — a connector package's read/write slot — grade a map
+-    against it and have the disagreement reported.
++    direction of its own — anything that located the map by a slot rather than
++    by reading it, a connector package's read/write filename or a connection
++    naming the direction it is grading — grade a map against that direction and
++    have the disagreement reported.
+     """
+     read_doc = _wrap(READ, _ONE_READ_RULE)
+     read_doc["direction"] = "write"
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index f8b36dd0..488d61a7 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -1192,7 +1192,10 @@ def test_standalone_type_map_at_the_pre_split_name_is_graded_as_it_declares(tmp_
+     # A document handed to the validator on its own has no siblings to be missing
+     # and nothing the name can be wrong relative to, so it is graded on what it
+     # declares. The routes answer differently on purpose, and this pins it.
+-    doc = _type_map_doc([{"match": "exact", "native_type": "X", "arrow_type": "Utf8"}], "read")
++    # A write document: the pre-split name stood for a read map, so that is the
++    # direction a name-derived answer would have picked, and only the other one
++    # shows the declaration deciding.
++    doc = _type_map_doc([{"match": "exact", "native_type": "X", "arrow_type": "Utf8"}], "write")
+     assert not _errors(validator.validate_document(doc, doc_path=tmp_path / "type-map.json"))
+ 
+ 
+@@ -1317,7 +1320,7 @@ def test_a_document_with_no_path_is_graded_the_same_way(validator, tmp_path):
+ 
+ def test_direction_disagreeing_with_schema_is_a_model_error(validator, tmp_path):
+     # `direction` picks the model; `$schema` is that model's own required
+-    # Literal, so a document whose two declarations disagree is rejected by
++    # Literal, so a document whose declarations disagree is rejected by
+     # whichever one `direction` selected — internally inconsistent, not
+     # silently resolved.
+     doc = _type_map_doc([{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}], "write")
+@@ -1398,7 +1401,7 @@ def test_sibling_type_map_is_graded_by_the_slot_it_fills(
+     # exercised: the sibling holding the correct direction is error-free, so
+     # every error below belongs to the misfiled one. Findings carry no file
+     # identity, so the `direction` Literal in the message is what names which
+-    # slot rejected — without it the two params assert the same thing.
++    # slot rejected — without it each param asserts the same thing.
+     # The database and storage families walk their siblings down separate
+     # branches, so each family is graded here: a branch that skipped the grading,
+     # or passed the document's own `direction` back to it, returns no error at
+@@ -1415,37 +1418,6 @@ def test_sibling_type_map_is_graded_by_the_slot_it_fills(
+                for f in errors), (slot, errors)
+ 
+ 
+-# --- type_map_findings, the definition every direction-holding caller shares ---
+-
+-def test_every_registered_kind_is_reached_by_a_document_here():
+-    # Coverage is derived from `_KIND_REGISTRY`, not listed: a hand-written set
+-    # would leave a newly registered kind silently ungraded, and a kind no
+-    # document here reaches is a detector nothing in this file exercises.
+-    from analitiq.validator._core import _KIND_REGISTRY
+-
+-    docs = {
+-        "connector": _connector_doc(),
+-        "api-endpoint": _endpoint("TEXT", "Utf8"),
+-        "database-endpoint": _db_endpoint(derive_db_endpoint_id(None, "public", "orders")),
+-        "type-map": _type_map_doc(
+-            [{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}], "write"),
+-        # `auth` is a connector sentinel and there is no `kind`, so this reaches
+-        # the kindless-connector fallback rather than the connector proper.
+-        "kindless-connector": {"$schema": CONNECTOR_SCHEMA_URL, "auth": {}},
+-        "pipeline-bundle": {"pipeline": _pipeline_doc(), "streams": [], "connections": []},
+-        "connection": _connection_doc(),
+-        "stream": _stream_doc(),
+-        "pipeline": _pipeline_doc(),
+-        "unrecognized": {"nothing": "claims this"},
+-    }
+-    reached = set()
+-    for doc in docs.values():
+-        # `_dispatch` takes the first matching detector, so that is the one graded.
+-        reached.add(next((i for i, (d, _) in enumerate(_KIND_REGISTRY) if d(doc)), None))
+-    assert reached == set(range(len(_KIND_REGISTRY))) | {None}, sorted(
+-        set(range(len(_KIND_REGISTRY))) - reached)
+-
+-
+ def test_legacy_bare_array_type_map_is_rejected_not_silently_accepted(validator, tmp_path):
+     # Pre-migration documents (a bare top-level rule array, no envelope) no
+     # longer sniff as a type-map at all — `register_kind`'s detector requires
+@@ -1885,12 +1857,22 @@ def test_endpoint_findings_name_the_file_on_both_routes(tmp_path, connector_base
+ # ---------------------------------------------------------------------------
+ 
+ def test_type_map_findings_grades_as_the_direction_the_caller_names(validator):
+-    # `native_type` is read as a render template only under write grading, so a
+-    # malformed placeholder is a defect no read grading can produce.
++    # The document declares the direction the caller did not, so what is graded
++    # says which one decided: `native_type` is read as a render template only
++    # under write grading, and a malformed placeholder is a defect no read
++    # grading can produce.
++    #
++    # The disagreement itself is reported alongside that defect, not instead of
++    # it. A caller holding a slot is looking at the file once, and a route that
++    # stopped at the disagreement would hand back a defect list the author
++    # completes only by fixing `direction` and running again.
+     doc = _type_map_doc(
+-        [{"match": "exact", "native_type": "VARCHAR${", "arrow_type": "Utf8"}], "write")
+-    assert [f["message_id"] for f in _errors(validator.type_map_findings(doc, "write"))] == [
+-        "write-exact-malformed-placeholder"]
++        [{"match": "exact", "native_type": "VARCHAR${", "arrow_type": "Utf8"}], "read")
++    errors = _errors(validator.type_map_findings(doc, "write"))
++    assert {f["path"] for f in errors} == {
++        "/direction", "/$schema", "/rules/0/exact"}, errors
++    assert any(f["message_id"] == "write-exact-malformed-placeholder"
++               for f in errors), errors
+ 
+ 
+ def test_type_map_findings_scope_decides_the_write_vocabulary_alone(validator):
+diff --git a/plugins/analitiq-connector-builder/README.md b/plugins/analitiq-connector-builder/README.md
+index 04a81094..67ee47ec 100644
+--- a/plugins/analitiq-connector-builder/README.md
++++ b/plugins/analitiq-connector-builder/README.md
+@@ -82,9 +82,12 @@ Schemas are generated from — so there is no schema fetch. It runs:
+ 1. **Contract-model validation** — structure, plus the cross-field rules the
+    models themselves apply.
+    <!-- PROBE: type-map-direction-from-document, type-map-direction-not-schema-url -->
+-   Discriminating keys in the document body select the model — a type map by its
+-   own `direction`, never by its filename or its `$schema`. Each kind is graded
+-   against the model behind this schema:
++   Discriminating keys in the document body select the model — a type map
++   validated on its own by its own `direction`, not by its filename and not by
++   its `$schema`. Inside a connector package a map is located by the slot
++   filename its kind requires, and graded as that slot
++   (`references/metadata-and-versioning.md`). Each kind is graded against the
++   model behind this schema:
+    - Connector → `https://schemas.analitiq.ai/connector/latest.json`
+    - Read map (`direction: "read"`) → `https://schemas.analitiq.ai/type-map-read/latest.json`
+    - Write map (`direction: "write"`, database only) → `https://schemas.analitiq.ai/type-map-write/latest.json`
+diff --git a/plugins/analitiq-connector-builder/agents/connector-schema-validator.md b/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
+index 3dd3fdbc..631ce26c 100644
+--- a/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
++++ b/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
+@@ -21,12 +21,14 @@ artifact.
+ 
+ ## Inputs
+ 
+-- `document_path` — absolute path to the draft JSON document. Validating a type
+-  map on its own runs no package-level check under any name — those run when the
+-  **connector** is validated, and a direction the connector's `kind` requires but
+-  ships no map for surfaces there as a missing sibling (`RULE-PKG-030`). Point
+-  this at the draft where it sits rather than at a copy you re-serialized, so
+-  what ships is what was graded. This agent validates JSON documents only; a
++- `document_path` — absolute path to the draft JSON document.
++  <!-- PROBE: type-map-direction-from-document, type-map-slot-grades-the-sibling -->
++  Validating a type map on its own runs no package-level check under any name —
++  those run when the **connector** is validated, off the maps sitting beside it
++  under the slot filenames its `kind` requires, and a direction it requires but
++  ships no map for surfaces there as a missing sibling (`RULE-PKG-030`). So
++  point this at the draft where it sits in the package rather than at a copy you
++  re-serialized: what is beside it decides as much as what is in it. This agent validates JSON documents only; a
+   connector's Python package files (`connector.py`, `pyproject.toml`, …) are
+   outside its scope — report them as not validated rather than passing judgment
+   on them.
+diff --git a/plugins/analitiq-connector-builder/skills/connector-builder/references/metadata-and-versioning.md b/plugins/analitiq-connector-builder/skills/connector-builder/references/metadata-and-versioning.md
+index c908e0c9..4498dd4a 100644
+--- a/plugins/analitiq-connector-builder/skills/connector-builder/references/metadata-and-versioning.md
++++ b/plugins/analitiq-connector-builder/skills/connector-builder/references/metadata-and-versioning.md
+@@ -69,7 +69,7 @@ Authored connector files declare `$schema` (`RULE-SHRD-003`) as
+ 
+ The document families differ, so don't generalize from one to another:
+ 
+-<!-- PROBE: connector-schema-optional, endpoint-schema-host-locked, type-map-schema-required, type-map-direction-from-document, type-map-direction-not-schema-url -->
++<!-- PROBE: connector-schema-optional, endpoint-schema-host-locked, type-map-schema-required, type-map-direction-from-document, type-map-direction-not-schema-url, type-map-slot-grades-the-sibling -->
+ | Document | `$schema` | Enforced? |
+ |---|---|---|
+ | Connector | Author it; matched by pattern, tolerating any environment host (`schemas.analitiq.<tld>`). | Partly. The *pattern* is enforced when present, but the field is optional — a connector omitting `$schema` entirely validates clean. Always writing it is our convention, not a contract rule. |
+diff --git a/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md b/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
+index 9d22c8a9..a62e472f 100644
+--- a/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
++++ b/plugins/analitiq-connector-builder/skills/connector-builder/references/pipeline.md
+@@ -131,11 +131,13 @@ either kind.
+ ### 4. Validate the domain (barrier)
+ 
+ Invoke `connector-schema-validator` over the connector body and type
+-map(s); it detects each document's kind from its own shape, and grades a map
+-as the direction the map itself declares. Author each map the connector's
+-`kind` calls for under the filename that kind requires (`RULE-PKG-030`) — the
+-name is read when the connector is validated and its siblings are in hand,
+-not when a map is validated on its own.
++map(s); it detects each document's kind from its own shape.
++<!-- PROBE: type-map-direction-from-document, type-map-slot-grades-the-sibling -->
++A map validated on its own is graded as the direction the map itself declares.
++Author each map the connector's `kind` calls for under the filename that kind
++requires (`RULE-PKG-030`) — the name is read when the connector is validated and
++its siblings are in hand, and there the slot is the direction the map is graded
++as.
+ 
+ Validation covers the JSON documents above; the package files are
+ governed by rules of their own (`RULE-PKG-007`, `RULE-PKG-009`,
+diff --git a/rules/records/RULE-PKG-030.yaml b/rules/records/RULE-PKG-030.yaml
+index 289bdcbc..5cfdadf9 100644
+--- a/rules/records/RULE-PKG-030.yaml
++++ b/rules/records/RULE-PKG-030.yaml
+@@ -17,10 +17,10 @@ rationale: >
+   capability, and the rules in it are graded by nobody and trusted by the next
+   author. The pre-split single-map filename is rejected outright rather than
+   read as a read map, because a connector that still carries it has a write
+-  direction nobody has looked at. Carrying that name is the whole of what this
+-  rule reads — it is a fact about the package, not about the document under it,
+-  and a document standing on its own has no siblings for a name to be wrong
+-  relative to. So the name is read where the package is in hand, and this rule
+-  reaches nowhere else.
++  direction nobody has looked at. About that name the rule reads only whether the
++  package carries it: it is a fact about the package, not about the document
++  under it, and a document standing on its own has no siblings for a name to be
++  wrong relative to. So the name is read where the package is in hand, and this
++  rule reaches nowhere else.
+ status: active
+ superseded_by: null
+diff --git a/scripts/render_validator_claims.py b/scripts/render_validator_claims.py
+index b0c73067..df0b0d0c 100644
+--- a/scripts/render_validator_claims.py
++++ b/scripts/render_validator_claims.py
+@@ -627,6 +627,24 @@ def _p_type_map_direction_from_document() -> list[dict]:
+         return _validate(doc, doc_path=path)
+ 
+ 
++def _p_type_map_slot_grades_the_sibling() -> list[dict]:
++    # The same document the standalone route passes under this name: it declares
++    # write and its `$schema` agrees. Located as the read slot's sibling, the
++    # slot is what it is graded as, so the write `$schema` is rejected — the
++    # filename deciding, which is what the package route has that the standalone
++    # route does not.
++    rules = [{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}]
++    misfiled = _wrap_type_map(rules, "write")
++    doc = _example_body(DB_EXAMPLE)
++    with tempfile.TemporaryDirectory() as tmp:
++        definition = Path(tmp) / "definition"
++        definition.mkdir()
++        (definition / "connector.json").write_text(json.dumps(doc))
++        (definition / "type-map-read.json").write_text(json.dumps(misfiled))
++        shutil.copy(DB_EXAMPLE / "type-map-write.json", definition / "type-map-write.json")
++        return _validate(doc, doc_path=definition / "connector.json")
++
++
+ def _p_type_map_direction_not_schema_url() -> list[dict]:
+     # `direction` and `$schema` made to disagree, so only one of them can have
+     # chosen the model. Rejecting the WRITE `$schema` against the read model is
+@@ -1020,6 +1038,8 @@ PROBES: tuple[Probe, ...] = (
+     Probe("type-map-schema-required", "error", _p_type_map_schema_required,
+           message_re=r"Field required"),
+     Probe("type-map-direction-from-document", "clean", _p_type_map_direction_from_document),
++    Probe("type-map-slot-grades-the-sibling", "error", _p_type_map_slot_grades_the_sibling,
++          message_re=r"type-map-read/latest\.json"),
+     Probe("type-map-direction-not-schema-url", "error", _p_type_map_direction_not_schema_url,
+           message_re=r"type-map-read"),
+     Probe("pagination-limit-bare-zero-rejected", "error", _p_pagination_limit_bare_zero,

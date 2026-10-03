@@ -33,6 +33,11 @@ def claim_checks_mode() -> str:
     return _setting("claim_checks", "ALQ_REVIEW_CLAIM_CHECKS")
 
 
+def shim_checks_mode() -> str:
+    """The shim check's own setting (spec 006 R1), so it can be rolled back alone."""
+    return _setting("shim_checks", "ALQ_REVIEW_SHIM_CHECKS")
+
+
 def deny(reason: str) -> dict:
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                    "permissionDecisionReason": f"[alq-review] {reason}"}}
@@ -71,6 +76,11 @@ def refuse_spec(payload: dict, action: str, reason: str, target) -> dict | None:
 def refuse_claim(payload: dict, action: str, reason: str, target=None) -> dict | None:
     """A claim check's refusal: it blocks only when both the plugin and the claim checks enforce."""
     return _refuse_under(claim_checks_mode(), payload, action, reason, target)
+
+
+def refuse_shim(payload: dict, action: str, reason: str, target=None) -> dict | None:
+    """A shim check's refusal: it blocks only when both the plugin and the shim checks enforce."""
+    return _refuse_under(shim_checks_mode(), payload, action, reason, target)
 
 
 def session_file(payload: dict, kind: str = "") -> Path:

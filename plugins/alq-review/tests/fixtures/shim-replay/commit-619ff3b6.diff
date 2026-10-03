@@ -1,0 +1,267 @@
+diff --git a/packages/validator/src/analitiq/validator/_core.py b/packages/validator/src/analitiq/validator/_core.py
+index 7092a46a..36376fad 100644
+--- a/packages/validator/src/analitiq/validator/_core.py
++++ b/packages/validator/src/analitiq/validator/_core.py
+@@ -15,9 +15,9 @@ This module owns the parts that are independent of any particular artifact kind:
+   whose validity is its contract model plus the `$schema`-omission check
+   registers via `register_model_and_schema_kind()` instead of hand-writing
+   that combination;
+-- `_bounded()` — the one width a borrowed diagnostic, or a document value
+-  echoed inside one, is clipped to, so a finding is bounded the same way
+-  whichever route the text arrived by;
++- `_bounded()` — the one width a diagnostic borrowed from another library, or
++  a document value it echoes, is clipped to; messages the contract models write
++  are not clipped;
+ - `_run_guarded()` — a crash in one check becomes a single `notApplicable`
+   finding so the others survive;
+ - `finding_costs_a_pass()` — whether one finding, on its own, keeps a document
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index ee514273..63345988 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -1114,8 +1114,8 @@ def type_map_sibling_paths(parent: Path) -> list[Path]:
+     Which files are type-map documents is one question with one answer, asked
+     wherever maps are collected — beside a connector here, beside a connection
+     by the pipeline plugin's adapter. The order is part of the answer: it is
+-    what makes "the document already holding a direction" the same document
+-    from either side.
++    what makes "the document that declared a direction first" the same
++    document from either side.
+     """
+     return sorted(parent.glob(_TYPE_MAP_GLOB))
+ 
+@@ -1332,8 +1332,8 @@ def check_coverage(doc: dict, doc_path: Path | None) -> list[dict]:
+             message_id="write-map-not-allowed", kind="fail", path="/",
+             message=(
+                 "api connector must not ship a type-map document declaring direction "
+-                f"'write'; sibling {declared_by['write']} declares it, and the write "
+-                "direction is database-only.")))
++                f"'write'; sibling {declared_by['write']} declares it, and an api "
++                "connector has no write direction.")))
+     if not isinstance(read_rules, list):
+         # notApplicable, not fail: the check knows exactly which rule it would
+         # be grading (RULE-PKG-033) — the read map itself is missing, unreadable,
+@@ -1531,8 +1531,8 @@ def _validate_api_endpoint(doc: Any, doc_path: Path | None) -> list[dict]:
+                             "Validate the connector to see why.")))
+                 elif sibling_exists:
+                     # The file IS there and nothing was read out of it. Reporting
+-                    # this as "not reachable" would contradict the parse error
+-                    # emitted beside it under the same id.
++                    # this as "not reachable" would contradict the read/parse
++                    # finding emitted beside it.
+                     sibling_findings.append(finding(
+                         rule="RULE-ENDP-047",
+                         message_id="transport-ref-check-skipped-unparseable",
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index d19702c9..429726e3 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -1707,8 +1707,8 @@ def test_the_discriminator_answer_says_what_is_wrong_and_what_went_ungraded(vali
+ 
+ 
+ def test_a_borrowed_diagnostic_does_not_carry_the_document_back_whole(validator):
+-    # A model error's sentence comes from pydantic, which renders the failing
+-    # input into it. This package is the gate over documents it did not author,
++    # A discriminator error's sentence comes from pydantic, which renders the
++    # failing tag into it. This package is the gate over documents it did not author,
+     # and the sentence reaches a CI log and an agent's context, so an oversized
+     # value is clipped rather than echoed.
+     oversized = "X" * 5000
+@@ -2340,7 +2340,7 @@ def test_type_map_sibling_paths_selects_the_type_map_documents(validator, tmp_pa
+ def test_type_map_sibling_paths_orders_what_the_directory_hands_back(validator):
+     # Directory order is the filesystem's, and it is not sorted: two callers
+     # taking it as given would disagree about which of two documents declaring
+-    # one direction already held it. A stub stands in for the directory because
++    # one direction declared it first. A stub stands in for the directory because
+     # a real one cannot be made to hand back an unsorted listing on demand.
+     class _Scrambled:
+         def glob(self, pattern):
+@@ -2355,11 +2355,11 @@ def test_type_map_directions_gives_each_direction_to_the_first_to_declare_it(val
+     directions = validator.TypeMapDirections()
+     first = _type_map_doc([{"match": "exact", "native_type": "STRING", "arrow_type": "Utf8"}], "read")
+     assert directions.claim("a.json", first) == ("read", None)
+-    # The later document declares a direction another already holds, so it takes
+-    # none — and the direction comes back anyway, because that is what a caller
++    # The later document declares a direction another declared first, so it
++    # takes none — and the direction comes back anyway, because that is what a caller
+     # names in the message it reports.
+     assert directions.claim("b.json", first) == ("read", "a.json")
+-    # A second holder does not displace the first for any subsequent document.
++    # A later declaration does not displace the first for any subsequent document.
+     assert directions.claim("c.json", first) == ("read", "a.json")
+ 
+ 
+diff --git a/plugins/analitiq-connector-builder/README.md b/plugins/analitiq-connector-builder/README.md
+index 53805ae8..c2b1e705 100644
+--- a/plugins/analitiq-connector-builder/README.md
++++ b/plugins/analitiq-connector-builder/README.md
+@@ -91,7 +91,7 @@ Schemas are generated from — so there is no schema fetch. It runs:
+    is graded against the model behind this schema:
+    - Connector → `https://schemas.analitiq.ai/connector/latest.json`
+    - Read map (`direction: "read"`) → `https://schemas.analitiq.ai/type-map-read/latest.json`
+-   - Write map (`direction: "write"`, database only) → `https://schemas.analitiq.ai/type-map-write/latest.json`
++   - Write map (`direction: "write"`, for the kinds `RULE-PKG-030` calls for) → `https://schemas.analitiq.ai/type-map-write/latest.json`
+    - API endpoint → `https://schemas.analitiq.ai/api-endpoint/latest.json`
+    - Database endpoint → `https://schemas.analitiq.ai/database-endpoint/latest.json`
+    Every rule an author must satisfy is catalogued by id in
+diff --git a/plugins/analitiq-connector-builder/skills/shared/type-maps.md b/plugins/analitiq-connector-builder/skills/shared/type-maps.md
+index 64f88527..4845f745 100644
+--- a/plugins/analitiq-connector-builder/skills/shared/type-maps.md
++++ b/plugins/analitiq-connector-builder/skills/shared/type-maps.md
+@@ -61,7 +61,6 @@ connector's rendering for every stream on that connection (`RULE-TMAP-018`).
+ - **Present with an empty `rules` array** — never ship one at either scope; the
+   contract requires at least one rule, so a document with no rules is a
+   rejected document rather than the fallthrough an absent file gives you.
+-- **The pre-split `type-map.json`** — it matches no pattern either scope
+-  collects by, so nothing reads it and nothing counts it toward a direction. A
+-  connector ships a map declaring each direction its `kind` calls for
++- **The pre-split `type-map.json`** — never ship it; it is no direction's map.
++  A connector ships a map declaring each direction its `kind` calls for
+   (`RULE-PKG-030`).
+diff --git a/plugins/analitiq-pipeline-builder/scripts/validate.py b/plugins/analitiq-pipeline-builder/scripts/validate.py
+index 683325ec..a8c515c6 100644
+--- a/plugins/analitiq-pipeline-builder/scripts/validate.py
++++ b/plugins/analitiq-pipeline-builder/scripts/validate.py
+@@ -166,8 +166,9 @@ def _contained(findings: list[dict], path: str):
+ 
+ def _model_findings(entity: str, doc) -> list[dict]:
+     """Validate a single connection/stream/pipeline document against its published
+-    contract model, mapping each Pydantic error to a finding (the same mapping the
+-    validator itself uses internally)."""
++    contract model, mapping each Pydantic error to a finding. The message is the
++    validator's own rendering of the error, so a document value it echoes is
++    clipped here exactly as it is there."""
+     if entity == "connection":
+         from analitiq.contracts.connection import ConnectionInput as Model
+     elif entity == "stream":
+@@ -177,13 +178,14 @@ def _model_findings(entity: str, doc) -> list[dict]:
+     else:  # pragma: no cover - guarded by the entity choices
+         raise ValueError(f"no contract model for entity {entity!r}")
+     from pydantic import ValidationError
++    from analitiq.validator._core import _model_error_message
+     try:
+         Model.model_validate(doc)
+         return []
+     except ValidationError as exc:
+         return [
+             _finding("contract-model", "error",
+-                     "/" + "/".join(str(p) for p in err["loc"]), err["msg"])
++                     "/" + "/".join(str(p) for p in err["loc"]), _model_error_message(err))
+             for err in exc.errors()
+         ]
+ 
+@@ -240,8 +242,8 @@ def _connection_type_map_findings(conn_dir: Path, findings: list[dict]) -> None:
+     finding, mirroring the published connector-side check.
+ 
+     Appends directly to the caller's shared `findings` list rather than
+-    building a local one to return: the legacy check and each collected file
+-    are independently-decidable units, each in its own `_contained` guard, so a
++    building a local one to return: the legacy check, each file's collection,
++    and each kept file's grading run in their own `_contained` guard, so a
+     crash in one costs only its own finding — never a list of already-decided
+     results a crash partway through would otherwise discard before this
+     function got the chance to return it."""
+@@ -261,11 +263,10 @@ def _connection_type_map_findings(conn_dir: Path, findings: list[dict]) -> None:
+                 f"{LEGACY_TYPE_MAP_FILENAME} is the pre-split filename; the engine never "
+                 "reads it. Split it into type-map-read.json (native → Arrow) and, for the "
+                 "write direction, type-map-write.json (Arrow → native)."))
+-    # Which files are maps, which one is the map for a direction, and what the
+-    # dead pre-split name means are the published validator's answers — the same
+-    # ones it gives beside a connector. What differs here is only the reporting:
+-    # findings rooted at the connection site, each file decided inside its own
+-    # crash guard.
++    # Which files are maps, which document declared a direction first, and what
++    # the dead pre-split name means are the published validator's answers. This
++    # function drops a direction two documents declare, and reports at the
++    # connection site with each file inside its own crash guard.
+     directions = TypeMapDirections()
+     # Collected first and graded after, because a document is graded only once
+     # the whole directory says it is the map for its direction: a second
+diff --git a/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md b/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
+index ee46cff4..90142d14 100644
+--- a/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
++++ b/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
+@@ -54,6 +54,8 @@ printf '%s' '["citext", "vector(3)"]' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/t
+ - **Write probes** — the distinct `arrow_type` strings frozen into the endpoint
+   documents, after read-side resolution and judgment are complete.
+ 
++`--direction` names the probes' vocabulary — `read` for native types, `write`
++for `arrow_type` strings — and every `--map` must declare that direction.
+ `resolved` gives the rendered value per covered probe; `gaps` lists the
+ uncovered ones. Pass only map files that exist.
+ 
+diff --git a/scripts/render_validator_claims.py b/scripts/render_validator_claims.py
+index 414fb25e..f540249d 100644
+--- a/scripts/render_validator_claims.py
++++ b/scripts/render_validator_claims.py
+@@ -1174,12 +1174,13 @@ def run_probe(probe: Probe) -> ProbeFailure | None:
+     if probe.expect not in ("clean", "error", "silent"):
+         raise ValueError(f"probe {probe.id!r}: unknown expectation {probe.expect!r}")
+     findings = probe.build()
+-    # The validator's own last-resort guard converts a crash into a finding
+-    # whose message embeds the exception text. That text can contain the same
+-    # vocabulary as the real rejection message, so a crashed check could
+-    # otherwise satisfy an expect="error" probe while every user gets
+-    # "validator bug — please report" instead of the rejection the prose
+-    # promises. A crash never proves a claim, in either direction.
++    # A guard that contains a crash emits a finding whose message embeds the
++    # exception text. The validator's is `notApplicable`: it hides the findings
++    # the crashed check would have made, so an expect="clean" probe passes, and
++    # its text can satisfy a `require_re`. The pipeline adapter's is
++    # error-severity and can satisfy an expect="error" probe. Either way users
++    # get "validator bug — please report" instead of what the prose promises. A
++    # crash never proves a claim, in either direction.
+     #
+     # Recognised by the id each guard publishes for it — the validator's, and
+     # the pipeline adapter's for its own containment — not by its wording: the
+diff --git a/tests/pipeline_builder/test_validate.py b/tests/pipeline_builder/test_validate.py
+index 59a4917e..0179e0e9 100644
+--- a/tests/pipeline_builder/test_validate.py
++++ b/tests/pipeline_builder/test_validate.py
+@@ -139,6 +139,19 @@ def test_invalid_single_document(tmp_path, entity, doc, validator_id):
+     ), diag["findings"]
+ 
+ 
++def test_a_contract_model_finding_does_not_carry_the_document_back_whole(tmp_path):
++    # A discriminated union's sentence renders the tag it was handed, so an
++    # oversized one would arrive whole in a CI log. The tag is clipped the way
++    # the validator clips it, and the accepted tags after it survive.
++    oversized = "S" * 5000
++    doc = json.loads(json.dumps(STREAM))
++    doc["source"]["endpoint_ref"]["scope"] = oversized
++    diag = V.diagnostics_for("stream", _write(tmp_path, "stream.json", doc))
++    [tag] = [f for f in diag["findings"] if f["path"] == "/source/endpoint_ref"]
++    assert oversized not in tag["message"] and len(tag["message"]) < 500, len(tag["message"])
++    assert "'connection'" in tag["message"], tag["message"][-200:]
++
++
+ def test_active_pipeline_requires_stream_single_document(tmp_path):
+     # the published pipeline contract enforces active => >=1 stream reference at the
+     # single-document level; an active pipeline with empty streams is rejected without
+@@ -649,17 +662,18 @@ def test_bundle_flags_invalid_connection_write_type_map(tmp_path):
+         for f in bad), diag["findings"]
+ 
+ 
+-def test_bundle_rejects_two_connection_maps_declaring_one_direction(tmp_path):
++@pytest.mark.parametrize("defective", ["type-map-read.json", "type-map-write.json"])
++def test_bundle_rejects_two_connection_maps_declaring_one_direction(tmp_path, defective):
+     # The same rule the published validator applies beside a connector, at the
+     # site this adapter owns: a direction two documents declare has no map, so
+-    # the collision is reported and neither document is graded. The earlier
+-    # document carries a defect of its own — reporting it would say which of the
+-    # two the order happened to reach first.
++    # the collision is reported and neither document is graded. Whichever of the
++    # two carries a defect of its own, reporting it would say which one the
++    # order happened to reach first or last.
+     doc = _build_bundle(tmp_path)
+-    _write(tmp_path, "connections/postgresql/definition/type-map-read.json",
+-           _tm([{"match": "exact", "arrow_type": "utf8", "native_type": "TEXT"}], "write"))
+-    _write(tmp_path, "connections/postgresql/definition/type-map-write.json",
+-           _tm(TYPE_MAP_WRITE, "write"))
++    for name in ("type-map-read.json", "type-map-write.json"):
++        rules = ([{"match": "exact", "arrow_type": "utf8", "native_type": "TEXT"}]
++                 if name == defective else TYPE_MAP_WRITE)
++        _write(tmp_path, f"connections/postgresql/definition/{name}", _tm(rules, "write"))
+     diag = V.diagnostics_for("pipeline", doc, bundle_root=tmp_path)
+     assert not diag["passed"]
+     collision = [f for f in diag["findings"] if "both declare direction" in f["message"]]

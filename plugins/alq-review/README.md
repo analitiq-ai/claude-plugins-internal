@@ -71,6 +71,14 @@ that is under review.
    rejects it, and a rejection counts as a refusal. After 3 refusals of one hunk the agent must stop and ask
    the user, who lets the words stand by typing `unlock claim-<id>`. What the repo's own commit hook changes
    during the commit is cosmetic and is not checked again.
+8. **A fix reaches every site of its bug before it is committed.** A `git commit` that stages code is also refused
+   until the `shim-check` workflow has checked that staged tree, or the user has overridden its bug; each refusal
+   names the next step. Jev answers whether the change fixes a defect. For a fix, sweepers list the sites doing the
+   same operation and the callers, reading a copy of `HEAD` in `<main checkout>/.claude/worktrees/`, which the
+   repo's `.gitignore` should list. Jev then answers where the fix acts and whether it reaches every listed site
+   with the same defect; anything short of a fix at the cause that reaches them all is a `patch`, and its commit is
+   refused. Only the user overrides a bug, by typing the `override shim-<id>` that each refusal names. The full
+   rules are in `specs/006-shim-check-gate/`.
 
 ## How an agent uses it
 
@@ -80,6 +88,8 @@ Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', stage:
 Workflow(name='alq-review:assess-round', args={worktree: '/abs/checkout'})                  # after the poller reports findings
 Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout'})                   # before git commit
 Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout', contests: [{claim: '<id>', evidence: 'path:line'}]})
+Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout'})                    # before git commit
+Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout', contests: [{site: '<id>', reason: '<why>'}]})
 ```
 
 Agents do not need to be told any of this: every refusal names the next legal step.
@@ -97,6 +107,11 @@ The claim check (7) has its own `claim_checks` setting, overridden by `ALQ_REVIE
 only when both settings enforce. `claim_warn_over` (20) is the number of judged claims above which the
 workflow's result suggests splitting the change.
 
+The shim check (8) has its own `shim_checks` setting, overridden by `ALQ_REVIEW_SHIM_CHECKS`; when either it or the
+plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is reached through OpenRouter with the
+key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
+failed, and a failed check refuses the commit as a patch does.
+
 ## State
 
 `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
@@ -109,6 +124,8 @@ workflow's result suggests splitting the change.
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
   - `claim_checks (repo, tree)`, `claim_reads (repo, patch_id)`, `claim_verdicts (repo, claim_id)`,
     `claim_holds (repo, base, file)` - the claim checks, keyed by repo, git's own fingerprints and the claim id, since a commit has no PR
+  - `shim_checks (repo, tree)`, `shim_chains (repo, id)`, `shim_rulings (repo, chain, site)` - the shim checks, the
+    chains of fixes of one bug, and the rulings on contested sites
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`tests/test_poller_contract.py` pins the two ends together)
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
@@ -131,6 +148,10 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |
 | `scripts/claimgate.py` | the claim check's hook handlers |
+| `scripts/shimcheck.py` | the shim check's rules - pure functions of a check and its chains |
+| `scripts/shimgate.py` | the shim check's hook handlers |
+| `scripts/jev.py` | the Jev questions the shim check asks |
+| `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
 | `scripts/hookio.py` | settings, refusals, `gate.log` and session state, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `workflows/` | orchestration only; everything else is injected by the hook |

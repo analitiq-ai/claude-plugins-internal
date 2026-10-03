@@ -6,7 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sweeper_read.py"
           }
         ]
       }
@@ -17,7 +27,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py",
+            "timeout": 60
           }
         ]
       }

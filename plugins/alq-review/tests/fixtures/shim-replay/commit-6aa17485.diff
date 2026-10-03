@@ -1,0 +1,158 @@
+diff --git a/packages/contract-models/src/analitiq/contracts/shared/common.py b/packages/contract-models/src/analitiq/contracts/shared/common.py
+index cace3c83..9e442c04 100644
+--- a/packages/contract-models/src/analitiq/contracts/shared/common.py
++++ b/packages/contract-models/src/analitiq/contracts/shared/common.py
+@@ -88,6 +88,9 @@ DESCRIPTION_MAX = 2000
+ TAG_MIN_LEN = 1
+ TAG_MAX_LEN = 64
+ TAGS_MAX = 50
++# A coarse guard against an unbounded document, set far above any authored
++# document's size, so text that exceeds it is malformed rather than large.
++DOCUMENT_TEXT_MAX_LENGTH = 500_000
+ 
+ 
+ # Anchored "no leading/trailing whitespace" — the declarative mirror of
+@@ -127,6 +130,8 @@ NonEmptyStr = Annotated[
+     str, StringConstraints(min_length=1, pattern=r"\S")
+ ]
+ 
++DocumentText = Annotated[str, StringConstraints(max_length=DOCUMENT_TEXT_MAX_LENGTH)]
++
+ 
+ # --- Field-shape validators -------------------------------------------------
+ 
+diff --git a/packages/contract-models/src/analitiq/contracts/validation_requests.py b/packages/contract-models/src/analitiq/contracts/validation_requests.py
+index ec5fabe6..5f2374df 100644
+--- a/packages/contract-models/src/analitiq/contracts/validation_requests.py
++++ b/packages/contract-models/src/analitiq/contracts/validation_requests.py
+@@ -11,13 +11,17 @@ from typing import Annotated
+ 
+ from pydantic import Field, RootModel, StringConstraints, model_validator
+ 
+-from analitiq.contracts.shared.common import ParseOnly, StrictModel, closed_true_end_keys
++from analitiq.contracts.shared.common import (
++    DocumentText,
++    ParseOnly,
++    StrictModel,
++    closed_true_end_keys,
++)
+ 
+-# Coarse guards against an unbounded request, not a policy on package size:
+-# each is set far above what a real connector or pipeline package needs, so
+-# one that exceeds a ceiling is a malformed request rather than a large package.
++# A coarse guard against an unbounded request, not a policy on package size:
++# set far above what a real connector or pipeline package needs, so a set that
++# exceeds it is a malformed request rather than a large package.
+ MAX_DOCUMENTS = 2000
+-MAX_DOCUMENT_TEXT_LENGTH = 1_048_576
+ 
+ # A segment is any run of non-`/` characters except `.` and `..`. Written
+ # without lookahead, which pydantic-core's regex engine refuses.
+@@ -25,7 +29,6 @@ _SEGMENT = r"(?:[^/.][^/]*|\.[^/.][^/]*|\.\.[^/]+)"
+ DOCUMENT_KEY_PATTERN = rf"^{_SEGMENT}(?:/{_SEGMENT})*$"
+ 
+ DocumentKey = Annotated[str, StringConstraints(pattern=DOCUMENT_KEY_PATTERN)]
+-DocumentText = Annotated[str, StringConstraints(max_length=MAX_DOCUMENT_TEXT_LENGTH)]
+ 
+ # `RootModel` cannot inherit `StrictModel` — pydantic rejects an `extra`
+ # setting on a root model — so this mixes in the parse-only policy directly,
+diff --git a/packages/contract-models/tests/unit/test_validation_requests.py b/packages/contract-models/tests/unit/test_validation_requests.py
+index 3b7ff3b1..471b8bb9 100644
+--- a/packages/contract-models/tests/unit/test_validation_requests.py
++++ b/packages/contract-models/tests/unit/test_validation_requests.py
+@@ -16,8 +16,8 @@ import jsonschema
+ import pytest
+ from pydantic import ValidationError
+ 
++from analitiq.contracts.shared.common import DOCUMENT_TEXT_MAX_LENGTH
+ from analitiq.contracts.validation_requests import (
+-    MAX_DOCUMENT_TEXT_LENGTH,
+     MAX_DOCUMENTS,
+     DocumentSet,
+     ValidateConnectorPackageRequest,
+@@ -138,18 +138,18 @@ def test_document_count_ceiling(resource):
+ 
+ def test_document_text_ceiling(resource):
+     REQUESTS[resource].model_validate(
+-        {"documents": {"connector.json": "x" * MAX_DOCUMENT_TEXT_LENGTH}})
++        {"documents": {"connector.json": "x" * DOCUMENT_TEXT_MAX_LENGTH}})
+     with pytest.raises(ValidationError):
+         REQUESTS[resource].model_validate(
+-            {"documents": {"connector.json": "x" * (MAX_DOCUMENT_TEXT_LENGTH + 1)}})
++            {"documents": {"connector.json": "x" * (DOCUMENT_TEXT_MAX_LENGTH + 1)}})
+ 
+ 
+ def test_published_schema_carries_the_ceilings(resource):
+     document_set = DocumentSet.model_json_schema()
+     assert document_set["maxProperties"] == MAX_DOCUMENTS
+     (value_schema,) = document_set["patternProperties"].values()
+-    assert value_schema["maxLength"] == MAX_DOCUMENT_TEXT_LENGTH
++    assert value_schema["maxLength"] == DOCUMENT_TEXT_MAX_LENGTH
+     published = _published_schema(resource)
+     with pytest.raises(jsonschema.ValidationError):
+         jsonschema.validate(
+-            {"documents": {"connector.json": "x" * (MAX_DOCUMENT_TEXT_LENGTH + 1)}}, published)
++            {"documents": {"connector.json": "x" * (DOCUMENT_TEXT_MAX_LENGTH + 1)}}, published)
+diff --git a/schemas/contracts-version.json b/schemas/contracts-version.json
+index 19b46c71..7130925c 100644
+--- a/schemas/contracts-version.json
++++ b/schemas/contracts-version.json
+@@ -1,5 +1,5 @@
+ {
+   "$comment": "GENERATED by scripts/render_schemas.py \u2014 the analitiq-contract-models version the contract source tree declared when this schema tree was rendered, plus a sha256 over every other document in the tree (so the stamp changes with every render, not only on a version bump). Do not hand-edit; `render_schemas.py contracts-version` re-renders it.",
+   "analitiq-contract-models": "1.0.0rc25",
+-  "tree_sha256": "7b4dac0fcc1171c38b91d7c56c5f196273315f2d2f629f68f256a591983d088d"
++  "tree_sha256": "c1438afb6a2565158cdc4958ce9af9f71261eb9d348254af8da7b0aaf35814e5"
+ }
+diff --git a/schemas/validate-connector-package-request/1.0.0.json b/schemas/validate-connector-package-request/1.0.0.json
+index 519bb702..dfbad484 100644
+--- a/schemas/validate-connector-package-request/1.0.0.json
++++ b/schemas/validate-connector-package-request/1.0.0.json
+@@ -6,7 +6,7 @@
+       "maxProperties": 2000,
+       "patternProperties": {
+         "^(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+)(?:/(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))*(?![\\s\\S])": {
+-          "maxLength": 1048576,
++          "maxLength": 500000,
+           "type": "string"
+         }
+       },
+diff --git a/schemas/validate-connector-package-request/latest.json b/schemas/validate-connector-package-request/latest.json
+index 4e29c6cd..24d91249 100644
+--- a/schemas/validate-connector-package-request/latest.json
++++ b/schemas/validate-connector-package-request/latest.json
+@@ -6,7 +6,7 @@
+       "maxProperties": 2000,
+       "patternProperties": {
+         "^(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+)(?:/(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))*(?![\\s\\S])": {
+-          "maxLength": 1048576,
++          "maxLength": 500000,
+           "type": "string"
+         }
+       },
+diff --git a/schemas/validate-pipeline-package-request/1.0.0.json b/schemas/validate-pipeline-package-request/1.0.0.json
+index 28e37828..8e681182 100644
+--- a/schemas/validate-pipeline-package-request/1.0.0.json
++++ b/schemas/validate-pipeline-package-request/1.0.0.json
+@@ -6,7 +6,7 @@
+       "maxProperties": 2000,
+       "patternProperties": {
+         "^(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+)(?:/(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))*(?![\\s\\S])": {
+-          "maxLength": 1048576,
++          "maxLength": 500000,
+           "type": "string"
+         }
+       },
+diff --git a/schemas/validate-pipeline-package-request/latest.json b/schemas/validate-pipeline-package-request/latest.json
+index ebe71937..f8801299 100644
+--- a/schemas/validate-pipeline-package-request/latest.json
++++ b/schemas/validate-pipeline-package-request/latest.json
+@@ -6,7 +6,7 @@
+       "maxProperties": 2000,
+       "patternProperties": {
+         "^(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+)(?:/(?:[^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))*(?![\\s\\S])": {
+-          "maxLength": 1048576,
++          "maxLength": 500000,
+           "type": "string"
+         }
+       },

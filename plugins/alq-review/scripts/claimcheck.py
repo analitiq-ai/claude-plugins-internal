@@ -61,7 +61,7 @@ def paragraph(lines: list[str], hunk: dict) -> tuple[int, int]:
     return first, last
 
 
-def _citations(text: str, located: Located) -> tuple[list[str], list[str]]:
+def citations(text: str, located: Located) -> tuple[list[str], list[str]]:
     """The `path:line` citations in `text` that name a line of the checked tree, and those that do not."""
     good, bad = [], []
     for found in _CITATION.finditer(_URL.sub(" ", text or "")):
@@ -123,10 +123,10 @@ def validate_verdict(output: dict, located: Located, *, contest: bool) -> list[s
         errors.append("split the claim into its assertions; there must be at least one")
 
     def supported(evidence: str) -> bool:
-        return bool(_citations(evidence, located)[0] or (contest and _URL.search(evidence or "")))
+        return bool(citations(evidence, located)[0] or (contest and _URL.search(evidence or "")))
 
     for entry in assertions:
-        bad = _citations(entry["evidence"], located)[1]
+        bad = citations(entry["evidence"], located)[1]
         if bad:
             errors.append(f"{', '.join(bad)} is not a line of a file in the staged tree; cite only what will be committed")
         if not contest and _URL.search(entry["evidence"] or ""):
@@ -149,7 +149,7 @@ def validate_verdict(output: dict, located: Located, *, contest: bool) -> list[s
 
 
 def cited_paths(verdict: dict, located: Located) -> set[str]:
-    return {c.rsplit(":", 1)[0] for e in verdict["assertions"] for c in _citations(e["evidence"], located)[0]}
+    return {c.rsplit(":", 1)[0] for e in verdict["assertions"] for c in citations(e["evidence"], located)[0]}
 
 
 # --- a check's progress -----------------------------------------------------------------------------
@@ -219,14 +219,23 @@ def _wrong_report(check: dict, claims: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def commit_decision(check: dict | None, *, empty: bool, concluding: bool, staging: bool, alone: bool,
-                    held: list[dict], released: set[str], root: str) -> Decision:
+def commit_preconditions(*, empty: bool, concluding: bool, staging: bool, alone: bool) -> Decision | None:
+    """What every commit check decides before reading its own record; None when that record decides. Shared, so a
+    check whose sibling only logs still refuses a commit that could change what is staged."""
     if empty or concluding:
         return Decision(True)
     if staging or not alone:
         return Decision(False, "A commit is checked as the exact staged tree, and this command could change what is "
                                "staged. Stage with `git add` in an earlier command, then run `git commit` alone (only "
                                "`cd` may come before it).")
+    return None
+
+
+def commit_decision(check: dict | None, *, empty: bool, concluding: bool, staging: bool, alone: bool,
+                    held: list[dict], released: set[str], root: str) -> Decision:
+    settled = commit_preconditions(empty=empty, concluding=concluding, staging=staging, alone=alone)
+    if settled is not None:
+        return settled
     if held:
         return Decision(False, user_question(held))
     call = CALL % root
@@ -250,13 +259,15 @@ def _old_range(item: dict) -> tuple[int, int]:
     return item["old_start"], item["old_start"] + max(item["old_count"], 1) - 1
 
 
-def _touches(hold: dict, hunk: dict) -> bool:
+def touches(hold: dict, hunk: dict) -> bool:
+    """Whether two old-side ranges of one file overlap or are adjacent, a pure insertion counting as the line it follows;
+    the caller passes both in the numbering of one base."""
     (a, b), (c, d) = _old_range(hold), _old_range(hunk)
     return hold["file"] == hunk["file"] and a <= d + 1 and c <= b + 1
 
 
 def find_hold(holds: list[dict], hunk: dict) -> dict | None:
-    return next((h for h in holds if _touches(h, hunk)), None)
+    return next((h for h in holds if touches(h, hunk)), None)
 
 
 def hunk_state(holds: list[dict], hunk: dict) -> str:
@@ -324,7 +335,7 @@ def accept_contest(contest: dict, check: dict | None, located: Located) -> list[
     if verdict is None or verdict["verdict"] != "WRONG":
         return [f"claim {cid!r} has no WRONG verdict in the check of this staged tree to contest"]
     evidence = contest.get("evidence") or ""
-    if not (_citations(evidence, located)[0] or _URL.search(evidence)):
+    if not (citations(evidence, located)[0] or _URL.search(evidence)):
         return [f"the contest of claim-{cid} gives no evidence the checker can verify: add a path:line of the staged "
                 "tree or an https:// page that shows the claim holds"]
     return []

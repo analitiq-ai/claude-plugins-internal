@@ -59,6 +59,25 @@ CREATE TABLE IF NOT EXISTS claim_holds (
   doc  TEXT NOT NULL,
   PRIMARY KEY (repo, base, file)
 );
+CREATE TABLE IF NOT EXISTS shim_checks (
+  repo TEXT NOT NULL,
+  tree TEXT NOT NULL,
+  doc  TEXT NOT NULL,
+  PRIMARY KEY (repo, tree)
+);
+CREATE TABLE IF NOT EXISTS shim_chains (
+  repo     TEXT NOT NULL,
+  chain_id TEXT NOT NULL,
+  doc      TEXT NOT NULL,
+  PRIMARY KEY (repo, chain_id)
+);
+CREATE TABLE IF NOT EXISTS shim_rulings (
+  repo     TEXT NOT NULL,
+  chain_id TEXT NOT NULL,
+  site_id  TEXT NOT NULL,
+  doc      TEXT NOT NULL,
+  PRIMARY KEY (repo, chain_id, site_id)
+);
 """
 
 
@@ -179,9 +198,9 @@ def open_pr(repo: str, branch: str, head: str, ask) -> int | None:
     return pr
 
 
-class Claims:
-    """One repo's claim-check records, read and written inside the transaction that opened them. A commit has no PR,
-    so these are keyed by repo, by git's own fingerprints (a tree id, a hunk's patch-id), and by a claim id."""
+class _Records:
+    """One repo's records of a commit check, read and written inside the transaction that opened them. A commit has
+    no PR, so these are keyed by repo and by what the check fingerprints."""
 
     def __init__(self, conn: sqlite3.Connection, repo: str):
         self._conn, self.repo = conn, repo
@@ -195,6 +214,11 @@ class Claims:
         marks = ", ".join("?" * (len(columns) + 2))
         self._conn.execute(f"INSERT OR REPLACE INTO {table} ({names}) VALUES ({marks})",
                            (self.repo, *keys, json.dumps(doc)))
+
+
+class Claims(_Records):
+    """The claim check's records: by git's own fingerprints (a tree id, a hunk's patch-id), by a claim id, and its holds by
+    base and file."""
 
     def check(self, tree: str) -> dict | None:
         return self._get("claim_checks", "tree", tree)
@@ -221,6 +245,77 @@ class Claims:
 
     def save_holds(self, base: str, file: str, holds: list[dict]) -> None:
         self._put("claim_holds", ("base", "file"), (base, file), holds)
+
+
+class Shims(_Records):
+    """The shim check's records: checks by staged tree, bug chains by id, and rulings by chain and site."""
+
+    def check(self, tree: str) -> dict | None:
+        return self._get("shim_checks", "tree", tree)
+
+    def save_check(self, check: dict) -> None:
+        self._put("shim_checks", ("tree",), (check["tree"],), check)
+
+    def unfinished_at(self, root: str) -> list[dict]:
+        rows = self._conn.execute("SELECT doc FROM shim_checks WHERE repo = ? AND json_extract(doc, '$.root') = ? "
+                                  "AND json_extract(doc, '$.status') IN ('sweeping', 'judging')", (self.repo, root))
+        return [json.loads(doc) for (doc,) in rows]
+
+    def chain(self, chain_id: str) -> dict | None:
+        return self._get("shim_chains", "chain_id", chain_id)
+
+    def save_chain(self, chain: dict) -> None:
+        self._put("shim_chains", ("chain_id",), (chain["id"],), chain)
+
+    def chains_at(self, branch: str, head: str) -> list[dict]:
+        rows = self._conn.execute("SELECT doc FROM shim_chains WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
+                                  "AND json_extract(doc, '$.head') = ? ORDER BY rowid", (self.repo, branch, head))
+        return [json.loads(doc) for (doc,) in rows]
+
+    def rulings(self, chain_id: str) -> dict[str, dict]:
+        rows = self._conn.execute("SELECT site_id, doc FROM shim_rulings WHERE repo = ? AND chain_id = ?",
+                                  (self.repo, chain_id))
+        return {site: json.loads(doc) for site, doc in rows}
+
+    def save_ruling(self, chain_id: str, site_id: str, ruling: dict) -> None:
+        self._put("shim_rulings", ("chain_id", "site_id"), (chain_id, site_id), ruling)
+
+    def drop_ruling(self, chain_id: str, site_id: str) -> None:
+        self._conn.execute("DELETE FROM shim_rulings WHERE repo = ? AND chain_id = ? AND site_id = ?",
+                           (self.repo, chain_id, site_id))
+
+
+@contextmanager
+def open_shims(repo: str):
+    """`repo`'s shim-check records, opened as open_claims opens the claim check's."""
+    with _transaction() as conn:
+        yield Shims(conn, repo)
+
+
+def shim_chain_repos(chain_id: str) -> list[str]:
+    """Every repo with a chain `chain_id`, which is how a user's `override shim-<id>` finds it."""
+    with closing(_connect()) as conn:
+        return sorted(r for (r,) in conn.execute("SELECT repo FROM shim_chains WHERE chain_id = ?", (chain_id,)))
+
+
+def _trees(table: str, prefix: str) -> list[tuple[str, str, dict]]:
+    with closing(_connect()) as conn:
+        rows = conn.execute(f"SELECT repo, tree, doc FROM {table} WHERE substr(tree, 1, ?) = ? ORDER BY repo, tree",
+                            (len(prefix), prefix))
+        return [(repo, tree, json.loads(doc)) for repo, tree, doc in rows]
+
+
+def shim_trees(prefix: str) -> list[tuple[str, str]]:
+    """(repo, tree) of every shim check whose staged tree starts with `prefix`."""
+    return [(repo, tree) for repo, tree, _ in _trees("shim_checks", prefix)]
+
+
+def checked_roots(prefix: str) -> list[tuple[str, str, str]]:
+    """(repo, tree, checkout root) of every staged tree starting with `prefix` that a claim or shim check has seen;
+    how a user's `override shim-<tree prefix>` finds the checkout it names."""
+    found = {(repo, tree): doc["root"] for table in ("claim_checks", "shim_checks")
+             for repo, tree, doc in _trees(table, prefix)}
+    return sorted((repo, tree, root) for (repo, tree), root in found.items())
 
 
 @contextmanager

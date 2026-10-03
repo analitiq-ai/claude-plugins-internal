@@ -35,17 +35,19 @@ class Gate(Repo):
         self.state_dir = Path(self.tmp.name) / "state"
         self.head = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
         self.serve_remote()
-        # No network in tests: gh knows the branch's open PR ("<number> <base>", PR 7 by default; empty for none) and
-        # the repo's default branch; every other lookup sees a gh that cannot answer.
+        # No network in tests: gh knows the branch's open PR ("<number> <base>", PR 7 by default; empty for none) and,
+        # when GH_ISSUE_STATE is set, every issue's state; every other lookup sees a gh that cannot answer.
         stub = Path(self.tmp.name) / "bin"
         stub.mkdir()
         (stub / "gh").write_text('#!/bin/sh\necho "$*" >> "$GH_LOG"\ncase "$*" in\n  "pr list"*) echo "$GH_OPEN_PR" ;;\n'
-                                                                  '  "repo view"*) echo main ;;\n  *) exit 1 ;;\nesac\n')
+                                 '  "issue view"*) [ -n "$GH_ISSUE_STATE" ] && echo "$GH_ISSUE_STATE" || exit 1 ;;\n'
+                                 '  *) exit 1 ;;\nesac\n')
         (stub / "gh").chmod(0o755)
         self.env = dict(os.environ, ALQ_REVIEW_STATE_DIR=str(self.state_dir), PATH=f"{stub}{os.pathsep}{os.environ['PATH']}",
                         GH_OPEN_PR="7 main", GH_LOG=str(Path(self.tmp.name) / "gh.log"),
-                        # The claim check has its own tests (test_claim_gate.py); here a commit is judged by the review alone.
-                        ALQ_REVIEW_CLAIM_CHECKS="log")
+                        # The claim and shim checks have their own tests (test_claim_gate.py, test_shim_gate.py); here a
+                        # commit is judged by the review alone.
+                        ALQ_REVIEW_CLAIM_CHECKS="log", ALQ_REVIEW_SHIM_CHECKS="log")
 
     def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": self.tmp.name, **extra}

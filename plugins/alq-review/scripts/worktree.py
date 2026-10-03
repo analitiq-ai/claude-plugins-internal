@@ -246,6 +246,11 @@ def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
              "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
 
 
+def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
+    """The diff from tree `base` to tree `tree`, of `paths` when any are named, with three lines of context."""
+    return git(root, "diff", "-U3", "-M", base, tree, "--", *paths)
+
+
 def tree_text(root: str, tree: str, path: str) -> str | None:
     """`path` as tree `tree` records it; None when the tree has no such file."""
     found = _run(root, "cat-file", "blob", f"{tree}:{path}")

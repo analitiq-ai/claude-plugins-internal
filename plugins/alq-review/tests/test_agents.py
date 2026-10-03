@@ -18,5 +18,11 @@ class ClaimAgents(unittest.TestCase):
         self.assertEqual(tools("claim-contest-judge"), ["Read", "Glob", "Grep", "WebFetch"])
 
 
+class ShimAgents(unittest.TestCase):
+    def test_sweepers_and_judges_read_and_search_only(self):
+        self.assertEqual(tools("shim-sweeper"), ["Read", "Glob", "Grep"])
+        self.assertEqual(tools("shim-site-judge"), ["Read", "Glob", "Grep"])
+
+
 if __name__ == "__main__":
     unittest.main()

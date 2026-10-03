@@ -1,0 +1,844 @@
+diff --git a/packages/contract-models/src/analitiq/contracts/shared/rules.json b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+index aae2255e..3bd5713f 100644
+--- a/packages/contract-models/src/analitiq/contracts/shared/rules.json
++++ b/packages/contract-models/src/analitiq/contracts/shared/rules.json
+@@ -5696,7 +5696,7 @@
+    "mechanism": null,
+    "symbol": null,
+    "fixture_model": null,
+-   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary for that direction, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author.\nWhich directions a package covers is counted from what its documents declare, never from what they are named. Read of the engine as it stands: it collects a connector's and a connection's type maps by pattern, keys each one by the `direction` in its body, and never inspects the filename — so a package whose documents declare one direction twice has no unambiguous document for any direction, and loading stops before a column is read. Counting filenames instead would pass that package and fail one the engine loads correctly. The count is right whichever way that reading goes stale: one document per required direction is what a consumer needs however it finds them, and a filename a consumer never reads cannot make a second document for one direction unambiguous. The pattern the documents are collected by is the half of that reading a stale copy does break: it is stated on both sides and published by neither, so a pattern that widens or narrows on the engine's side leaves this check grading a set of files the engine does not load, and nothing here goes red — a map that stops being found where it was authored is the signal to re-read it from the engine.\nThe pre-split single-map filename is rejected outright rather than read as a read map. It matches no pattern either side collects by, so there is nothing to count it toward, and a connector that still carries it has a write direction nobody has looked at. That name is a fact about the package rather than about the document under it, so it is graded here, where the package is in hand, and a map handed to the validator on its own is graded on the direction it declares.\n",
++   "rationale": "The maps are separate documents from `connector.json`, so nothing about the connector document is wrong when one is missing — the connector simply has no type vocabulary for that direction, and the failure arrives at the first stream that resolves a column instead of at authoring. Shipping a spare map is the same defect wearing the opposite sign: a direction the connector never renders reads as a capability, and the rules in it are graded by nobody and trusted by the next author.\nWhich directions a package covers is counted from what its documents declare, never from what they are named. Read of the engine as it stands: it collects a connector's and a connection's type maps by pattern, keys each one by the `direction` in its body, and never inspects the filename — so a package whose documents declare one direction twice has no unambiguous document for any direction, and loading stops before a column is read. Counting filenames instead would pass that package and fail one the engine loads correctly. The count is right whichever way that reading goes stale: one document per required direction is what a consumer needs however it finds them, and a filename a consumer never reads cannot make a second document for one direction unambiguous. The pattern the documents are collected by is the half of that reading a stale copy does break: it is stated on both sides and pinned by neither, so a pattern that widens or narrows on the engine's side leaves this check grading a set of files the engine does not load, and nothing here goes red — a map that stops being found where it was authored is the signal to re-read it from the engine.\nThe pre-split single-map filename is rejected outright rather than read as a read map. It matches no pattern either side collects by, so there is nothing to count it toward, and a connector that still carries it has a write direction nobody has looked at. That name is a fact about the package rather than about the document under it, so it is graded here, where the package is in hand, and a map handed to the validator on its own is graded on the direction it declares.\n",
+    "status": "active",
+    "superseded_by": null
+   },
+diff --git a/packages/validator/src/analitiq/validator/__init__.py b/packages/validator/src/analitiq/validator/__init__.py
+index d6170e44..cee3e4ec 100644
+--- a/packages/validator/src/analitiq/validator/__init__.py
++++ b/packages/validator/src/analitiq/validator/__init__.py
+@@ -18,8 +18,9 @@ other defect the model finds rather than grading the document as what it claims
+ to be.
+ 
+ A caller holding a *directory* of maps asks which files are maps and which one
+-is the map for each direction: `type_map_sibling_paths(parent)` answers the
+-first, `TypeMapDirections` the second. They are published because the answer has
++declared each direction first: `type_map_sibling_paths(parent)` answers the
++first, and `TypeMapDirections` the second, so a caller can report a later
++declaration against the first. They are published because the answer has
+ to be the same at every scope — a connector's siblings here, a connection's
+ beside the pipeline plugin's adapter — while what each caller reports about a
+ document, and where it roots that report, is its own.
+diff --git a/packages/validator/src/analitiq/validator/_core.py b/packages/validator/src/analitiq/validator/_core.py
+index c55b7109..7092a46a 100644
+--- a/packages/validator/src/analitiq/validator/_core.py
++++ b/packages/validator/src/analitiq/validator/_core.py
+@@ -15,8 +15,9 @@ This module owns the parts that are independent of any particular artifact kind:
+   whose validity is its contract model plus the `$schema`-omission check
+   registers via `register_model_and_schema_kind()` instead of hand-writing
+   that combination;
+-- `_bounded()` — the one width every borrowed diagnostic is clipped to, so a
+-  finding is bounded the same way whichever route the text arrived by;
++- `_bounded()` — the one width a borrowed diagnostic, or a document value
++  echoed inside one, is clipped to, so a finding is bounded the same way
++  whichever route the text arrived by;
+ - `_run_guarded()` — a crash in one check becomes a single `notApplicable`
+   finding so the others survive;
+ - `finding_costs_a_pass()` — whether one finding, on its own, keeps a document
+@@ -111,15 +112,21 @@ def _bounded(text: str, limit: int = 200) -> str:
+     return text if len(text) <= limit else f"{text[:limit]}…"
+ 
+ 
+-# Pydantic error types whose sentence is built out of the failing document
+-# rather than out of the constraint that rejected it: a discriminated union
+-# renders the tag it was handed, so an oversized value in that one field arrives
+-# whole. Every other type renders the constraint — the pattern, the permitted
+-# literals, the missing field — which is long on some contract models and is the
+-# half an author needs entire. So the bound is applied by type rather than by
+-# length: clipping every model message costs the Arrow-type vocabulary its tail,
+-# and clipping none puts an unbounded document excerpt in a CI log.
+-_INPUT_ECHOING_ERROR_TYPES = frozenset({"union_tag_invalid"})
++# Pydantic error types whose sentence renders a value taken from the failing
++# document, each keyed to the `ctx` entry holding that value. Only the value is
++# clipped: the rest of the sentence is the constraint that rejected it — for a
++# discriminated union, every tag it accepts — which is the half an author needs
++# entire. Pydantic's other built-in sentences render the constraint and not the
++# input; a `value_error` carries whatever the contract model's validator wrote.
++_INPUT_ECHOING_CTX = {"union_tag_invalid": "tag"}
++
++
++def _model_error_message(err: Any) -> str:
++    key = _INPUT_ECHOING_CTX.get(err["type"])
++    if key is None:
++        return err["msg"]
++    echoed = str(err["ctx"][key])
++    return err["msg"].replace(echoed, _bounded(echoed), 1)
+ 
+ 
+ def finding(
+@@ -238,9 +245,7 @@ def _model_findings(doc: Any, adapter: TypeAdapter) -> list[dict]:
+                     message_id=err["type"],
+                     kind="fail",
+                     path=base_path,
+-                    message=(_bounded(err["msg"])
+-                             if err["type"] in _INPUT_ECHOING_ERROR_TYPES
+-                             else err["msg"]),
++                    message=_model_error_message(err),
+                 ))
+             for v in violations:
+                 findings.append(finding(
+diff --git a/packages/validator/src/analitiq/validator/connectors.py b/packages/validator/src/analitiq/validator/connectors.py
+index 764a6cc2..ee514273 100644
+--- a/packages/validator/src/analitiq/validator/connectors.py
++++ b/packages/validator/src/analitiq/validator/connectors.py
+@@ -1108,7 +1108,8 @@ def legacy_type_map_present(parent: Path) -> bool:
+ 
+ 
+ def type_map_sibling_paths(parent: Path) -> list[Path]:
+-    """The type-map documents beside `parent`, in the order they are considered.
++    """The entries in `parent` whose names mark them as type-map documents, in
++    the order they are considered.
+ 
+     Which files are type-map documents is one question with one answer, asked
+     wherever maps are collected — beside a connector here, beside a connection
+@@ -1136,7 +1137,7 @@ def declared_direction(doc: Any) -> str | None:
+ 
+ 
+ class TypeMapDirections:
+-    """Which collected document is the map for each direction, in the order
++    """Which collected document first declared each direction, in the order
+     `type_map_sibling_paths` returns them.
+ 
+     Which directions a set of maps covers is a question about the documents,
+@@ -1164,8 +1165,8 @@ class TypeMapDirections:
+ 
+         Returns `(direction, held_by)`. `direction` is the direction the
+         document declares, or None when it declares none usable. `held_by`
+-        names the document already holding that direction, and is None when
+-        this one takes it — so a caller reads a claim as `held_by is None`,
++        names the document that declared that direction first, and is None
++        when this one is first — so a caller reads a claim as `held_by is None`,
+         and has the direction to name either way.
+         """
+         declared = declared_direction(doc)
+@@ -1287,7 +1288,8 @@ def check_coverage(doc: dict, doc_path: Path | None) -> list[dict]:
+     # withhold every endpoint-anchored check as well, hiding every defect in
+     # every endpoint document behind one broken file. What is carried is
+     # whatever `doc.get("rules")` holds when `doc` is a dict — `None` when no
+-    # document declared the read direction, and whatever value the dict's
++    # sibling holds the read direction (none declares it, or more than one
++    # does), and whatever value the dict's
+     # `rules` key holds otherwise, list or not — so the readers below ask
+     # whether it is a list rather than whether it is set.
+     read_rules: Any = None
+diff --git a/packages/validator/tests/test_validation.py b/packages/validator/tests/test_validation.py
+index 55b1ca20..d19702c9 100644
+--- a/packages/validator/tests/test_validation.py
++++ b/packages/validator/tests/test_validation.py
+@@ -1270,8 +1270,9 @@ def test_coverage_reads_a_type_map_under_any_matching_filename(tmp_path, kind, v
+ 
+ @pytest.mark.parametrize("kind", _STORAGE_KINDS)
+ def test_a_storage_write_map_is_graded_and_named(tmp_path, kind, validator):
+-    # The storage branch walks both directions, and the write half is reached
+-    # only by a map declaring it. A branch that graded the read direction alone
++    # The storage branch grades each direction a sibling declares, and the write
++    # direction is reached only by a map declaring it. A branch that graded the
++    # read direction alone
+     # would pass this package, and the defect would arrive at the first
+     # destination write. The map sits under a name no convention reserves, so
+     # the finding has to carry it — a pointer alone roots the defect in
+@@ -1351,8 +1352,9 @@ def test_coverage_lets_no_sibling_take_a_direction_from_the_map_that_declared_it
+ 
+ 
+ def test_coverage_grades_a_sibling_that_parsed_to_no_document(tmp_path, validator):
+-    # `null` is the one payload that parses and is not a document. Reading the
+-    # loader's answer as "nothing to grade" would let it through: a storage kind
++    # `null` parses to `None`, the value a loader answering `None` for "nothing
++    # was read" also returns. Reading the loader's answer as "nothing to grade"
++    # would let it through: a storage kind
+     # requires no map, so a package whose only sibling is that file passes with
+     # nothing said about it, and the load stops there for every consumer. What
+     # says a sibling was already reported is the finding the loader returned,
+@@ -1431,21 +1433,23 @@ def test_coverage_refuses_an_api_write_direction_two_siblings_declare(tmp_path,
+     assert "write-map-not-allowed" in ids, errors
+ 
+ 
++def test_an_unparseable_sibling_is_reported_as_unparseable_and_nothing_else(tmp_path, validator):
++    # Nothing was read, so there is no document to grade: a model finding over
++    # it would describe a value the file never held.
++    (tmp_path / "type-map-read.json").write_text("[ not json")
++    (tmp_path / "connector.json").write_text("{}")
++    findings = validator.check_coverage(_min_connector("file"), tmp_path / "connector.json")
++    assert [f["message_id"] for f in findings] == ["type-map-unparseable"], findings
++
++
+ def test_coverage_reports_a_collected_sibling_that_is_not_a_regular_file(tmp_path, validator):
+     # The pattern collects directory entries, not documents, so what it hands
+     # the loader is whatever carries the name. A directory raises on the read
+-    # and reports an errno; a FIFO blocks it until something writes, and the
+-    # check never returns. The alarm bounds that, so a load reaching the read
+-    # fails here instead of hanging the suite.
++    # and reports an errno that says nothing about the package.
+     (tmp_path / "type-map-read.json").mkdir()
+     (tmp_path / "connector.json").write_text("{}")
+-    signal.signal(signal.SIGALRM, _raise_timeout)
+-    signal.alarm(10)
+-    try:
+-        errors = _errors(validator.check_coverage(
+-            _min_connector("file"), tmp_path / "connector.json"))
+-    finally:
+-        signal.alarm(0)
++    errors = _errors(validator.check_coverage(
++        _min_connector("file"), tmp_path / "connector.json"))
+     assert any("not a regular file" in e["message"] for e in errors), errors
+ 
+ 
+@@ -1687,9 +1691,9 @@ def test_an_unusable_direction_is_answered_on_the_discriminator(
+ 
+ def test_the_discriminator_answer_says_what_is_wrong_and_what_went_ungraded(validator):
+     # Pydantic's sentence for an absent tag names the field and stops: it never
+-    # says the field is missing, and it names neither value that would resolve
+-    # it. For a tag present and wrong it names both, so only the absent case is
+-    # replaced.
++    # says the field is missing, and it names none of the values that would
++    # resolve it. For a tag present and wrong it names the field and the
++    # accepted values, so only the absent case is replaced.
+     #
+     # Nothing past the discriminator was measured either way — the tag selects
+     # the model the rest is graded against — and a report that does not say so
+@@ -1711,6 +1715,22 @@ def test_a_borrowed_diagnostic_does_not_carry_the_document_back_whole(validator)
+     [error] = _errors(validator.validate_document(_unusable(oversized)))
+     assert oversized not in error["message"], len(error["message"])
+     assert len(error["message"]) < 500, len(error["message"])
++    # Only the echoed value is clipped. The accepted values sit after it in the
++    # same sentence, and they are what the author needs to fix it.
++    assert "'read', 'write'" in error["message"], error["message"][-120:]
++
++
++def test_a_short_wrong_tag_comes_back_with_every_accepted_value(validator):
++    # A tag of ordinary length echoes nothing worth bounding, and the sentence
++    # is long only because the union accepts many values: clipping it drops the
++    # ones an author could have picked.
++    doc = _connector_doc()
++    doc["auth"] = {"type": "oauth2"}
++    tag = [e for e in _errors(validator.validate_document(doc))
++           if e["message_id"] == "union_tag_invalid"]
++    assert tag, doc["auth"]
++    assert "…" not in tag[0]["message"], tag[0]["message"]
++    assert "'none'" in tag[0]["message"], tag[0]["message"]
+ 
+ 
+ def test_a_borrowed_diagnostic_keeps_the_constraint_it_was_rejected_by(validator):
+@@ -2229,6 +2249,18 @@ def test_type_map_findings_grades_as_the_direction_the_caller_names(validator):
+                for f in errors), errors
+ 
+ 
++def test_type_map_findings_grades_a_map_declaring_no_direction_as_named(validator):
++    # A document with no `direction` disagrees with nothing, so the caller's
++    # direction is the only one there is. Skipping the advisories with the
++    # disagreeing case would hand back the envelope error alone, and the
++    # author fixing it would meet the vocabulary gap only on the next run.
++    doc = _type_map_doc([{"match": "exact", "arrow_type": "Utf8", "native_type": "TEXT"}], "write")
++    del doc["direction"]
++    findings = validator.type_map_findings(doc, "write")
++    assert "/direction" in {f["path"] for f in _errors(findings)}, findings
++    assert "RULE-TMAP-017" in {f.get("rule") for f in findings}, findings
++
++
+ def test_type_map_findings_scope_decides_the_write_vocabulary_alone(validator):
+     # the whole reason `scope` exists: a connector write map must render the
+     # canonical vocabulary, a connection map is gap-only and would earn
+diff --git a/plugins/analitiq-connector-builder/agents/connector-schema-validator.md b/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
+index 43d634e0..d45df3e7 100644
+--- a/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
++++ b/plugins/analitiq-connector-builder/agents/connector-schema-validator.md
+@@ -27,9 +27,9 @@ artifact.
+   those run when the **connector** is validated, off the maps sitting beside it,
+   each counted toward the direction it declares, and a direction the `kind`
+   requires that no sibling declares surfaces there as a missing map
+-  (`RULE-PKG-030`). So point this at the draft where it sits in the package
+-  rather than at a copy you re-serialized: what is beside it decides as much as
+-  what is in it, and what ships is then what was graded. This agent validates
++  (`RULE-PKG-030`). So validate the connector where it sits in the package, not
++  a copy re-serialized elsewhere: its package-level checks read the maps and
++  endpoints beside it, and what ships is then what was graded. This agent validates
+   JSON documents only; a connector's Python package files (`connector.py`,
+   `pyproject.toml`, …) are outside its scope — report them as not validated
+   rather than passing judgment on them.
+diff --git a/plugins/analitiq-pipeline-builder/agents/private-endpoint-creator.md b/plugins/analitiq-pipeline-builder/agents/private-endpoint-creator.md
+index 75f2347d..254d6941 100644
+--- a/plugins/analitiq-pipeline-builder/agents/private-endpoint-creator.md
++++ b/plugins/analitiq-pipeline-builder/agents/private-endpoint-creator.md
+@@ -109,7 +109,7 @@ One invocation runs exactly one mode.
+ 
+ 6. Derive a **fully-qualified** `arrow_type` for **every** column. First resolve
+    the distinct native types through the type maps with
+-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/type_map_gaps.py"`
++   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/type_map_gaps.py" --direction read`
+    (maps in precedence order: the
+    connection's own `definition/type-map-read.json` if present, then the
+    connector's) and freeze the rendered `arrow_type` for every covered
+@@ -125,7 +125,8 @@ One invocation runs exactly one mode.
+ 7. **Author connection-scoped type-map gap rules** per
+    `skills/endpoint-spec/spec-type-map-gaps.md`:
+    - For every read gap from step 6, a read rule (`RULE-TMAP-021`).
+-   - Probe the distinct frozen `arrow_type` strings against the write maps (connection first if present, then connector); for
++   - Probe the distinct frozen `arrow_type` strings with `--direction write`
++     against the write maps (connection first if present, then connector); for
+      every write gap, a write rule rendering the discovered native that
+      produced the `arrow_type`. When several distinct `native_type`s share one
+      uncovered `arrow_type`, do **not** pick — report it in `type_maps.ambiguities` and
+@@ -185,7 +186,7 @@ document's columns. Derivation rules: `skills/endpoint-spec/spec-new-table.md`.
+ 2. Derive the column list from the passed source document per
+    `spec-new-table.md`.
+ 3. Resolve every distinct `arrow_type` through the write maps with
+-   `type_map_gaps.py` (connection map first if present,
++   `type_map_gaps.py --direction write` (connection map first if present,
+    then the connector's): a rendered native becomes the column's
+    `native_type`; an uncovered `arrow_type` follows `spec-new-table.md` —
+    dialect override → the fallback label the `native_type` field declares
+diff --git a/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py b/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
+index 5a3284e6..e071fef8 100644
+--- a/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
++++ b/plugins/analitiq-pipeline-builder/scripts/type_map_gaps.py
+@@ -19,14 +19,15 @@ map is the fallback.
+ Usage::
+ 
+     printf '%s' '["citext", "vector(3)"]' | python3 type_map_gaps.py \
++        --direction read \
+         --map connections/pg/definition/type-map-read.json \
+         --map connectors/postgresql/definition/type-map-read.json
+ 
+-Each map declares the direction being probed; its filename says nothing about
+-it here, as it says nothing anywhere else a map is consumed. Maps declaring
+-different directions are a usage error, as is one declaring neither. Probes are
+-a JSON array of strings on stdin (or --probes-file): provider `native_type`
+-labels when reading, `arrow_type` strings when writing. Output on stdout::
++``--direction`` names the vocabulary the probes are in: provider `native_type`
++labels for ``read``, `arrow_type` strings for ``write``. Every map is graded as
++that direction, so one declaring the other is refused rather than probed; its
++filename plays no part. Probes are a JSON array of strings on stdin (or
++--probes-file). Output on stdout::
+ 
+     {"direction": "read",
+      "resolved": {"citext": null, "vector(3)": null},
+@@ -52,33 +53,6 @@ def _fail(message: str) -> "int":
+     return 2
+ 
+ 
+-def _declared_direction(path: Path) -> str:
+-    """The direction a type-map document declares. A name says nothing about a
+-    map's direction anywhere a map is consumed, so it says nothing here either:
+-    probing the direction a filename suggested would report gaps in a vocabulary
+-    the document never claimed to hold."""
+-    try:
+-        doc = json.loads(path.read_text())
+-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+-        raise ValueError(f"{path}: {exc}") from exc
+-    from analitiq.validator import declared_direction
+-    if not isinstance(doc, dict):
+-        raise ValueError(
+-            f"{path} is not a JSON object, so it declares nothing; a type-map document "
+-            "declares 'read' or 'write', and nothing else says which vocabulary to probe")
+-    declared = declared_direction(doc)
+-    if declared is None:
+-        # The rejected value is whatever the document held, so it is clipped to
+-        # the width the validator clips every borrowed diagnostic to.
+-        from analitiq.validator._core import _bounded
+-
+-        raise ValueError(
+-            f"{path} declares direction {_bounded(repr(doc.get('direction')))}; a type-map "
+-            "document declares 'read' or 'write', and nothing else says which vocabulary "
+-            "to probe")
+-    return declared
+-
+-
+ def _load_rules(path: Path, direction: str) -> list:
+     """Read one {$schema, direction, rules} type-map document, grade it as the
+     direction named, and return its `rules` array. Grading here is
+@@ -154,10 +128,13 @@ def resolve(direction: str, probes: list[str], rule_files: list[Path]) -> dict:
+ 
+ def main(argv: list[str] | None = None) -> int:
+     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
++    parser.add_argument("--direction", required=True, choices=("read", "write"),
++                        help="The vocabulary the probes are in: native_type labels (read) "
++                             "or arrow_type strings (write). Every --map must declare it.")
+     parser.add_argument("--map", action="append", required=True, dest="maps", metavar="PATH",
+-                        help="A {$schema, direction, rules} type-map document, which declares "
+-                             "the direction it holds; repeatable, in precedence order "
+-                             "(connection-scoped map first, connector map after).")
++                        help="A {$schema, direction, rules} type-map document; repeatable, "
++                             "in precedence order (connection-scoped map first, connector "
++                             "map after).")
+     parser.add_argument("--probes-file", metavar="PATH",
+                         help="JSON array of probe strings; defaults to stdin.")
+     args = parser.parse_args(argv)
+@@ -167,20 +144,6 @@ def main(argv: list[str] | None = None) -> int:
+     except RuntimeError as exc:
+         return _fail(str(exc))
+ 
+-    # Each document declares the direction being probed, and they must agree:
+-    # the resolver concatenates their rule arrays into one precedence order, so
+-    # a pair holding opposite directions has no single vocabulary to probe.
+-    directions: dict[str, str] = {}
+-    for m in args.maps:
+-        try:
+-            directions.setdefault(_declared_direction(Path(m)), m)
+-        except ValueError as exc:
+-            return _fail(str(exc))
+-    if len(directions) > 1:
+-        return _fail("every --map must hold the same direction, got "
+-                     + ", ".join(f"{m} ({d})" for d, m in sorted(directions.items())))
+-    direction = next(iter(directions))
+-
+     try:
+         raw = Path(args.probes_file).read_text() if args.probes_file else sys.stdin.read()
+         probes = json.loads(raw)
+@@ -190,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
+         return _fail("probes must be a JSON array of strings")
+ 
+     try:
+-        result = resolve(direction, probes, [Path(m) for m in args.maps])
++        result = resolve(args.direction, probes, [Path(m) for m in args.maps])
+     except (OSError, ValueError) as exc:
+         # _load_rules names the file in a ValueError for every way one can fail
+         # — unreadable, unparseable, or graded fatal — which is the only path
+diff --git a/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md b/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
+index 1f821958..ee46cff4 100644
+--- a/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
++++ b/plugins/analitiq-pipeline-builder/skills/endpoint-spec/spec-type-map-gaps.md
+@@ -44,6 +44,7 @@ maps in precedence order (connection first, when one exists, then connector):
+ 
+ ```bash
+ printf '%s' '["citext", "vector(3)"]' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/type_map_gaps.py" \
++  --direction read \
+   --map connections/<slug>/definition/type-map-read.json \
+   --map connectors/<connector-slug>/definition/type-map-read.json
+ ```
+@@ -53,9 +54,8 @@ printf '%s' '["citext", "vector(3)"]' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/t
+ - **Write probes** — the distinct `arrow_type` strings frozen into the endpoint
+   documents, after read-side resolution and judgment are complete.
+ 
+-Every `--map` in one call declares the same direction, and that is the
+-direction probed. `resolved` gives the rendered value per covered probe; `gaps`
+-lists the uncovered ones. Pass only map files that exist.
++`resolved` gives the rendered value per covered probe; `gaps` lists the
++uncovered ones. Pass only map files that exist.
+ 
+ ## Registered rules for a type map
+ 
+diff --git a/rules/records/RULE-PKG-030.yaml b/rules/records/RULE-PKG-030.yaml
+index aba32416..2b0044b1 100644
+--- a/rules/records/RULE-PKG-030.yaml
++++ b/rules/records/RULE-PKG-030.yaml
+@@ -29,7 +29,7 @@ rationale: >
+   filename a consumer never reads cannot make a second document for one
+   direction unambiguous. The pattern the documents are collected by is the half
+   of that reading a stale copy does break: it is stated on both sides and
+-  published by neither, so a pattern that widens or narrows on the engine's side
++  pinned by neither, so a pattern that widens or narrows on the engine's side
+   leaves this check grading a set of files the engine does not load, and nothing
+   here goes red — a map that stops being found where it was authored is the
+   signal to re-read it from the engine.
+diff --git a/scripts/render_validator_claims.py b/scripts/render_validator_claims.py
+index 3d3d75f4..414fb25e 100644
+--- a/scripts/render_validator_claims.py
++++ b/scripts/render_validator_claims.py
+@@ -1061,9 +1061,9 @@ PROBES: tuple[Probe, ...] = (
+           _p_type_map_coverage_counts_declarations),
+     Probe("type-map-duplicate-direction-rejected", "error", _p_type_map_duplicate_direction,
+           message_re=r"both declare direction .*neither of these is it"),
+-    # The collision's consequence, which the message alone does not carry: the
+-    # direction the pair declares is covered by neither of them, and the finding
+-    # saying so distinguishes that from a direction nothing declared.
++    # The collision also fails coverage: the missing-map finding for that
++    # direction fires, and its reason separates a duplicated direction from one
++    # nothing declared.
+     Probe("type-map-duplicate-direction-covers-nothing", "error",
+           _p_type_map_duplicate_direction,
+           message_re=r"more than one sibling declares it, so none of them is it"),
+@@ -1181,11 +1181,14 @@ def run_probe(probe: Probe) -> ProbeFailure | None:
+     # "validator bug — please report" instead of the rejection the prose
+     # promises. A crash never proves a claim, in either direction.
+     #
+-    # Recognised by the id the validator publishes for it, not by its wording:
+-    # the sentence is the guard's to reword, and a probe grader reading the
+-    # English would stop detecting crashes the day it changes, with every probe
+-    # still reporting green.
+-    crashed = [f for f in findings if f.get("message_id") == "check-crashed"]
++    # Recognised by the id each guard publishes for it — the validator's, and
++    # the pipeline adapter's for its own containment — not by its wording: the
++    # sentence is the guard's to reword, and a probe grader reading the English
++    # would stop detecting crashes the day it changes, with every probe still
++    # reporting green.
++    crashed = [f for f in findings
++               if f.get("message_id") == "check-crashed"
++               or f.get("validator") == "adapter-crash"]
+     if crashed:
+         return ProbeFailure(probe.id, "the validator crashed on the probe document", crashed)
+     return _expectation_failure(probe, findings) or _pattern_failure(probe, findings)
+diff --git a/tests/connector_builder/test_examples_validate.py b/tests/connector_builder/test_examples_validate.py
+index cd30c3b9..b56cf835 100644
+--- a/tests/connector_builder/test_examples_validate.py
++++ b/tests/connector_builder/test_examples_validate.py
+@@ -33,13 +33,15 @@ require_contract_models("analitiq.contracts", "analitiq.validator")
+ from analitiq.contracts.type_map import (  # noqa: E402
+     TYPE_MAP_READ_SCHEMA_URL, TYPE_MAP_WRITE_SCHEMA_URL,
+ )
+-from analitiq.validator import validate_document  # noqa: E402
++from analitiq.validator import (  # noqa: E402
++    declared_direction, type_map_sibling_paths, validate_document,
++)
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[2]
+ SKILLS_ROOT = REPO_ROOT / "plugins" / "analitiq-connector-builder" / "skills"
+ TYPE_MAP_SCHEMAS = {
+-    "type-map-read.json": TYPE_MAP_READ_SCHEMA_URL,
+-    "type-map-write.json": TYPE_MAP_WRITE_SCHEMA_URL,
++    "read": TYPE_MAP_READ_SCHEMA_URL,
++    "write": TYPE_MAP_WRITE_SCHEMA_URL,
+ }
+ 
+ 
+@@ -60,10 +62,8 @@ def _stage(example_dir: Path, dest_root: Path) -> Path:
+     if body is None:  # _example_dirs() filters for this, but fail usefully if staged directly
+         raise FileNotFoundError(f"{example_dir} has no *.example.json to stage")
+     shutil.copy(body, definition / "connector.json")
+-    for name in ("type-map-read.json", "type-map-write.json"):
+-        src = example_dir / name
+-        if src.exists():
+-            shutil.copy(src, definition / name)
++    for src in type_map_sibling_paths(example_dir):
++        shutil.copy(src, definition / src.name)
+     endpoints = example_dir / "endpoints"
+     if endpoints.is_dir():
+         shutil.copytree(endpoints, definition / "endpoints")
+@@ -155,7 +155,7 @@ def test_prose_type_map_rules_validate(tmp_path: Path) -> None:
+         if direction == "unquotable":
+             continue
+         doc = {
+-            "$schema": TYPE_MAP_SCHEMAS[f"type-map-{direction}.json"],
++            "$schema": TYPE_MAP_SCHEMAS[direction],
+             "direction": direction,
+             "rules": [rule],
+         }
+@@ -205,13 +205,12 @@ def test_example_connector_validates(example_dir: Path, tmp_path: Path) -> None:
+ 
+ @pytest.mark.parametrize("example_dir", _example_dirs(), ids=lambda d: d.name)
+ def test_example_type_maps_validate(example_dir: Path, tmp_path: Path) -> None:
+-    """Validate each type map as a standalone document, under its own filename.
++    """Validate each type map as a standalone document.
+ 
+-    This is the invocation `connector-schema-validator` documents (each map under
+-    its conventional filename, direction resolved from the document's own
+-    `direction`), so it should be exercised directly rather than only through
+-    the connector's sibling walk. It also localizes a failure to the
+-    map instead of surfacing it on the connector.
++    This is the invocation `connector-schema-validator` documents (each map
++    graded as the direction it declares), so it should be exercised directly
++    rather than only through the connector's sibling walk. It also localizes a
++    failure to the map instead of surfacing it on the connector.
+ 
+     It does NOT close the database read-map gap: rule-shape errors are already
+     caught by the sibling walk, and neither level probes natives on a DB
+@@ -219,8 +218,7 @@ def test_example_type_maps_validate(example_dir: Path, tmp_path: Path) -> None:
+     documented in `spec-type-maps.md`, not covered here.
+     """
+     definition = _stage(example_dir, tmp_path).parent
+-    present = [definition / name for name in TYPE_MAP_SCHEMAS
+-               if (definition / name).exists()]
++    present = type_map_sibling_paths(definition)
+     assert present, f"{example_dir.name} ships no type map"
+ 
+     for map_path in present:
+@@ -232,9 +230,15 @@ def test_example_type_maps_validate(example_dir: Path, tmp_path: Path) -> None:
+         )
+ 
+ 
++def _write_map(example_dir: Path) -> Path | None:
++    return next((p for p in type_map_sibling_paths(example_dir)
++                 if declared_direction(json.loads(p.read_text(encoding="utf-8"))) == "write"),
++                None)
++
++
+ @pytest.mark.parametrize(
+     "example_dir",
+-    [d for d in _example_dirs() if (d / "type-map-write.json").exists()],
++    [d for d in _example_dirs() if _write_map(d) is not None],
+     ids=lambda d: d.name,
+ )
+ def test_example_write_maps_render_bare_container_markers(
+@@ -251,7 +255,7 @@ def test_example_write_maps_render_bare_container_markers(
+     legitimately still warns about other families.
+     """
+     definition = _stage(example_dir, tmp_path).parent
+-    map_path = definition / "type-map-write.json"
++    map_path = _write_map(definition)
+     document = json.loads(map_path.read_text(encoding="utf-8"))
+     findings = validate_document(document, doc_path=map_path.resolve())
+     named = [
+diff --git a/tests/connector_builder/test_validator_claims.py b/tests/connector_builder/test_validator_claims.py
+index ad9a017b..441b23a0 100644
+--- a/tests/connector_builder/test_validator_claims.py
++++ b/tests/connector_builder/test_validator_claims.py
+@@ -351,6 +351,10 @@ def test_run_probe_branches() -> None:
+         raise KeyError("x")
+ 
+     [crash] = _run_guarded(_boom, crash_label="contract-model")
++    # The pipeline adapter contains a crash of its own with an error-severity
++    # finding, which an expect="error" probe would otherwise count as the
++    # rejection it was looking for.
++    adapter_crash = _REGISTRY._pipeline_adapter()._crash_finding("", KeyError("x"))
+ 
+     assert _REGISTRY.run_probe(probe("clean", [warning])) is None
+     assert _REGISTRY.run_probe(probe("silent", [])) is None
+@@ -368,6 +372,8 @@ def test_run_probe_branches() -> None:
+     assert "crashed" in _REGISTRY.run_probe(
+         probe("error", [crash], message_re="crashed unexpectedly")).reason
+     assert "crashed" in _REGISTRY.run_probe(probe("clean", [crash])).reason
++    assert "crashed" in _REGISTRY.run_probe(
++        probe("error", [adapter_crash], message_re="KeyError")).reason
+     assert "forbidden" in _REGISTRY.run_probe(
+         probe("clean", [warning], forbid_re="coverage")).reason
+     assert "required" in _REGISTRY.run_probe(
+diff --git a/tests/pipeline_builder/test_type_map_gaps.py b/tests/pipeline_builder/test_type_map_gaps.py
+index 9e7e430d..201297e5 100644
+--- a/tests/pipeline_builder/test_type_map_gaps.py
++++ b/tests/pipeline_builder/test_type_map_gaps.py
+@@ -159,7 +159,7 @@ def test_cli_end_to_end(tmp_path, capsys):
+     m = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+     probes = tmp_path / "probes.json"
+     probes.write_text(json.dumps(["citext", "vector(3)"]))
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 0
+     out = json.loads(capsys.readouterr().out)
+     assert out == {"direction": "read",
+@@ -178,7 +178,7 @@ def test_cli_connection_map_beats_connector_map(tmp_path, capsys):
+     connector = _map(base_dir, "type-map-read.json", CONNECTOR_READ)
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(connection), "--map", str(connector),
++    rc = G.main(["--direction", "read", "--map", str(connection), "--map", str(connector),
+                  "--probes-file", str(probes)])
+     assert rc == 0
+     assert json.loads(capsys.readouterr().out)["resolved"] == {"citext": "LargeUtf8"}
+@@ -189,7 +189,7 @@ def test_cli_rejects_bad_probes(tmp_path, capsys, probes_payload):
+     m = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+     probes = tmp_path / "probes.json"
+     probes.write_text(probes_payload)
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 2
+     assert json.loads(capsys.readouterr().out or "null") is None  # nothing on stdout
+ 
+@@ -200,7 +200,7 @@ def test_cli_missing_map_names_the_file(tmp_path, capsys):
+     missing = tmp_path / "type-map-read.json"
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(missing), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(missing), "--probes-file", str(probes)])
+     assert rc == 2
+     err = capsys.readouterr()
+     assert not err.out
+@@ -247,7 +247,7 @@ def test_a_non_fatal_finding_reaches_stderr_beside_the_gap_it_explains(tmp_path,
+     probes = tmp_path / "probes.json"
+     probes.write_text('["vector(3)"]')
+ 
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+ 
+     captured = capsys.readouterr()
+     assert rc == 0
+@@ -283,132 +283,68 @@ def test_map_direction_must_match_model(tmp_path):
+ 
+ 
+ def test_cli_probes_a_map_under_any_filename(tmp_path, capsys):
+-    # The name says nothing about direction anywhere a map is consumed, so it
+-    # says nothing here: the document's own declaration is what is probed.
+-    m = _map(tmp_path, "my-types.json", CONNECTOR_READ)
+-    probes = tmp_path / "probes.json"
+-    probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
+-    assert rc == 0
+-    assert json.loads(capsys.readouterr().out)["direction"] == "read"
+-
+-
+-def test_cli_probes_the_direction_the_envelope_declares(tmp_path, capsys):
+-    # A write map under the read direction's conventional name is probed as the
+-    # write map it declares. Probing it as read would not simply fail: each
+-    # direction keys on the member the other renders, so it would match the
+-    # wrong things and every verdict would be computed from rules that mean
+-    # something else.
++    # A write map under the read direction's conventional name is probed as
++    # write: the name says nothing about direction anywhere a map is consumed.
+     m = _map(tmp_path, "type-map-read.json", CONNECTOR_WRITE, "write")
+     probes = tmp_path / "probes.json"
+     probes.write_text('["Utf8"]')
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "write", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 0
+-    assert json.loads(capsys.readouterr().out)["direction"] == "write"
++    assert json.loads(capsys.readouterr().out)["resolved"] == {"Utf8": "TEXT"}
+ 
+ 
+-def test_cli_rejects_a_map_declaring_no_usable_direction(tmp_path, capsys):
+-    # Nothing else says which vocabulary to probe, so probing cannot begin —
+-    # picking one would report gaps in a vocabulary the document never claimed.
+-    m = tmp_path / "type-map-read.json"
+-    m.write_text(json.dumps({**_tm_doc(CONNECTOR_READ, "read"), "direction": "sideways"}))
++def test_cli_refuses_a_map_declaring_the_other_direction_than_probed(tmp_path, capsys):
++    # The probes are in one vocabulary and the caller is the one holding them.
++    # A read map keys on native types, so Arrow probes run through it would not
++    # fail: each would come back resolved or a gap by rules that mean something
++    # else, and the run would exit clean.
++    m = _map(tmp_path, "my-types.json", CONNECTOR_READ)
+     probes = tmp_path / "probes.json"
+-    probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    probes.write_text('["Utf8", "Int64"]')
++    rc = G.main(["--direction", "write", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 2
+     err = capsys.readouterr()
+     assert not err.out
+-    assert "declares direction 'sideways'" in err.err
+-
++    assert str(m) in err.err and "/direction" in err.err, err.err
+ 
+-def test_cli_bounds_the_direction_it_echoes(tmp_path, capsys):
+-    # The rejected value is whatever the document held, so echoing it whole puts
+-    # an attacker-sized string on the operator's terminal. Clipped to the one
+-    # width every borrowed diagnostic in the validator is clipped to.
+-    from analitiq.validator._core import _bounded
+ 
+-    oversized = "s" * 5000
++def test_cli_rejects_a_map_declaring_no_usable_direction(tmp_path, capsys):
+     m = tmp_path / "type-map-read.json"
+-    m.write_text(json.dumps({**_tm_doc(CONNECTOR_READ, "read"), "direction": oversized}))
++    m.write_text(json.dumps({**_tm_doc(CONNECTOR_READ, "read"), "direction": "sideways"}))
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 2
+-    err = capsys.readouterr().err
+-    assert oversized not in err, len(err)
+-    assert _bounded(repr(oversized)) in err, err
++    err = capsys.readouterr()
++    assert not err.out
++    assert str(m) in err.err and "/direction" in err.err, err.err
+ 
+ 
+-def test_cli_rejects_maps_holding_different_directions(tmp_path, capsys):
++def test_cli_holds_every_map_to_the_direction_probed(tmp_path, capsys):
++    # A fallback map is concatenated into the same rule list as the primary, so
++    # one declaring the other direction is refused as surely as a lone one.
+     r = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+     (tmp_path / "w").mkdir()
+     w = _map(tmp_path / "w", "type-map-write.json", CONNECTOR_WRITE, "write")
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(r), "--map", str(w), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(r), "--map", str(w),
++                 "--probes-file", str(probes)])
+     assert rc == 2
+     err = capsys.readouterr()
+     assert not err.out
+-    assert "same direction" in err.err
+-    # The message names one map per direction, and which one is the first to
+-    # declare it: a later map naming the same direction changes nothing about
+-    # which document the author is pointed at.
+-    assert str(r) in err.err and str(w) in err.err, err.err
++    assert str(w) in err.err, err.err
+ 
+ 
+ @pytest.mark.parametrize("payload", ["null", "[]", '"read"'])
+-def test_cli_says_a_map_that_is_no_object_is_no_object(tmp_path, capsys, payload):
+-    # A payload that is not a JSON object holds no fields at all, so reporting
+-    # it as declaring direction None sends the author looking for a key the
+-    # document cannot carry. The sibling scopes answer this case on the shape,
+-    # and this one says the same thing.
++def test_cli_refuses_a_map_that_is_no_object(tmp_path, capsys, payload):
+     m = tmp_path / "type-map-read.json"
+     m.write_text(payload)
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(m), "--probes-file", str(probes)])
+-    assert rc == 2
+-    err = capsys.readouterr().err
+-    assert str(m) in err, err
+-    assert "declares direction" not in err, err
+-
+-
+-def test_cli_parse_failure_is_reported_as_a_parse_failure(tmp_path, capsys):
+-    # The direction of an unparseable map is not "whatever the others said": a
+-    # run that swallowed the read failure here would reach the agreement check
+-    # with one map missing and report a direction disagreement that does not
+-    # exist, sending the operator to fix the wrong thing.
+-    bad = tmp_path / "type-map-read.json"
+-    bad.write_text("[ not json")
+-    (tmp_path / "w").mkdir()
+-    good = _map(tmp_path / "w", "type-map-write.json", CONNECTOR_WRITE, "write")
+-    probes = tmp_path / "probes.json"
+-    probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(bad), "--map", str(good), "--probes-file", str(probes)])
+-    assert rc == 2
+-    err = capsys.readouterr().err
+-    assert str(bad) in err, err
+-    assert "same direction" not in err, err
+-
+-
+-def test_cli_names_the_first_map_that_declared_a_direction(tmp_path, capsys):
+-    # Precedence order is the argument order, so the map an author is pointed at
+-    # for a direction is the one that claimed it first. A later map declaring the
+-    # same direction is the fallback, not the document whose declaration created
+-    # the conflict, and naming it would send the author to the wrong file.
+-    primary = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+-    (tmp_path / "fallback").mkdir()
+-    fallback = _map(tmp_path / "fallback", "type-map-read.json", CONNECTOR_READ)
+-    (tmp_path / "w").mkdir()
+-    w = _map(tmp_path / "w", "type-map-write.json", CONNECTOR_WRITE, "write")
+-    probes = tmp_path / "probes.json"
+-    probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(primary), "--map", str(fallback), "--map", str(w),
+-                 "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(m), "--probes-file", str(probes)])
+     assert rc == 2
+-    err = capsys.readouterr().err
+-    assert str(primary) in err, err
+-    assert str(fallback) not in err, err
++    assert str(m) in capsys.readouterr().err
+ 
+ 
+ def test_cli_parse_error_names_the_file(tmp_path, capsys):
+@@ -416,7 +352,7 @@ def test_cli_parse_error_names_the_file(tmp_path, capsys):
+     bad.write_text("[ not json")
+     probes = tmp_path / "probes.json"
+     probes.write_text('["citext"]')
+-    rc = G.main(["--map", str(bad), "--probes-file", str(probes)])
++    rc = G.main(["--direction", "read", "--map", str(bad), "--probes-file", str(probes)])
+     assert rc == 2
+     assert str(bad) in capsys.readouterr().err
+ 
+@@ -426,6 +362,6 @@ def test_cli_reads_probes_from_stdin(tmp_path, capsys, monkeypatch):
+     import io
+     m = _map(tmp_path, "type-map-read.json", CONNECTOR_READ)
+     monkeypatch.setattr("sys.stdin", io.StringIO('["citext"]'))
+-    rc = G.main(["--map", str(m)])
++    rc = G.main(["--direction", "read", "--map", str(m)])
+     assert rc == 0
+     assert json.loads(capsys.readouterr().out)["resolved"] == {"citext": "Utf8"}
+diff --git a/tests/pipeline_builder/test_validate.py b/tests/pipeline_builder/test_validate.py
+index 884b9c6d..59a4917e 100644
+--- a/tests/pipeline_builder/test_validate.py
++++ b/tests/pipeline_builder/test_validate.py
+@@ -526,8 +526,9 @@ def test_the_filename_decides_none_of_what_is_reported(tmp_path):
+      "/rules/0/exact/arrow_type", "string_pattern_mismatch"),
+ ])
+ def test_invalid_type_map_content(tmp_path, doc, path, message_id):
+-    # the defect each fixture carries, not merely that something failed: a slot
+-    # dispute alone would satisfy a `kind == "fail"` assertion without the model
++    # the defect each fixture carries, not merely that something failed: an
++    # envelope finding alone (`/direction` or `/$schema`) would satisfy a
++    # `kind == "fail"` assertion without the model
+     # ever reaching the rules
+     diag = V.diagnostics_for("type-map", _write(tmp_path, "type-map-read.json", doc))
+     assert not diag["passed"]
