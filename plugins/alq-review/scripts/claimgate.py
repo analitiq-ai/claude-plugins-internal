@@ -16,7 +16,7 @@ from hookio import deny, record, refuse_claim, session_state
 from shell import Action
 
 CHECK = "alq-review:claim-check"
-UNLOCK_CLAIM = re.compile(r"unlock\s+claim-(?P<claim>[0-9a-f]{16})\b")
+UNLOCK_CLAIM = re.compile(rf"unlock\s+{claimcheck.CLAIM_REF.pattern}\b")
 _AGENTS = (briefs.CLAIM_READER, briefs.CLAIM_JUDGE, briefs.CLAIM_CONTEST_JUDGE)
 
 
@@ -132,12 +132,20 @@ def _reuse(claims: ledger.Claims, check: dict, earlier: dict | None) -> list[dic
     return to_read
 
 
-def _accepted_contests(check: dict | None, contests, located) -> list[str]:
+def _accepted_contests(check: dict | None, contests, located) -> tuple[list[dict], list[str]]:
+    """The accepted contests, each naming its claim by id, and the reason each other contest is refused."""
     if not isinstance(contests, list) or not all(isinstance(c, dict) for c in contests):
-        return ["args.contests is a list of {claim, evidence}"]
+        return [], ["args.contests is a list of {claim, evidence}"]
     if check is None or check["status"] != "complete":
-        return ["a contest answers the completed check of the staged change; there is none to contest"]
-    return [error for contest in contests for error in claimcheck.accept_contest(contest, check, located)]
+        return [], ["a contest answers the completed check of the staged change; there is none to contest"]
+    accepted, errors = [], []
+    for contest in contests:
+        cid, refused = claimcheck.accept_contest(contest, check, located)
+        if cid is None:
+            errors += refused
+        else:
+            accepted.append(dict(contest, claim=cid))
+    return accepted, errors
 
 
 def on_launch(payload: dict, call: dict) -> dict | None:
@@ -169,7 +177,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
             return refuse_claim(payload, "claim-launch", claimcheck.user_question(held), logged)
         if contests:
             located, _ = _reader_of(root, tree)
-            errors = _accepted_contests(earlier, contests, located)
+            contests, errors = _accepted_contests(earlier, contests, located)
             if errors:
                 return refuse_claim(payload, "claim-launch", "The contest was refused:\n- " + "\n- ".join(errors), logged)
             check = earlier
@@ -206,7 +214,7 @@ def _verdict_errors(body: dict, check: SimpleNamespace, located, contest: bool) 
         return [f"{body['file']}: \"{body['quote']}\" is not a claim this check judges; give file and quote exactly "
                 "as you were given them"]
     if contest and cid not in check.contested:
-        return [f"claim-{cid} is not under contest"]
+        return [f"{claimcheck.claim_ref(cid)} is not under contest"]
     if not contest and not check.open:
         return [f"{check.ref} takes no more verdicts"]
     return claimcheck.validate_verdict(body, located, contest=contest)
@@ -284,12 +292,12 @@ def after_output(payload: dict) -> None:
             verdict = {k: v for k, v in body.items() if k != "check_ref"}
             if agent_type == briefs.CLAIM_CONTEST_JUDGE:
                 holds = _holds(claims, check["base"], check["hunks"])
-                outcome = f"contest of claim-{cid} {claimcheck.contest_outcome(check, holds, cid, verdict)}"
+                outcome = f"contest of {claimcheck.claim_ref(cid)} {claimcheck.contest_outcome(check, holds, cid, verdict)}"
                 _save_holds(claims, check["base"], holds)
             else:
                 check["verdicts"][cid] = verdict
                 check["cost"]["judged"] += 1
-                outcome = f"claim-{cid} {verdict['verdict']}"
+                outcome = f"{claimcheck.claim_ref(cid)} {verdict['verdict']}"
             if claimcheck.cacheable(check["claims"][cid], verdict):
                 located, _ = _reader_of(check["root"], check["tree"])
                 claims.save_verdict(cid, {"verdict": verdict, "evidence_blobs": {
@@ -328,8 +336,8 @@ def on_prompt(payload: dict, typed: re.Match) -> dict:
             claims.save_holds(base, file, holds)
         released.append(f"{repo} {file}")
     if released:
-        record(payload, "claim-unlock", "released", f"claim-{cid}: {', '.join(released)}")
-        said = (f"The user released claim-{cid} in {', '.join(released)}: while those words stay as they are, its WRONG "
+        record(payload, "claim-unlock", "released", f"{claimcheck.claim_ref(cid)}: {', '.join(released)}")
+        said = (f"The user released {claimcheck.claim_ref(cid)} in {', '.join(released)}: while those words stay as they are, its WRONG "
                 "verdict no longer refuses the commit. Changed words are checked again.")
     else:
         said = f"`{typed.group(0)}` names no claim a check is holding, so nothing was released."

@@ -1,7 +1,7 @@
 export const meta = {
   name: 'claim-check',
   description: "Check the claims of a staged change before it is committed: read every hunk, then judge each claim about this repo's own behaviour against its code",
-  whenToUse: "Before `git commit`, when the alq-review gate asks for it. Pass args.worktree = absolute path of the checkout. To contest a WRONG verdict, also pass args.contests = [{claim: '<id>', evidence: '<path:line or https:// URL>'}].",
+  whenToUse: "Before `git commit`, when the alq-review gate asks for it. Pass args.worktree = absolute path of the checkout. To contest a WRONG verdict, also pass args.contests = [{claim: 'claim-<id>', evidence: '<path:line or https:// URL>'}].",
   phases: [{ title: 'Read' }, { title: 'Judge' }, { title: 'Contest' }],
 }
 

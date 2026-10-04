@@ -55,6 +55,13 @@ class Ids(unittest.TestCase):
         self.assertNotEqual(same, claimcheck.claim_id("README.md", "the validator accepts"))
         self.assertNotEqual(same, claimcheck.claim_id("docs/x.md", "the validator rejects"))
 
+    def test_a_claim_is_named_claim_dash_id_and_parses_back(self):
+        cid = claimcheck.claim_id("README.md", "the validator rejects")
+        self.assertEqual(claimcheck.claim_ref(cid), f"claim-{cid}")
+        self.assertEqual(claimcheck.parse_claim_ref(claimcheck.claim_ref(cid)), cid)
+        for other in (cid, f"claim-{cid}x", f" claim-{cid}", "claim-", None, 7):
+            self.assertIsNone(claimcheck.parse_claim_ref(other), other)
+
     def test_a_check_ref_names_repo_and_tree_and_parses_back(self):
         ref = claimcheck.check_ref("acme/demo", TREE)
         self.assertEqual(ref, f"acme/demo#tree:{TREE}")
@@ -309,17 +316,29 @@ class Holds(unittest.TestCase):
 
 
 class Contests(unittest.TestCase):
-    def test_a_contest_needs_evidence_and_a_wrong_claim(self):
+    def test_a_contest_names_a_wrong_claim_and_gives_evidence(self):
         current = check(verdicts={claim()["id"]: verdict("WRONG")})
         cid = claim()["id"]
-        self.assertEqual(claimcheck.accept_contest({"claim": cid, "evidence": "see validator.py:2"}, current, located), [])
-        self.assertEqual(claimcheck.accept_contest({"claim": cid, "evidence": "https://docs.example/a"}, current,
-                                                   located), [])
-        [missing] = claimcheck.accept_contest({"claim": cid, "evidence": "I am sure it rejects"}, current, located)
+        ref = claimcheck.claim_ref(cid)
+        self.assertEqual(claimcheck.accept_contest({"claim": ref, "evidence": "see validator.py:2"}, current, located),
+                         (cid, []))
+        self.assertEqual(claimcheck.accept_contest({"claim": ref, "evidence": "https://docs.example/a"}, current,
+                                                   located), (cid, []))
+        _, [missing] = claimcheck.accept_contest({"claim": ref, "evidence": "I am sure it rejects"}, current, located)
         self.assertIn("path:line", missing)
-        self.assertTrue(claimcheck.accept_contest({"claim": "nope", "evidence": "validator.py:2"}, current, located))
+
+    def test_a_contest_refusal_names_what_the_check_holds(self):
+        cid = claim()["id"]
+        current = check(verdicts={cid: verdict("WRONG")})
+        for named in (cid, "nope", None):
+            self.assertEqual(claimcheck.accept_contest({"claim": named, "evidence": "validator.py:2"}, current, located),
+                             (None, [f"{named!r} is not a claim id of this check; its WRONG claims: claim-{cid}"]))
         passed = check(verdicts={cid: verdict("CORRECT")})
-        self.assertTrue(claimcheck.accept_contest({"claim": cid, "evidence": "validator.py:2"}, passed, located))
+        self.assertEqual(claimcheck.accept_contest({"claim": f"claim-{cid}", "evidence": "validator.py:2"}, passed,
+                                                   located), (None, [f"claim-{cid} is CORRECT, not WRONG"]))
+        unjudged = check()
+        _, [said] = claimcheck.accept_contest({"claim": f"claim-{cid}", "evidence": "validator.py:2"}, unjudged, located)
+        self.assertEqual(said, f"claim-{cid} was not judged, so it has no WRONG verdict to contest")
 
     def test_a_fetch_goes_only_to_a_cited_host(self):
         hosts = claimcheck.cited_hosts([{"claim": "c", "evidence": "per https://docs.example/a and validator.py:2"}])

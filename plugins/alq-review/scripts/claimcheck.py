@@ -23,6 +23,8 @@ REFUSALS_BEFORE_USER = 3
 CALL = "Workflow(name='alq-review:claim-check', args={worktree: '%s'})"
 # A claim with one of these words is about cases no cited file can close, so its CORRECT is never reused.
 _UNIVERSAL = re.compile(r"\b(every|only|all|exactly|always|never)\b", re.I)
+# How agents and the user name a claim; the bare hash stays inside the plugin.
+CLAIM_REF = re.compile(r"claim-(?P<claim>[0-9a-f]{16})")
 _CHECK_REF = re.compile(r"(?P<repo>[\w.-]+/[\w.-]+)#tree:(?P<tree>[0-9a-f]{40}|[0-9a-f]{64})")
 _CITATION = re.compile(r"(?<![\w/.:-])(?P<path>[\w./-]+):(?P<line>\d+)\b")
 _URL = re.compile(r"https://[^\s<>\"'`)\]]+")
@@ -38,6 +40,15 @@ def plain(text: str) -> str:
 
 def claim_id(file: str, quote: str) -> str:
     return hashlib.sha256(f"{file}\0{plain(quote)}".encode()).hexdigest()[:16]
+
+
+def claim_ref(cid: str) -> str:
+    return f"claim-{cid}"
+
+
+def parse_claim_ref(ref: object) -> str | None:
+    found = CLAIM_REF.fullmatch(ref) if isinstance(ref, str) else None
+    return found["claim"] if found else None
 
 
 def check_ref(repo: str, tree: str) -> str:
@@ -206,7 +217,7 @@ def user_question(held: list[dict]) -> str:
     places = ", ".join(f"{h['file']} ({_old_side(h)})" for h in held)
     return (f"These claims were refused {REFUSALS_BEFORE_USER} times in {places}, and an agent may not try again. "
             "Stop and ask the user: is the claim wrong, or is the checker? Show them each claim and its last verdict. "
-            f"Only the user releases it, by typing {' or '.join(f'`unlock claim-{c}`' for c in claims)}.")
+            f"Only the user releases it, by typing {' or '.join(f'`unlock {claim_ref(c)}`' for c in claims)}.")
 
 
 def _wrong_report(check: dict, claims: list[dict]) -> str:
@@ -214,7 +225,7 @@ def _wrong_report(check: dict, claims: list[dict]) -> str:
     for claim in claims:
         verdict = check["verdicts"][claim["id"]]
         broken = next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
-        lines.append(f"- {claim['file']}:{claim['line']} \"{claim['quote']}\" (claim-{claim['id']}). Fails when: "
+        lines.append(f"- {claim['file']}:{claim['line']} \"{claim['quote']}\" ({claim_ref(claim['id'])}). Fails when: "
                      f"{verdict['failing_case']}. Evidence: {broken['evidence']}")
     return "\n".join(lines)
 
@@ -249,7 +260,7 @@ def commit_decision(check: dict | None, *, empty: bool, concluding: bool, stagin
         return Decision(False, "The claim check ruled these claims WRONG:\n" + _wrong_report(check, wrong) +
                         "\nNext step: fix the claim or the code, stage it and run the check again; or contest a verdict "
                         f"with evidence: Workflow(name='alq-review:claim-check', args={{worktree: '{root}', contests: "
-                        "[{claim: '<id>', evidence: '<path:line or https:// URL>'}]}).")
+                        "[{claim: 'claim-<id>', evidence: '<path:line or https:// URL>'}]}).")
     return Decision(True)
 
 
@@ -329,16 +340,22 @@ def release(hold: dict) -> None:
 
 # --- contests ------------------------------------------------------------------------------------
 
-def accept_contest(contest: dict, check: dict | None, located: Located) -> list[str]:
-    cid = contest.get("claim")
-    verdict = (check or {}).get("verdicts", {}).get(cid)
-    if verdict is None or verdict["verdict"] != "WRONG":
-        return [f"claim {cid!r} has no WRONG verdict in the check of this staged tree to contest"]
+def accept_contest(contest: dict, check: dict, located: Located) -> tuple[str | None, list[str]]:
+    """The id of the claim `contest` names, or why the completed `check` can't take the contest."""
+    cid = parse_claim_ref(contest.get("claim"))
+    if cid not in check["claims"]:
+        wrong = ", ".join(claim_ref(c["id"]) for c in wrong_claims(check)) or "none"
+        return None, [f"{contest.get('claim')!r} is not a claim id of this check; its WRONG claims: {wrong}"]
+    verdict = check["verdicts"].get(cid)
+    if verdict is None:
+        return None, [f"{claim_ref(cid)} was not judged, so it has no WRONG verdict to contest"]
+    if verdict["verdict"] != "WRONG":
+        return None, [f"{claim_ref(cid)} is {verdict['verdict']}, not WRONG"]
     evidence = contest.get("evidence") or ""
     if not (citations(evidence, located)[0] or _URL.search(evidence)):
-        return [f"the contest of claim-{cid} gives no evidence the checker can verify: add a path:line of the staged "
-                "tree or an https:// page that shows the claim holds"]
-    return []
+        return None, [f"the contest of {claim_ref(cid)} gives no evidence the checker can verify: add a path:line of "
+                      "the staged tree or an https:// page that shows the claim holds"]
+    return cid, []
 
 
 def cited_hosts(contests: list[dict]) -> list[str]:

@@ -88,7 +88,7 @@ Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout'})      
 Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', stage: 'audit'})  # anti-pattern audit
 Workflow(name='alq-review:assess-round', args={worktree: '/abs/checkout'})                  # after the poller reports findings
 Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout'})                   # before git commit
-Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout', contests: [{claim: '<id>', evidence: 'path:line'}]})
+Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout', contests: [{claim: 'claim-<id>', evidence: 'path:line'}]})
 Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout'})                    # before git commit
 Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout', contests: [{site: '<id>', reason: '<why>'}]})
 ```

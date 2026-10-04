@@ -286,7 +286,7 @@ def claim_check_args(check: dict, *, to_read: list[dict], contests: list[dict], 
                          "schema": _reader_schema(check, i, batch)} for i, batch in enumerate(batches)],
             "judge": {"prompt": _judge_prompt(check), "schema": verdict_schema(check)},
             "claims": [{"file": c["file"], "line": c["line"], "quote": c["quote"]} for c in claimcheck.to_judge(check)],
-            "contests": [{"claim_id": c["claim"], "prompt": _contest_prompt(check, by_id[c["claim"]], c),
+            "contests": [{"claim_id": claimcheck.claim_ref(c["claim"]), "prompt": _contest_prompt(check, by_id[c["claim"]], c),
                           "schema": verdict_schema(check, by_id[c["claim"]]["file"], by_id[c["claim"]]["quote"])}
                          for c in contests],
             "not_judged": claimcheck.not_judged(check)}

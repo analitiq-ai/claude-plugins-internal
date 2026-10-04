@@ -400,7 +400,7 @@ class ClaimCheckContest(ClaimGate):
     def test_a_contest_with_evidence_is_judged_by_a_fresh_judge(self):
         self.wrong_readme()
         cid = claimcheck.claim_id("README.md", FALSE.strip())
-        out, args = self.check_launch(contests=[{"claim": cid, "evidence": "https://docs.example/validator"}])
+        out, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "https://docs.example/validator"}])
         self.assertEqual(self.decision(out), "allow")
         [job] = args["contests"]
         self.assertEqual(args["contest_type"], CONTEST)
@@ -423,7 +423,7 @@ class ClaimCheckContest(ClaimGate):
     def test_a_rejected_contest_is_a_refusal(self):
         self.wrong_readme()
         cid = claimcheck.claim_id("README.md", FALSE.strip())
-        _, args = self.check_launch(contests=[{"claim": cid, "evidence": "validator.py:1"}])
+        _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
         self.judge(args, "README.md", FALSE.strip(), agent_type=CONTEST)
         self.assertEqual([h["refusals"] for h in self.holds()], [2])
         self.assertEqual(self.decision(self.git_commit()), "deny")
@@ -431,9 +431,36 @@ class ClaimCheckContest(ClaimGate):
     def test_a_contest_without_evidence_is_refused_before_any_agent(self):
         self.wrong_readme()
         cid = claimcheck.claim_id("README.md", FALSE.strip())
-        out, _ = self.check_launch(contests=[{"claim": cid, "evidence": "I am sure it rejects them"}])
+        out, _ = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "I am sure it rejects them"}])
         self.assertEqual(self.decision(out), "deny")
         self.assertIn("evidence", self.reason(out))
+
+    def test_a_contest_names_its_claim_as_the_gate_prints_it(self):
+        self.wrong_readme()
+        cid = claimcheck.claim_id("README.md", FALSE.strip())
+        refusal = self.reason(self.git_commit())
+        self.assertIn(f"(claim-{cid})", refusal)
+        self.assertIn("contests: [{claim: 'claim-<id>'", refusal)
+        out, _ = self.check_launch(contests=[{"claim": cid, "evidence": "validator.py:1"}])
+        self.assertEqual(self.decision(out), "deny")
+        said = self.reason(out)
+        self.assertIn(f"{cid!r} is not a claim id of this check", said)
+        self.assertIn(f"its WRONG claims: claim-{cid}", said)
+        self.assertNotIn("staged tree", said)
+
+    def test_a_contest_of_a_claim_that_is_not_wrong_names_its_verdict(self):
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", FALSE)
+        self.stage("docs/guide.md", "The validator returns True.\n")
+        _, args = self.check_launch()
+        self.read(args, {"README.md": ("PROSE", [(1, FALSE.strip(), "K1")]), "validator.py": ("CODE", []),
+                         "docs/guide.md": ("PROSE", [(1, "The validator returns True.", "K1")])})
+        self.judge(args, "README.md", FALSE.strip())
+        self.judge(args, "docs/guide.md", "The validator returns True.", "CORRECT")
+        cid = claimcheck.claim_id("docs/guide.md", "The validator returns True.")
+        out, _ = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn(f"claim-{cid} is CORRECT, not WRONG", self.reason(out))
 
 
 @unittest.skipUnless(shutil.which("node"), "node runs the workflow script")
@@ -460,6 +487,15 @@ class ClaimCheckWorkflow(ClaimGate):
         self.assertEqual((result["status"], result["judged"], result["agents"]), ("COMPLETE", 1, 2))
         self.assertEqual(result["wrong"][0]["evidence"], ["validator.py:2"])
         self.assertEqual(result["not_judged_categories"], {"K7": 1})
+
+    def test_a_contest_is_labelled_and_reported_by_its_printed_id(self):
+        self.wrong_readme()
+        cid = claimcheck.claim_id("README.md", FALSE.strip())
+        _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
+        upheld = {"verdict": "CORRECT", "basis": "b", "assertions": [{"text": "a", "confirmed": True, "evidence": "validator.py:1"}]}
+        ran = self.run_workflow(args, {CONTEST: upheld})
+        self.assertEqual([c["label"] for c in ran["calls"]], [f"contest claim-{cid}"])
+        self.assertEqual([c["claim_id"] for c in ran["result"]["contests"]], [f"claim-{cid}"])
 
     def test_an_agent_that_does_not_report_leaves_the_check_incomplete(self):
         self.stage("README.md", FALSE)
