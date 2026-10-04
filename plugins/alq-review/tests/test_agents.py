@@ -30,7 +30,6 @@ class IssueTackle(unittest.TestCase):
     def test_step_4_leaves_handing_reviewers_the_spec_to_the_gate(self):
         """The gate replaces a review round's args (#62), so an agent told to pass the spec has no way to."""
         step4 = TACKLE.read_text().split("## Step 4")[1].split("## Step 5")[0]
-        self.assertNotIn("specs/<n>.md", step4)
         self.assertIn("gate", step4)
 
 

@@ -22,11 +22,11 @@ the wrong value, not its address.
 
 ## Step 1 - get the spec
 
-`<n>` from the branch (`^(bugfix|hotfix|feat|...)/(\d+)-`) or from the invoker. Read
-`specs/<n>.md` in the worktree. If it is absent, fetch it from the issue - it is the home:
+`<n>` from the branch (`^(bugfix|hotfix|feat|...)/(\d+)-`) or from the invoker. Fetch the
+spec from the issue, its only home:
 
 ```
-gh api repos/{owner}/{repo}/issues/<n>/comments \
+gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
   --jq '.[] | select(.body | contains("<!-- analitiq-spec -->")) | .body'
 ```
 

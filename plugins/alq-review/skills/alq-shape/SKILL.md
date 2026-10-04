@@ -10,17 +10,17 @@ Shaping and implementation are separated in time - an issue can be shaped today 
 up next week - so the spec cannot live in a worktree that does not exist yet. This skill
 needs no worktree and no branch; it runs anywhere with `gh` authenticated.
 
-`alq-issue-tackle` later materialises that comment into `specs/<n>.md` inside its worktree, so
-the implementer, the reviewers, and the commit gate read a local file. That file is a cache.
-**The issue is the home.** If the two disagree, the issue wins.
+**The issue is the only home.** `alq-issue-tackle`, `alq-root-cause-check` and the alq-review gate,
+which puts it into each internal review round, fetch the spec from that comment; no copy of it is
+kept anywhere else.
 
 ## Step 1 - read the issue, and stop if it is already shaped
 
 ```
 gh issue view <n>
-gh api repos/{owner}/{repo}/issues/<n>/comments \
+gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
   --jq '.[] | select(.body | contains("<!-- analitiq-spec -->")) | .id'
-gh api repos/{owner}/{repo}/issues/<n>/comments \
+gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
   --jq '.[] | select(.body | contains("<!-- analitiq-premise -->")) | .id'
 ```
 
@@ -130,8 +130,8 @@ No shape needed: <one line saying why - the outcome is determined by the request
 None.
 ```
 
-The marker still has to be posted. `alq-issue-tackle` materialises it and the commit gate finds
-it; without it the gate blocks every commit on the branch.
+The marker still has to be posted. `alq-issue-tackle` looks for it; without it, tackle shapes
+the issue again.
 
 ## Step 4 - trace the reported behaviour to its cause
 

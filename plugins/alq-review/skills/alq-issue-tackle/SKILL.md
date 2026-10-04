@@ -1,6 +1,6 @@
 ---
 name: alq-issue-tackle
-description: Implement the fix for a GitHub issue given its issue number, working in a git worktree against the spec stored on the issue. Materialises that spec into the worktree, shaping the issue first if it has none, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, and reviews the diff against the spec before opening a PR. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
+description: Implement the fix for a GitHub issue given its issue number, working in a git worktree against the spec stored on the issue. Reads that spec from the issue, shaping the issue first if it has none, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, and reviews the diff against the spec before opening a PR. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
 ---
 
 You will be given a number that represents an issue open in GitHub. Call it `<n>`.
@@ -10,13 +10,13 @@ You will be given a number that represents an issue open in GitHub. Call it `<n>
 Create a worktree at `.claude/worktrees/<n>` on a branch named `<type>/<n>-<short-description>` per
 the branch-naming rules. All work happens there. Never work on main.
 
-## Step 2 - materialise the spec into the worktree
+## Step 2 - read the spec from the issue
 
 The spec lives on the issue, as a comment marked `<!-- analitiq-spec -->`. It was probably
 written days before this worktree existed. Fetch it:
 
 ```
-gh api repos/{owner}/{repo}/issues/<n>/comments \
+gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
   --jq '.[] | select(.body | contains("<!-- analitiq-spec -->")) | .body'
 ```
 
@@ -24,20 +24,20 @@ gh api repos/{owner}/{repo}/issues/<n>/comments \
   It either posts the spec, posts a "No shape needed" marker, or challenges the issue's premise
   and posts no spec. If the second fetch still returns nothing, stop and report the premise
   challenge; the user decides whether the issue is worked at all.
-- It came back: write it to `specs/<n>.md` in the worktree. `specs/` is gitignored, so the
-  file is never committed.
+- It came back: that is the spec. Write no copy of it into the worktree: nothing reads one, and a
+  file there is one `git add .` from being committed beside the comment it drifts from.
 
-Fetch it **every time this skill starts**, overwriting any `specs/<n>.md` already there. The
-local file is a cache; the issue is the home. A spec revised after the worktree was created
-must win, and it only wins if the cache is never trusted over the source.
+Fetch it **every time this skill starts**, never from memory of an earlier run. A spec revised
+after the worktree was created must win.
 
 Read it before writing any code. The Acceptance section is what this change is for.
 
 Then check that it has a **Hand-maintained surfaces** section. A spec without one predates
 `alq-shape`'s Step 6: **stop** and report that it needs a re-shape. Write no code.
 
-Do not start implementing before the spec exists. The commit gate will refuse the commit
-anyway, and finding that out after writing the code wastes the work.
+Do not start implementing before the spec exists. Each internal review round grades the diff
+against the spec the gate reads from the issue; code written before there is one has nothing to be
+graded against.
 
 A decision tagged `(code)` was true of the default branch when the spec was written, which
 may have been weeks ago. Re-check the module it names before relying on it; a stale (code)
@@ -79,6 +79,4 @@ Open the PR in DRAFT and run the review loops to green.
 
 ## Step 6 - cleanup
 
-Once the PR is merged, remove the worktree. `specs/<n>.md` is gitignored and uncommitted, so
-it goes with the worktree, and nothing is lost - it was only ever a copy of the issue comment,
-which stays.
+Once the PR is merged, remove the worktree.
