@@ -82,8 +82,9 @@ that is under review.
    same operation and the callers, reading a copy of `HEAD` in `<main checkout>/.claude/worktrees/`, which the
    repo's `.gitignore` should list. Jev then answers where the fix acts and whether it reaches every listed site
    with the same defect; anything short of a fix at the cause that reaches them all is a `patch`, and its commit is
-   refused. Only the user overrides a bug, by typing the `override shim-<id>` that each refusal names. The full
-   rules are in `specs/006-shim-check-gate/`.
+   refused. With no listed site left, a fix at the cause is complete. Only the user overrides a bug, by typing the
+   `override shim-<id>` that each refusal names. The full rules are in `specs/006-shim-check-gate/`, amended by
+   `specs/011-shim-no-site-left/`.
    A commit whose code is all in test files skips this check (`specs/012-tests-only-tree/`).
 
 ## How an agent uses it

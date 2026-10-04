@@ -20,8 +20,9 @@ def replay(entry: dict) -> dict:
     if kind == "fix":
         answers, more = jev.ask(jev.fix_state(diff, (FIXTURES / entry["sweep"]).read_text()), jev.FIX)
         level, coverage, cost = answers["level"], answers["coverage"], cost + more
-    return {"kind": kind, "level": level, "coverage": coverage, "verdict": shimcheck.verdict(kind, level, coverage),
-            "cost": cost}
+    # The recorded sweeps are prose, never parsed into a `same_operation` list, so SC-001 grades coverage as given.
+    return {"kind": kind, "level": level, "coverage": coverage,
+            "verdict": shimcheck.verdict(kind, level, coverage, sites_left=True), "cost": cost}
 
 
 def main() -> int:

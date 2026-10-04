@@ -338,7 +338,8 @@ def _judge(check: dict, deadline: float) -> None:
         return
     check["cost"]["jev_usd"] += cost
     check["level"], check["coverage"] = answers["level"], answers["coverage"]
-    check["verdict"] = shimcheck.verdict(check["kind"], check["level"], check["coverage"])
+    check["verdict"] = shimcheck.verdict(check["kind"], check["level"], check["coverage"],
+                                         sites_left=bool(check["same_operation"]))
     _finish(check, "complete")
 
 

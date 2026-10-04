@@ -109,8 +109,9 @@ def ruled_out(rulings: dict[str, dict]) -> set[str]:
     return {sid for sid, r in rulings.items() if r["ruling"] in RULED_OUT}
 
 
-def verdict(kind: str, level: str | None, coverage: str | None) -> str:
-    if kind == "not_fix" or (level == "cause" and coverage in ("all", "none_other")):
+def verdict(kind: str, level: str | None, coverage: str | None, *, sites_left: bool) -> str:
+    """`coverage` is defined over listed sites (`jev.FIX`), so with no SAME OPERATION site left it is not read."""
+    if kind == "not_fix" or (level == "cause" and (not sites_left or coverage in ("all", "none_other"))):
         return "complete"
     return "patch"
 
@@ -212,15 +213,17 @@ def _patch_report(check: dict, chain: dict | None, code: list[dict], root: str) 
     listed = "".join(f"- {sid} {s['file']}:{s['line']} {s['function']} — {s['does']} "
                      f"({'touched' if marks[sid] else 'not touched'})\n"
                      for s, sid in ((s, site_id(s["file"], s["function"])) for s in sites))
-    return (f"The shim check ruled this fix a patch: level {check['level']}, coverage {check['coverage']}. These sites "
-            f"do the same operation as the code it changes:\n{listed}"
-            f"This is refusal {chain['count'] if chain else 1} of this bug.\n"
+    # `contest_errors` refuses any site the list does not hold, so with no site there is nothing to contest.
+    next_step = (f"Next step: fix the cause at every site that has the defect, stage it and run {CALL % root} again; "
+                 f"or contest a site: Workflow(name='alq-review:shim-check', args={{worktree: '{root}', contests: "
+                 "[{site: '<id>', reason: '<why it does not share the defect>'}]})." if sites else
+                 f"Next step: move the fix to the cause of the defect, stage it and run {CALL % root} again.")
+    return (f"The shim check ruled this fix a patch: level {check['level']}, coverage {check['coverage']}."
+            + (f" These sites do the same operation as the code it changes:\n{listed}" if sites else "\n")
+            + f"This is refusal {chain['count'] if chain else 1} of this bug.\n"
             + (f"Each fix so far has left a site, so the next check runs a deep sweep: three sweepers, one starting "
                f"from the callers. Launch it: {CALL % root}.\n" if chain and chain["state"] == "deep_due" else "")
-            + 
-            f"Next step: fix the cause at every site that has the defect, stage it and run {CALL % root} again; or "
-            f"contest a site: Workflow(name='alq-review:shim-check', args={{worktree: '{root}', contests: "
-            "[{site: '<id>', reason: '<why it does not share the defect>'}]}).")
+            + next_step)
 
 
 def user_question(chain: dict) -> str:

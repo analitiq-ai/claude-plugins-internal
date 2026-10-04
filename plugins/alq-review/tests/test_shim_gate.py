@@ -156,6 +156,18 @@ class ShimCommit(ShimGate):
                      "refusal 2 of this bug", "override shim-" + "c" * 16):
             self.assertIn(part, reason)
 
+    def test_a_symptom_fix_with_no_site_left_is_refused_with_no_site_list_and_no_contest(self):
+        tree = self.labelled({"b.py": (FIXED, "CODE")})
+        self.record(tree, verdict="patch", kind="fix", level="symptom", coverage="none_other", same_operation=[],
+                    callers=[])
+        refused = self.git_commit()
+        self.assertEqual(self.decision(refused), "deny")
+        reason = self.reason(refused)
+        self.assertIn("level symptom", reason)
+        self.assertIn(f"override shim-{tree[:12]}", reason)
+        for absent in ("These sites do the same operation", "contest"):
+            self.assertNotIn(absent, reason)
+
     def test_a_complete_check_commits(self):
         tree = self.labelled({"b.py": (FIXED, "CODE")})
         self.record(tree, verdict="complete", kind="fix", level="cause", coverage="all", same_operation=[], callers=[])
@@ -411,6 +423,15 @@ class ShimSweep(Staged):
         self.assertIn("HTTP 500", check["reason"])
         self.assertEqual(self.snapshots(), [])
 
+    def test_an_empty_list_leaves_a_cause_fix_complete_whatever_the_coverage_answer(self):
+        Jev.answers.update(level="cause", coverage="edited_only")
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        with self.shims() as shims:
+            check = shims.check(self.tree)
+        self.assertEqual((check["status"], check["coverage"], check["verdict"]), ("complete", "edited_only", "complete"))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
     def test_a_diff_too_large_for_jev_says_to_split_it(self):
         _, args = self.shim_launch()
         Jev.status = 400
@@ -498,6 +519,26 @@ class ShimContest(Staged):
             [chain] = shims.chains_at(check["branch"], check["head"])
         self.assertEqual((chain["count"], chain["state"]), (1, "ended"))
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
+    def rule_out_every_site(self, ruling, **extra):
+        """#59: Jev answers `edited_only` over the empty list left once every listed site is ruled out."""
+        _, args = self.contest(self.LOAD, self.SAVE)
+        self.rule(args, self.LOAD, ruling, **extra)
+        self.rule(args, self.SAVE, ruling, **extra)
+        with self.shims() as shims:
+            check = shims.check(self.tree)
+        self.assertEqual((check["mode"], check["level"], check["coverage"], check["same_operation"], check["verdict"]),
+                         ("rejudge", "cause", "edited_only", [], "complete"))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+        logged = [e for e in self.gate_log() if e["action"] == "shim-check"][-1]
+        self.assertIn(f"{check['ref']}: rejudge, level cause, coverage edited_only, 0 sites", logged["reason"])
+
+    def test_every_site_ruled_not_shared_leaves_a_cause_fix_complete_whatever_the_coverage_answer(self):
+        self.rule_out_every_site("not_shared")
+
+    def test_every_site_deferred_leaves_a_cause_fix_complete_whatever_the_coverage_answer(self):
+        self.env["GH_ISSUE_STATE"] = "OPEN"
+        self.rule_out_every_site("deferred", issue=5)
 
     def test_an_open_deferral_drops_the_site_from_later_checks_and_a_closed_one_returns_it(self):
         self.env["GH_ISSUE_STATE"] = "OPEN"
@@ -629,6 +670,7 @@ class ShimChain(ShimGate):
         self.checked(lines_changed(4, mark="checked again"))
         git(self.root, "checkout", "-q", "HEAD", "--", ".")
         self.labelled({"c.py": ("def load():\n    return open('b').read() or ''\n", "CODE")})
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         _, args = self.shim_launch()
         self.sweep(args, [])
         [chain] = self.chains()
@@ -636,6 +678,7 @@ class ShimChain(ShimGate):
 
     def test_a_patch_reaching_neither_opens_its_own_chain(self):
         self.checked(lines_changed(4))
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         self.checked(lines_changed(16), sites=())
         self.assertEqual(sorted(c["count"] for c in self.chains()), [1, 1])
 
@@ -659,7 +702,9 @@ class ShimChain(ShimGate):
 
     def test_one_patch_reaching_two_chains_counts_for_both(self):
         self.checked(lines_changed(4))
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         self.checked(lines_changed(16), sites=())
+        Jev.answers["level"] = "cause"
         self.checked(lines_changed(4, 16))
         self.assertEqual(sorted(c["count"] for c in self.chains()), [2, 2])
 

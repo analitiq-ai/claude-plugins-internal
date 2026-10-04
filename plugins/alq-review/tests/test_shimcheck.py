@@ -53,12 +53,21 @@ class ValidateSweep(unittest.TestCase):
 
 class Verdict(unittest.TestCase):
     def test_complete_only_for_a_cause_fix_that_covers_every_site_or_a_non_fix(self):
-        self.assertEqual(shimcheck.verdict("not_fix", None, None), "complete")
+        self.assertEqual(shimcheck.verdict("not_fix", None, None, sites_left=True), "complete")
         for coverage in ("all", "none_other"):
-            self.assertEqual(shimcheck.verdict("fix", "cause", coverage), "complete")
+            self.assertEqual(shimcheck.verdict("fix", "cause", coverage, sites_left=True), "complete")
         for level, coverage in (("cause", "edited_only"), ("cause", "some"), ("symptom", "all"),
                                 ("symptom", "none_other")):
-            self.assertEqual(shimcheck.verdict("fix", level, coverage), "patch", (level, coverage))
+            self.assertEqual(shimcheck.verdict("fix", level, coverage, sites_left=True), "patch", (level, coverage))
+
+    def test_with_no_site_left_a_cause_fix_is_complete_whatever_the_coverage_answer(self):
+        for coverage in ("all", "edited_only", "none_other"):
+            self.assertEqual(shimcheck.verdict("fix", "cause", coverage, sites_left=False), "complete", coverage)
+        self.assertEqual(shimcheck.verdict("not_fix", None, None, sites_left=False), "complete")
+
+    def test_with_no_site_left_a_symptom_fix_is_still_a_patch(self):
+        for coverage in ("all", "edited_only", "none_other"):
+            self.assertEqual(shimcheck.verdict("fix", "symptom", coverage, sites_left=False), "patch", coverage)
 
 
 class Overlap(unittest.TestCase):
