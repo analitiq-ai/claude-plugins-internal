@@ -63,15 +63,18 @@ that is under review.
    runs it with `python3 scripts/settled_design.py --branch <checkout> <branch it merges into>`.
 7. **Claims are checked before they are committed.** Every `git commit` an agent runs, with or without a PR,
    is refused until the `claim-check` workflow has checked that exact staged tree. Readers label each hunk
-   code, prose or mixed and quote each claim its text makes, in one of eight categories; a judge per claim
-   about this repo's own behaviour (K1) tries to break it against the code and rules it `CORRECT`, `WRONG` or
-   `UNSURE`, citing `path:line` evidence the gate checks against the staged tree. A `WRONG` refuses the
+   code, prose or mixed and quote each claim its text makes, in one of the categories `scripts/briefs.py`
+   lists; a judge per claim of a judged category (`claimcheck.JUDGED`) tries to break it and rules it
+   `CORRECT`, `WRONG` or `UNSURE`, citing `path:line` evidence the gate checks against the staged tree. A claim
+   about this repo's own behaviour is judged against the code; what a test says it checks (its name,
+   description or failure message) is judged against that test alone, since its code may not exist yet. A `WRONG` refuses the
    commit with the claim, its failing case and its evidence; `UNSURE` is a note, also when every verdict is
    one. A check whose readers or judges did not all report refuses as a failed check, never as a wrong claim. The commit
    must run alone (only `cd` before it) and stage nothing itself (`-a`, `-i`, `-o`, pathspecs), since what was
    checked must be what lands; an empty commit or one that concludes a merge, cherry-pick or revert passes.
-   A hunk with the same words keeps its read, and a `CORRECT` stands while every file it cited is unchanged
-   (not for every/only/all/exactly/always/never claims). An author who thinks a verdict is wrong contests it
+   A hunk's read is reused only while its words and the reader's task and labels are unchanged, and a `CORRECT`
+   only while its claim keeps its category and every file it cited is unchanged (never for
+   every/only/all/exactly/always/never claims). An author who thinks a verdict is wrong contests it
    with a `path:line` or an `https://` page; a fresh judge, which may read only the cited hosts, upholds it or
    rejects it, and a rejection counts as a refusal. After 3 refusals of one hunk the agent must stop and ask
    the user, who lets the words stand by typing `unlock claim-<id>`. What the repo's own commit hook changes

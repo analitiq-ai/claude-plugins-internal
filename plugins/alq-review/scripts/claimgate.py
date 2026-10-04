@@ -108,13 +108,13 @@ def _new_check(repo: str, root: str, tree: str, base: str, hunks: list[dict]) ->
 
 
 def _reuse(claims: ledger.Claims, check: dict, earlier: dict | None) -> list[dict]:
-    """Fill in what earlier checks settled; return the hunks that still need a reader. A hunk with the same words
-    keeps its read; a CORRECT stands while every file it cited is unchanged; verdicts of the same tree stand."""
+    """Fill in what earlier checks settled; return the hunks that still need a reader. A stored read is reused only
+    under the current reader brief, and a cached CORRECT only while its claim keeps its category."""
     _, text_of = _reader_of(check["root"], check["tree"])
     to_read = []
     for hunk in check["hunks"]:
         read = claims.read(hunk["patch_id"])
-        if read is not None:
+        if read is not None and read.get("brief") == briefs.READER_BRIEF:
             claims_now = [{"line": hunk["new_start"] + c["offset"], "quote": c["quote"], "category": c["category"]}
                           for c in read["claims"]]
             output = {"hunks": [{"id": hunk["id"], "kind": read["kind"], "claims": claims_now}]}
@@ -126,8 +126,8 @@ def _reuse(claims: ledger.Claims, check: dict, earlier: dict | None) -> list[dic
         if earlier and cid in earlier["verdicts"]:
             check["verdicts"][cid] = earlier["verdicts"][cid]
             continue
-        cached = claims.verdict(cid) if claim["category"] == claimcheck.JUDGED else None
-        if cached and claimcheck.still_correct(cached, lambda p: worktree.tree_blob(check["root"], check["tree"], p)):
+        cached = claims.verdict(cid) if claim["category"] in claimcheck.JUDGED else None
+        if cached and claimcheck.still_correct(cached, claim, lambda p: worktree.tree_blob(check["root"], check["tree"], p)):
             check["verdicts"][cid] = cached["verdict"]
     return to_read
 
@@ -239,7 +239,7 @@ def _as_read(check: dict) -> SimpleNamespace:
     """What the verdict rules need from the stored check, read before the agent's body is."""
     return SimpleNamespace(
         ref=check["ref"], open=check["status"] in ("reading", "judging"),
-        judged={cid for cid, c in check["claims"].items() if c["category"] == claimcheck.JUDGED},
+        judged={cid for cid, c in check["claims"].items() if c["category"] in claimcheck.JUDGED},
         contested={cid for cid, state in check["contests"].items() if state == "pending"})
 
 
@@ -283,7 +283,7 @@ def after_output(payload: dict) -> None:
             for entry in body["hunks"]:
                 hunk = hunks[entry["id"]]
                 claimcheck.add_read(check, hunk, entry["kind"], entry["claims"])
-                claims.save_read(hunk["patch_id"], {"kind": entry["kind"], "claims": [
+                claims.save_read(hunk["patch_id"], {"brief": briefs.READER_BRIEF, "kind": entry["kind"], "claims": [
                     {"offset": c["line"] - hunk["new_start"], "quote": c["quote"], "category": c["category"]}
                     for c in entry["claims"]]})
             outcome = f"read batch {body['batch']}"
@@ -300,7 +300,7 @@ def after_output(payload: dict) -> None:
                 outcome = f"{claimcheck.claim_ref(cid)} {verdict['verdict']}"
             if claimcheck.cacheable(check["claims"][cid], verdict):
                 located, _ = _reader_of(check["root"], check["tree"])
-                claims.save_verdict(cid, {"verdict": verdict, "evidence_blobs": {
+                claims.save_verdict(cid, {"category": check["claims"][cid]["category"], "verdict": verdict, "evidence_blobs": {
                     path: worktree.tree_blob(check["root"], check["tree"], path)
                     for path in claimcheck.cited_paths(verdict, located)}})
         _settle(payload, claims, check)

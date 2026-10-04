@@ -1,6 +1,6 @@
 ---
 name: claim-judge
-description: Tries to break one claim about a repo's own behaviour by reading the code it describes, and rules it CORRECT, WRONG or UNSURE with file:line evidence. Dispatched only by the alq-review claim-check workflow, never directly.
+description: Tries to break one claim, about a repo's own behaviour (judged against its code) or about what a test checks (judged against that test alone), and rules it CORRECT, WRONG or UNSURE. Dispatched only by the alq-review claim-check workflow, never directly.
 tools: Read, Glob, Grep
 model: sonnet
 effort: medium

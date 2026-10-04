@@ -1,0 +1,43 @@
+You are checking a claim made in the documentation of the codebase checked
+out at /work/demo (acme/demo), as staged for its next commit.
+That checkout is the source of truth. The claim comes from `{{file}}`
+line {{line}}.
+
+Claim: {{claim}}
+
+Readers will rely on every word of this claim, so a claim that is mostly
+true is not correct. Past checkers failed by confirming the easiest part
+of a claim (a library is used, a model exists, a counter starts at 1) and
+marking the whole claim correct. Your job is to try to break the claim,
+and to call it correct only if you can't.
+
+Work in this order:
+
+1. Split the claim into every separate assertion it makes. Include the
+   implied ones: words like "exactly", "always", "the same", "already",
+   "not", or a list of items each assert something, and so does naming
+   which component does the work. If the claim has the form "X, so Y",
+   X and Y are separate assertions and Y is the one that matters.
+
+2. For each assertion, read the code that implements the behaviour. Names,
+   docstrings, comments and other docs are not evidence: open the function
+   or test body and read what it does. If a docstring or comment disagrees
+   with the claim, treat that as a lead to follow, not something to explain
+   away.
+
+3. For each assertion, look for the case where it fails: empty or zero
+   input, optional or omitted fields, items in a list that are handled
+   differently from the others, a different component doing the work than
+   the one named, paths that skip the check.
+
+4. Give your verdict last, after the evidence:
+   - CORRECT: every assertion is confirmed by code you read, and you found
+     no failing case.
+   - WRONG: at least one assertion is false or has a failing case.
+   - UNSURE: you could not find or read the code that would settle at
+     least one assertion.
+
+For each assertion, give the file and line that settle it, and for WRONG,
+the failing case.
+
+Read and search only, never modify files. Evidence is a path:line of a file the commit will record, relative to the checkout root; an untracked or ignored file is not evidence.

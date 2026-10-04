@@ -70,7 +70,8 @@ class Ids(unittest.TestCase):
             self.assertIsNone(claimcheck.parse_check_ref(bad), bad)
 
     def test_the_vocabularies(self):
-        self.assertEqual(claimcheck.CATEGORIES, tuple(f"K{i}" for i in range(1, 9)))
+        self.assertEqual(claimcheck.CATEGORIES, tuple(f"K{i}" for i in range(1, 10)))
+        self.assertEqual(claimcheck.JUDGED, ("K1", "K9"))
         self.assertEqual(claimcheck.VERDICTS, ("CORRECT", "WRONG", "UNSURE"))
 
 
@@ -183,6 +184,13 @@ class Completion(unittest.TestCase):
         self.assertEqual(self.settle(current), "complete")
         self.assertEqual(claimcheck.not_judged(current), {"K3": 1})
         self.assertEqual(claimcheck.to_judge(current), [])
+
+    def test_what_a_test_checks_is_judged_like_what_the_code_does(self):
+        named = claim("test_an_empty_list_is_rejected", file="tests/test_validator.py", category="K9")
+        current = check(claims=[named, claim("every rule is listed", category="K3")])
+        self.assertEqual(self.settle(current), "judging")
+        self.assertEqual(claimcheck.to_judge(current), [named])
+        self.assertEqual(claimcheck.not_judged(current), {"K3": 1})
 
 
 class CommitPreconditions(unittest.TestCase):
@@ -357,10 +365,11 @@ class VerdictCache(unittest.TestCase):
             self.assertFalse(claimcheck.cacheable(claim(), verdict(kind)), kind)
 
     def test_a_cached_verdict_holds_while_its_cited_files_are_unchanged(self):
-        entry = {"evidence_blobs": {"validator.py": "b1"}, "verdict": verdict("CORRECT")}
-        self.assertTrue(claimcheck.still_correct(entry, {"validator.py": "b1"}.get))
-        self.assertFalse(claimcheck.still_correct(entry, {"validator.py": "b2"}.get))
-        self.assertFalse(claimcheck.still_correct(entry, {}.get))
+        entry = {"category": "K1", "evidence_blobs": {"validator.py": "b1"}, "verdict": verdict("CORRECT")}
+        self.assertTrue(claimcheck.still_correct(entry, claim(), {"validator.py": "b1"}.get))
+        self.assertFalse(claimcheck.still_correct(entry, claim(), {"validator.py": "b2"}.get))
+        self.assertFalse(claimcheck.still_correct(entry, claim(), {}.get))
+        self.assertFalse(claimcheck.still_correct(entry, claim(category="K9"), {"validator.py": "b1"}.get))
         self.assertEqual(claimcheck.cited_paths(verdict("CORRECT"), located), {"validator.py"})
 
 

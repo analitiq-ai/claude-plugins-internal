@@ -3,8 +3,10 @@ and judge outputs standing for the agents."""
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
@@ -194,11 +196,31 @@ class ClaimCheckLaunch(ClaimGate):
         self.assertEqual(args["check_ref"], f"acme/demo#tree:{git(self.root, 'write-tree')}")
         self.assertEqual([h["file"] for h in args["readers"][0]["hunks"]], ["README.md", "validator.py"])
         self.assertEqual((args["reader_type"], args["judge_type"]), (READER, JUDGE))
+        self.assertEqual(set(args["judges"]), set(claimcheck.JUDGED))
         for part in ("prompt", "schema"):
             self.assertIn(part, args["readers"][0])
-            self.assertIn(part, args["judge"])
-        self.assertIn(str(self.root), args["judge"]["prompt"])
+            for category in claimcheck.JUDGED:
+                self.assertIn(part, args["judges"][category])
+        for category in claimcheck.JUDGED:
+            self.assertIn(str(self.root), args["judges"][category]["prompt"])
         self.assertEqual(self.stored()["status"], "reading")
+
+    def test_the_k1_judge_prompt_is_unchanged_by_k9(self):
+        self.stage("README.md", FALSE)
+        _, args = self.check_launch()
+        pinned = (Path(__file__).parent / "fixtures" / "k1_judge_prompt.txt").read_text()
+        self.assertEqual(args["judges"]["K1"]["prompt"], pinned.replace("/work/demo", str(self.root)))
+
+    def test_what_a_test_checks_is_judged_against_that_test_not_the_code(self):
+        self.stage("README.md", FALSE)
+        _, args = self.check_launch()
+        k9 = args["judges"]["K9"]["prompt"]
+        self.assertNotEqual(k9, args["judges"]["K1"]["prompt"])
+        for part in ("{{file}}", "{{line}}", "{{claim}}", "its assertions and inputs", "code under test is not evidence"):
+            self.assertIn(part, " ".join(k9.split()))
+        reader = " ".join(args["readers"][0]["prompt"].split())
+        self.assertIn("- K9: what a test checks", reader)
+        self.assertIn("a test's name or failure message", reader)
 
     def test_nothing_staged_is_nothing_to_check(self):
         out, _ = self.check_launch()
@@ -311,6 +333,33 @@ class ClaimCheckRepair(ClaimGate):
         self.assertEqual([h["file"] for r in again["readers"] for h in r["hunks"]], ["README.md"])
         self.assertEqual(again["claims"], [])
         self.assertNotEqual(args["check_ref"], again["check_ref"])
+
+    def test_a_correct_verdict_is_not_reused_for_the_claim_filed_under_another_category(self):
+        message = "an empty list is rejected"
+        self.stage("validator.py", VALIDATOR)
+        self.stage("tests/test_validator.py", f"def test_empty():\n    assert check([]) is False, \"{message}\"\n")
+        _, args = self.check_launch()
+        self.read(args, {"tests/test_validator.py": ("MIXED", [(2, message, "K1")]), "validator.py": ("CODE", [])})
+        self.judge(args, "tests/test_validator.py", message, "CORRECT", evidence="validator.py:2")
+        self.stage("tests/test_validator.py", f"def test_an_empty_list():\n    assert check([]) is False, \"{message}\"\n")
+        _, relabelled = self.check_launch()
+        self.read(relabelled, {"tests/test_validator.py": ("MIXED", [(2, message, "K9")])})
+        self.judge(relabelled, "tests/test_validator.py", message, evidence="tests/test_validator.py:2")
+        self.stage("docs/guide.md", "Run the tests.\n")
+        _, again = self.check_launch()
+        self.assertEqual([c["quote"] for c in again["claims"]], [message])
+
+    def test_a_read_made_under_another_reader_brief_is_read_again(self):
+        self.stage("README.md", TRUE)
+        _, args = self.check_launch()
+        self.read(args, {"README.md": ("PROSE", [(1, TRUE.strip(), "K1")])})
+        with closing(sqlite3.connect(self.state_dir / "ledger.db")) as conn, conn:
+            for patch_id, doc in conn.execute("SELECT patch_id, doc FROM claim_reads").fetchall():
+                conn.execute("UPDATE claim_reads SET doc = ? WHERE patch_id = ?",
+                             (json.dumps({**json.loads(doc), "brief": "an-older-reader-brief"}), patch_id))
+        self.stage("docs/guide.md", "Run the tests.\n")
+        _, again = self.check_launch()
+        self.assertEqual(sorted(h["file"] for r in again["readers"] for h in r["hunks"]), ["README.md", "docs/guide.md"])
 
     def test_a_check_left_judging_is_relaunched_for_the_missing_verdict_only(self):
         self.stage("validator.py", VALIDATOR)
@@ -462,6 +511,20 @@ class ClaimCheckContest(ClaimGate):
         self.assertEqual(self.decision(out), "deny")
         self.assertIn(f"claim-{cid} is CORRECT, not WRONG", self.reason(out))
 
+    def test_a_contest_of_a_test_claim_is_judged_against_that_test(self):
+        name = "test_an_empty_list_is_rejected"
+        self.stage("validator.py", VALIDATOR)
+        self.stage("tests/test_validator.py", f"def {name}():\n    assert check([]) is False\n")
+        _, args = self.check_launch()
+        self.read(args, {"tests/test_validator.py": ("MIXED", [(1, name, "K9")]), "validator.py": ("CODE", [])})
+        self.judge(args, "tests/test_validator.py", name, evidence="tests/test_validator.py:2")
+        cid = claimcheck.claim_id("tests/test_validator.py", name)
+        _, contested = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "tests/test_validator.py:2"}])
+        [job] = contested["contests"]
+        filled = (contested["judges"]["K9"]["prompt"].replace("{{file}}", "tests/test_validator.py")
+                  .replace("{{line}}", "1").replace("{{claim}}", name))
+        self.assertTrue(job["prompt"].startswith(filled), job["prompt"][:300])
+
 
 @unittest.skipUnless(shutil.which("node"), "node runs the workflow script")
 class ClaimCheckWorkflow(ClaimGate):
@@ -487,6 +550,28 @@ class ClaimCheckWorkflow(ClaimGate):
         self.assertEqual((result["status"], result["judged"], result["agents"]), ("COMPLETE", 1, 2))
         self.assertEqual(result["wrong"][0]["evidence"], ["validator.py:2"])
         self.assertEqual(result["not_judged_categories"], {"K7": 1})
+
+    def test_each_judged_category_gets_its_own_judge_prompt(self):
+        name = "test_an_empty_list_is_rejected"
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", FALSE + "\nSee the guide.\n")
+        self.stage("tests/test_validator.py", f"def {name}():\n    assert check([]) is False\n")
+        _, args = self.check_launch()
+        correct = {"verdict": "CORRECT", "basis": "b", "assertions": [{"text": "a", "confirmed": True, "evidence": "x:1"}]}
+        ran = self.run_workflow(args, {READER: {
+            "README.md": {"kind": "PROSE", "claims": [{"line": 1, "quote": FALSE.strip(), "category": "K1"},
+                                                      {"line": 3, "quote": "See the guide.", "category": "K7"}]},
+            "tests/test_validator.py": {"kind": "MIXED", "claims": [{"line": 1, "quote": name, "category": "K9"}]},
+            "validator.py": {"kind": "CODE", "claims": []}}, JUDGE: correct})
+        prompts = {j["schema"]["properties"]["file"]["enum"][0]: j["prompt"] for j in ran["calls"] if j["agentType"] == JUDGE}
+        fill = (lambda category, file, line, quote: args["judges"][category]["prompt"].replace("{{file}}", file)
+                .replace("{{line}}", str(line)).replace("{{claim}}", quote))
+        self.assertEqual(prompts, {"README.md": fill("K1", "README.md", 1, FALSE.strip()),
+                                   "tests/test_validator.py": fill("K9", "tests/test_validator.py", 1, name)})
+        self.assertEqual(ran["result"]["not_judged_categories"], {"K7": 1})
+
+    def test_the_workflow_names_no_category(self):
+        self.assertNotRegex(WORKFLOW.read_text(), r"['\"`]K\d+['\"`]")
 
     def test_a_contest_is_labelled_and_reported_by_its_printed_id(self):
         self.wrong_readme()

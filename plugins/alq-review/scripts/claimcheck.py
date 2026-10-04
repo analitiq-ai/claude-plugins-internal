@@ -15,8 +15,9 @@ from urllib.parse import urlsplit
 
 from policy import Decision
 
-CATEGORIES = tuple(f"K{i}" for i in range(1, 9))
-JUDGED = "K1"  # what the repo's own code, contracts, validator or CI does (spec FR-005)
+CATEGORIES = tuple(f"K{i}" for i in range(1, 10))
+# K1, what the repo's own code, contracts, validator or CI does (spec FR-005); K9, what a test checks (#57).
+JUDGED = ("K1", "K9")
 VERDICTS = ("CORRECT", "WRONG", "UNSURE")
 KINDS = ("CODE", "PROSE", "MIXED")
 REFUSALS_BEFORE_USER = 3
@@ -175,13 +176,13 @@ def add_read(check: dict, hunk: dict, kind: str, claims: list[dict]) -> None:
 
 
 def to_judge(check: dict) -> list[dict]:
-    return [c for c in check["claims"].values() if c["category"] == JUDGED and c["id"] not in check["verdicts"]]
+    return [c for c in check["claims"].values() if c["category"] in JUDGED and c["id"] not in check["verdicts"]]
 
 
 def not_judged(check: dict) -> dict[str, int]:
     counts: dict[str, int] = {}
     for claim in check["claims"].values():
-        if claim["category"] != JUDGED:
+        if claim["category"] not in JUDGED:
             counts[claim["category"]] = counts.get(claim["category"], 0) + 1
     return counts
 
@@ -391,6 +392,8 @@ def cacheable(claim: dict, verdict: dict) -> bool:
     return verdict["verdict"] == "CORRECT" and not _UNIVERSAL.search(claim["quote"])
 
 
-def still_correct(entry: dict, blob_of: Callable[[str], "str | None"]) -> bool:
-    """A cached CORRECT stands while every file it cited has the same blob in the checked tree."""
-    return bool(entry["evidence_blobs"]) and all(blob_of(p) == b for p, b in entry["evidence_blobs"].items())
+def still_correct(entry: dict, claim: dict, blob_of: Callable[[str], "str | None"]) -> bool:
+    """A cached CORRECT stands while the claim keeps the category it was judged under, since each judged category is
+    judged against different evidence, and every file it cited has the same blob in the checked tree."""
+    return (entry.get("category") == claim["category"] and bool(entry["evidence_blobs"])
+            and all(blob_of(p) == b for p, b in entry["evidence_blobs"].items()))

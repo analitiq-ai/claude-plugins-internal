@@ -175,7 +175,8 @@ def brief(state: dict, rnd: dict) -> dict:
 CLAIM_READER, CLAIM_JUDGE, CLAIM_CONTEST_JUDGE = ("alq-review:claim-reader", "alq-review:claim-judge",
                                                   "alq-review:claim-contest-judge")
 READ_BATCH = 16  # hunks per reader, in the order git lists them; a larger commit gets more readers
-# The categories of the plugins-random-commits study (specs/005-claim-check-gate); only K1 is judged.
+# The categories of the plugins-random-commits study (specs/005-claim-check-gate), and K9 (#57); the judged ones
+# are `claimcheck.JUDGED`, each with its own judge prompt in `_JUDGE_PROMPTS`.
 CATEGORY_MEANINGS = {
     "K1": "what our own code, contracts, validator or CI does",
     "K2": "how a vendor tool, cloud platform, language or standard behaves",
@@ -185,6 +186,8 @@ CATEGORY_MEANINGS = {
     "K6": "a command or code block and what it does",
     "K7": "a citation of a file, field, symbol, rule or requirement",
     "K8": "planned behaviour, meaning what a proposal or design says the system will do once it's built",
+    "K9": "what a test checks: a test's name, description or failure message (a comment in a test about the code "
+          "it tests is K1)",
 }
 # The judge prompt the study's 30-claim replay ran (spec SC-001), unchanged below its first paragraph, which names
 # the staged checkout instead of a commit. {{file}}, {{line}} and {{claim}} are filled in per claim by the workflow.
@@ -223,8 +226,59 @@ Work in this order:
 
 For each assertion, give the file and line that settle it, and for WRONG,
 the failing case."""
+# A test is often written before the code it drives, so what it says it checks is judged against the test alone.
+_TEST_JUDGE_TAIL = """
+Judge the claim against its own test only: its assertions and inputs,
+and the fixtures and helpers the test body calls. The code under test is
+not evidence either way. A test is often written before that code
+exists, so code that is missing or behaves differently does not make
+the claim wrong.
+
+Readers rely on the claim to know what the test proves, so a test that
+checks less than its name or message says makes the claim wrong. Your
+job is to try to break the claim, and to call it correct only if you
+can't.
+
+Work in this order:
+
+1. Find the test the claim belongs to: the test function, case or
+   assertion whose name, description or failure message it is.
+
+2. Split the claim into every separate assertion it makes about what
+   the test checks. Include the implied ones: a named value, error or
+   outcome, and words like "every", "only", "not" or "rejects".
+
+3. For each assertion, find the input the test passes and the assertion
+   that checks it. An outcome the test never asserts, an input it never
+   passes, or an assertion weaker than the claim (checking that a call
+   fails, where the claim names the error) is a failing case.
+
+4. Give your verdict last, after the evidence:
+   - CORRECT: the test's own inputs and assertions check every
+     assertion of the claim.
+   - WRONG: at least one assertion is not checked by the test, or is
+     checked more weakly than the claim says.
+   - UNSURE: you could not find the test the claim belongs to.
+
+For each assertion, give the file and line of the test that settle it,
+and for WRONG, the failing case."""
 _EVIDENCE_RULE = ("\n\nRead and search only, never modify files. Evidence is a path:line of a file the commit will "
                   "record, relative to the checkout root; an untracked or ignored file is not evidence.")
+
+
+_READER_TASK = ("For each hunk, read its file around the hunk, then:\n"
+                "1. Label it CODE (only code), PROSE (only text for people: docs, comments, docstrings, messages) or "
+                "MIXED (code with comments, docstrings, or a test's name or failure message in it), judging by its "
+                "content, not the file's extension.\n"
+                "2. List the claims its text makes: every statement a reader could rely on and that could be false. A "
+                "removed line counts through the sentence it leaves behind. Quote each claim verbatim from the staged "
+                "file, give the line it starts on, and give it the one category that fits best:\n"
+                + "\n".join(f"- {k}: {meaning}" for k, meaning in CATEGORY_MEANINGS.items()) + "\n"
+                "Code itself states no claim; its comments and docstrings do, and so do a test's name and failure "
+                "messages. A hunk with no claim has an empty list.\n\n"
+                "Read only, never modify files. Answer through StructuredOutput.")
+# A stored read stands only for the task and labels it answered: a changed task, kind or category re-reads the hunk.
+READER_BRIEF = hashlib.sha256(json.dumps([_READER_TASK, claimcheck.KINDS, claimcheck.CATEGORIES]).encode()).hexdigest()[:16]
 
 
 def _reader_prompt(check: dict, hunks: list[dict]) -> str:
@@ -232,19 +286,9 @@ def _reader_prompt(check: dict, hunks: list[dict]) -> str:
         f"{h['id']}: {h['file']}, staged lines {h['new_start']}-{h['new_start'] + max(h['new_count'], 1) - 1}\n"
         + "".join(f"- {line}\n" for line in h["removed"]) + "".join(f"+ {line}\n" for line in h["added"])
         for h in hunks)
-    kinds = "\n".join(f"- {k}: {meaning}" for k, meaning in CATEGORY_MEANINGS.items())
     return (f"These are hunks of a change staged for commit in the checkout at {check['root']} ({check['repo']}). "
             "The files there are as they will be committed.\n\n"
-            f"{shown}\n\n"
-            "For each hunk, read its file around the hunk, then:\n"
-            "1. Label it CODE (only code), PROSE (only text for people: docs, comments, docstrings, messages) or MIXED "
-            "(code with comments or docstrings in it), judging by its content, not the file's extension.\n"
-            "2. List the claims its text makes: every statement a reader could rely on and that could be false. A "
-            "removed line counts through the sentence it leaves behind. Quote each claim verbatim from the staged file, "
-            "give the line it starts on, and give it the one category that fits best:\n"
-            f"{kinds}\n"
-            "Code itself states no claim; its comments and docstrings do. A hunk with no claim has an empty list.\n\n"
-            "Read only, never modify files. Answer through StructuredOutput.")
+            f"{shown}\n\n" + _READER_TASK)
 
 
 def _reader_schema(check: dict, batch: int, hunks: list[dict]) -> dict:
@@ -280,9 +324,20 @@ def _judge_prompt(check: dict) -> str:
             "line {{line}}.\n\nClaim: {{claim}}\n" + _JUDGE_TAIL + _EVIDENCE_RULE)
 
 
+def _test_judge_prompt(check: dict) -> str:
+    return ("You are checking what a test says it checks, in the codebase checked\n"
+            f"out at {check['root']} ({check['repo']}), as staged for its next commit.\n"
+            "That checkout is the source of truth. The claim is a test's name,\n"
+            "description or failure message, from `{{file}}` line {{line}}.\n\nClaim: {{claim}}\n"
+            + _TEST_JUDGE_TAIL + _EVIDENCE_RULE)
+
+
+_JUDGE_PROMPTS = {"K1": _judge_prompt, "K9": _test_judge_prompt}
+
+
 def _contest_prompt(check: dict, claim: dict, contest: dict) -> str:
     ruled = check["verdicts"][claim["id"]]
-    return (_judge_prompt(check).replace("{{file}}", claim["file"]).replace("{{line}}", str(claim["line"]))
+    return (_JUDGE_PROMPTS[claim["category"]](check).replace("{{file}}", claim["file"]).replace("{{line}}", str(claim["line"]))
             .replace("{{claim}}", claim["quote"])
             + f"\n\nAn earlier checker ruled this claim WRONG. Its failing case: {ruled['failing_case']}. Its basis: "
             f"{ruled['basis']}\nThe author contests that ruling with this evidence: {contest['evidence']}\n"
@@ -291,8 +346,8 @@ def _contest_prompt(check: dict, claim: dict, contest: dict) -> str:
 
 
 def claim_check_args(check: dict, *, to_read: list[dict], contests: list[dict], warn_over: int) -> dict:
-    """What the claim-check workflow runs: readers for the hunks no earlier check read, a judge for each K1 claim
-    with no verdict, and a fresh judge per contest."""
+    """What the claim-check workflow runs: readers for the hunks no earlier check read, a judge for each claim of a
+    judged category with no verdict, briefed by its category, and a fresh judge per contest."""
     batches = [to_read[i:i + READ_BATCH] for i in range(0, len(to_read), READ_BATCH)]
     check["batches"] = [[h["id"] for h in batch] for batch in batches]
     by_id = {c["id"]: c for c in check["claims"].values()}
@@ -300,8 +355,10 @@ def claim_check_args(check: dict, *, to_read: list[dict], contests: list[dict], 
             "reader_type": CLAIM_READER, "judge_type": CLAIM_JUDGE, "contest_type": CLAIM_CONTEST_JUDGE,
             "readers": [{"batch": i, "hunks": batch, "prompt": _reader_prompt(check, batch),
                          "schema": _reader_schema(check, i, batch)} for i, batch in enumerate(batches)],
-            "judge": {"prompt": _judge_prompt(check), "schema": verdict_schema(check)},
-            "claims": [{"file": c["file"], "line": c["line"], "quote": c["quote"]} for c in claimcheck.to_judge(check)],
+            "judges": {category: {"prompt": _JUDGE_PROMPTS[category](check), "schema": verdict_schema(check)}
+                       for category in claimcheck.JUDGED},
+            "claims": [{"file": c["file"], "line": c["line"], "quote": c["quote"], "category": c["category"]}
+                       for c in claimcheck.to_judge(check)],
             "contests": [{"claim_id": claimcheck.claim_ref(c["claim"]), "prompt": _contest_prompt(check, by_id[c["claim"]], c),
                           "schema": verdict_schema(check, by_id[c["claim"]]["file"], by_id[c["claim"]]["quote"])}
                          for c in contests],

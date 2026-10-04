@@ -1,6 +1,6 @@
 export const meta = {
   name: 'claim-check',
-  description: "Check the claims of a staged change before it is committed: read every hunk, then judge each claim about this repo's own behaviour against its code",
+  description: "Check the claims of a staged change before it is committed: read its hunks, then judge each claim of a judged category, what this repo's code does against that code and what a test checks against that test",
   whenToUse: "Before `git commit`, when the alq-review gate asks for it. Pass args.worktree = absolute path of the checkout. To contest a WRONG verdict, also pass args.contests = [{claim: 'claim-<id>', evidence: '<path:line or https:// URL>'}].",
   phases: [{ title: 'Read' }, { title: 'Judge' }, { title: 'Contest' }],
 }
@@ -11,9 +11,10 @@ if (!args || !args.check_ref) {
   return { status: 'REFUSED', reason: 'The alq-review gate hook did not supply this check. Is the plugin enabled?' }
 }
 
-const fill = c => args.judge.prompt.split('{{file}}').join(c.file).split('{{line}}').join(String(c.line)).split('{{claim}}').join(c.quote)
+// The gate sends a judge prompt per judged category; a reader claim of any other category is only counted.
+const fill = c => args.judges[c.category].prompt.split('{{file}}').join(c.file).split('{{line}}').join(String(c.line)).split('{{claim}}').join(c.quote)
 // Each judge may answer only for its own claim.
-const pinned = c => ({ ...args.judge.schema, properties: { ...args.judge.schema.properties, file: { enum: [c.file] }, quote: { enum: [c.quote] } } })
+const pinned = c => { const schema = args.judges[c.category].schema; return { ...schema, properties: { ...schema.properties, file: { enum: [c.file] }, quote: { enum: [c.quote] } } } }
 const judge = c => agent(fill(c), { label: `${c.file}:${c.line}`, phase: 'Judge', schema: pinned(c), agentType: args.judge_type })
   .then(verdict => ({ claim: c, verdict }))
 
@@ -36,8 +37,8 @@ const fromReaders = await pipeline(args.readers,
     const claims = []
     for (const hunk of read.hunks) {
       for (const c of hunk.claims) {
-        if (c.category !== 'K1') { notJudged[c.category] = (notJudged[c.category] || 0) + 1; continue }
-        const claim = { file: files[hunk.id], line: c.line, quote: c.quote }
+        if (!args.judges[c.category]) { notJudged[c.category] = (notJudged[c.category] || 0) + 1; continue }
+        const claim = { file: files[hunk.id], line: c.line, quote: c.quote, category: c.category }
         if (fresh(claim)) claims.push(claim)
       }
     }
