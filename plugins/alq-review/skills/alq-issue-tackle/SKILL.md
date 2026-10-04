@@ -63,8 +63,9 @@ decision is the one failure this flow invites.
 
 ## Step 4 - review against the spec
 
-Run the internal PR review. Give every reviewer subagent the contents of `specs/<n>.md` and
-tell it to check the diff against the Acceptance section - not just for general defects. A
+Run the internal PR review. You do not hand reviewers the spec: for an internal round, the
+alq-review gate reads the spec comment from the issue the branch is named for and puts it in full
+into each reviewer's prompt, asking for each unmet Acceptance criterion as a finding. A
 diff that is clean on its own terms and does not satisfy the spec is a failure.
 
 Then invoke the `alq-root-cause-check` skill. A symptom patch is clean code by every other measure,

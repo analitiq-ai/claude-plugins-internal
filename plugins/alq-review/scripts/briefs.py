@@ -48,6 +48,13 @@ def issue_number(branch: str) -> int | None:
     return int(found.group(1)) if found else None
 
 
+def branch_spec(slug: str, branch: str) -> str | None:
+    """The spec on the issue `branch` is named for; None when it names no issue or the issue has no spec.
+    RuntimeError as github.issue_spec raises it."""
+    issue = issue_number(branch)
+    return github.issue_spec(slug, issue) if issue else None
+
+
 def _ruled_on(state: dict) -> str:
     rulings = ledger.adjudicated(state)
     if not rulings:
@@ -57,7 +64,17 @@ def _ruled_on(state: dict) -> str:
             "wrong or a FIX was not actually made:\n" + "\n".join(lines))
 
 
-def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str) -> str:
+def _graded_against(spec: str | None) -> str:
+    if spec is None:
+        return ""
+    # Inline, not a fetch command: it assumes nothing about which tools the reviewer agents have.
+    return ("\n\nThis change implements the spec posted on its issue, quoted in full between the lines below. Each "
+            "Acceptance criterion the change does not meet is a finding: quote the criterion in its title. The spec's "
+            "Out of scope bounds what you may ask for.\n----- spec -----\n" + spec + "\n----- end of spec -----")
+
+
+def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
+                   spec: str | None) -> str:
     if decision.scope == "delta":
         scope = (f"In {where.root}, run: git diff {decision.delta_from}..HEAD\n"
                  "That is what changed since the previous review round. The rest of the branch was reviewed then: "
@@ -67,7 +84,7 @@ def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decis
     return (f"Review branch {where.branch} of {where.slug}.\n{scope}\n\n"
             "Report only what must change before this merges: a defect, a broken contract, a violated project rule. "
             "No style preferences, no praise, no summary. An empty findings list is a normal and expected answer."
-            f"{_ruled_on(state)}\n\n"
+            f"{_graded_against(spec)}{_ruled_on(state)}\n\n"
             f"Answer through StructuredOutput, numbering findings {short(agent_type)}-1, {short(agent_type)}-2, ...")
 
 
@@ -102,12 +119,13 @@ def _assess_args(rnd: dict, churned_files: bool) -> dict:
                 rnd["ref"], policy.admissible_verdicts(rnd, churned=churned_files))}
 
 
-def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision) -> dict:
+def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: str | None) -> dict:
+    """`spec` is the branch's issue spec, which internal reviewers grade the change against; audits ignore it."""
     waves = AUDIT_WAVES if rnd["stage"] == "audit" else [INTERNAL_REVIEWERS]
 
     def reviewer(agent_type: str) -> dict:
         prompt = (_audit_prompt(where, rnd["base_sha"], agent_type) if rnd["stage"] == "audit"
-                  else _review_prompt(state, where, decision, rnd["base_sha"], agent_type))
+                  else _review_prompt(state, where, decision, rnd["base_sha"], agent_type, spec))
         entry = {"type": agent_type, "short": short(agent_type), "prompt": prompt,
                  "schema": assessment.findings_schema(rnd["ref"], short(agent_type))}
         if agent_type in NEEDS:
@@ -131,9 +149,7 @@ def brief_token(rnd: dict) -> str:
 
 
 def brief(state: dict, rnd: dict) -> dict:
-    issue = issue_number(state["branch"])
-    spec = (f"gh api repos/{state['repo']}/issues/{issue}/comments --paginate "
-            f"--jq '.[] | select(.body | contains(\"{github.SPEC_MARKER}\")) | .body'") if issue else None
+    spec = branch_spec(state["repo"], state["branch"])
     base = rnd["base_sha"]
     measured = facts.round_facts(state, rnd, rnd["root"])
     return {
@@ -141,7 +157,7 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec_command": spec or "none: the branch names no issue, so spec_ref is 'n/a' throughout",
+        "spec": spec or "none: the branch names no issue, or its issue has no spec, so spec_ref is 'n/a' throughout",
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],
@@ -385,7 +401,10 @@ def main() -> None:
         rnd = ledger.find_round(state, ref)
         if rnd["status"] != "awaiting_assessment":
             sys.exit(f"{ref} is {rnd['status']}, not awaiting assessment")
-        print(json.dumps(brief(state, rnd), indent=1))
+        try:
+            print(json.dumps(brief(state, rnd), indent=1))
+        except RuntimeError as exc:
+            sys.exit(f"The brief for {ref} cannot be built: {exc}")
 
 
 if __name__ == "__main__":

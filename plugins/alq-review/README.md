@@ -48,7 +48,11 @@ that is under review.
    PR merges into (the repo's default branch while there is no PR), fetched fresh at each launch; a
    round whose base cannot be read is refused. Later rounds review only what changed since the
    previous round, and reviewers are told what has already been ruled on. Re-running a round on an
-   unchanged commit is refused.
+   unchanged commit is refused. On a branch named for an issue (`<type>/<n>-...`), every internal
+   round, delta rounds included, puts that issue's `<!-- analitiq-spec -->` comment in full into each
+   reviewer's prompt, and each Acceptance criterion the change does not meet is a finding; the
+   assessor's brief carries the same text. A launch is refused when gh cannot read the issue's
+   comments, or finds more than one spec among them. Audit reviewers are not given the spec.
 6. **A settled design before the first round.** The first internal round on a branch that changes a
    spec folder (`specs/<feature>/`) runs `scripts/settled_design.py` on each such folder: every
    mechanism under `plan.md`'s `## Mechanisms` cites a `research.md` decision with Decision, Rationale

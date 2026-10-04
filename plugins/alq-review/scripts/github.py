@@ -1,7 +1,7 @@
 """The GitHub lookups the gate needs, through the gh CLI (which carries the bot's token).
 
 Each returns None when gh cannot answer, and the caller decides what an unknown means there; except
-pr_target, whose unknown no caller may read as an answer.
+pr_target and issue_spec, which raise RuntimeError instead, since for them None is an answer (no PR, no spec).
 """
 from __future__ import annotations
 
@@ -38,6 +38,18 @@ def _gh(*args: str) -> str | None:
 def issue_state(slug: str, number: int) -> str | None:
     """`OPEN` or `CLOSED`."""
     return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
+
+
+def issue_spec(slug: str, number: int) -> str | None:
+    """The body of issue `number`'s spec comment; None when it has none. RuntimeError when gh cannot read its
+    comments, or when more than one is a spec: alq-shape posts exactly one, so either could be the wrong one."""
+    comments = [json.loads(line) for line in _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments",
+                                                     "--jq", ".[] | {id, body}").splitlines()]
+    specs = [c for c in comments if SPEC_MARKER in c["body"]]
+    if len(specs) > 1:
+        raise RuntimeError(f"{slug}#{number} has {len(specs)} spec comments ({', '.join(str(c['id']) for c in specs)}), "
+                           "and only one is the spec")
+    return specs[0]["body"] if specs else None
 
 
 def repo_visibility(slug: str) -> str | None:

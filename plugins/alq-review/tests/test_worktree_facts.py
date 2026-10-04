@@ -257,7 +257,8 @@ class RoundFacts(Repo):
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], git(self.root, "rev-parse", "HEAD"))
         rnd["root"] = str(self.root)
         self.assertEqual(rnd["base_sha"], moved)
-        self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
+        with mock.patch("github.issue_spec", return_value=None):  # no network: the issue has no spec
+            self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
 
     def test_first_round_never_carries_a_burden(self):
         state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
@@ -309,7 +310,7 @@ class RoundFacts(Repo):
         nxt["root"] = str(self.root)
 
         where = worktree.locate(str(self.root / "b.py"))
-        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"))
+        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"), None)
                       ["assess"]["schema"]["properties"])
 
     def test_the_churned_round_cannot_be_handed_a_verdict_that_edits_again(self):

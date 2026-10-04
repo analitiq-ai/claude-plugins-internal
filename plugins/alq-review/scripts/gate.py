@@ -417,12 +417,22 @@ def on_workflow(payload: dict) -> dict | None:
                     refused = refuse_spec(payload, action, unsettled, event)
                     if refused:
                         return refused
+            spec = None
+            if stage == "internal":
+                try:
+                    spec = briefs.branch_spec(where.slug, where.branch)
+                except RuntimeError as exc:
+                    refused = refuse(payload, action, f"The spec of this branch's issue could not be settled: {exc}. "
+                                     "Next step: check `gh auth status`, or leave exactly one spec comment on the "
+                                     "issue, then launch again.", event)
+                    if refused:
+                        return refused
             waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
                                     expected=[t for wave in waves for t in wave], escalation=decision.escalation, now=now)
             rnd.update(root=where.root, session=payload["session_id"])
-            injected = briefs.review_args(state, rnd, where, decision)
+            injected = briefs.review_args(state, rnd, where, decision, spec)
     record(payload, "launch", "allow", rnd["ref"], event)
     # "allow" doubles as the permission a headless run needs to start a workflow at all.
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
