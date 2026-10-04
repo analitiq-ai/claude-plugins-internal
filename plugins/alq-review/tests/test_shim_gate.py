@@ -296,6 +296,45 @@ class ShimLaunch(ShimGate):
 
 
 
+class ShimTestsOnly(ShimGate):
+    """A tree that changes only test files is not a fix to sweep, whatever Jev would answer (#60)."""
+    RED = "def test_b3_is_checked():\n    assert False\n"
+
+    def test_a_tests_only_tree_commits_with_no_question(self):
+        for name in ("tests/test_b.py", "src/test_b.py"):
+            with self.subTest(name=name):
+                git(self.root, "reset", "-q")
+                self.labelled({name: (self.RED, "CODE")})
+                out = self.git_commit()
+                self.assertNotEqual(self.decision(out), "deny", self.reason(out))
+                self.assertEqual(Jev.seen, [])
+
+    def test_a_tests_only_launch_is_complete_with_no_question_and_no_sweep(self):
+        tree = self.labelled({"tests/test_b.py": (self.RED, "CODE")})
+        out, args = self.shim_launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual((args["mode"], args["sweepers"]), ("none", []))
+        with self.shims() as shims:
+            check = shims.check(tree)
+        self.assertEqual((check["mode"], check["verdict"], check["status"]), ("none", "complete", "complete"))
+        self.assertEqual(Jev.seen, [])
+
+    def test_a_tests_only_tree_reaching_a_held_bug_commits(self):
+        self.chain(state="held", count=4, ranges=[{"file": "tests/test_b.py", "old_start": 0, "old_count": 1}])
+        self.labelled({"tests/test_b.py": (self.RED, "CODE")})
+        out = self.git_commit()
+        self.assertNotEqual(self.decision(out), "deny", self.reason(out))
+
+    def test_a_fix_with_its_tests_is_swept_with_the_tests(self):
+        tree = self.labelled({"b.py": (FIXED, "CODE"), "tests/test_b.py": (self.RED, "CODE")})
+        out, args = self.shim_launch()
+        self.assertEqual((self.decision(out), args["mode"]), ("allow", "sweep"))
+        [asked] = Jev.seen
+        self.assertIn("tests/test_b.py", asked["state"])
+        with self.shims() as shims:
+            self.assertEqual(sorted(h["file"] for h in shims.check(tree)["hunks"]), ["b.py", "tests/test_b.py"])
+
+
 class Staged(ShimGate):
     """A fix staged in b.py, with c.py in HEAD for a sweeper to list."""
 

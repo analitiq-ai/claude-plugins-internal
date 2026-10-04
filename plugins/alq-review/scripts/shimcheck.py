@@ -15,6 +15,11 @@ DEEP_AT, HOLD_AT = 3, 4
 SWEPT = ("CODE", "MIXED")
 CALL = "Workflow(name='alq-review:shim-check', args={worktree: '%s'})"
 _CHECK_REF = re.compile(r"shim-(?P<repo>[\w.-]+/[\w.-]+)-(?P<tree>[0-9a-f]{12})")
+# The file name patterns are taken from the runners' default discovery (pytest, go test, Jest, terraform test).
+# Counting every file under a `tests`, `test` or `__tests__` folder is our addition, so that fixtures and helpers
+# kept there count as test files too; Jest's own `__tests__` default matches only JS/TS files.
+_TEST_DIRS = {"tests", "test", "__tests__"}
+_TEST_NAME = re.compile(r"test_.*\.py|.*_test\.(?:py|go)|.*\.(?:test|spec)\.(?:js|jsx|ts|tsx|mjs|cjs)|.*\.tftest\.hcl")
 
 
 def check_ref(repo: str, tree: str) -> str:
@@ -143,8 +148,15 @@ def override_id(chain: dict | None, tree: str) -> str:
     return chain["id"] if chain else tree[:12]
 
 
+def is_test_file(path: str) -> bool:
+    *folders, name = path.split("/")
+    return bool(_TEST_DIRS.intersection(folders)) or _TEST_NAME.fullmatch(name) is not None
+
+
 def swept(hunks: list[dict], labels: dict[str, str]) -> list[dict]:
-    return [h for h in hunks if labels.get(h["id"]) in SWEPT]
+    """The code hunks a fix is swept for; a tree whose code is all in test files fixes nothing yet, so it has none."""
+    code = [h for h in hunks if labels.get(h["id"]) in SWEPT]
+    return [] if all(is_test_file(h["file"]) for h in code) else code
 
 
 def matching_chains(chains: list[dict], hunks: list[dict]) -> list[dict]:

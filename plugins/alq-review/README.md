@@ -84,6 +84,7 @@ that is under review.
    with the same defect; anything short of a fix at the cause that reaches them all is a `patch`, and its commit is
    refused. Only the user overrides a bug, by typing the `override shim-<id>` that each refusal names. The full
    rules are in `specs/006-shim-check-gate/`.
+   A commit whose code is all in test files skips this check (`specs/012-tests-only-tree/`).
 
 ## How an agent uses it
 

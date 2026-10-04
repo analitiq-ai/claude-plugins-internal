@@ -86,6 +86,38 @@ class OverrideId(unittest.TestCase):
         self.assertEqual(shimcheck.override_id(None, "0123456789abcdef" * 2 + "01234567"), "0123456789ab")
 
 
+class IsTestFile(unittest.TestCase):
+    def test_each_test_file_name_pattern_is_a_test_file(self):
+        for path in ("test_load.py", "src/test_load.py", "src/load_test.py", "cmd/load_test.go", "web/App.test.tsx",
+                     "web/app.spec.js", "lib/util.test.mjs", "lib/util.spec.cjs", "web/a.test.ts", "web/a.spec.jsx",
+                     "modules/vpc/main.tftest.hcl"):
+            with self.subTest(path=path):
+                self.assertTrue(shimcheck.is_test_file(path))
+
+    def test_any_file_under_a_tests_test_or___tests___folder_is_a_test_file(self):
+        for path in ("tests/fixtures/repo.json", "pkg/test/helpers.go", "web/__tests__/App.jsx",
+                     "web/__tests__/data.json"):
+            with self.subTest(path=path):
+                self.assertTrue(shimcheck.is_test_file(path))
+
+    def test_a_near_miss_is_not_a_test_file(self):
+        for path in ("specs/006/spec.md", "src/contest.py", "latest.py", "src/testing.py", "attest/main.py",
+                     "src/test_load.go", "web/a.test.md", "load_test.pyc"):
+            with self.subTest(path=path):
+                self.assertFalse(shimcheck.is_test_file(path))
+
+
+class Swept(unittest.TestCase):
+    def test_a_tree_whose_code_is_all_in_test_files_has_nothing_to_sweep(self):
+        hunks = [dict(hunk("tests/test_load.py"), id="h1"), dict(hunk("src/test_save.py"), id="h2"),
+                 dict(hunk("README.md"), id="h3")]
+        self.assertEqual(shimcheck.swept(hunks, {"h1": "CODE", "h2": "MIXED", "h3": "PROSE"}), [])
+
+    def test_a_tree_with_code_outside_test_files_sweeps_its_test_hunks_too(self):
+        hunks = [dict(hunk("tests/test_load.py"), id="h1"), dict(hunk(), id="h2"), dict(hunk("README.md"), id="h3")]
+        self.assertEqual(shimcheck.swept(hunks, {"h1": "CODE", "h2": "CODE", "h3": "PROSE"}), hunks[:2])
+
+
 class CommitDecision(unittest.TestCase):
     def test_a_held_bug_refuses_though_another_bug_the_tree_reaches_is_overridden(self):
         held = shimcheck.new_chain("acme/demo", "main", "a" * 40, "b" * 40, [hunk()], state="held")
