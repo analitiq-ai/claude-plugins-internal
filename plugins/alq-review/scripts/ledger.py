@@ -352,11 +352,15 @@ def counted(state: dict, stage: str) -> list[dict]:
             if r["stage"] == stage and r["epoch"] == state["epoch"] and r["status"] in COUNTED]
 
 
+def named_round(state: dict, ref: str) -> dict | None:
+    return next((rnd for rnd in state["rounds"] if rnd["ref"] == ref), None)
+
+
 def find_round(state: dict, ref: str) -> dict:
-    for rnd in state["rounds"]:
-        if rnd["ref"] == ref:
-            return rnd
-    raise LedgerError(f"no round {ref}")
+    rnd = named_round(state, ref)
+    if rnd is None:
+        raise LedgerError(f"no round {ref}")
+    return rnd
 
 
 def _append_round(state: dict, stage: str, now: datetime, **fields) -> dict:
