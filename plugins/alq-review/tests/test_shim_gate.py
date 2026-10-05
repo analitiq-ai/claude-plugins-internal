@@ -716,6 +716,26 @@ class ShimChain(ShimGate):
         with self.shims() as shims:
             self.assertEqual(shims.chain("c" * 16)["count"], 1)
 
+    def test_a_first_patch_records_the_chain_it_opens(self):
+        tree = self.checked(lines_changed(4))
+        [chain] = self.chains()
+        with self.shims() as shims:
+            self.assertEqual(shims.check(tree)["chain"], chain["id"])
+        out, args = self.shim_launch(contests=[{"site": shimcheck.site_id(SITE["file"], SITE["function"]),
+                                                "reason": "c.py reads another file"}])
+        self.assertEqual((self.decision(out), args["mode"]), ("allow", "contest"))
+
+    def test_a_first_patch_overridden_while_it_sweeps_is_stored_with_no_chain(self):
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        tree = self.labelled({"b.py": (lines_changed(4), "CODE")})
+        _, args = self.shim_launch()
+        self.hook("UserPromptSubmit", prompt=f"override shim-{tree[:12]}")
+        self.sweep(args, [SITE])
+        with self.shims() as shims:
+            check = shims.check(tree)
+        self.assertEqual((check["status"], check["verdict"], check["chain"]), ("complete", "patch", None))
+        self.assertEqual([c["state"] for c in self.chains()], ["overridden"])
+
     def test_a_tree_checked_twice_counts_once(self):
         tree = self.checked(lines_changed(4))
         with self.shims() as shims:
@@ -765,6 +785,21 @@ class ShimDeep(ShimChain):
         self.assertIn("b.py:10 save", reason)
         self.assertIn("c.py:2 load", reason)
         self.assertEqual(self.snapshots(), [])
+
+    def test_a_deep_patch_of_a_new_tree_is_contested_without_counting(self):
+        self.refused_three_times()
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.labelled({"b.py": (lines_changed(4, mark="deep"), "CODE")})
+        _, args = self.shim_launch()
+        for i in range(3):
+            self.sweep(args, [SITE, self.OTHER], agent_id=f"d{i}")
+        [before] = self.chains()
+        out, args = self.shim_launch(contests=[{"site": shimcheck.site_id("b.py", "save"),
+                                                "reason": "save writes another file"}])
+        self.assertEqual(self.decision(out), "allow", self.reason(out))
+        self.assertEqual(args["mode"], "contest")
+        [after] = self.chains()
+        self.assertEqual((after["count"], after["members"]), (before["count"], before["members"]))
 
     def test_later_checks_of_the_bug_are_judged_against_the_target_with_no_sweep(self):
         self.deep()

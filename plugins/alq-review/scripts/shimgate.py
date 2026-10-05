@@ -236,13 +236,13 @@ def _drop_closed_deferrals(payload: dict, repo: str, chains: list[dict], logged)
 
 def _contest(payload: dict, call: dict, check: dict | None, chains: list[dict], contests, logged) -> dict | None:
     """Accept a contest of listed sites and run one judge per site; the tree is judged again once all are ruled."""
-    chain = next((c for c in chains if check and check["tree"] in c["members"]), None)
+    chain = next((c for c in chains if check and c["id"] == check["chain"]), None)
     with ledger.open_shims(logged.repo) as shims:
         ruled = set(shims.rulings(chain["id"])) if chain else set()
     errors = shimcheck.contest_errors(contests, check, chain, ruled)
     if errors:
         return refuse_shim(payload, "shim-launch", "The contest was refused:\n- " + "\n- ".join(errors), logged)
-    check.update(chain=chain["id"], contests={c["site"]: c["reason"] for c in contests}, status="ruling",
+    check.update(contests={c["site"]: c["reason"] for c in contests}, status="ruling",
                  started=time.time())
     with ledger.open_shims(check["repo"]) as shims:
         shims.save_check(check)
@@ -348,14 +348,19 @@ def _save(payload: dict, check: dict) -> None:
     to one of them as the misses of the earlier checks (R12)."""
     found = []
     with ledger.open_shims(check["repo"]) as shims:
-        shims.save_check(check)
         if check["status"] == "complete":
             before = {c["id"]: c for c in shims.chains_at(check["branch"], check["head"])}
-            for chain in shimcheck.settled_chains(list(before.values()), check):
+            settled = shimcheck.settled_chains(list(before.values()), check)
+            # A first refusal opens its chain only now; the chain a check is contested on is the one it names. A bug
+            # the user overrode while it was swept settles no chain.
+            if check["verdict"] == "patch" and check["chain"] is None and settled:
+                check["chain"] = settled[0]["id"]
+            for chain in settled:
                 # A refusal's list, or the deep sweep's whatever its verdict (FR-018).
                 if chain["id"] in before and (check["verdict"] == "patch" or check["mode"] == "deep"):
                     found += [(chain["id"], sid, tree) for sid, tree in shimcheck.misses(before[chain["id"]], check)]
                 shims.save_chain(chain)
+        shims.save_check(check)
     for chain_id, sid, tree in found:
         record(payload, "shim-miss", sid, f"chain {chain_id}: left out by {shimcheck.check_ref(check['repo'], tree)}",
                _logged(check["repo"], check["root"]))
