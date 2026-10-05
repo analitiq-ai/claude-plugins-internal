@@ -17,7 +17,7 @@ threads or approvals and this gate is the only one there is -- it still checks
 only the internal review. Messages here therefore never claim the server is
 covering the rest.
 
-The attestation is a PR comment carrying MARKER and naming the commit it
+The attestation is a PR comment carrying shell.ATTESTATION_MARKER and naming the commit it
 reviewed, the same shape codex-gate.yml demands of Codex. Binding it to a SHA is
 what makes it evidence instead of a checkbox: a push moves the head and the
 attestation for the old head stops counting, so "internally reviewed" can never
@@ -54,8 +54,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-MARKER = "<!-- analitiq-internal-review -->"
 
 # The commit the attestation covers. Bold markers optional because GitHub
 # surfaces render the same body differently; backticks optional for the same
@@ -246,9 +244,11 @@ def spend_override(session: str, number: int) -> bool:
 
 def attested(comments: list[dict], head: str) -> bool:
     """Does any attestation comment name the commit that is currently the head?"""
+    # Imported here for the reason released() imports github here.
+    from shell import ATTESTATION_MARKER
     for comment in comments:
         body = comment.get("body") or ""
-        if MARKER not in body:
+        if ATTESTATION_MARKER not in body:
             continue
         found = REVIEWED_COMMIT.search(body)
         if found and head.startswith(found.group(1).lower()):
@@ -260,20 +260,20 @@ def released(pr: dict, head: str) -> bool:
     """Did pr-gate pass the head as a version-only release? An unreadable answer is no."""
     # Imported here, under main()'s refuse-on-error guard: a reader that fails to load must close the gate, not crash
     # the hook, which Claude Code treats as a non-blocking error.
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plugins" / "alq-review" / "scripts"))
     import github
     repo = PR_URL.match(pr.get("url") or "")
     return repo is not None and github.released(repo.group(1), head) is not None
 
 
 def how_to_attest(number: int, head: str, verb: str) -> str:
+    from shell import ATTESTATION_MARKER
     return (
         f"No internal-review attestation for {head[:10]} on PR #{number}, so `gh pr {verb}` "
         "is blocked. This gate checks one thing: that the internal pr-review-toolkit pass "
         "ran clean on the commit being merged. It is recorded on the PR because no GitHub "
         "check can observe it.\n\n"
         "Run the internal review. When it comes back clean on this exact commit, post:\n\n"
-        f"  gh pr comment {number} --body '{MARKER}\n"
+        f"  gh pr comment {number} --body '{ATTESTATION_MARKER}\n"
         "  Internal review clean.\n"
         f"  Reviewed commit: `{head}`'\n\n"
         "An attestation naming an older commit does not count: every push voids it, "

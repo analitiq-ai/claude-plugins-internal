@@ -1,0 +1,12 @@
+{
+  "name": "alq-internal",
+  "owner": {
+    "name": "Analitiq"
+  },
+  "plugins": [
+    {
+      "name": "alq-review",
+      "source": "./plugins/alq-review"
+    }
+  ]
+}

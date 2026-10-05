@@ -108,7 +108,7 @@ class Mutation(unittest.TestCase):
         state = state_with_round()
         assess(state, "RESHAPE_SPEC")
         reason = mutation(state).reason
-        self.assertIn("`/design-doc rescope #7`", reason)
+        self.assertIn("`/alq-review:design-doc rescope #7`", reason)
         self.assertIn("`unlock #7`", reason)
 
     def test_an_escalate_lock_offers_no_rescope(self):

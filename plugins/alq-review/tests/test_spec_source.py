@@ -1,4 +1,4 @@
-"""Skills name no `specs/<n>.md` copy of the spec, fetch its body with one command, and page through comments (#61).
+"""Skills name no `specs/<n>.md` copy of the spec, fetch its body with one command, and page through comments (engineering#61).
 
 A copy written into a worktree is one `git add .` from being committed beside the comment it was taken
 from, in this repo and in every repo that links these skills.
@@ -11,9 +11,8 @@ import helpers  # noqa: F401  puts scripts/ on the path
 
 import github
 
-CLAUDE = Path(__file__).resolve().parents[3]
-SKILLS = CLAUDE / "skills"
-PLUGINS = CLAUDE / "plugins"
+PLUGIN = Path(__file__).resolve().parents[1]
+SKILLS = PLUGIN / "skills"
 LOCAL_SPEC_COPY = re.compile(r"specs/<\w+>\.md")
 
 
@@ -30,13 +29,13 @@ def spec_fetches(text: str) -> list[str]:
 
 class SpecSource(unittest.TestCase):
     def test_no_skill_or_plugin_names_a_local_spec_copy(self):
-        hits = [f"{path.relative_to(CLAUDE)}:{text.count(chr(10), 0, m.start()) + 1}"
-                for path, text in prose(SKILLS, PLUGINS).items() for m in LOCAL_SPEC_COPY.finditer(text)]
+        hits = [f"{path.relative_to(PLUGIN)}:{text.count(chr(10), 0, m.start()) + 1}"
+                for path, text in prose(PLUGIN).items() for m in LOCAL_SPEC_COPY.finditer(text)]
         self.assertEqual(hits, [])
 
     def test_skills_read_the_spec_with_one_paginated_lookup(self):
         """github.issue_spec reads every page; a skill's copy that reads only the first misses a later spec."""
-        readers = {path.relative_to(CLAUDE): found for path, text in prose(SKILLS).items()
+        readers = {path.relative_to(PLUGIN): found for path, text in prose(SKILLS).items()
                    if (found := spec_fetches(text))}
         self.assertIn(Path("skills/alq-issue-tackle/SKILL.md"), readers)
         self.assertIn(Path("skills/alq-root-cause-check/SKILL.md"), readers)
@@ -46,9 +45,9 @@ class SpecSource(unittest.TestCase):
 
     def test_every_skill_reads_an_issues_comments_across_all_pages(self):
         """A lookup of the spec or premise comment by id misses it on page two as surely as a body fetch does."""
-        unpaged = [f"{path.relative_to(CLAUDE)}: {line}" for path, text in prose(SKILLS).items()
+        unpaged = [f"{path.relative_to(PLUGIN)}: {line}" for path, text in prose(SKILLS).items()
                    for line in re.sub(r"\s*\\\n\s*", " ", text).splitlines()
-                   if re.search(r"gh api (?!-X)\S*issues/<n>/comments", line) and "--paginate" not in line]
+                   if re.search(r"gh api (?!(?:.*\s)?-X\s).*issues/<n>/comments", line) and "--paginate" not in line]
         self.assertEqual(unpaged, [])
 
 

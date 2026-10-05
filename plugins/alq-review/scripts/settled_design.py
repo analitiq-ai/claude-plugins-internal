@@ -130,8 +130,8 @@ def branch_problems(root: str, base: str, patterns: list[str]) -> list[str]:
     touched = {Path(*Path(f).parts[:2]) for f in changed if f.startswith("specs/") and len(Path(f).parts) > 2}
     folders = sorted(f for f in touched if (Path(root) / f).is_dir())
     if not folders:
-        return [f"{doc}:1: a design document changed and no spec folder did; a design-document change comes with a "
-                "spec folder. Next step: settle the design in a spec folder (/design-doc #<issue>)."
+        return [f"{doc}:1: a design document changed and no spec folder the branch keeps did; a design-document change comes with a "
+                "spec folder. Next step: settle the design in a spec folder (/alq-review:design-doc #<issue>)."
                 for doc in design_documents(changed, patterns)]
     return [p for folder in folders for p in problems(Path(root) / folder)]
 

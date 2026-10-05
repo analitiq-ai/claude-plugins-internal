@@ -25,7 +25,7 @@ inputs:
     type: string
     default: "claude"
     prompt: "Integration to use"
-  # Gate verdicts for runs driven without a terminal (the /design-doc skill passes them on resume).
+  # Gate verdicts for runs driven without a terminal (the /alq-review:design-doc skill passes them on resume).
   grill_verdict:
     type: string
     default: ""
@@ -92,7 +92,7 @@ steps:
     run: |
       set -eu
       dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-      python3 .claude/plugins/alq-review/scripts/settled_design.py "$dir"
+      python3 "$ALQ_REVIEW_ROOT/scripts/settled_design.py" "$dir"
 
   - id: mark-critiques
     type: shell

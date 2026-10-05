@@ -42,7 +42,8 @@ def issue_state(slug: str, number: int) -> str | None:
 
 def issue_spec(slug: str, number: int) -> str | None:
     """The body of issue `number`'s spec comment; None when it has none. RuntimeError when gh cannot read its
-    comments, or when more than one is a spec: alq-shape posts exactly one, so either could be the wrong one."""
+    comments, or when more than one is a spec: alq-review:alq-shape updates its spec in place rather than posting a second, so with two either
+    could be the wrong one."""
     comments = [json.loads(line) for line in _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments",
                                                      "--jq", ".[] | {id, body}").splitlines()]
     specs = [c for c in comments if SPEC_MARKER in c["body"]]

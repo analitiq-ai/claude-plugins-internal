@@ -1,6 +1,6 @@
 ---
 name: alq-shape
-description: Turn a GitHub issue into a written spec before any code is written, and store it on the issue itself. Pulls the issue with gh issue view, refuses if it is already shaped or its premise was challenged, challenges whether the issue solves a real problem and whether its proposed change reaches that problem before shaping anything, judges whether it is big enough to be worth shaping, traces a reported defect from the symptom back to its root cause before any fix is shaped, answers every question it can from code discovery and from data-integration best practice first, interviews the user only on what is genuinely undecided, lists every hand-maintained surface the design adds, then posts the spec as a marked comment on the issue. Use when the user runs /alq-shape with an issue number, asks to shape, spec, or design an issue before implementing it, or when alq-issue-tackle finds no spec for the issue it is about to work on.
+description: Turn a GitHub issue into a written spec before any code is written, and store it on the issue itself. Pulls the issue with gh issue view, refuses if it is already shaped or its premise was challenged, challenges whether the issue solves a real problem and whether its proposed change reaches that problem before shaping anything, judges whether it is big enough to be worth shaping, traces a reported defect from the symptom back to its root cause before any fix is shaped, answers every question it can from code discovery and from data-integration best practice first, interviews the user only on what is genuinely undecided, lists every hand-maintained surface the design adds, then posts the spec as a marked comment on the issue. Use when the user runs /alq-review:alq-shape with an issue number, asks to shape, spec, or design an issue before implementing it, or when alq-review:alq-issue-tackle finds no spec for the issue it is about to work on.
 ---
 
 You will be given a number that represents an issue open in GitHub. Call it `<n>`.
@@ -10,7 +10,7 @@ Shaping and implementation are separated in time - an issue can be shaped today 
 up next week - so the spec cannot live in a worktree that does not exist yet. This skill
 needs no worktree and no branch; it runs anywhere with `gh` authenticated.
 
-**The issue is the only home.** `alq-issue-tackle`, `alq-root-cause-check` and the alq-review gate,
+**The issue is the only home.** `alq-review:alq-issue-tackle`, `alq-review:alq-root-cause-check` and the alq-review gate,
 which puts it into each internal review round, fetch the spec from that comment; no copy of it is
 kept anywhere else.
 
@@ -74,7 +74,7 @@ When the premise holds, the answers become the spec's **Why this is worth doing*
 ### When the premise fails
 
 Do not shape. Post the finding as a comment carrying `<!-- analitiq-premise -->`, never the spec
-marker - the spec marker is what lets `alq-issue-tackle` start work:
+marker - the spec marker is what lets `alq-review:alq-issue-tackle` start work:
 
 ```
 <!-- analitiq-premise -->
@@ -130,7 +130,7 @@ No shape needed: <one line saying why - the outcome is determined by the request
 None.
 ```
 
-The marker still has to be posted. `alq-issue-tackle` looks for it; without it, tackle shapes
+The marker still has to be posted. `alq-review:alq-issue-tackle` looks for it; without it, tackle shapes
 the issue again.
 
 ## Step 4 - trace the reported behaviour to its cause
@@ -364,7 +364,7 @@ settled without the user seeing it.>
 ## Hand-maintained surfaces
 <"None." - or one entry per surface from Step 6: what it mirrors, what happens on drift, why it
 is not derived. A spec without this section has not been through Step 6, and
-`alq-issue-tackle` refuses it.>
+`alq-review:alq-issue-tackle` refuses it.>
 
 ## Out of scope
 <what was raised and deliberately excluded>

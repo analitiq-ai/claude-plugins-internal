@@ -1,4 +1,4 @@
-"""Drives pre-merge-gate.py the way Claude Code does: one JSON payload on stdin per hook event."""
+"""Drives pre_merge_gate.py the way Claude Code does: one JSON payload on stdin per hook event."""
 import json
 import os
 import subprocess
@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-GATE = Path(__file__).resolve().parent.parent / "pre-merge-gate.py"
+GATE = Path(__file__).resolve().parent.parent / "scripts" / "pre_merge_gate.py"
 HEAD = "0123456789abcdef0123456789abcdef01234567"
 
 
@@ -145,6 +145,27 @@ class VersionOnlyRelease(Hook):
                                                 "tool_input": {"command": "gh pr merge 12 --merge"}}))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
+
+
+class Registration(unittest.TestCase):
+    """The plugin, not the repo it is used in, wires the gate, so it holds wherever alq-review is enabled."""
+
+    def test_the_plugin_registers_the_gate_for_bash_calls_and_prompts(self):
+        hooks = json.loads((GATE.parent.parent / "hooks" / "hooks.json").read_text())["hooks"]
+        command = "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py"
+        def runs_gate(event, tool=None):
+            return any(h["command"] == command for group in hooks.get(event, [])
+                       if tool is None or tool in group.get("matcher", "").split("|") for h in group["hooks"])
+        self.assertTrue(runs_gate("PreToolUse", "Bash"))
+        self.assertTrue(runs_gate("UserPromptSubmit"))
+
+
+class Marker(unittest.TestCase):
+    def test_the_gate_takes_its_marker_from_shell_the_only_script_that_spells_it(self):
+        """test_shell pins shell.ATTESTATION_MARKER to the org pr-gate; a second literal here would drift from it."""
+        defining = [p.name for p in GATE.parent.glob("*.py") if "<!-- analitiq-internal-review -->" in p.read_text()]
+        self.assertEqual(defining, ["shell.py"])
+        self.assertIn("from shell import ATTESTATION_MARKER", GATE.read_text())
 
 
 if __name__ == "__main__":

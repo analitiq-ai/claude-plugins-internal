@@ -1,10 +1,11 @@
 ---
 name: design-doc
-description: Scope or re-scope a change in a spec folder before it is built, by running the design-doc Spec Kit workflow (specify → grill → plan → critique → tasks). Use for a GitHub issue that needs scoping (`/design-doc #<issue>`) or a PR whose review round was ruled RESHAPE_SPEC (`/design-doc rescope <ref>`).
+description: Scope or re-scope a change in a spec folder before it is built, by running the design-doc Spec Kit workflow (specify → grill → plan → critique → tasks). Use for a GitHub issue that needs scoping (`/alq-review:design-doc #<issue>`) or a PR whose review round was ruled RESHAPE_SPEC (`/alq-review:design-doc rescope <ref>`).
 argument-hint: "#<issue> | rescope <#pr | owner/repo#pr | branch>"
 ---
 
-Drive the `design-doc` Spec Kit workflow (`.specify/workflows/design-doc/workflow.yml`). The workflow owns
+Drive the `design-doc` Spec Kit workflow (this plugin's `speckit/workflows/design-doc/workflow.yml`, which each
+start installs into the checkout with the settled-design preset). The workflow owns
 the step order and the checks; this skill picks the checkout and the inputs, runs the two interactive steps
 in this session, and passes the user's verdicts on resume. Never reimplement a workflow step here.
 

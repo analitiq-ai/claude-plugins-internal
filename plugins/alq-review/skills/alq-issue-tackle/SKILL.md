@@ -20,7 +20,7 @@ gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
   --jq '.[] | select(.body | contains("<!-- analitiq-spec -->")) | .body'
 ```
 
-- Nothing came back: invoke the `alq-shape` skill with `<n>` and wait for it, then fetch again.
+- Nothing came back: invoke the `alq-review:alq-shape` skill with `<n>` and wait for it, then fetch again.
   It either posts the spec, posts a "No shape needed" marker, or challenges the issue's premise
   and posts no spec. If the second fetch still returns nothing, stop and report the premise
   challenge; the user decides whether the issue is worked at all.
@@ -32,8 +32,8 @@ after the worktree was created must win.
 
 Read it before writing any code. The Acceptance section is what this change is for.
 
-Then check that it has a **Hand-maintained surfaces** section. A spec without one predates
-`alq-shape`'s Step 6: **stop** and report that it needs a re-shape. Write no code.
+Then check that it has a **Hand-maintained surfaces** section. A spec without one has not been
+through `alq-review:alq-shape`'s Step 6: **stop** and report that it needs a re-shape. Write no code.
 
 Do not start implementing before the spec exists. Each internal review round grades the diff
 against the spec the gate reads from the issue; code written before there is one has nothing to be
@@ -68,7 +68,7 @@ alq-review gate reads the spec comment from the issue the branch is named for an
 into each reviewer's prompt, asking for each unmet Acceptance criterion as a finding. A
 diff that is clean on its own terms and does not satisfy the spec is a failure.
 
-Then invoke the `alq-root-cause-check` skill. A symptom patch is clean code by every other measure,
+Then invoke the `alq-review:alq-root-cause-check` skill. A symptom patch is clean code by every other measure,
 so it passes every reviewer not specifically asked whether the fix reached the cause - that
 skill is the one that asks. Treat a verdict of AT SYMPTOM or SPEC WRONG as blocking: the first
 means going back to Step 3, the second means re-shaping the issue before any more code.

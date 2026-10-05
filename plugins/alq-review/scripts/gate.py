@@ -37,7 +37,8 @@ INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop m
 # Anchored at the prompt's start by match(): the cron bot's prompts quote issue and PR text anyone can write.
 _REF = r"(?:(?P<repo>[\w.-]+/[\w.-]+)?#(?P<pr>\d+)|(?P<branch>\S+))"
 UNLOCK = re.compile(rf"unlock\s+{_REF}")
-RESCOPE = re.compile(rf"{re.escape(policy.RESCOPE)}\s+{_REF}")
+# Claude Code also runs the skill by its bare name, while no other command has it.
+RESCOPE = re.compile(rf"/(?:{policy.PLUGIN}:)?{policy.RESCOPE_SKILL} rescope\s+{_REF}")
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,7 @@ def _names(state: dict, typed: re.Match) -> bool:
 
 
 def _rescope_brief(state: dict, ruling: dict) -> str:
-    """What the design-doc skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
+    """What the alq-review:design-doc skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
     gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
     return (f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {ledger.current_round(state)['root']}. Open decision: "
             f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")

@@ -17,9 +17,9 @@ that is under review.
    `ESCALATE` hand the branch to the user: it stays locked until the user starts a prompt with
    `unlock #<pr>` (or `unlock <branch>`, or `unlock <owner>/<repo>#<pr>` when two repos share the number),
    and the refusal tells the agent to ask for exactly that. A spec edit does not release it: the agent can
-   make one. A `RESHAPE_SPEC` lock is also released by a prompt starting `/design-doc rescope <same ref>`: the
+   make one. A `RESHAPE_SPEC` lock is also released by a prompt starting `/alq-review:design-doc rescope <same ref>`: the
    session is handed the ruling (open decision, rationale, `spec_gap` findings) and the round's worktree, and
-   the `design-doc` skill re-scopes that worktree's spec folder. Any other lock refuses it and names `unlock`. While a branch is held, every Bash command of the session that launched its round is checked
+   the `alq-review:design-doc` skill re-scopes that worktree's spec folder. Any other lock refuses it and names `unlock`. While a branch is held, every Bash command of the session that launched its round is checked
    against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
    change there, as they stood before the command. A file written or a commit made by any route is caught
    and the agent told to put it back, even if the command then leaves the branch; checking another branch
@@ -164,10 +164,14 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
 | `scripts/hookio.py` | settings, refusals, `gate.log` and session state, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
+| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge #N` |
+| `skills/` | `alq-shape`, `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
+| `speckit/` | the settled-design preset and design-doc workflow, installed into the project by each `design-doc` start |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
 
-Tests: `python3 -m unittest discover -s tests`
+Tests: `python3 -m unittest` in each `tests/` folder. The design-doc driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
+`tests/test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.

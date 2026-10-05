@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 
 RUNS = Path(".specify/workflows/runs")
+PLUGIN = Path(__file__).resolve().parents[3]
+# Spec Kit applies only presets and workflows installed in the project, so each start installs the plugin's.
+PRESET = (PLUGIN / "speckit" / "presets" / "settled-design", Path(".specify/presets/settled-design"))
+WORKFLOW = (PLUGIN / "speckit" / "workflows" / "design-doc", Path(".specify/workflows/design-doc"))
+ENV = {"ALQ_REVIEW_ROOT": str(PLUGIN)}
 # The headless agent steps get only what they need to write the spec folder.
 AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Edit Bash(bash .specify/*) '
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
@@ -40,8 +45,31 @@ def report(state):
 
 def _specify(args, env):
     proc = subprocess.run(["specify", "workflow", *args, "--json"], capture_output=True, text=True,
-                          env={**os.environ, "SPECKIT_INTEGRATION_CLAUDE_EXTRA_ARGS": AGENT_ARGS, **env})
+                          env={**os.environ, "SPECKIT_INTEGRATION_CLAUDE_EXTRA_ARGS": AGENT_ARGS, **ENV, **env})
     return proc
+
+
+def _installed(source, target):
+    return all((target / f.relative_to(source)).is_file()
+               and (target / f.relative_to(source)).read_bytes() == f.read_bytes()
+               for f in source.rglob("*") if f.is_file())
+
+
+def _install(*command):
+    proc = subprocess.run(["specify", *command], capture_output=True, text=True)
+    if proc.returncode != 0:
+        sys.exit(f"`specify {' '.join(command)}` failed:\n{proc.stdout}{proc.stderr}")
+
+
+def install():
+    source, target = PRESET
+    if not _installed(source, target):
+        if target.exists():
+            _install("preset", "remove", "settled-design")
+        _install("preset", "add", "--dev", str(source))
+    source, target = WORKFLOW
+    if not _installed(source, target):
+        _install("workflow", "add", "--dev", str(source))
 
 
 def _state(run_id):
@@ -59,6 +87,7 @@ def start(spec_file, spec_dir):
         # select-spec reads the folder from the environment; the input only picks the rescope branch.
         inputs += ["-i", f"spec_dir={spec_dir}"]
         env["SPEC_DIR"] = spec_dir
+    install()
     before = set(RUNS.iterdir()) if RUNS.is_dir() else set()
     proc = _specify(["run", "design-doc", *inputs], env)
     new = set(RUNS.iterdir()) - before if RUNS.is_dir() else set()

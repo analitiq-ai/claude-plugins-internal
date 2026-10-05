@@ -16,8 +16,10 @@ LOCKING = ("RESHAPE_SPEC", "ESCALATE")
 MOVING = ("PATCH", "CLASS_FIX")
 
 REVIEW_CALL = "Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: '%s'})"
-# The design-doc skill's re-scope entry point: typed by the user, it answers a RESHAPE_SPEC lock.
-RESCOPE = "/design-doc rescope"
+# The alq-review:design-doc skill's re-scope entry point: typed by the user, it answers a RESHAPE_SPEC lock. Named with its
+# plugin, the one form Claude Code runs whatever other commands are installed.
+PLUGIN, RESCOPE_SKILL = "alq-review", "design-doc"
+RESCOPE = f"/{PLUGIN}:{RESCOPE_SKILL} rescope"
 ASSESS_CALL = "Workflow(name='alq-review:assess-round', args={worktree: '<absolute worktree path>'})"
 
 

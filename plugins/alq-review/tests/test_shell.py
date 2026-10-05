@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,7 +8,10 @@ import helpers  # noqa: F401  (puts scripts/ on the path)
 
 import shell
 
-PR_GATE = Path(__file__).resolve().parents[4] / "analitiq-org-github" / ".github" / "scripts" / "pr-gate.js"
+# The org's .github repo is checked out beside this repo's main checkout, which a worktree's own root is not.
+CHECKOUT = Path(subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=Path(__file__).parent,
+                               capture_output=True, text=True, check=True).stdout.strip()).parent
+PR_GATE = CHECKOUT.parent / "analitiq-org-github" / ".github" / "scripts" / "pr-gate.js"
 
 
 def kinds(command, cwd="/work"):
