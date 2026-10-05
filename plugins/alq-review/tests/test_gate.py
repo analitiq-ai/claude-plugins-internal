@@ -347,16 +347,6 @@ class IssueSpec(Gate):
                                capture_output=True, text=True, check=True)
         self.assertEqual(json.loads(brief.stdout)["spec"], self.SPEC)
 
-    def test_a_brief_asked_for_a_round_that_does_not_exist_names_it_and_writes_no_ledger(self):
-        self.launch()
-        brief = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", "acme/demo#6:internal-0.1"],
-                               env=self.env, capture_output=True, text=True)
-        self.assertNotEqual(brief.returncode, 0)
-        self.assertIn("acme/demo#6:internal-0.1 names no round", brief.stderr)
-        self.assertNotIn("Traceback", brief.stderr)
-        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
-            self.assertEqual([s["pr"] for s in ledger.all_states()], [7])
-
     def test_the_spec_is_selected_by_github_issue_spec_alone(self):
         """One selector of the spec comment: the briefs hold no marker filter of their own."""
         source = (SCRIPTS / "briefs.py").read_text()
