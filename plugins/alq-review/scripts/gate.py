@@ -448,6 +448,24 @@ def _round_output(payload: dict) -> tuple[str, str] | None:
     return None
 
 
+def _awaits(rnd: dict, agent_type: str) -> bool:
+    if agent_type == briefs.ASSESSOR:
+        return rnd["status"] == "awaiting_assessment"
+    return agent_type in rnd["expected"] and rnd["status"] == "collecting"
+
+
+def _misdirected(session: str, ref: str, agent_type: str, rnd: dict | None) -> str:
+    """Why `ref` is not `agent_type`'s round, and which ref is: the agent wrote the ref, but only the session ties
+    it to the round that dispatched it."""
+    what = f"{ref} names no round" if rnd is None else f"{agent_type} has nothing to submit to {ref} while it is {rnd['status']}"
+    awaiting = [r["ref"] for state in ledger.all_states() for r in state["rounds"]
+                if r.get("session") == session and _awaits(r, agent_type)]
+    if not awaiting:
+        return f"{what}, and no round launched in this session awaits output from {agent_type}"
+    expected = awaiting[0] if len(awaiting) == 1 else f"one of {', '.join(awaiting)}"
+    return f"{what}; round_ref must be {expected}, as your prompt gives it"
+
+
 def on_structured_output(payload: dict) -> dict | None:
     if claimgate.owns(payload):
         return claimgate.on_output(payload)
@@ -458,18 +476,19 @@ def on_structured_output(payload: dict) -> dict | None:
         return None
     ref, agent_type = found
     body = payload["tool_input"]
-    with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
-        rnd = ledger.find_round(state, ref)
-        if agent_type == briefs.ASSESSOR and rnd["status"] == "awaiting_assessment":
-            measured = facts.round_facts(state, rnd, rnd["root"])
-            admissible = policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"]))
-            finding_ids, token = [f["id"] for f in rnd["findings"]], briefs.brief_token(rnd)
-            validate = partial(assessment.validate_assessment, finding_ids=finding_ids, admissible=admissible,
-                               burden=measured["burden"], token=token)
-        elif agent_type in rnd["expected"] and rnd["status"] == "collecting":
-            validate = partial(assessment.validate_report, short=briefs.short(agent_type))
-        else:
-            validate, errors = None, [f"{agent_type} has nothing to submit to {ref} while it is {rnd['status']}"]
+    # Read, not opened: a ref naming the wrong PR must not create that PR's ledger.
+    state = ledger.read(*ledger.parse_ref(ref))
+    rnd = ledger.named_round(state, ref)
+    if rnd is None or not _awaits(rnd, agent_type):
+        validate, errors = None, [_misdirected(payload["session_id"], ref, agent_type, rnd)]
+    elif agent_type == briefs.ASSESSOR:
+        measured = facts.round_facts(state, rnd, rnd["root"])
+        admissible = policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"]))
+        finding_ids, token = [f["id"] for f in rnd["findings"]], briefs.brief_token(rnd)
+        validate = partial(assessment.validate_assessment, finding_ids=finding_ids, admissible=admissible,
+                           burden=measured["burden"], token=token)
+    else:
+        validate = partial(assessment.validate_report, short=briefs.short(agent_type))
     if validate:
         try:
             errors = validate(body)

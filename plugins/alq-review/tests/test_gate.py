@@ -218,6 +218,37 @@ class InternalRound(Gate):
         dup = [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "severity": "LOW", "detail": "d"}] * 2
         self.assertEqual(self.decision(self.report(first, dup, args["round_ref"])), "deny")
 
+    def test_a_report_naming_another_pr_is_told_its_round_and_writes_no_ledger(self):
+        _, args = self.launch()
+        reviewer = args["waves"][0][0]
+        out = self.report(reviewer, [], "acme/demo#6:internal-0.1")
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn(f"round_ref must be {args['round_ref']}", self.reason(out))
+        self.assertNotIn("crashed", self.reason(out))
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            self.assertEqual([s["pr"] for s in ledger.all_states()], [7])
+        self.assertEqual(self.decision(self.report(reviewer, [], args["round_ref"])), None)
+
+    def test_an_assessment_naming_a_round_that_does_not_exist_is_told_the_round_it_assesses(self):
+        _, args = self.launch()
+        first = args["waves"][0][0]
+        found = [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3, "severity": "HIGH", "detail": "d"}]
+        self.run_reviewers(args, found)
+        body = dict(self.assessment(args["round_ref"], [found[0]["id"]]), round_ref="acme/demo#7:internal-0.3")
+        out = self.submit_assessment(body)
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn(f"round_ref must be {args['round_ref']}", self.reason(out))
+        self.assertNotIn("crashed", self.reason(out))
+
+    def test_a_report_to_a_round_that_no_longer_awaits_it_is_told_the_round_that_does(self):
+        _, args = self.launch()
+        self.run_reviewers(args, [])
+        self.commit("b.py", "changed\n", "fix: b")
+        _, second = self.launch()
+        out = self.report(second["waves"][0][0], [], args["round_ref"])
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn(f"round_ref must be {second['round_ref']}", self.reason(out))
+
     def test_structured_output_of_unrelated_workflows_is_ignored(self):
         self.assertEqual(self.hook("PreToolUse", "StructuredOutput", {"n": 1}, agent_id="x", agent_type="workflow-subagent"), {})
 
@@ -315,6 +346,16 @@ class IssueSpec(Gate):
         brief = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", args["round_ref"]], env=self.env,
                                capture_output=True, text=True, check=True)
         self.assertEqual(json.loads(brief.stdout)["spec"], self.SPEC)
+
+    def test_a_brief_asked_for_a_round_that_does_not_exist_names_it_and_writes_no_ledger(self):
+        self.launch()
+        brief = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", "acme/demo#6:internal-0.1"],
+                               env=self.env, capture_output=True, text=True)
+        self.assertNotEqual(brief.returncode, 0)
+        self.assertIn("acme/demo#6:internal-0.1 names no round", brief.stderr)
+        self.assertNotIn("Traceback", brief.stderr)
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            self.assertEqual([s["pr"] for s in ledger.all_states()], [7])
 
     def test_the_spec_is_selected_by_github_issue_spec_alone(self):
         """One selector of the spec comment: the briefs hold no marker filter of their own."""

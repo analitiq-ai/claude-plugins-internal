@@ -454,14 +454,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Print the assessor's brief for one review round.")
     parser.add_argument("--ref", required=True)
     ref = parser.parse_args().ref
-    with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
-        rnd = ledger.find_round(state, ref)
-        if rnd["status"] != "awaiting_assessment":
-            sys.exit(f"{ref} is {rnd['status']}, not awaiting assessment")
-        try:
-            print(json.dumps(brief(state, rnd), indent=1))
-        except RuntimeError as exc:
-            sys.exit(f"The brief for {ref} cannot be built: {exc}")
+    # Read, not opened: a ref naming the wrong PR must not create that PR's ledger.
+    state = ledger.read(*ledger.parse_ref(ref))
+    rnd = ledger.named_round(state, ref)
+    if rnd is None:
+        sys.exit(f"{ref} names no round; use the round_ref your prompt gives")
+    if rnd["status"] != "awaiting_assessment":
+        sys.exit(f"{ref} is {rnd['status']}, not awaiting assessment")
+    try:
+        print(json.dumps(brief(state, rnd), indent=1))
+    except RuntimeError as exc:
+        sys.exit(f"The brief for {ref} cannot be built: {exc}")
 
 
 if __name__ == "__main__":
