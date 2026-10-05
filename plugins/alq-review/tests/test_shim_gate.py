@@ -308,6 +308,48 @@ class ShimLaunch(ShimGate):
 
 
 
+class ShimStagedDiff(ShimGate):
+    """The sweepers and site judges read every staged file and Jev only the code file; a site a prose hunk reaches is
+    touched."""
+    DOC = {"file": "docs.md", "line": 1, "function": "intro", "does": "says b is read unchecked"}
+
+    def setUp(self):
+        super().setUp()
+        self.commit("docs.md", "b is read unchecked\nusage\n", "docs: b")
+        Jev.answers["coverage"] = "edited_only"
+        self.tree = self.labelled({"b.py": (FIXED, "CODE"), "docs.md": ("b is checked\nusage\n", "PROSE")})
+
+    def test_the_sweepers_read_every_staged_file_and_jev_the_code_alone(self):
+        _, args = self.shim_launch()
+        [sweeper] = args["sweepers"]
+        self.assertIn("+b is checked", sweeper["prompt"])
+        self.assertIn("+b3 checked", sweeper["prompt"])
+        self.sweep(args, [self.DOC])
+        self.assertEqual([("+b is checked" in asked["state"], "+b3 checked" in asked["state"]) for asked in Jev.seen],
+                         [(False, True)] * len(Jev.seen))
+        self.assertEqual(len(Jev.seen), 2)
+
+    def test_a_site_judge_reads_every_staged_file(self):
+        _, args = self.shim_launch()
+        self.sweep(args, [self.DOC])
+        out, args = self.shim_launch(contests=[{"site": shimcheck.site_id("docs.md", "intro"),
+                                                "reason": "the staged change rewrites it"}])
+        self.assertEqual(self.decision(out), "allow", self.reason(out))
+        [judge] = args["judges"]
+        self.assertIn("+b is checked", judge["prompt"])
+        self.assertIn("+b3 checked", judge["prompt"])
+
+    def test_a_site_is_touched_by_a_prose_hunk_as_by_a_code_hunk(self):
+        fixed = {"file": "b.py", "line": 4, "function": "b3", "does": "reads b unchecked"}
+        self.record(self.tree, verdict="patch", kind="fix", level="cause", coverage="edited_only",
+                    same_operation=[self.DOC, fixed, SITE], callers=[])
+        reason = self.reason(self.git_commit())
+        self.assertIn(f"{shimcheck.site_id('b.py', 'b3')} b.py:4 b3 — reads b unchecked (touched)", reason)
+        self.assertIn(f"{shimcheck.site_id('docs.md', 'intro')} docs.md:1 intro — says b is read unchecked (touched)",
+                      reason)
+        self.assertIn(f"{shimcheck.site_id('c.py', 'load')} c.py:2 load — reads b unchecked (not touched)", reason)
+
+
 class ShimTestsOnly(ShimGate):
     """A tree that changes only test files is not a fix to sweep, whatever Jev would answer (#60)."""
     RED = "def test_b3_is_checked():\n    assert False\n"

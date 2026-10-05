@@ -207,9 +207,10 @@ def settled_chains(chains: list[dict], check: dict) -> list[dict]:
             for c in reached if check["tree"] not in c["members"]]
 
 
-def _patch_report(check: dict, chain: dict | None, code: list[dict], root: str) -> str:
+def _patch_report(check: dict, chain: dict | None, hunks: list[dict], root: str) -> str:
+    """`hunks` are the staged hunks whatever their label: a prose edit reaching a site touches it (FR-007)."""
     sites = check["same_operation"]
-    marks = touched(sites, code)
+    marks = touched(sites, hunks)
     listed = "".join(f"- {sid} {s['file']}:{s['line']} {s['function']} — {s['does']} "
                      f"({'touched' if marks[sid] else 'not touched'})\n"
                      for s, sid in ((s, site_id(s["file"], s["function"])) for s in sites))
@@ -267,5 +268,5 @@ def commit_decision(check: dict | None, chains: list[dict], *, empty: bool, conc
         return refuse(f"The shim check of this staged tree is running ({check['status']}). Wait for it; if it "
                       f"stopped, relaunch it: {call}.")
     if check["verdict"] == "patch":
-        return refuse(_patch_report(check, chain, code, root))
+        return refuse(_patch_report(check, chain, hunks, root))
     return Decision(True)

@@ -60,9 +60,16 @@ def on_commit(payload: dict, action: Action) -> dict | None:
 
 # --- the launch ---------------------------------------------------------------------------------------
 
-def _new_check(where: worktree.Worktree, tree: str, head: str, chain: dict | None, code: list[dict], diff: str) -> dict:
+def _diff_of(root: str, base: str, tree: str, hunks: list[dict]) -> str:
+    """From the hunks' files, not a bare diff, so the binary and generated files `tree_hunks` leaves out stay out."""
+    return worktree.tree_diff(root, base, tree, sorted({h["file"] for h in hunks}))
+
+
+def _new_check(where: worktree.Worktree, tree: str, head: str, chain: dict | None, code: list[dict], diff: str,
+               code_diff: str) -> dict:
     return {"ref": shimcheck.check_ref(where.slug, tree), "repo": where.slug, "root": where.root, "tree": tree,
             "head": head, "branch": where.branch, "chain": chain and chain["id"], "hunks": code, "diff": diff,
+            "code_diff": code_diff,
             "mode": None, "kind": None, "expected": [], "outputs": {}, "same_operation": [], "callers": [],
             "level": None, "coverage": None, "verdict": None, "status": "sweeping", "reason": None,
             "contests": {}, "snapshot": None, "started": time.time(),
@@ -100,7 +107,7 @@ def _failure(exc: Exception) -> str:
 def _is_fix(check: dict, deadline: float) -> bool:
     """Ask `kind` unless an earlier launch of this tree has; anything but a fix is complete."""
     if check["kind"] is None:
-        check["kind"], cost = jev.ask_kind(check["diff"], deadline)
+        check["kind"], cost = jev.ask_kind(check["code_diff"], deadline)
         check["cost"]["jev_usd"] += cost
     if check["kind"] == "not_fix":
         check["mode"], check["verdict"] = "not_fix", "complete"
@@ -182,8 +189,10 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         check = earlier
         check["started"] = time.time()
     else:
-        diff = worktree.tree_diff(root, base, tree, sorted({h["file"] for h in code})) if code else ""
-        check = _new_check(where, tree, head, next(iter(chains), None), code, diff)
+        # The sweepers and site judges read every file with a staged hunk (FR-003); Jev reads only the files with a
+        # code hunk (FR-005).
+        diff, code_diff = (_diff_of(root, base, tree, hunks), _diff_of(root, base, tree, code)) if code else ("", "")
+        check = _new_check(where, tree, head, next(iter(chains), None), code, diff, code_diff)
     _end_replaced(payload, check)
     mode = None
     try:
@@ -332,7 +341,7 @@ def _judge(check: dict, deadline: float) -> None:
         check["same_operation"] = [s for s in check["same_operation"]
                                    if shimcheck.site_id(s["file"], s["function"]) not in out]
     try:
-        answers, cost = jev.ask_fix(check["diff"], check["same_operation"], check["callers"], deadline)
+        answers, cost = jev.ask_fix(check["code_diff"], check["same_operation"], check["callers"], deadline)
     except jev.JevError as exc:
         _finish(check, "failed", _failure(exc))
         return
