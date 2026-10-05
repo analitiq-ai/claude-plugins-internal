@@ -193,6 +193,8 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
   cosmetic checks and validations, so what they change is not checked again and the push is not gated (user
   decision 2026-10-02). This replaces the earlier word-diff-before-push design (critique E9).
 - **Rationale**: Re-checking cosmetic changes costs a check and adds a push gate for no claim the hooks write.
+- **Existing tools**: None fit. Looked at: nothing new is built for this decision; commit hooks that rewrite
+  files stay as they are.
 
 ## Limits
 
