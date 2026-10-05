@@ -10,10 +10,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+import yaml  # Spec Kit's own dependency
 
 SKILL = Path(__file__).resolve().parents[1]
 DRIVER = SKILL / "scripts" / "drive_workflow.py"
-WORKFLOW = SKILL.parents[2] / ".specify" / "workflows" / "design-doc" / "workflow.yml"
+SPECKIT = SKILL.parents[1] / "speckit"
 sys.path.insert(0, str(DRIVER.parent))
 import drive_workflow  # noqa: E402
 
@@ -24,9 +27,8 @@ class Project:
     def __init__(self, spec_text="# Demo\n\nSettled.\n"):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
-        wf = self.root / ".specify" / "workflows" / "design-doc"
-        wf.mkdir(parents=True)
-        (wf / "workflow.yml").write_text(WORKFLOW.read_text())
+        # A Spec Kit project with neither the plugin's preset nor its workflow installed.
+        (self.root / ".specify" / "workflows").mkdir(parents=True)
         (self.root / SPEC_DIR).mkdir(parents=True)
         (self.root / SPEC_DIR / "spec.md").write_text(spec_text)
 
@@ -87,6 +89,50 @@ class Rescope(unittest.TestCase):
         self.assertIn("spec_dir must be specs/<feature>", report["stderr"])
         self.assertFalse(report["open_markers"])
         self.assertFalse((self.project.root / "PWNED").exists())
+
+
+def same_files(source: Path, installed: Path) -> bool:
+    return all((installed / f.relative_to(source)).is_file()
+               and (installed / f.relative_to(source)).read_bytes() == f.read_bytes()
+               for f in source.rglob("*") if f.is_file())
+
+
+class Install(unittest.TestCase):
+    """A start installs the plugin's settled-design preset and design-doc workflow into the project it runs in."""
+
+    def setUp(self):
+        self.project = Project()
+        self.addCleanup(self.project.close)
+        self.preset = self.project.root / ".specify" / "presets" / "settled-design"
+        self.workflow = self.project.root / ".specify" / "workflows" / "design-doc"
+
+    def start(self):
+        proc, report = self.project.drive("start", self.project.spec_file("RESCOPE x"), SPEC_DIR)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"))
+
+    def test_a_project_without_them_gets_both(self):
+        self.start()
+        self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "design-doc", self.workflow))
+
+    def test_an_installed_copy_that_differs_from_the_plugins_is_replaced(self):
+        self.start()
+        (self.preset / "templates" / "plan-template.md").write_text("stale\n")
+        (self.workflow / "critique_report.py").write_text("stale\n")
+        self.start()
+        self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "design-doc", self.workflow))
+
+    def test_the_settled_design_step_runs_the_check_under_the_root_specify_runs_with(self):
+        """The step runs in the project, which has no copy of alq-review's scripts; the driver says where they are."""
+        steps = yaml.safe_load((SPECKIT / "workflows" / "design-doc" / "workflow.yml").read_text())["steps"]
+        [step] = [s for s in steps if s["id"] == "settled-design"]
+        self.assertIn('python3 "$ALQ_REVIEW_ROOT/scripts/settled_design.py" "$dir"', step["run"])
+        with mock.patch.object(drive_workflow.subprocess, "run") as run:
+            drive_workflow._specify(["resume", "r1"], {})
+        root = Path(run.call_args.kwargs["env"]["ALQ_REVIEW_ROOT"])
+        self.assertTrue((root / "scripts" / "settled_design.py").is_file())
 
 
 class OpenMarkers(unittest.TestCase):

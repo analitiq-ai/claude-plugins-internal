@@ -231,7 +231,7 @@ class InternalRound(Gate):
 
 
 class IssueSpec(Gate):
-    """Internal reviewers are given the spec of the issue their branch names, when it has one (#62)."""
+    """Internal reviewers are given the spec of the issue their branch names, when it has one (engineering#62)."""
     SPEC = "<!-- analitiq-spec -->\n# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n"
 
     def comments(self, *bodies):
@@ -262,7 +262,7 @@ class IssueSpec(Gate):
         self.assertGradesAgainstSpec(second)
 
     def expected_prompt(self, branch, reviewer):
-        """The internal reviewer prompt as it stood before #62, word for word."""
+        """The internal reviewer prompt as it stood before engineering#62, word for word."""
         main = git(self.root, "rev-parse", "main")
         return (f"Review branch {branch} of acme/demo.\nIn {self.root}, run: git diff {main}...HEAD\n"
                 "That is the whole change under review.\n\n"
@@ -490,6 +490,13 @@ class HeldBranch(Gate):
             f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {self.root}. "
             "Open decision: which root is canonical? Why: because "
             "Spec gaps: the canonical root is chosen round by round (n/a)."))
+
+    def test_the_plugin_qualified_rescope_releases_the_lock_as_the_bare_one_does(self):
+        """Claude Code runs a plugin skill as `/alq-review:design-doc`, and as `/design-doc` only while no other
+        command has that name."""
+        self.lock()
+        self.assertIn("The user unlocked acme/demo#7", self.say("/alq-review:design-doc rescope #7"))
+        self.assertEqual(self.edit(), {})
 
     def test_a_rescope_releases_nothing_but_a_reshape_spec_lock(self):
         """An ESCALATE lock asks a question a re-scope does not answer."""
@@ -1208,7 +1215,7 @@ class DesignDocuments(SpecChecks):
                 self.assertEqual(self.decision(out), "deny")
                 self.assertIn(f"{name}:1: ", self.reason(out))
                 self.assertIn("a design-document change comes with a spec folder", self.reason(out))
-                self.assertIn("Next step: settle the design in a spec folder (/design-doc", self.reason(out))
+                self.assertIn("Next step: settle the design in a spec folder (/alq-review:design-doc", self.reason(out))
                 self.assertEqual(self.saved()["rounds"], [])
 
     def test_a_design_document_with_a_settled_spec_folder_launches(self):

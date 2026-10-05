@@ -259,10 +259,7 @@ report() {
   jq -r --arg repo "$repo" --arg pr "$pr" --arg gate_app "$GATE_APP" "$REPORT" <<<"$1"
 }
 
-# Hand the outcome to the alq-review gate (.claude/plugins/alq-review), which
-# requires an assessment of every findings round before code changes. The gate
-# knows a checkout and no PR; this script knows a PR and no checkout — so the
-# hand-over is one file per PR that names the branch, which the gate consumes.
+# Hand the outcome to the alq-review gate: one inbox file per PR, naming its branch and head.
 # A failure here is announced and never changes this script's own verdict.
 hand_to_gate() {
   local status=$1 threads=$2 checks=$3 gcomments=$4 inbox file

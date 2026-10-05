@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 AGENTS = Path(__file__).resolve().parent.parent / "agents"
-TACKLE = Path(__file__).resolve().parents[3] / "skills" / "alq-issue-tackle" / "SKILL.md"
+TACKLE = Path(__file__).resolve().parents[1] / "skills" / "alq-issue-tackle" / "SKILL.md"
 
 
 def tools(name: str) -> list[str]:
@@ -28,7 +28,7 @@ class ShimAgents(unittest.TestCase):
 
 class IssueTackle(unittest.TestCase):
     def test_step_4_leaves_handing_reviewers_the_spec_to_the_gate(self):
-        """The gate replaces a review round's args (#62), so an agent told to pass the spec has no way to."""
+        """The gate replaces a review round's args (engineering#62), so an agent told to pass the spec has no way to."""
         step4 = TACKLE.read_text().split("## Step 4")[1].split("## Step 5")[0]
         self.assertIn("gate", step4)
 

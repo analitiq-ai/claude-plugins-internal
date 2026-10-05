@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from policy import Decision
 
 CATEGORIES = tuple(f"K{i}" for i in range(1, 10))
-# K1, what the repo's own code, contracts, validator or CI does (spec FR-005); K9, what a test checks (#57).
+# K1, what the repo's own code, contracts, validator or CI does (spec FR-005); K9, what a test checks (engineering#57).
 JUDGED = ("K1", "K9")
 VERDICTS = ("CORRECT", "WRONG", "UNSURE")
 KINDS = ("CODE", "PROSE", "MIXED")

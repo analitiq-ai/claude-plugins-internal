@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[4] / ".specify" / "workflows" / "design-doc" / "critique_report.py"
+SCRIPT = Path(__file__).resolve().parents[3] / "speckit" / "workflows" / "design-doc" / "critique_report.py"
 FEATURE = "specs/001-demo"
 
 

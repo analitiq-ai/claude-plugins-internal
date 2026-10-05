@@ -11,7 +11,7 @@ from helpers import T0
 
 import ledger
 
-POLLER = Path(__file__).resolve().parents[3] / "skills" / "alq-github-pr-review" / "poll-pr-review.sh"
+POLLER = Path(__file__).resolve().parents[1] / "skills" / "alq-github-pr-review" / "poll-pr-review.sh"
 THREADS = [{"by": "chatgpt-codex-connector", "path": "src/a.py", "line": 12, "outdated": False,
             "url": "https://github.com/acme/demo/pull/7#discussion_r1", "at": "2026-09-18T11:59:00Z",
             "severity": "P1", "gist": "Guard the empty list"}]

@@ -175,7 +175,7 @@ def brief(state: dict, rnd: dict) -> dict:
 CLAIM_READER, CLAIM_JUDGE, CLAIM_CONTEST_JUDGE = ("alq-review:claim-reader", "alq-review:claim-judge",
                                                   "alq-review:claim-contest-judge")
 READ_BATCH = 16  # hunks per reader, in the order git lists them; a larger commit gets more readers
-# The categories of the plugins-random-commits study (specs/005-claim-check-gate), and K9 (#57); the judged ones
+# The categories of the plugins-random-commits study (specs/005-claim-check-gate), and K9 (engineering#57); the judged ones
 # are `claimcheck.JUDGED`, each with its own judge prompt in `_JUDGE_PROMPTS`.
 CATEGORY_MEANINGS = {
     "K1": "what our own code, contracts, validator or CI does",

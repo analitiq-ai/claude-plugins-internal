@@ -351,7 +351,7 @@ class ShimStagedDiff(ShimGate):
 
 
 class ShimTestsOnly(ShimGate):
-    """A tree that changes only test files is not a fix to sweep, whatever Jev would answer (#60)."""
+    """A tree that changes only test files is not a fix to sweep, whatever Jev would answer (engineering#60)."""
     RED = "def test_b3_is_checked():\n    assert False\n"
 
     def test_a_tests_only_tree_commits_with_no_question(self):
@@ -563,7 +563,7 @@ class ShimContest(Staged):
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
     def rule_out_every_site(self, ruling, **extra):
-        """#59: Jev answers `edited_only` over the empty list left once every listed site is ruled out."""
+        """engineering#59: once every listed site is ruled out, the re-judged check is complete with coverage `edited_only` and no sites."""
         _, args = self.contest(self.LOAD, self.SAVE)
         self.rule(args, self.LOAD, ruling, **extra)
         self.rule(args, self.SAVE, ruling, **extra)
