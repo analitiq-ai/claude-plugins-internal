@@ -331,7 +331,7 @@ def on_prompt(payload: dict, typed: re.Match) -> dict:
         with ledger.open_claims(repo) as claims:
             holds = claims.holds(base, file)
             for hold in holds:
-                if cid in hold["claims"]:
+                if any(c["id"] == cid for c in hold["claims"]):
                     claimcheck.release(hold)
             claims.save_holds(base, file, holds)
         released.append(f"{repo} {file}")

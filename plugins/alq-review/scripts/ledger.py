@@ -330,7 +330,8 @@ def claim_holders(claim_id: str) -> list[tuple[str, str, str]]:
     """(repo, base, file) of every hold that names `claim_id`, which is how a user's `unlock claim-<id>` finds it."""
     with closing(_connect()) as conn:
         rows = conn.execute("SELECT repo, base, file FROM claim_holds, json_each(claim_holds.doc) AS hold, "
-                            "json_each(hold.value, '$.claims') AS named WHERE named.value = ? ORDER BY repo, base, file",
+                            "json_each(hold.value, '$.claims') AS named WHERE json_extract(named.value, '$.id') = ? "
+                            "ORDER BY repo, base, file",
                             (claim_id,))
         return sorted(set(rows))
 
