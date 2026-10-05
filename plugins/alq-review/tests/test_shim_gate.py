@@ -309,8 +309,8 @@ class ShimLaunch(ShimGate):
 
 
 class ShimStagedDiff(ShimGate):
-    """The sweepers and site judges read every staged file and Jev only the code file; a site a prose hunk reaches is
-    touched."""
+    """The sweepers, the site judges and Jev's `level` and `coverage` read every staged file, and `kind` only the code
+    file; a site a prose hunk reaches is touched."""
     DOC = {"file": "docs.md", "line": 1, "function": "intro", "does": "says b is read unchecked"}
 
     def setUp(self):
@@ -319,15 +319,27 @@ class ShimStagedDiff(ShimGate):
         Jev.answers["coverage"] = "edited_only"
         self.tree = self.labelled({"b.py": (FIXED, "CODE"), "docs.md": ("b is checked\nusage\n", "PROSE")})
 
-    def test_the_sweepers_read_every_staged_file_and_jev_the_code_alone(self):
+    def asked_for(self, asked):
+        return sorted(asked["questions"]), "+b is checked" in asked["state"], "+b3 checked" in asked["state"]
+
+    def test_the_fix_questions_read_what_the_sweepers_read_and_kind_the_code_alone(self):
         _, args = self.shim_launch()
         [sweeper] = args["sweepers"]
         self.assertIn("+b is checked", sweeper["prompt"])
         self.assertIn("+b3 checked", sweeper["prompt"])
         self.sweep(args, [self.DOC])
-        self.assertEqual([("+b is checked" in asked["state"], "+b3 checked" in asked["state"]) for asked in Jev.seen],
-                         [(False, True)] * len(Jev.seen))
-        self.assertEqual(len(Jev.seen), 2)
+        self.assertEqual([self.asked_for(asked) for asked in Jev.seen],
+                         [(["kind"], False, True), (["coverage", "level"], True, True)])
+
+    def test_the_judgement_again_after_a_ruling_reads_every_staged_file(self):
+        _, args = self.shim_launch()
+        b3 = shimcheck.site_id("b.py", "b3")
+        self.sweep(args, [self.DOC, {"file": "b.py", "line": 4, "function": "b3", "does": "reads b unchecked"}])
+        _, args = self.shim_launch(contests=[{"site": b3, "reason": "the staged change checks it"}])
+        Jev.seen = []
+        self.output(SITE_JUDGE, {"check_ref": args["check_ref"], "site": b3, "ruling": "not_shared",
+                                 "evidence": ["b.py:4"], "reason": "read both"}, agent_id="j")
+        self.assertEqual([self.asked_for(asked) for asked in Jev.seen], [(["coverage", "level"], True, True)])
 
     def test_a_site_judge_reads_every_staged_file(self):
         _, args = self.shim_launch()

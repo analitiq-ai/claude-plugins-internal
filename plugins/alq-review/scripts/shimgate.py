@@ -189,8 +189,8 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         check = earlier
         check["started"] = time.time()
     else:
-        # The sweepers and site judges read every file with a staged hunk (FR-003); Jev reads only the files with a
-        # code hunk (FR-005).
+        # Jev's `kind` reads only the files with a code hunk (FR-005); everything else reads every file with a staged
+        # hunk, so the lists are judged against the diff they were swept from.
         diff, code_diff = (_diff_of(root, base, tree, hunks), _diff_of(root, base, tree, code)) if code else ("", "")
         check = _new_check(where, tree, head, next(iter(chains), None), code, diff, code_diff)
     _end_replaced(payload, check)
@@ -341,7 +341,7 @@ def _judge(check: dict, deadline: float) -> None:
         check["same_operation"] = [s for s in check["same_operation"]
                                    if shimcheck.site_id(s["file"], s["function"]) not in out]
     try:
-        answers, cost = jev.ask_fix(check["code_diff"], check["same_operation"], check["callers"], deadline)
+        answers, cost = jev.ask_fix(check["diff"], check["same_operation"], check["callers"], deadline)
     except jev.JevError as exc:
         _finish(check, "failed", _failure(exc))
         return
