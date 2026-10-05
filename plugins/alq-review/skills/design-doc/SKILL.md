@@ -26,8 +26,8 @@ in this session, and passes the user's verdicts on resume. Never reimplement a w
 
   The spec folder is the one the PR changed, as the gate finds it, against the base branch GitHub names (one
   command, `SETTLED` being `../../scripts/settled_design.py` from this skill's base directory):
-  `python3 SETTLED --spec-folders <CHECKOUT> "$(gh pr view <PR> -R <REPO> --json baseRefName --jq .baseRefName)"`.
-  None or more than one: ask the user which. For the folder `<p>/specs/<feature>`, `PROJECT` is `<p>` in
+  `BASE=$(gh pr view <PR> -R <REPO> --json baseRefName --jq .baseRefName) && python3 SETTLED --spec-folders <CHECKOUT> "$BASE"`.
+  A non-zero exit: show the user its stderr and stop. None or more than one folder printed: ask the user which. For the folder `<p>/specs/<feature>`, `PROJECT` is `<p>` in
   `CHECKOUT` (`CHECKOUT` itself for `specs/<feature>`) and `SPEC_DIR` is `specs/<feature>`.
   With the Write tool, write `SPEC_FILE`: `RESCOPE of <SPEC_DIR> (<REPO>#<PR>). Open decision: … Why: … Spec gaps: …`
   (from the line).

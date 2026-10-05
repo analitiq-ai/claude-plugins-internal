@@ -8,7 +8,7 @@ was recorded.
 
 A branch is graded as the gate grades it at the first internal round: each spec folder it changes, or, when it
 changes none, each design document it changes, which needs one. A spec folder is `<dir>/specs/<feature>/` at any
-depth: Spec Kit puts `specs/` beside the nearest `.specify/`, so a repo can hold one spec home per project in it.
+depth, so a repo can hold one Spec Kit project, each with its own `specs/`, per subdirectory.
 
 Usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into>. Prints one problem per line
 and exits 1 when there are any, 2 when the check cannot run.
