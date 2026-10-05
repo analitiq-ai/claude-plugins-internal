@@ -416,9 +416,13 @@ class ClaimCheckRepair(ClaimGate):
         asked = self.git_commit()
         self.assertEqual(self.decision(asked), "deny")
         claim = claimcheck.claim_id("README.md", third)
-        self.assertIn(f"unlock claim-{claim}", self.reason(asked))
+        shown = (f"README.md:1 \"{third}\"", "check([]) returns True", f"unlock claim-{claim}")
+        for part in shown:
+            self.assertIn(part, self.reason(asked))
         self.stage("README.md", "A fourth try.\n")
-        self.assertIn(f"unlock claim-{claim}", self.reason(self.check_launch()[0]))
+        launched = self.reason(self.check_launch()[0])
+        for part in shown:
+            self.assertIn(part, launched)
         self.stage("README.md", third + "\n")
 
         released = self.hook("UserPromptSubmit", prompt=f"unlock claim-{claim}")
@@ -494,7 +498,7 @@ class ClaimCheckContest(ClaimGate):
         self.assertEqual(self.decision(out), "deny")
         said = self.reason(out)
         self.assertIn(f"{cid!r} is not a claim id of this check", said)
-        self.assertIn(f"its WRONG claims: claim-{cid}", said)
+        self.assertIn(f'its WRONG claims: README.md:1 "{FALSE.strip()}" (claim-{cid})', said)
         self.assertNotIn("staged tree", said)
 
     def test_a_contest_of_a_claim_that_is_not_wrong_names_its_verdict(self):

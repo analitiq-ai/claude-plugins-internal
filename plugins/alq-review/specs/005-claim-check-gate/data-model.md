@@ -60,7 +60,7 @@ The bound and the release (FR-011, FR-017). One hold per git hunk, named by its 
 | Field | Meaning |
 |---|---|
 | `refusals` | completed checks, and rejected contests, that ruled a claim in this hunk `WRONG` |
-| `claims[]` | the claim ids last ruled `WRONG` here, which `unlock claim-<id>` resolves |
+| `claims[]` | each claim last ruled `WRONG` here, as `{id, file, line, quote, failing_case, evidence}`: the refusal shows them, since the hold outlives the check that ruled them; `unlock claim-<id>` resolves `id` |
 | `released_patch_id` | the hunk's patch-id when the user typed `unlock`; empty until then |
 
 A later hunk whose old-side range overlaps or touches the hold's continues it. State: `refusals < 3` → the

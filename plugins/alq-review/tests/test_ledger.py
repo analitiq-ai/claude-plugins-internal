@@ -200,7 +200,7 @@ class Store(unittest.TestCase):
 
     def test_held_claims_are_found_by_query(self):
         with ledger.open_claims("acme/demo") as claims:
-            claims.save_holds("base1", "README.md", [{"claims": ["abc"], "refusals": 3}])
+            claims.save_holds("base1", "README.md", [{"claims": [{"id": "abc", "quote": "zzz"}], "refusals": 3}])
         self.assertEqual(ledger.claim_holders("abc"), [("acme/demo", "base1", "README.md")])
         self.assertEqual(ledger.claim_holders("zzz"), [])
 

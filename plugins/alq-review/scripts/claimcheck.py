@@ -213,22 +213,33 @@ def _old_side(hold: dict) -> str:
     return "new file" if hold["old_start"] == 0 else f"added after old line {hold['old_start']}"
 
 
+def ruled_wrong(claim: dict, verdict: dict) -> dict:
+    """A claim with the WRONG verdict that refused it, as a hold keeps it: the hold outlives the check, and a reworded
+    claim gets a new id, so the user can be shown it only from here."""
+    broken = next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
+    return {"id": claim["id"], "file": claim["file"], "line": claim["line"], "quote": claim["quote"],
+            "failing_case": verdict["failing_case"], "evidence": broken["evidence"]}
+
+
+def _named(claim: dict) -> str:
+    return f"{claim['file']}:{claim['line']} \"{claim['quote']}\" ({claim_ref(claim['id'])})"
+
+
+def _wrong_line(wrong: dict) -> str:
+    return f"- {_named(wrong)}. Fails when: {wrong['failing_case']}. Evidence: {wrong['evidence']}"
+
+
 def user_question(held: list[dict]) -> str:
-    claims = sorted({cid for hold in held for cid in hold["claims"]})
-    places = ", ".join(f"{h['file']} ({_old_side(h)})" for h in held)
-    return (f"These claims were refused {REFUSALS_BEFORE_USER} times in {places}, and an agent may not try again. "
-            "Stop and ask the user: is the claim wrong, or is the checker? Show them each claim and its last verdict. "
-            f"Only the user releases it, by typing {' or '.join(f'`unlock {claim_ref(c)}`' for c in claims)}.")
+    hunks = "\n".join(f"{h['file']} ({_old_side(h)}), refused {h['refusals']} times:\n" +
+                      "\n".join(f"{_wrong_line(c)}. Release: `unlock {claim_ref(c['id'])}`" for c in h["claims"])
+                      for h in held)
+    return ("Do not try these hunks again. Stop and ask the user: is the claim wrong, or is the checker? "
+            "Show them each claim last ruled WRONG, with the case it fails in and the evidence:\n"
+            f"{hunks}\nReleasing a hunk is the user's call: they type one of its `unlock` lines.")
 
 
 def _wrong_report(check: dict, claims: list[dict]) -> str:
-    lines = []
-    for claim in claims:
-        verdict = check["verdicts"][claim["id"]]
-        broken = next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
-        lines.append(f"- {claim['file']}:{claim['line']} \"{claim['quote']}\" ({claim_ref(claim['id'])}). Fails when: "
-                     f"{verdict['failing_case']}. Evidence: {broken['evidence']}")
-    return "\n".join(lines)
+    return "\n".join(_wrong_line(ruled_wrong(claim, check["verdicts"][claim["id"]])) for claim in claims)
 
 
 def commit_preconditions(*, empty: bool, concluding: bool, staging: bool, alone: bool) -> Decision | None:
@@ -293,31 +304,39 @@ def hunk_state(holds: list[dict], hunk: dict) -> str:
     return "held" if hold["refusals"] >= REFUSALS_BEFORE_USER else "open"
 
 
-def _refuse_hunk(holds: list[dict], hunk: dict, claim_ids: list[str]) -> list[dict]:
+def _refuse_hunk(holds: list[dict], hunk: dict) -> dict | None:
+    """Count one refusal on the hold `hunk` continues, appending a new hold to `holds` when none does; None when the
+    user released these words, which counts nothing."""
     hold = find_hold(holds, hunk)
     if hold is None:
         hold = {"file": hunk["file"], "old_start": hunk["old_start"], "old_count": hunk["old_count"], "refusals": 0,
                 "claims": [], "patch_id": hunk["patch_id"], "released_patch_id": None}
-        holds = holds + [hold]
+        holds.append(hold)
     elif hold["released_patch_id"] == hunk["patch_id"]:
-        return holds
+        return None
     elif hold["released_patch_id"]:
         hold.update(refusals=0, released_patch_id=None)
     (a, b), (c, d) = _old_range(hold), _old_range(hunk)
     start, end = min(a, c), max(b, d)
     hold.update(old_start=start, old_count=end - start + 1 if hold["old_count"] or hunk["old_count"] else 0,
-                refusals=hold["refusals"] + 1, claims=sorted(claim_ids), patch_id=hunk["patch_id"])
-    return holds
+                refusals=hold["refusals"] + 1, patch_id=hunk["patch_id"])
+    return hold
+
+
+def _name_claims(hold: dict, check: dict) -> None:
+    """Keep on `hold` the claims `check` ruled WRONG in every hunk it covers, not only the hunk that refused last."""
+    hunks = {h["id"]: h for h in check["hunks"]}
+    hold["claims"] = sorted((ruled_wrong(c, check["verdicts"][c["id"]]) for c in wrong_claims(check)
+                             if touches(hold, hunks[c["hunk"]])), key=lambda c: (c["line"], c["id"]))
 
 
 def count_refusals(holds: list[dict], check: dict) -> list[dict]:
     """One refusal per hunk for a completed check that ruled any claim in it WRONG (spec FR-017)."""
-    by_hunk: dict[str, list[str]] = {}
-    for claim in wrong_claims(check):
-        by_hunk.setdefault(claim["hunk"], []).append(claim["id"])
-    for hunk in check["hunks"]:
-        if hunk["id"] in by_hunk:
-            holds = _refuse_hunk(holds, hunk, by_hunk[hunk["id"]])
+    holds = list(holds)
+    wrong = {c["hunk"] for c in wrong_claims(check)}
+    for hold in [_refuse_hunk(holds, h) for h in check["hunks"] if h["id"] in wrong]:
+        if hold is not None:
+            _name_claims(hold, check)
     return holds
 
 
@@ -345,7 +364,7 @@ def accept_contest(contest: dict, check: dict, located: Located) -> tuple[str | 
     """The id of the claim `contest` names, or why the completed `check` can't take the contest."""
     cid = parse_claim_ref(contest.get("claim"))
     if cid not in check["claims"]:
-        wrong = ", ".join(claim_ref(c["id"]) for c in wrong_claims(check)) or "none"
+        wrong = ", ".join(_named(c) for c in wrong_claims(check)) or "none"
         return None, [f"{contest.get('claim')!r} is not a claim id of this check; its WRONG claims: {wrong}"]
     verdict = check["verdicts"].get(cid)
     if verdict is None:
@@ -372,16 +391,19 @@ def fetch_allowed(url: str, hosts: list[str]) -> bool:
 
 
 def contest_outcome(check: dict, holds: list[dict], cid: str, verdict: dict) -> str:
-    """A fresh judge's ruling on a contested claim: upheld replaces the WRONG; rejected is one more refusal of its
-    hunk (critique P2). `holds` are the holds of every file in the check, changed in place."""
-    claim = check["claims"][cid]
+    """A fresh judge's ruling on a contested claim replaces its verdict: upheld lifts the WRONG; rejected refuses its
+    hunk as a completed check's WRONG does (critique P2). `holds` are the holds of every file in the check, changed in
+    place."""
+    hunk = next(h for h in check["hunks"] if h["id"] == check["claims"][cid]["hunk"])
+    check["verdicts"][cid] = verdict
     if verdict["verdict"] == "WRONG":
-        hunk = next(h for h in check["hunks"] if h["id"] == claim["hunk"])
-        holds[:] = _refuse_hunk(holds, hunk, [cid])
+        hold = _refuse_hunk(holds, hunk)
         outcome = "rejected"
     else:
-        check["verdicts"][cid] = verdict
+        hold = find_hold(holds, hunk)
         outcome = "upheld"
+    if hold is not None:
+        _name_claims(hold, check)
     check.setdefault("contests", {})[cid] = outcome
     return outcome
 

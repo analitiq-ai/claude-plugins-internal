@@ -252,18 +252,54 @@ class CommitDecision(unittest.TestCase):
         for kind in ("CORRECT", "UNSURE"):
             self.assertTrue(self.decide(check(verdicts={claim()["id"]: verdict(kind)})).allow, kind)
 
-    def test_a_held_hunk_asks_the_user(self):
-        hold = {"file": "README.md", "old_start": 3, "old_count": 1, "refusals": 3, "claims": [claim()["id"]],
-                "patch_id": "p1", "released_patch_id": None}
-        refused = self.decide(None, held=[hold])
+    @staticmethod
+    def held(current):
+        holds = []
+        for _ in range(claimcheck.REFUSALS_BEFORE_USER):
+            holds = claimcheck.count_refusals(holds, current)
+        return holds
+
+    def test_a_held_hunk_asks_the_user_and_shows_each_claim_with_its_ruling(self):
+        logs = claim("and it logs the reason", line=4)
+        logged = verdict("WRONG", failing_case="nothing is logged",
+                         assertions=[{"text": "it logs", "confirmed": False, "evidence": "validator.py:1"}])
+        current = check(claims=[claim(), logs], verdicts={claim()["id"]: verdict("WRONG"), logs["id"]: logged})
+        refused = self.decide(None, held=self.held(current))
         self.assertFalse(refused.allow)
-        self.assertIn(f"unlock claim-{claim()['id']}", refused.reason)
-        self.assertIn("README.md (old lines 3-3)", refused.reason)
+        for part in ("Stop and ask the user", "README.md (old lines 3-3), refused 3 times:",
+                     f'- README.md:3 "The validator rejects an empty list" (claim-{claim()["id"]}). Fails when: '
+                     f'check([]) returns True. Evidence: validator.py:2. Release: `unlock claim-{claim()["id"]}`',
+                     f'- README.md:4 "and it logs the reason" (claim-{logs["id"]}). Fails when: nothing is logged. '
+                     f'Evidence: validator.py:1. Release: `unlock claim-{logs["id"]}`'):
+            self.assertIn(part, refused.reason)
+
+    def test_each_held_hunk_shows_its_own_count(self):
+        far = claim("Other text", line=6, hid="h2")
+        current = check(claims=[claim(), far], verdicts={c["id"]: verdict("WRONG") for c in (claim(), far)},
+                        hunks=[hunk(), hunk("h2", old=(6, 1), new=(6, 1), patch_id="p2")])
+        again = check(verdicts={claim()["id"]: verdict("WRONG")}, hunks=[hunk(patch_id="p3")])
+        reason = self.decide(None, held=claimcheck.count_refusals(self.held(current), again)).reason
+        self.assertIn("README.md (old lines 3-3), refused 4 times:", reason)
+        self.assertIn("README.md (old lines 6-6), refused 3 times:", reason)
+
+    def test_a_held_claim_reads_as_the_wrong_refusal_names_it(self):
+        current = check(verdicts={claim()["id"]: verdict("WRONG")})
+        [line] = [l for l in self.decide(current).reason.split("\n") if l.startswith("- ")]
+        self.assertIn(line, self.decide(None, held=self.held(current)).reason)
+
+    def test_each_held_claim_is_listed_under_its_own_hunk(self):
+        far = claim("Other text", line=6, hid="h2")
+        current = check(claims=[claim(), far], verdicts={c["id"]: verdict("WRONG") for c in (claim(), far)},
+                        hunks=[hunk(), hunk("h2", old=(6, 1), new=(6, 1), patch_id="p2")])
+        reason = self.decide(None, held=self.held(current)).reason
+        first, second = reason.index("README.md (old lines 3-3)"), reason.index("README.md (old lines 6-6)")
+        self.assertLess(first, reason.index(f"claim-{claim()['id']}"))
+        self.assertLess(reason.index(f"claim-{claim()['id']}"), second)
+        self.assertLess(second, reason.index(f"claim-{far['id']}"))
 
     def test_a_held_new_file_is_named_as_new(self):
-        hold = {"file": "README.md", "old_start": 0, "old_count": 0, "refusals": 3, "claims": [claim()["id"]],
-                "patch_id": "p1", "released_patch_id": None}
-        self.assertIn("README.md (new file)", self.decide(None, held=[hold]).reason)
+        new = check(verdicts={claim()["id"]: verdict("WRONG")}, hunks=[hunk(old=(0, 0), new=(1, 6))])
+        self.assertIn("README.md (new file)", self.decide(None, held=self.held(new)).reason)
 
     def test_a_released_hunks_wrong_claims_pass(self):
         current = check(verdicts={claim()["id"]: verdict("WRONG")})
@@ -276,7 +312,10 @@ class Holds(unittest.TestCase):
         current = check(claims=two, verdicts={c["id"]: verdict("WRONG") for c in two})
         holds = claimcheck.count_refusals([], current)
         self.assertEqual([(h["file"], h["refusals"]) for h in holds], [("README.md", 1)])
-        self.assertEqual(sorted(holds[0]["claims"]), sorted(c["id"] for c in two))
+        self.assertEqual([c["id"] for c in holds[0]["claims"]], [c["id"] for c in two])
+        self.assertEqual(holds[0]["claims"][1], {"id": two[1]["id"], "file": "README.md", "line": 4,
+                                                 "quote": "and it logs the reason",
+                                                 "failing_case": "check([]) returns True", "evidence": "validator.py:2"})
 
     def test_overlapping_or_touching_hunks_continue_a_hold_and_others_do_not(self):
         holds = claimcheck.count_refusals([], check(verdicts={claim()["id"]: verdict("WRONG")}))
@@ -322,6 +361,32 @@ class Holds(unittest.TestCase):
         self.assertEqual((upheld, holds[0]["refusals"]), ("upheld", 2))
         self.assertEqual(current["verdicts"][claim()["id"]]["verdict"], "CORRECT")
 
+    def test_a_hold_names_the_wrong_claims_of_every_hunk_of_one_check_it_covers(self):
+        wide = check(verdicts={claim()["id"]: verdict("WRONG")}, hunks=[hunk(old=(3, 4), new=(3, 4))])
+        far = claim("Other text", line=6, hid="h2")
+        both = check(claims=[claim(), far], verdicts={c["id"]: verdict("WRONG") for c in (claim(), far)},
+                     hunks=[hunk(patch_id="p2"), hunk("h2", old=(6, 1), new=(6, 1), patch_id="p3")])
+        [hold] = claimcheck.count_refusals(claimcheck.count_refusals([], wide), both)
+        self.assertEqual([c["id"] for c in hold["claims"]], [claim()["id"], far["id"]])
+        claimcheck.contest_outcome(both, [hold], claim()["id"], verdict("WRONG"))
+        self.assertEqual([c["id"] for c in hold["claims"]], [claim()["id"], far["id"]])
+
+    def test_an_upheld_contest_drops_its_claim_from_the_hold(self):
+        logs = claim("and it logs the reason", line=4)
+        current = check(claims=[claim(), logs], verdicts={c["id"]: verdict("WRONG") for c in (claim(), logs)})
+        holds = claimcheck.count_refusals([], current)
+        claimcheck.contest_outcome(current, holds, claim()["id"], verdict("CORRECT"))
+        self.assertEqual([c["id"] for c in holds[0]["claims"]], [logs["id"]])
+
+    def test_a_rejected_contest_keeps_the_hunks_other_wrong_claims_and_shows_the_fresh_ruling(self):
+        logs = claim("and it logs the reason", line=4)
+        current = check(claims=[claim(), logs], verdicts={c["id"]: verdict("WRONG") for c in (claim(), logs)})
+        holds = claimcheck.count_refusals([], current)
+        claimcheck.contest_outcome(current, holds, claim()["id"], verdict("WRONG", failing_case="check([0]) is True"))
+        self.assertEqual([(c["quote"], c["failing_case"]) for c in holds[0]["claims"]],
+                         [("The validator rejects an empty list", "check([0]) is True"),
+                          ("and it logs the reason", "check([]) returns True")])
+
 
 class Contests(unittest.TestCase):
     def test_a_contest_names_a_wrong_claim_and_gives_evidence(self):
@@ -340,7 +405,8 @@ class Contests(unittest.TestCase):
         current = check(verdicts={cid: verdict("WRONG")})
         for named in (cid, "nope", None):
             self.assertEqual(claimcheck.accept_contest({"claim": named, "evidence": "validator.py:2"}, current, located),
-                             (None, [f"{named!r} is not a claim id of this check; its WRONG claims: claim-{cid}"]))
+                             (None, [f"{named!r} is not a claim id of this check; its WRONG claims: "
+                                     f'README.md:3 "The validator rejects an empty list" (claim-{cid})']))
         passed = check(verdicts={cid: verdict("CORRECT")})
         self.assertEqual(claimcheck.accept_contest({"claim": f"claim-{cid}", "evidence": "validator.py:2"}, passed,
                                                    located), (None, [f"claim-{cid} is CORRECT, not WRONG"]))
