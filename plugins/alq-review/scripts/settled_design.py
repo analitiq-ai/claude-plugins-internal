@@ -7,10 +7,13 @@ Existing tools fields. Whether the choice is right is for critique and review; t
 was recorded.
 
 A branch is graded as the gate grades it at the first internal round: each spec folder it changes, or, when it
-changes none, each design document it changes, which needs one.
+changes none, each design document it changes, which needs one. A spec folder is `<dir>/specs/<feature>/` at any
+depth: Spec Kit puts `specs/` beside the nearest `.specify/`, so a repo can hold one spec home per project in it.
 
 Usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into>. Prints one problem per line
 and exits 1 when there are any, 2 when the check cannot run.
+settled_design.py --spec-folders <checkout> <branch it merges into> prints the spec folders the branch changes
+and keeps, one per line, relative to the checkout.
 """
 from __future__ import annotations
 
@@ -123,12 +126,26 @@ def design_documents(changed: list[str], patterns: list[str]) -> list[str]:
     return [f for f in changed if any(PurePosixPath(f).full_match(p) for p in patterns)]
 
 
+def _spec_folder(path: str) -> str | None:
+    """The spec folder a changed path lies in, or None; a file directly under `specs/` is in none."""
+    parts = PurePosixPath(path).parts
+    if "specs" not in parts:
+        return None
+    end = parts.index("specs") + 2
+    return str(PurePosixPath(*parts[:end])) if len(parts) > end else None
+
+
+def spec_folders(root: str, changed: list[str]) -> list[str]:
+    """The spec folders among the `changed` paths that the checkout at `root` still has."""
+    touched = {folder for f in changed if (folder := _spec_folder(f))}
+    # A folder the branch deleted cannot be graded, so it does not stand in for the one a design document needs.
+    return sorted(f for f in touched if (Path(root) / f).is_dir())
+
+
 def branch_problems(root: str, base: str, patterns: list[str]) -> list[str]:
     """Problems with the branch checked out at `root`, measured from `base`."""
     changed = worktree.changed_files(root, base)
-    # A folder the branch deleted cannot be graded, so it does not stand in for the one a design document needs.
-    touched = {Path(*Path(f).parts[:2]) for f in changed if f.startswith("specs/") and len(Path(f).parts) > 2}
-    folders = sorted(f for f in touched if (Path(root) / f).is_dir())
+    folders = spec_folders(root, changed)
     if not folders:
         return [f"{doc}:1: a design document changed and no spec folder the branch keeps did; a design-document change comes with a "
                 "spec folder. Next step: settle the design in a spec folder (/alq-review:design-doc #<issue>)."
@@ -137,6 +154,11 @@ def branch_problems(root: str, base: str, patterns: list[str]) -> list[str]:
 
 
 def _run(argv: list[str]) -> list[str]:
+    if len(argv) == 3 and argv[0] == "--spec-folders" and all(argv[1:]):
+        root, target = argv[1:]
+        for folder in spec_folders(root, worktree.changed_files(root, worktree.review_base(root, target))):
+            print(folder)
+        return []
     if len(argv) == 3 and argv[0] == "--branch" and all(argv[1:]):
         root, target = argv[1:]
         return branch_problems(root, worktree.review_base(root, target), config.load()["design_documents"])
@@ -145,7 +167,8 @@ def _run(argv: list[str]) -> list[str]:
         if not folder.is_dir():
             raise ValueError(f"{folder}: not a spec folder")
         return problems(folder)
-    print("usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into>", file=sys.stderr)
+    print("usage: settled_design.py <spec folder> | --branch <checkout> <branch it merges into> | --spec-folders "
+          "<checkout> <branch it merges into>", file=sys.stderr)
     sys.exit(2)
 
 

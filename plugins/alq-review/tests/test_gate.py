@@ -1145,12 +1145,12 @@ class SpecChecks(Gate):
         super().setUp()
         self.env["ALQ_REVIEW_SPEC_CHECKS"] = "enforce"
 
-    def commit_spec(self, plan):
-        folder = self.root / "specs" / "004-demo"
+    def commit_spec(self, plan, home="."):
+        folder = self.root / home / "specs" / "004-demo"
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "plan.md").write_text(plan)
         (folder / "research.md").write_text(test_settled_design.RESEARCH)
-        git(self.root, "add", "specs")
+        git(self.root, "add", "-A")
         git(self.root, "commit", "-q", "-m", "docs: plan")
 
 
@@ -1168,6 +1168,12 @@ class SettledDesign(SpecChecks):
     def test_a_settled_folder_launches(self):
         self.commit_spec(test_settled_design.PLAN)
         self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_a_spec_folder_under_a_subdirectory_is_graded(self):
+        self.commit_spec("# Plan\n", home="plugins/x")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("plugins/x/specs/004-demo/plan.md", self.reason(out))
 
     def test_a_branch_that_changes_no_spec_folder_is_not_checked(self):
         folder = self.root / "specs" / "004-demo"
@@ -1261,6 +1267,22 @@ class DesignDocuments(SpecChecks):
         self.assertEqual(self.decision(out), "deny")
         self.assertIn("## Mechanisms", self.reason(out))
 
+    def test_a_design_document_with_a_settled_spec_folder_under_a_subdirectory_launches(self):
+        self.commit_file("plugins/x/README.md")
+        self.commit_spec(test_settled_design.PLAN, home="plugins/x")
+        self.assertEqual(self.decision(self.launch()[0]), "allow")
+
+    def test_deleting_a_spec_folder_under_a_subdirectory_does_not_stand_in_for_one(self):
+        self.commit_spec(test_settled_design.PLAN, home="plugins/x")
+        git(self.root, "push", "-q", "origin", "HEAD:main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "rm", "-q", "-r", "plugins/x/specs")
+        git(self.root, "commit", "-q", "-m", "docs: drop the finished spec")
+        self.commit_file("plugins/x/README.md")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("plugins/x/README.md:1: ", self.reason(out))
+
     def test_deleting_a_spec_folder_does_not_stand_in_for_one(self):
         self.commit_spec(test_settled_design.PLAN)
         git(self.root, "push", "-q", "origin", "HEAD:main")
@@ -1314,6 +1336,24 @@ class DesignDocuments(SpecChecks):
         self.commit_spec(test_settled_design.PLAN)
         done = self.run_by_hand()
         self.assertEqual((done.returncode, done.stderr), (0, ""))
+
+
+    def spec_folders_by_hand(self):
+        return subprocess.run([sys.executable, str(SCRIPTS / "settled_design.py"), "--spec-folders", str(self.root),
+                               "main"], capture_output=True, text=True)
+
+    def test_spec_folders_lists_the_folders_the_gate_grades(self):
+        self.commit_spec(test_settled_design.PLAN)
+        self.commit_spec(test_settled_design.PLAN, home="plugins/x")
+        self.commit_file("plugins/x/specs/notes.md")
+        done = self.spec_folders_by_hand()
+        self.assertEqual((done.returncode, done.stdout, done.stderr),
+                         (0, "plugins/x/specs/004-demo\nspecs/004-demo\n", ""))
+
+    def test_spec_folders_of_a_branch_without_one_prints_nothing(self):
+        self.commit_file("README.md")
+        done = self.spec_folders_by_hand()
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
 
 
 if __name__ == "__main__":
