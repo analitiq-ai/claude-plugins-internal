@@ -54,13 +54,15 @@ that is under review.
    assessor's brief carries the same text. A launch is refused when gh cannot read the issue's
    comments, or finds more than one spec among them. Audit reviewers are not given the spec.
 6. **A settled design before the first round.** The first internal round on a branch that changes a
-   spec folder (`specs/<feature>/`) runs `scripts/settled_design.py` on each such folder: every
+   spec folder (`<dir>/specs/<feature>/` at any depth, so each plugin of a repo can keep its own `specs/`) runs
+   `scripts/settled_design.py` on each such folder: every
    mechanism under `plan.md`'s `## Mechanisms` cites a `research.md` decision with Decision, Rationale
    and Existing tools (or `None fit. Looked at: <where>`). A folder that fails refuses the round and is
    named with each problem. A branch that changes a design document (the `design_documents` path
    patterns in `config.json`: README, CLAUDE.md, AGENTS.md, ADRs, rule files) and no spec folder is
    refused too. Run it by hand with `python3 scripts/settled_design.py <spec folder>`, or as the gate
-   runs it with `python3 scripts/settled_design.py --branch <checkout> <branch it merges into>`.
+   runs it with `python3 scripts/settled_design.py --branch <checkout> <branch it merges into>`; `--spec-folders`
+   in place of `--branch` lists the spec folders it would grade.
 7. **Claims are checked before they are committed.** Every `git commit` an agent runs, with or without a PR,
    is refused until the `claim-check` workflow has checked that exact staged tree. Readers label each hunk
    code, prose or mixed and quote each claim its text makes, in one of the categories `scripts/briefs.py`
