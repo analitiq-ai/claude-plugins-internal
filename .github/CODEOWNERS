@@ -1,0 +1,5 @@
+# The owner's approving review is what ratifies a decision record.
+/dev/alq-review/docs/adr/ @Analitiq-Bot-Wonka
+
+# Owned too, or the rule above could be removed without that approval.
+/.github/CODEOWNERS @Analitiq-Bot-Wonka
