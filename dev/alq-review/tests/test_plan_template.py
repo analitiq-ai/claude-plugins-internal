@@ -9,7 +9,9 @@ import textwrap
 import unittest
 from pathlib import Path
 
-DRIVER = Path(__file__).resolve().parents[1] / "scripts"
+from paths import PLUGIN
+
+DRIVER = PLUGIN / "skills" / "design-doc" / "scripts"
 sys.path.insert(0, str(DRIVER))
 import drive_workflow  # noqa: E402
 

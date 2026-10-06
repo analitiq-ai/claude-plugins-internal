@@ -6,8 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from paths import PLUGIN
+
 HERE = Path(__file__).resolve().parent
-GATE = HERE.parent / "deepsource-pr-gate.sh"
+GATE = PLUGIN / "skills" / "alq-github-pr-review" / "deepsource-pr-gate.sh"
 GRADE_A = (HERE / "fixtures" / "deepsource-grade-a.html").read_text()          # reviews 28ad046...babd121
 GRADE_B = (HERE / "fixtures" / "deepsource-grade-b-python-failed.html").read_text()  # reviews 034d6f8...4b982f3
 DEEPSOURCE = "deepsource-io[bot]"

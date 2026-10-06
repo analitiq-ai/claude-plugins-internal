@@ -12,11 +12,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from paths import PLUGIN
+
 import yaml  # Spec Kit's own dependency
 
-SKILL = Path(__file__).resolve().parents[1]
+SKILL = PLUGIN / "skills" / "design-doc"
 DRIVER = SKILL / "scripts" / "drive_workflow.py"
-SPECKIT = SKILL.parents[1] / "speckit"
+SPECKIT = PLUGIN / "speckit"
 sys.path.insert(0, str(DRIVER.parent))
 import drive_workflow  # noqa: E402
 

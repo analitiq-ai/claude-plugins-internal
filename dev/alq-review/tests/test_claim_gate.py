@@ -10,6 +10,8 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
+from paths import PLUGIN
+
 from test_gate import Gate
 from test_worktree_facts import git
 
@@ -18,7 +20,7 @@ import hookio
 import ledger
 
 HARNESS = Path(__file__).resolve().parent / "workflow_harness.mjs"
-WORKFLOW = Path(__file__).resolve().parent.parent / "workflows" / "claim-check.js"
+WORKFLOW = PLUGIN / "workflows" / "claim-check.js"
 CHECK = "alq-review:claim-check"
 READER, JUDGE, CONTEST = "alq-review:claim-reader", "alq-review:claim-judge", "alq-review:claim-contest-judge"
 VALIDATOR = "def check(items):\n    return True\n"

@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - id: find
-        run: echo "suites=$(find plugins -type d -name tests -not -path '*/fixtures/*' | sort | jq -Rcs 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
+        run: echo "suites=$(find dev -type d -name tests -not -path '*/fixtures/*' | sort | jq -Rcs 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
 
   unittest:
     name: unittest (${{ matrix.suite }})

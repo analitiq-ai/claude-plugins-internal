@@ -7,11 +7,12 @@ import re
 import unittest
 from pathlib import Path
 
+from paths import PLUGIN
+
 import helpers  # noqa: F401  puts scripts/ on the path
 
 import github
 
-PLUGIN = Path(__file__).resolve().parents[1]
 SKILLS = PLUGIN / "skills"
 LOCAL_SPEC_COPY = re.compile(r"specs/<\w+>\.md")
 

@@ -2,10 +2,11 @@
 tells an agent to do what the gate now does for it is checked here too."""
 import re
 import unittest
-from pathlib import Path
 
-AGENTS = Path(__file__).resolve().parent.parent / "agents"
-TACKLE = Path(__file__).resolve().parents[1] / "skills" / "alq-issue-tackle" / "SKILL.md"
+from paths import PLUGIN
+
+AGENTS = PLUGIN / "agents"
+TACKLE = PLUGIN / "skills" / "alq-issue-tackle" / "SKILL.md"
 
 
 def tools(name: str) -> list[str]:

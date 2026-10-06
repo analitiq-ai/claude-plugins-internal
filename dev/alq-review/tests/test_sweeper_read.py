@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-HOOK = Path(__file__).resolve().parent.parent / "scripts" / "sweeper_read.py"
+from paths import PLUGIN
+
+HOOK = PLUGIN / "scripts" / "sweeper_read.py"
 SWEEPER = "alq-review:shim-sweeper"
 
 

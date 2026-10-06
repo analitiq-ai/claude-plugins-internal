@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-GATE = Path(__file__).resolve().parent.parent / "scripts" / "pre_merge_gate.py"
+from paths import PLUGIN
+
+GATE = PLUGIN / "scripts" / "pre_merge_gate.py"
 HEAD = "0123456789abcdef0123456789abcdef01234567"
 
 
