@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0001"
 title: "Follow a piece of text across edits by a lineage carried from version to version"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, holds]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/specs/{005-claim-check-gate,006-shim-check-gate}/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka" 
   agent:
     name: Claude Code
     model: claude-fable-5-1
