@@ -72,14 +72,15 @@ an agent reading and obeying an instruction, and does every refusal name the nex
 
 Source: `README.md` (opening; How an agent uses it).
 
-### P2. Only the User Releases a Hold
+### P2. Only an Approved Entity Releases a Hold
 
-Gate: for every lock, count or hold the plan adds or changes, can anything an agent is able to
-do — an edit, a commit, a re-run, a move of the branch — release it, lower it or start it again?
-If so the plan fails: a release MUST be something only the user's own prompt can do.
+Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
+approved to release it (the user or another system) and the one action by which it does?
+Nothing else may release the hold, lower it or start it again. A hold with no named approver,
+or with any second way out, fails the gate.
 
-Source: `README.md` (What it enforces 2, 4, 7, 8; State: `unlock` is user
-only).
+Source: `README.md` (What it enforces 2, 4, 7, 8; State: `unlock`; Layout:
+`scripts/pre_merge_gate.py`, the org gate's release).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
