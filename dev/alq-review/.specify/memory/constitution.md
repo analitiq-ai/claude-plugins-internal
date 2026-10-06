@@ -114,7 +114,7 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - Repo shape: `plugins/<name>/` holds what an install copies, listed in
   `.claude-plugin/marketplace.json`; `dev/<name>/` holds what the plugin is built with (this
   project and its `specs/<nnn>-<feature>/`) and is never installed (`README.md`).
-- Tests: CI runs every `tests/` folder under `plugins/` (`.github/workflows/tests.yml`).
+- Tests: CI runs every `tests/` folder under `plugins/` and `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
 - The spec-folder, claim and shim checks each have a `log` / `enforce` setting beside the
   plugin's mode (`plugins/alq-review/README.md`: Mode).
 - Where the plugin keeps its state: `plugins/alq-review/README.md` (State).
@@ -146,4 +146,4 @@ CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-06
+**Version**: 1.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-06
