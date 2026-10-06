@@ -41,7 +41,7 @@ refusals of a hunk (`plugins/alq-review/scripts/claimcheck.py:333`). The shim ch
 one bug in a chain of code ranges (`plugins/alq-review/scripts/shimcheck.py:187`).
 
 The bound is there to bring the user in when there is too much churn on one claim. Agents are meant to keep
-reworking text through review rounds until it has no contradictions. So the count has to follow one claim
+reworking through review rounds until the PR's reviewers raise no more legitimate issues. So the count has to follow one claim
 through its rewordings. Other work on the branch must not touch it. It must not lower except by the approved
 entity's release, or when that churn ends: the claim is ruled `CORRECT` or is deleted.
 
