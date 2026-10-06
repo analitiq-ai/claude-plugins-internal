@@ -1,8 +1,9 @@
 # alq-review Constitution
 
-Constitution for the `alq-review` plugin, whose Spec Kit project is this folder
-(`plugins/alq-review/` in `analitiq-ai/claude-plugins-internal`). Paths are relative to it unless
-they name another repo. Each principle is a plan-time gate: a plan passes only if it answers the
+Constitution for building the `alq-review` plugin. Its Spec Kit project is `dev/alq-review/` in
+`analitiq-ai/claude-plugins-internal`; the plugin it governs is `plugins/alq-review/`. Paths are
+relative to the repo root unless they name another repo. Nothing under `dev/` is installed with
+the plugin. Each principle is a plan-time gate: a plan passes only if it answers the
 gate question. The files named in each Source line are the source of truth; this document
 indexes them and never restates their text.
 
@@ -70,7 +71,7 @@ code it governs in the same PR).
 Gate: is every rule the plan adds decided by code on the hook path, with no step that relies on
 an agent reading and obeying an instruction, and does every refusal name the next legal step?
 
-Source: `README.md` (opening; How an agent uses it).
+Source: `plugins/alq-review/README.md` (opening; How an agent uses it).
 
 ### P2. Only an Approved Entity Releases a Hold
 
@@ -79,7 +80,7 @@ approved to release it (the user or another system) and the one action by which 
 Nothing else may release the hold, lower it or start it again. A hold with no named approver,
 or with any second way out, fails the gate.
 
-Source: `README.md` (What it enforces 2, 4, 7, 8; State: `unlock`; Layout:
+Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 7, 8; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
@@ -87,7 +88,7 @@ Source: `README.md` (What it enforces 2, 4, 7, 8; State: `unlock`; Layout:
 Gate: does every decision the plan adds live in a pure function of stored state and git's
 answers, with hook handlers doing only input/output and workflows doing only orchestration?
 
-Source: `README.md` (Layout).
+Source: `plugins/alq-review/README.md` (Layout).
 
 ### P4. A Check That Could Not Run Is Its Own Outcome
 
@@ -95,7 +96,7 @@ Gate: when a reader, judge, model or service the plan depends on does not answer
 reported as a failed check or a named `cannot verify` — never as a pass, never as a finding
 against the author, and never as a guess?
 
-Source: `README.md` (What it enforces 2, 7; Mode: the shim check).
+Source: `plugins/alq-review/README.md` (What it enforces 2, 7; Mode: the shim check).
 
 ### P5. Settled Design, Existing Tools First
 
@@ -103,21 +104,22 @@ Gate: does every mechanism in `plan.md` cite a `research.md` decision carrying D
 Rationale and Existing tools (or `None fit. Looked at: <where>`), so nothing is hand-rolled
 before what already exists was looked at?
 
-Source: `README.md` (What it enforces 6); `scripts/settled_design.py`.
+Source: `plugins/alq-review/README.md` (What it enforces 6);
+`plugins/alq-review/scripts/settled_design.py`.
 
 ## Platform Constraints
 
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
-- Repo shape: one folder per plugin under `plugins/`, listed in the repo's
-  `.claude-plugin/marketplace.json`; each plugin keeps its own `specs/<nnn>-<feature>/` (the
-  repo's `README.md`).
-- Tests: CI runs every `tests/` folder under `plugins/` (the repo's
-  `.github/workflows/tests.yml`).
+- Repo shape: `plugins/<name>/` holds what an install copies, listed in
+  `.claude-plugin/marketplace.json`; `dev/<name>/` holds what the plugin is built with (this
+  project and its `specs/<nnn>-<feature>/`) and is never installed (`README.md`).
+- Tests: CI runs every `tests/` folder under `plugins/` (`.github/workflows/tests.yml`).
 - The spec-folder, claim and shim checks each have a `log` / `enforce` setting beside the
-  plugin's mode; state lives in one SQLite ledger outside the repo (`README.md`: Mode; State).
-- Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins (`README.md`,
-  last line).
+  plugin's mode (`plugins/alq-review/README.md`: Mode).
+- Where the plugin keeps its state: `plugins/alq-review/README.md` (State).
+- Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins
+  (`plugins/alq-review/README.md`, last line).
 - Private repo: Principle II's public-repo limits bind what the plugin writes into public repos,
   not this repo's own files.
 
@@ -126,8 +128,8 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 Not gates — context so `/speckit-tasks` shapes tasks to fit: issue-numbered branch, worktree at
 `.claude/worktrees/<n>`, draft PR, internal review rounds, then merge on a clean round and green
 CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
-`.claude/rules/pr-review-loop.md`. Plans are checked against the decision records in `docs/adr/`
-by the adrkit `after_plan` hook.
+`.claude/rules/pr-review-loop.md`. Decision records go in `dev/alq-review/docs/adr/`. The adrkit
+`after_plan` hook is optional: it offers to check a plan against them.
 
 ## Governance
 

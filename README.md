@@ -16,5 +16,7 @@ claude plugin install alq-review@alq-internal
 
 The repo is private: the clone uses your git credentials for github.com.
 
-Each plugin keeps its feature specs in its own `specs/<nnn>-<feature>/` (Spec Kit), e.g. `plugins/alq-review/specs/`. CI runs every `tests/` folder under `plugins/`
-(`.github/workflows/tests.yml`).
+`plugins/<name>/` holds what an install copies. `dev/<name>/` holds what the plugin is built with and is never installed: its
+Spec Kit project (`.specify/`, with the plugin's constitution), the `speckit-*` commands and its feature specs in
+`specs/<nnn>-<feature>/`. Its decision records go in `docs/adr/` there. Start Claude Code in `dev/<name>/` for spec work. CI runs every
+`tests/` folder under `plugins/` (`.github/workflows/tests.yml`).

@@ -88,9 +88,11 @@ that is under review.
    repo's `.gitignore` should list. Jev then answers where the fix acts and whether it reaches every listed site
    with the same defect; anything short of a fix at the cause that reaches them all is a `patch`, and its commit is
    refused. With no listed site left, a fix at the cause is complete. Only the user overrides a bug, by typing the
-   `override shim-<id>` that each refusal names. The full rules are in `specs/006-shim-check-gate/`, amended by
-   `specs/011-shim-no-site-left/`.
-   A commit whose code is all in test files skips this check (`specs/012-tests-only-tree/`).
+   `override shim-<id>` that this check's refusal of a commit names, except the refusal that says to run
+   `git commit` alone. An overridden bug lets the commit through only after the claim check has labelled every
+   staged hunk. The full rules are in this repo's
+   `dev/alq-review/specs/006-shim-check-gate/`, amended by `dev/alq-review/specs/011-shim-no-site-left/`.
+   A commit whose code is all in test files skips this check (`dev/alq-review/specs/012-tests-only-tree/`).
 
 ## How an agent uses it
 
