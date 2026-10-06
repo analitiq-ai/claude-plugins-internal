@@ -111,8 +111,10 @@ Agents do not need to be told any of this: every refusal names the next legal st
 ## Mode
 
 `config.json` holds `{"mode": "log"}` or `{"mode": "enforce"}`; `ALQ_REVIEW_MODE` overrides it.
-In `log` mode nothing is blocked; each refusal is written as `would_deny` to `gate.log` so the rules
-can be checked against real sessions before they can stall one.
+It ships `enforce`, as does each check's own setting below.
+In `log` mode a refusal made through `hookio.refuse` does not block; it is written as `would_deny` to `gate.log`.
+A workflow launched without `args.worktree`, an agent's rejected output, a shim sweeper's read outside its
+snapshot and `scripts/pre_merge_gate.py` refuse in either mode.
 
 The spec-folder checks (6) have their own `spec_checks` setting, overridden by `ALQ_REVIEW_SPEC_CHECKS`.
 It ships `enforce`; the checks refuse only when both settings enforce.
