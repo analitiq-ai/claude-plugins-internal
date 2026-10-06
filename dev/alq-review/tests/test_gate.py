@@ -11,6 +11,8 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
+from paths import PLUGIN
+
 from test_worktree_facts import Repo, git
 
 import briefs
@@ -22,7 +24,7 @@ import policy
 import test_policy
 import test_settled_design
 
-SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+SCRIPTS = PLUGIN / "scripts"
 GATE = SCRIPTS / "gate.py"
 REVIEW, ASSESS = "alq-review:review-round", "alq-review:assess-round"
 

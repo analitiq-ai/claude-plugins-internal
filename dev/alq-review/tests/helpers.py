@@ -1,8 +1,9 @@
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from paths import PLUGIN
+
+sys.path.insert(0, str(PLUGIN / "scripts"))
 
 import ledger  # noqa: E402
 

@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from unittest import mock
 
+from paths import PLUGIN
+
 from test_claim_gate import HARNESS, ClaimGate
 from test_worktree_facts import git
 
@@ -22,7 +24,7 @@ LAUNCH = "alq-review:shim-check"
 FIXED = "".join(f"b{i}\n" for i in range(3)) + "b3 checked\n" + "".join(f"b{i}\n" for i in range(4, 20))
 SITE = {"file": "c.py", "line": 2, "function": "load", "does": "reads b unchecked"}
 SWEEPER, SITE_JUDGE = "alq-review:shim-sweeper", "alq-review:shim-site-judge"
-WORKFLOW = Path(__file__).resolve().parent.parent / "workflows" / "shim-check.js"
+WORKFLOW = PLUGIN / "workflows" / "shim-check.js"
 
 
 class Jev(BaseHTTPRequestHandler):

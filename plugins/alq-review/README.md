@@ -141,7 +141,7 @@ failed, and a failed check refuses the commit as a patch does.
   - `shim_checks (repo, tree)`, `shim_chains (repo, id)`, `shim_rulings (repo, chain, site)` - the shim checks, the
     chains of fixes of one bug, and the rulings on contested sites
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
-  FINDINGS; stored under its PR once per hook event, before anything is judged (`tests/test_poller_contract.py` pins the two ends together)
+  FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
 
 ```
@@ -175,7 +175,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `agents/assessor.md` | the assessor |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
 
-Tests: `python3 -m unittest` in each `tests/` folder. The design-doc driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
-`tests/test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
+Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy. The design-doc driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
+`test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.

@@ -12,7 +12,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-POLLER = Path(__file__).resolve().parents[1] / "poll-pr-review.sh"
+from paths import PLUGIN
+
+POLLER = PLUGIN / "skills" / "alq-github-pr-review" / "poll-pr-review.sh"
 REPO, PR = "acme/demo", 7
 HEAD = "abc1234567890abcdef1234567890abcdef12345"
 CODEX = "chatgpt-codex-connector"

@@ -6,10 +6,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from paths import PLUGIN
+
 import helpers  # noqa: F401  (puts scripts/ on the path)
 import settled_design
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "settled_design.py"
+SCRIPT = PLUGIN / "scripts" / "settled_design.py"
 
 PLAN = """# Plan
 
