@@ -3,7 +3,7 @@ and how often one hunk may be refused before the user decides. No I/O: git and t
 arguments, the way `policy.py` takes a ledger the gate has already read; a function that updates a check or its
 holds changes the argument in place.
 
-A check is one staged tree's record (see specs/005-claim-check-gate/data-model.md): its hunks, the reader's label
+A check is one staged tree's record (see dev/alq-review/specs/005-claim-check-gate/data-model.md): its hunks, the reader's label
 and claims per hunk, and a verdict per judged claim.
 """
 from __future__ import annotations

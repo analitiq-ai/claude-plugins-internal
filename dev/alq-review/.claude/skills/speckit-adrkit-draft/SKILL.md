@@ -1,0 +1,1 @@
+../../../.specify/extensions/adrkit/.specify-dev/agent-commands/claude/speckit-adrkit-draft/SKILL.md

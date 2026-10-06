@@ -1,0 +1,120 @@
+schema_version: "1.0"
+workflow:
+  id: "design-doc"
+  name: "Design Document Cycle"
+  version: "1.4.0"
+  author: "Analitiq"
+  description: "Settles design decisions in a spec folder before a design document is drafted: specify → grill → plan → critique → tasks"
+
+requires:
+  speckit_version: ">=1.0.7"
+  integrations:
+    any: ["claude"]
+
+inputs:
+  spec:
+    type: string
+    required: true
+    prompt: "Describe the document change and the decisions it must make"
+  # Non-empty re-scopes an existing spec folder. The folder itself comes from $SPEC_DIR, never from
+  # this input: template text is spliced into shell source before the shell can validate it.
+  spec_dir:
+    type: string
+    default: ""
+  integration:
+    type: string
+    default: "claude"
+    prompt: "Integration to use"
+  # Gate verdicts for runs driven without a terminal (the /alq-review:design-doc skill passes them on resume).
+  grill_verdict:
+    type: string
+    default: ""
+  critique_verdict:
+    type: string
+    default: ""
+
+steps:
+  # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
+  - id: scope
+    type: if
+    condition: "{{ inputs.spec_dir }}"
+    then:
+      - id: select-spec
+        type: shell
+        run: |
+          set -eu
+          dir="$SPEC_DIR"
+          case "$dir" in
+            specs/*/*|*..*|*[!A-Za-z0-9._/-]*|specs/) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
+            specs/*) ;;
+            *) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
+          esac
+          test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+          printf '{\n  "feature_directory": "%s"\n}\n' "$dir" > .specify/feature.json
+    else:
+      - id: specify
+        command: speckit.specify
+        integration: "{{ inputs.integration }}"
+        input:
+          args: "{{ inputs.spec }}"
+
+  # grill interviews the author, which a headless command step cannot do.
+  - id: grill
+    type: gate
+    message: "In Claude Code, run /speckit-grill-me on this spec and answer every question. Approve when grill has finished."
+    options: [approve, reject]
+    verdict_input: grill_verdict
+    on_reject: abort
+
+  - id: no-open-markers
+    type: shell
+    run: |
+      set -eu
+      dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+      test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+      found=0
+      grep -n "NEEDS CLARIFICATION" "$dir/spec.md" || found=$?
+      case $found in
+        0) echo "Open clarification markers remain in $dir/spec.md" >&2; exit 1 ;;
+        1) ;;
+        *) exit "$found" ;;
+      esac
+
+  - id: plan
+    command: speckit.plan
+    integration: "{{ inputs.integration }}"
+    input:
+      args: "{{ inputs.spec }}"
+
+  # Every mechanism the plan lists cites a research decision naming the existing tools looked at.
+  - id: settled-design
+    type: shell
+    run: |
+      set -eu
+      dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+      python3 "$ALQ_REVIEW_ROOT/scripts/settled_design.py" "$dir"
+
+  - id: mark-critiques
+    type: shell
+    run: python3 .specify/workflows/design-doc/critique_report.py mark
+
+  - id: critique
+    command: speckit.critique.run
+    integration: "{{ inputs.integration }}"
+
+  - id: new-critique
+    type: shell
+    output_format: json
+    run: python3 .specify/workflows/design-doc/critique_report.py find
+
+  - id: review-critique
+    type: gate
+    message: "Review the critique. Fix the spec/plan for every finding you accept, then approve."
+    show_file: "{{ steps.new-critique.output.data.path }}"
+    options: [approve, reject]
+    verdict_input: critique_verdict
+    on_reject: abort
+
+  - id: tasks
+    command: speckit.tasks
+    integration: "{{ inputs.integration }}"
