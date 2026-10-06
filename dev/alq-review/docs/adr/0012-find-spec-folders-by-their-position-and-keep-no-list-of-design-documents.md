@@ -36,107 +36,79 @@ externalRefs:
 
 # ADR-0012: Find spec folders by their position and keep no list of design documents
 
-Draft for the ratifier. Paths are relative to the repo root. The first half of this record is in the code
-today. The second half, deleting the design-document rule, is not (main @ 50c4330).
-
 ## Context
 
 Before the first internal review round, the gate has to know which changed files belong to a design. It
-answers that in two different ways.
+answers that in two ways.
 
-**Spec folders are found by position.** `_spec_folder` (`plugins/alq-review/scripts/settled_design.py:129`)
-looks only at the parts of a changed path. It returns the path up to the part after the first `specs` part,
-when the path has more parts after that one. It returns `None` for a path with no `specs` part and for a file
-directly under `specs/`. `test_a_folder_under_a_subdirectory_counts`
-(`dev/alq-review/tests/test_settled_design.py:128`) passes `plugins/x/specs/004-demo/plan.md` to
-`spec_folders` and asserts that the result is the folder `plugins/x/specs/004-demo`. Spec 015 chose this in
-`dev/alq-review/specs/015-nested-spec-folders/research.md` R1: "it is Spec Kit's own layout", "so it needs
-nothing kept in step with it".
+Spec folders are found by position. Spec 015 research R1 chose `<dir>/specs/<feature>/` at any depth, read
+from the path, because "it is Spec Kit's own layout", "so it needs nothing kept in step with it".
 
-**Design documents are found by a configured list.** `plugins/alq-review/config.json` holds
-`design_documents`, five path patterns: `**/README.md`, `**/CLAUDE.md`, `**/AGENTS.md`, `docs/adr/**` and
-`.claude/rules/**`. When the changed files lie in no spec folder that the checkout still has,
-`branch_problems` returns one problem for each changed file that matches a pattern
-(`plugins/alq-review/scripts/settled_design.py:149`). The gate passes the list in at
-`plugins/alq-review/scripts/gate.py:359`, and the `--branch` mode of the script does at
-`plugins/alq-review/scripts/settled_design.py:164`. Spec 004 chose the rule in
-`dev/alq-review/specs/004-spec-folder-checks/research.md` R10 and states it as FR-004
-(`dev/alq-review/specs/004-spec-folder-checks/spec.md:170`).
+Design documents are found by a list. `plugins/alq-review/config.json` holds `design_documents`, a list of
+path patterns. A branch that changes a matching file and no spec folder is refused its first internal round.
+Spec 004 chose that rule (FR-004, research R10).
 
-Spec 015 R1 rejected a list for spec folders and said why: it "would be a hand-maintained list, and
-`config.json` is plugin-wide, not per repo" (`dev/alq-review/specs/015-nested-spec-folders/research.md:8`).
-Lines 13 and 14 of that file call `design_documents` "a configured list, rejected for the reason above". The
-list stayed in use for design documents.
+Spec 015 R1 rejected a list for spec folders: it "would be a hand-maintained list, and `config.json` is
+plugin-wide, not per repo". The same kind of list stayed in use for design documents. Issue #29 records what
+came of it:
 
-What was observed of the rule:
+- The rule fires on a file changing, not on a design changing.
+- It refused the first round on PR #21, which moved tests to another folder, and on PR #28, which corrected
+  two README sentences. Neither decided a design.
+- Its pattern `docs/adr/**` does not match this repo's decision records, which are in
+  `dev/alq-review/docs/adr/`.
 
-- `design_documents` matches the paths of changed files, not their content
-  (`plugins/alq-review/scripts/settled_design.py:126`). A branch whose changed files match no pattern and
-  lie in no spec folder gets no problem from `branch_problems`.
-- The rule refused the first internal round on PR #21, which moved tests to another folder, and on PR #28, which
-  corrected two README sentences. Neither decided a design.
-- Run on 2026-10-06 with Python 3.13.5 and the patterns of `config.json`, `design_documents` matched
-  `docs/adr/0001-x.md` and did not match `dev/alq-review/docs/adr/0001-x.md`. The constitution puts this
-  repo's decision records in `dev/alq-review/docs/adr/`
-  (`dev/alq-review/.specify/memory/constitution.md:131`).
+Why now: on 2026-10-06 the user decided to delete the rule. The user said: "I do not want to hand-roll and
+maintain a list of path patterns."
 
 ## Decision
 
-1. **Position, not a list.** A spec folder is `<dir>/specs/<feature>/` at any depth, read from the path.
-   `spec_folders` answers it for `branch_problems` and for the `--spec-folders` mode
-   (`plugins/alq-review/scripts/settled_design.py:148`, `:159`), which the `design-doc` skill calls
-   (`plugins/alq-review/skills/design-doc/SKILL.md:29`). This is spec 015 R1 and R2, and it stands as built.
-2. **No design-document rule.** The user decided on 2026-10-06 to delete the rule "a design-document change
-   needs a spec folder" and the `design_documents` list it reads, with no replacement. The user said: "I do
-   not want to hand-roll and maintain a list of path patterns."
-3. **What stays.** A spec folder that a branch changes must be settled before the first internal round.
+1. We will find a spec folder by its position, `<dir>/specs/<feature>/` at any depth, with no configured
+   list. This is spec 015 R1 and R2, and it stands as built.
+2. We will delete the rule "a design-document change needs a spec folder" and the `design_documents` list it
+   reads, with no replacement.
+3. We will keep the rule that a spec folder a branch changes must be settled before the first internal round.
 
-This record replaces spec 004 FR-004, for its design-document half, and spec 004 research R10. The specs are
+This replaces spec 004 FR-004, for its design-document half, and spec 004 research R10. Those specs are
 history and are not rewritten.
-
-Accepted loss: a design decided by editing only a README, a decision record or a rule file will no longer be
-stopped at the first internal round. Reviewers grading the change against the spec are what guards against
-it.
 
 ## Options considered
 
-### Option A: Spec folders by position, and no design-document rule (decided by the user)
+### Option A: Spec folders by position, and no design-document rule (chosen)
 
 | Dimension | Assessment |
 |---|---|
 | Hand-maintained lists | None |
-| Stops a design decided in a README alone | No. This is the accepted loss |
+| Stops a design decided in a README alone | No |
 | Refuses a branch that changes only documents | No |
 
-### Option B: Do nothing: the configured list and its rule (today)
+### Option B: Do nothing
 
-Rejected by the user. The reasons on record are the three observations in Context and the reason spec 015 R1
-gave against a list.
+The list and its rule stay. The list has to be kept in step with where each repo puts its documents, and
+the rule keeps refusing changes that decide nothing.
 
 ### Other options, rejected
 
 | Option | Why rejected |
 |---|---|
-| C. Keep the rule, and recognise in code only files whose place a tool fixes (decision records, the constitution) | Offered to the user on 2026-10-06 and not chosen. A decision record would then need a spec folder beside it. |
+| C. Keep the rule, and recognise in code only the files whose place a tool fixes | Put to the user on 2026-10-06 and not chosen. The user chose to delete the rule. |
 | D. A `spec_folders` glob list in `config.json` | Spec 015 R1: "a hand-maintained list, and `config.json` is plugin-wide, not per repo". |
-| E. The `.specify/` folder as the mark of a Spec Kit project | Spec 015 R1: "no Analitiq repo commits it" (`dev/alq-review/specs/015-nested-spec-folders/research.md:12`). |
-| F. Widen the patterns to any depth | It keeps a list of path patterns, which the user's decision rules out. |
+| E. The `.specify/` folder as the mark of a Spec Kit project | Spec 015 R1: "no Analitiq repo commits it". |
 
 ## Trade-offs
 
-- The reason spec 004 gave for the rule is no longer guarded by code: "an unsettled design was the main cause
-  in the churn study" (`dev/alq-review/specs/004-spec-folder-checks/research.md:179`).
+- A design decided by editing only a README, a decision record or a rule file will no longer be stopped at
+  the first internal round once the rule is deleted. Issue #29 records this as the accepted loss.
+- Spec 004 R10 gave the rule its reason, an unsettled design as a cause of review churn. Code will no
+  longer guard that case outside spec folders.
 - A folder named `specs/<x>/` that is not a spec folder is treated as one. Spec 015 R1 accepted this: it
-  "fails loud (its missing `plan.md` is named), not silently"
-  (`dev/alq-review/specs/015-nested-spec-folders/research.md:11`).
+  "fails loud (its missing `plan.md` is named), not silently".
 
 ## Consequences
 
-- Easier: the settled-design check will not refuse a branch that changes only documents. Nothing in
-  `config.json` has to be kept in step with where a repo puts its documents.
+- Easier: a branch that changes only documents is not refused by the settled-design check. Nothing in
+  `config.json` has to follow where a repo puts its documents.
 - Harder: nothing automatic sends an author to a spec folder when a design changes outside one.
-- What goes with the rule is listed in issue #29. It includes the tests of the class `DesignDocuments`
-  (`dev/alq-review/tests/test_gate.py:1240`) and the sentence at `plugins/alq-review/README.md:61`.
 - **How we would know this was wrong:** review churn on a PR that is traced to a design decided in a README,
   a decision record or a rule file with no spec folder; or a repo whose `specs/<x>/` folders are not spec
   folders and get refused.
@@ -144,7 +116,7 @@ gave against a list.
 
 ## Action items
 
-1. [ ] The ratifier accepts this record, or sends it back.
-2. [ ] Delete the rule, its list and its tests (issue #29), with a test first that the settled-design check
-   does not refuse a README-only branch.
-3. [ ] Note in the change that it replaces spec 004 FR-004 (design-document half) and R10.
+1. [ ] The ratifier ratifies this record, or sends it back.
+2. [ ] Delete the rule, its list and its tests (issue #29), from a failing test that the settled-design
+   check does not refuse a README-only branch.
+3. [ ] Note in that change that it replaces spec 004 FR-004 (design-document half) and R10.
