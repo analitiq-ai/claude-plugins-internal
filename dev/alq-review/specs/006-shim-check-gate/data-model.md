@@ -46,12 +46,13 @@ relaunch of any tree that is not `complete` restarts it: `sweeping` or `failed` 
 
 | Field | Meaning |
 |---|---|
-| `id` | first 16 hex of sha256(repo \0 branch \0 head \0 first tree) |
-| `branch`, `head` | the chain is only matched on this branch at this `HEAD` (R9) |
+| `id` | first 16 hex of sha256(repo \0 branch \0 first tree); never recomputed |
+| `branch` | the chain is only matched on this branch (R9) |
 | `count` | completed `patch` checks of distinct trees |
-| `ranges` | old-side ranges of every member check's hunks, plus listed sites' lines |
+| `tree`, `ranges` | the tree the ranges were last carried to; per file, the new-side ranges of every member check's hunks plus listed sites' lines, in that tree's coordinates (R9) |
+| `override_head` | the branch's `HEAD` when the user's override was typed; empty otherwise (R11) |
 | `target` | the deep sweep's merged SAME OPERATION and CALLERS/CONSUMERS lists, once run |
-| `state` | `open` → `deep_due` (count 3) → `deep_done` → `held` (count 4); `overridden` from any state by the user's `override shim-<id>`, and no check changes it; `ended` on a `complete`. Once `HEAD` moves the chain is no longer matched |
+| `state` | `open` → `deep_due` (count 3) → `deep_done` → `held` (count 4); `overridden` from any state by the user's `override shim-<id>`, and no check changes it; `ended` on a `complete`. An override is over once the branch's `HEAD` differs from `override_head`; the chain then has the state its count gives. A commit changes nothing else |
 | `seen` | per site id listed so far, the trees whose checks listed it (R12) |
 
 ## shim_rulings — key (repo, chain id, site id)
@@ -67,6 +68,6 @@ relaunch of any tree that is not `complete` restarts it: `sweeping` or `failed` 
 Order, first match wins: shared preconditions (R1) → a hunk has no label yet: refuse, name the claim check (R2) →
 no hunk is code/mixed: allow → chain `held`: refuse with the user question → tree matches an `overridden` chain:
 allow → no check for the tree: refuse, name the launch → check not `complete`: refuse, say the check failed or
-is running and name the relaunch → `patch`: refuse with sites (each marked touched / not touched by the staged
-hunks), answers, chain count, and at count 3 the deep-sweep step → `complete`: allow. Every refusal names
+is running and name the relaunch → `patch`: refuse with sites (each with the line ranges the staged change alters in its
+file), answers, chain count, and at count 3 the deep-sweep step → `complete`: allow. Every refusal names
 `override shim-<id>` (R11).

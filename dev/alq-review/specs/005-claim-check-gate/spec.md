@@ -21,7 +21,8 @@ plugin is installed in.
 - Q: Who re-judges a contest? → A: A fresh checker, given the claim, the first verdict and the evidence.
 - Q: How many refusals of one claim before the user decides? → A: 3.
 - Q: How does the user release a claim refused 3 times? → A: With the existing user-typed `unlock`, naming the
-  claim. It covers that claim at its current text and ends when the claim changes.
+  claim. It covers that claim at its current text and ends when the claim changes. (The count after a release
+  is settled on 2026-10-06, below.)
 - Q: Does rewording a flagged claim reset its refusal count? → A: No. The 3 refusals count attempts at that
   claim, however it is reworded; after 3 attempts the user is involved.
 - Q: May a contest cite an outside source? → A: Yes. The checker that re-judges a contest may fetch a cited
@@ -36,6 +37,7 @@ plugin is installed in.
 
 - Q: What unit does the refusal count use? → A: One count per git hunk, as git makes it; a new file is one hunk.
   Counts are never summed across hunks or files. The user is involved as soon as any one hunk reaches 3.
+  (Replaced on 2026-10-06, below.)
 - Q: Does a contest count toward the bound? → A: A rejected contest counts as one refusal; an upheld one counts
   none and replaces the verdict.
 - Q: Is a change that only removes text checked? → A: Yes. Removing words can change what a claim says.
@@ -47,6 +49,21 @@ plugin is installed in.
   complete and the claims are notes. A check fails only when a reader or judge did not report.
 - Q: May the contest checker follow links? → A: Yes, within the sites the contest cites, and nowhere else.
 - Q: Who decides whether the check works well enough? → A: The user, by reading its log. No threshold is built in.
+
+### Session 2026-10-06
+
+Recorded in issue #17 and ratified as ADR-0001.
+
+- Q: What unit does the refusal count use? → A: One count per claim, followed through its rewordings as a
+  lineage. Not per hunk: a hunk shares one count across every claim in it, and a new file is one hunk. Counts
+  are never summed across claims.
+- Q: Does a commit of other work change a count? → A: No. Nothing is keyed on `HEAD` or on a commit.
+- Q: How is a reworded claim known to be the same claim? → A: By a diff of the two versions of its file, never
+  by a model and never by a similarity threshold.
+- Q: What is not followed? → A: A claim moved and reworded in one step, and the half of a split that lands in
+  a pure insertion. Each starts a new count.
+- Q: What happens to the count after `unlock`? → A: It stays. The release covers the words as they are; a later
+  rewording is checked again, and one more `WRONG` brings the user back.
 
 ## Background
 
@@ -115,12 +132,22 @@ the commit stays refused and the refusal asks the user, by name, what to do.
    checker given the claim, the first verdict and that evidence, and the outcome is recorded.
 3. **Given** a contest that offers only an assertion or an assumption, **When** the check is run again,
    **Then** the verdict stands, the contest is not re-judged, and the author is told what evidence is missing.
-4. **Given** one hunk has been refused 3 times, with its wording changed between attempts or not, **When** the
-   author commits again, **Then** the commit stays refused and the refusal states the open question for the
-   user. Other hunks refused fewer times do not add to that count.
-5. **Given** a hunk stopped after 3 refusals, **When** the user types the existing `unlock` naming a claim in it,
-   **Then** the commit goes through with that hunk as it stands. **When** the author then changes its words,
-   **Then** it is checked again.
+4. **Given** one claim has been ruled `WRONG` by 3 checks, with its wording changed between them or not,
+   **When** the author commits again, **Then** the commit stays refused and the refusal states the open question
+   for the user, with that claim's words and ruling at each check. Other claims ruled `WRONG` fewer times, in the
+   same hunk or not, do not add to that count.
+5. **Given** a claim stopped at 3, **When** the user types the existing `unlock` naming it, **Then** the commit
+   goes through with that claim as it stands. **When** the author then changes its words, **Then** it is checked
+   again with its count kept, and one more `WRONG` asks the user again.
+6. **Given** a claim ruled `WRONG`, **When** a commit of another file lands, or the last commit is amended, and
+   the same words are staged again, **Then** its count is unchanged.
+7. **Given** a claim ruled `WRONG`, **When** its sentence is split in two in place, **Then** both parts carry its
+   count. **When** two such claims are merged into one, **Then** that one carries the larger count, not the sum.
+8. **Given** a claim ruled `WRONG`, **When** its words are moved unchanged within the file, **Then** its count is
+   unchanged.
+9. **Given** a claim ruled `WRONG`, **When** a later check rules it `CORRECT`, or its words are deleted, **Then**
+   its count ends.
+10. **Given** one check that rules two claims of one hunk `WRONG`, **Then** each claim's count rises by one.
 
 ---
 
@@ -200,9 +227,11 @@ and shows the cost.
 - **FR-010**: The system MUST re-judge only the claims whose hunks changed since the last check, and MUST NOT
   reuse a verdict once the claim or the code it was judged against has changed. A `WRONG` verdict MUST be
   judged again whenever anything in the staged change differs, since the fix may be in another file.
-- **FR-011**: The system MUST refuse one hunk at most 3 times and, when any one hunk reaches 3, MUST stop the
-  repair loop and put the decision to the user, who releases it with the existing user-typed `unlock` naming a
-  claim in it; an agent MUST NOT be able to release it. The release covers the hunk at its current words only.
+- **FR-011**: When 3 checks have ruled one claim `WRONG`, the system MUST stop the repair loop of that claim and
+  put the decision to the user, who releases it with the existing user-typed `unlock` naming that claim; an
+  agent MUST NOT be able to release it. The release covers the claim at its current words only and does not
+  lower its count. [NEEDS CLARIFICATION: may a check be launched while a claim is stopped? Today the launch is
+  refused. ADR-0001 lets a `CORRECT` ruling or a deletion end the count, and only a check can see either.]
 - **FR-012**: The system MUST let the author contest a verdict, and MUST re-judge the claim, with a fresh checker
   given the claim, the first verdict and the evidence, only when the contest carries evidence the checker can verify (a file and line, or a source that was read). A contest without
   evidence MUST leave the verdict standing.
@@ -214,10 +243,13 @@ and shows the cost.
   or judge does not report, MUST say the check failed rather than that a claim is wrong, and MUST name the
   retry. A check whose verdicts all are `UNSURE` has not failed.
 - **FR-016**: The checkers MUST be unable to change any file in the repo.
-- **FR-017**: A refusal is counted once per hunk, per completed check that rules a claim in it `WRONG`, and once
-  per rejected contest; an upheld contest counts none. Repeating a commit against an unchanged check does not
-  count. A hunk is as git makes it against the last commit, so rewording inside it keeps its count, and counts
-  are never summed across hunks or files.
+- **FR-017**: A refusal is counted once per claim, per completed check that rules it `WRONG`, and once per
+  rejected contest; an upheld contest counts none. Repeating a commit, or a check of the same staged tree, does
+  not count. A claim MUST be followed from one version of its file to the next as ADR-0001 says: by a diff of
+  the two versions, never by a model and never by a similarity threshold. Rewording in place keeps the count, a
+  split passes it to both parts, a merge takes the larger count, and words moved unchanged within the file keep
+  it. A commit, an amend or a rebase MUST NOT change a count. Counts are never summed across claims. A claim
+  moved and reworded in one step is not followed and starts a new count.
 - **FR-018**: The system MUST record for each check the claims judged, their verdicts, the refusals, contests and
   their outcomes, releases by the user, and the cost, for the user to read.
 - **FR-019**: The claim check MUST have its own blocking setting, separate from the review gate's, and MUST ship
@@ -235,6 +267,8 @@ and shows the cost.
   `WRONG` the failing case.
 - **Check record**: the claims judged for a commit, their verdicts, and the cost.
 - **Contest**: the author's evidence for disputing a verdict, and the outcome of the re-judgement.
+- **Lineage**: one claim followed through the versions of its file since a check first ruled it `WRONG`, with
+  its words and ruling at each check. The refusal count belongs to it.
 
 ## Success Criteria *(mandatory)*
 

@@ -14,7 +14,7 @@ Refusals come from `gate.refuse()` under the `claim_checks` setting, and name th
 | Check launch while tracked files have unstaged changes | the files; stage or discard them, then launch again |
 | Check still `reading` or `judging` | the check failed, not that a claim is wrong; relaunch the same call |
 | One or more `WRONG` | per claim: `file:line`, the quoted claim, the failing case, the evidence `file:line`; then: fix the claim or the code, or contest with evidence |
-| Any one hunk refused 3 times | the open question for the user, that hunk's claims, and `unlock claim-<id>` |
+| Any one claim ruled `WRONG` by 3 checks | the open question for the user, that claim's words and ruling at each check, and `unlock claim-<id>` |
 
 A commit with an empty staged diff, or one that concludes a merge, cherry-pick or revert, is not refused.
 `UNSURE` verdicts and the large-commit warning never refuse; they come back in the workflow result.

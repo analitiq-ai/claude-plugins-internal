@@ -16,12 +16,12 @@ decided in [research.md](research.md); shapes are in [data-model.md](data-model.
 
 ## Technical Context
 
-**Language/Version**: Python 3 (stdlib only, as the rest of `scripts/`), JavaScript for the workflow script
+**Language/Version**: Python 3 (stdlib plus `diff-match-patch`, R12), JavaScript for the workflow script
 
-**Primary Dependencies**: none new. Uses `git`, the Claude Code `Workflow` tool and hook protocol, SQLite
+**Primary Dependencies**: `diff-match-patch` (R12, ADR-0001). Uses `git`, the Claude Code `Workflow` tool and hook protocol, SQLite
 
 **Storage**: `ledger.db` under the plugin state root, four new tables (`claim_checks`, `claim_reads`,
-`claim_verdicts`, `claim_holds`); no copy of the tree: agents read the worktree, which must match the index
+`claim_verdicts`, `claim_lineages`); no copy of the tree: agents read the worktree, which must match the index
 
 **Testing**: `python3 -m unittest discover -s tests`; gate tests drive `scripts/gate.py` with hook payloads and
 recorded agent outputs, so no test calls a model
@@ -46,10 +46,12 @@ modify files; verdicts are unmeasured and the user accepts that
 |---|---|
 | I. Contract-first | No shape from the contracts map is added or re-declared. The records, outputs and verdict values are internal to alq-review and defined once in `scripts/claimcheck.py`; the claim categories K1-K8 are the study's, used as labels only. Pass. |
 | II. Ownership & trust boundaries | Everything lives in alq-review in this repo, which owns the plugin. Agent output is untrusted input: R6 validates it before it is recorded, and evidence outside the staged tree is rejected; the contest judge's fetches are limited to the cited sites (R9). No public repo is touched; no secret. Pass. |
-| III. Fail loud, no workarounds | A crashed gate refuses the commit (R1); a failed check refuses and says so (R10); no fallback and no compatibility branch. The one thing the plan cannot do exactly, treat "a claim" as the same claim after rewording, is stated as a reading to confirm (R8), not worked around. Pass. |
+| III. Fail loud, no workarounds | A crashed gate refuses the commit (R1); a failed check refuses and says so (R10); no fallback and no compatibility branch. A claim moved and reworded in one step is not followed; that is stated as a limit (R12), not worked around. Pass. |
 | IV. Test-first | `tasks.md` starts every mechanism from a failing test, run before the code. Pass. |
 | V. Smallest complete change | No second checker, no cap, no record-only phase, no built-in accuracy threshold (spec). Fingerprints are git's own (`write-tree`, `patch-id`), not hand-rolled. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. The plugin README documents the plugin and changes with it. Pass. |
+| P2. Only an approved entity releases a hold | The count of a claim lineage is released by the user alone, by a prompt starting `unlock claim-<id>` (R8). Nothing else releases it, lowers it or starts it again; a `CORRECT` ruling or a deletion ends the lineage. Pass. |
+| P5. Settled design, existing tools first | Every mechanism cites a decision below. R12 reuses `git diff` and `diff-match-patch` and cites the survey of 2026-10-06 in issue #17 for what was looked at. Pass. |
 
 Re-check after Phase 1: unchanged.
 
@@ -83,6 +85,7 @@ specs/005-claim-check-gate/
 ├── workflows/claim-check.js       # new
 ├── scripts/
 │   ├── claimcheck.py              # new: ids, validators, commit decision, record transitions (pure)
+│   ├── lineage.py                 # new, pure: carries a lineage from one version of a file to the next (R12)
 │   ├── gate.py                    # on_bash (commit), on_workflow, WebFetch, StructuredOutput hooks, on_prompt
 │   ├── shell.py                   # commit action carries staging flags and whether it stands alone
 │   ├── worktree.py                # tree_hunks; added_lines split over a diff parser
@@ -90,6 +93,7 @@ specs/005-claim-check-gate/
 │   └── briefs.py                  # reader and judge prompts, claim-check args
 └── tests/
     ├── test_claimcheck.py         # new: pure functions
+    ├── test_lineage.py            # new: sequences of versions (reword, split, merge, move, delete)
     └── test_gate.py               # claim-check gate cases added
 ```
 
@@ -110,11 +114,12 @@ user prompt.
 - The claim-check workflow: R4
 - Read-only agents over a worktree that matches the staged tree: R5
 - Validation of agent output against the staged tree: R6
-- Check, read, verdict and hold records in the ledger database: R7
-- Refusal bound per git hunk and the user's unlock: R8
+- Check, read, verdict and lineage records in the ledger database: R7
+- Refusal bound per claim lineage and the user's unlock: R8
 - Contest with evidence, a fresh judge and host-limited fetches: R9
 - Cost, large-commit warning, failed-check result and the log: R10
 - A commit hook's changes are not checked again: R11
+- Carrying a lineage from one version of a file to the next: R12
 
 ## Complexity Tracking
 
@@ -123,6 +128,6 @@ No constitution violations to justify.
 ## Limits
 
 - Repos without a GitHub `origin` are outside the plugin's reach today, so they are outside this check.
-- A new file is one hunk, so one refusal count; text moved to other lines, or a commit that lands on `HEAD`,
-  starts a new count (R8).
+- A claim moved and reworded in one step, or the half of a split that lands in a pure insertion, starts a new
+  count (R12).
 - Commits that do not go through `git commit` as the Bash tool runs it are not intercepted (list in research.md).

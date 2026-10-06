@@ -10,7 +10,7 @@ An agent's `git commit` with code or mixed hunks is refused until a shim check h
 Jev first says whether the change fixes a defect; a non-fix passes. For a fix, a read-only Sonnet sweeper lists
 every site in `HEAD` that does the same operation; Jev answers `level` and `coverage`; code composes `complete`
 or `patch`. A `patch` refuses with the sites. Refusals are counted per bug on
-one branch and `HEAD`; the third triggers a deep sweep, the fourth asks the user. It is built inside alq-review as
+one branch, across commits (ADR-0001); the third triggers a deep sweep, the fourth asks the user. It is built inside alq-review as
 a second rule on the claim check's `git commit` interception, reusing its hunk labels, its gate-injected workflow
 shape and its ledger. Every mechanism is decided in [research.md](research.md); shapes are in
 [data-model.md](data-model.md) and [contracts/shim-check.md](contracts/shim-check.md).
@@ -19,7 +19,7 @@ shape and its ledger. Every mechanism is decided in [research.md](research.md); 
 
 **Language/Version**: Python 3 (stdlib only, as the rest of `scripts/`); JavaScript for the workflow script
 
-**Primary Dependencies**: none new in code. Jev (`typesafe/jev-1.13` via OpenRouter, one HTTPS POST); `git`, `gh`, the Claude Code `Workflow` tool
+**Primary Dependencies**: `diff-match-patch`, through the lineage module of spec 005 R12. Jev (`typesafe/jev-1.13` via OpenRouter, one HTTPS POST); `git`, `gh`, the Claude Code `Workflow` tool
 and hook protocol, SQLite
 
 **Storage**: `ledger.db` under the plugin state root, three new tables (`shim_checks`, `shim_chains`,
@@ -55,6 +55,8 @@ per contested site
 | IV. Test-first | `tasks.md` starts every mechanism from a failing test, run before the code. Pass. |
 | V. Smallest complete change | One new pure module, one hook module, one client, one workflow, two agents. Labels, preconditions, range overlap, the user-prompt release path and the ledger are reused, not copied. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. The plugin README documents the plugin and changes with it. Pass. |
+| P2. Only an approved entity releases a hold | A chain held at count 4 is released by the user alone, by a prompt `override shim-<id>` (R11). The release lasts until a commit lands on the branch and does not lower the count; nothing else releases the hold or starts the count again, and a `complete` verdict ends the chain. Pass. |
+| P5. Settled design, existing tools first | Every mechanism cites a decision below. R9 reuses the lineage module of spec 005 R12, which cites the survey of 2026-10-06 in issue #17. Pass. |
 
 Re-check after Phase 1: unchanged. One deviation from the spec's wording is recorded rather than hidden: the
 contested-site judge is a fresh agent of the assessor's standing, not the round assessor (R7); the spec's user
@@ -124,7 +126,7 @@ call; `gate.on_prompt` for every user prompt; `ledger.SCHEMA` by every ledger ca
 - Jev client; `kind` at launch, `level`/`coverage` from the recording hook: R6
 - Verdict composed in code; the contested-site judge: R7
 - Contest acceptance, rulings, deferred issues, re-judge without a sweep: R8
-- Bug chains per branch and `HEAD`: R9
+- Bug chains per branch, their ranges carried from one checked tree to the next: R9
 - Deep sweep (three alq-review sweepers) at the third refusal, reused target afterwards: R10
 - Hold at the fourth refusal; the user's `override shim-<id>` per bug until a commit lands: R11
 - Sweep-miss logging inside a chain: R12
@@ -142,5 +144,6 @@ No constitution violations to justify.
 - The OpenRouter key file must be present wherever alq-review runs, the bot image included; without it every
   code commit is refused under `enforce`. Release order: one Jev call succeeds on the bot before the bump
   (quickstart §9).
-- A bug is only followed while `HEAD` is unchanged; an overridden bug's chain ends when its commit lands.
+- A chain range whose lines are moved elsewhere in the file is dropped (R9). An override ends when a commit lands
+  on the branch (R11).
 - Commits that do not go through `git commit` as the Bash tool runs it are not intercepted (spec 005).

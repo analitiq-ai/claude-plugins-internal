@@ -29,6 +29,7 @@ takes the prose and mixed hunks.
   sweep, that names a site present at an earlier check but not listed by it is logged as that check's miss. The user
   reads the log; nothing acts on it.
 - Q: Where does a bug's count apply? → A: To one branch; a commit on another branch never continues it.
+  (Whether a commit on the same branch ends it is settled on 2026-10-06, below.)
 - Q: (critique X1) The `level` question assumes a defect; should non-fix commits be judged? → A: No. The
   classifier first decides whether the commit fixes a defect; only fixes are swept and judged, other commits pass
   with that answer logged. Non-fix commits are replayed before release.
@@ -41,11 +42,24 @@ takes the prose and mixed hunks.
   a commit lands, however often the author re-stages; it never returns to the check in that time. It replaces the
   `unlock` of the earlier answer.
 - Q: (critique P2) Should a refusal say which listed sites the change touched? → A: Yes, as a git fact per site.
+  (The fact shown is replaced on 2026-10-06, below.)
 - Q: (implementation, replay) What does SC-001 measure? → A: Only the evidence fixes are scored, each against its
   expected verdict: a patch is caught, a complete fix passes. Non-fix commits are not scored. 053e0ec9 is expected
   `patch`.
 - Q: (critique E7) How is the release made safe for the bot? → A: Before the version is bumped, one classifier call
   must succeed on the bot.
+
+### Session 2026-10-06
+
+Recorded in issue #17 and ratified as ADR-0001.
+
+- Q: Does a commit on the branch end a bug's count? → A: No. A bug's lines are followed from one checked tree to
+  the next by a diff of each file's two versions. Nothing is keyed on `HEAD` or on a commit.
+- Q: Which git fact does a refusal show per listed site? → A: The line ranges the staged change alters in that
+  site's file, in place of the `touched` / `not touched` mark.
+- Q: Does this check stop at the same count as the claim check? → A: No. Spec 005 FR-011 requires the
+  user to be asked at a claim's 3rd `WRONG` ruling. This check runs the deep sweep at a bug's 3rd refusal and asks the user at the
+  4th, because the deep sweep is a repair step the claim check does not have.
 
 ## Background
 
@@ -150,13 +164,15 @@ sites; one more refused commit asks the user.
 
 1. **Given** a `patch` refusal listing b.py, **When** the next commit edits b.py, **Then** it counts as the same
    bug's 2nd attempt; a commit editing neither a listed site nor the earlier fix's lines starts a new count.
+   A commit of other work that lands between the two attempts does not change the count.
 2. **Given** a `symptom` refusal, **When** the next commit edits the same lines again, **Then** it counts as the
    same bug.
 3. **Given** a bug's 3rd refusal, **When** the refusal is issued, **Then** the deep sweep runs and the refusal
    lists every site it found; that list, not the single sweep's, is the bug's coverage target from then on.
 4. **Given** a bug that has had its deep sweep, **When** a further commit for it is refused, **Then** the commit
    stays refused and the refusal asks the user; **When** the user types the override it names, **Then** the commit
-   goes through, and so does every re-staged version of that bug's change until a commit lands.
+   goes through, and so does every re-staged version of that bug's change until a commit lands. After that
+   commit the bug keeps its count, and its next refusal asks the user again.
 5. **Given** any refusal by this check (not checked, running, failed, `patch`), **When** the user types the
    override it names, **Then** the check is off for that bug on that branch until a commit lands; the override is
    logged.
@@ -246,7 +262,9 @@ line and see a new one.
   commit goes through.
 - **FR-015**: Refusals MUST be counted per bug, not per site or commit, and each count belongs to one branch. A commit
   MUST count as the same bug as an earlier `patch` refusal on its own branch when it edits a site that refusal
-  listed or a line the refused fix changed; a `complete` verdict ends the count.
+  listed or a line the refused fix changed; a `complete` verdict ends the count. Those lines MUST be followed
+  from one checked tree to the next as ADR-0001 says, by a diff of each file's two versions; a commit, an amend
+  or a rebase on that branch MUST NOT end or restart the count.
 - **FR-016**: At a bug's 3rd refusal the gate MUST run a deep sweep: two independent sweeps with the standard
   prompt plus one sweep that searches from the callers and consumers of the changed code, all alq-review agents,
   their SAME OPERATION lists merged. That merged list MUST be the
@@ -255,8 +273,10 @@ line and see a new one.
   MUST name an override the user can type. A user-typed override MUST switch this check off for that bug on that
   branch until a commit lands, whatever the check's state; re-staged changes of the same bug MUST NOT be checked
   again in that time. Only a user prompt can override; the override MUST be logged. Other checks are not affected.
+  An override MUST NOT lower the bug's count.
 - **FR-018**: The gate MUST log a sweep miss against an earlier check whenever a later refusal of the same bug, or
-  its deep sweep, names a site that was in the tree at that check but absent from its SAME OPERATION list.
+  its deep sweep, names a site that was in the tree at that check but absent from its SAME OPERATION list. Only
+  checks that swept the same `HEAD` are compared.
 
 ### Key Entities
 

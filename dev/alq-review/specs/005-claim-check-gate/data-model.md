@@ -52,18 +52,36 @@ claims keep their quotes and ids (FR-010); a cached claim whose quote no longer 
 checked tree. Not kept for a claim saying every, only, all, exactly, always or never. `WRONG` and `UNSURE` are never
 cached across trees.
 
-## Hold (`claim_holds`: key `repo`, `base`, `file`; JSON `doc` = the file's list of holds)
+## Lineage (`claim_lineages`: key `repo`, `branch`, `id`; JSON `doc`)
 
-The bound and the release (FR-011, FR-017). One hold per git hunk, named by its old-side range against `base`
-(`{file, old_start, old_count, refusals, claims, patch_id, released_patch_id}`). A new file is one hunk.
+The bound and the release (FR-011, FR-017, ADR-0001). One lineage per claim, minted when a check first rules it
+`WRONG`. Its `id` is that version's claim id and is never recomputed from later words.
 
 | Field | Meaning |
 |---|---|
-| `refusals` | completed checks, and rejected contests, that ruled a claim in this hunk `WRONG` |
-| `claims[]` | each claim last ruled `WRONG` here, as `{id, file, line, quote, failing_case, evidence}`: the refusal shows them, since the hold outlives the check that ruled them; `unlock claim-<id>` resolves `id` |
-| `released_patch_id` | the hunk's patch-id when the user typed `unlock`; empty until then |
+| `file` | the file the claim is in |
+| `versions[]` | one per check that saw the claim, as `{check, tree, id, line, quote, ruling, failing_case, evidence}`. `check` is the check ref, so a repeated check adds nothing. `tree` names the version of the file the next check diffs against |
+| `contests[]` | the check ref of each rejected contest |
+| `released` | the claim id of the version the user released with `unlock`; empty until then |
+| `ended` | `correct` or `gone`; empty while the lineage is open |
 
-A later hunk whose old-side range overlaps or touches the hold's continues it. State: `refusals < 3` → the
-check runs; `refusals == 3` and not released → refused and the user asked; released and the hunk's patch-id
-equals `released_patch_id` → passes; a different patch-id → `refusals` restarts at 0. A repeated commit against
-the same check adds no refusal. Counts are per hunk; nothing sums them.
+Count: the versions ruled `WRONG`, plus the rejected contests. Nothing lowers it.
+
+Succession (R12), at each completed check, for each open lineage of a file in the staged change. The diff is
+`git diff -U0` of the file's blob in the last version's `tree` against the staged blob:
+
+- its line is outside every hunk → same lineage, line shifted;
+- its line is inside a replaced range → the sentence's character span is mapped into the staged blob, and each
+  claim the reader finds in that span is the lineage's next version. Several claims may continue one lineage. A
+  claim that continues several lineages is a version of each, and its count is the largest of theirs;
+- its words are unchanged at another place in the file → found by its claim id;
+- nothing is mapped and the id is not found → `ended: gone`.
+
+A `CORRECT` ruling sets `ended: correct`. Not followed: a claim moved and reworded in one step, and the half of
+a split that lands in a pure insertion.
+
+State: count below 3 → the check runs. Count 3 or more and the last version not `released` → refused, and the
+user is asked with every version's words and ruling. Last version `released` → passes. Words changed after a
+release → checked again, and a `WRONG` ruling stops it again. `unlock claim-<id>` takes the id of the current
+words or of the lineage. Nothing is keyed on `HEAD` or a commit, and a lineage carries no line range. Rows of
+the earlier `claim_holds` table are not migrated.

@@ -49,14 +49,15 @@ Questions `level` and `coverage`, instructions and criteria verbatim from the de
 
 - not checked: names the launch call.
 - failed: "the check failed, not the fix: <reason>", names the relaunch.
-- patch: level, coverage, every SAME OPERATION site with id and `touched` or `not touched` (whether a staged hunk
-  overlaps the site's lines in `HEAD`), the chain count; at count 3 the deep-sweep step; how to contest a site.
+- patch: level, coverage, every SAME OPERATION site with id and the line ranges the staged change alters in that
+  site's file (none when the file is not in the change), the chain count; at count 3 the deep-sweep step; how to contest a site.
 - held: the question for the user.
 - every refusal ends with `override shim-<id>` (chain id, or tree prefix when no chain matches).
 
 ## User override
 
 A user prompt `override shim-<id>` switches this check off for that bug on that branch until a commit lands (R11).
+The bug keeps its count afterwards.
 The sweeper reads `<main checkout>/.claude/worktrees/shim-<12 hex of sha256(HEAD, staged tree)>/`, deleted when the check ends or a later
 check at the same checkout replaces it (R3).
 

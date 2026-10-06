@@ -166,17 +166,24 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
 - **Existing tools**: `github._gh`: fits for the issue state. Claim-check contest handling in `claimgate.on_launch`:
   fits as the pattern.
 
-## R9: A bug chain is the run of patch checks on one branch at one `HEAD`
+## R9: A bug chain is a set of line ranges on one branch, carried from one checked tree to the next
 
-- **Decision**: A chain is keyed by `(repo, branch, HEAD sha)`. A refused commit never lands, so every retry of a
-  bug is a new staged tree on the same `HEAD`. A completed `patch` check joins an open chain when any of its
-  code/mixed hunks' old-side ranges (against `HEAD`, as git makes them) overlaps a listed site's line or a hunk of a
-  check already in the chain; otherwise it opens a new chain. Each completed `patch` check of a new tree adds one
-  to its chain; a `complete` check that overlaps ends it, and so does `HEAD` moving.
-- **Rationale**: FR-015 and the per-branch answer. Old-side ranges against an unchanged `HEAD` are computed by git,
-  not a model, and the sites came from `HEAD`, so both sides of the overlap test are in the same coordinates.
-  The chain ends when a commit lands, because the only way a patch lands is the user's override or `log` mode.
-- **Existing tools**: `claimcheck._touches` (old-side range overlap) and `worktree.tree_hunks`: fit, reused.
+- **Decision**: A chain is keyed by `(repo, branch, chain id)`; the id is minted from the first member's tree
+  and never recomputed. It stores its ranges per file in the coordinates of the last tree it was carried to:
+  the new-side ranges of every member check's code/mixed hunks, plus the listed sites' lines. At each launch
+  every open chain's ranges are carried to the staged tree by the lineage module (spec 005 R12) over
+  `git diff -U0 <old blob> <new blob>` of each file: a range outside every hunk is shifted, a range that
+  overlaps a replaced range grows to cover the replacing lines, a range whose lines are all deleted is dropped.
+  A completed `patch` check joins a chain when a new-side range of its hunks overlaps a carried range;
+  otherwise it opens a new chain. Each completed `patch` check of a new tree adds one to its chain, kept as
+  the tree, so a repeated check adds none. A `complete` check that overlaps ends the chain. A commit, an amend
+  or a rebase does not.
+- **Rationale**: FR-015 and ADR-0001. The earlier key, `(repo, branch, HEAD sha)`, lost the chain whenever a
+  commit of other work landed, and `test_head_moving_leaves_the_chain_behind` asserted that loss (issue #17).
+  Carrying the ranges by a diff of blobs keeps both sides of the overlap test in one tree's coordinates without
+  an unchanged `HEAD`. Line ranges need only the hunk mapping, not the character mapping.
+- **Existing tools**: the lineage module of spec 005 R12: fits, reused, not copied. `claimcheck._touches`
+  (range overlap) and `worktree.tree_hunks`: fit, reused.
 
 ## R10: At a chain's third refusal the next check runs the deep sweep, and later checks reuse its list
 
@@ -199,15 +206,18 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   of this check (not checked, running, failed, `patch`, held) ends with `override shim-<id>`: the chain id when
   the staged tree matches a chain (R9), else the tree's 12-hex prefix. `gate.on_prompt` learns that word; for a
   tree id it opens a chain seeded with that tree's hunk ranges. Either way the chain becomes `overridden`: every
-  staged tree that matches it (R9 overlap) commits without a check, on that branch, until `HEAD` moves, which ends
-  the chain. The override is logged (`shim-override`). It touches only this check; the claim check keeps its own
+  staged tree that matches it (R9 overlap) commits without a check, on that branch, until a commit lands there.
+  The override records the branch's `HEAD` when it is typed and is over once that differs; this is the one
+  place a commit is consulted, and it decides how long a release lasts, not which bug a change belongs to. The
+  chain then returns to the state its count gives, so the next refusal of a bug already at 4 asks the user
+  again. The override is logged (`shim-override`). It touches only this check; the claim check keeps its own
   release. `shell.classify` already refuses an agent command that writes the ledger, and a user prompt is the
   only path to `on_prompt`.
 - **Rationale**: FR-007/FR-017 and the user's choice (critique E2, option B): one override per check, lasting for
   the bug's piece of work however often it is re-staged, ending on its own when the commit lands. Any commit on
-  the branch moves `HEAD` and so ends it, an unrelated one included; since a commit carries the whole index, the
-  bug's staged hunks normally land in that commit. Carrying a chain across `HEAD` would break R9's same
-  coordinates. Same release
+  the branch ends the override, an unrelated one included; since a commit carries the whole index, the
+  bug's staged hunks normally land in that commit. The count is kept after it because only the approved entity
+  may release a hold and nothing may start it again (constitution P2). Same release
   path as the claim check (spec 005 R8), so the agent cannot override itself.
 - **Existing tools**: `gate.on_prompt`, `claimgate.UNLOCK_CLAIM`: fit as the pattern.
 
@@ -215,8 +225,10 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
 
 - **Decision**: When a chain records a new list (a later check or the deep sweep), every site id in it that is
   absent from an earlier check's list in the same chain is logged once to `gate.log` as `shim-miss`, against
-  that earlier check. All checks of a chain share `HEAD`, so every listed site was in the tree at each of them.
-- **Rationale**: FR-018 and SC-004. Same `HEAD` makes "present at the earlier check" true by construction. Sweep
+  that earlier check. Only earlier checks that swept the same `HEAD` as the new list are compared, so every
+  listed site was in the tree each of them swept.
+- **Rationale**: FR-018 and SC-004. Same `HEAD` makes "present at the earlier check" true by construction; a
+  chain can now span several, so the comparison is limited to it. Sweep
   variance also produces entries; the user reads the log, nothing acts on it.
 - **Existing tools**: `hookio.record` / `gate.log`: fit.
 
@@ -250,6 +262,8 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
 - The check needs the OpenRouter key wherever alq-review runs, the bot image included. Before a version that
   turns the check on is installed on the bot, one Jev call must succeed there (quickstart §9).
 - Commits that do not go through `git commit` as the Bash tool runs it are not intercepted (spec 005 limits).
+- A chain range whose lines are moved elsewhere in the file is dropped, so an edit at the new place does not
+  continue the bug (R9). Chains stored under the earlier key are not migrated.
 - Paths marked `export-ignore` and submodule contents are not in the snapshot, so sites there are never listed
   (R3). No root `.gitattributes` of plugins, infra or frontend uses `export-ignore` today.
 - A commit made in the main checkout rather than a worktree has the snapshot inside its own tree until the check

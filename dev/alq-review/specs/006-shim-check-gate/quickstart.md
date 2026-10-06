@@ -31,12 +31,13 @@ needs no sweep and the commit is allowed; contesting the same site again is refu
 
 ## 4. Chain, deep sweep and override (US3, gate test with recorded outputs)
 
-Feed four recorded sweep outputs that each list one new site on the same `HEAD` → refusals 1–3, the third naming
+Feed four recorded sweep outputs that each list one new site, with a commit of an unrelated file landing after
+the first → refusals 1–3, the third naming
 the deep sweep; the deep launch runs three agents; one more `patch` → held; a user prompt `override shim-<id>` →
 that tree commits, and so does a re-staged tree of the same bug, with no launch; a tree of an unrelated bug is
-still refused; after the commit lands, a new tree of that bug is checked again. Override a `not checked` refusal
+still refused; after the commit lands, a new tree of that bug is checked again and its `patch` is held at once. Override a `not checked` refusal
 by its tree id → same result. `gate.log` holds a `shim-miss` per newly listed site and one `shim-override`.
-A `patch` refusal marks each listed site `touched` or `not touched`.
+A `patch` refusal gives, per listed site, the line ranges the staged change alters in its file.
 
 ## 5. Restart a stopped check
 
