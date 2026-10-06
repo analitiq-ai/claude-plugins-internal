@@ -65,27 +65,30 @@ We will bind both gates, and any later gate that counts rulings on a piece of te
    version to version. We will not recompute it from later words.
 2. **A diff decides what descends from what.** Each check will diff the file as the previous check saw it
    against the file as staged now, blob against blob. Commits play no part: we will key no count and no
-   lineage on `HEAD` or a commit sha.
+   lineage on `HEAD` or a commit sha. A hold will carry no line ranges, and holds will not be merged.
    - Text outside the changed ranges will keep its lineage, with its line shifted.
    - Inside a rewritten range, a character-offset mapping (`diff-match-patch`) will carry each sentence to its
      place in the new version, and the text found there will inherit the lineage. This covers one sentence
-     split in two and two merged into one.
+     split in two and two merged into one. A claim that inherits several lineages will carry the larger
+     count, never the sum.
    - A claim whose words are unchanged but moved will be found by its existing claim id, a hash of the file
-     and the words.
+     and the words. The diff cannot do this: on a fixture, `git diff -U0` showed a sentence moved within
+     the file as unchanged context (issue #17).
 3. **The count belongs to the lineage.** It will count the failed rulings in that lineage's chain of
    versions. Other changes on the branch will not change it. It will not lower except by the approved
    entity's release (P2) or the end of that churn.
 4. **No model and no threshold.** A model will not decide whether two texts are the same claim. We will use
    no text-similarity threshold.
 
-Known gap: we will not follow text that is moved and reworded in one step.
+Known gap: we will not follow text that is moved and reworded in one step. The same gap covers a split
+whose second half lands elsewhere in the file: the half in the rewritten range inherits the lineage, and
+the half in a pure insertion starts a new one.
 
 Threat model: the rule is to stop an agent stuck in a loop on one claim. It is not a defence against an agent
 that deletes text and adds it back elsewhere on purpose.
 
-We will set the rest in the amendments of specs 005 and 006, as issue #17 lists: the bound, the count after a
-merge, what a release covers, how the dependency is installed, the shim check's touched mark, the module
-layout and the tests.
+We will set the rest in the amendments of specs 005 and 006, as issue #17 lists: the bound, what a release covers,
+how the dependency is installed, the shim check's touched mark, the module layout and the tests.
 
 ## Options considered
 
@@ -100,7 +103,7 @@ layout and the tests.
 | Gap | Moved and reworded in one step |
 
 Existing tools were surveyed on 2026-10-06 (summary in issue #17). No tool was found that follows a sentence
-across versions with split, merge and move.
+across versions with split, merge and move. Options J to L are the tools that came closest.
 
 ### Option B: Do nothing: hunk holds keyed on `HEAD`
 
@@ -118,6 +121,11 @@ claims of a hunk.
 | G. A model decides whether it is the same claim | Unreliable, and each answer can be argued. |
 | H. Similarity matching for text that is moved and reworded | It needs a threshold nobody can justify. |
 | I. Chains of commit shas | The rework happens on staged trees between commits, and amend, rebase and squash rewrite commit shas. |
+| J. `prosediff`, which pairs sentences across versions | Its pairing is a similarity threshold (see H). On a fixture it got a rewording and a merge right and missed half of a split. |
+| K. Review-comment porting, as in Gerrit, GitLab, Phabricator and Sourcegraph | It shifts hunks only, and treats text inside an edit as unknown. |
+| L. Ids assigned when the text is written, as requirements and docs tools do | The id is given at authoring time only. |
+| M. `file + line` as the lineage id | It is unique only with the minting check added, and it invites lookups by the current line number, which is wrong once a line is added above. The claim id is already computed. |
+| N. Vendoring `diff-match-patch` | The user chose to install it as a dependency. |
 
 ## Trade-offs
 
