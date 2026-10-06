@@ -342,6 +342,35 @@ the chain holds and asks the user. Misses are logged.
 
 ---
 
+## Phase 8: Amendment of 2026-10-06 — a bug is followed across commits (ADR-0001, issue #17)
+
+**Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes the `HEAD` parts of T038 and T039, the chain
+`state` line of the data-model test in Phase 2, the "after `HEAD` moves, the bug is checked again" case, and
+the touched / not touched mark wherever a task names it. Needs spec 005 Phase 7 (T052) first. Stored chains
+are not migrated.
+
+**Independent test**: quickstart §4.
+
+- [ ] T060 Rewrite `test_head_moving_leaves_the_chain_behind` to assert the opposite: a commit of an unrelated
+  file between two patches of one bug leaves the chain at count 2. Run; it fails on the current code.
+- [ ] T061 [P] Failing tests in `tests/test_shimcheck.py` for carried ranges (R9): a range below an edit is
+  shifted; a range overlapping a replaced range grows to the replacing lines; a fully deleted range is dropped;
+  a site line swept in `HEAD` is carried to the staged tree before it is stored; the carry is applied before
+  the overlap test for an open, a held and an overridden chain, at commit and at launch. Run; fail.
+- [ ] T062 Implement the carry in `shimcheck` on the lineage module, and key chains by `(repo, branch, chain
+  id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
+- [ ] T063 [P] Failing tests for the derived state (data-model `shim_chains`): held at count 4 refuses the
+  commit and the launch; an override lets matching trees through while the branch's `HEAD` is the recorded one;
+  after a commit lands the next tree of that bug is checked, `complete` ends the chain and a `patch` is held at
+  once; a tree-id override opens a chain at count 0; at count 3 with no target the launch is `deep`, and it is
+  not run twice after an override. Run; fail.
+- [ ] T064 Replace the stored `state` and its transitions by the derived state of T063. Green.
+- [ ] T065 Failing test, then code: a `patch` refusal prints, per listed site, the staged-tree line ranges of the
+  hunks in its file, and no touched mark. Green.
+- [ ] T066 Failing test, then code: a sweep miss is logged only against earlier checks that swept the same
+  `HEAD` (R12). Green.
+- [ ] T067 Update the plugin README (the shim check, override) and run quickstart §4.
+
 ## Dependencies & Execution Order
 
 - **Setup (T001–T004)**: T001 and T002 can change R3/R6. If T001 fails, stop before Phase 2.

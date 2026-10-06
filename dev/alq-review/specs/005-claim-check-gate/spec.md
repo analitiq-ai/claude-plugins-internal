@@ -57,13 +57,15 @@ Recorded in issue #17 and ratified as ADR-0001.
 - Q: What unit does the refusal count use? → A: One count per claim, followed through its rewordings as a
   lineage. Not per hunk: a hunk shares one count across every claim in it, and a new file is one hunk. Counts
   are never summed across claims.
-- Q: Does a commit of other work change a count? → A: No. Nothing is keyed on `HEAD` or on a commit.
+- Q: Does a commit of other work change a count? → A: No. No count and no lineage is keyed on `HEAD` or on a commit.
 - Q: How is a reworded claim known to be the same claim? → A: By a diff of the two versions of its file, never
   by a model and never by a similarity threshold.
 - Q: What is not followed? → A: A claim moved and reworded in one step, and the half of a split that lands in
   a pure insertion. Each starts a new count.
 - Q: What happens to the count after `unlock`? → A: It stays. The release covers the words as they are; a later
   rewording is checked again, and one more `WRONG` brings the user back.
+- Q: May a check be launched while a claim is stopped and not yet released? → A: No. The gate waits for the
+  user. A `CORRECT` ruling or a deletion ends a count only below the bound or after a release.
 
 ## Background
 
@@ -136,7 +138,8 @@ the commit stays refused and the refusal asks the user, by name, what to do.
    **When** the author commits again, **Then** the commit stays refused and the refusal states the open question
    for the user, with that claim's words and ruling at each check. Other claims ruled `WRONG` fewer times, in the
    same hunk or not, do not add to that count.
-5. **Given** a claim stopped at 3, **When** the user types the existing `unlock` naming it, **Then** the commit
+5. **Given** a claim stopped at 3 and not yet released, **When** the author launches a check, **Then** the
+   launch is refused with the question for the user. **When** the user types the existing `unlock` naming it, **Then** the commit
    goes through with that claim as it stands. **When** the author then changes its words, **Then** it is checked
    again with its count kept, and one more `WRONG` asks the user again.
 6. **Given** a claim ruled `WRONG`, **When** a commit of another file lands, or the last commit is amended, and
@@ -230,8 +233,8 @@ and shows the cost.
 - **FR-011**: When 3 checks have ruled one claim `WRONG`, the system MUST stop the repair loop of that claim and
   put the decision to the user, who releases it with the existing user-typed `unlock` naming that claim; an
   agent MUST NOT be able to release it. The release covers the claim at its current words only and does not
-  lower its count. [NEEDS CLARIFICATION: may a check be launched while a claim is stopped? Today the launch is
-  refused. ADR-0001 lets a `CORRECT` ruling or a deletion end the count, and only a check can see either.]
+  lower its count. While a claim is stopped and not released, a launch of the check MUST be refused. After the
+  release, a change to the claim's words MUST be checked again, and one more `WRONG` MUST stop it again at once.
 - **FR-012**: The system MUST let the author contest a verdict, and MUST re-judge the claim, with a fresh checker
   given the claim, the first verdict and the evidence, only when the contest carries evidence the checker can verify (a file and line, or a source that was read). A contest without
   evidence MUST leave the verdict standing.

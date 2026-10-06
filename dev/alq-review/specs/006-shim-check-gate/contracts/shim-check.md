@@ -11,7 +11,8 @@ Workflow(name='alq-review:shim-check', args={worktree: '<path>', contests: [{sit
 
 Refused before any agent runs when: `worktree` is not an absolute path to a branch checkout with a GitHub origin;
 tracked files differ from what is staged; nothing is staged; the claim check has not labelled every hunk of the
-staged tree; the tree already has a `complete` check and no contest is given; the chain is `held`; a contest names
+staged tree; the tree already has a `complete` check and no contest is given; the staged tree matches a held
+chain (R11), which waits for the user; a contest names
 a site not in the chain's current list, a site already ruled, or has an empty reason. The gate, not the caller,
 sets the mode (R4).
 
@@ -49,7 +50,7 @@ Questions `level` and `coverage`, instructions and criteria verbatim from the de
 
 - not checked: names the launch call.
 - failed: "the check failed, not the fix: <reason>", names the relaunch.
-- patch: level, coverage, every SAME OPERATION site with id and the line ranges the staged change alters in that
+- patch: level, coverage, every SAME OPERATION site with id and the staged-tree line ranges of the hunks in that
   site's file (none when the file is not in the change), the chain count; at count 3 the deep-sweep step; how to contest a site.
 - held: the question for the user.
 - every refusal ends with `override shim-<id>` (chain id, or tree prefix when no chain matches).
@@ -57,7 +58,7 @@ Questions `level` and `coverage`, instructions and criteria verbatim from the de
 ## User override
 
 A user prompt `override shim-<id>` switches this check off for that bug on that branch until a commit lands (R11).
-The bug keeps its count afterwards.
+The bug keeps its count afterwards: its next edit is checked again, and a `patch` is held at once.
 The sweeper reads `<main checkout>/.claude/worktrees/shim-<12 hex of sha256(HEAD, staged tree)>/`, deleted when the check ends or a later
 check at the same checkout replaces it (R3).
 

@@ -49,11 +49,21 @@ relaunch of any tree that is not `complete` restarts it: `sweeping` or `failed` 
 | `id` | first 16 hex of sha256(repo \0 branch \0 first tree); never recomputed |
 | `branch` | the chain is only matched on this branch (R9) |
 | `count` | completed `patch` checks of distinct trees |
-| `tree`, `ranges` | the tree the ranges were last carried to; per file, the new-side ranges of every member check's hunks plus listed sites' lines, in that tree's coordinates (R9) |
-| `override_head` | the branch's `HEAD` when the user's override was typed; empty otherwise (R11) |
+| `tree`, `ranges` | the tree the ranges are in the coordinates of; per file, the new-side ranges of every member check's hunks plus listed sites' lines, each carried there (R9) |
 | `target` | the deep sweep's merged SAME OPERATION and CALLERS/CONSUMERS lists, once run |
-| `state` | `open` → `deep_due` (count 3) → `deep_done` → `held` (count 4); `overridden` from any state by the user's `override shim-<id>`, and no check changes it; `ended` on a `complete`. An override is over once the branch's `HEAD` differs from `override_head`; the chain then has the state its count gives. A commit changes nothing else |
+| `override` | `{head, count}`: the branch's `HEAD` and the chain's count when the user typed `override shim-<id>`; empty until then (R11) |
+| `ended` | set by a `complete` check that overlaps; nothing else ends a chain |
 | `seen` | per site id listed so far, the trees whose checks listed it (R12) |
+
+State is derived, never stored:
+
+- overridden: `override.head` equals the branch's `HEAD`. Matching trees commit without a check.
+- held: `count` is 4 or more and above `override.count` (or never overridden), and the chain is not overridden.
+  The commit and the launch are refused with the question for the user.
+- deep sweep due: `count` is 3 and `target` is empty. The next launch runs `deep` mode.
+- otherwise the check runs: `sweep` mode while `target` is empty, `rejudge` once it is set.
+
+A chain opened by a tree-id override has `count` 0 and `override.count` 0. A commit changes no field.
 
 ## shim_rulings — key (repo, chain id, site id)
 
@@ -66,8 +76,8 @@ relaunch of any tree that is not `complete` restarts it: `sweeping` or `failed` 
 ## Commit decision (pure, `shimcheck.commit_decision`)
 
 Order, first match wins: shared preconditions (R1) → a hunk has no label yet: refuse, name the claim check (R2) →
-no hunk is code/mixed: allow → chain `held`: refuse with the user question → tree matches an `overridden` chain:
-allow → no check for the tree: refuse, name the launch → check not `complete`: refuse, say the check failed or
+no hunk is code/mixed: allow → tree matches an overridden chain: allow → tree matches a held chain: refuse with
+the user question → no check for the tree: refuse, name the launch → check not `complete`: refuse, say the check failed or
 is running and name the relaunch → `patch`: refuse with sites (each with the line ranges the staged change alters in its
 file), answers, chain count, and at count 3 the deep-sweep step → `complete`: allow. Every refusal names
 `override shim-<id>` (R11).

@@ -17,7 +17,7 @@ shape and its ledger. Every mechanism is decided in [research.md](research.md); 
 
 ## Technical Context
 
-**Language/Version**: Python 3 (stdlib only, as the rest of `scripts/`); JavaScript for the workflow script
+**Language/Version**: Python 3 (the standard library plus `diff-match-patch`, spec 005 R12); JavaScript for the workflow script
 
 **Primary Dependencies**: `diff-match-patch`, through the lineage module of spec 005 R12. Jev (`typesafe/jev-1.13` via OpenRouter, one HTTPS POST); `git`, `gh`, the Claude Code `Workflow` tool
 and hook protocol, SQLite
@@ -55,7 +55,7 @@ per contested site
 | IV. Test-first | `tasks.md` starts every mechanism from a failing test, run before the code. Pass. |
 | V. Smallest complete change | One new pure module, one hook module, one client, one workflow, two agents. Labels, preconditions, range overlap, the user-prompt release path and the ledger are reused, not copied. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. The plugin README documents the plugin and changes with it. Pass. |
-| P2. Only an approved entity releases a hold | A chain held at count 4 is released by the user alone, by a prompt `override shim-<id>` (R11). The release lasts until a commit lands on the branch and does not lower the count; nothing else releases the hold or starts the count again, and a `complete` verdict ends the chain. Pass. |
+| P2. Only an approved entity releases a hold | A chain held at count 4 is released by the user alone, by a prompt `override shim-<id>` (R11). The release lasts until a commit lands on the branch and does not lower the count; nothing else releases the hold or starts the count again. No check runs on a held chain, so no verdict can end it; a `complete` verdict ends a chain only below the bound or after an override. Pass. |
 | P5. Settled design, existing tools first | Every mechanism cites a decision below. R9 reuses the lineage module of spec 005 R12, which cites the survey of 2026-10-06 in issue #17. Pass. |
 
 Re-check after Phase 1: unchanged. One deviation from the spec's wording is recorded rather than hidden: the

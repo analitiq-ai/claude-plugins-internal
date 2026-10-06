@@ -306,6 +306,36 @@ judged again; the result and `gate.log` show claims judged and cost.
 
 ---
 
+## Phase 7: Amendment of 2026-10-06 - the count follows a claim lineage (ADR-0001, issue #17)
+
+**Goal**: FR-011 and FR-017 as amended. Supersedes the hold tasks T032 and T038 and the hold parts of T011:
+those describe the per-hunk count that this phase removes. No migration of `claim_holds` rows.
+
+**Independent test**: quickstart step 3, and US2 scenarios 4 to 10.
+
+- [ ] T050 Failing gate tests for the two reported defects, on the current code: a commit of another file
+  between two `WRONG` checks of one claim leaves its count at 2 (#15); one check that rules two claims of one
+  hunk `WRONG` adds one to each claim and two to neither (#16). Run; both fail for those reasons.
+- [ ] T051 [P] Failing tests in `tests/test_lineage.py` for the pure module (R12), each a sequence of file
+  versions: reword in place keeps the row; a line shifted by an edit above keeps the row; a split forks one row
+  per part at the parent's count; two rows arriving at one claim leave the larger count and end the other
+  `merged`; words moved unchanged are found by claim id; deleted words end the row `gone`; the same words ruled
+  `WRONG` after their row ended get a new row id; the same check applied twice adds nothing; moved and reworded
+  in one step starts a new row. Run; fail because `lineage.py` does not exist.
+- [ ] T052 Implement `scripts/lineage.py`, pure: open rows, the `git diff -U0` hunks of two blobs and the staged
+  claims in, new rows out. `diff-match-patch` maps a sentence's character span. T051 passes.
+- [ ] T053 Failing test: a hook that imports `lineage` without `diff-match-patch` installed fails with a message
+  naming the install command. Implement. Green.
+- [ ] T054 [P] Failing tests in `tests/test_claimcheck.py` for the state of a row (data-model Lineage): below 3
+  the check runs; at 3 and above the released count the launch and the commit are refused with every version's
+  words and ruling; the released claim passes; reworded after a release it is checked, `CORRECT` ends the row
+  and `WRONG` stops it at once; `unlock claim-<id>` resolves a current claim id before a row id. Run; fail.
+- [ ] T055 Replace `claim_holds` by `claim_lineages` in `scripts/ledger.py`, and the hold functions of
+  `scripts/claimcheck.py` and their callers in `scripts/claimgate.py` by the row state of T054 and the module
+  of T052. Delete the hold code and its tests. T050 and T054 pass.
+- [ ] T056 Update the plugin README (the claim check, `unlock`, State) and run quickstart step 3 with real
+  agents.
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies

@@ -62,7 +62,7 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
   are checked by user decision (critique P1). `patch-id` is git's own content fingerprint for a diff: probed, it
   is unchanged by added spaces and indentation and changes when a word changes (critique E4/E9).
 - **Existing tools**: `worktree.added_lines`, `worktree._HUNK`: fit after the split. `git patch-id --stable`:
-  fits as the hunk fingerprint. `unidiff` (PyPI): not used; the plugin is stdlib-only and a hunk header is one
+  fits as the hunk fingerprint. `unidiff` (PyPI): not used; a hunk header is one
   regex.
 
 ## R4: One workflow does the reading and judging, and the gate supplies everything it needs
@@ -134,24 +134,29 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
 
 ## R8: The bound counts WRONG rulings per claim lineage, and the user releases with `unlock`
 
-- **Decision**: A lineage is kept per (repo, branch, lineage id) and minted when a check first rules a claim
-  `WRONG`; its id is that version's claim id and is never recomputed. Each completed check that rules the claim
+- **Decision**: A lineage is one row per (repo, branch, lineage id) with one current claim, minted when a check
+  rules `WRONG` a claim that continues no open row; its id is made from the minting check and that claim's id
+  and is never recomputed. Each completed check that rules the claim
   `WRONG` adds one version to its lineage, keyed by the check ref, so a repeated check or commit adds none. A
   rejected contest adds one; an upheld one adds none and replaces the verdict in the check for the same tree
   (critique P2). The count is the `WRONG` versions plus the rejected contests. Counts are never summed across
   claims: when any one lineage reaches 3, the commit is refused with the question for the user and every
   version's words and ruling. `on_prompt` already parses `unlock <ref>`; `claim-<id>` names the current words or
-  the lineage, and the release records the current version's claim id. A release does not lower the count: a
-  later rewording is checked again, and one more `WRONG` stops it again. Nothing is keyed on `HEAD` or a commit.
+  the lineage, and the release records the current version's claim id and the count. While a lineage is at 3
+  or more and above its released count, a launch of the check is refused as well as the commit: the gate waits
+  for the user. A release does not lower the count: a later rewording is checked again, `CORRECT` ends the
+  lineage, and one more `WRONG` stops it again at once. No count and no lineage is keyed on `HEAD` or a commit.
   Only a prompt typed by the user releases (FR-011).
 - **Rationale**: ADR-0001. The earlier key, a hold per (repo, `HEAD`, file, hunk), failed in three observed ways
   (issue #17): a commit of other work moved `HEAD` and the same words started again at 1 with no `unlock`
   (#15); one check added two refusals to one hold (#16); and three different claims of a new file, each wrong
-  once, reached 3 because a new file is one hunk (critique E1). Keying on the claim's words alone would give
+  once, reached 3 because a new file is one hunk (critique E1). A check is not allowed on a stopped lineage
+  because a passing ruling would then end a hold without the user, a second way out that constitution P2
+  forbids (user decision, 2026-10-06). Keying on the claim's words alone would give
   every rewording a new count, which is why the id is carried and succession is decided by a diff (R12).
 - **Existing tools**: `gate.on_prompt` / `UNLOCK`, `policy.unlock_ref`: fit as the user-only release path. The
-  claim id (`sha256(file + normalised words)[:16]`): fits as the lineage id, already computed and already what
-  `unlock` takes. The PR ledger's `unlocked_at` fields: not reused, they belong to a PR and a commit has none.
+  claim id (`sha256(file + normalised words)[:16]`): fits as what `unlock` takes; not enough as the row id,
+  since the same words can be ruled `WRONG` again after their row ended. The PR ledger's `unlocked_at` fields: not reused, they belong to a PR and a commit has none.
 
 ## R9: A contest is evidence checked by the gate and judged by a fresh agent, whose fetches the gate limits
 
@@ -203,8 +208,9 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
   two blobs, and the claims the reader found in the staged blob, and returns the new lineages. The diff is
   `git diff -U0 <old blob> <new blob>`; commits play no part. A line outside every hunk is shifted past the
   hunks above it. A sentence inside a replaced range has its character span mapped into the new blob by
-  `diff-match-patch`, and the claims found in that span continue the lineage: a split continues it twice, and a
-  claim that continues several lineages takes the largest count. A claim whose words are unchanged at another
+  `diff-match-patch`, and the claims found in that span continue the lineage: a split forks it into one row
+  per part, each starting at the parent's count, and when two rows arrive at one claim the row with the
+  larger count continues and the other ends. A claim whose words are unchanged at another
   place in the file is found by its claim id. A lineage with nothing mapped and no id found ends. Two pieces
   are hand-rolled: shifting a line past earlier hunks, and locating a sentence's character span.
   `diff-match-patch` is a required dependency: the hooks import it and fail with a message naming the install

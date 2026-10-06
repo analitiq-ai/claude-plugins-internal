@@ -54,12 +54,15 @@ takes the prose and mixed hunks.
 Recorded in issue #17 and ratified as ADR-0001.
 
 - Q: Does a commit on the branch end a bug's count? → A: No. A bug's lines are followed from one checked tree to
-  the next by a diff of each file's two versions. Nothing is keyed on `HEAD` or on a commit.
+  the next by a diff of each file's two versions. No count and no chain is keyed on `HEAD` or on a commit.
 - Q: Which git fact does a refusal show per listed site? → A: The line ranges the staged change alters in that
   site's file, in place of the `touched` / `not touched` mark.
 - Q: Does this check stop at the same count as the claim check? → A: No. Spec 005 FR-011 requires the
   user to be asked at a claim's 3rd `WRONG` ruling. This check runs the deep sweep at a bug's 3rd refusal and asks the user at the
   4th, because the deep sweep is a repair step the claim check does not have.
+- Q: May a check be launched while a bug is held and not yet overridden? → A: No. The gate waits for the user.
+- Q: What happens to a bug after the user's override ends? → A: The next edit of that bug is checked again. A
+  `complete` verdict ends the bug. A `patch` asks the user again at once.
 
 ## Background
 
@@ -172,11 +175,14 @@ sites; one more refused commit asks the user.
 4. **Given** a bug that has had its deep sweep, **When** a further commit for it is refused, **Then** the commit
    stays refused and the refusal asks the user; **When** the user types the override it names, **Then** the commit
    goes through, and so does every re-staged version of that bug's change until a commit lands. After that
-   commit the bug keeps its count, and its next refusal asks the user again.
+   commit the bug keeps its count: its next edit is checked again, a `complete` verdict ends it, and a `patch`
+   asks the user again at once.
 5. **Given** any refusal by this check (not checked, running, failed, `patch`), **When** the user types the
    override it names, **Then** the check is off for that bug on that branch until a commit lands; the override is
    logged.
 6. **Given** a `complete` verdict for a bug, **Then** its count ends.
+7. **Given** a bug held and not yet overridden, **When** the author launches a check, **Then** the launch is
+   refused with the question for the user.
 
 ---
 
@@ -273,7 +279,9 @@ line and see a new one.
   MUST name an override the user can type. A user-typed override MUST switch this check off for that bug on that
   branch until a commit lands, whatever the check's state; re-staged changes of the same bug MUST NOT be checked
   again in that time. Only a user prompt can override; the override MUST be logged. Other checks are not affected.
-  An override MUST NOT lower the bug's count.
+  An override MUST NOT lower the bug's count. While a bug is held and not overridden, a launch of the check
+  MUST be refused. After the override ends, the next change to that bug MUST be checked again: `complete` ends
+  the bug, and a `patch` MUST ask the user again at once.
 - **FR-018**: The gate MUST log a sweep miss against an earlier check whenever a later refusal of the same bug, or
   its deep sweep, names a site that was in the tree at that check but absent from its SAME OPERATION list. Only
   checks that swept the same `HEAD` are compared.

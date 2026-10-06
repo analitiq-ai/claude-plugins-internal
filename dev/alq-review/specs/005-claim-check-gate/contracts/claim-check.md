@@ -72,4 +72,6 @@ contest.
 
 `config.json`: `claim_checks` (`log` | `enforce`, default `enforce`, env `ALQ_REVIEW_CLAIM_CHECKS`) and
 `claim_warn_over` (default 20). Every check, refusal, contest outcome and release is written to `gate.log`.
-Release: a user prompt starting `unlock claim-<id>`, handled by `gate.on_prompt` beside `unlock #<pr>`.
+Release: a user prompt starting `unlock claim-<id>`, handled by `gate.on_prompt` beside `unlock #<pr>`. `<id>` is
+the current claim id or the lineage id. Until then a launch for a tree with a stopped claim is refused with
+the same question.
