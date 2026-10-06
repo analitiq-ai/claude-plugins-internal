@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "settled-design": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:1ddf31ef0507e246b1276f7263ead8f0bd9198f3bacfe75b39548344145e4d5b",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.plan"
+        ]
+      },
+      "registered_skills": {
+        "claude": [
+          "speckit-plan"
+        ]
+      },
+      "installed_at": "2026-10-06T09:47:56.841309+00:00"
+    }
+  }
+}
