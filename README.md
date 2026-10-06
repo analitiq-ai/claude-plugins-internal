@@ -19,4 +19,4 @@ The repo is private: the clone uses your git credentials for github.com.
 `plugins/<name>/` holds what an install copies. `dev/<name>/` holds what the plugin is built with and is never installed: its
 Spec Kit project (`.specify/`, with the plugin's constitution), the `speckit-*` commands, its feature specs in
 `specs/<nnn>-<feature>/` and its tests in `tests/`. Its decision records go in `docs/adr/` there. Start Claude Code in `dev/<name>/` for
-spec work. CI runs every `tests/` folder under `plugins/` and `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
+spec work. CI runs every `tests/` folder under `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
