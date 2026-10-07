@@ -54,7 +54,6 @@ Why now: the next check has two specs to follow and they disagree.
 1. We will ship every new check refusing from its first release.
 2. We will give a new check no record-only phase and no accuracy bar to pass first.
 3. We will build in no threshold and no review date. The user reads the log and decides.
-4. We will treat spec 004 FR-023 as replaced by this ADR.
 
 ## Options considered
 

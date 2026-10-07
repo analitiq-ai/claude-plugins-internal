@@ -51,9 +51,9 @@ to work it out again.
 2. We will run each check as a Claude Workflow. The workflow only orders the work. The gate supplies its
    prompts and schemas at launch, and a hook validates each answer before it is recorded.
 3. We will name the workflow call in the refusal, so the author runs it and commits again.
-4. We will allow one exception. The shim check's classifier, Jev, is called from hooks, not from the workflow.
-   One call is about a second, and the verdict then exists before the author tries to commit. Those hooks
-   hold Jev to 40 seconds, below the hook's own 60.
+4. We will allow one exception. The shim check's classifier, Jev, is called from hooks, not from the workflow,
+   so that the verdict exists before the author tries to commit. A call made inside a hook gets less time
+   than the hook itself has.
 
 ## Options considered
 
@@ -82,7 +82,15 @@ or keep a record for each claim.
 
 ### Option E: An outside tool, `or1can/claims`
 
-Rejected: its judging check is advisory, so it cannot block on a judged claim.
+Its judging check is advisory. Blocking on it from a hook of ours, or through a second agent, was weighed.
+Rejected:
+
+- It picks what to judge from names declared in Swift and Rust files only. No Analitiq repo holds either,
+  so it would judge nothing.
+- Blocking on a verdict needs a hook that refuses the commit, a check of each verdict and a record of it
+  for the staged change. That is Option A. Only the judge's brief would be reused.
+- A second agent that decides whether a finding blocks puts the refusal in a model's answer, not in a rule
+  that can be tested.
 
 ## Trade-offs
 

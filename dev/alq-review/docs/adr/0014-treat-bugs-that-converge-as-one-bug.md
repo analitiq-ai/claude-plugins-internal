@@ -49,7 +49,7 @@ weigh merging.
 We will treat bugs that converge as one bug. When two bugs that are tracked apart converge, they are one bug
 from then on, and every later step applies to them together.
 
-We will set the rest in the amendment of spec 006, the count of the merged bug included.
+We leave open how the refusals of the merged bug are counted.
 
 ## Options considered
 

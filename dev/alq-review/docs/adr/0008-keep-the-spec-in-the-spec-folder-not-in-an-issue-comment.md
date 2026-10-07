@@ -52,11 +52,10 @@ Why now: issue #25 moves the spec into the spec folder, and the skills and the g
 ## Decision
 
 1. We will keep the spec of a change in its spec folder. An issue comment is no longer its home.
-2. We will change `alq-shape`, `alq-issue-tackle` and `alq-root-cause-check` so that they stop naming the
-   issue comment as the spec's home.
-3. We will change the gate in the same change, so that what it hands to the internal reviewers and to the
-   assessor as the spec comes from the spec folder. Issue #25 gives the reason: otherwise the skills say the
-   spec is in the folder while the gate still grades each review against the comment.
+2. We will have every part of the plugin that reads the spec read it from the spec folder: the skills that
+   shape and tackle an issue, and what the gate hands to the internal reviewers and to the assessor.
+3. We will switch them in one change. Otherwise the skills say the spec is in the folder while the gate
+   still grades each review against the comment.
 
 Issue #25 lists four points this decision leaves open. They are settled in that issue's spec, not here.
 
