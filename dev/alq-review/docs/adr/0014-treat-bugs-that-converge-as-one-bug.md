@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "17"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
-    label: "The lineage design that record 0001 decided and this record adds to"
+    label: "The lineage design that ADR-0001 decided and this ADR adds to"
 ---
 
 # ADR-0014: Treat bugs that converge as one bug
@@ -42,7 +42,7 @@ each)." It does not say which bug the deep sweep, the hold and the override then
 round of the amendment of specs 005 and 006 found the gap. Its reviewers proposed fills that contradict each other, and the round
 ruled that the answer is the user's.
 
-Why now: the amendment of spec 006 to record 0001 was stopped in review on this question. The plan did not
+Why now: the amendment of spec 006 to ADR-0001 was stopped in review on this question. The plan did not
 weigh merging. The user decided it on 2026-10-07.
 
 ## Decision
@@ -79,13 +79,13 @@ fixes two bugs and is ruled a patch needs both sent for the deeper sweep togethe
 ## Consequences
 
 - Easier: one check of one change gives one verdict to one bug.
-- Harder: spec 006 has to say how two bugs become one, and its "counts toward both" is replaced. Record 0001 says "holds will not be merged", and has
-  to be read with this record.
+- Harder: spec 006 has to say how two bugs become one, and its "counts toward both" is replaced. ADR-0001 says "holds will not be merged", and has
+  to be read with this ADR.
 - **How we would know this was wrong:** users who override a merged bug and say its two halves had nothing to
   do with each other.
 - Revisit if: such reports come in.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
-2. [ ] Amend spec 006 to it, in the PR that amends it to record 0001.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
+2. [ ] Amend spec 006 to it, in the PR that amends it to ADR-0001.

@@ -25,7 +25,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decisions already made, written as records"
+    label: "The batch of decisions already made, written as ADRs"
   - type: issue
     id: "36"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/36"
@@ -49,7 +49,7 @@ project needs an allow from a hook.
 Why now: the rule is written only in a docstring and two research files. Issue #26 will add a per-repo
 switch that needs a place to live.
 
-The user decided two things on 2026-10-07, in review of this record and with no plan behind them: the
+The user decided two things on 2026-10-07, in review of this ADR and with no plan behind them: the
 merge override grants move under the state root, and how long a record lives.
 
 ## Decision
@@ -60,7 +60,7 @@ merge override grants move under the state root, and how long a record lives.
    `BEGIN IMMEDIATE` transaction.
 3. We will key a record about a PR by repo and PR, and a record about a commit or a staged tree by
    repo and an id that needs no PR.
-4. We will name each exception in a record. One is named here: the sweeper's copy of `HEAD` stays
+4. We will name each exception in an ADR. One is named here: the sweeper's copy of `HEAD` stays
    beside the worktrees. It is a read copy, not a record.
 5. We will keep the merge override grants under the state root with the other session records, by the
    user's decision of 2026-10-07. Issue #36 moves them there.
@@ -85,7 +85,7 @@ merge override grants move under the state root, and how long a record lives.
 
 ### Option B: Do nothing
 
-The rule stays in a docstring and two research files, with no record that binds the next gate.
+The rule stays in a docstring and two research files, with no ADR that binds the next gate.
 
 ### Option C: A second store for the commit checks
 
@@ -118,20 +118,20 @@ Weighed on 2026-10-07 and rejected by the user:
   folder of their own.
 - Decisions 6 to 8 are not built: today no record is deleted when its PR, its branch or its session ends.
 - A PR merged where the gate does not see it keeps its records until something asks GitHub.
-- The two logs are not bounded by this record.
+- The two logs are not bounded by this ADR.
 
 ## Consequences
 
 - Easier: a new gate adds a table to one schema and reuses one transaction.
 - Harder: anything that must hold on two machines at once cannot rest on this store alone.
 - **How we would know this was wrong:** two machines working on one PR disagree on whether it is
-  locked or held, and that costs a wrong refusal or a wrong pass. Or a new store appears with no record.
+  locked or held, and that costs a wrong refusal or a wrong pass. Or a new store appears with no ADR.
   Or a lock or a hold is gone while its PR is still open.
 - Revisit if: gate state has to be shared between machines.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [x] Decide whether the merge override grants move under the state root.
 3. [ ] List every folder the plugin writes in the README's State section.
 4. [ ] Move the merge override grants under the state root (issue #36).

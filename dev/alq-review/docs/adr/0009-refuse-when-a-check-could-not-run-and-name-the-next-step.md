@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0009: Refuse when a check could not run and name the next step
@@ -48,7 +48,7 @@ The gates settled that one by one, and not all the same way:
 - The watch on a held branch reports a checkout it cannot read and lets the command run.
 
 No plan decided this. The user decided it on 2026-10-06, when asked which of these readings is the rule.
-Why now: the answers differ from gate to gate, and no record binds the next check.
+Why now: the answers differ from gate to gate, and no ADR binds the next check.
 
 ## Decision
 
@@ -92,6 +92,6 @@ The held-branch watch does this, and P4 allows it. The user rejected it: the cal
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back, and confirms that `UNSURE` is an answer.
+1. [ ] The ratifier ratifies this ADR, or sends it back, and confirms that `UNSURE` is an answer.
 2. [ ] Bring the gates that let a call through into line, tracked in an issue.
 3. [ ] Amend constitution P4 to say that the outcome refuses, in its own PR.

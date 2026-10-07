@@ -25,14 +25,14 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0015: Send private source to the outside classifier that judges a fix
 
 ## Context
 
-The shim check judges a fix with Jev, a classifier outside the org (record 0007). To judge a change, Jev has
+The shim check judges a fix with Jev, a classifier outside the org (ADR-0007). To judge a change, Jev has
 to read it. So source code leaves the org, to OpenRouter and to TypeSafe.
 
 What is sent: the diff of the staged change and, for a fix, the lists of sites the sweep found, each with its
@@ -43,7 +43,7 @@ The check runs on every repo the plugin is installed in, private repos included.
 The plan of the shim check records this as the user's decision, and its spec takes Jev's terms as accepted
 for private source. Neither gives a date or a reason, and no alternative was weighed.
 
-Why now: the decision was one point of seven in record 0007, which is about how a verdict is made. It reaches
+Why now: the decision was one point of seven in ADR-0007, which is about how a verdict is made. It reaches
 every repo, and it cannot be undone for code already sent.
 
 ## Decision
@@ -64,7 +64,7 @@ TypeSafe, so that the shim check can judge a fix. This is the user's decision.
 
 ### Option B: Do nothing
 
-The permission stays one point of record 0007, marked as reaching one component and as easy to undo.
+The permission stays one point of ADR-0007, marked as reaching one component and as easy to undo.
 
 The plan weighed no alternative to sending private source.
 
@@ -80,7 +80,7 @@ The plan weighed no alternative to sending private source.
 ## Consequences
 
 - Easier: the shim check works the same on a private repo as on a public one.
-- Harder: another feature that sends source out of the org cannot lean on this record. It needs its own.
+- Harder: another feature that sends source out of the org cannot lean on this ADR. It needs its own.
 - **How we would know this was wrong:** a provider changes its terms for private source; or source that was
   sent to the classifier turns up outside the org.
 - Revisit if: a judge inside the org or inside the session can answer within the hook's time, or the plugin
@@ -88,4 +88,4 @@ The plan weighed no alternative to sending private source.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.

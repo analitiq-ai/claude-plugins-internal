@@ -47,7 +47,7 @@ The `design-doc` skill writes a spec folder, `<dir>/specs/<feature>/`, for the s
 folders each open by saying that the acceptance criteria are the issue comment. So a reader has to open two places to know what a change must do, and nothing keeps
 the two in step.
 
-Why now: on 2026-10-06 the user decided which of the two is the spec. This record comes from that decision,
+Why now: on 2026-10-06 the user decided which of the two is the spec. This ADR comes from that decision,
 as recorded in issue #25, and not from a Spec Kit plan.
 
 ## Decision
@@ -100,7 +100,7 @@ committed beside the comment it drifts from". The user's decision names one home
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Settle the four open points of issue #25 in its spec.
 3. [ ] Amend spec 014 to this rule, in its own PR, before the code.
 4. [ ] Change the three skills, the gate's spec reader and the tests in one change.

@@ -53,7 +53,7 @@ per repo. The same kind of list stayed in use for design documents. Issue #29 re
 - The rule fires on a file changing, not on a design changing.
 - It refused the first round on PR #21, which moved tests to another folder, and on PR #28, which corrected
   two README sentences. Neither decided a design.
-- Its pattern `docs/adr/**` does not match this repo's decision records, which are in
+- Its pattern `docs/adr/**` does not match this repo's ADRs, which are in
   `dev/alq-review/docs/adr/`.
 
 Why now: on 2026-10-06 the user decided to delete the rule. The user said: "I do not want to hand-roll and
@@ -95,7 +95,7 @@ the rule keeps refusing changes that decide nothing.
 
 ## Trade-offs
 
-- A design decided by editing only a README, a decision record or a rule file will no longer be stopped at
+- A design decided by editing only a README, an ADR or a rule file will no longer be stopped at
   the first internal round once the rule is deleted. Issue #29 records this as the accepted loss.
 - The rule's reason was an unsettled design as a cause of review churn. Code will no longer guard that
   case outside spec folders.
@@ -108,13 +108,13 @@ the rule keeps refusing changes that decide nothing.
   `config.json` has to follow where a repo puts its documents.
 - Harder: nothing automatic sends an author to a spec folder when a design changes outside one.
 - **How we would know this was wrong:** review churn on a PR that is traced to a design decided in a README,
-  a decision record or a rule file with no spec folder; or a repo whose `specs/<x>/` folders are not spec
+  an ADR or a rule file with no spec folder; or a repo whose `specs/<x>/` folders are not spec
   folders and get refused.
 - Revisit if: a tool appears that marks a design change by its content, not by a file name.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Delete the rule, its list and its tests (issue #29), from a failing test that the settled-design
    check does not refuse a README-only branch.
 3. [ ] Note in that change that it replaces spec 004 FR-004 (design-document half) and R10.

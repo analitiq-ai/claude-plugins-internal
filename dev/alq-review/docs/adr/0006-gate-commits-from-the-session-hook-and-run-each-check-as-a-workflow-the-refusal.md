@@ -29,7 +29,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decisions already made, written as records"
+    label: "The batch of decisions already made, written as ADRs"
 ---
 
 # ADR-0006: Gate commits from the session hook and run each check as a workflow the refusal names
@@ -107,7 +107,7 @@ Rejected: its judging check is advisory, so it cannot block on a judged claim.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] A new commit-time check follows points 1 to 3.
-3. [ ] A model call that a new check makes inside a hook is added to this record as a named exception, with
+3. [ ] A model call that a new check makes inside a hook is added to this ADR as a named exception, with
    its time budget.

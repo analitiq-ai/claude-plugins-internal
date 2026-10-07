@@ -29,7 +29,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decisions already made, written as records"
+    label: "The batch of decisions already made, written as ADRs"
 ---
 
 # ADR-0003: Gate locally only what the server cannot see and read the org gate's verdict from its check run
@@ -52,7 +52,7 @@ The same drift applies to prose. The gate's behaviour was restated in a rule and
 no test to hold either copy to the gate's code.
 
 Why now: these reasons sit in a docstring, a code comment and the spec of a prose-only feature. No
-record binds the next local gate or skill.
+ADR binds the next local gate or skill.
 
 ## Decision
 
@@ -77,7 +77,7 @@ record binds the next local gate or skill.
 
 ### Option B: Do nothing
 
-No record binds the next gate, so nothing stops it from copying a server rule.
+No ADR binds the next gate, so nothing stops it from copying a server rule.
 
 ### Option C: Re-check the server's rules in the local hook
 
@@ -114,6 +114,6 @@ Rejected: it would be a second copy of the org gate's mapping, with no drift tes
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Decide whether the poller's App filter and the one in `github.py` become one reader.
 3. [ ] Decide whether the App name, run name and title prefix get a drift test.

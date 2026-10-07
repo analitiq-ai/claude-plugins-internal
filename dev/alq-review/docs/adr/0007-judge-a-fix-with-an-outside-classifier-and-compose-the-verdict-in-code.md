@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0007: Judge a fix with an outside classifier and compose the verdict in code
@@ -56,7 +56,7 @@ Two later specs met the same limits and each added a rule. The rules are spread 
    answer unread; it does not rewrite one.
 6. We will put a rule in code ahead of the model wherever code can decide.
 
-Record 0015 decides that private source may be sent to the classifier.
+ADR-0015 decides that private source may be sent to the classifier.
 
 ## Options considered
 
@@ -66,7 +66,7 @@ Record 0015 decides that private source may be sent to the classifier.
 |---|---|
 | Fits inside a hook | Yes, a call is about a second |
 | Verdict rule | Set in code |
-| What leaves the org | The diff of the change, and for a fix the lists of sites (record 0015) |
+| What leaves the org | The diff of the change, and for a fix the lists of sites (ADR-0015) |
 
 ### Option B: Do nothing
 
@@ -94,4 +94,4 @@ Rejected: its overall answer would differ from its two answers.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.

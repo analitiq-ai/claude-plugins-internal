@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0011: Ship every check enforcing from its first release
@@ -55,7 +55,7 @@ user decided it on 2026-10-06: "Enforce them on first release".
 1. We will ship every new check refusing from its first release.
 2. We will give a new check no record-only phase and no accuracy bar to pass first.
 3. We will build in no threshold and no review date. The user reads the log and decides.
-4. We will treat spec 004 FR-023 as replaced by this record.
+4. We will treat spec 004 FR-023 as replaced by this ADR.
 
 ## Options considered
 
@@ -95,6 +95,6 @@ Proposed in critique. The user's answer is point 3.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
-2. [ ] Mark spec 004 FR-023 as replaced by this record, in its own PR.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
+2. [ ] Mark spec 004 FR-023 as replaced by this ADR, in its own PR.
 3. [ ] Settle how a check is switched off (issue #26).

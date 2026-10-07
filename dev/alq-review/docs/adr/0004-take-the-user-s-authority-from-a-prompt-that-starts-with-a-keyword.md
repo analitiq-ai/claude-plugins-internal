@@ -27,11 +27,11 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
   - type: issue
     id: "26"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/26"
-    label: "The on/off switch for the claim check and the shim check, which follows this record"
+    label: "The on/off switch for the claim check and the shim check, which follows this ADR"
 ---
 
 # ADR-0004: Take the user's authority from a prompt that starts with a keyword
@@ -92,7 +92,7 @@ Rejected by constitution P2. A hold that an agent can release has a second way o
 
 - The authority belongs to whoever writes the start of a prompt. In an automated session that is whoever
   writes the automation's prompt, not a person at a keyboard.
-- The rule rests on a platform fact this record did not test: an agent's tool calls do not raise
+- The rule rests on a platform fact this ADR did not test: an agent's tool calls do not raise
   `UserPromptSubmit`.
 - A release is local to the machine where the prompt was typed.
 
@@ -107,7 +107,7 @@ Rejected by constitution P2. A hold that an agent can release has a second way o
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Build the switch of issue #26 as a keyword prompt.
 3. [ ] Decide whether the `ledger.py unlock` command stays. It is a release route that is not a prompt.
-4. [ ] Point constitution P2 at this record for how the user's action is recognised, in its own PR.
+4. [ ] Point constitution P2 at this ADR for how the user's action is recognised, in its own PR.

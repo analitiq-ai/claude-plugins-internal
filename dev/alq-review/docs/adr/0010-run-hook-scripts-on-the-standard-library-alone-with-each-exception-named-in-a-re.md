@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.1.0
 id: "0010"
-title: "Run hook scripts on the standard library alone, with each exception named in a record"
+title: "Run hook scripts on the standard library alone, with each exception named in an ADR"
 status: draft
 date: 2026-10-06
 deciders: []
@@ -27,14 +27,14 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decision records this one belongs to"
+    label: "The batch of ADRs this one belongs to"
   - type: issue
     id: "17"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
     label: "D7: the first named exception, diff-match-patch"
 ---
 
-# ADR-0010: Run hook scripts on the standard library alone, with each exception named in a record
+# ADR-0010: Run hook scripts on the standard library alone, with each exception named in an ADR
 
 ## Context
 
@@ -47,16 +47,16 @@ used it to turn down `unidiff` and the OpenRouter SDKs. None of them gives a rea
 Constitution P5 pulls the other way. It asks that nothing is hand-rolled before what already exists was
 looked at. Nothing written says how the two are weighed.
 
-Why now: record 0001 puts the package `diff-match-patch` on the hook path. Without a decision, that would
+Why now: ADR-0001 puts the package `diff-match-patch` on the hook path. Without a decision, that would
 end an unwritten rule by accident. No plan decided this. The user decided it on 2026-10-06.
 
 ## Decision
 
 1. We will keep the rule: a Python script that a hook runs imports the standard library and the plugin's
    own files, and nothing else.
-2. We will allow an exception only when a decision record names the package and says why the standard
+2. We will allow an exception only when an ADR names the package and says why the standard
    library does not do the job.
-3. We will treat `diff-match-patch`, named in record 0001, as the one exception.
+3. We will treat `diff-match-patch`, named in ADR-0001, as the one exception.
 4. We will refuse, not fall back, when a check needs a named package and cannot import it. The refusal
    names the package and the command that installs it.
 
@@ -64,17 +64,17 @@ The rule covers Python imports. Programs the scripts run, such as `git` and `gh`
 
 ## Options considered
 
-### Option A: Standard library alone, each exception named in a record (chosen)
+### Option A: Standard library alone, each exception named in an ADR (chosen)
 
 | Dimension | Assessment |
 |---|---|
 | Install | Stays a file copy for every check that uses no named package |
-| A new package | Needs a record first, so someone decides it |
-| Weighed against P5 | In the exception's record, once per package |
+| A new package | Needs an ADR first, so someone decides it |
+| Weighed against P5 | In the exception's ADR, once per package |
 
 ### Option B: Do nothing
 
-The rule stays unwritten. Plans keep citing it as a fact, and record 0001 breaks it with no decision.
+The rule stays unwritten. Plans keep citing it as a fact, and ADR-0001 breaks it with no decision.
 
 ### Option C: Vendor a needed package into the plugin folder
 
@@ -92,9 +92,9 @@ No other alternative was weighed. Dropping the rule was not proposed by anyone.
 
 ## Consequences
 
-- Easier: a plan cites this record in place of "stdlib only". A reviewer can turn down an unnamed import by
+- Easier: a plan cites this ADR in place of "stdlib only". A reviewer can turn down an unnamed import by
   pointing here.
-- Harder: each new package needs a record before the code. The first exception needs an install step that
+- Harder: each new package needs an ADR before the code. The first exception needs an install step that
   does not exist yet.
 - **How we would know this was wrong:** a second and a third exception are asked for within a few months,
   or checks refuse for a missing package on machines where nobody ran the install step.
@@ -102,6 +102,6 @@ No other alternative was weighed. Dropping the rule was not proposed by anyone.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Decide how a named package is installed and pinned, with the work of issue #17.
 3. [ ] Build the refusal for a missing named package with the first exception, from a failing test.

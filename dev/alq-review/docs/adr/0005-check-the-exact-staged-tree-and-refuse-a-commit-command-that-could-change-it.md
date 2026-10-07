@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decisions already made, written as records"
+    label: "The batch of decisions already made, written as ADRs"
 ---
 
 # ADR-0005: Check the exact staged tree and refuse a commit command that could change it
@@ -112,6 +112,6 @@ gate for no claim the hooks write.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
-2. [ ] Note in spec 004 (R7, R9) that this record overtakes the finding that commit content cannot be
+1. [ ] The ratifier ratifies this ADR, or sends it back.
+2. [ ] Note in spec 004 (R7, R9) that this ADR overtakes the finding that commit content cannot be
    read, in its own PR.
