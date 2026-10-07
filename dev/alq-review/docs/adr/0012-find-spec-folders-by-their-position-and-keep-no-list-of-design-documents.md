@@ -91,7 +91,7 @@ the rule keeps refusing changes that decide nothing.
 |---|---|
 | C. Keep the rule, and recognise in code only the files whose place a tool fixes | Put to the user on 2026-10-06 and not chosen. The user chose to delete the rule. |
 | D. A `spec_folders` glob list in `config.json` | A hand-maintained list, and `config.json` is plugin-wide, not per repo. |
-| E. The `.specify/` folder as the mark of a Spec Kit project | Spec 015 R1: "no Analitiq repo commits it". |
+| E. The `.specify/` folder as the mark of a Spec Kit project | Only this repo commits it. A repo with spec folders and no committed `.specify/` would not be recognised. |
 
 ## Trade-offs
 
