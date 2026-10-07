@@ -26,6 +26,10 @@ externalRefs:
     id: "30"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
     label: "The batch of decisions already made, written as records"
+  - type: issue
+    id: "36"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/36"
+    label: "Move the merge override grants under the state root"
 ---
 
 # ADR-0002: Keep all gate state in one local store outside every repo
@@ -55,6 +59,8 @@ switch that needs a place to live.
    repo and an id that needs no PR.
 4. We will name each exception in a record. One is named here: the sweeper's copy of `HEAD` stays
    beside the worktrees, as spec 006 research R3 decided. It is a read copy, not a record.
+5. We will keep the merge override grants under the state root with the other session records, by the
+   user's decision of 2026-10-07. Issue #36 moves them there.
 
 ## Options considered
 
@@ -88,8 +94,8 @@ allow".
 
 - State is per machine. A hold or a ledger on one machine is not known on another.
 - The ledger is in no PR, so a reviewer cannot read it there.
-- Not everything is in the store today: the merge override grants are kept in a folder of their own
-  (action item 2).
+- Not everything is in the store yet: until issue #36 is done, the merge override grants are kept in a
+  folder of their own.
 
 ## Consequences
 
@@ -102,5 +108,6 @@ allow".
 ## Action items
 
 1. [ ] The ratifier ratifies this record, or sends it back.
-2. [ ] Decide whether the merge override grants move under the state root.
+2. [x] Decide whether the merge override grants move under the state root.
 3. [ ] List every folder the plugin writes in the README's State section.
+4. [ ] Move the merge override grants under the state root (issue #36).

@@ -139,6 +139,9 @@ The plugin writes in four places:
 | `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
 | `.specify/` in the project | `presets/settled-design/`<br>`workflows/design-doc/`<br>`critique-baseline.json` |
 
+The merge-gate folder is to be folded into the state folder (decision record 0002): issue #36 moves the merge
+override grants to `sessions/<session id>.merge.json` there. Until it lands, the grants are where the table says.
+
 In the state folder:
 
 - `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
