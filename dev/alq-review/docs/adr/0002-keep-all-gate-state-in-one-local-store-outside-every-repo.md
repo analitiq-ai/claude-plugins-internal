@@ -103,4 +103,4 @@ allow".
 
 1. [ ] The ratifier ratifies this record, or sends it back.
 2. [ ] Decide whether the merge override grants move under the state root.
-3. [ ] List every folder the plugin writes in the README's State section.
+3. [x] List every folder the plugin writes in the README's State section.
