@@ -60,8 +60,7 @@ per repo. The same kind of list stayed in use for design documents. Issue #29 re
   `dev/alq-review/docs/adr/`.
 
 Spec Kit marks a project with a `.specify/` folder, and creates spec folders only in the `specs/` beside
-it. Only this repo commits `.specify/` today. Every Analitiq repo that holds spec folders will commit it,
-so that the project is there in every checkout.
+it. When a repo commits `.specify/`, every checkout of it carries the mark.
 
 Why now: issue #29 deletes the rule. A list of path patterns has to be hand-rolled and maintained.
 
@@ -88,7 +87,7 @@ of issue #25. It is not decided here.
 | What makes a folder a spec folder | The committed `.specify/` beside its `specs/` |
 | Same answer in every session and on every machine | Yes, it is read from the commit |
 | Hand-maintained lists | None |
-| Needs | `.specify/` committed in every repo that holds spec folders |
+| A repo that does not commit `.specify/` | Has no spec folders, as far as the gate can tell |
 | Stops a design decided in a README alone | No |
 
 ### Option B: Do nothing
@@ -134,7 +133,6 @@ where each repo puts its documents, and the rule keeps refusing changes that dec
 1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Delete the design-document rule, its list and its tests (issue #29), from a failing test that the
    settled-design check does not refuse a README-only branch.
-3. [ ] Commit `.specify/` in every repo that holds spec folders.
-4. [ ] After item 3, change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder
-   with no `.specify/` beside it is not graded. No issue is open for this.
-5. [ ] Note in spec 004 (FR-004, R10) and spec 015 (R1) what this ADR replaces, in the changes that do it.
+3. [ ] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no
+   `.specify/` beside it is not graded. No issue is open for this.
+4. [ ] Note in spec 004 (FR-004, R10) and spec 015 (R1) what this ADR replaces, in the changes that do it.
