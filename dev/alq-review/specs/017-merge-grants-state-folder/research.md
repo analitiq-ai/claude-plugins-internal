@@ -260,8 +260,14 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   plan leaves the other fifteen as they are, but for the fixture. The whole suite: 711 run and pass on the worktree; against the scratch copy 695 run, with those 4
   failures and 2 errors from test files that ask git about the checkout (`test_shell`, `test_shipped_tree`),
   which a scratch copy is not.
-- **Not run by anyone**: the rows as tests in `test_pre_merge_gate.py`; they were run as scratch rows only. The
-  rows that make a folder read-only, when run as root.
+- **Measured** (the repo's tests, 2026-10-07): the rows as tests in `test_pre_merge_gate.py`, 56 with the
+  fifteen left alone. On main's script 22 pass, those fifteen and the seven guards, and 34 do not: 32 fail and
+  2 end in an error on a file main never writes. On the new script all 56 pass, and the whole suite's 742. The
+  file was then run on seventeen wrong versions: the fifteen above and two more. N28 became three tests, and
+  the name built without the repo breaks only the one about another PR; the other two are broken by every
+  session's grants kept under one id, and by a grant asked for by an `--admin` merge only. Each of the
+  seventeen fails the tests the table names for it.
+- **Not run by anyone**: the test that makes a folder read-only, as root. It skips that half there.
 
 ## R8: An override and a grant name the PR as `owner/repo#N`
 

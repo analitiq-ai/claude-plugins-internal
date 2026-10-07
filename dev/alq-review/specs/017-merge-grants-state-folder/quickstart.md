@@ -4,8 +4,8 @@ Run from `dev/alq-review/` in the feature worktree. The answers, the table of wh
 and the test list are in [contracts/merge-override.md](contracts/merge-override.md); the record is in
 [data-model.md](data-model.md).
 
-Steps 2 to 4 were run on 2026-10-07 against the scratch copy, by the author, and printed what is written here.
-Step 1 needs the tests, which are not written yet. Step 5 was not run by anyone.
+Steps 1 to 4 were run on 2026-10-07 in the feature worktree, by the author, and printed what is written here.
+Step 1 ran 56 tests in the file and 742 in the suite, all passing. Step 5 was not run by anyone.
 
 ## 1. Tests (no model, no network)
 

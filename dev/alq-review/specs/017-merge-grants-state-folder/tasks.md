@@ -106,7 +106,7 @@ stand-in PR with a github.com address.
 
 > Written before the script is touched. Each is seen to fail in T008.
 
-- [ ] T003 [US1] In `tests/test_pre_merge_gate.py`, add class `GrantRecord(Hook)` and, beside `Marker`, class
+- [X] T003 [US1] In `tests/test_pre_merge_gate.py`, add class `GrantRecord(Hook)` and, beside `Marker`, class
   `OnePlace(unittest.TestCase)`:
   - N4 `test_the_write_guard_covers_the_file_the_gate_wrote` (`GrantRecord`): `say()`; exactly one `.json`
     file is listed by `files()`; `write()` to it returns `The review ledger is written by the gate only.`
@@ -128,7 +128,7 @@ user, and left alone by a merge that does not need it.
 
 ### Tests for User Story 2
 
-- [ ] T004 [US2] In `tests/test_pre_merge_gate.py`, class `MergeOverride`. New tests:
+- [X] T004 [US2] In `tests/test_pre_merge_gate.py`, class `MergeOverride`. New tests:
   - N1 `test_an_override_is_recorded_in_the_state_folder_and_nowhere_else`: `say()`; `files()` is exactly
     `state/sessions/s1.merge.json` and `state/sessions/s1.merge.lock`; the record is `{"granted": [NAME]}`;
     `self.elsewhere` does not exist.
@@ -175,7 +175,7 @@ user, and left alone by a merge that does not need it.
     is refused with `Cannot verify the pre-merge state`; with `gh` restored it passes.
   - K3 `test_an_override_quoted_inside_a_prompt_grants_nothing`: `say("Work on this issue:\n\n" + TYPED)`;
     `--admin` is refused; `say()`; it passes.
-- [ ] T005 [US2] In `tests/test_pre_merge_gate.py`:
+- [X] T005 [US2] In `tests/test_pre_merge_gate.py`:
   - N17 `test_an_override_typed_while_off_is_still_granted` (`MergeSwitch`, name kept): `switch()`; `say()`;
     the answer holds `NAME`; the record under `self.state` is `{"granted": [NAME]}`.
   - N21 `test_the_readme_lists_the_record_and_gives_the_override_as_typed` (`OnePlace`): `PLUGIN/README.md`
@@ -193,7 +193,7 @@ answered with the reason and, where the gate knows one, the step.
 
 ### Tests for User Story 3
 
-- [ ] T006 [US3] In `tests/test_pre_merge_gate.py`, add class `UnusableGrants(Hook)`, the cases the contract's
+- [X] T006 [US3] In `tests/test_pre_merge_gate.py`, add class `UnusableGrants(Hook)`, the cases the contract's
   "What each broken case gets" table lists:
   - N9 `test_an_override_under_an_id_that_is_not_a_plain_name_is_answered`: for session `../../escape` and
     for none: the two fields are equal and hold `could not be recorded, so nothing is granted` and
@@ -222,7 +222,7 @@ answered with the reason and, where the gate knows one, the step.
     run that copy: exit 0, the two fields equal, `could not be recorded`.
   - N20 `test_a_helper_that_is_there_but_does_not_load_still_answers`: copy `scripts/` to a folder and
     replace its `hookio.py` with `def broken(:\n`, then with `raise RuntimeError('boom')\n`: the same each time.
-- [ ] T007 [US3] In `tests/test_pre_merge_gate.py`, class `UnusableGrants` unless a class is named. The
+- [X] T007 [US3] In `tests/test_pre_merge_gate.py`, class `UnusableGrants` unless a class is named. The
   rows about a merge that no damaged record touches sit in `MergeOverride`, beside the tests they extend:
   - N25 `test_an_admin_merge_is_refused_even_when_gh_is_not_on_the_hooks_path` (`MergeOverride`, name kept):
     `hold(NAME)`; a `PATH` without `gh`; `/opt/tools/gh pr merge 12 --admin` is refused; the refusal holds
@@ -254,11 +254,11 @@ answered with the reason and, where the gate knows one, the step.
 **Purpose**: one edit of `scripts/pre_merge_gate.py` from the settled shape (research R1–R8, contract,
 data-model). T009–T011 are parts of that one edit; the file is run after T011, not between.
 
-- [ ] T008 Red on main. Run `tests/test_pre_merge_gate.py` with `-v` before `scripts/pre_merge_gate.py` is
+- [X] T008 Red on main. Run `tests/test_pre_merge_gate.py` with `-v` before `scripts/pre_merge_gate.py` is
   touched. Expected: 56 tests; 22 pass (the 15 untouched and G1–G7); 34 fail (every N and K row). Check each
   failure against the contract's "Fails on main because" column: one that fails for another reason, such as a
   fixture error, is fixed before going on. Keep the output in a file outside the repo, for T015.
-- [ ] T009 In `scripts/pre_merge_gate.py`, the record and its keeping (R1, R2, R3):
+- [X] T009 In `scripts/pre_merge_gate.py`, the record and its keeping (R1, R2, R3):
   - Delete `_overrides`, `_update_overrides`, `SESSION_ID` and the imports `fcntl`, `os` and `Path`.
   - Add `GRANTS = ".merge"`, `REPO = r"[\w.-]+/[\w.-]+"` (a repo as `ledger.ROUND_REF` spells one) and
     `GRANT = re.compile(rf"{REPO}#\d+")`.
@@ -273,7 +273,7 @@ data-model). T009–T011 are parts of that one edit; the file is run after T011,
     `held["granted"] = sorted(granted)`. A `ValueError` or `RecursionError` from that block is raised again as
     a `ValueError` in the contract's damaged-record words: the record's path, the repair, never what it holds.
     An `OSError` is left as raised. Returns what `change` returns.
-- [ ] T010 In `scripts/pre_merge_gate.py`, the PR's name and the answer to a prompt (R8, R4):
+- [X] T010 In `scripts/pre_merge_gate.py`, the PR's name and the answer to a prompt (R8, R4):
   - `PR_URL` gains a group for the number. `OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#(\d+)\b")`;
     the repo is optional only so that `override-merge #N` is answered.
   - `pr_name(repo, number) -> str`. Data model: "`owner/repo#N`: the repo as GitHub names it, a `#`, and the
@@ -285,7 +285,7 @@ data-model). T009–T011 are parts of that one edit; the file is run after T011,
     line. Otherwise `_update_grants(payload, lambda granted: granted.add(named))`; any exception → the
     contract's "could not be recorded" line, and `_log_failure`; none → the granted line. One `json.dump`:
     `systemMessage` and `hookSpecificOutput.additionalContext`, both `[alq-review] ` and the line. Return 0.
-- [ ] T011 In `scripts/pre_merge_gate.py`, the merge side (R5, R8):
+- [X] T011 In `scripts/pre_merge_gate.py`, the merge side (R5, R8):
   - `spend_override(payload, named) -> bool`, through `_update_grants`.
   - `refuse_admin` becomes `admin_needs_override(how) -> str` and returns its words; `how` is one of the three
     sentences of the contract's "What an `--admin` merge is told about overriding".
@@ -299,11 +299,11 @@ data-model). T009–T011 are parts of that one edit; the file is run after T011,
     `spend_override`; True → return 0; an `OSError` or `ValueError` → the contract's note, `_log_failure`,
     and `deny` of the note, a blank line and `refusal`. Otherwise `deny(refusal)`.
   - The module's opening comment gives `override-merge owner/repo#N` and says why the repo is named.
-- [ ] T012 [P] In `README.md`, two lines. Under State, after the `.off.json` line, a line for the record
+- [X] T012 [P] In `README.md`, two lines. Under State, after the `.off.json` line, a line for the record
   `sessions/<session id>.merge.json`: "the merge overrides the user typed in that session and no merge has
   used, one `owner/repo#N` per PR". In the Layout row of `scripts/pre_merge_gate.py`, `override-merge #N`
   becomes `override-merge owner/repo#N`.
-- [ ] T013 Run `tests/test_pre_merge_gate.py`: 56 pass. Run the whole suite in `tests/`: every test passes
+- [X] T013 Run `tests/test_pre_merge_gate.py`: 56 pass. Run the whole suite in `tests/`: every test passes
   (742 expected: T001's 711 and the 31 new tests). A row that fails is fixed in the script from the contract. A
   third patch to the script means stop and write it once more from the shape (repo rule).
 
@@ -316,7 +316,7 @@ data-model). T009–T011 are parts of that one edit; the file is run after T011,
 **Purpose**: a guard row passes on main, and many new rows fail on main only because main does not take the new
 form. Each such row is shown to fail on a wrong version of the new script, for its own reason (plan, Testing).
 
-- [ ] T014 For each wrong version below: copy `plugins/alq-review/` and `dev/alq-review/tests/` into a
+- [X] T014 For each wrong version below: copy `plugins/alq-review/` and `dev/alq-review/tests/` into a
   throwaway folder outside the repo, keeping those two paths; make the one change in the copy's
   `scripts/pre_merge_gate.py`; from the copy's `dev/alq-review/` run `tests/test_pre_merge_gate.py`. Every row
   named must fail. A row that passes is not testing what it says: change the row, run it again on main's script and
@@ -324,7 +324,7 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
 
   | Wrong version | The one change | Rows that must fail |
   |---|---|---|
-  | `old-folder` | `_update_grants` keeps the record at `$XDG_STATE_HOME/analitiq-merge-gate/<session id>.json` under its own `fcntl` lock, as main does | N1, N4 |
+  | `old-folder` | `_update_grants` keeps the record at `$XDG_STATE_HOME/analitiq-merge-gate/<session id>.json` under its own `fcntl` lock, as main does | N1, N4, N17 |
   | `agent-only` | `grant` prints no `systemMessage` | N2 |
   | `asked-first` | `gated` calls `spend_override` before `unmet` | N6, N7, N29, G1, G2 |
   | `read-before-lock` | `spend_override` answers from a plain read of the record made before the lock is taken | N8 |
@@ -345,7 +345,7 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
   The last two were added while the tests were written: N28 is three kept tests, and `number-only` breaks
   only the one about another PR.
 
-- [ ] T015 Two commits, in this order, each with the repo's trailers. First `tests/test_pre_merge_gate.py`
+- [X] T015 Two commits, in this order, each with the repo's trailers. First `tests/test_pre_merge_gate.py`
   alone, `test(#36): the merge override names its PR and is kept in the state folder`: the message carries
   T008's result, and for each wrong version one line naming it and the failing output of its rows, and says the
   wrong versions were run against the script of the next commit. Then `scripts/pre_merge_gate.py` and
@@ -355,9 +355,9 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T016 Run `specs/017-merge-grants-state-folder/quickstart.md` steps 1 to 4 in the worktree. Each prints
+- [X] T016 Run `specs/017-merge-grants-state-folder/quickstart.md` steps 1 to 4 in the worktree. Each prints
   what the document says.
-- [ ] T017 Say what was run, in `specs/017-merge-grants-state-folder/`: `plan.md` (Testing), `research.md`
+- [X] T017 Say what was run, in `specs/017-merge-grants-state-folder/`: `plan.md` (Testing), `research.md`
   (R7, "Not run by anyone"), `contracts/merge-override.md` (Test list) and `quickstart.md` (its opening lines)
   each say the rows were not run as tests in the repo, or that the tests are not written. Replace that with what
   T013, T014 and T016 showed. Tick this file. Commit as `docs(#36)`.
@@ -365,7 +365,7 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
   session. Record the result in `research.md` R4 and in `quickstart.md`, in place of "Not run by anyone". If
   no `[alq-review]` line is shown to the user, SC-008 is not met and the plan goes back to R4. If it is not run
   before the PR opens, the PR's body says so.
-- [ ] T019 Before the PR opens. `git fetch origin main`; if PR #31 has merged, rebase and remove from
+- [X] T019 Before the PR opens. `git fetch origin main`; if PR #31 has merged, rebase and remove from
   `README.md` the merge-gate row and the note it added to the State section (N18 fails until they are gone).
   Tripwire: `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; a file above 3 is rewritten once, not
   patched again. The PR's body says what the README cannot: an unspent override is lost on upgrade; the override

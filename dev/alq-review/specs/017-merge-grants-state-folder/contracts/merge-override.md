@@ -111,16 +111,19 @@ Three kinds.
   has, and in where its state is kept (SC-004). One that shows a refusal also shows the same override letting
   its own merge through; without that it passes on a gate that grants nothing.
 
-Run on 2026-10-07 as scratch rows, by the author: every row passed on the scratch copy; every new and kept row
-failed on main; every guard row passed on main; every wrong version failed the rows that name it. Not run as
-tests in the repo.
+Run on 2026-10-07 as the tests of `tests/test_pre_merge_gate.py`, by the author: every row passes on the new
+script; every new and kept row fails on main's; every guard row passes on main's; every wrong version fails the
+rows that name it.
+
+On main a typed `override-merge owner/repo#N` is not taken: it is answered with nothing and grants nothing. A
+row that types one fails on main for that, whatever more its cell says of main.
 
 | # | Kind | The test shows | Fails on main because | Wrong version that fails it |
 |---|---|---|---|---|
 | N1 | new | an override is recorded as `{"granted": ["acme/demo#12"]}` under the state folder; the second folder does not come to exist | main does not take the name, and keeps grants in the old folder | grants kept in the old folder |
 | N2 | new | a recorded override shows the user and the agent the same line, naming the PR | main does not take the name, and tells the agent only | the line sent to the agent only |
 | N3 | new | `override-merge #12` is answered with what to type, writes nothing, and an `--admin` merge is still refused | main grants on it | |
-| N4 | new | a `Write` to the file the gate wrote, found by listing the folders, is refused | main wrote it where the guard does not reach | grants kept in the old folder |
+| N4 | new | a `Write` to the file the gate wrote, found by listing the folders, is refused | main does not take the name, so no file is written | grants kept in the old folder |
 | N5 | new | a file in the old folder grants nothing and is left as it was, in the old form and in the new | main reads it as a grant | |
 | N6 | new | an attested merge leaves a held grant, and an `--admin` merge then passes on it once | main does not take the name | the grant asked for before `unmet` |
 | N7 | new | the same for a version-only release | the same | the same |
@@ -133,7 +136,7 @@ tests in the repo.
 | N14 | new | `sessions` a file, and `sessions` read-only: the override is not recorded; an `--admin` merge gets the note | main keeps grants elsewhere | |
 | N15 | new | a file where the state folder should be: the override is answered as not recorded | main keeps grants elsewhere | |
 | N16 | new | a failure to record, and a failure to use, each leave a line in `errors.log` | main writes none | |
-| N17 | new | an override typed while off is recorded under the state folder | main records it in the old folder | |
+| N17 | new | an override typed while off is recorded under the state folder | main does not take the name | grants kept in the old folder |
 | N18 | new | no file of the plugin spells the old folder; `pre_merge_gate.py` spells neither `fcntl` nor `SESSION_ID` | the merge gate has all three | |
 | N19 | new | the script run apart from the plugin's other scripts still answers an override as not recorded | main does not need them | |
 | N20 | new | a `hookio.py` that does not parse, and one that raises when loaded: the override is answered as not recorded, exit 0 | main does not load it, and grants | the log step's guard letting only a missing module and a file error pass |
@@ -145,7 +148,7 @@ tests in the repo.
 | N26 | new | a PR without a github.com address: `--admin` is refused, told no override can name it, and given no line | main gives `override-merge #12` | |
 | N27 | new | an override typed twice grants one merge | main does not take the name | the names kept as a list |
 | N28 | new | another PR, the same number in another repo and another session find no grant; the grant stands in for a missing attestation once | main does not take the name | the name built without the repo; every session's grants kept under one id; a grant asked for by an `--admin` merge only |
-| N29 | new | GitHub's answer about a release cannot be read, grant held: the merge is refused with the general answer, the grant is kept, and `--admin` then passes | main passes the first on the grant | the grant asked for before `unmet` |
+| N29 | new | GitHub's answer about a release cannot be read, grant held: the merge is refused with the general answer, the grant is kept, and `--admin` then passes | main does not take the name, so no grant is held | the grant asked for before `unmet` |
 | G1 | guard | an attested merge passes over each damaged record and leaves it as found | | the grant asked for before `unmet` |
 | G2 | guard | an attested merge passes under an id that is not a plain name | | the same |
 | G3 | guard | over a damaged record, `gh pr ready`, `--undo`, `--disable-auto`, a merge `gh pr view` cannot name and a `gh api` merge are judged as today | | the grants read at the top of `gated` |
