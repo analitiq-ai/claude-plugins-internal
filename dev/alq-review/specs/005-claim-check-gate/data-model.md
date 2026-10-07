@@ -55,46 +55,84 @@ cached across trees.
 ## Lineage (`claim_lineages`: key `repo`, `branch`, `id`; JSON `doc`)
 
 The bound and the release (FR-011, FR-017, ADR-0001). One row is one chain of versions with one current claim.
+Every rule about a row's state is in this section. Other documents cite it and decide nothing about state.
 
 | Field | Meaning |
 |---|---|
-| `id` | first 16 hex of sha256(check ref that minted the row \0 claim id of its first own version); never recomputed |
+| `id` | first 16 hex of sha256(check ref that minted the row \0 id of the claim it was minted for); never recomputed |
 | `file` | the file the claim is in |
-| `versions[]` | the chain, oldest first, as `{check, tree, id, line, quote, ruling, failing_case, evidence}`. At most one per check ref, so a repeated check adds nothing. The last one is the current claim; its `tree` names the version of the file the next check diffs against |
-| `contests[]` | the check ref of each rejected contest |
+| `versions[]` | oldest first, as `{check, tree, id, line, quote, ruling, failing_case, evidence}`. At most one per check ref. The last one is the current claim; its `tree` names the version of the file the next check diffs against |
+| `contests[]` | the check ref of each rejected contest that was counted |
 | `released` | `{id, count}`: the current claim's id and the count when the user typed `unlock`; empty until then |
-| `ended` | `correct`, `gone` or `merged`; empty while the row is open |
+| `ended` | `correct`, `gone` or `merged`; empty while the row is open. An ended row is not changed again |
 
-Count: the versions ruled `WRONG`, plus the rejected contests. Nothing lowers it.
+Count: the versions ruled `WRONG`, plus the entries of `contests[]`. Nothing lowers it.
 
-Minting. A row is minted when a check rules `WRONG` a claim that continues no open row. A claim whose words
-were in a row that has ended gets a new row: the minting check differs, so the id does.
+### State
 
-Succession (R12), at each completed check, for each open row of a file in the staged change. The diff is
-`git diff -U0` of the file's blob in the current version's `tree` against the staged blob:
+A function of the stored fields, for an open row. Ordered; the first match is the state.
 
-- its line is outside every hunk → same row, line shifted;
-- its line is inside a replaced range → the sentence's character span is mapped into the staged blob. One
-  claim found there is the row's next version. Several claims found there fork the row: the first continues
-  it, and each other gets a new row, minted at this check, that starts with a copy of the parent's `versions`
-  and `contests`, so it starts at the parent's count;
-- its words are unchanged at another place in the file → found by its claim id;
-- two open rows whose next version is the same claim → the row with the larger count continues, the other
-  ends `merged`;
-- nothing is mapped and the id is not found → `ended: gone`.
+1. `released`: `released.id` is the current claim's id.
+2. `stopped`: the count is 3 or more, and `released` is empty or the count is above `released.count`.
+3. `checked`: any other row.
 
-A `CORRECT` ruling sets `ended: correct`. Not followed: a claim moved and reworded in one step, and the half of
-a split that lands in a pure insertion. So at most one open row has a given current claim id.
+### Transitions
 
-State, per open row:
+A completed check is applied to every open row of its repo and branch whose `file` is in the staged change. The
+column is the row's state before the check. Succession is applied first, then the ruling. The state after an
+event is read from the list above.
 
-- count below 3 → the check runs.
-- stopped: count 3 or more and above `released.count` (or never released). The launch and the commit are both
-  refused, and the user is asked with every version's words and ruling.
-- current claim id equals `released.id` → that claim passes the commit although its ruling is `WRONG`.
-- words changed after a release → the count still equals `released.count`, so the check runs; `CORRECT` ends the
-  row, `WRONG` raises the count and stops it again at once.
+A `stopped` row is changed by the user's `unlock` and by nothing else: the tree rule below refuses the launch,
+and a check that was already running when the row stopped writes nothing to it.
 
-`unlock claim-<id>` resolves `<id>` first as the current claim id of an open row, then as a row `id`. No count
-and no lineage is keyed on `HEAD` or a commit, and a row carries no line range. Rows of the earlier
-`claim_holds` table are not migrated.
+| Event | `checked` | `released` |
+|---|---|---|
+| **Succession** (R12): `git diff -U0` of the file's blob in the current version's `tree` against the staged blob | | |
+| Words unchanged: the line is outside every hunk, or the claim id is found at another place in the file | nothing written | nothing written |
+| Reworded: this row wins one claim in the span its sentence maps to in the staged blob | a version is appended for that claim, which is now current | the same; the row is then `checked`, with its count equal to `released.count` |
+| Split: this row wins several claims in that span | the first by line continues the row as a rewording. Each other one gets a row minted at this check, starting with a copy of `versions`, `contests` and `released`, then continued as a rewording | the same |
+| Merged: other rows win every claim this row reaches | `ended: merged`; its `released` ends with it | the same |
+| Deleted: nothing is mapped and the id is not found | `ended: gone` | `ended: gone` |
+| **Ruling** of the current claim by this check | | |
+| `WRONG` | recorded on this check's version, which is appended if succession appended none; the count rises by one | nothing written |
+| `CORRECT` | `ended: correct` | `ended: correct` |
+| `UNSURE`, or the claim is not judged | recorded on this check's version if succession appended one; nothing is counted | nothing written |
+| **Other events** | | |
+| A contest of the current claim is rejected | the check ref is appended to `contests[]`; the count rises by one | nothing written |
+| A contest of the current claim is upheld | the new ruling is applied as above; the `WRONG` it replaces stays counted | the new ruling is applied as above |
+| The user types `unlock claim-<id>` | `released` is set to the current claim's id and the count | `released` is written again with the same values |
+| A commit, an amend or a rebase lands | nothing written | nothing written |
+
+The same events on a `stopped` row: the user's `unlock` sets `released` to the current claim's id and the count,
+so the row is `released`; a commit writes nothing; every other event cannot occur or writes nothing, as said above.
+
+Who wins a claim. A claim reached by several rows is won by the row with the largest count; rows with equal
+counts, by the smaller `id`. Wins are decided for the whole file before any row is minted, so every claim has one
+winner and at most one open row has a given current claim id.
+
+Minting. A check that rules `WRONG` a claim no open row wins mints a row with that one version, at count 1. A
+row with that `id` already exists only when the same tree was checked a second time; then nothing is written.
+For the same reason a check ref adds at most one version to a row.
+
+A contest is accepted only for a claim that is the current claim of an open row
+([contracts/claim-check.md](contracts/claim-check.md) §2). So a rejected contest always has a row to be counted on.
+
+Not followed: a claim moved and reworded in one step, and the half of a split that lands in a pure insertion.
+Each is a claim no row wins.
+
+### Tree rule
+
+How a staged tree is matched to rows before any check of it exists. The launch and the commit use it unchanged.
+
+A staged tree matches every open row of its repo and branch whose `file` is in the staged change, under its old
+or its new name when the file is renamed.
+
+- A matched row is `stopped` → the launch and the commit are both refused. The refusal asks the user, per
+  stopped row, with every version's words and ruling and `unlock claim-<id>`. This holds whether the row's words
+  are unchanged, reworded or deleted in the staged tree.
+- No matched row is `stopped` → the check may be launched, and the commit is decided by the tree's check: a
+  `WRONG` claim refuses it unless its id is the `released.id` of a matched row.
+
+`unlock claim-<id>` names every open row whose current claim id is `<id>`; when there is none, the row whose
+`id` is `<id>`. No count and no lineage is keyed on `HEAD` or a commit, and a row carries no line range. Rows of
+the earlier `claim_holds` table are not migrated.

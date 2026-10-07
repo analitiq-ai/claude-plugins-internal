@@ -177,10 +177,9 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   module (spec 005 R12) over `git diff -U0 <old blob> <new blob>` of each file: a range outside every hunk is
   shifted, a range that overlaps a replaced range grows to cover the replacing lines, a range whose lines are
   all deleted is dropped. The commit hook computes the carry and stores nothing; a launch stores the carried
-  ranges with the staged tree. A completed `patch` check joins a chain when a new-side range of its hunks
-  overlaps a carried range; otherwise it opens a new chain. Each completed `patch` check of a new tree adds one
-  to its chain, kept as the tree, so a repeated check adds none. A `complete` check that overlaps ends the
-  chain. A commit, an amend or a rebase does not. A refusal prints, per listed site, the staged-tree line
+  ranges with the staged tree. A staged tree matches every chain one of whose carried ranges a new-side range
+  of its hunks overlaps; what a completed check then does to each matched chain is in data-model `shim_chains`.
+  A commit, an amend or a rebase changes no chain. A refusal prints, per listed site, the staged-tree line
   ranges of the hunks in that site's file.
 - **Rationale**: FR-015 and ADR-0001. The earlier key, `(repo, branch, HEAD sha)`, lost the chain whenever a
   commit of other work landed, and `test_head_moving_leaves_the_chain_behind` asserted that loss (issue #17).
@@ -207,25 +206,27 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
 
 ## R11: Every refusal names an override; a user's override switches the check off for that bug until a commit lands
 
-- **Decision**: A chain is held when its count is 4 or more and above the count at its last override. While it
-  is held, the commit and a launch of the check are both refused with the question for the user. Every refusal
-  of this check (not checked, running, failed, `patch`, held) ends with `override shim-<id>`: the chain id when
-  the staged tree matches a chain (R9), else the tree's 12-hex prefix. `gate.on_prompt` learns that word; for a
-  tree id it opens a chain seeded with that tree's hunk ranges. The override records two things on the chain:
-  the branch's `HEAD` and the chain's count. While the branch's `HEAD` still equals the recorded one, every
-  staged tree that matches the chain (R9 overlap) commits without a check. Once a commit lands the override is
-  over and the count is unchanged: the next staged tree of that bug is checked again, a `complete` verdict ends
-  the chain, and a `patch` raises the count above the recorded one, so the chain is held again at once. The
-  recorded `HEAD` decides how long a release lasts, not which bug a change belongs to. The override is logged
-  (`shim-override`). It touches only this check; the claim check keeps its own release. Only a prompt typed by
-  the user overrides (FR-017).
+- **Decision**: Every refusal of this check (not checked, running, failed, `patch`, held) ends with
+  `override shim-<id>`: the chain id when the staged tree matches a chain (R9), else the tree's 12-hex prefix.
+  `gate.on_prompt` learns that word; for a tree id that matches no chain it opens a chain seeded with that
+  tree's hunk ranges. The override records the branch's `HEAD` and the chain's count on the chain and is logged
+  (`shim-override`). A chain's four states (`checked`, `deep due`, `held`, `overridden`), what every event does
+  to a chain and what a staged tree that matches several chains gets are in data-model `shim_chains`, and
+  nowhere else. The decisions that section carries out: a bug is held at its 4th refusal; while it is held, the
+  launch is refused as well as the commit; an override lasts while the branch's `HEAD` is the recorded one and
+  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; an
+  override lets a tree through only when no chain it matches is held. The recorded `HEAD` decides how long a
+  release lasts, not which bug a change belongs to. The override touches only this check; the claim check keeps
+  its own release. Only a prompt typed by the user overrides (FR-017).
 - **Rationale**: FR-007/FR-017 and the user's choice (critique E2, option B): one override per check, lasting for
   the bug's piece of work however often it is re-staged, ending on its own when the commit lands. Any commit on
   the branch ends the override, an unrelated one included. The count is kept after it because only the approved
   entity may release a hold and nothing may start it again (constitution P2); for the same reason no check runs
   on a held chain, since a `complete` verdict would end the hold without the user (user decision, 2026-10-06).
   Once the override is over, the bug's next staged tree is checked before the user is asked again (user
-  decision, 2026-10-06).
+  decision, 2026-10-06). A bug overridden before its 4th refusal goes on from its count, because the state is
+  a function of the count and that answer was about a held bug. A held bug is asked about before an override of
+  another bug is honoured, because the override names one bug (FR-017).
 - **Existing tools**: `gate.on_prompt`, `claimgate.UNLOCK_CLAIM`: fit as the pattern.
 
 ## R12: Sweep misses are found by comparing lists inside a chain

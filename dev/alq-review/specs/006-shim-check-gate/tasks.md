@@ -344,32 +344,44 @@ the chain holds and asks the user. Misses are logged.
 
 ## Phase 8: Amendment of 2026-10-06 — a bug is followed across commits (ADR-0001, issue #17)
 
-**Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes the `HEAD` parts of T038 and T039, the chain
-`state` line of the data-model test in Phase 2, the "after `HEAD` moves, the bug is checked again" case, and
-the touched / not touched mark wherever a task names it. Needs spec 005 Phase 7 (T052) first. Stored chains
-are not migrated.
+**Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes every task line that names a removed mechanism: the
+touched mark (T007, the Phase 3 goal, T019), the stored chain `state` and its `HEAD` end (T009, T019, T031,
+T042), the count at one `HEAD` (the Phase 5 goal, T038), and the "after `HEAD` moves, the bug is checked again"
+case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrated.
 
 **Independent test**: quickstart §4.
 
-- [ ] T060 Rewrite `test_head_moving_leaves_the_chain_behind` to assert the opposite: a commit of an unrelated
-  file between two patches of one bug leaves the chain at count 2. Run; it fails on the current code.
-- [ ] T061 [P] Failing tests in `tests/test_shimcheck.py` for carried ranges (R9): a range below an edit is
+- [ ] T060 Change `test_head_moving_leaves_the_chain_behind`, which asserts count 1 after a commit of an
+  unrelated file between two patches of one bug, so that it asserts count 2. Run it; it fails on the current
+  code.
+- [ ] T061 [P] Write tests, not written yet, in `tests/test_shimcheck.py` for carried ranges (R9): a range below an edit is
   shifted; a range overlapping a replaced range grows to the replacing lines; a fully deleted range is dropped;
-  a site line swept in `HEAD` is carried to the staged tree before it is stored; the carry is applied before
-  the overlap test for an open, a held and an overridden chain, at commit and at launch. Run; fail.
-- [ ] T062 Implement the carry in `shimcheck` on the lineage module, and key chains by `(repo, branch, chain
-  id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
-- [ ] T063 [P] Failing tests for the derived state (data-model `shim_chains`): held at count 4 refuses the
-  commit and the launch; an override lets matching trees through while the branch's `HEAD` is the recorded one;
-  after a commit lands the next tree of that bug is checked, `complete` ends the chain and a `patch` is held at
-  once; a tree-id override opens a chain at count 0; at count 3 with no target the launch is `deep`, and it is
-  not run twice after an override. Run; fail.
-- [ ] T064 Replace the stored `state` and its transitions by the derived state of T063. Green.
-- [ ] T065 Failing test, then code: a `patch` refusal prints, per listed site, the staged-tree line ranges of the
+  a site line swept in `HEAD` is carried to the staged tree before it is stored; a chain in each of the four
+  states whose range moved is still matched, at commit and at launch. Run them; each fails.
+- [ ] T062 Implement the carry in `shimcheck` on the lineage module, applied before the overlap test, and key
+  chains by `(repo, branch, chain id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
+- [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure, one per cell of data-model `shim_chains` that
+  can occur. State: `held` is matched before `overridden`, then `deep due`, then `checked`. For a `checked` and
+  for a `deep due` chain: a `patch` on a new tree; the `deep` check's `patch`, which counts nothing; a `patch`
+  on a counted tree; `complete`; a failed check; an allowed launch; the override by chain id and by tree id; a
+  commit. For a `held` and for an `overridden` chain: the override, a commit, and a completed check that writes
+  nothing. A `patch` that matches no chain opens one at count 1; a tree-id override that matches none opens one
+  at count 0. A bug overridden at 4 is `checked` after the commit and `held` at its next `patch`; one overridden
+  at 2 is `deep due` at 3 and `held` at 4; the deep sweep is not run twice. Tree rule: one tree that matches a
+  held and an overridden chain is refused; an overridden and a `checked` one, allowed; one that
+  matches a `deep due` and a `checked` chain runs `deep` mode. Run them; each fails.
+- [ ] T064 Write gate tests, not written yet, in `tests/test_shim_gate.py` for the hook paths: a user prompt `override shim-<id>`
+  by chain id and by tree id; an agent cannot override; a tree that matches a held chain is refused at the launch
+  and at the commit; one that matches an overridden chain and no held one is refused at the launch and allowed
+  at the commit; one that matches both is refused at both. Run them; those for a changed rule fail, and the
+  rest pin behaviour that must not change.
+- [ ] T065 Replace the stored `state` and its transitions by the rules of data-model `shim_chains`. T063 and
+  T064 pass.
+- [ ] T066 Failing test, then code: a `patch` refusal prints, per listed site, the staged-tree line ranges of the
   hunks in its file, and no touched mark. Green.
-- [ ] T066 Failing test, then code: a sweep miss is logged only against earlier checks that swept the same
+- [ ] T067 Failing test, then code: a sweep miss is logged only against earlier checks that swept the same
   `HEAD` (R12). Green.
-- [ ] T067 Update the plugin README (the shim check, override) and run quickstart §4.
+- [ ] T068 Update the plugin README (the shim check, override) and run quickstart §4.
 
 ## Dependencies & Execution Order
 

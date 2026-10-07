@@ -17,8 +17,8 @@ and `test_worktree_facts.Repo`):
 3. Run the workflow again without fixing the sentence (reword it if you like): `WRONG` again. A repeated `git commit`
    against the same check adds no refusal. After the third check that rules that claim `WRONG`, the
    refusal asks the user and prints `unlock claim-<id>` (US2 scenario 4). A second claim ruled `WRONG` once in
-   the same checks is still at 1.
-4. Fix the sentence, stage, run the workflow: `COMPLETE`, and the commit goes through. Only the changed claim was
+   the same checks is still at 1. A launch in that state is refused with the same question (US2 scenario 5).
+4. As the user, type `unlock claim-<id>`. Fix the sentence, stage, run the workflow: `COMPLETE`, and the commit goes through. Only the changed claim was
    judged (SC-005).
 5. Stage only code: the workflow's reader runs and judges nothing; the commit goes through (US1 scenario 4).
 6. Stage the removal of "only" from a committed sentence: the sentence is judged as it now reads (US1 scenario 5).

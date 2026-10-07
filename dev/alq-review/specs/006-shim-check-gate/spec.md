@@ -55,13 +55,13 @@ Recorded in issue #17 and ratified as ADR-0001.
 
 - Q: Does a commit on the branch end a bug's count? → A: No. A bug's lines are followed from one checked tree to
   the next by a diff of each file's two versions. No count and no chain is keyed on `HEAD` or on a commit.
-- Q: Which git fact does a refusal show per listed site? → A: The line ranges the staged change alters in that
+- Q: Which git fact does a refusal show per listed site? → A: The staged-tree line ranges of the hunks in that
   site's file, in place of the `touched` / `not touched` mark.
 - Q: Does this check stop at the same count as the claim check? → A: No. Spec 005 FR-011 requires the
   user to be asked at a claim's 3rd `WRONG` ruling. This check runs the deep sweep at a bug's 3rd refusal and asks the user at the
   4th, because the deep sweep is a repair step the claim check does not have.
 - Q: May a check be launched while a bug is held and not yet overridden? → A: No. The gate waits for the user.
-- Q: What happens to a bug after the user's override ends? → A: The next edit of that bug is checked again. A
+- Q: What happens to a held bug after the user's override ends? → A: The next edit of that bug is checked again. A
   `complete` verdict ends the bug. A `patch` asks the user again at once.
 
 ## Background
@@ -281,7 +281,9 @@ line and see a new one.
   again in that time. Only a user prompt can override; the override MUST be logged. Other checks are not affected.
   An override MUST NOT lower the bug's count. While a bug is held and not overridden, a launch of the check
   MUST be refused. After the override ends, the next change to that bug MUST be checked again: `complete` ends
-  the bug, and a `patch` MUST ask the user again at once.
+  the bug, and a `patch` of a bug that was held when it was overridden MUST ask the user again at once. A bug
+  overridden before its 4th refusal goes on from its count. An override MUST NOT let a change through while that
+  change also matches a held bug.
 - **FR-018**: The gate MUST log a sweep miss against an earlier check whenever a later refusal of the same bug, or
   its deep sweep, names a site that was in the tree at that check but absent from its SAME OPERATION list. Only
   checks that swept the same `HEAD` are compared.

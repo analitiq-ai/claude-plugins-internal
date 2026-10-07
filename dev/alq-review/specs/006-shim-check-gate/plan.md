@@ -55,7 +55,7 @@ per contested site
 | IV. Test-first | `tasks.md` starts every mechanism from a failing test, run before the code. Pass. |
 | V. Smallest complete change | One new pure module, one hook module, one client, one workflow, two agents. Labels, preconditions, range overlap, the user-prompt release path and the ledger are reused, not copied. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. The plugin README documents the plugin and changes with it. Pass. |
-| P2. Only an approved entity releases a hold | A chain held at count 4 is released by the user alone, by a prompt `override shim-<id>` (R11). The release lasts until a commit lands on the branch and does not lower the count; nothing else releases the hold or starts the count again. No check runs on a held chain, so no verdict can end it; a `complete` verdict ends a chain only below the bound or after an override. Pass. |
+| P2. Only an approved entity releases a hold | A chain held at count 4 is released by the user alone, by a prompt `override shim-<id>` (R11). The release lasts until a commit lands on the branch and does not lower the count; nothing else releases the hold or starts the count again. A held chain is changed by that prompt alone (data-model `shim_chains`): no check is launched for a tree that matches it, and an override of another bug does not let such a tree through. Pass. |
 | P5. Settled design, existing tools first | Every mechanism cites a decision below. R9 reuses the lineage module of spec 005 R12, which cites the survey of 2026-10-06 in issue #17. Pass. |
 
 Re-check after Phase 1: unchanged. One deviation from the spec's wording is recorded rather than hidden: the

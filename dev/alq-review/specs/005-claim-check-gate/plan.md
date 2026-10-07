@@ -50,7 +50,7 @@ modify files; verdicts are unmeasured and the user accepts that
 | IV. Test-first | `tasks.md` starts every mechanism from a failing test, run before the code. Pass. |
 | V. Smallest complete change | No second checker, no cap, no record-only phase, no built-in accuracy threshold (spec). Fingerprints are git's own (`write-tree`, `patch-id`), not hand-rolled. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. The plugin README documents the plugin and changes with it. Pass. |
-| P2. Only an approved entity releases a hold | The count of a claim lineage is released by the user alone, by a prompt starting `unlock claim-<id>` (R8). Nothing else releases it, lowers it or starts it again. While a lineage is stopped and not released no check runs, so no ruling can end it; a `CORRECT` ruling or a deletion ends a lineage only below the bound or after the release. Pass. |
+| P2. Only an approved entity releases a hold | The count of a claim lineage is released by the user alone, by a prompt starting `unlock claim-<id>` (R8). Nothing else releases it, lowers it or starts it again. A stopped row is changed by that prompt alone (data-model Lineage): no check is launched for a staged change that includes its file, so no ruling and no deletion can end it. Pass. |
 | P5. Settled design, existing tools first | Every mechanism cites a decision below. R12 reuses `git diff` and `diff-match-patch` and cites the survey of 2026-10-06 in issue #17 for what was looked at. Pass. |
 
 Re-check after Phase 1: unchanged.

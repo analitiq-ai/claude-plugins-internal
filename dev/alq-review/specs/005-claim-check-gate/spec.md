@@ -233,8 +233,10 @@ and shows the cost.
 - **FR-011**: When 3 checks have ruled one claim `WRONG`, the system MUST stop the repair loop of that claim and
   put the decision to the user, who releases it with the existing user-typed `unlock` naming that claim; an
   agent MUST NOT be able to release it. The release covers the claim at its current words only and does not
-  lower its count. While a claim is stopped and not released, a launch of the check MUST be refused. After the
-  release, a change to the claim's words MUST be checked again, and one more `WRONG` MUST stop it again at once.
+  lower its count. While a claim is stopped and not released, a launch of the check and a commit MUST both be
+  refused for every staged change that includes the claim's file. After the release, a `WRONG` ruling of the
+  released words MUST NOT add to the count; a change to the claim's words MUST be checked again, and one more
+  `WRONG` MUST stop it again at once.
 - **FR-012**: The system MUST let the author contest a verdict, and MUST re-judge the claim, with a fresh checker
   given the claim, the first verdict and the evidence, only when the contest carries evidence the checker can verify (a file and line, or a source that was read). A contest without
   evidence MUST leave the verdict standing.

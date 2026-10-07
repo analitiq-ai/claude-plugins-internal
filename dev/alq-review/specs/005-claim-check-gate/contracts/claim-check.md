@@ -14,7 +14,7 @@ Refusals come from `gate.refuse()` under the `claim_checks` setting, and name th
 | Check launch while tracked files have unstaged changes | the files; stage or discard them, then launch again |
 | Check still `reading` or `judging` | the check failed, not that a claim is wrong; relaunch the same call |
 | One or more `WRONG` | per claim: `file:line`, the quoted claim, the failing case, the evidence `file:line`; then: fix the claim or the code, or contest with evidence |
-| Any one claim ruled `WRONG` by 3 checks | the open question for the user, that claim's words and ruling at each check, and `unlock claim-<id>` |
+| The staged change matches a `stopped` lineage row (data-model Lineage, tree rule) | the question for the user: per stopped row, its words and ruling at each check, and `unlock claim-<id>` |
 
 A commit with an empty staged diff, or one that concludes a merge, cherry-pick or revert, is not refused.
 `UNSURE` verdicts and the large-commit warning never refuse; they come back in the workflow result.
@@ -23,7 +23,9 @@ A commit with an empty staged diff, or one that concludes a merge, cherry-pick o
 
 Launch: `args = {worktree: <absolute path>, contests?: [{claim, evidence}]}`, where `claim` is a claim id printed
 in the refusal. `evidence` holds a `path:line` in the staged tree or an `https://` URL; a contest without one is
-refused at launch, before any agent runs.
+refused at launch, before any agent runs. So is a contest of a claim that is not the current claim of an open
+lineage row: the refusal says to change the staged change, so that a new check rules the claim. A launch is
+also refused when the tree rule of data-model Lineage refuses it, with the same text as the commit.
 
 The gate replaces `args` at launch with the hunks, the reader and judge prompts and schemas, and `check_ref`
 (see `data-model.md`). The script only orders the work and returns:
@@ -72,6 +74,5 @@ contest.
 
 `config.json`: `claim_checks` (`log` | `enforce`, default `enforce`, env `ALQ_REVIEW_CLAIM_CHECKS`) and
 `claim_warn_over` (default 20). Every check, refusal, contest outcome and release is written to `gate.log`.
-Release: a user prompt starting `unlock claim-<id>`, handled by `gate.on_prompt` beside `unlock #<pr>`. `<id>` is
-the current claim id or the lineage id. Until then a launch for a tree with a stopped claim is refused with
-the same question.
+Release: a user prompt starting `unlock claim-<id>`, handled by `gate.on_prompt` beside `unlock #<pr>`. Which
+rows `<id>` names and what the release does to them are in data-model Lineage.

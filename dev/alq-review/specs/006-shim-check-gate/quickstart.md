@@ -37,7 +37,7 @@ the deep sweep; the deep launch runs three agents; one more `patch` → held, an
 that tree commits, and so does a re-staged tree of the same bug, with no launch; a tree of an unrelated bug is
 still refused; after the commit lands, a new tree of that bug is checked again: a `patch` is held at once, a `complete` ends the bug. Override a `not checked` refusal
 by its tree id → same result. `gate.log` holds a `shim-miss` per newly listed site and one `shim-override`.
-A `patch` refusal gives, per listed site, the line ranges the staged change alters in its file.
+A `patch` refusal gives, per listed site, the staged-tree line ranges of the hunks in its file.
 
 ## 5. Restart a stopped check
 
