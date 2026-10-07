@@ -37,11 +37,11 @@ externalRefs:
 The shim check needs three judgements of a staged change: is it a fix, where does the fix act, and does it
 reach the other sites with the same defect. A model has to give them, within three limits:
 
-- The answers are needed inside a hook, which has 40 seconds of model time.
+- The answers are needed inside a hook, so within seconds.
 - The check's success criterion is a replay over recorded commits. The replay measured the questions as
   worded, so a reworded question is an unmeasured one.
-- A refusal has to follow from a rule that can be tested. The classifier would answer "complete?"
-  differently from its own two answers.
+- A refusal has to follow from a rule that can be tested. Asked for the overall verdict, the classifier
+  answers differently from its own two answers.
 
 Two later specs met the same limits and each added a rule. The rules are spread over three spec folders.
 
@@ -49,13 +49,14 @@ Two later specs met the same limits and each added a rule. The rules are spread 
 
 1. We will judge a fix with Jev, an outside one-shot classifier reached through OpenRouter.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
-3. We will compose `complete` or `patch` in code, in one function.
-4. We will keep the `level` and `coverage` questions word for word as they were replayed. A change to their
-   wording or to the request's shape needs a new replay.
-5. We will store an answer as Jev gave it. Code may leave an answer unread; it does not rewrite one.
+3. We will compose the verdict in code, in one function.
+4. We will keep the replayed questions word for word. A change to their wording or to the request's shape
+   needs a new replay.
+5. We will store an answer as Jev gave it, so the ledger and the log report what it said. Code may leave an
+   answer unread; it does not rewrite one.
 6. We will put a rule in code ahead of the model wherever code can decide.
-7. We will send the code of every repo, private ones included, to OpenRouter and TypeSafe, by the user's
-   decision.
+
+Record 0015 decides that private source may be sent to the classifier.
 
 ## Options considered
 
@@ -63,9 +64,9 @@ Two later specs met the same limits and each added a rule. The rules are spread 
 
 | Dimension | Assessment |
 |---|---|
-| Time and cost per call | 0.39 to 0.63 s and about $0.0008 to $0.0009 on the largest replay diff |
+| Fits inside a hook | Yes, a call is about a second |
 | Verdict rule | Set in code |
-| What leaves the org | The diff of the change, and for a fix the lists of sites |
+| What leaves the org | The diff of the change, and for a fix the lists of sites (record 0015) |
 
 ### Option B: Do nothing
 
@@ -73,41 +74,24 @@ The sweep lists sites and nothing says whether the change reaches them. No sourc
 
 ### Option C: Ask Jev for the overall verdict
 
-Rejected: its overall answer would differ from its two answers. The replay's third question is not sent.
-
-### Option D: Rewrite `coverage` to `none_other` when no site is left
-
-Rejected: the ledger and log would misreport Jev's answer.
-
-### Option E: Skip the `coverage` question when no site is left
-
-Rejected: it is a second request shape, and the success criterion rests on replaying one shape.
-
-### Option F: Leave a tests-only change to Jev's `kind` answer
-
-Rejected: it keeps red-test-first commits refusable.
+Rejected: its overall answer would differ from its two answers.
 
 ## Trade-offs
 
-- Private source leaves the org. The check also needs an OpenRouter key wherever the plugin runs, the bot
-  image included.
-- A code diff over about 33k tokens cannot be classified, and the commit must be split. Measured: 6 to 8% of
-  638 recent commits.
+- A diff too large for the classifier cannot be judged, and the commit must be split. Measured: 6 to 8% of
+  recent commits.
 - A better-worded question cannot ship on its own. It needs a new replay first, and the replay calls live Jev.
-- `kind` is not stable on one ask. In the replay it labelled a real patch `not_fix` in 1 of 5 asks, so it is
-  asked up to three times. It also labelled 8 of 18 non-fix commits `fix`.
+- The answer to "is it a fix" is not stable on one ask, so it is asked more than once. In the replay it called
+  close to half of the non-fix commits a fix.
 
 ## Consequences
 
 - Easier: a change to the verdict rule is a code change with a unit test. The stored answers are Jev's own.
 - Harder: every change to a question, or to what is sent with it, waits on a replay.
-- **How we would know this was wrong:** the replay stops giving every evidence fix its expected verdict; the
-  share of commits refused as too large rises above the measured 6 to 8%; or the provider changes its terms
-  for private source or retires the model.
+- **How we would know this was wrong:** the replay stops giving every evidence fix its expected verdict; or
+  the share of commits refused as too large rises above the measured 6 to 8%.
 - Revisit if: the model is changed or withdrawn, or a judge inside the session can answer within the hook's time.
 
 ## Action items
 
 1. [ ] The ratifier ratifies this record, or sends it back.
-2. [ ] A new question for Jev is replayed before it ships.
-3. [ ] A new rule that code can decide goes ahead of the Jev call, not after it.
