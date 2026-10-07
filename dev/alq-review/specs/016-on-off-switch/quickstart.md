@@ -9,7 +9,7 @@ are in [contracts/switch-keywords.md](contracts/switch-keywords.md).
 python3 -m unittest discover -s tests
 ```
 
-Expected: the switch cases in `test_gate.py` and `test_pre_merge_gate.py` pass, one per row of the contract's
+Expected: the switch cases in `test_switch.py` and `test_pre_merge_gate.py` pass, one per row of the contract's
 table and one per answer; every test that existed before passes unchanged (SC-003).
 
 ## 2. Off and on (US1, live)

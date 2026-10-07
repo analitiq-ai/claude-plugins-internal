@@ -353,6 +353,13 @@ class UnreadableSwitch(Switch, Gate):
         self.assertIn("so the plugin counts as on", self.say("hello")["systemMessage"])
         self.assertEqual(self.decision(self.edit()), "deny")
 
+    def test_an_unlock_typed_then_is_answered_with_both_the_notice_and_the_release(self):
+        test_gate.HeldBranch.lock(self)
+        self.write_off_file("not json")
+        out = self.say("unlock #7")
+        self.assertIn("so the plugin counts as on", out["systemMessage"])
+        self.assertIn("feat/1-demo", out["hookSpecificOutput"]["additionalContext"])
+
     def test_a_resumed_session_is_told_the_plugin_counts_as_on(self):
         self.write_off_file("not json")
         out = self.hook("SessionStart", source="resume")

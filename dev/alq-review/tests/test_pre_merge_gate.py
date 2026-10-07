@@ -155,6 +155,19 @@ class MergeSwitch(Hook):
         self.switch(text="not json")
         self.assertEqual(self.merge("gh pr merge 12 --admin --squash"), "deny")
 
+    UNBALANCED = 'gh pr merge 12 --admin --body "x'
+
+    def test_a_merge_with_an_unbalanced_quote_is_denied_while_on_and_not_while_off(self):
+        self.assertEqual(self.merge(self.UNBALANCED), "deny")
+        self.switch()
+        self.assertIsNone(self.merge(self.UNBALANCED))
+
+    def test_a_merge_with_an_unbalanced_quote_is_denied_for_another_session_and_for_an_unreadable_file(self):
+        self.switch(session="s1")
+        self.assertEqual(self.merge(self.UNBALANCED, session="s2"), "deny")
+        self.switch(text="not json")
+        self.assertEqual(self.merge(self.UNBALANCED), "deny")
+
 
 RELEASE = "version-only release: 1.0.0 → 1.0.1"
 

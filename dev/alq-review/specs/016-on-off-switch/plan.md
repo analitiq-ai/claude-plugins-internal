@@ -92,7 +92,8 @@ plugins/alq-review/
 └── README.md                 # a Switch section; State lists the file
 
 dev/alq-review/tests/
-└── test_gate.py, test_pre_merge_gate.py, test_shell.py   # extended
+├── test_switch.py           # new
+└── test_pre_merge_gate.py   # extended
 ```
 
 **Structure Decision**: the plugin's existing layout, one PR.
