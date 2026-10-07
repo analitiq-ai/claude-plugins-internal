@@ -62,8 +62,8 @@ Every rule about a row's state is in this section. Other documents cite it and d
 | `id` | first 16 hex of sha256(check ref that minted the row \0 id of the claim it was minted for); never recomputed |
 | `file` | the path of the file the claim is in; never rewritten |
 | `versions[]` | oldest first, as `{check, tree, id, line, quote, ruling, failing_case, evidence}`. At most one per check ref. The last one is the current claim; its `tree` names the version of the file the next check diffs against |
-| `wrong[]` | the check ref of each check that ruled the row's current claim `WRONG`; only appended |
-| `contests[]` | the check ref of each rejected contest that was counted; only appended |
+| `wrong[]` | the check ref of each check that ruled the row's current claim `WRONG`; only appended, and a check ref is in it at most once |
+| `contests[]` | one entry per rejected contest that was counted, holding its check ref; only appended |
 | `released` | `{id, count}`: the current claim's id and the count when the user typed `unlock`; empty until then |
 | `ended` | `correct`, `gone` or `merged`; empty while the row is open. An ended row is not changed again |
 
@@ -83,13 +83,16 @@ A function of the stored fields, for an open row. Ordered; the first match is th
 The one place that says which rows a staged tree has to do with. The launch, the commit and a completed check
 use it unchanged.
 
-A staged tree matches every open row of its repo and branch whose `file` is a path the staged change adds,
-changes or deletes. Paths are compared as they are: nothing pairs an old path with a new one (decision record
-0013). A moved file is a delete of its old path, so its rows are matched by that path.
+Input: the path set of the staged tree, which is the output of `git diff --no-renames --name-only <base> <tree>`.
+With rename detection off a moved file is two paths in it, the old one deleted and the new one added (decision
+record 0013). The path set is not read from `hunks[]`: that diff pairs paths (`-M`) and never names the old
+path of a moved file.
+
+A staged tree matches every open row of its repo and branch whose `file` is in the path set.
 
 1. A matched row is `stopped` → the launch and the commit are both refused. The refusal asks the user, per
    stopped row, with every version's words and ruling and `unlock claim-<id>`. This holds whether the row's
-   words are unchanged, reworded or deleted in the staged tree, the deletion of a moved file included.
+   words are unchanged, reworded or deleted in the staged tree, and when its file is moved or deleted.
 2. No matched row is `stopped` → the check may be launched, and the commit is decided by the tree's check: a
    `WRONG` claim refuses it unless its id is the `released.id` of a matched row.
 
@@ -110,13 +113,14 @@ running when the row stopped writes nothing to it. A commit writes nothing.
 | Reworded: this row wins one claim in the span its sentence maps to in the staged blob | a version is appended for that claim, which is now current | the same; the row is then `checked`, with its count equal to `released.count` |
 | Split: this row wins several claims in that span | the first by line continues the row as a rewording. Each other one gets a row minted at this check, starting with a copy of `versions`, `wrong`, `contests` and `released`, then continued as a rewording | the same |
 | Merged: other rows win every claim this row reaches | `ended: merged`; its `released` ends with it | the same |
-| Deleted: nothing is mapped and the id is not found, or the staged change deletes the file | `ended: gone` | `ended: gone` |
+| Deleted: nothing is mapped and the id is not found, or the staged tree has no blob at the path | `ended: gone` | `ended: gone` |
 | **Ruling** of the current claim by this check | | |
-| `WRONG` | the check ref is appended to `wrong[]`, and the ruling is recorded on this check's version, which is appended if succession appended none; the count rises by one | nothing written |
+| `WRONG` by a check ref not in `wrong[]` | the check ref is appended to `wrong[]`, and the ruling is recorded on this check's version, which is appended if succession appended none; the count rises by one | nothing written |
+| `WRONG` by a check ref in `wrong[]` (the same tree checked a second time) | nothing written | nothing written |
 | `CORRECT` | `ended: correct` | `ended: correct` |
 | `UNSURE`, or the claim is not judged | recorded on this check's version if succession appended one; nothing is counted | nothing written |
 | **Other events** | | |
-| A contest of the current claim is rejected | the check ref is appended to `contests[]`; the count rises by one | nothing written |
+| A contest of the current claim is rejected | one entry with the check ref is appended to `contests[]`; the count rises by one | nothing written |
 | A contest of the current claim is upheld | the new ruling replaces the `ruling` of the version and is applied as above; `wrong[]` is not changed, so the count stays | the new ruling is applied as above |
 | The user types `unlock claim-<id>` | `released` is set to the current claim's id and the count | `released` is written again with the same values |
 | A commit, an amend or a rebase lands | nothing written | nothing written |
@@ -130,15 +134,17 @@ winner and at most one open row has a given current claim id.
 
 Minting. A check that rules `WRONG` a claim no open row wins mints a row with that one version, at count 1. A
 row with that `id` already exists only when the same tree was checked a second time; then nothing is written.
-For the same reason a check ref adds at most one version to a row.
+For the same reason a check ref adds at most one version and at most one entry of `wrong[]` to a row.
 
 A contest is accepted only for a claim that is the current claim of an open row
 ([contracts/claim-check.md](contracts/claim-check.md) §2). So a rejected contest always has a row to be counted on.
 
 Not followed: a claim moved and reworded in one step; the half of a split that lands in a pure insertion; and a
 claim whose file is moved to a new path (decision record 0013). The first two are claims no row wins. For a
-moved file the row at the old path is `Deleted`, and the same words at the new path are a claim no row wins,
-because the claim id hashes the path. Each starts a new count.
+moved file the row at the old path is `Deleted`. At the new path the check reads what `hunks[]` holds for it:
+the lines that differ from the base tree's file when `-M` pairs the two paths, and every line when it does
+not. A claim in those lines is one no row wins, because the claim id hashes the path. Text equal to the base
+tree's is in no hunk and is not read, as in a file that is not moved. Each starts a new count.
 
 `unlock claim-<id>` names every open row whose current claim id is `<id>`; when there is none, the row whose
 `id` is `<id>`. No count and no lineage is keyed on `HEAD` or a commit, and a row carries no line range. Rows of

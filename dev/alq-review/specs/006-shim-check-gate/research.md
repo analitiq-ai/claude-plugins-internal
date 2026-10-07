@@ -215,8 +215,9 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   to a chain and what a staged tree that matches several chains gets are in data-model `shim_chains`, and
   nowhere else. The decisions that section carries out: a bug is held at its 4th refusal; while it is held, the
   launch is refused as well as the commit; an override lasts while the branch's `HEAD` is the recorded one and
-  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; bugs
-  that one staged tree overlaps are one bug from then on (decision record 0014). The recorded `HEAD` decides how long a
+  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; an
+  override lets a tree through only when no chain it matches is held; bugs that one staged tree overlaps are
+  one bug from then on (decision record 0014). The recorded `HEAD` decides how long a
   release lasts, not which bug a change belongs to. The override touches only this check; the claim check keeps
   its own release. Only a prompt typed by the user overrides (FR-017).
 - **Rationale**: FR-007/FR-017 and the user's choice (critique E2, option B): one override per check, lasting for

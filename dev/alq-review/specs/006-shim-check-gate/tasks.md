@@ -361,26 +361,16 @@ case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrate
   states whose range moved is still matched, at commit and at launch. Run them; each fails.
 - [ ] T062 Implement the carry in `shimcheck` on the lineage module, applied before the overlap test, and key
   chains by `(repo, branch, chain id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
-- [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure, one per cell of data-model `shim_chains` that
-  can occur. State: `held` is matched before `overridden`, then `deep due`, then `checked`. For a `checked` and
-  for a `deep due` chain, each event of the table that can occur in that column: a `patch` on a new tree; the
-  `deep` check's `patch`, which counts nothing and adds its tree to `trees`; a contest after it on that tree,
-  which counts nothing; a `patch` on a tree in `trees`; `complete`; a failed check; an allowed launch; the
-  override by chain id and by tree id; a commit. For a `held` and for an `overridden` chain: the override, a commit, and a completed check that writes
-  nothing. A `patch` that matches no chain opens one at count 1; a tree-id override that matches none opens one
-  at count 0. A bug overridden at 4 is `checked` after the commit and `held` at its next `patch`; one overridden
-  at 2 is `deep due` at 3 and `held` at 4; the deep sweep is not run twice. Tree rule, for a tree that matches two
-  chains, one per row of the merged-chain table: the `id` is that of the larger count, and of the smaller `id`
-  at equal counts; the `count` is the larger; `target` is the union when both have one and empty when one has
-  none, so a chain at 3 with a target merged with one at 1 is `deep due`; `override` is kept when both have one
-  at the same `head` and neither is `held`, and dropped otherwise, so a held chain merged with an overridden one
-  is `held`; the other chain gets `ended: merged` at an allowed launch and at an override; its rulings are
-  keyed to the merged chain, and a site ruled differently in the two loses its ruling. Run them; each fails.
-- [ ] T064 Write gate tests, not written yet, in `tests/test_shim_gate.py` for the hook paths: a user prompt `override shim-<id>`
-  by chain id and by tree id; an agent cannot override; a tree that matches a held chain is refused at the launch
-  and at the commit; one that matches an overridden chain and no held one is refused at the launch and allowed
-  at the commit; one that matches both is refused at both. Run them; those for a changed rule fail, and the
-  rest pin behaviour that must not change.
+- [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure: one per entry of the State
+  list of data-model `shim_chains`, one per clause of its Tree rule, one per row of its merged-chain table, one
+  per cell of its Transitions table that can occur, and one per sentence of the paragraphs after that table.
+  Run them; each fails.
+- [ ] T064 Write gate tests, not written yet, in `tests/test_shim_gate.py`, driving the hooks: clauses 2 and 3
+  of the Tree rule of data-model `shim_chains` at the launch and at the commit; a launch for a tree that
+  matches two chains, asserting the stored merged chain and the other chain's `ended`; both forms of the
+  user's override, and an agent's, asserting the stored `override`; a tree that matches two held chains,
+  asserting that the word the refusal prints, once typed, lets that tree commit. Run them; those for a changed
+  rule fail, and the rest pin behaviour that must not change.
 - [ ] T065 Replace the stored `state` and its transitions by the rules of data-model `shim_chains`. T063 and
   T064 pass.
 - [ ] T066 Failing test, then code: a `patch` refusal prints, per listed site, the staged-tree line ranges of the
