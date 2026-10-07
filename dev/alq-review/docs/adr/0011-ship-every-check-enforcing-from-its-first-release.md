@@ -54,8 +54,7 @@ user decided it on 2026-10-06: "Enforce them on first release".
 
 1. We will ship every new check refusing from its first release.
 2. We will give a new check no record-only phase and no accuracy bar to pass first.
-3. We will build in no threshold and no review date. The user reads the log and decides, as spec 005 says:
-   "No threshold is built in."
+3. We will build in no threshold and no review date. The user reads the log and decides.
 4. We will treat spec 004 FR-023 as replaced by this record.
 
 ## Options considered
@@ -74,12 +73,12 @@ The specs keep two answers, and each new check picks one.
 
 ### Option C: A record-only phase first (spec 004 FR-023)
 
-The user rejected it for the claim check and the shim check, in the clarifications quoted above. Spec 005
-records the reason: "The user accepts that the verdicts are unmeasured and blocks from the first release."
+The user rejected it for the claim check and the shim check, in the clarifications quoted above, and
+accepts that the verdicts are unmeasured.
 
 ### Option D: Enforce, with a built-in threshold or a trial review
 
-The critiques of specs 005 and 006 proposed it. The user's answer is point 3.
+Proposed in critique. The user's answer is point 3.
 
 ## Trade-offs
 

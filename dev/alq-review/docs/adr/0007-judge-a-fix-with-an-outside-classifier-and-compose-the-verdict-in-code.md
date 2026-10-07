@@ -35,28 +35,27 @@ externalRefs:
 ## Context
 
 The shim check needs three judgements of a staged change: is it a fix, where does the fix act, and does it
-reach the other sites with the same defect. A model has to give them, and spec 006 sets three limits on how:
+reach the other sites with the same defect. A model has to give them, within three limits:
 
-- The answers are needed inside a hook. Spec 006 research R6 gives the hook 40 seconds of model time.
-- The check's success criterion SC-001 is a replay over recorded commits. The replay measured the questions
-  as worded, so a reworded question is an unmeasured one.
-- A refusal has to follow from a rule that can be tested. Spec 006 notes that the classifier would answer
-  "complete?" differently from its own two answers.
+- The answers are needed inside a hook, which has 40 seconds of model time.
+- The check's success criterion is a replay over recorded commits. The replay measured the questions as
+  worded, so a reworded question is an unmeasured one.
+- A refusal has to follow from a rule that can be tested. The classifier would answer "complete?"
+  differently from its own two answers.
 
-Specs 011 and 012 later met the same limits and each added a rule. The rules are spread over three spec folders.
+Two later specs met the same limits and each added a rule. The rules are spread over three spec folders.
 
 ## Decision
 
 1. We will judge a fix with Jev, an outside one-shot classifier reached through OpenRouter.
-2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict:
-   "the verdict is composed from the two answers only" (spec 006 spec, edge cases).
+2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
 3. We will compose `complete` or `patch` in code, in one function.
-4. We will keep the `level` and `coverage` questions as they were replayed. They "are copied verbatim because
-   SC-001 rests on them" (spec 006 R6). A change to their wording or to the request's shape needs a new replay.
-5. We will store an answer as Jev gave it. Code may leave an answer unread; it does not rewrite one (spec 011 R1).
-6. We will put a rule in code ahead of the model wherever code can decide (spec 012 R3).
-7. We will send the code of every repo, private ones included, to OpenRouter and TypeSafe. Spec 006's plan
-   records this as the user's decision.
+4. We will keep the `level` and `coverage` questions word for word as they were replayed. A change to their
+   wording or to the request's shape needs a new replay.
+5. We will store an answer as Jev gave it. Code may leave an answer unread; it does not rewrite one.
+6. We will put a rule in code ahead of the model wherever code can decide.
+7. We will send the code of every repo, private ones included, to OpenRouter and TypeSafe, by the user's
+   decision.
 
 ## Options considered
 
@@ -64,7 +63,7 @@ Specs 011 and 012 later met the same limits and each added a rule. The rules are
 
 | Dimension | Assessment |
 |---|---|
-| Time and cost per call | 0.39 to 0.63 s and about $0.0008 to $0.0009 on the largest replay diff (spec 006 R6) |
+| Time and cost per call | 0.39 to 0.63 s and about $0.0008 to $0.0009 on the largest replay diff |
 | Verdict rule | Set in code |
 | What leaves the org | The diff of the change, and for a fix the lists of sites |
 
@@ -74,29 +73,29 @@ The sweep lists sites and nothing says whether the change reaches them. No sourc
 
 ### Option C: Ask Jev for the overall verdict
 
-Rejected in spec 006: its overall answer would differ from its two answers. The replay's third question is not sent.
+Rejected: its overall answer would differ from its two answers. The replay's third question is not sent.
 
 ### Option D: Rewrite `coverage` to `none_other` when no site is left
 
-Rejected in spec 011 R1: "the ledger and log would misreport Jev's answer".
+Rejected: the ledger and log would misreport Jev's answer.
 
 ### Option E: Skip the `coverage` question when no site is left
 
-Rejected in spec 011 R1: it is "a second request shape", and SC-001 rests on replaying one shape.
+Rejected: it is a second request shape, and the success criterion rests on replaying one shape.
 
 ### Option F: Leave a tests-only change to Jev's `kind` answer
 
-Rejected in spec 012 R3: it "keeps red-test-first commits refusable".
+Rejected: it keeps red-test-first commits refusable.
 
 ## Trade-offs
 
-- Private source leaves the org. The check also needs an OpenRouter key wherever the plugin runs, "the bot
-  image included" (spec 006 research, Limits).
-- A code diff over about 33k tokens cannot be classified, and the commit must be split. Spec 006 measured 6 to
-  8% of 638 recent commits.
+- Private source leaves the org. The check also needs an OpenRouter key wherever the plugin runs, the bot
+  image included.
+- A code diff over about 33k tokens cannot be classified, and the commit must be split. Measured: 6 to 8% of
+  638 recent commits.
 - A better-worded question cannot ship on its own. It needs a new replay first, and the replay calls live Jev.
 - `kind` is not stable on one ask. In the replay it labelled a real patch `not_fix` in 1 of 5 asks, so it is
-  asked up to three times. It also labelled 8 of 18 non-fix commits `fix` (spec 006 R6).
+  asked up to three times. It also labelled 8 of 18 non-fix commits `fix`.
 
 ## Consequences
 

@@ -44,12 +44,12 @@ A local gate can repeat the server's rules. The docstring of
 `plugins/alq-review/scripts/pre_merge_gate.py` says what that costs: a local second copy "drifts from
 the server's and starts disagreeing with it".
 
-The plugin also has to learn what the org gate decided. Spec 008 research R1 records the risk in
-matching a run by name: "another check may carry the same name". A comment in
-`plugins/alq-review/scripts/github.py` adds that an agent's token could post the same text.
+The plugin also has to learn what the org gate decided. Matching a run by name is a risk: another
+check may carry the same name. A comment in `plugins/alq-review/scripts/github.py` adds that an
+agent's token could post the same text.
 
-The same drift applies to prose. Spec 008 found the gate's behaviour restated in a rule and in a
-skill, with no test to hold either copy to the gate's code.
+The same drift applies to prose. The gate's behaviour was restated in a rule and in a skill, with
+no test to hold either copy to the gate's code.
 
 Why now: these reasons sit in a docstring, a code comment and the spec of a prose-only feature. No
 record binds the next local gate or skill.
@@ -62,7 +62,7 @@ record binds the next local gate or skill.
 3. We will read the org gate's verdict from a check run, matched by the run's name and the App that
    posted it, never by the name alone.
 4. We will keep prose from restating gate behaviour. A rule or skill names the run and its App, and
-   sends the reader to the state and title the poller prints (spec 008 research R2 and R3).
+   sends the reader to the state and title the poller prints.
 
 ## Options considered
 
@@ -86,11 +86,11 @@ favour of whichever copy was easier to edit".
 
 ### Option D: Gate behaviour written in both the rule and the skill
 
-Rejected in spec 008 research R2: one prose copy "means one place to drift instead of two".
+Rejected: one prose copy means one place to drift instead of two.
 
 ### Option E: A list of gate states in the skill
 
-Rejected in spec 008 research R3: it "would be a second copy of that mapping with no drift test".
+Rejected: it would be a second copy of the org gate's mapping, with no drift test.
 
 ## Trade-offs
 

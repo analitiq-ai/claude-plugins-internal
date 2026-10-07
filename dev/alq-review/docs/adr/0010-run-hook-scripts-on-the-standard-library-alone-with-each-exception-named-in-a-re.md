@@ -41,10 +41,8 @@ externalRefs:
 The plugin's hooks run Python scripts straight from the installed plugin folder. Installing the plugin
 copies files. There is no step that installs a package.
 
-The plans of specs 005 and 006 both state the limit as a fact: "Python 3 (stdlib only, as the rest of
-`scripts/`)". Their research used it to turn tools down. Spec 005 R3 did not use `unidiff` because "the
-plugin is stdlib-only and a hunk header is one regex". Spec 006 R6 did not use the OpenRouter SDKs because
-"the plugin is stdlib-only and the call is one POST". None of them gives a reason for the limit.
+Two plans state the limit as a fact: "Python 3 (stdlib only, as the rest of `scripts/`)". Their research
+used it to turn down `unidiff` and the OpenRouter SDKs. None of them gives a reason for the limit.
 
 Constitution P5 pulls the other way. It asks that nothing is hand-rolled before what already exists was
 looked at. Nothing written says how the two are weighed.

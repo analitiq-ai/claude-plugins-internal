@@ -41,16 +41,14 @@ externalRefs:
 Before the first internal review round, the gate has to know which changed files belong to a design. It
 answers that in two ways.
 
-Spec folders are found by position. Spec 015 research R1 chose `<dir>/specs/<feature>/` at any depth, read
-from the path, because "it is Spec Kit's own layout", "so it needs nothing kept in step with it".
+Spec folders are found by position: `<dir>/specs/<feature>/` at any depth, read from the path. It is Spec
+Kit's own layout, so nothing has to be kept in step with it.
 
 Design documents are found by a list. `plugins/alq-review/config.json` holds `design_documents`, a list of
 path patterns. A branch that changes a matching file and no spec folder is refused its first internal round.
-Spec 004 chose that rule (FR-004, research R10).
 
-Spec 015 R1 rejected a list for spec folders: it "would be a hand-maintained list, and `config.json` is
-plugin-wide, not per repo". The same kind of list stayed in use for design documents. Issue #29 records what
-came of it:
+A list was rejected for spec folders: it would be hand-maintained, and `config.json` is plugin-wide, not
+per repo. The same kind of list stayed in use for design documents. Issue #29 records what came of it:
 
 - The rule fires on a file changing, not on a design changing.
 - It refused the first round on PR #21, which moved tests to another folder, and on PR #28, which corrected
@@ -64,7 +62,7 @@ maintain a list of path patterns."
 ## Decision
 
 1. We will find a spec folder by its position, `<dir>/specs/<feature>/` at any depth, with no configured
-   list. This is spec 015 R1 and R2, and it stands as built.
+   list. It stands as built.
 2. We will delete the rule "a design-document change needs a spec folder" and the `design_documents` list it
    reads, with no replacement.
 3. We will keep the rule that a spec folder a branch changes must be settled before the first internal round.
@@ -92,17 +90,17 @@ the rule keeps refusing changes that decide nothing.
 | Option | Why rejected |
 |---|---|
 | C. Keep the rule, and recognise in code only the files whose place a tool fixes | Put to the user on 2026-10-06 and not chosen. The user chose to delete the rule. |
-| D. A `spec_folders` glob list in `config.json` | Spec 015 R1: "a hand-maintained list, and `config.json` is plugin-wide, not per repo". |
+| D. A `spec_folders` glob list in `config.json` | A hand-maintained list, and `config.json` is plugin-wide, not per repo. |
 | E. The `.specify/` folder as the mark of a Spec Kit project | Spec 015 R1: "no Analitiq repo commits it". |
 
 ## Trade-offs
 
 - A design decided by editing only a README, a decision record or a rule file will no longer be stopped at
   the first internal round once the rule is deleted. Issue #29 records this as the accepted loss.
-- Spec 004 R10 gave the rule its reason, an unsettled design as a cause of review churn. Code will no
-  longer guard that case outside spec folders.
-- A folder named `specs/<x>/` that is not a spec folder is treated as one. Spec 015 R1 accepted this: it
-  "fails loud (its missing `plan.md` is named), not silently".
+- The rule's reason was an unsettled design as a cause of review churn. Code will no longer guard that
+  case outside spec folders.
+- A folder named `specs/<x>/` that is not a spec folder is treated as one. Accepted: it fails loud
+  (its missing `plan.md` is named), not silently.
 
 ## Consequences
 

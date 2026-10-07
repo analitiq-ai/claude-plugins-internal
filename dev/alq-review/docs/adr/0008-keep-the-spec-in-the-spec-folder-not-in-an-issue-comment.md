@@ -41,7 +41,7 @@ The spec of a change has two homes: a marked comment on the issue, and a spec fo
 The skills `alq-shape`, `alq-issue-tackle` and `alq-root-cause-check` read the spec from a marked comment on
 the issue, and `alq-shape` calls the issue its only home. It gives the reason: an issue can be shaped today and picked up next week,
 "so the spec cannot live in a worktree that does not exist yet". Spec 014 built the review gate on that
-comment (research R1 and R2): the gate puts the comment into each internal reviewer's prompt.
+comment: the gate puts the comment into each internal reviewer's prompt.
 
 The `design-doc` skill writes a spec folder, `<dir>/specs/<feature>/`, for the same change. Seven spec
 folders each open by saying that the acceptance criteria are the issue comment. So a reader has to open two places to know what a change must do, and nothing keeps
@@ -87,7 +87,7 @@ committed beside the comment it drifts from". The user's decision names one home
 - A spec folder lives in a checkout. A spec can no longer be written from anywhere with only `gh`, which is
   the reason `alq-shape` gave for the comment.
 - A shaped issue now needs a branch that holds its spec folder before anyone else can pick it up.
-- Spec 014 R1 to R3 decide how the gate selects and reads the comment. They have to be amended.
+- Spec 014 decides how the gate selects and reads the comment. It has to be amended.
 - Existing spec folders point at a comment that will no longer be the spec.
 
 ## Consequences

@@ -46,8 +46,6 @@ The gates settled that one by one, and not all the same way:
 - The merge gate's docstring argues for refusing: "a false deny costs one command and a false allow
   costs a merge" (`plugins/alq-review/scripts/pre_merge_gate.py`).
 - The watch on a held branch reports a checkout it cannot read and lets the command run.
-- Spec 004 FR-021: "A check that fails to run MUST refuse the call it was deciding and log the error."
-  Spec 014 research calls running a round without its spec "a silent downgrade".
 
 No plan decided this. The user decided it on 2026-10-06, when asked which of these readings is the rule.
 Why now: the answers differ from gate to gate, and no record binds the next check.
@@ -58,7 +56,7 @@ Why now: the answers differ from gate to gate, and no record binds the next chec
 2. We will say in the refusal that the check failed, not the work.
 3. We will name a next step in the refusal, and it will be one that can succeed (constitution P1).
 4. We will not treat an answer as a failure. A branch with no issue or no spec is an answer. A judge's
-   `UNSURE` is an answer: spec 005 FR-015 says a check whose verdicts all are `UNSURE` "has not failed".
+   `UNSURE` is an answer: a check whose verdicts all are `UNSURE` has not failed.
 5. We will apply the rule only where a call is being decided. A hook event that only records refuses nothing.
 
 ## Options considered

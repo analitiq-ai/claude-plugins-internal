@@ -40,12 +40,11 @@ Two parts of the plugin must meet on the same records, and neither knows what th
 poller knows a PR but no checkout. The hooks know a checkout but no PR. The module docstring of
 `plugins/alq-review/scripts/ledger.py` gives this as the reason state lives outside every repo.
 
-Spec 005 then added records about a commit that is not made yet. Its research R7 notes that "PR ledgers
-cannot hold these records because a commit has no PR". So the store needed a second kind of key, and
-the spec had to choose between the existing store and a new one.
+The claim check then added records about a commit that is not made yet. A commit has no PR, so the
+store needed a second kind of key, and the choice was between the existing store and a new one.
 
-Spec 006 research R3 met the opposite pull. Its sweeper agents read a copy of `HEAD`, and a read
-outside the project needs an allow from a hook.
+The shim check met the opposite pull. Its sweeper agents read a copy of `HEAD`, and a read outside the
+project needs an allow from a hook.
 
 Why now: the rule is written only in a docstring and two research files. Issue #26 will add a per-repo
 switch that needs a place to live.
@@ -62,7 +61,7 @@ merge override grants move under the state root, and how long a record lives.
 3. We will key a record about a PR by repo and PR, and a record about a commit or a staged tree by
    repo and an id that needs no PR.
 4. We will name each exception in a record. One is named here: the sweeper's copy of `HEAD` stays
-   beside the worktrees, as spec 006 research R3 decided. It is a read copy, not a record.
+   beside the worktrees. It is a read copy, not a record.
 5. We will keep the merge override grants under the state root with the other session records, by the
    user's decision of 2026-10-07. Issue #36 moves them there.
 6. We will keep a gate's record for as long as its PR and branch live, and no longer, by the user's
@@ -90,17 +89,16 @@ The rule stays in a docstring and two research files, with no record that binds 
 
 ### Option C: A second store for the commit checks
 
-Rejected in spec 005 research R7: "a second store would need its own locking".
+Rejected: a second store would need its own locking.
 
 ### Option D: One JSON file per check
 
-Rejected in spec 005 research R7. The plugin had left that design for this reason: with a bare JSON file,
-writers at the same time lose each other's update, and a file lock can go stale.
+Rejected. The plugin had left that design for this reason: with a bare JSON file, writers at the same
+time lose each other's update, and a file lock can go stale.
 
 ### Option E: The sweeper's copy in the state folder
 
-Rejected in spec 006 research R3: the folder "is outside the project, so every read depends on the
-allow".
+Rejected: the folder is outside the project, so every read depends on the allow.
 
 ### Option F: The state in the worktree of the issue
 

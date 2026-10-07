@@ -48,9 +48,9 @@ and every agent session act as it".
 A second force is automation. The same docstring says the cron bot's prompts quote issue and PR text that
 anyone can write. A release word found anywhere in a prompt could come from a stranger.
 
-Why now: the same answer was reached three times, for the merge override, for the claim hold (spec 005
-research R8) and for the shim override (spec 006 research R11). It is written as a rule nowhere. Issue #26
-plans a further user-only action, an on/off switch for the two commit checks.
+Why now: the same answer was reached three times, for the merge override, the claim hold and the shim
+override. It is written as a rule nowhere. Issue #26 plans a further user-only action, an on/off switch
+for the two commit checks.
 
 ## Decision
 
@@ -71,7 +71,7 @@ The keywords today are `unlock <ref>`, `/alq-review:design-doc rescope <ref>`, `
 
 | Dimension | Assessment |
 |---|---|
-| Tells the user from an agent | By the hook event. Specs 005 R8 and 006 R11: "a user prompt is the only path to `on_prompt`" |
+| Tells the user from an agent | By the hook event |
 | Quoted text in a prompt | Not matched, because the keyword has to start the prompt |
 | What the user does | Types one line that the refusal names |
 | Depends on | Claude Code raising `UserPromptSubmit` for the user's prompts only |
