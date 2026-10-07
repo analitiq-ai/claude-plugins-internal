@@ -74,8 +74,8 @@ Why now: issue #29 deletes the rule. A list of path patterns has to be hand-roll
    design-document paths.
 4. We will keep the rule that a spec folder a branch changes must be settled before the first internal round.
 
-Which spec folder is the spec of a change, when its branch changes none or more than one, is an open point
-of issue #25. It is not decided here.
+Which spec folder is the spec of a change is named by its issue. Issue #25 holds that design. It is not
+decided here.
 
 ## Options considered
 
@@ -135,4 +135,3 @@ where each repo puts its documents, and the rule keeps refusing changes that dec
    settled-design check does not refuse a README-only branch.
 3. [ ] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no
    `.specify/` beside it is not graded. No issue is open for this.
-4. [ ] Note in spec 004 (FR-004, R10) and spec 015 (R1) what this ADR replaces, in the changes that do it.

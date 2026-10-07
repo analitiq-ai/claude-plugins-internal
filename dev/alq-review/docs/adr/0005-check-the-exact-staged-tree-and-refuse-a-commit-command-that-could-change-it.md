@@ -102,8 +102,7 @@ gate for no claim the hooks write.
 
 - Easier: a later commit-time check gets the same guarantee by calling the shared function and keying its
   record on the staged tree.
-- Harder: spec 004 still says commit content cannot be read. A reader of spec 004 alone would
-  conclude that no commit-time check can be exact.
+- Harder: every commit takes two commands, and any restaging needs a new check.
 - **How we would know this was wrong:** a commit lands under `enforce` whose tree has no complete check; or
   a repo's commit hook is found to write claims or code, not only cosmetic changes.
 - Revisit if: a hook can run after the earlier parts of a command, or Claude Code offers a way to read the
@@ -112,5 +111,3 @@ gate for no claim the hooks write.
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Note in spec 004 (R7, R9) that this ADR overtakes the finding that commit content cannot be
-   read, in its own PR.

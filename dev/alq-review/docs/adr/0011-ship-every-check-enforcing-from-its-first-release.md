@@ -94,5 +94,4 @@ Proposed in critique. Point 3 rules it out.
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Mark spec 004 FR-023 as replaced by this ADR, in its own PR.
-3. [ ] Settle how a check is switched off (issue #26).
+2. [ ] Settle how a check is switched off (issue #26).

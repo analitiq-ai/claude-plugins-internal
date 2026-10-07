@@ -78,8 +78,8 @@ fixes two bugs and is ruled a patch needs both sent for the deeper sweep togethe
 ## Consequences
 
 - Easier: one check of one change gives one verdict to one bug.
-- Harder: spec 006 has to say how two bugs become one, and its "counts toward both" is replaced. ADR-0001 says "holds will not be merged", and has
-  to be read with this ADR.
+- Harder: the shim check's design has to say how two bugs become one, and a commit no longer counts toward
+  both. ADR-0001 says "holds will not be merged", and has to be read with this ADR.
 - **How we would know this was wrong:** users who override a merged bug and say its two halves had nothing to
   do with each other.
 - Revisit if: such reports come in.
@@ -87,4 +87,4 @@ fixes two bugs and is ruled a patch needs both sent for the deeper sweep togethe
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Amend spec 006 to it, in the PR that amends it to ADR-0001.
+2. [ ] Carry it into the design of ADR-0001's rule (issue #17).

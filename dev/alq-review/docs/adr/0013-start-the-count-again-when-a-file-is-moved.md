@@ -85,4 +85,4 @@ accurate way to detect that a file was moved.
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Amend spec 005 to it, in the PR that amends it to ADR-0001.
+2. [ ] Carry it into the design of ADR-0001's rule (issue #17).

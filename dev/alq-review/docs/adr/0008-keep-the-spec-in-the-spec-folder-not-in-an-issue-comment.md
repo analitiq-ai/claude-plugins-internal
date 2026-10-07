@@ -57,7 +57,8 @@ Why now: issue #25 moves the spec into the spec folder, and the skills and the g
 3. We will switch them in one change. Otherwise the skills say the spec is in the folder while the gate
    still grades each review against the comment.
 
-Issue #25 lists four points this decision leaves open. They are settled in that issue's spec, not here.
+How an issue names its spec folder, and the points still open, are in issue #25. They are settled there,
+not here.
 
 ## Options considered
 
@@ -85,7 +86,6 @@ committed beside the comment it drifts from".
 - A spec folder lives in a checkout. A spec can no longer be written from anywhere with only `gh`, which is
   the reason `alq-shape` gave for the comment.
 - A shaped issue now needs a branch that holds its spec folder before anyone else can pick it up.
-- Spec 014 decides how the gate selects and reads the comment. It has to be amended.
 - Existing spec folders point at a comment that will no longer be the spec.
 
 ## Consequences
@@ -99,6 +99,5 @@ committed beside the comment it drifts from".
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Settle the four open points of issue #25 in its spec.
-3. [ ] Amend spec 014 to this rule, in its own PR, before the code.
-4. [ ] Change the three skills, the gate's spec reader and the tests in one change.
+2. [ ] Settle the open points of issue #25 in its spec.
+3. [ ] Change the three skills, the gate's spec reader and the tests in one change.
