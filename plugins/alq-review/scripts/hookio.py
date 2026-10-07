@@ -4,12 +4,15 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 import config
 import ledger
+
+SESSION_ID = re.compile(r"[\w-]+")
 
 
 def _setting(key: str, env: str) -> str:
@@ -83,10 +86,23 @@ def refuse_shim(payload: dict, action: str, reason: str, target=None) -> dict | 
     return _refuse_under(shim_checks_mode(), payload, action, reason, target)
 
 
+def _session_id(payload: dict) -> str | None:
+    """The payload's session id when it is a plain name; the payload is the harness's, and a path is built from it."""
+    session = payload.get("session_id")
+    return session if isinstance(session, str) and SESSION_ID.fullmatch(session) else None
+
+
+def _session_path(session: str, kind: str) -> Path:
+    return ledger.state_root() / "sessions" / f"{session}{kind}.json"
+
+
 def session_file(payload: dict, kind: str = "") -> Path:
-    directory = ledger.state_root() / "sessions"
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory / f"{payload['session_id']}{kind}.json"
+    session = _session_id(payload)
+    if session is None:
+        raise ValueError(f"session_id {payload.get('session_id')!r} is not a name a state file can be kept under")
+    path = _session_path(session, kind)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @contextmanager
@@ -98,3 +114,46 @@ def session_state(payload: dict, kind: str = ""):
         held = json.loads(path.read_text()) if path.exists() else {}
         yield held
         path.write_text(json.dumps(held))
+
+
+def log_error(text: str) -> None:
+    root = ledger.state_root()
+    root.mkdir(parents=True, exist_ok=True)
+    with open(root / "errors.log", "a") as log:
+        log.write(f"{ledger.stamp(datetime.now(timezone.utc))} {text}\n")
+
+
+# --- the user's on/off switch (spec 016) ------------------------------------------------------------
+
+_OFF = ".off"
+
+
+def switch_state(payload: dict) -> str:
+    """`off` while the user has switched the plugin off in this session, else `on`; `unreadable` when the switch's
+    file cannot be opened as text or is not what `set_switch` writes, which every caller treats as on. Asked on
+    every hook event, so it takes no lock, and writes only the `errors.log` line of an unreadable file."""
+    session = _session_id(payload)
+    if session is None:
+        return "on"
+    path = _session_path(session, _OFF)
+    try:
+        text = path.read_text()
+        held = json.loads(text)
+    except FileNotFoundError:
+        return "on"
+    except (OSError, ValueError) as exc:  # ValueError: bytes that are not UTF-8, text that is not JSON
+        found = f"{type(exc).__name__}: {exc}"
+    else:
+        if isinstance(held, dict) and set(held) == {"at", "by"} and all(isinstance(v, str) for v in held.values()):
+            return "off"
+        found = f"not {{at, by}}: {text[:200]!r}"
+    log_error(f"switch file {path}: {found}; the plugin counts as on")
+    return "unreadable"
+
+
+def set_switch(payload: dict, off: bool, by: str) -> None:
+    path = session_file(payload, _OFF)
+    if off:
+        path.write_text(json.dumps({"at": ledger.stamp(datetime.now(timezone.utc)), "by": by}))
+    else:
+        path.unlink(missing_ok=True)

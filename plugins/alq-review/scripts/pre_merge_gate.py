@@ -38,6 +38,11 @@ agent's: the permission is taken from the user's own words instead. A prompt tha
 past both this gate and the server's rules. It must start the prompt because the
 cron bot's prompts quote issue and PR text that anyone can write.
 
+The user can also switch alq-review off for a session (`alq-review off`, spec 016). That lifts
+this gate too -- `--admin` and `gh api` merges included -- because it is the user's decision to
+make, and it is read per session so no other session is affected. A switch that cannot be read
+leaves the gate on.
+
 Reads the PreToolUse or UserPromptSubmit payload on stdin. Fails closed once a gated command is
 recognised -- an unresolvable PR or an unreachable GitHub ends in deny, because
 a false deny costs one command and a false allow costs a merge.
@@ -290,16 +295,27 @@ def refuse_admin(number) -> int:
     )
 
 
-def gated(tokens: list[str], session: str) -> int:
-    if api_merge_bypass(tokens):
+def switched_off(payload: dict) -> bool:
+    # Imported here for the reason released() imports github here. Only a `gh pr merge`, a
+    # `gh pr ready` or a `gh api` merge reaches this, so a failure to load denies no other command.
+    import hookio
+    return hookio.switch_state(payload) == "off"
+
+
+def gated(tokens: list[str], payload: dict) -> int:
+    session = payload.get("session_id")
+    bypass = api_merge_bypass(tokens)
+    subcommand_at = None if bypass else find_invocation(tokens)
+    if not bypass and subcommand_at is None:
+        return 0
+    if switched_off(payload):
+        return 0
+
+    if bypass:
         return deny(
             "Merging through `gh api` steps around the internal-review gate. "
             "Use `gh pr merge` so the attestation is checked."
         )
-
-    subcommand_at = find_invocation(tokens)
-    if subcommand_at is None:
-        return 0
     verb = tokens[subcommand_at]
     args = arguments(tokens, subcommand_at)
 
@@ -351,20 +367,19 @@ def main() -> int:
     if "gh" not in command:
         return 0
 
-    tokens = tokenize(command)
-    if tokens is None:
-        # Unparseable quoting. Only refuse when the text plainly names a gated
-        # call: guessing at everything else would block unrelated work.
-        if re.search(r"\bgh\s+pr\s+(merge|ready)\b", command):
-            return deny(
-                "This command names `gh pr merge`/`gh pr ready` but could not be parsed "
-                "(unbalanced quote), so the pre-merge gate cannot read its arguments. "
-                "Rewrite it as a plain invocation."
-            )
-        return 0
-
     try:
-        return gated(tokens, payload.get("session_id"))
+        tokens = tokenize(command)
+        if tokens is None:
+            # Unparseable quoting. Only refuse when the text plainly names a gated
+            # call: guessing at everything else would block unrelated work.
+            if re.search(r"\bgh\s+pr\s+(merge|ready)\b", command) and not switched_off(payload):
+                return deny(
+                    "This command names `gh pr merge`/`gh pr ready` but could not be parsed "
+                    "(unbalanced quote), so the pre-merge gate cannot read its arguments. "
+                    "Rewrite it as a plain invocation."
+                )
+            return 0
+        return gated(tokens, payload)
     except Exception as exc:  # a broken gate must not become an open gate
         return deny(f"pre-merge gate failed and is refusing by default: {exc}")
 

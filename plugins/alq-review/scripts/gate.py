@@ -23,7 +23,7 @@ import claimgate
 import config
 import facts
 import github
-from hookio import deny, mode, record, refuse, refuse_spec, session_file, session_state
+from hookio import deny, log_error, mode, record, refuse, refuse_spec, session_file, session_state, set_switch, switch_state
 import ledger
 import policy
 import settled_design
@@ -125,8 +125,71 @@ def _rescope_brief(state: dict, ruling: dict) -> str:
             f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")
 
 
-def on_prompt(payload: dict) -> dict | None:
+SWITCH = re.compile(r"alq-review\s+(?P<to>on|off)\b\s*(?P<more>.*)")
+SWITCHED_OFF_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND, claimgate.CHECK, shimgate.CHECK)
+
+
+def _tell(event: str, said: str, user: bool = True) -> dict:
+    out = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": f"[alq-review] {said}"}}
+    return {"systemMessage": f"[alq-review] {said}", **out} if user else out
+
+
+def on_switch(payload: dict, typed: re.Match, switch: str) -> dict:
+    line = typed.group(0)[:200]
+    to = typed["to"]
+    if typed["more"]:
+        decision = "unknown"
+        said = f'"{line}" is not a switch, so nothing changed. Type alq-review off or alq-review on.'
+    elif switch == to:
+        decision, said = "unchanged", f"alq-review was already {to}."
+    else:
+        set_switch(payload, to == "off", line)
+        decision = to
+        said = ("alq-review is off for this session. It stays off until the user types alq-review on. Its workflows "
+                "do not run; carry on without them." if to == "off"
+                else "alq-review is on again. Its rules apply from where its records stand.")
+    record(payload, "switch", decision, line)
+    return _tell("UserPromptSubmit", said)
+
+
+def _unreadable_switch(payload: dict) -> dict:
+    return {"systemMessage": "[alq-review] this session's switch file could not be opened or is not one the plugin "
+            f"wrote, so the plugin counts as on ({session_file(payload, '.off')}; errors.log says which). Type "
+            "alq-review off or alq-review on to rewrite it."}
+
+
+def on_session_start(payload: dict, switch: str) -> dict | None:
+    if switch == "unreadable":
+        return _unreadable_switch(payload)
+    if switch != "off":
+        return None
+    # A resume opens on the user's side of the screen; a compaction happens mid-turn, where only the agent lost it.
+    return _tell("SessionStart", "alq-review is off in this session.", user=payload.get("source") != "compact")
+
+
+def launch_while_off(payload: dict) -> dict | None:
+    name = payload["tool_input"].get("name")
+    if name not in SWITCHED_OFF_WORKFLOWS:
+        return None
+    # Refused in log mode too: the gate supplies these workflows' arguments, and off it supplies none.
+    reason = (f"alq-review is off for this session, so {name} does not run. Carry on without it. Only the user turns "
+              "it on, with alq-review on; do not ask them to.")
+    record(payload, "workflow", "deny", reason)
+    return deny(reason)
+
+
+def on_prompt(payload: dict, switch: str) -> dict | None:
     prompt = payload.get("prompt", "").lstrip()
+    typed = SWITCH.fullmatch(prompt.splitlines()[0].rstrip()) if prompt else None
+    if typed:
+        return on_switch(payload, typed, switch)
+    out = _on_release(payload, prompt)
+    if switch == "unreadable":
+        out = {**(out or {}), **_unreadable_switch(payload)}
+    return out
+
+
+def _on_release(payload: dict, prompt: str) -> dict | None:
     claim = claimgate.UNLOCK_CLAIM.match(prompt)
     if claim:
         return claimgate.on_prompt(payload, claim)
@@ -526,10 +589,23 @@ PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_ba
 
 
 def handle(payload: dict) -> dict | None:
-    ledger.ingest_inbox(datetime.now(timezone.utc))
+    switch = switch_state(payload)
+    off = switch == "off"
+    if not off:
+        ledger.ingest_inbox(datetime.now(timezone.utc))
     event = payload["hook_event_name"]
     if event == "UserPromptSubmit":
-        return on_prompt(payload)
+        return on_prompt(payload, switch)
+    if event == "SessionStart":
+        return on_session_start(payload, switch)
+    if off and event not in ("SubagentStart", "SubagentStop"):
+        # Off, no rule judges. What is left keeps the plugin's own agents confined and its workflows from
+        # starting without the arguments the gate gives them.
+        if event == "PreToolUse" and payload["tool_name"] == "WebFetch":
+            return claimgate.on_webfetch(payload)
+        if event == "PreToolUse" and payload["tool_name"] == "Workflow":
+            return launch_while_off(payload)
+        return None
     if event == "PostToolUse" and payload["tool_name"] == "Bash":
         return after_bash(payload)
     if event in ("SubagentStart", "SubagentStop"):
@@ -563,9 +639,7 @@ def main() -> None:
         trace = traceback.format_exc()
         print(trace, file=sys.stderr)
         try:
-            ledger.state_root().mkdir(parents=True, exist_ok=True)
-            with open(ledger.state_root() / "errors.log", "a") as log:
-                log.write(f"{ledger.stamp(datetime.now(timezone.utc))} {payload.get('tool_name')}\n{trace}\n")
+            log_error(f"{payload.get('tool_name')}\n{trace}")
         except OSError:
             pass  # the trace is already on stderr
         where = payload.get("tool_name") or payload.get("hook_event_name")

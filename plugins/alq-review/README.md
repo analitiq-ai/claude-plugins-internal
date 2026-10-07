@@ -128,6 +128,26 @@ plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is
 key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
 failed, and a failed check refuses the commit as a patch does.
 
+## Switch
+
+A prompt that starts with `alq-review off` switches the plugin off for the session it was typed in, and
+`alq-review on` switches it on again, as `unlock` is typed. Another word after either on that line changes
+nothing and is answered with the two forms. The switch covers that session, its subagents and workflows
+included, and ends with it; no other session is affected.
+
+Off lifts every rule: the commit checks, the order of the stages, locked branches, the attestation, and the
+ready and merge rules, `--admin` and `gh api` merges included. Nothing is released: locks, counts, holds and
+overrides stay recorded and apply again when it is on.
+
+Still running while off: `unlock`, `override` and `override-merge`; the count of reviewers already running;
+and the confinement of the plugin's own agents. A launch of `review-round`, `assess-round`, `claim-check` or
+`shim-check` while off is refused, in `log` mode too, with `alq-review on` as the keyword that turns it on,
+and the agent is told to carry on without it.
+
+Off differs from `log`: in `log` the rules still run, as Mode describes; off, the rules listed above do not.
+
+A resumed session is told it is off. A switch file that cannot be opened, or is not one the plugin wrote, counts as on and is reported.
+
 ## State
 
 `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
@@ -144,6 +164,7 @@ failed, and a failed check refuses the commit as a patch does.
     chains of fixes of one bug, and the rulings on contested sites
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
+- `sessions/<session id>.off.json` - present while the user has the plugin switched off in that session
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
 
 ```
@@ -168,7 +189,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/shimgate.py` | the shim check's hook handlers |
 | `scripts/jev.py` | the Jev questions the shim check asks |
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
-| `scripts/hookio.py` | settings, refusals, `gate.log` and session state, shared by the handlers |
+| `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge #N` |
 | `skills/` | `alq-shape`, `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |

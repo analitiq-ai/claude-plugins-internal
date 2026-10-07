@@ -98,6 +98,64 @@ class MergeOverride(Hook):
 
 
 
+class MergeSwitch(Hook):
+    """The user's `alq-review off` lifts this gate for the session, by their decision (spec 016)."""
+
+    def setUp(self):
+        super().setUp()
+        self.state = Path(self.tmp.name) / "review-state"
+        self.env["ALQ_REVIEW_STATE_DIR"] = str(self.state)
+        self.calls = Path(self.tmp.name) / "gh-calls"
+
+    def switch(self, session="s1", text=None):
+        path = self.state / "sessions" / f"{session}.off.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text if text is not None else json.dumps({"at": "2026-10-07T10:00:00Z", "by": "alq-review off"}))
+
+    def counting_gh(self, is_draft=False):
+        view = {"number": 12, "headRefOid": HEAD, "isDraft": is_draft, "url": "u", "comments": []}
+        self.gh(f"echo called >> '{self.calls}'\necho '{json.dumps(view)}'")
+
+    def test_a_merge_without_attestation_is_not_denied_while_the_session_is_off(self):
+        self.counting_gh()
+        self.switch()
+        self.assertIsNone(self.merge("gh pr merge 12 --squash"))
+        self.assertFalse(self.calls.exists())
+
+    def test_publishing_a_draft_is_not_denied_while_the_session_is_off(self):
+        self.counting_gh(is_draft=True)
+        self.switch()
+        self.assertIsNone(self.merge("gh pr ready 12"))
+        self.assertFalse(self.calls.exists())
+
+    def test_an_admin_merge_is_not_denied_while_the_session_is_off(self):
+        self.counting_gh()
+        self.switch()
+        self.assertIsNone(self.merge("gh pr merge 12 --admin --squash"))
+        self.assertFalse(self.calls.exists())
+
+    def test_a_merge_through_gh_api_is_not_denied_while_the_session_is_off(self):
+        self.counting_gh()
+        self.switch()
+        self.assertIsNone(self.merge("gh api --method PUT repos/acme/demo/pulls/12/merge"))
+        self.assertFalse(self.calls.exists())
+
+    def test_another_session_is_denied_as_before_while_one_is_off(self):
+        self.switch(session="s1")
+        self.assertEqual(self.merge("gh pr merge 12 --admin --squash", session="s2"), "deny")
+
+    def test_an_override_typed_while_off_is_still_granted(self):
+        self.switch()
+        said = self.say("override-merge #12")
+        self.assertIn("gh pr merge 12", said["hookSpecificOutput"]["additionalContext"])
+        granted = Path(self.env["XDG_STATE_HOME"]) / "analitiq-merge-gate" / "s1.json"
+        self.assertEqual(json.loads(granted.read_text()), [12])
+
+    def test_an_unreadable_switch_file_gates_as_on(self):
+        self.switch(text="not json")
+        self.assertEqual(self.merge("gh pr merge 12 --admin --squash"), "deny")
+
+
 RELEASE = "version-only release: 1.0.0 → 1.0.1"
 
 
