@@ -85,8 +85,8 @@ or keep a record for each claim.
 Its judging check is advisory. Blocking on it from a hook of ours, or through a second agent, was weighed.
 Rejected:
 
-- It picks what to judge from names declared in Swift and Rust files only. No Analitiq repo holds either,
-  so it would judge nothing.
+- It picks what to judge from names declared in Swift and Rust files only. None of the seven Analitiq
+  repos tracks a file of either, so it would judge nothing.
 - Blocking on a verdict needs a hook that refuses the commit, a check of each verdict and a record of it
   for the staged change. That is Option A. Only the judge's brief would be reused.
 - A second agent that decides whether a finding blocks puts the refusal in a model's answer, not in a rule
