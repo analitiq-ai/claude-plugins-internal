@@ -145,8 +145,7 @@ override grants to `sessions/<session id>.merge.json` there. Until it lands, the
 In the state folder:
 
 - `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
-  concurrent writers take turns on it instead of losing each other's update the way a bare JSON file or a
-  stale flock would:
+  concurrent writers take turns on it:
   - `ledgers (repo, pr) -> doc` - one row per PR: its rounds, findings, assessments, epoch and unlocks
   - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch

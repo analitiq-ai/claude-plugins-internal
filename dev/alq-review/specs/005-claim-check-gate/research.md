@@ -130,7 +130,7 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
   and SC-005, stable. A `WRONG` can be fixed by a change to a file it never cited, so reusing it would refuse a
   claim that is now true and spend one of its 3 refusals (critique E4).
 - **Existing tools**: SQLite via `ledger._transaction`, `ledger._connect`: fit. Git blob ids and patch-ids as
-  the fingerprints: fit. A JSON file per check: rejected, the README records why the plugin left that design.
+  the fingerprints: fit. A JSON file per check: rejected, decision record 0002 records why the plugin left that design.
 
 ## R8: The bound counts completed WRONG checks per git hunk, and the user releases with `unlock`
 
