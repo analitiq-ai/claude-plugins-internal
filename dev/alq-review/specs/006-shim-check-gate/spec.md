@@ -64,6 +64,14 @@ Recorded in issue #17 and ratified as ADR-0001.
 - Q: What happens to a held bug after the user's override ends? → A: The next edit of that bug is checked again. A
   `complete` verdict ends the bug. A `patch` asks the user again at once.
 
+### Session 2026-10-07
+
+Recorded as decision record 0014, a draft until it is ratified.
+
+- Q: One staged change overlaps two bugs that are tracked apart. What does its one verdict do to them? → A: Bugs
+  that converge are one bug from then on, and every later step applies to them together. A commit that fixes
+  two bugs and is ruled a `patch` sends both for the deep sweep together.
+
 ## Background
 
 When an agent fixes a defect it patches the site a reviewer named and leaves the same defect at other sites
@@ -222,7 +230,8 @@ line and see a new one.
 - A commit outside a branch of a GitHub repo (detached HEAD, no GitHub origin): not checked, as for the claim check.
 - A fix-induced defect or a design problem (C2, C3): not visible to this check; the 36-branch replay showed many
   later turns come from these.
-- One commit edits sites of two refused bugs: it counts toward both (FR-015 applies to each).
+- One commit edits sites of two refused bugs: they are one bug from then on, with the larger of the two counts,
+  and the commit counts once toward it (FR-015, data-model `shim_chains`).
 
 ## Requirements *(mandatory)*
 
@@ -270,7 +279,8 @@ line and see a new one.
   MUST count as the same bug as an earlier `patch` refusal on its own branch when it edits a site that refusal
   listed or a line the refused fix changed; a `complete` verdict ends the count. Those lines MUST be followed
   from one checked tree to the next as ADR-0001 says, by a diff of each file's two versions; a commit, an amend
-  or a rebase on that branch MUST NOT end or restart the count.
+  or a rebase on that branch MUST NOT end or restart the count. Bugs that one staged change overlaps MUST be
+  treated as one bug from then on, and every later step MUST apply to them together.
 - **FR-016**: At a bug's 3rd refusal the gate MUST run a deep sweep: two independent sweeps with the standard
   prompt plus one sweep that searches from the callers and consumers of the changed code, all alq-review agents,
   their SAME OPERATION lists merged. That merged list MUST be the

@@ -12,7 +12,7 @@ Workflow(name='alq-review:shim-check', args={worktree: '<path>', contests: [{sit
 Refused before any agent runs when: `worktree` is not an absolute path to a branch checkout with a GitHub origin;
 tracked files differ from what is staged; nothing is staged; the claim check has not labelled every hunk of the
 staged tree; the tree already has a `complete` check and no contest is given; the tree rule of data-model
-`shim_chains` refuses it (a matched chain is held, or none is held and one is overridden); a contest names
+`shim_chains` refuses it (the bug is held or overridden); a contest names
 a site not in the chain's current list, a site already ruled, or has an empty reason. The gate, not the caller,
 sets the mode (R4).
 

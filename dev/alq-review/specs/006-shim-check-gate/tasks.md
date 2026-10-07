@@ -346,7 +346,8 @@ the chain holds and asks the user. Misses are logged.
 
 **Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes every task line that names a removed mechanism: the
 touched mark (T007, the Phase 3 goal, T019), the stored chain `state` and its `HEAD` end (T009, T019, T031,
-T042), the count at one `HEAD` (the Phase 5 goal, T038), and the "after `HEAD` moves, the bug is checked again"
+T042), the count at one `HEAD` (the Phase 5 goal, T038), the "one commit touching two chains counts for both"
+case of T038, and the "after `HEAD` moves, the bug is checked again"
 case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrated.
 
 **Independent test**: quickstart §4.
@@ -362,14 +363,19 @@ case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrate
   chains by `(repo, branch, chain id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
 - [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure, one per cell of data-model `shim_chains` that
   can occur. State: `held` is matched before `overridden`, then `deep due`, then `checked`. For a `checked` and
-  for a `deep due` chain: a `patch` on a new tree; the `deep` check's `patch`, which counts nothing; a `patch`
-  on a counted tree; `complete`; a failed check; an allowed launch; the override by chain id and by tree id; a
-  commit. For a `held` and for an `overridden` chain: the override, a commit, and a completed check that writes
+  for a `deep due` chain, each event of the table that can occur in that column: a `patch` on a new tree; the
+  `deep` check's `patch`, which counts nothing and adds its tree to `trees`; a contest after it on that tree,
+  which counts nothing; a `patch` on a tree in `trees`; `complete`; a failed check; an allowed launch; the
+  override by chain id and by tree id; a commit. For a `held` and for an `overridden` chain: the override, a commit, and a completed check that writes
   nothing. A `patch` that matches no chain opens one at count 1; a tree-id override that matches none opens one
   at count 0. A bug overridden at 4 is `checked` after the commit and `held` at its next `patch`; one overridden
-  at 2 is `deep due` at 3 and `held` at 4; the deep sweep is not run twice. Tree rule: one tree that matches a
-  held and an overridden chain is refused; an overridden and a `checked` one, allowed; one that
-  matches a `deep due` and a `checked` chain runs `deep` mode. Run them; each fails.
+  at 2 is `deep due` at 3 and `held` at 4; the deep sweep is not run twice. Tree rule, for a tree that matches two
+  chains, one per row of the merged-chain table: the `id` is that of the larger count, and of the smaller `id`
+  at equal counts; the `count` is the larger; `target` is the union when both have one and empty when one has
+  none, so a chain at 3 with a target merged with one at 1 is `deep due`; `override` is kept when both have one
+  at the same `head` and neither is `held`, and dropped otherwise, so a held chain merged with an overridden one
+  is `held`; the other chain gets `ended: merged` at an allowed launch and at an override; its rulings are
+  keyed to the merged chain, and a site ruled differently in the two loses its ruling. Run them; each fails.
 - [ ] T064 Write gate tests, not written yet, in `tests/test_shim_gate.py` for the hook paths: a user prompt `override shim-<id>`
   by chain id and by tree id; an agent cannot override; a tree that matches a held chain is refused at the launch
   and at the commit; one that matches an overridden chain and no held one is refused at the launch and allowed

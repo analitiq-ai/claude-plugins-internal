@@ -64,6 +64,13 @@ Recorded in issue #17 and ratified as ADR-0001.
   a pure insertion. Each starts a new count.
 - Q: What happens to the count after `unlock`? → A: It stays. The release covers the words as they are; a later
   rewording is checked again, and one more `WRONG` brings the user back.
+
+### Session 2026-10-07
+
+Recorded as decision record 0013, a draft until it is ratified.
+
+- Q: A file with a running count is moved. Does the count follow it? → A: No. Git stores a move as a delete and
+  a create and gives no way to identify a move, so the count starts from scratch at the new path.
 - Q: May a check be launched while a claim is stopped and not yet released? → A: No. The gate waits for the
   user. A `CORRECT` ruling or a deletion ends a count only below the bound or after a release.
 
@@ -192,7 +199,7 @@ and shows the cost.
 - A file marked generated in `.gitattributes`: nothing in it is checked.
 - A command that stages and commits together (`git add -A && git commit`): refused, because the content it will
   commit is not the content that was checked. The same goes for `git commit -a` and commits that name paths.
-- A claim made in a file that is renamed in the commit: it is judged as added text.
+- A claim made in a file that is renamed in the commit: it is judged as added text, and its count starts again.
 - A commit made outside the agent's session, by a person at a terminal: not covered; see Out of Scope.
 - The checker cannot read the code that settles the claim: the verdict is `UNSURE`, never `CORRECT`.
 - Every judged claim is about another repo: each verdict is `UNSURE`, the check is complete, and the commit
@@ -254,7 +261,8 @@ and shows the cost.
   the two versions, never by a model and never by a similarity threshold. Rewording in place keeps the count, a
   split passes it to both parts, a merge takes the larger count, and words moved unchanged within the file keep
   it. A commit, an amend or a rebase MUST NOT change a count. Counts are never summed across claims. A claim
-  moved and reworded in one step is not followed and starts a new count.
+  moved and reworded in one step is not followed and starts a new count. So does a claim whose file is moved to
+  a new path.
 - **FR-018**: The system MUST record for each check the claims judged, their verdicts, the refusals, contests and
   their outcomes, releases by the user, and the cost, for the user to read.
 - **FR-019**: The claim check MUST have its own blocking setting, separate from the review gate's, and MUST ship

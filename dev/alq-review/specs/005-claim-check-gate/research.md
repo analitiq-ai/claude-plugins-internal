@@ -228,4 +228,4 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
 - `shell.classify` and `worktree.locate` only see repos with a GitHub `origin`, so the check covers the repos
   alq-review already covers, which is what "every repo the plugin is installed in" meant for its other rules.
 - A claim moved and reworded in one step is not followed and starts a new count. So does the half of a split
-  that lands in a pure insertion (R12).
+  that lands in a pure insertion, and a claim whose file is moved to a new path (R12, data-model Lineage).

@@ -178,7 +178,8 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   shifted, a range that overlaps a replaced range grows to cover the replacing lines, a range whose lines are
   all deleted is dropped. The commit hook computes the carry and stores nothing; a launch stores the carried
   ranges with the staged tree. A staged tree matches every chain one of whose carried ranges a new-side range
-  of its hunks overlaps; what a completed check then does to each matched chain is in data-model `shim_chains`.
+  of its hunks overlaps. Chains that one tree matches become one bug; how, and what a completed check then does
+  to it, is in data-model `shim_chains`.
   A commit, an amend or a rebase changes no chain. A refusal prints, per listed site, the staged-tree line
   ranges of the hunks in that site's file.
 - **Rationale**: FR-015 and ADR-0001. The earlier key, `(repo, branch, HEAD sha)`, lost the chain whenever a
@@ -214,8 +215,8 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   to a chain and what a staged tree that matches several chains gets are in data-model `shim_chains`, and
   nowhere else. The decisions that section carries out: a bug is held at its 4th refusal; while it is held, the
   launch is refused as well as the commit; an override lasts while the branch's `HEAD` is the recorded one and
-  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; an
-  override lets a tree through only when no chain it matches is held. The recorded `HEAD` decides how long a
+  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; bugs
+  that one staged tree overlaps are one bug from then on (decision record 0014). The recorded `HEAD` decides how long a
   release lasts, not which bug a change belongs to. The override touches only this check; the claim check keeps
   its own release. Only a prompt typed by the user overrides (FR-017).
 - **Rationale**: FR-007/FR-017 and the user's choice (critique E2, option B): one override per check, lasting for

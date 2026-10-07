@@ -128,6 +128,6 @@ No constitution violations to justify.
 ## Limits
 
 - Repos without a GitHub `origin` are outside the plugin's reach today, so they are outside this check.
-- A claim moved and reworded in one step, or the half of a split that lands in a pure insertion, starts a new
-  count (R12).
+- A claim moved and reworded in one step, the half of a split that lands in a pure insertion, or a claim whose
+  file is moved to a new path, starts a new count (R12, data-model Lineage).
 - Commits that do not go through `git commit` as the Bash tool runs it are not intercepted (list in research.md).

@@ -322,7 +322,8 @@ transitions of T036, and T038. No migration of `claim_holds` rows.
   unchanged in place, and shifted by an edit above; words moved unchanged, found by claim id; reworded; split,
   where each new row copies `versions`, `contests` and `released`; merged, the larger count winning; merged at
   equal counts, the smaller `id` winning; two rows that map into the same two claims mint one row per claim;
-  deleted; moved and reworded in one step, which no row wins; the same check applied twice; a mint whose `id`
+  deleted; moved and reworded in one step, which no row wins; a file moved to a new path, whose row ends `gone`
+  and whose words at the new path no row wins; the same check applied twice; a mint whose `id`
   exists. Run them; they fail because `lineage.py` does not exist.
 - [ ] T052 Implement `scripts/lineage.py`, pure: open rows, the `git diff -U0` hunks of two blobs and the staged
   claims in, new rows out. `diff-match-patch` maps a sentence's character span. T051 passes.
@@ -330,17 +331,18 @@ transitions of T036, and T038. No migration of `claim_holds` rows.
   naming the install command. Implement. Green.
 - [ ] T054 [P] Write tests, not written yet, in `tests/test_claimcheck.py`, pure, one per cell of data-model Lineage that can
   occur. State: `released` is matched before `stopped`, `stopped` before `checked`. Ruling and other events, for
-  a `checked` and for a `released` row: `WRONG`; `CORRECT`; `UNSURE`; a rejected contest; an upheld contest,
-  whose replaced `WRONG` stays counted; `unlock`. For a `stopped` row: `unlock`, and a completed check that
+  a `checked` and for a `released` row: `WRONG`; `CORRECT`; `UNSURE`; a rejected contest; an upheld contest
+  ruled `CORRECT` and one ruled `UNSURE`, after each of which the count is unchanged; `unlock`. A `released`
+  row reworded and ruled `WRONG` by one check is read as `checked` and is `stopped` after it. For a `stopped` row: `unlock`, and a completed check that
   writes nothing. A row reworded after a release is `checked` at the released count, and one `WRONG` stops it.
-  Tree rule: a row is matched by its file, under either name of a rename; a stopped row refuses when its words
-  are unchanged, reworded and deleted; a `WRONG` claim with the `released.id` of a matched row passes; a row
+  Tree rule: a row is matched by its path; a stopped row refuses when its words are unchanged, reworded and
+  deleted, and when its file is moved; a `WRONG` claim with the `released.id` of a matched row passes; a row
   whose file is not in the staged change is not matched. Run them; each fails.
 - [ ] T055 Write gate tests, not written yet, in `tests/test_claim_gate.py` for the hook paths: a user prompt
   `unlock claim-<id>` releases by current claim id, and by row id when no current claim has it; an agent cannot
   release; the launch and the commit are refused for a stopped row; a contest of a claim that is not the
   current claim of an open row is refused at launch; a contest judge's `WRONG` output is counted on the row.
-  Run them; each fails.
+  Run them; those for a changed rule fail, and the rest pin behaviour that must not change.
 - [ ] T056 Replace `claim_holds` by `claim_lineages` in `scripts/ledger.py`, and the hold functions of
   `scripts/claimcheck.py` and their callers in `scripts/claimgate.py` by the rules of data-model Lineage and the
   module of T052. T050, T054 and T055 pass. Then delete the hold code and its tests.
