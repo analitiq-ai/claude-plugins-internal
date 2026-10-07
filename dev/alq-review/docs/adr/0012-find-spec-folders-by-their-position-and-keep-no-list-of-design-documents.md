@@ -56,8 +56,7 @@ per repo. The same kind of list stayed in use for design documents. Issue #29 re
 - Its pattern `docs/adr/**` does not match this repo's ADRs, which are in
   `dev/alq-review/docs/adr/`.
 
-Why now: on 2026-10-06 the user decided to delete the rule. The user said: "I do not want to hand-roll and
-maintain a list of path patterns."
+Why now: issue #29 deletes the rule. A list of path patterns has to be hand-rolled and maintained.
 
 ## Decision
 
@@ -89,7 +88,7 @@ the rule keeps refusing changes that decide nothing.
 
 | Option | Why rejected |
 |---|---|
-| C. Keep the rule, and recognise in code only the files whose place a tool fixes | Put to the user on 2026-10-06 and not chosen. The user chose to delete the rule. |
+| C. Keep the rule, and recognise in code only the files whose place a tool fixes | Not chosen: the rule is deleted, not narrowed. |
 | D. A `spec_folders` glob list in `config.json` | A hand-maintained list, and `config.json` is plugin-wide, not per repo. |
 | E. The `.specify/` folder as the mark of a Spec Kit project | Only this repo commits it. A repo with spec folders and no committed `.specify/` would not be recognised. |
 

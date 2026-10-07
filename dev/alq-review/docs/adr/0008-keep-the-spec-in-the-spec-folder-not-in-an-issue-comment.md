@@ -47,8 +47,7 @@ The `design-doc` skill writes a spec folder, `<dir>/specs/<feature>/`, for the s
 folders each open by saying that the acceptance criteria are the issue comment. So a reader has to open two places to know what a change must do, and nothing keeps
 the two in step.
 
-Why now: on 2026-10-06 the user decided which of the two is the spec. This ADR comes from that decision,
-as recorded in issue #25, and not from a Spec Kit plan.
+Why now: issue #25 moves the spec into the spec folder, and the skills and the gate still read the comment.
 
 ## Decision
 
@@ -75,12 +74,12 @@ Issue #25 lists four points this decision leaves open. They are settled in that 
 ### Option B: Do nothing
 
 The comment stays the spec and the folder holds design decisions only. Two places stay in use for one
-change. The user's decision names the folder.
+change.
 
 ### Option C: Both, with one a copy of the other
 
 `alq-issue-tackle` already rejects a second copy: a file in the worktree is "one `git add .` from being
-committed beside the comment it drifts from". The user's decision names one home.
+committed beside the comment it drifts from".
 
 ## Trade-offs
 

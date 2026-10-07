@@ -47,8 +47,7 @@ be switched to refusing later. The specs give both answers:
 The plugin ships with its mode and every check's own setting on `enforce`
 (`plugins/alq-review/config.json`).
 
-Why now: the next check has two specs to follow and they disagree. No plan decided the general rule. The
-user decided it on 2026-10-06: "Enforce them on first release".
+Why now: the next check has two specs to follow and they disagree.
 
 ## Decision
 
@@ -73,12 +72,12 @@ The specs keep two answers, and each new check picks one.
 
 ### Option C: A record-only phase first (spec 004 FR-023)
 
-The user rejected it for the claim check and the shim check, in the clarifications quoted above, and
-accepts that the verdicts are unmeasured.
+Rejected for the claim check and the shim check in the clarifications quoted above. The cost: a check
+refuses before its verdicts are measured.
 
 ### Option D: Enforce, with a built-in threshold or a trial review
 
-Proposed in critique. The user's answer is point 3.
+Proposed in critique. Point 3 rules it out.
 
 ## Trade-offs
 

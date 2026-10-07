@@ -41,11 +41,11 @@ with its file, line, function and a short description an agent wrote.
 
 The check runs on every repo the plugin is installed in, private repos included.
 
-The plan of the shim check records sending private source as the user's decision, and its spec takes Jev's
-terms as accepted for private source. Neither gives a date or a reason, and no alternative was weighed.
+The plan of the shim check allows sending private source, and its spec takes Jev's terms as accepted for
+private source. Neither gives a reason, and no alternative was weighed.
 
-On 2026-10-07 the user widened that decision from the shim check to any alq-review check, with no plan
-behind it. A check of prose claims may use Jev later.
+This ADR widens that from the shim check to any alq-review check. A check of prose claims may use Jev
+later.
 
 Why now: the decision was one point of seven in ADR-0007, which is about how a verdict is made. It reaches
 every repo, and it cannot be undone for code already sent.
@@ -77,8 +77,8 @@ The permission stays one point of ADR-0007, marked as reaching one component and
 
 ### Option C: The shim check only
 
-This is what the plan decided. Weighed on 2026-10-07 and not chosen by the user: a later check that sends
-the same content to the same receiver adds no new exposure, and would need an ADR that repeats this one.
+This is what the plan allows. Not chosen: a later check that sends the same content to the same receiver
+adds no new exposure, and would need an ADR that repeats this one.
 
 No alternative to sending private source was weighed.
 

@@ -38,13 +38,12 @@ ADR-0001 says how a count follows a piece of text across edits inside one file. 
 that is moved to a new path while one of its claims has a running count.
 
 The plan of spec 005 does not decide it either. Its Limits name two cases that start a new count, and a moved
-file is not one of them. The third review round of the amendment of specs 005 and 006 found the gap and ruled
-that the answer is the user's.
+file is not one of them. The third review round of the amendment of specs 005 and 006 found the gap and
+left it open.
 
 Git stores a move as a delete of the old path and a create of the new one.
 
-Why now: spec 005 cannot be amended to ADR-0001 while this is open. The plan made no choice here. The user
-decided it on 2026-10-07.
+Why now: spec 005 cannot be amended to ADR-0001 while this is open.
 
 ## Decision
 

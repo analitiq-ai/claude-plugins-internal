@@ -48,7 +48,7 @@ Constitution P5 pulls the other way. It asks that nothing is hand-rolled before 
 looked at. Nothing written says how the two are weighed.
 
 Why now: ADR-0001 puts the package `diff-match-patch` on the hook path. Without a decision, that would
-end an unwritten rule by accident. No plan decided this. The user decided it on 2026-10-06.
+end an unwritten rule by accident.
 
 ## Decision
 
@@ -78,14 +78,13 @@ The rule stays unwritten. Plans keep citing it as a fact, and ADR-0001 breaks it
 
 ### Option C: Vendor a needed package into the plugin folder
 
-Issue #17 lists it for `diff-match-patch`. The user chose a pip install over a vendored copy.
+Issue #17 lists it for `diff-match-patch`. Not chosen: the package is installed with pip instead.
 
 No other alternative was weighed. Dropping the rule was not proposed by anyone.
 
 ## Trade-offs
 
-- No reason for the rule itself is recorded. It rests on the user's decision and on the install being a
-  file copy.
+- No reason for the rule itself is recorded. It rests on the install being a file copy.
 - A named exception makes the install more than a copy. Until the package is on a machine, the checks that
   need it refuse there.
 - The rule costs hand-rolled code where a package exists, and that code needs its own tests.

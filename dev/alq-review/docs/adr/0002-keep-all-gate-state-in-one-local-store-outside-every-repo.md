@@ -49,9 +49,6 @@ project needs an allow from a hook.
 Why now: the rule is written only in a docstring and two research files. Issue #26 will add a per-repo
 switch that needs a place to live.
 
-The user decided two things on 2026-10-07, in review of this ADR and with no plan behind them: the
-merge override grants move under the state root, and how long a record lives.
-
 ## Decision
 
 1. We will keep what a gate records in one local folder outside every repo and every worktree, the state
@@ -62,11 +59,11 @@ merge override grants move under the state root, and how long a record lives.
    repo and an id that needs no PR.
 4. We will name each exception in an ADR. One is named here: the sweeper's copy of `HEAD` stays
    beside the worktrees. It is a read copy, not a record.
-5. We will keep the merge override grants under the state root with the other session records, by the
-   user's decision of 2026-10-07. Issue #36 moves them there.
-6. We will keep a gate's record for as long as its PR and branch live, and no longer, by the user's
-   decision of 2026-10-07. It is deleted when the PR is merged or closed and the branch is deleted; for a
-   branch that never had a PR, when the branch is deleted.
+5. We will keep the merge override grants under the state root with the other session records. Issue #36
+   moves them there.
+6. We will keep a gate's record for as long as its PR and branch live, and no longer. It is deleted when
+   the PR is merged or closed and the branch is deleted; for a branch that never had a PR, when the branch
+   is deleted.
 7. We will let only the gate delete a record, on GitHub's answer that the PR is merged or closed. Removing
    a worktree deletes nothing, so cleaning up cannot release a lock or a hold.
 8. We will delete a session's records once the session is over.
@@ -102,7 +99,7 @@ Rejected: the folder is outside the project, so every read depends on the allow.
 
 ### Option F: The state in the worktree of the issue
 
-Weighed on 2026-10-07 and rejected by the user:
+Rejected:
 
 - Removing the worktree would reset the gate. Its locks, counts and holds would go with the folder, and
   removing a worktree is a routine command.

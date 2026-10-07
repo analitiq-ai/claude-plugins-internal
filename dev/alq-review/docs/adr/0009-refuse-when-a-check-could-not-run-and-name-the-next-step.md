@@ -47,7 +47,6 @@ The gates settled that one by one, and not all the same way:
   costs a merge" (`plugins/alq-review/scripts/pre_merge_gate.py`).
 - The watch on a held branch reports a checkout it cannot read and lets the command run.
 
-No plan decided this. The user decided it on 2026-10-06, when asked which of these readings is the rule.
 Why now: the answers differ from gate to gate, and no ADR binds the next check.
 
 ## Decision
@@ -75,7 +74,7 @@ Each gate keeps deciding by which error looks cheaper. The cases in Context stay
 
 ### Option C: Let the call through and report `cannot verify`
 
-The held-branch watch does this, and P4 allows it. The user rejected it: the call goes through unchecked.
+The held-branch watch does this, and P4 allows it. Rejected: the call goes through unchecked.
 
 ## Trade-offs
 

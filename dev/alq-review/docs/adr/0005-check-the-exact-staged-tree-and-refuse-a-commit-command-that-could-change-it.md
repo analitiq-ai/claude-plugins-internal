@@ -59,8 +59,7 @@ itself to be refused, so it had to solve the problem and not step around it.
    checkout read what is staged.
 4. We will keep the rules of point 2 in one function that every commit check calls.
 5. We will not check a commit with nothing staged, or one that concludes a merge, cherry-pick or revert.
-6. We will not check again what a repo's own commit hook rewrites, and we will not gate the push. This is a
-   user decision of 2026-10-02.
+6. We will not check again what a repo's own commit hook rewrites, and we will not gate the push.
 
 ## Options considered
 
@@ -83,8 +82,8 @@ This was the rule's first wording. Rejected in critique: it is an open-ended lis
 
 ### Option D: Give the agents a copy of the staged tree, and allow unstaged changes
 
-Rejected by a user decision. A copy can time out inside the hook, go missing, or be deleted by another
-session's cleanup, and it is read from outside the project.
+Rejected: a copy can time out inside the hook, go missing, or be deleted by another session's cleanup,
+and it is read from outside the project.
 
 ### Option E: Check again after the commit, before the push
 

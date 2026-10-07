@@ -39,11 +39,10 @@ change can overlap two bugs that have a record each.
 
 Spec 006 says of it: "One commit edits sites of two refused bugs: it counts toward both (FR-015 applies to
 each)." It does not say which bug the deep sweep, the hold and the override then belong to. The third review
-round of the amendment of specs 005 and 006 found the gap. Its reviewers proposed fills that contradict each other, and the round
-ruled that the answer is the user's.
+round of the amendment of specs 005 and 006 found the gap. Its reviewers proposed fills that contradict each other.
 
 Why now: the amendment of spec 006 to ADR-0001 was stopped in review on this question. The plan did not
-weigh merging. The user decided it on 2026-10-07.
+weigh merging.
 
 ## Decision
 

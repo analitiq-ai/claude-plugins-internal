@@ -59,8 +59,7 @@ for the two commit checks.
 2. We will require the prompt to start with the release's keyword. A keyword later in the prompt releases
    nothing.
 3. We will not accept a command, a file edit, a setting or an agent's message as a release.
-4. We will give each new user-only action a keyword of its own. The switch of issue #26 follows this rule, by
-   the user's decision of 2026-10-06 that it is typed by the user.
+4. We will give each new user-only action a keyword of its own. The switch of issue #26 follows this rule.
 
 The keywords today are `unlock <ref>`, `/alq-review:design-doc rescope <ref>`, `unlock claim-<id>`,
 `override shim-<id>` and `override-merge #N`.
