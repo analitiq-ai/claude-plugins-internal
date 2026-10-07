@@ -165,6 +165,7 @@ A resumed session is told it is off. A switch file that cannot be opened, or is 
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
 - `sessions/<session id>.off.json` - present while the user has the plugin switched off in that session
+- `sessions/<session id>.merge.json` - the merge overrides the user typed in that session and no merge has used, one `owner/repo#N` per PR
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
 
 ```
@@ -191,7 +192,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
-| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge #N` |
+| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
 | `skills/` | `alq-shape`, `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
 | `speckit/` | the settled-design preset and design-doc workflow, installed into the project by each `design-doc` start |
 | `workflows/` | orchestration only; everything else is injected by the hook |

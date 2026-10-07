@@ -34,9 +34,10 @@ checkout rather than keeping a copy that drifts when the gate changes.
 The user can overrule the reviewers. Analitiq-Bot is an org admin, and the user and
 every agent session act as it, so GitHub cannot tell the user's override from an
 agent's: the permission is taken from the user's own words instead. A prompt that
-*starts* with `override-merge #N` grants one `gh pr merge` of PR N in that session,
-past both this gate and the server's rules. It must start the prompt because the
-cron bot's prompts quote issue and PR text that anyone can write.
+*starts* with `override-merge owner/repo#N` grants one `gh pr merge` of that PR in that
+session, past both this gate and the server's rules. It names the repo because every repo has
+a PR N. It must start the prompt because the cron bot's prompts quote issue and PR text that
+anyone can write.
 
 The user can also switch alq-review off for a session (`alq-review off`, spec 016). That lifts
 this gate too -- `--admin` and `gh api` merges included -- because it is the user's decision to
@@ -50,22 +51,19 @@ a false deny costs one command and a false allow costs a merge.
 
 from __future__ import annotations
 
-import fcntl
 import json
-import os
 import re
 import shlex
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 # The commit the attestation covers. Bold markers optional because GitHub
 # surfaces render the same body differently; backticks optional for the same
 # reason. Ten hex digits minimum -- see the module docstring.
 REVIEWED_COMMIT = re.compile(r"\*{0,2}Reviewed commit:\*{0,2}\s*[`'\"]?([0-9a-f]{10,40})", re.I)
 
-PR_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/pull/\d+$")
+PR_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/pull/(\d+)$")
 
 GATED = {"merge", "ready"}
 
@@ -86,8 +84,11 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")"}
 # The REST merge endpoint, which would otherwise walk straight around this gate.
 API_MERGE = re.compile(r"pulls/\d+/merge")
 
-OVERRIDE = re.compile(r"override-merge\s+#(\d+)\b")
-SESSION_ID = re.compile(r"[\w-]+")
+REPO = r"[\w.-]+/[\w.-]+"  # a repo slug, as ledger.ROUND_REF spells one
+# The repo is optional here only so that an override without one is answered, not passed over.
+OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#(\d+)\b")
+GRANT = re.compile(rf"{REPO}#\d+")
+GRANTS = ".merge"
 
 
 def deny(reason: str) -> int:
@@ -201,50 +202,84 @@ def fetch(pr_ref: str | None, repo: str | None) -> tuple[dict | None, str]:
         return None, f"could not parse `gh pr view` output: {exc}"
 
 
-def _overrides(session: str) -> Path | None:
-    if not SESSION_ID.fullmatch(session or ""):
-        return None  # not a name to build a path from; such a session holds no override
-    root = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "analitiq-merge-gate"
-    root.mkdir(parents=True, exist_ok=True)
-    return root / f"{session}.json"
+def pr_name(repo: str, number: str) -> str:
+    """How an override and a grant name a PR: GitHub's `owner/repo#N`, in lower case as GitHub compares names."""
+    return f"{repo.lower()}#{int(number)}"
 
 
-def _update_overrides(session: str, change) -> bool:
-    """Apply `change` to the session's granted PR numbers under one lock; returns what it returns."""
-    path = _overrides(session)
-    if path is None:
-        return False
-    with open(path.with_suffix(".lock"), "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        granted = set(json.loads(path.read_text())) if path.exists() else set()
-        result = change(granted)
-        path.write_text(json.dumps(sorted(granted)))
+def name_of(pr: dict) -> str | None:
+    """The name of the PR `gh pr view` found, from its address; None when that is not a github.com PR."""
+    found = PR_URL.match(pr.get("url") or "")
+    return pr_name(*found.groups()) if found else None
+
+
+def _granted(held) -> set:
+    """The PR names of a grants record; ValueError when the record is not one this gate wrote."""
+    names = held.get("granted", []) if isinstance(held, dict) and set(held) <= {"granted"} else None
+    if not isinstance(names, list) or not all(isinstance(n, str) and GRANT.fullmatch(n) and n == n.lower()
+                                              for n in names):
+        raise ValueError('it is not {"granted": [PR names]}')
+    return set(names)
+
+
+def _update_grants(payload: dict, change):
+    """Apply `change` to the session's granted PR names under the session record's lock; returns what it returns."""
+    # Imported here for the reason released() imports github here.
+    import hookio
+    try:
+        record = hookio.session_file(payload, GRANTS)
+    except ValueError as exc:
+        raise ValueError(f"{exc}. No merge override can be kept in this session: the merge waits for what it "
+                         f"lacks, or is run from another session") from exc
+    try:
+        with hookio.session_state(payload, GRANTS) as held:
+            granted = _granted(held)
+            result = change(granted)
+            held["granted"] = sorted(granted)
+    except (ValueError, RecursionError) as exc:  # what the record holds, not where it is kept
+        raise ValueError(f"{record} is not a record the merge gate wrote ({exc}). The user deletes it and types "
+                         f"the override again") from exc
     return result
+
+
+def _log_failure(said: str) -> None:
+    try:
+        import hookio
+        hookio.log_error(said)
+    except Exception:  # a plugin module that is there but does not load raises more than ImportError
+        pass  # the answer carries the reason
 
 
 def grant(payload: dict) -> int:
     typed = OVERRIDE.match((payload.get("prompt") or "").lstrip())
     if not typed:
         return 0
-    number = int(typed.group(1))
-
-    def add(granted):
-        granted.add(number)
-        return True
-    if _update_overrides(payload.get("session_id"), add):
-        json.dump({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
-                   f"The user granted one `gh pr merge {number}` past its unmet requirements, "
-                   f"`--admin` included."}}, sys.stdout)
+    if typed.group(1) is None:
+        said = (f"`override-merge #{typed.group(2)}` does not say which repo's PR that is, so nothing is granted. "
+                f"The user names the PR: `override-merge owner/repo#{typed.group(2)}`.")
+    else:
+        named = pr_name(typed.group(1), typed.group(2))
+        try:
+            _update_grants(payload, lambda granted: granted.add(named))
+        except Exception as exc:  # outside main()'s guard; an override that was not recorded is not one
+            said = (f"`override-merge {named}` could not be recorded, so nothing is granted: "
+                    f"{type(exc).__name__}: {exc}")
+            _log_failure(said)
+        else:
+            said = f"The user granted one merge of `{named}` past its unmet requirements, `--admin` included."
+    # gate._tell's two fields, built here because this answer is owed when the plugin's modules cannot load.
+    json.dump({"systemMessage": f"[alq-review] {said}", "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}, sys.stdout)
     return 0
 
 
-def spend_override(session: str, number: int) -> bool:
+def spend_override(payload: dict, named: str) -> bool:
     def spend(granted):
-        if number not in granted:
+        if named not in granted:
             return False
-        granted.discard(number)
+        granted.discard(named)
         return True
-    return _update_overrides(session, spend)
+    return _update_grants(payload, spend)
 
 
 def attested(comments: list[dict], head: str) -> bool:
@@ -286,13 +321,29 @@ def how_to_attest(number: int, head: str, verb: str) -> str:
     )
 
 
-def refuse_admin(number) -> int:
-    return deny(
+def admin_needs_override(how: str) -> str:
+    """`how` says how the user overrules it here, or why no override can."""
+    return (
         "`gh pr merge --admin` merges in spite of every check the branch requires -- "
         "CI, DeepSource, the Codex verdict, unresolved threads, the approval. Only the "
-        f"user overrules them: they start a prompt with `override-merge #{number}`. "
-        "Tell them what is unmet and stop."
+        f"user overrules them: {how} Tell them what is unmet and stop."
     )
+
+
+def unmet(verb: str, args: list[str], pr: dict, named: str | None) -> str | None:
+    """Why this `gh pr merge` or `gh pr ready` is refused, or None when it is not."""
+    if "--admin" in args:
+        return admin_needs_override(
+            f"they start a prompt with `override-merge {named}`." if named else
+            "an override names a PR by its repo, and `gh pr view` gave no github.com address for this one.")
+    if verb == "ready" and not pr.get("isDraft"):
+        return None  # already published; nothing to gate
+    head = (pr.get("headRefOid") or "").lower()
+    if not head:
+        return f"`gh pr view` returned no head commit for PR {pr.get('number')}."
+    if attested(pr.get("comments") or [], head) or released(pr, head):
+        return None
+    return how_to_attest(pr.get("number"), head, verb)
 
 
 def switched_off(payload: dict) -> bool:
@@ -303,7 +354,6 @@ def switched_off(payload: dict) -> bool:
 
 
 def gated(tokens: list[str], payload: dict) -> int:
-    session = payload.get("session_id")
     bypass = api_merge_bypass(tokens)
     subcommand_at = None if bypass else find_invocation(tokens)
     if not bypass and subcommand_at is None:
@@ -328,7 +378,9 @@ def gated(tokens: list[str], payload: dict) -> int:
     pr_ref, repo = target(args)
     if shutil.which("gh") is None:
         # A bare `gh` cannot run either; one named by path still can.
-        return refuse_admin(pr_ref or "N") if "--admin" in args else 0
+        return deny(admin_needs_override(
+            "an override names the PR `gh pr view` finds, and `gh` is not on this hook's path, so none can be "
+            "applied until it is.")) if "--admin" in args else 0
 
     pr, error = fetch(pr_ref, repo)
     if pr is None:
@@ -337,23 +389,21 @@ def gated(tokens: list[str], payload: dict) -> int:
             f"{error}. Resolve that and retry -- this gate refuses rather than guesses."
         )
 
-    if verb == "merge" and spend_override(session, pr.get("number")):
+    named = name_of(pr)
+    refusal = unmet(verb, args, pr, named)
+    if refusal is None:
         return 0
-
-    if "--admin" in args:
-        return refuse_admin(pr.get("number"))
-
-    if verb == "ready" and not pr.get("isDraft"):
-        return 0  # already published; nothing to gate
-
-    head = (pr.get("headRefOid") or "").lower()
-    if not head:
-        return deny(f"`gh pr view` returned no head commit for PR {pr.get('number')}.")
-
-    if attested(pr.get("comments") or [], head) or released(pr, head):
-        return 0
-
-    return deny(how_to_attest(pr.get("number"), head, verb))
+    if verb == "merge" and named:
+        # Asked last, so an override is spent only by a merge that needs it and no other merge waits on its record.
+        try:
+            if spend_override(payload, named):
+                return 0
+        except (OSError, ValueError) as exc:
+            unread = (f"This session's merge overrides could not be used, so this merge was judged without one: "
+                      f"{type(exc).__name__}: {exc}.")
+            _log_failure(unread)
+            return deny(f"{unread}\n\n{refusal}")
+    return deny(refusal)
 
 
 def main() -> int:
