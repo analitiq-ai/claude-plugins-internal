@@ -130,7 +130,16 @@ failed, and a failed check refuses the commit as a patch does.
 
 ## State
 
-`${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
+The plugin writes in four places:
+
+| Place | Files |
+|---|---|
+| The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, each with a `.lock` beside it<br>`gate.log`<br>`errors.log` |
+| The merge-gate folder, `${XDG_STATE_HOME:-~/.local/state}/analitiq-merge-gate` | `<session id>.json` and its `.lock` |
+| `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
+| `.specify/` in the project | `presets/settled-design/`<br>`workflows/design-doc/`<br>`critique-baseline.json` |
+
+In the state folder:
 
 - `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
   concurrent writers take turns on it instead of losing each other's update the way a bare JSON file or a
