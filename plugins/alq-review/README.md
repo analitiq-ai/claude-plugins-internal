@@ -144,26 +144,7 @@ failed, and a failed check refuses the commit as a patch does.
     chains of fixes of one bug, and the rulings on contested sites
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
-- `sessions/<session id>.json`, `.held.json`, `.fetch.json` - one session's reviewers that have started and not
-  stopped, the checkouts a Bash call was let through on while held, and the hosts a contest judge may fetch; each is
-  read and written back under a `.lock` file beside it
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
-
-Outside that folder:
-
-- `${XDG_STATE_HOME:-~/.local/state}/analitiq-merge-gate/<session id>.json` and its `.lock` - the PR numbers the
-  user's `override-merge #N` granted that session. `ALQ_REVIEW_STATE_DIR` does not move it.
-- `<main checkout>/.claude/worktrees/shim-<12 hex>/` - the copy of `HEAD` a shim sweeper reads, exported when a
-  sweep starts and deleted when its check ends
-- `.specify/` in the project: a `design-doc` start installs `presets/settled-design` and `workflows/design-doc`
-  from `speckit/`, and the workflow's `mark-critiques` step writes `critique-baseline.json`, the critique reports
-  that existed when it ran. Spec Kit writes the runs under `workflows/runs/` and the spec folder.
-
-Read and not written: `config.json` in the plugin, the Jev key file, and a spec folder's `plan.md` and
-`research.md` for the settled-design check.
-
-The plugin deletes an inbox file once it is stored and a sweeper's copy when its check ends. It has no cleanup for
-`ledger.db`, the session files, the two logs or the merge-gate files.
 
 ```
 python3 scripts/ledger.py status --worktree /abs/checkout
