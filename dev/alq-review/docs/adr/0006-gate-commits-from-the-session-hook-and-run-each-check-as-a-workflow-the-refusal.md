@@ -51,9 +51,9 @@ to work it out again.
 2. We will run each check as a Claude Workflow. The workflow only orders the work. The gate supplies its
    prompts and schemas at launch, and a hook validates each answer before it is recorded.
 3. We will name the workflow call in the refusal, so the author runs it and commits again.
-4. We will allow one exception. The shim check's classifier, Jev, is called from hooks, not from the workflow,
-   so that the verdict exists before the author tries to commit. A call made inside a hook gets less time
-   than the hook itself has.
+4. We will name in this ADR every model call made inside a hook. Today there is one: the shim check's
+   classifier, Jev. It is called from hooks, not from the workflow, so that the verdict exists before the
+   author tries to commit. A call made inside a hook gets less time than the hook itself has.
 
 ## Options considered
 
@@ -101,7 +101,7 @@ Rejected:
   outside a Claude Code session, or one in a repo with no GitHub `origin`.
 - The workflow depends on a hook rewriting `Workflow` input. The docs do not say a command hook may do
   this.
-- The Jev exception puts a network call on the hook path.
+- The call to Jev is a network call on the hook path.
 
 ## Consequences
 
@@ -116,6 +116,3 @@ Rejected:
 ## Action items
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [ ] A new commit-time check follows points 1 to 3.
-3. [ ] A model call that a new check makes inside a hook is added to this ADR as a named exception, with
-   its time budget.
