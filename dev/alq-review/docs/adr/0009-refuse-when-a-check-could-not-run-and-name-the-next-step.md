@@ -54,8 +54,8 @@ Why now: the answers differ from gate to gate, and no ADR binds the next check.
 1. We will refuse the call a check was deciding whenever that check could not run.
 2. We will say in the refusal that the check failed, not the work.
 3. We will name a next step in the refusal, and it will be one that can succeed (constitution P1).
-4. We will not treat an answer as a failure. A branch with no issue or no spec is an answer. A judge's
-   `UNSURE` is an answer: a check whose verdicts all are `UNSURE` has not failed.
+4. We will not treat an answer as a failure. A branch with no issue, or an issue that says it has no spec,
+   is an answer. A judge's `UNSURE` is an answer: a check whose verdicts all are `UNSURE` has not failed.
 5. We will apply the rule only where a call is being decided. A hook event that only records refuses nothing.
 
 ## Options considered
