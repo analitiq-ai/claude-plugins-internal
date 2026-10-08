@@ -20,7 +20,8 @@ from shell import Action
 CHECK = "alq-review:shim-check"
 # Below the 60 s hooks.json gives the gate, so a Jev that stops answering fails the check before the hook is killed.
 JEV_SECONDS = 40
-OVERRIDE = re.compile(r"override\s+shim-(?P<id>[0-9a-f]{16}|[0-9a-f]{12})\b")
+# What the user types after `override`: a bug's chain, or the first 12 digits of a tree no check has run on.
+BUG = re.compile(r"shim-(?P<id>[0-9a-f]{16}|[0-9a-f]{12})")
 
 
 def _logged(repo: str, root: str | None = None) -> SimpleNamespace:
@@ -465,7 +466,11 @@ def _override_tree(prefix: str) -> list[str]:
     return overridden
 
 
-def on_prompt(payload: dict, typed: re.Match) -> dict:
+def on_prompt(payload: dict, word: str) -> dict | None:
+    """Answers `override <word>` where the word names a bug of the shim check; None where it does not."""
+    typed = BUG.fullmatch(word)
+    if typed is None:
+        return None
     named = typed["id"]
     overridden = _override_chain(named) if len(named) == 16 else _override_tree(named)
     if overridden:
@@ -473,5 +478,5 @@ def on_prompt(payload: dict, typed: re.Match) -> dict:
         said = (f"The user switched the shim check off for bug shim-{named} in {', '.join(overridden)}: staged changes "
                 "of that bug commit without the check until HEAD moves.")
     else:
-        said = f"`{typed.group(0)}` names no bug the shim check knows, so nothing was switched off."
+        said = f"`override {word}` names no bug the shim check knows, so nothing was switched off."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}

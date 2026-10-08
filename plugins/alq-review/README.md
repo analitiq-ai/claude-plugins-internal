@@ -128,11 +128,18 @@ plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is
 key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
 failed, and a failed check refuses the commit as a patch does.
 
+## What the user types
+
+`unlock`, `override`, `override-merge`, the rescope and the switch are read from a prompt's first words, by
+one reader. A space, a tab or a line break parts two words, and nothing else does. A word is read whole:
+`unlock #7.` names no PR, since `#7.` is not a number. A PR's name is `owner/repo#N`, in ASCII, its number
+without a leading zero; capitals in it do not matter.
+
 ## Switch
 
 A prompt that starts with `alq-review off` switches the plugin off for the session it was typed in, and
-`alq-review on` switches it on again, as `unlock` is typed. Another word after either on that line changes
-nothing and is answered with the two forms. The switch covers that session, its subagents and workflows
+`alq-review on` switches it on again. Anything else after `alq-review` on that line changes nothing and is
+answered with the two forms. The switch covers that session, its subagents and workflows
 included, and ends with it; no other session is affected.
 
 Off lifts every rule: the commit checks, the order of the stages, locked branches, the attestation, and the

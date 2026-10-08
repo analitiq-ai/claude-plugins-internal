@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import traceback
 from dataclasses import dataclass
@@ -26,6 +25,7 @@ import github
 from hookio import deny, log_error, mode, record, refuse, refuse_spec, session_file, session_state, set_switch, switch_state
 import ledger
 import policy
+from pre_merge_gate import PullRequest, first_line, first_words
 import settled_design
 import shimgate
 import shell
@@ -34,11 +34,8 @@ import worktree
 REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round"
 REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
 INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
-# Anchored at the prompt's start by match(): the cron bot's prompts quote issue and PR text anyone can write.
-_REF = r"(?:(?P<repo>[\w.-]+/[\w.-]+)?#(?P<pr>\d+)|(?P<branch>\S+))"
-UNLOCK = re.compile(rf"unlock\s+{_REF}")
 # Claude Code also runs the skill by its bare name, while no other command has it.
-RESCOPE = re.compile(rf"/(?:{policy.PLUGIN}:)?{policy.RESCOPE_SKILL} rescope\s+{_REF}")
+RESCOPE_SKILLS = (f"/{policy.PLUGIN}:{policy.RESCOPE_SKILL}", f"/{policy.RESCOPE_SKILL}")
 
 
 @dataclass(frozen=True)
@@ -112,10 +109,12 @@ def decide(payload: dict, target: Target, rule, **facts_for_rule) -> policy.Deci
 
 # --- the user hands a locked branch back ---------------------------------------------------------
 
-def _names(state: dict, typed: re.Match) -> bool:
-    if typed["pr"]:
-        return state["pr"] == int(typed["pr"]) and typed["repo"] in (None, state["repo"])
-    return state["branch"] == typed["branch"]
+def _names(state: dict, word: str) -> bool:
+    """Whether `word`, typed after `unlock` or the rescope, means this locked PR: its branch, `#` and its number,
+    or its name."""
+    named = PullRequest.named(word)
+    return (word in (state["branch"], f"#{state['pr']}")
+            or (named is not None and named == PullRequest.named(f"{state['repo']}#{state['pr']}")))
 
 
 def _rescope_brief(state: dict, ruling: dict) -> str:
@@ -125,7 +124,6 @@ def _rescope_brief(state: dict, ruling: dict) -> str:
             f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")
 
 
-SWITCH = re.compile(r"alq-review\s+(?P<to>on|off)\b\s*(?P<more>.*)")
 SWITCHED_OFF_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND, claimgate.CHECK, shimgate.CHECK)
 
 
@@ -134,10 +132,13 @@ def _tell(event: str, said: str, user: bool = True) -> dict:
     return {"systemMessage": f"[alq-review] {said}", **out} if user else out
 
 
-def on_switch(payload: dict, typed: re.Match, switch: str) -> dict:
-    line = typed.group(0)[:200]
-    to = typed["to"]
-    if typed["more"]:
+def on_switch(payload: dict, line: str, switch: str) -> dict:
+    """Answers a prompt whose first word is the plugin's name: `on` or `off` alone after it on that line is the
+    switch, and anything else is told the two forms."""
+    typed = first_words(line, 3)
+    to = typed[1] if len(typed) == 2 else None
+    line = line[:200]
+    if to not in ("on", "off"):
         decision = "unknown"
         said = f'"{line}" is not a switch, so nothing changed. Type alq-review off or alq-review on.'
     elif switch == to:
@@ -179,10 +180,11 @@ def launch_while_off(payload: dict) -> dict | None:
 
 
 def on_prompt(payload: dict, switch: str) -> dict | None:
-    prompt = payload.get("prompt", "").lstrip()
-    typed = SWITCH.fullmatch(prompt.splitlines()[0].rstrip()) if prompt else None
-    if typed:
-        return on_switch(payload, typed, switch)
+    """A typed command is a prompt's first words, each read whole: the cron bot's prompts quote issue and PR text
+    anyone can write, and a word read in part is judged in part."""
+    prompt = payload.get("prompt", "")
+    if first_words(prompt, 1) == [policy.PLUGIN]:
+        return on_switch(payload, first_line(prompt), switch)
     out = _on_release(payload, prompt)
     if switch == "unreadable":
         out = {**(out or {}), **_unreadable_switch(payload)}
@@ -190,35 +192,38 @@ def on_prompt(payload: dict, switch: str) -> dict | None:
 
 
 def _on_release(payload: dict, prompt: str) -> dict | None:
-    claim = claimgate.UNLOCK_CLAIM.match(prompt)
-    if claim:
-        return claimgate.on_prompt(payload, claim)
-    override = shimgate.OVERRIDE.match(prompt)
-    if override:
-        return shimgate.on_prompt(payload, override)
-    typed = UNLOCK.match(prompt) or RESCOPE.match(prompt)
-    if not typed:
-        return None
-    rescope = typed.re is RESCOPE
+    typed = first_words(prompt, 3)
+    if len(typed) >= 2 and typed[0] == "unlock":
+        return claimgate.on_prompt(payload, typed[1]) or _unlock(payload, typed[:2], rescope=False)
+    if len(typed) >= 2 and typed[0] == "override":
+        return shimgate.on_prompt(payload, typed[1])
+    if len(typed) == 3 and typed[0] in RESCOPE_SKILLS and typed[1] == "rescope":
+        return _unlock(payload, typed, rescope=True)
+    return None
+
+
+def _unlock(payload: dict, typed: list[str], rescope: bool) -> dict:
+    """Answers an unlock or a rescope: releases the one locked branch its last word names."""
+    typed_as = " ".join(typed)
     held = [state for state in ledger.all_states() if policy.locked(state)]
-    named = [state for state in held if _names(state, typed)]
+    named = [state for state in held if _names(state, typed[-1])]
 
     def refs(states):
         return ", ".join(f"{s['repo']}#{s['pr']}" for s in states)
     if len(named) == 1 and rescope and not policy.reshape_spec_ruling(named[0]):
-        said = (f"`{typed.group(0)}` releases only a RESHAPE_SPEC lock, and {refs(named)} is held for another reason, "
+        said = (f"`{typed_as}` releases only a RESHAPE_SPEC lock, and {refs(named)} is held for another reason, "
                 f"so nothing was unlocked. Its release is `unlock {policy.unlock_ref(named[0])}`.")
     elif len(named) == 1:
         brief = _rescope_brief(named[0], policy.reshape_spec_ruling(named[0])) if rescope else ""
         with ledger.open_ledger(named[0]["repo"], named[0]["pr"]) as state:
-            ledger.unlock(state, f"user prompt: {payload['prompt'].strip().splitlines()[0][:200]}", datetime.now(timezone.utc))
+            ledger.unlock(state, f"user prompt: {first_line(payload['prompt'])[:200]}", datetime.now(timezone.utc))
         said = f"The user unlocked {state['repo']}#{state['pr']} ({state['branch']}); its code may change again. {brief}".rstrip()
     elif named:
         command = policy.RESCOPE if rescope else "unlock"
         said = (f"`{command}` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
                 f"repo: `{command} <owner>/<repo>#<number>`.")
     else:
-        said = f"`{typed.group(0)}` names no locked PR, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
+        said = f"`{typed_as}` names no locked PR, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}
 
 

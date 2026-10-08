@@ -93,9 +93,12 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")"}
 API_MERGE = re.compile(r"pulls/\d+/merge")
 
 KEYWORD = "override-merge"
-# What parts a prompt's words: space, tab, line break. Written out, not `\s` or str.split(): those also take
-# characters nobody types or sees.
-BLANK = " \t\r\n"
+# What the user types is read as words, each whole. gate.py reads its commands with this script's reader, and the
+# reader is kept here because this script must answer an override when the plugin's other scripts cannot load.
+# A blank parts words: space, tab, line break. Written out, not `\s`, str.split() or str.splitlines(): those also
+# take characters nobody types or sees.
+LINE_BREAK = "\r\n"
+BLANK = " \t" + LINE_BREAK
 WORDS = re.compile(rf"[{BLANK}]+")
 NOT_A_NAME = ("`override-merge` is not followed by a PR's name, so nothing is granted. The user names the PR in one "
               "word, with its repo: `override-merge owner/repo#N`.")
@@ -248,12 +251,14 @@ def name_of(pr: dict) -> PullRequest | None:
     return PullRequest.named(f"{repo}#{number}")
 
 
-def override_word(prompt: str) -> str | None:
-    """The word after the keyword, "" when none follows; None when the prompt's first word is not the keyword."""
-    first, *after = WORDS.split(prompt.lstrip(BLANK), maxsplit=2)
-    if first != KEYWORD:
-        return None
-    return after[0] if after else ""
+def first_words(prompt: str, count: int) -> list[str]:
+    """A prompt's first `count` words, fewer when it has fewer."""
+    return [word for word in WORDS.split(prompt.lstrip(BLANK), maxsplit=count)[:count] if word]
+
+
+def first_line(prompt: str) -> str:
+    """A prompt's first line that has a word, without the blanks round it."""
+    return re.split(f"[{LINE_BREAK}]", prompt.lstrip(BLANK), maxsplit=1)[0].rstrip(BLANK)
 
 
 def _granted(held) -> set[PullRequest]:
@@ -299,10 +304,10 @@ def _logged(said: str) -> str:
 
 
 def grant(payload: dict) -> int:
-    word = override_word(payload.get("prompt") or "")
-    if word is None:
+    typed = first_words(payload.get("prompt") or "", 2)
+    if typed[:1] != [KEYWORD]:
         return 0
-    named = PullRequest.named(word)
+    named = PullRequest.named(typed[1]) if len(typed) == 2 else None
     if named is None:
         said = NOT_A_NAME
     else:
