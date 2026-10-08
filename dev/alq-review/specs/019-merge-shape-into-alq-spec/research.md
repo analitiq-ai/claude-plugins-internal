@@ -4,14 +4,18 @@ Every unknown the plan had is settled below. Paths are from the repo root. Nothi
 Spec Kit workflow yet; where a decision rests on how Spec Kit 1.0.7 behaves and that was only read, the decision
 says so and the first task proves it with a failing test (R10).
 
-## R1: The workflow gains a `premise` gate, a report check and a record step, and the rest of the workflow runs only on "write the spec"
+## R1: The workflow gains a `premise` gate, a report check and a record step, and no later step runs on a stop pick
 
 - **Decision**: `workflow.yml` starts with an `if` step that runs only for a new spec (`inputs.spec_dir` empty). Its
   `then` holds `premise` (a `gate`, `options: [write the spec, no spec needed, not worth doing]`, `on_reject: skip`,
   `verdict_input: premise_verdict`), then `premise-report` (a shell step that runs `premise_report.py check`), then
-  `record-outcome` (a shell step that runs `premise_report.py record`, doing nothing for "write the spec"). A second `if` step,
-  `proceed`, holds today's steps and runs when `inputs.spec_dir` is set or the choice is "write the spec". The two other
-  picks therefore end the run `completed` with no spec folder, after the location comment is posted.
+  `record-outcome` (a shell step that runs `premise_report.py record`, doing nothing for "write the spec"). Every later step stays
+  top-level, inside an `if` of its own. From `grill` on, and for `scope`, that `if` runs when `inputs.spec_dir` is set or
+  the choice is "write the spec", one condition shared through a YAML anchor; `scope` then runs `select-spec` on a
+  re-scope and `specify` otherwise, and `root-cause` runs only when the choice is "write the spec". The two other picks therefore end the run `completed` with no spec
+  folder, after the location comment is posted. One `if` holding all of today's steps does not fit: a resume re-runs
+  the top-level step the run stopped in with everything nested in it, so resuming past grill would run `specify`
+  again and overwrite the spec. `test_drive_workflow.py` pins this (the spec edited after grill is the one graded).
 - **Rationale**: FR-001 and FR-003 want a pause before `specify` with three named outcomes, and FR-011 wants the checks to be
   steps. `on_reject: skip` is the only setting that lets a gate with three non-reject options finish, because `abort` and
   `retry` need a `reject` option. A re-scope must skip the step (spec edge case), and the `if` on `spec_dir` is the way
@@ -88,9 +92,10 @@ says so and the first task proves it with a failing test (R10).
   when `spec.md` has no `## Root cause` heading, the first non-blank line under it neither starts `Observed:` nor
   is `Not a defect report.`, or it is `Not a defect report.` while the report says `Reports wrong behaviour: yes`. The
   report's flag is the one answer to "is this a defect"; the section does not get a second say. The workflow runs the
-  script in the `proceed` branch as `root-cause`, directly after `specify`, and as `root-cause-after-grill`, after
+  script as `root-cause`, directly after `specify`, and as `root-cause-after-grill`, after
   `no-open-markers`, because the user may edit the section in grill. Both steps call the one script. On a re-scope there
-  is no report and no `specify`: the first step is skipped and the second runs without the report argument. The constant `Not a defect report.` is defined here and the
+  is no report and no `specify`: the first step is skipped and the second runs as `root-cause-of-rescope`, without the
+  report argument. The constant `Not a defect report.` is defined here and the
   template (R4) names the same sentence.
 - **Rationale**: FR-021 asks for exactly this check: the section is there and labelled, not that the trace is
   right. `alq-root-cause-check` already looks for the `## Root cause` heading and an `Observed:` line, and

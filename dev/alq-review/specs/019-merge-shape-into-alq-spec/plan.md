@@ -81,7 +81,7 @@ plugins/alq-review/
 │   ├── rootcause.py               # new: check <spec folder> [<premise report>]
 │   └── speclocation.py            # third form: NotWorthDoing; located refuses it; not-worth-doing and status commands
 ├── speckit/
-│   ├── workflows/design-doc/workflow.yml          # premise stage, checks, proceed stage
+│   ├── workflows/design-doc/workflow.yml          # premise stage, checks, later steps skip on a stop pick
 │   └── presets/settled-design/                    # spec-template + speckit.specify appends, version 1.1.0
 ├── skills/
 │   ├── alq-shape/                 # deleted
@@ -115,7 +115,7 @@ different readers (R2, R5); the location comment stays in its one module (R6); t
 
 ## Mechanisms
 
-- The workflow's premise gate, report check, outcome record and `proceed` branch: R1
+- The workflow's premise gate, report check, outcome record and the skip of every later step: R1
 - The premise report's form, its check, and the stop outcomes: R2
 - Where the report lives and how `specify` finds it: R3
 - The spec template's premise and root cause sections: R4

@@ -4,7 +4,7 @@ preset:
   id: "settled-design"
   name: "Settled Design"
   version: "1.1.0"
-  description: "spec.md carries the premise answers and a labelled root cause (checked by alq-review's rootcause.py); plan.md lists its mechanisms, each citing a research.md decision that names the existing tools looked at (checked by alq-review's settled_design.py)."
+  description: "spec.md has a section for the premise answers and one for the root cause (alq-review's rootcause.py checks that the root cause section is there and labelled); plan.md lists its mechanisms, each citing a research.md decision that has an Existing tools field (checked by alq-review's settled_design.py)."
   author: "Analitiq"
   repository: "https://github.com/analitiq-ai/claude-plugins-internal"
   license: "Proprietary"

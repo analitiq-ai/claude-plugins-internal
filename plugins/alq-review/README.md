@@ -201,6 +201,8 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
 | `scripts/speclocation.py` | reads and writes the issue's location comment, and resolves it to the spec folder |
 | `scripts/settled_design.py` | the settled-design check over one spec folder or a branch |
+| `scripts/premise_report.py` | the form of the premise report, its check, and the location comment a stop pick leaves |
+| `scripts/rootcause.py` | the check that a spec's `## Root cause` section is there and labelled |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |
 | `scripts/claimgate.py` | the claim check's hook handlers |
@@ -211,7 +213,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
-| `skills/` | `alq-shape`, `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
+| `skills/` | `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
 | `speckit/` | the settled-design preset and design-doc workflow, installed into the project by each `design-doc` start |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |

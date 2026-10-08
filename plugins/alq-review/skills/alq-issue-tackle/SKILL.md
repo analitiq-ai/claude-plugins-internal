@@ -16,6 +16,7 @@ A location that changed since the last run must win. There are three outcomes:
 - It prints `spec: none` and a reason: the user decided the issue needs no spec. Work from the issue itself.
 - It exits non-zero: show the user its message and stop. Write no code. With no location comment,
   the next step is `/alq-review:design-doc #<n>`, which creates the spec folder and posts the comment.
+  An issue that was judged not worth doing is refused here too, and the message says so.
 
 ## Step 2 - worktree and spec
 
@@ -33,19 +34,14 @@ Do not start implementing before the spec exists. Each internal review round gra
 against the spec the gate reads from the spec folder the location comment names; code written
 before there is one has nothing to be graded against.
 
-A decision tagged `(code)` was true of the default branch when the spec was written, which
-may have been weeks ago. Re-check the module it names before relying on it; a stale (code)
-decision is the one failure this flow invites.
-
 ## Step 3 - implement
 
 - Implement against the spec's Acceptance section. That section is the definition of done.
 - Ask any clarification questions you may have.
-- Implement at the spec's **Root cause**, not at the site the issue reported. The trace was
-  done at shaping time; re-deriving it here is how a symptom patch gets written by a fresh
-  reader of the issue title.
+- Implement at the spec's **Root cause**, not at the site the issue reported. Working from
+  the issue title instead of that section is how a symptom patch gets written.
 - If the code contradicts the Root cause section - the trace was right weeks ago and the
-  module has moved since - stop and say so. Re-shaping is cheap; a spec nobody can satisfy
+  module has moved since - stop and say so. Re-scoping is cheap; a spec nobody can satisfy
   gets silently ignored instead of corrected.
 - Read the section's **Observed:** line first. If it says the trace is a hypothesis, or marks
   the affected callers as predicted rather than verified, confirm the mechanism yourself

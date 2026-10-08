@@ -47,7 +47,7 @@ def problems(spec: str, report: str | None) -> list[str]:
     if not opening.startswith(OBSERVED):
         return [f"`{HEADING}` does not open with an `{OBSERVED}` line. Next step: open it with `{OBSERVED}` and "
                 f"what was seen, or that the trace is a hypothesis; for an issue that reports no defect, with "
-                f"`{NOT_A_DEFECT}`"]
+                f"`{NOT_A_DEFECT}`."]
     return []
 
 

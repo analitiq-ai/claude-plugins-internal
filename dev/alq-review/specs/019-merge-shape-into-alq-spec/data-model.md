@@ -44,6 +44,9 @@ The `## Why this is worth doing` section: the six answers, each followed by its 
 | `premise` (gate) | `inputs.spec_dir` empty | `choice` |
 | `premise-report` (shell) | with `premise` | exit code |
 | `record-outcome` (shell) | with `premise` | posts the comment for the two stop picks |
-| `proceed` (if) | `inputs.spec_dir` set, or choice is `write the spec` | branches to the existing steps |
-| `root-cause` (shell) | inside `proceed`, after `specify` only | exit code |
-| `root-cause-after-grill` (shell) | inside `proceed`, after `no-open-markers` | exit code; the same script |
+| `select-spec` (shell) | `inputs.spec_dir` set | as before |
+| `specify` (command) | choice is `write the spec` | as before |
+| `grill` to `tasks`, each top-level in an `if` of its own | `inputs.spec_dir` set, or choice is `write the spec` | as before |
+| `root-cause` (shell) | choice is `write the spec`, after `specify` | exit code |
+| `root-cause-after-grill` (shell) | new spec, after `no-open-markers` | exit code; the same script, with the report |
+| `root-cause-of-rescope` (shell) | re-scope, after `no-open-markers` | exit code; the same script, no report |

@@ -34,8 +34,7 @@ It prints the spec folder and its branch, or `spec: none` and a reason. Read `<f
 Stop and say so, with no verdict, when the section reads `Not a defect report.` Report
 **CANNOT TELL** and name what is missing when: `show` exits non-zero (with no location comment,
 name `/alq-review:design-doc #<n>` as the next step), it prints `spec: none`, or spec.md has no
-`## Root cause` section. A spec written by /alq-review:design-doc has no Root cause section yet,
-so this check returns CANNOT TELL for it. Never invent the cause yourself and grade
+`## Root cause` section. Never invent the cause yourself and grade
 against that; a cause you derived from the diff will always agree with the diff.
 
 ## Step 2 - read the Root cause, and check how much of it was measured
@@ -103,7 +102,7 @@ one nobody else in the pipeline is looking for.
 ## The rule that keeps this honest
 
 When the diff and the spec disagree, there are exactly two legitimate resolutions: **move the fix
-to the cause**, or **redo the trace and re-shape the issue**. Editing the Root cause section to
+to the cause**, or **redo the trace and re-scope the issue**. Editing the Root cause section to
 describe wherever the diff happens to be is neither. It is the cheapest way past this check and it
 turns the spec into a transcript of what was done, which is worth nothing to the next reader.
 
