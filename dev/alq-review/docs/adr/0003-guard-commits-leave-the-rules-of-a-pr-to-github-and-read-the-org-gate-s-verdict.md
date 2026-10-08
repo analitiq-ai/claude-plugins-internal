@@ -45,9 +45,12 @@ The plugin's hook could repeat GitHub's rules. The docstring of
 `plugins/alq-review/scripts/pre_merge_gate.py` says what that costs: a local second copy "drifts from
 the server's and starts disagreeing with it".
 
-The plugin also has to learn what the org gate decided. Matching a run by name is a risk: another
-check may carry the same name. A comment in `plugins/alq-review/scripts/github.py` adds that an
-agent's token could post the same text.
+One kind of PR is merged with no internal review: a version-only release, which only moves its package's
+own version up. The org gate rules which PRs are one, and says so in the title of its `internal-review`
+check run. The hook reads that title.
+
+Matching a run by name is a risk: another check may carry the same name. A comment in
+`plugins/alq-review/scripts/github.py` adds that an agent's token could post the same text.
 
 Why now: these reasons sit in a docstring and a code comment. No ADR binds the next gate.
 
@@ -60,8 +63,10 @@ Why now: these reasons sit in a docstring and a code comment. No ADR binds the n
    - It repeats none of GitHub's rules: CI, review threads and approvals. It only refuses a command that
      steps around them.
    - Where a session runs makes no difference to any of this.
-2. We will read the org gate's verdict from a check run, matched by the run's name and the App that
-   posted it, never by the name alone.
+2. We will name in this ADR every kind of PR that needs no internal review. Today there is one: a
+   version-only release. For any other PR that should go without the plugin, the user switches it off.
+3. We will take a check run as the org gate's verdict only when its App posted it. A run with the right
+   name from anyone else counts for nothing. The exception of point 2 rests on such a verdict.
 
 ## Options considered
 
@@ -71,6 +76,7 @@ Why now: these reasons sit in a docstring and a code comment. No ADR binds the n
 |---|---|
 | Refuses a merge on CI, review threads or approvals | No, GitHub does |
 | Depends on where the session runs | No |
+| PRs that need no internal review | Named in this ADR, one today |
 | A run with the same name from another App | Not trusted |
 | Repos without branch protection | Nothing enforces CI, threads or approvals |
 
@@ -83,12 +89,18 @@ No ADR binds the next gate, so nothing stops it from copying one of GitHub's rul
 Rejected in the hook's docstring: the two copies disagree, and the disagreement "gets resolved in
 favour of whichever copy was easier to edit".
 
+### Option D: No exception, and the switch for a version-only release
+
+Not chosen: the exception works today, and the org gate already rules which PRs are version-only.
+
 ## Trade-offs
 
 - The hook's docstring names a gap: a private repo that cannot enable branch protection has nothing
   that enforces CI, threads or approvals.
 - Reading the verdict depends on strings that copy another repo's file: the App's name, the run's
   name and a title prefix.
+- A new kind of PR that needs no internal review needs a change to this ADR. Until then the user has the
+  switch, which is all or nothing for a session: off lifts the commit checks too.
 
 ## Consequences
 
@@ -98,7 +110,7 @@ favour of whichever copy was easier to edit".
   protection.
 - **How we would know this was wrong:** a merge goes through with unmet requirements on a repo
   without branch protection, and it costs a broken main. Or the org gate changes its run name or App
-  and the plugin reads no verdict where there is one.
+  and the plugin reads no verdict where there is one. Or the list of point 2 grows past a few kinds.
 - Revisit if: branch protection becomes available on every repo the plugin serves, or the org gate
   publishes its verdict in a form that needs no name matching.
 
