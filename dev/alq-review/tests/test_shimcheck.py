@@ -244,7 +244,7 @@ class Carried(unittest.TestCase):
         subprocess.run(["git", "init", "-q", self.root], check=True)
 
     def carry(self, bugs, new, file="src/load.py"):
-        return shimcheck.carried(bugs, {file: self.old}, {file: new}, self.hunks_for(self.old, new) if new else None)
+        return shimcheck.carried(bugs, {file: self.old}, {file: new}, self.hunks_for(self.old, new))
 
     def test_lines_added_above_a_bug_move_it_down(self):
         new = "top\ntop2\n" + self.old
@@ -262,8 +262,7 @@ class Carried(unittest.TestCase):
         self.assertEqual((gone["state"], gone["ranges"]), ("ended", []))
 
     def test_a_file_that_is_no_longer_there_takes_its_ranges(self):
-        [gone] = shimcheck.carried([bug(ranges=[hunk(old=(10, 2))])], {"src/load.py": self.old}, {"src/load.py": None},
-                                   None)
+        [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], "")
         self.assertEqual(gone["state"], "ended")
 
     def test_a_range_in_another_file_is_kept_when_one_range_is_dropped(self):

@@ -143,7 +143,7 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
         for lid in owners:
             if lid != winner:
                 survivor[lid] = winner
-                found[lid].update(state="ended", ended={"by": "merged", "ref": ref, "into": winner})
+                claimcheck.end(found[lid], "merged", ref, winner)
         inherited[claim["id"]] = [winner]
     for lid in survivor:
         found[lid]["ended"]["into"] = live(lid)
@@ -157,7 +157,7 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
                   if span and not any(overlaps(span, spans[c["id"]]) for c in claims)]
         item["places"] = sorted(read + unread, key=lambda p: p["start"])
         if not item["places"]:
-            item.update(state="ended", ended={"by": "deleted", "ref": ref, "into": None})
+            claimcheck.end(item, "deleted", ref)
     return list(found.values()), inherited
 
 

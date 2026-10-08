@@ -269,7 +269,7 @@ def settled_chains(chains: list[dict], check: dict) -> list[dict]:
     return [*gone, *(c for c, before in zip(counted, updated) if gone or c is not before)]
 
 
-def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str | None], hunks_of) -> list[dict]:
+def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], hunks_of) -> list[dict]:
     """`bugs` with each range moved from the text of its file in `olds` to the text in `news` (R9): the same mapping
     `lineage.carry` gives a claim's words, the lines turned to a span and back. A range with no place in the new text is
     dropped, and a bug with none left is `ended`. An overridden bug whose lines a change reached goes back to the state
@@ -279,9 +279,6 @@ def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str | None],
         ranges, reached = [], False
         for r in bug["ranges"]:
             old, new = olds[r["file"]], news[r["file"]]
-            if new is None:
-                reached = True
-                continue
             if new == old:
                 ranges.append(r)
                 continue

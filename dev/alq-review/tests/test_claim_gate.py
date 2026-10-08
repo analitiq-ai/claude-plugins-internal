@@ -520,6 +520,15 @@ class ClaimLineages(ClaimGate):
         self.assertEqual(self.counts(), [2])
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
+    def test_an_upheld_contest_that_finds_the_claim_correct_ends_the_lineage(self):  # C17, FR-008
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.contest(V[1], "CORRECT")
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "correct"))
+        self.wrong(V[2])
+        self.assertEqual(self.counts(), [1])
+
     def test_reshaping_text_that_shares_a_hunk_keeps_each_claim_its_own_lineage(self):  # C10
         self.stage("validator.py", VALIDATOR)
         lines = [f"The validator rejects {word} lists." for word in ("empty", "short", "long")]
@@ -620,6 +629,33 @@ class ClaimReshaping(ClaimGate):
         self.ruling({"README.md": [(1, halves[0], "UNSURE"), (2, halves[1], "UNSURE")]})
         [found] = self.lineages()
         self.assertEqual((claimcheck.count(found), len(found["places"])), (2, 2))
+
+    def halves_ruled(self, first, second):
+        """Two wrong rewordings of one sentence, then its halves ruled `first` and `second`."""
+        self.stage("validator.py", VALIDATOR)
+        for verb in ("rejects", "refuses"):
+            long = f"The validator {verb} an empty list and it logs the reason."
+            self.stage("README.md", long + "\n")
+            self.ruling({"README.md": [(1, long, "WRONG")]})
+        halves = ("The validator refuses an empty list.", "It logs the reason.")
+        self.stage("README.md", "\n".join(halves) + "\n")
+        self.ruling({"README.md": [(1, halves[0], first), (2, halves[1], second)]})
+
+    def test_a_split_whose_first_half_is_correct_and_second_wrong_still_counts(self):  # C4, FR-003
+        self.halves_ruled("CORRECT", "WRONG")
+        self.assertEqual(self.counts(), [3])
+
+    def test_a_split_whose_first_half_is_wrong_and_second_correct_still_counts(self):  # C4, FR-003
+        self.halves_ruled("WRONG", "CORRECT")
+        self.assertEqual(self.counts(), [3])
+
+    def test_a_file_the_tree_lacks_ends_its_lineages(self):  # C6, FR-010
+        self.commit("README.md", "Placeholder.\n", "docs: readme")
+        self.at_two("Other text.")
+        git(self.root, "rm", "-q", "-f", "README.md")
+        self.check_launch()
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
 
     def test_two_lineages_merged_into_one_sentence_continue_as_the_higher(self):  # C5
         self.stage("validator.py", VALIDATOR)

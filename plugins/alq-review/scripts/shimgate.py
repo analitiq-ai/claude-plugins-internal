@@ -50,23 +50,23 @@ def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dic
         if seen is None:
             raise RuntimeError(f"a bug of {branch} has a range in {file} and no saved text to carry it from")
         olds[file] = seen["text"]
-    news = {file: worktree.tree_text(root, head, file) for file in olds}
+    news = {file: _head_text(root, head, file) for file in olds}
     return shimcheck.carried(bugs, olds, news, lambda file: worktree.text_hunks(root, olds[file], news[file]))
 
 
+def _head_text(root: str, head: str, file: str) -> str:
+    """The file as `head` has it, empty when `head` has not got it yet: a bug in a file only the staged change holds is
+    measured against nothing, so the next check finds it where this one left it."""
+    return worktree.tree_text(root, head, file) or ""
+
+
 def _persist(shims: ledger.Shims, root: str, branch: str, head: str, bugs: list[dict], ref: str) -> None:
-    """Saves every bug of the branch as carried or settled, and the text of `head` their ranges are in. A file `head`
-    does not have gives a range nothing to be carried from later, so the range is dropped."""
-    texts = {r["file"]: worktree.tree_text(root, head, r["file"]) for b in bugs if shimcheck.tracked(b)
-             for r in b["ranges"]}
+    """Saves every bug of the branch as carried or settled, and the text of `head` their ranges are in."""
+    texts = {r["file"]: _head_text(root, head, r["file"]) for b in bugs if shimcheck.tracked(b) for r in b["ranges"]}
     for bug in bugs:
-        if shimcheck.tracked(bug):
-            kept = [r for r in bug["ranges"] if texts[r["file"]] is not None]
-            bug = dict(bug, ranges=kept, state=bug["state"] if kept else "ended")
         shims.save_bug(bug)
     for file, text in texts.items():
-        if text is not None:
-            shims.save_seen(branch, "shim", file, {"text": text, "ref": ref})
+        shims.save_seen(branch, "shim", file, {"text": text, "ref": ref})
 
 
 def on_commit(payload: dict, action: Action) -> dict | None:
@@ -531,7 +531,7 @@ def on_prompt(payload: dict, word: str) -> dict | None:
     if overridden:
         record(payload, "shim-override", "overridden", f"{word}: {', '.join(overridden)}")
         said = (f"The user switched the shim check off for bug {word} in {', '.join(overridden)}: staged changes "
-                "of that bug commit without the check until HEAD moves.")
+                "of that bug commit without the check until a commit changes that bug's code.")
     else:
         said = f"`override {word}` names no bug the shim check knows, so nothing was switched off."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}

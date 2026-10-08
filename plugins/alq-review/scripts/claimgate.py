@@ -55,7 +55,8 @@ def _files(hunks: list[dict]) -> list[str]:
 def _carried(claims: ledger.Claims, root: str, tree: str, branch: str, file: str, read: list[dict], ref: str):
     """(open lineages of `file` before, after, {claim id: [lineage id]}, the file's text) once the lineages are carried
     from the text a completed check last saw to the text in `tree`, `read` being the claims found in it; None when
-    `tree` does not have the file, so its lineages are left alone. Saves nothing."""
+    `tree` does not have the file. The callers ask only for files the change touched, so that file was deleted and its
+    words are gone. Saves nothing."""
     text = worktree.tree_text(root, tree, file)
     if text is None:
         return None
@@ -90,22 +91,18 @@ def _mint(claim: dict, ref: str, text: str) -> dict:
     return found
 
 
-def _correct(found: dict, claim_id: str, ref: str) -> None:
-    """A CORRECT ruling takes its words out of the lineage; with none left the lineage ends."""
-    found["places"] = [place for place in found["places"] if place["claim"] != claim_id]
-    if not found["places"]:
-        found.update(state="ended", ended={"by": "correct", "ref": ref, "into": None})
-
-
 def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
     """A check that just completed moves each file's lineages to the text it checked, enters its rulings in their
     chains once, starts a lineage for each WRONG claim that continues none, and keeps that text to carry from next."""
     branch, ref = check["branch"], check["ref"]
     lineages = {}
-    for file in _files(check["hunks"]):
+    for file in sorted({*_files(check["hunks"]), *worktree.deleted_files(check["root"], check["base"], check["tree"])}):
         read = sorted((c for c in check["claims"].values() if c["file"] == file), key=lambda c: (c["line"], c["id"]))
         carried = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
         if carried is None:
+            for item in claims.open_lineages(branch, file):
+                claimcheck.end(item, "deleted", ref)
+                claims.save_lineage(branch, item)
             continue
         before, after, inherited, text = carried
         claimcheck.keep_holds(before, after)
@@ -122,8 +119,6 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
                 continue
             inherited[claim["id"]] = [found["id"]]
             claimcheck.enter(found, ref, claim, verdict)
-            if verdict["verdict"] == "CORRECT":
-                _correct(found, claim["id"], ref)
         for item in after:
             claims.save_lineage(branch, item)
         if any(item["state"] == "open" for item in after):

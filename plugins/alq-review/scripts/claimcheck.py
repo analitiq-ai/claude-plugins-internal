@@ -227,14 +227,21 @@ def new_lineage(claim: dict, ref: str) -> dict:
             "chain": [], "released": None}
 
 
+def end(lineage: dict, by: str, ref: str, into: str | None = None) -> None:
+    """Close a lineage, keeping it on record: `by` is `correct`, `deleted` or `merged` (into the lineage `into`)."""
+    lineage.update(state="ended", ended={"by": by, "ref": ref, "into": into})
+
+
 def _broken(verdict: dict) -> dict:
     return next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
 
 
 def enter(lineage: dict, ref: str, claim: dict, verdict: dict) -> None:
-    """Add a ruling to the chain, once per `ref`: the same check ruled again, or its completion step run again,
-    adds nothing. A WRONG ruling on words the user released is entered as released, so it counts nothing."""
-    if any(item["ref"] == ref for item in lineage["chain"]):
+    """Add a ruling to the chain, once per `ref` and claim: the same check ruled again, or its completion step run
+    again, adds nothing, while the halves of a split claim each enter theirs. A WRONG ruling on words the user released
+    is entered as released, so it counts nothing. A CORRECT ruling takes its words out of the lineage, and with none
+    left the lineage ends."""
+    if any(item["ref"] == ref and item["claim"] == claim["id"] for item in lineage["chain"]):
         return
     wrong = verdict["verdict"] == "WRONG"
     released = lineage["released"]
@@ -243,6 +250,10 @@ def enter(lineage: dict, ref: str, claim: dict, verdict: dict) -> None:
     if wrong:
         item.update(failing_case=verdict["failing_case"], evidence=_broken(verdict)["evidence"])
     lineage["chain"].append(item)
+    if verdict["verdict"] == "CORRECT":
+        lineage["places"] = [place for place in lineage["places"] if place["claim"] != claim["id"]]
+        if not lineage["places"]:
+            end(lineage, "correct", ref)
 
 
 def count(lineage: dict) -> int:
@@ -371,7 +382,8 @@ def fetch_allowed(url: str, hosts: list[str]) -> bool:
 
 def contest_outcome(check: dict, lineage: dict, cid: str, verdict: dict) -> str:
     """A fresh judge's ruling on a contested claim replaces its verdict and enters the claim's chain under a ref of
-    its own: a rejected contest is one more WRONG, an upheld one lowers nothing (only the user's release does)."""
+    its own: a rejected contest is one more WRONG, an upheld one lowers nothing (only the user's release does) and, when it
+    finds the claim CORRECT, ends the lineage like any CORRECT ruling."""
     check["verdicts"][cid] = verdict
     prefix = f"{check['ref']}/contest-"
     nth = 1 + sum(1 for item in lineage["chain"] if item["claim"] == cid and item["ref"].startswith(prefix))

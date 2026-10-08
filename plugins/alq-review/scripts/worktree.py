@@ -246,6 +246,12 @@ def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
              "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
 
 
+def deleted_files(root: str, base: str, tree: str) -> list[str]:
+    """The files tree `base` has and tree `tree` has not. A rename is a deleted path and a new one: a moved file starts
+    again (ADR-0013), and a deleted file has no hunk to say so."""
+    return git(root, "diff", "--no-renames", "--diff-filter=D", "--name-only", base, tree).splitlines()
+
+
 def text_hunks(root: str, old: str, new: str) -> list[Hunk]:
     """The hunks that turn text `old` into text `new`, as git diffs them. Both are written as blobs first, so the
     answer never depends on which objects the repository kept."""

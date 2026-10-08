@@ -826,6 +826,26 @@ class ShimChain(ShimGate):
         [chain] = self.chains()
         self.assertEqual(chain["count"], 2)
 
+    def test_a_file_head_lacks_patched_twice_is_one_bug_at_count_2(self):  # B1, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        for mark in ("first", "second"):
+            self.labelled({"n.py": (f"def load():\n    return '{mark}'\n", "CODE")})
+            _, args = self.shim_launch()
+            self.sweep(args, [])
+        [chain] = self.chains()
+        self.assertEqual((chain["count"], chain["state"]), (2, "open"))
+
+    def test_a_bug_in_a_file_head_then_gains_is_still_tracked(self):  # B1, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        text = "def load():\n    return 'first'\n"
+        self.labelled({"n.py": (text, "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        git(self.root, "rm", "-q", "-f", "--cached", "n.py")
+        self.commit("n.py", text, "feat: n")
+        self.checked(lines_changed(4))
+        self.assertEqual(sorted(c["count"] for c in self.chains() if c["state"] != "ended"), [1])
+
     def test_one_patch_reaching_two_bugs_makes_them_one_at_the_higher_count_and_counts_once(self):
         self.checked(lines_changed(4))
         Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
