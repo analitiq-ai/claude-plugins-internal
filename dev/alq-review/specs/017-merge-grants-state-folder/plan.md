@@ -11,9 +11,10 @@ A session's merge override grants move from a folder of their own into the state
 guard and under the setting that moves the state folder, with no new rule. The merge gate's own copy of the
 helper and of the session-id rule are deleted.
 
-Four things change in what is typed and answered, by the user's answers to the
+Five things change in what is typed and answered. The first four are by the user's answers to the
 [first](critiques/critique-20261007-merge-grants.md) and
-[second](critiques/critique-20261007-merge-grants-2.md) critique:
+[second](critiques/critique-20261007-merge-grants-2.md) critique; the fifth is from review of the PR and an
+audit of the branch (2026-10-08):
 
 - An override names its PR, `override-merge owner/repo#N`, and a grant lets through that PR only.
   `override-merge #N` grants nothing and is answered with what to type.
@@ -23,13 +24,18 @@ Four things change in what is typed and answered, by the user's answers to the
 - An override that cannot be recorded, and grants that cannot be used by a merge that needs one, are answered
   with the reason and, where the gate knows one, the step. A refusal that offers an override gives the line in
   full, or says why none applies.
+- Every command the user types to the plugin is read one way, by one reader: a prompt's first words, parted
+  by a space, a tab or a line break, each read whole, and a PR's name read whole wherever it is typed. The
+  override's keyword is always answered.
 
-One script changes, with its tests and two README lines. `hookio.py`, `gate.py` and `hooks.json` are not edited.
+Four scripts change, with their tests and the README: `pre_merge_gate.py`, and `gate.py`, `claimgate.py` and
+`shimgate.py` where they read what the user types. `hookio.py` and `hooks.json` are not edited.
 
 The change was run on a scratch copy of the plugin three times: as first planned, after the first critique,
 and after the second. Every "Measured" line in [research.md](research.md) says which. The first run found a
 class of cases where FR-011's words cannot be given (R5, issue #49); FR-011 and the spec's Edge Cases are
-worded to match. The third run was the author's alone; no reviewer has run it.
+worded to match. The third run was the author's alone; no reviewer has run it. Since the PR opened the tests
+are in the repo, and what they showed is in R7.
 
 Decisions are in [research.md](research.md), the record and the PR name in [data-model.md](data-model.md), the
 answers, the table of which commands ask for a grant and the test list in
@@ -61,10 +67,7 @@ contract's last table is the test list, in three kinds.
 Where a red run on a wrong version is shown: the commit that adds the test names the wrong version in one
 line and carries the failing output. The wrong versions themselves are not committed.
 
-Run on 2026-10-08 as the tests of `tests/test_pre_merge_gate.py`, by the author. On main's script: 58 tests,
-22 pass (the 15 left alone and the 7 guards) and 36 do not (every new and kept test of the override). On the
-new script: all 58 pass, and the whole suite's 744. Each of 26 wrong versions fails the tests that name it
-(R7); the commits that add the tests carry the output
+What was run, on which script, and what it showed is in R7, and nowhere else in this folder
 
 **Target Platform**: any machine running Claude Code with the plugin enabled
 
@@ -84,7 +87,8 @@ override is lost on upgrade, the override is now typed with the repo, and the ol
 hand
 
 **Scale/Scope**: one record per session that types an override or runs a merge that needs one.
-`pre_merge_gate.py`, `test_pre_merge_gate.py` and the README change
+`pre_merge_gate.py`, `gate.py`, `claimgate.py`, `shimgate.py`, their four test files, `test_switch.py` and the
+README change
 
 ## Constitution Check
 
@@ -92,20 +96,20 @@ hand
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | No shape from the contracts map is added. The grant record's form is defined once, in `pre_merge_gate.py`, its only reader and writer (R2). The PR's name is built by one function for what is typed and for what GitHub answers, and is GitHub's own form (R8). Pass. |
+| I. Contract-first | No shape from the contracts map is added. The grant record's form is defined once, in `pre_merge_gate.py`, its only reader and writer (R2). The PR's name has one reader, for what is typed, for what GitHub answers and for what the record holds, and is GitHub's own form (R8). A typed command's words have one reader, for every command of the plugin (R9). Pass. |
 | II. Ownership & trust boundaries | All in alq-review, this repo. The session id is checked where the path is built, by the one rule left (R3). The record is checked each time it is read, and what a foreign record holds is not passed on to the user or the agent (R2). The repo a grant is compared with comes from GitHub's answer, not from the command (R8). Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | The cause is fixed: the grants move, and nothing is guarded twice. No migration, no reading of the old folder (R1). The old typed form grants nothing; it is matched only to tell the user what to type (R8). Failures are answered and logged, not swallowed (R4, R5). One guard lets any failure pass: the one round the step that writes a failure to `errors.log`, and what passes there is the failure to log, with the first failure already in the answer (R4). The cases where the layer cannot give FR-011's words are named with the real fix, issue #49 (R5). Pass. |
 | IV. Test-first | A new row starts as a test that fails on main. A guard row cannot fail on main; it starts by failing on the wrong version the contract names, and so does a new row that main fails only for not taking the new form. The commit carries that red run (Technical Context, R7). Pass. |
-| V. Smallest complete change | One script, its tests, two README lines. The script's copy of the helper and of the session-id rule go. Two smaller copies stay, for one reason: this script must answer when the plugin's other scripts cannot load, so it keeps its own `deny` and builds its own answer to a prompt (R4). The repo's spelling is written here as `ledger.ROUND_REF` has it, for the same reason (R8). No migration, no `gate.log` line for an override (issue #51), no new module, no way to withdraw a grant. Pass. |
-| VI. Governing rule ships apart | No rule file, lint, guard or schema check changes: the write guard is used as it is (R6). Decision record 0002 is updated in PR #31, not here. The README describes the plugin and changes with it. The test that reads the plugin's files is a test of this change, written red first, as `Marker` is (R7). Pass. |
+| V. Smallest complete change | Four scripts where they read what the user types, their tests, the README. The script's copy of the helper and of the session-id rule go, and so do six patterns that each read a typed command their own way (R9). Two smaller copies stay, for one reason: this script must answer when the plugin's other scripts cannot load, so it keeps its own `deny` and builds its own answer to a prompt (R4). The reader of typed commands is kept in this script for the same reason, and `gate.py` loads it from here (R9). No migration, no `gate.log` line for an override (issue #51), no new module, no way to withdraw a grant. Pass. |
+| VI. Governing rule ships apart | No rule file, lint or schema check changes, and the write guard is used as it is (R6). `gate.py` changes only in how it reads what the user types (R9); what it refuses, and when, does not. Decision record 0002 is updated in PR #31, not here. The README describes the plugin and changes with it. The test that reads the plugin's files is a test of this change, written red first, as `Marker` is (R7). Pass. |
 | P1. Code decides | The grant is read by the hook. A refusal says what the merge lacks. Where it offers an override it gives the line in full, and the line works as given; where no override applies it says why (R8). A damaged record's answer names it and the repair (R2). An id that is not a plain name is told no override can be kept in that session and what can be done (R3). One kind of answer names no step: an override that could not be recorded because of the folder or the plugin's own scripts carries the system's error and the path, since the gate knows no step there (contract). Pass, with that stated. |
 | P2. Only an approved entity releases a hold | The hold is the merge gate's. The approver is the user; the action is `override-merge owner/repo#N` at the start of a prompt, and it releases that PR only. This plan removes two other ways out: an agent's file edit to the grant, with the plugin on and enforcing, and a grant being spent on another repo's PR of the same number. Three it does not add remain; see Complexity Tracking. Justified deviation. |
-| P3. Rules are pure | The record's check and the PR's name are pure functions, and the two changes to the grants are pure functions of the names held. Locking, reading and writing stay in the helper. `unmet` is not pure: it holds today's checks in today's order, and one of them asks GitHub about a release, as `gated` does today (R5). Pass. |
+| P3. Rules are pure | The record's check, the reader of a PR's name and the reader of a prompt's words are pure functions, and the two changes to the grants are pure functions of the names held. Locking, reading and writing stay in the helper. `unmet` is not pure: it holds today's checks in today's order, and one of them asks GitHub about a release, as `gated` does today (R5). Pass. |
 | P4. A check that could not run is its own outcome | Grants that cannot be used are their own outcome: said beside the refusal, logged, the record left as found, and never a grant. A merge that needs no grant does not run the check (R5). A PR that cannot be named is told so, not treated as holding no grant (R8). Pass. |
 | P5. Settled design | Every mechanism below cites a decision with its existing tools. Nothing is left to measure for this feature; what nobody ran is listed in R4 and R7, and the hook's time limit is issue #52. Pass. |
 
 Re-check after Phase 1, after the first critique, and after the second: P1, P2, P3 and III were reworded to say
-what is true; no row changed its answer.
+what is true; no row changed its answer. After review round 3 and the audit: I, V, VI and P3, the same.
 
 ## Project Structure
 
@@ -128,11 +132,18 @@ specs/017-merge-grants-state-folder/
 
 ```text
 plugins/alq-review/
-├── scripts/pre_merge_gate.py     # grants through hookio.session_state, by PR name, asked for last; the answers; no copy of the helper or the id rule
-└── README.md                     # State lists the record; the Layout row gives the override as typed
+├── scripts/pre_merge_gate.py     # grants through hookio.session_state, by PR name, asked for last; the answers; the reader of typed words and of a PR's name
+├── scripts/gate.py               # unlock, the rescope and the switch read with that reader
+├── scripts/claimgate.py          # `unlock claim-<id>` takes the typed word
+├── scripts/shimgate.py           # `override shim-<id>` takes the typed word
+└── README.md                     # State lists the record; the Layout row gives the override as typed; how a typed command is read
 
 dev/alq-review/tests/
-└── test_pre_merge_gate.py        # state under ALQ_REVIEW_STATE_DIR; the contract's test list
+├── test_pre_merge_gate.py        # state under ALQ_REVIEW_STATE_DIR; the contract's rows N1 to N45, G1 to G7, K1 to K3
+├── test_gate.py                  # N46 to N50, G8, G10
+├── test_switch.py                # N51 to N53, G9
+├── test_claim_gate.py            # N54
+└── test_shim_gate.py             # N55
 ```
 
 **Structure Decision**: the plugin's existing layout, one PR.
@@ -153,4 +164,5 @@ dev/alq-review/tests/
 - A grant is asked for last, only by a merge the gate is about to refuse; grants that cannot be used are said beside that refusal, and no other command opens the record: R5
 - The write guard covers the record by where it is, unchanged: R6
 - The merge gate's tests keep state under `ALQ_REVIEW_STATE_DIR`, beside a second folder that must not come to exist; one test reads the plugin for the old folder's name, a second copy of the helper in this script and the README's two lines: R7
-- An override and a grant name the PR as `owner/repo#N`, built by one function from what is typed and from GitHub's answer; a refusal gives that line in full or says why none applies: R8
+- An override and a grant name the PR as `owner/repo#N`, read by one reader of whole texts from what is typed, from GitHub's answer and from the record; a refusal gives that line in full or says why none applies: R8
+- Every command the user types is a prompt's first words, read whole by one reader that `gate.py` loads from the merge gate's script: R9

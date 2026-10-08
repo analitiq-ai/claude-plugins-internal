@@ -7,10 +7,10 @@ description: "Task list for merge override grants in the state folder"
 
 **Input**: Design documents from `/specs/017-merge-grants-state-folder/`
 
-**Prerequisites**: plan.md, spec.md, research.md (R1–R8), data-model.md, contracts/merge-override.md, quickstart.md
+**Prerequisites**: plan.md, spec.md, research.md (R1–R9), data-model.md, contracts/merge-override.md, quickstart.md
 
-**Tests**: Required (constitution IV). The contract's last table is the test list. Its rows are numbered N1–N31
-(new), G1–G7 (guard) and K1–K3 (kept), and a task names a row by that number. Tests run
+**Tests**: Required (constitution IV). The contract's last table is the test list. Its rows are numbered N1–N55
+(new), G1–G10 (guard) and K1–K3 (kept), and a task names a row by that number. Tests run
 `scripts/pre_merge_gate.py` and `scripts/gate.py` as programs, with hook payloads and a stub `gh`. None calls a
 model or the network.
 
@@ -377,8 +377,11 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
 
 ## Phase 9: After review of the PR (2026-10-08)
 
-**Purpose**: what the PR's internal review found and this feature fixes. What it found and this feature does
-not fix is issue #54 (spec, Assumptions).
+**Purpose**: what the PR's internal review and an audit of the branch found and this feature fixes. What they
+found and this feature does not fix is issue #54 (spec, Assumptions).
+
+A task says what it did to the script as the script then was. `REPO`, `PR_URL`, `OVERRIDE`, `GRANT` and
+`pr_name`, named by tasks up to T025, were replaced in T027; `override_word`, in T030.
 
 - [X] T020 In `tests/test_pre_merge_gate.py`, once, before the script. N28 "one PR" also merges PR 14 with
   GitHub answering for it. N9 and N10 assert the whole sentence of what can be done. Two damaged records more: a
@@ -429,6 +432,37 @@ its own classes, and a failure is told in one place, the answer.
 
   Then the spec folder's statements of what was run.
 
+Round 3, on `6543633`. Three rounds had each moved one of three patterns for a PR's name. The script's reading
+of a name is written again from one shape (research R8): one reader, handed whole texts.
+
+- [X] T026 In `tests/test_pre_merge_gate.py`, once, before the script (`cc641fa`). N32 to N38 and N42 to N44
+  (contract), with three tests of the word after the keyword. The reader is called as a function and tried
+  with every character there is. G6 loses its prompts with a name that is not one; N44 has them, answered.
+  Seen on `6543633`: 71 tests, 58 pass and 13 do not.
+- [X] T027 In `scripts/pre_merge_gate.py`, once (`e0eb6e3`). `PullRequest` and its reader `named` replace
+  `REPO`, `PR_URL`, `OVERRIDE`, `GRANT` and `pr_name`. `name_of` rewrites GitHub's address as a name and hands
+  it to the reader. `_granted` hands each item of the record to it. `grant` answers every prompt whose first
+  word is the keyword.
+- [X] T028 Run again: the file (71 pass), the suite (757 pass), main's script (22 pass), and 47 wrong
+  versions, the twenty-six rebuilt on the new script and twenty-one more: each fails the tests named for it.
+  The spec folder's statements were not brought up to it; T032 does that.
+
+Round 4, on `e0eb6e3`, from an audit of the branch. It found the other typed commands still read by the rule
+T027 replaced, and this folder describing the script of round 2 (research R9).
+
+- [X] T029 In `tests/`, once, before the scripts (`4e1fa12`). `test_pre_merge_gate.py`: N39 to N41 on
+  `first_words` in place of the three tests of T026, and N45. `test_gate.py`: N46 to N50, G8, G10.
+  `test_switch.py`: N51 to N53, G9. `test_claim_gate.py`: N54. `test_shim_gate.py`: N55. Seen on `e0eb6e3`:
+  of the 17, the 14 new do not pass and the 3 guards do.
+- [X] T030 In `scripts/`, once. `pre_merge_gate.py`: `first_words` and `first_line` replace `override_word`.
+  `gate.py`: `on_prompt`, `on_switch`, `_on_release` and `_names` read with them and with `PullRequest.named`;
+  `_unlock` is the part of `_on_release` that answers an unlock; `_REF`, `UNLOCK`, `RESCOPE` and `SWITCH` go.
+  `claimgate.py`, `shimgate.py`: `on_prompt` takes the typed word; `UNLOCK_CLAIM` and `OVERRIDE` go. The
+  README says how a typed command is read.
+- [X] T031 Run again: research R7's last entry says what, and what each run showed.
+- [X] T032 This folder, each document written once from the code as it is. The contract tells what each
+  answer says and no longer copies its words. Counts of tests are kept in research R7 only.
+
 ---
 
 ## Dependencies & Execution Order
@@ -464,8 +498,8 @@ seen red on main. The script is then edited once. The wrong versions then show t
 red on main for their own reason do go red on a wrong version of the new script.
 
 Before review, each of the three changed files is committed once: the tests, then the script with the README.
-Four commits in all: the spec, the tests, the change, and the documents saying what was run. Each round of
-review then adds its own three (Phase 9).
+Four commits in all: the spec, the tests, the change, and the documents saying what was run. Each round after
+that adds its tests, then its change, then the documents (Phase 9); round 3's documents came with round 4's.
 
 The scratch copy the research measured is not in the repo. These tasks, the contract and the data model
 describe the change in full; T008, T013 and T014 are what show the result matches.

@@ -11,25 +11,37 @@ times: as first planned, after the [first critique](critiques/critique-20261007-
 what it was run on; "scratch copy" is the third unless it says otherwise. Everything measured on the third was
 run by the author; no reviewer has run it.
 
+The script was written again twice after the PR was opened, on 2026-10-08: once by review round 3 (R8) and
+once by an audit of the branch (R9). A "Decision" says what the code now does. A "Measured" line says what
+was run on the copy or commit it names, and is not changed when the code moves on; where one no longer holds
+for the code as it is, the line after it says so.
+
 ## Callers
 
-What the change edits, and who calls it. All of it is in `pre_merge_gate.py`, which no script or test imports:
-it is run by the two hooks in `hooks.json` and by `test_pre_merge_gate.py`, as a program.
+What the change edits, and who calls it.
 
 | Edited | Called by |
 |---|---|
-| `grant` | `main`, on `UserPromptSubmit` |
+| `pre_merge_gate.grant` | `main`, on `UserPromptSubmit` |
 | `gated` (its last part, after `gh pr view` has answered, and the branch for `gh` not on the path) | `main`, on `PreToolUse` for Bash |
-| `refuse_admin` | `gated`, in two places: `gh` not on the path, and a named PR |
+| `unmet`, `admin_needs_override` | `gated`; `admin_needs_override` also by `unmet` |
 | `spend_override` | `gated`, for `gh pr merge` only |
-| `_overrides`, `_update_overrides` | `grant`, `spend_override` |
-| `SESSION_ID` | `_overrides` |
-| `OVERRIDE` | `grant` |
-| `PR_URL` (gains a group for the number) | `released`, which reads the repo from it and is not edited |
+| `_update_grants`, `_granted` | `grant`, `spend_override` |
+| `name_of` | `gated`; `released` takes the name it gives |
+| `PullRequest.named` | `grant`, `name_of`, `_granted`, `gate._names` |
+| `first_words` | `grant`, `gate.on_prompt`, `gate.on_switch`, `gate._on_release` |
+| `first_line` | `gate.on_prompt`, `gate._unlock` |
+| `gate.on_prompt` | `gate.handle`, on `UserPromptSubmit` |
+| `gate.on_switch`, `gate._on_release` | `gate.on_prompt` |
+| `gate._unlock` (new, the last part of `_on_release`) | `gate._on_release`, for `unlock` and for the rescope |
+| `gate._names` | `gate._unlock` |
+| `claimgate.on_prompt`, `shimgate.on_prompt` (each now takes the typed word) | `gate._on_release` |
 | the module's opening comment | read by people; it gives the typed form |
 
-`hookio.session_state`, `hookio.session_file` and `hookio.log_error` are called, not edited. `session_state`'s
-callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.py` (the contest judge's hosts).
+`pre_merge_gate.py` is run by its two hooks in `hooks.json`, and is loaded by `gate.py` and by
+`test_pre_merge_gate.py` for the reader (R9). `hookio.session_state`, `hookio.session_file` and
+`hookio.log_error` are called, not edited. `session_state`'s other callers are `gate.py` (reviewers running,
+held Bash calls) and `claimgate.py` (the contest judge's hosts).
 
 ## R1: A session's grants are a session record of their own kind
 
@@ -109,13 +121,10 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
 
 ## R4: A typed override is answered to the user and the agent, recorded or not
 
-- **Decision**: `grant` answers every typed override with one line, the same in `systemMessage` (the user) and
-  `additionalContext` (the agent), prefixed `[alq-review] `. Recorded:
-  ``The user granted one merge of `owner/repo#N` past its unmet requirements, `--admin` included.``
-  Not recorded:
-  `` `override-merge owner/repo#N` could not be recorded, so nothing is granted: <error type>: <error> ``.
-  Without a repo (R8):
-  `` `override-merge #N` does not say which repo's PR that is, so nothing is granted. The user names the PR: `override-merge owner/repo#N`. ``
+- **Decision**: `grant` answers every prompt whose first word is the keyword with one line, the same in
+  `systemMessage` (the user) and `additionalContext` (the agent), under the plugin's prefix. There are three
+  lines: recorded; not recorded, with the error's type and message; and not followed by a PR's name, with the
+  form to type (R8). What each tells is in the contract; the words are the script's.
   A failure to record is also written to `errors.log`, inside a guard that lets any failure of that step pass:
   the answer already carries the reason, and where the log line could not be written the answer says that too.
   Nothing is written to stderr: run on 2026-10-08, a line printed there by the script of review round 1
@@ -148,6 +157,8 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   nothing; an id that is not a plain name gets no answer at all; an old folder that cannot be created ends in
   a trace with exit 1. On the second scratch copy a `hookio.py` that does not parse ended in a trace with exit
   1; on main it grants, since main does not load it.
+- **No longer so**: `override-merge 12` and `override-merge acme/demo #12` printing nothing. Since review
+  round 3 the keyword is always answered (R8).
 - **Not run by anyone**: that Claude Code shows a `systemMessage` from a prompt hook to the user. It rests on
   the hooks reference (016 R6) and on the switch using the same two fields. The quickstart has a by-hand step
   for it.
@@ -274,21 +285,33 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   pass and 36 do not: 34 fail and 2 end in an error. On the new script all 58 pass, and the whole suite's 744.
   Twenty-six wrong versions, the seventeen rebuilt on the new script and nine more from the two rounds of
   review (tasks, Phase 9): each fails the tests named for it.
+- **Measured again** (2026-10-08, review round 3, `cc641fa` and `e0eb6e3`): 71 tests in the file. On the script
+  of round 2 (`6543633`) 58 pass and 13 do not; on main's 22 pass, as before. On the new script all 71 pass,
+  and the whole suite's 757. Forty-seven wrong versions, the twenty-six rebuilt and twenty-one more: each
+  fails the tests named for it.
+- **Measured again** (2026-10-08, the audit's round, R9): 17 tests added or rewritten in five files (contract
+  N39 to N41, N45 to N55, G8 to G10). On the scripts of `e0eb6e3`, whose `gate.py`, `claimgate.py` and
+  `shimgate.py` are main's, the 14 new ones do not pass and the 3 guards do. On the new scripts all pass: 72
+  in the merge gate's file, and the whole suite's 770. Sixty-six wrong versions, round 3's forty-seven
+  with seven rebuilt on the reader of words and nineteen more, six of them in `pre_merge_gate.py`, eleven in
+  `gate.py`, one each in `claimgate.py` and `shimgate.py`: each fails the tests the contract names for it.
+  The quickstart's steps 2 to 4 print what it says.
 - **Not run by anyone**: the test that makes a folder read-only, as root. It skips that half there.
 
 ## R8: An override and a grant name the PR as `owner/repo#N`
 
-- **Decision**: a PR's name is `owner/repo#N`, in lower case. One function builds it, `pr_name(repo, number)`,
-  for both sides. Typed: the override is `override-merge owner/repo#N`, with the repo spelled as the ledger's
-  round reference spells one. At a merge: the name is read from the address `gh pr view` already returns, by
-  `PR_URL`, which gains a group for the number. A name is spelled in one place, `REPO` and `NUMBER`, in ASCII
-  and with no leading zero, and the typed form, GitHub's address and the record are each matched against it.
-  The ASCII is in the classes themselves, not in a flag on each pattern.
-  The record holds names and a grant is found by comparing the
-  whole name. `override-merge #N` is matched only to be answered with what to type (R4); it grants nothing.
+- **Decision**: a PR's name is `owner/repo#N`, in lower case, and it has one reader: `PullRequest.named`. The
+  reader is handed a whole text and answers with the PR or with nothing; it never looks for a name inside a
+  longer text. A name is spelled in one place, `NAME`, in ASCII and with no leading zero, the ASCII in the
+  classes themselves and not in a flag. Every text that may be a name goes to that reader whole (data model):
+  the word after the keyword; GitHub's address for the PR, which `name_of` first rewrites as the name it would
+  be; each item of the record; the word after `unlock` (R9). A `PullRequest` built from parts is held to the
+  same reading, so none exists that the reader would not give.
+  The record holds names and a grant is found by comparing the whole name. The keyword followed by anything
+  but a name, `#N` included, grants nothing and is answered with what to type (R4).
   The `--admin` refusal gives the line in full, `override-merge acme/demo#12`. Where a PR has no name, no grant
   is asked for and the refusal says why no override applies and names no line: `gh` not on the hook's path
-  (`gh pr view` cannot run), and an address that is not a github.com PR.
+  (`gh pr view` cannot run), and an address that is not a github.com PR's.
 - **Rationale**: FR-017, FR-018, SC-009, P1, P2, and the user's answer of 2026-10-07: an override is for a PR,
   and a bare number is not one. With a grant that waits until needed (R5), a bare number is live for every
   repo the session works in. The repo comes from GitHub's answer about the PR being merged, not from the
@@ -328,3 +351,57 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   `override-merge acme/demo#1２`, its second digit full-width, and `override-merge acme/demo#12é` print nothing
   and write nothing. On the script of review round 1 (`4ac61ee`), which made the patterns ASCII by a flag, the
   first granted `acme/demo#1` and the second `acme/demo#12`: the flag also moved where a typed number ends.
+- **Why one reader, and whole texts** (review round 3, 2026-10-08): the name was matched by three patterns,
+  one each for the prompt, the address and the record, and each round of review found one of them ending a
+  name in the wrong place or taking a letter another refused. Each fix moved one pattern. Run on the script of
+  round 2 (`1bbcc03`): `override-merge acme/demo#12.` and `override-merge acme/demo#1` followed by a
+  zero-width space and `2` were each granted, as PR 12 and PR 1. With one reader of whole texts there is no
+  place where a name ends but the text's end, and nothing after it to judge.
+- **No longer so**: a mistyped override, `override-merge acme#12` or `acme/demo#0012`, printing nothing. It is
+  answered with what to type: a prompt that starts with the keyword and gets silence leaves the user not
+  knowing whether it took.
+
+## R9: Every typed command is read by the one reader of words and of names
+
+- **Decision**: `pre_merge_gate.py` holds the reader: `first_words(prompt, count)`, `first_line(prompt)` and
+  `PullRequest.named` (R8). A blank is a space, a tab or a line break, written out. `grant` reads the override
+  with it. `gate.py` loads it and reads `unlock`, the rescope, `unlock claim-<id>`, `override shim-<id>` and
+  the switch with it: a command is the prompt's first words, each compared whole. The patterns `gate._REF`,
+  `UNLOCK`, `RESCOPE` and `SWITCH`, `claimgate.UNLOCK_CLAIM` and `shimgate.OVERRIDE` are deleted.
+  `claimgate.on_prompt` and `shimgate.on_prompt` take the typed word and answer nothing when it is not a
+  claim's or a bug's name, read whole. `gate._names` compares the typed word with the locked branch, with `#`
+  and its number as written, and, through the reader of names, with its PR's name. A prompt whose first word
+  is the plugin's name is always answered: by the switch when `on` or `off` is the only other word on that
+  line, and otherwise with the two forms.
+- **Rationale**: FR-019, SC-010, constitution I and V. Review round 3 replaced the override's reader because
+  it read a word in part. The other commands kept the rule it replaced, in patterns of their own, and had
+  come apart from it in three ways: what counts as a blank, where a number ends, and whether a name's capitals
+  count (measured below). One reader, called by every command, is the only form in which they cannot come
+  apart again. The reader is kept in `pre_merge_gate.py` because that script must answer an override when the
+  plugin's other scripts cannot load (R4; contract N19, N20). In a module of its own it would be loaded there
+  inside a guard, with an answer for a reader that did not load: a new way to fail, bought for tidiness. The
+  cost is that `gate.py` loads a script that is also a hook's program.
+- **What it changes for the user**: a word with a mark joined to it is that word, so `unlock #7,`,
+  `unlock claim-<id>.` and `override shim-<id>.` no longer name what they start with. A number with a leading
+  zero or a digit from outside ASCII is not that number. A no-break space, a line separator, a vertical tab
+  and the like neither part words nor are passed over. Capitals in `unlock owner/repo#N` do not count.
+  `alq-review` followed by anything but the switch is answered with the two forms, where `alq-review offline`
+  or `alq-review` alone got silence.
+- **Existing tools**: `str.split()`, `str.lstrip()`, `str.splitlines()` and `\s`: each takes characters
+  nobody types or sees, which is the fault being removed; not used. `claimcheck.parse_claim_ref`: reads a
+  whole claim name; fits, used. `claimcheck.CLAIM_REF` inside a longer pattern, as `UNLOCK_CLAIM` had it: the
+  second reader; deleted. `policy.unlock_ref`: what a refusal tells the user to type, `#N` or the branch; both
+  are still taken. `shlex`, which reads Bash commands for the gates: a prompt is not a command line, and its
+  quotes and backslashes mean nothing.
+- **Measured** (2026-10-08, on `e0eb6e3`, whose `gate.py`, `claimgate.py` and `shimgate.py` are main's): with
+  PR 7 locked, `unlock #7,`, `unlock #07` and `unlock #` with a full-width `7` each unlock it. `unlock
+  acme/demo#1`, a zero-width space, `2` unlocks PR 1. `unlock Acme/Demo#7` does not unlock a PR kept as
+  `acme/demo`. A no-break space, a line separator, a vertical tab or an ideographic space before `unlock` or
+  `alq-review off` is passed over, and a no-break space between `unlock` and `#7` parts them; the same space
+  after `override-merge` does not. `alq-review offline` is answered with nothing.
+- **Measured** (2026-10-08, this round's tests): R7.
+- **Not done here**: where the plugin reads a repo it or git wrote, it spells one by patterns of their own:
+  `ledger.ROUND_REF`, `claimcheck._CHECK_REF`, `shimcheck._CHECK_REF`, `shell._COMMENTS_API`,
+  `worktree._GITHUB_REMOTE`. None reads what the user typed, and a ledger is keyed by the repo as the remote
+  spells it, so giving them the one reader means keying ledgers anew. That belongs with issue #54, which does
+  not name them yet.

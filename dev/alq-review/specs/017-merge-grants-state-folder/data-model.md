@@ -2,13 +2,28 @@
 
 ## PR name (R8)
 
-`owner/repo#N`: the repo as GitHub names it, a `#`, and the PR's number without leading zeros. Kept and
-compared in lower case. Built by one function, from what the user typed and from the address `gh pr view`
-gives for the PR being merged. A PR without a github.com address has no name.
+`owner/repo#N`: the repo as GitHub names it, a `#`, and the PR's number. `owner` and `repo` are ASCII letters,
+digits, `.`, `-` and `_`; `N` is the digits `0` to `9`, the first not `0`. Kept and compared in lower case. The
+number is text: it is compared, never counted.
 
-The name is spelled in one place: `owner` and `repo` are ASCII letters, digits, `.`, `-` and `_`; `N` is the
-digits `0` to `9`, the first not `0`. What the user types, the address GitHub gives and what a record holds are
-all matched against that spelling, so a name the gate writes is one it reads back.
+A name has one reader, `PullRequest.named`. It is handed a whole text and answers with the PR or with nothing.
+It never looks for a name inside a longer text, so nothing can follow a name, or sit inside one, unjudged. A
+`PullRequest` built from its parts is held to the same reading.
+
+Four texts are handed to it, each whole:
+
+| From | The text |
+|---|---|
+| a prompt starting `override-merge` | the prompt's second word (R9) |
+| a prompt starting `unlock` or the rescope | the command's last word, and the locked PR's repo and number written as a name, to compare the two |
+| `gh pr view` | the PR's address, `https://github.com/owner/repo/pull/N`, rewritten as `owner/repo#N`. A PR with any other address has no name |
+| a record | each item of `granted`, which must also be in lower case, as the gate writes it |
+
+## A typed command's words (R9)
+
+A prompt is read as words by one reader, `first_words`, and its first line by `first_line`. A blank is a
+space, a tab or a line break. Blanks part words and are dropped before the first; no other character is. A
+line ends at a line break and nowhere else. A word is handed on whole.
 
 ## Grant record — `sessions/<session id>.merge.json` (R1, R2)
 
@@ -37,7 +52,7 @@ No other field. Written only by `pre_merge_gate.py`, through `hookio.session_sta
 | Event | The record |
 |---|---|
 | the user starts a prompt with `override-merge owner/repo#N` | the PR's name is added; typed again, nothing changes |
-| the user starts a prompt with `override-merge #N` | not opened; nothing is granted |
+| the user starts a prompt with `override-merge` and anything but a PR's name, `#N` included | not opened; nothing is granted |
 | a `gh pr merge` of that PR in that session that needs an override | the name is removed and that merge is let through on it |
 | a `gh pr merge` of that PR that needs none | not opened; the name stays for a merge that needs it |
 | a merge of another PR, the same number in another repo included | the name stays; that merge finds no grant |

@@ -28,6 +28,12 @@ repo, `override-merge owner/repo#N`, and a refusal that offers an override gives
 none can apply. The Terms, Today, US2, US3, FR-005, FR-010, FR-011, FR-017, FR-018, the Edge Cases, SC-004,
 SC-008, SC-009 and the Assumptions changed with it.
 
+**Changed after the PR was opened (2026-10-08)**, by its review and by an audit of the branch: the override's
+keyword is always answered, and every command the user types to the plugin is read one way. Review kept
+finding the override's reader wrong about where a name ends or what it may hold, and the audit found `unlock`,
+the rescope and the switch still reading by the rule the override had dropped. FR-017, FR-019, SC-010, the Edge Cases and the
+Assumptions changed with it.
+
 ## Clarifications
 
 ### Session 2026-10-07
@@ -155,6 +161,9 @@ the record and the repair. Merge an attested PR and see it pass.
 - Several merges of the same PR that need the override run at once on one grant: one is let through on it; the others are refused.
 - A session is open across the upgrade and holds an unspent grant: the grant is gone. The user types the override again, in the new form.
 - `override-merge #12`, typed out of habit: nothing is granted and one line says what to type. Nothing is written.
+- `override-merge acme/demo#12.`, the name with a full stop joined to it, or `override-merge` alone: the same. A word is read whole, so this is not PR 12.
+- `unlock #7,` and `unlock #07`: neither names PR 7, and nothing is unlocked. On main both unlock it.
+- A command with a no-break space where a space should be: not a command. A no-break space is not a blank.
 - An override for `acme/demo#12`, and a merge of another repo's PR 12 in that session: refused; the grant stays for its own PR.
 - A grant no merge has needed stays until a merge of its own PR needs it. Nothing else ends it, and it cannot be withdrawn. See Assumptions.
 - The repo is renamed after the override is typed: GitHub gives the PR its new name, the grant no longer matches, and the refusal gives the new line to type. Not run; it follows from how names are compared.
@@ -187,8 +196,9 @@ the record and the repair. Merge an attested PR and see it pass.
 - **FR-014**: The README's State section MUST list the grant record under the state folder and MUST name no other folder for grants. Where the README gives the override, it MUST give it in the form the merge gate takes.
 - **FR-015**: The merge gate's tests MUST keep their state in a throwaway folder chosen by the setting the other gates' tests use.
 - **FR-016**: A failure to record or to read a session's grants MUST be written to the plugin's error log, when the log can be written.
-- **FR-017**: An override MUST name its PR as `owner/repo#N`, and there MUST be one such form. A grant MUST let through only a merge of the PR it names: the same repo and the same number, names compared without regard to capitals. `override-merge #N` MUST grant nothing, and the user MUST be shown one line saying so and what to type.
+- **FR-017**: An override MUST name its PR as `owner/repo#N`, and there MUST be one such form. A grant MUST let through only a merge of the PR it names: the same repo and the same number, names compared without regard to capitals. The keyword followed by anything but a PR's name, `override-merge #N` included, or by nothing, MUST grant nothing, and the user MUST be shown one line saying so and what to type.
 - **FR-018**: A refusal that tells the user they can override MUST give the line to type in full, so that typing it as given is recorded. Where no override can apply, the refusal MUST say that and why, and MUST NOT name a line to type: `gh` is not on the hook's path, or the PR has no address on github.com.
+- **FR-019**: Every command the user types to the plugin MUST be read one way: `override-merge`, `unlock`, `override`, the rescope and the switch. A command is a prompt's first words. Words are parted by a space, a tab or a line break and by nothing else, and only those are passed over before the first word. A word MUST be read whole, never in part. A PR's name MUST be read by one reader wherever it is typed, and its capitals MUST NOT count. The plugin MUST keep no second reader of a typed command.
 
 ### Key Entities
 
@@ -209,18 +219,21 @@ the record and the repair. Merge an attested PR and see it pass.
 - **SC-007**: The plugin's code and README name one place for grants. The old folder is named in neither.
 - **SC-008**: Every typed override shows the user a line: recorded, not recorded and why, or not an override and what to type.
 - **SC-009**: An override for a PR of one repo lets 0 merges of another repo's PR through.
+- **SC-010**: Of every character there is, 3 part the words of a typed command, and 0 others do. A word with anything joined to a PR's name or number names 0 PRs, for every command that takes one.
 
 ## Assumptions
 
 - **Why a session id that is not a plain name is answered, not passed over** (the user's decisions, 2026-10-07). A session's id is supplied by Claude Code, not by the agent, so this decides only what a payload without a usable id gets. Passed over, the user's override is dropped without a word, and the merge gate needs a rule of its own for that case. Answered, the merge gate does what the plugin's other gates already do. Safety is the same either way: a grant only turns a refusal into a pass, so grants that cannot be reached let no merge through. That is also why a merge that needs no override is not refused for them.
 - **The switch is not changed.** Feature 016 counts the plugin as on for a session id that is not a plain name. That stays.
 - **No migration**, by the user's decision in issue #36. A grant is spent once and belongs to one session. The old folder is deleted by hand.
-- **The old form is not kept** (the user's decision, 2026-10-07). `override-merge #N` grants nothing after this feature. It is still recognised, only so that the user who types it is told what to type.
+- **The old form is not kept** (the user's decision, 2026-10-07). `override-merge #N` grants nothing after this feature. It is answered as every word that is not a PR's name is: with what to type.
 - **An override names a PR on github.com.** The plugin reads a PR's repo from its github.com address, as the version-only release check already does. A PR on another host cannot be named, so no override applies to it and the refusal says so. On main a number-only override lets such a merge through (run on 2026-10-07). Nobody here uses another host; not tracked.
 - **A grant has no end but its spending** (the user's decision of 2026-10-07 to keep "only when needed"). An override that no merge has needed stays in the record, across a resume of the session, until a merge of its own PR needs it. It cannot be withdrawn. After this feature it can be spent on the PR it names and no other.
 - **`log` mode and a session that is off leave a gap that this feature does not close.** Run on 2026-10-07: in `log` mode an agent's write to a session record in the state folder is recorded, not refused, while the merge gate refuses in either mode. With the plugin off in a session, a write to another session's record in the state folder is not refused. So after this feature an agent could still write a grant by a file edit in those two cases. This is how the write guard treats every record, and closing it changes what `log` and off mean for all of them. By the user's decision of 2026-10-07 it is issue #38, not part of this feature.
 - **A shell command that writes the state folder is not stopped** (issue #50). Run on 2026-10-07 on a scratch copy of this feature as first planned: a shell command wrote a grant, and a merge with `--admin` then passed with no override typed. Closing it means keeping the state where an agent cannot write, which is its own feature.
 - **A grant lets through the PR the gate asks GitHub about, which is not always the PR the command merges** (issue #54). Run on 2026-10-08 with a stand-in for GitHub: after `cd` into another checkout, with `GH_REPO` set, or with the repo given as `-R=x` or `-Rx`, a merge is judged as the PR of that number in the folder the session is in, and a grant for that PR is spent on it; a second merge in one command is not judged. Main does the same, for the review as for the override. FR-017 and SC-009 hold for a command the gate reads right. Closing it means one place that works out which repo and PR every command acts on, which is its own feature.
+- **The other commands change in what they take** (FR-019). `unlock`, the rescope, `unlock claim-<id>` and `override shim-<id>` no longer take a word with a mark joined to it, a number with a leading zero or a digit from outside ASCII, or a blank that is not a space, a tab or a line break. `unlock owner/repo#N` no longer minds capitals. A prompt whose first word is `alq-review` is always answered: with the switch, or with the two forms. Each was run (research R9).
+- **Where the plugin reads a repo it or git wrote, it still spells one by patterns of their own**: a round's reference, a check's reference, the comments address, the checkout's remote. None reads what the user typed. A ledger is still kept under the repo as the remote spells it, capitals included. They belong with issue #54's one place for a repo and a PR, which does not name them yet.
 - **A grant is spent when the gate lets a merge through on it**, whether or not GitHub then merges. Unchanged.
 - **A damaged grant record is repaired by hand.** The user deletes it and types the override again. The plugin does not replace it, and does not repeat what it holds, so that a person opens the file itself.
 - **A grant record is written in place**, as every session record is, so a write that fails can leave it empty (issue #48). After this feature a merge that needs no override no longer writes it.

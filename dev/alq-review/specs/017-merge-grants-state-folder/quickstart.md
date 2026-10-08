@@ -4,8 +4,9 @@ Run from `dev/alq-review/` in the feature worktree. The answers, the table of wh
 and the test list are in [contracts/merge-override.md](contracts/merge-override.md); the record is in
 [data-model.md](data-model.md).
 
-Steps 1 to 4 were run on 2026-10-08 in the feature worktree, by the author, and printed what is written here.
-Step 1 ran 58 tests in the file and 744 in the suite, all passing. Step 5 was not run by anyone.
+Steps 1 to 4 were run on 2026-10-08 in the feature worktree, by the author, on the code as it is after the
+audit's round (tasks, T030), and printed what is written here. How many tests step 1 ran is in research R7.
+Step 5 was not run by anyone.
 
 ## 1. Tests (no model, no network)
 
@@ -34,17 +35,18 @@ export ALQ_REVIEW_STATE_DIR=$(mktemp -d) XDG_STATE_HOME=$(mktemp -u)
 scripts=../../plugins/alq-review/scripts
 say() { printf '{"hook_event_name":"UserPromptSubmit","session_id":"s1","prompt":"%s"}' "$1" | python3 $scripts/pre_merge_gate.py; echo; }
 say 'override-merge #12'
+say 'override-merge acme/demo#12.'
 find "$ALQ_REVIEW_STATE_DIR" -type f
 say 'override-merge Acme/Demo#12'
 find "$ALQ_REVIEW_STATE_DIR" -type f; ls "$XDG_STATE_HOME"
 cat "$ALQ_REVIEW_STATE_DIR/sessions/s1.merge.json"
 ```
 
-Expected: the first prompt is answered that it does not say which repo's PR that is, with
-`override-merge owner/repo#12` as what to type, and `find` prints nothing. The second is answered, in
-`systemMessage` and `additionalContext` alike, that one merge of `acme/demo#12` is granted. `find` then prints
-`sessions/s1.merge.json` and `sessions/s1.merge.lock`; `ls` says the second folder does not exist. The record
-is `{"granted": ["acme/demo#12"]}`.
+Expected: the first two prompts are each answered that the keyword is not followed by a PR's name and that
+nothing is granted, with `override-merge owner/repo#N` as what to type, and `find` prints nothing. The third
+is answered, in `systemMessage` and `additionalContext` alike, that one merge of `acme/demo#12` is granted.
+`find` then prints `sessions/s1.merge.json` and `sessions/s1.merge.lock`; `ls` says the second folder does not
+exist. The record is `{"granted": ["acme/demo#12"]}`.
 
 ```bash
 wrote=$(find "$ALQ_REVIEW_STATE_DIR" -name '*.json')
@@ -52,8 +54,18 @@ echo '{"hook_event_name":"PreToolUse","session_id":"s1","tool_name":"Write","cwd
   | ALQ_REVIEW_MODE=enforce python3 $scripts/gate.py
 ```
 
-Expected: the file the gate wrote is the one tried, and the `Write` is denied with
-`The review ledger is written by the gate only.`
+Expected: the file the gate wrote is the one tried, and the `Write` is denied by the write guard.
+
+```bash
+typed() { printf '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"'"$PWD"'","prompt":"%s"}' "$1" | python3 $scripts/gate.py; echo; }
+typed 'unlock #7,'
+typed 'unlock Acme/Demo#7'
+typed 'alq-review offline'
+```
+
+Expected: the first two are each answered that the command names no locked PR, the first quoted as
+`unlock #7,` and not as `unlock #7`. The third is answered that it is not a switch, with the two forms. A
+locked PR being unlocked is in the tests of step 1.
 
 ## 4. A grant that cannot be kept (US3)
 
