@@ -6,6 +6,10 @@
 compared in lower case. Built by one function, from what the user typed and from the address `gh pr view`
 gives for the PR being merged. A PR without a github.com address has no name.
 
+The name is spelled in one place: `owner` and `repo` are ASCII letters, digits, `.`, `-` and `_`; `N` is the
+digits `0` to `9`, the first not `0`. What the user types, the address GitHub gives and what a record holds are
+all matched against that spelling, so a name the gate writes is one it reads back.
+
 ## Grant record — `sessions/<session id>.merge.json` (R1, R2)
 
 Under the state root, beside `<session id>.merge.lock`. It appears the first time the session types an
@@ -46,4 +50,4 @@ A grant that cannot be recorded does not exist (R4). Grants that cannot be read 
 merge that needed one is told so (R5).
 
 No other record changes. `ledger.db`, `gate.log` and the session's switch are not touched. A failure is one
-line in `errors.log` (R4, R5).
+line in `errors.log` (R4, R5); when that line cannot be written, the hook says so on stderr.

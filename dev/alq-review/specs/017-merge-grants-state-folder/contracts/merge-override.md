@@ -10,6 +10,9 @@ the user was not run by anyone.
 `override-merge owner/repo#N` at the start of a prompt (leading whitespace ignored). One form. Capitals in the
 name do not matter. The `--admin` refusal prints the line for the PR in hand.
 
+`owner` and `repo` are ASCII letters, digits, `.`, `-` and `_`. `N` is the digits `0` to `9` and does not start
+with `0`. A line that is not that, `owner/repo#012` included, is not an override and is answered with nothing.
+
 `override-merge #N` is not an override. It is answered, below, and grants nothing.
 
 ## What the user and the agent are told
@@ -25,7 +28,7 @@ as the switch's answers are.
 | anything else, a mistyped override included | nothing, as today |
 
 Either way the hook exits 0 and the rest of the prompt goes on. An override that was not recorded is also one
-line in `errors.log`, when that can be written.
+line in `errors.log`; when that cannot be written, the hook says so on stderr.
 
 ## Which commands ask for a grant
 
@@ -51,8 +54,8 @@ A merge that needs an override and finds grants it cannot use gets, in `log` mod
 
 ``This session's merge overrides could not be used, so this merge was judged without one: <error type>: <error>.``
 
-then a blank line, then the refusal it gets without a grant. The line is also written to `errors.log`, when
-that can be written.
+then a blank line, then the refusal it gets without a grant. The line is also written to `errors.log`; when
+that cannot be written, the hook says so on stderr.
 
 ## What an `--admin` merge is told about overriding
 
@@ -111,7 +114,7 @@ Three kinds.
   has, and in where its state is kept (SC-004). One that shows a refusal also shows the same override letting
   its own merge through; without that it passes on a gate that grants nothing.
 
-Run on 2026-10-07 as the tests of `tests/test_pre_merge_gate.py`, by the author: every row passes on the new
+Run on 2026-10-08 as the tests of `tests/test_pre_merge_gate.py`, by the author: every row passes on the new
 script; every new and kept row fails on main's; every guard row passes on main's; every wrong version fails the
 rows that name it.
 
@@ -128,10 +131,10 @@ row that types one fails on main for that, whatever more its cell says of main.
 | N6 | new | an attested merge leaves a held grant, and an `--admin` merge then passes on it once | main does not take the name | the grant asked for before `unmet` |
 | N7 | new | the same for a version-only release | the same | the same |
 | N8 | new | while the record's lock is held a merge that needs the grant waits; the grant is taken away meanwhile, and the merge is refused | main locks another file | the grant read before the lock |
-| N9 | new | an override under an id that is not a plain name, or under none, is answered as not recorded, with what can be done | main answers nothing | |
-| N10 | new | an `--admin` merge under such an id gets the note, the same words, and the `--admin` refusal | main gives no note | |
-| N11 | new | an override over each damaged record names the record and the repair, leaves it as found, and repeats nothing it holds | main does not read that file | what the record holds quoted in the answer |
-| N12 | new | an unattested merge over each damaged record gets the note and how to attest; an `--admin` one gets the note in `log` mode | main gives no note | the last refusal sent through `hookio.refuse` |
+| N9 | new | an override under an id that is not a plain name, or under none, is answered as not recorded, with what can be done | main answers nothing | the answer cut before what can be done |
+| N10 | new | an `--admin` merge under such an id gets the note, the same words, and the `--admin` refusal | main gives no note | the same |
+| N11 | new | an override over each damaged record names the record and the repair, leaves it as found, and repeats nothing it holds | main does not read that file | what the record holds quoted in the answer; a name in a record not held to the form of a name |
+| N12 | new | an unattested merge over each damaged record gets the note and how to attest; an `--admin` one gets the note in `log` mode | main gives no note | the last refusal sent through `hookio.refuse`; a name in a record not held to the form of a name |
 | N13 | new | after the damaged record is deleted, the override is recorded and one merge passes | main does not read that file | |
 | N14 | new | `sessions` a file, and `sessions` read-only: the override is not recorded; an `--admin` merge gets the note | main keeps grants elsewhere | |
 | N15 | new | a file where the state folder should be: the override is answered as not recorded | main keeps grants elsewhere | |
@@ -147,14 +150,16 @@ row that types one fails on main for that, whatever more its cell says of main.
 | N25 | new | `gh` not on the hook's path, grant held: `--admin` is refused, told none can be applied, and given no line | main gives `override-merge #12` | |
 | N26 | new | a PR without a github.com address: `--admin` is refused, told no override can name it, and given no line | main gives `override-merge #12` | |
 | N27 | new | an override typed twice grants one merge | main does not take the name | the names kept as a list |
-| N28 | new | another PR, the same number in another repo and another session find no grant; the grant stands in for a missing attestation once | main does not take the name | the name built without the repo; every session's grants kept under one id; a grant asked for by an `--admin` merge only |
+| N28 | new | another PR, the same number in another repo and another session find no grant; the grant stands in for a missing attestation once | main does not take the name | the name built without the repo; the name built with one number whatever the PR; every session's grants kept under one id; a grant asked for by an `--admin` merge only |
 | N29 | new | GitHub's answer about a release cannot be read, grant held: the merge is refused with the general answer, the grant is kept, and `--admin` then passes | main does not take the name, so no grant is held | the grant asked for before `unmet` |
+| N30 | new | an override whose number is thousands of digits long is answered as granted, exit 0 | main does not take the name | the number counted when the name is built |
+| N31 | new | a folder where `errors.log` should be: a failure to record and a failure to use are answered as in N9 and N12, and each time the hook says on stderr that the log line was not written | main does not take the name | a failed log write passed over in silence |
 | G1 | guard | an attested merge passes over each damaged record and leaves it as found | | the grant asked for before `unmet` |
 | G2 | guard | an attested merge passes under an id that is not a plain name | | the same |
 | G3 | guard | over a damaged record, `gh pr ready`, `--undo`, `--disable-auto`, a merge `gh pr view` cannot name and a `gh api` merge are judged as today | | the grants read at the top of `gated` |
 | G4 | guard | over a damaged record, a session that is off is let through | | the same |
 | G5 | guard | in `log` mode, with no override typed, an `--admin` merge and an unattested merge are refused | | the last refusal sent through `hookio.refuse` |
-| G6 | guard | a prompt that is not an override prints nothing and writes nothing | | an answer built before the keyword is matched |
+| G6 | guard | a prompt that is not an override prints nothing and writes nothing, a number written `012` and a name with a letter from outside ASCII included | | an answer built before the keyword is matched |
 | G7 | guard | the line an `--admin` refusal gives, typed as given, lets that merge through | | the refusal giving `override-merge #12` |
 | K1 | kept | a held grant does not publish a draft; an `--admin` merge then passes on it | main does not take the name | a grant asked for by a publish too |
 | K2 | kept | a grant is not spent while `gh pr view` fails; once it answers, the merge passes on it | the same | none built: the PR's name comes from the answer that failed |
@@ -164,5 +169,10 @@ The existing tests "one PR", "one session", "exactly one merge", "stands in for 
 the refusal", "`gh` not on the path" and "typed while off" are the new rows above that show the same thing.
 Each keeps its name (SC-004); N28 is three of them.
 
+Added on 2026-10-08, from review of the PR: N30, N31, the last two damaged records, the last two cases of G6,
+a wrong version for N9 and N10, and one more for N11, N12 and N28. N30, N31 and those four cases were seen to
+fail on the script as first pushed (`33ae8b1`).
+
 The damaged records: `[12]`, text that is not JSON, an empty file, a list nested 100,000 deep, a second key,
-numbers for names, a name in capitals, `true` for a name, and an object holding words written to be obeyed.
+numbers for names, a name in capitals, `true` for a name, a number with a leading zero, digits that are not
+`0` to `9`, and an object holding words written to be obeyed.

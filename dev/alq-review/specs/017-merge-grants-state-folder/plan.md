@@ -61,10 +61,10 @@ contract's last table is the test list, in three kinds.
 Where a red run on a wrong version is shown: the commit that adds the test names the wrong version in one
 line and carries the failing output. The wrong versions themselves are not committed.
 
-Run on 2026-10-07 as the tests of `tests/test_pre_merge_gate.py`, by the author. On main's script: 56 tests,
-22 pass (the 15 left alone and the 7 guards) and 34 do not (every new and kept test of the override). On the
-new script: all 56 pass, and the whole suite's 742. Each of 17 wrong versions fails the tests that name it
-(R7); the commit that adds the tests carries the output
+Run on 2026-10-08 as the tests of `tests/test_pre_merge_gate.py`, by the author. On main's script: 58 tests,
+22 pass (the 15 left alone and the 7 guards) and 36 do not (every new and kept test of the override). On the
+new script: all 58 pass, and the whole suite's 744. Each of 22 wrong versions fails the tests that name it
+(R7); the commits that add the tests carry the output
 
 **Target Platform**: any machine running Claude Code with the plugin enabled
 

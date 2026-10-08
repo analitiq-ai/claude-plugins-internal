@@ -117,7 +117,8 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   Without a repo (R8):
   `` `override-merge #N` does not say which repo's PR that is, so nothing is granted. The user names the PR: `override-merge owner/repo#N`. ``
   A failure to record is also written to `errors.log`, inside a guard that lets any failure of that step pass:
-  the answer already carries the reason. The hook exits 0 and the rest of the prompt goes on. `grant` catches
+  the answer already carries the reason, and the guard says on stderr that the log line was not written. The
+  hook exits 0 and the rest of the prompt goes on. `grant` catches
   every exception: it runs outside `main`'s guard, so it is the last thing between a failure and a program
   trace.
 - **Rationale**: FR-005, FR-009, FR-016, FR-017. The recorded line is shown to the user so that silence means
@@ -267,6 +268,10 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   the name built without the repo breaks only the one about another PR; the other two are broken by every
   session's grants kept under one id, and by a grant asked for by an `--admin` merge only. Each of the
   seventeen fails the tests the table names for it.
+- **Measured again** (2026-10-08, with what review of the PR added): 58 tests in the file. On main's script 22
+  pass and 36 do not: 34 fail and 2 end in an error. On the new script all 58 pass, and the whole suite's 744.
+  Twenty-two wrong versions, the seventeen rebuilt on the new script and five more (contract: N9 to N12, N28,
+  N30, N31): each fails the tests named for it.
 - **Not run by anyone**: the test that makes a folder read-only, as root. It skips that half there.
 
 ## R8: An override and a grant name the PR as `owner/repo#N`
@@ -274,7 +279,9 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
 - **Decision**: a PR's name is `owner/repo#N`, in lower case. One function builds it, `pr_name(repo, number)`,
   for both sides. Typed: the override is `override-merge owner/repo#N`, with the repo spelled as the ledger's
   round reference spells one. At a merge: the name is read from the address `gh pr view` already returns, by
-  `PR_URL`, which gains a group for the number. The record holds names and a grant is found by comparing the
+  `PR_URL`, which gains a group for the number. A name is spelled in one place, `REPO` and `NUMBER`, in ASCII
+  and with no leading zero, and the typed form, GitHub's address and the record are each matched against it.
+  The record holds names and a grant is found by comparing the
   whole name. `override-merge #N` is matched only to be answered with what to type (R4); it grants nothing.
   The `--admin` refusal gives the line in full, `override-merge acme/demo#12`. Where a PR has no name, no grant
   is asked for and the refusal says why no override applies and names no line: `gh` not on the hook's path
@@ -282,14 +289,15 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
 - **Rationale**: FR-017, FR-018, SC-009, P1, P2, and the user's answer of 2026-10-07: an override is for a PR,
   and a bare number is not one. With a grant that waits until needed (R5), a bare number is live for every
   repo the session works in. The repo comes from GitHub's answer about the PR being merged, not from the
-  command's `-R` or the folder it runs in, so what is compared is what would be merged. Lower case on both
+  command's `-R` or the folder it runs in, so what is compared is what GitHub says of the PR the gate asked about. That is the PR
+  being merged for a command the gate reads right; where it does not, issue #54. Lower case on both
   sides, because GitHub compares owner and repo names without regard to capitals and gives back its own
   spelling. One form only, and the old one answered rather than accepted: a second accepted form would be the
   old matching rule kept alive. The exact line in the refusal is what makes the longer form cost the user
   nothing: they copy it.
 - **Existing tools**: GitHub's reference `owner/repo#N`: what GitHub itself writes for a PR in another repo;
   used as it is. `ledger.ROUND_REF` and the round reference `owner/repo#N:stage-epoch.n`: the plugin already
-  names a PR this way inside a round's name; the same spelling of a repo is used. `ledger.py` is not loaded
+  names a PR this way inside a round's name; the same spelling of a repo is used, held to ASCII here. `ledger.py` is not loaded
   for it: this script matches the keyword on every prompt and must answer when the plugin's other scripts
   cannot load (R4). `PR_URL` in this script: read today by `released` for the repo; fits, with one more group.
   `gh pr view --json url`: already asked for. The PR's full address as the typed form: longer, and a second
@@ -298,7 +306,8 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   guess at the repo from the folder the session happens to be in. `inbox/<owner>__<repo>__<pr>.json`: a file
   name, not something a person types.
 - **Measured** (scratch copy): `override-merge acme/demo#12` records `{"granted": ["acme/demo#12"]}`.
-  `override-merge Acme/Demo#0012 because…` records the same. With that grant, a `--admin` merge where
+  `override-merge Acme/Demo#12 because…` records the same (run again 2026-10-08). With that grant, a
+  `--admin` merge where
   `gh pr view` names `other/repo#12` is refused and gives `override-merge other/repo#12`; an attested merge of
   `acme/demo#12` passes and leaves the grant; the other repo's merge is still refused; `acme/demo#12` with
   `--admin` then passes. A grant typed in capitals lets the merge through, and so does GitHub answering in
@@ -309,3 +318,7 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   can be applied until `gh` is on the path, and names no line; main names `override-merge #12`. A PR with an
   address on another host, grant typed: `--admin` is refused and told no override can name it; main lets it
   through on a number. On main `override-merge acme/demo#12` answers nothing and writes nothing.
+- **Measured again** (2026-10-08): `override-merge acme/demo#0012` and `override-merge ANALİTİQ-AI/demo#7`
+  print nothing and write nothing. On the script as first pushed (`33ae8b1`) the second was recorded as a name
+  with a letter from outside ASCII, which the record's own reader refuses: the next override in that session
+  was answered as not recorded. That is why a name is ASCII on every side, and why it is spelled once.

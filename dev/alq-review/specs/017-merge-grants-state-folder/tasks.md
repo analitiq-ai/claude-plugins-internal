@@ -374,6 +374,34 @@ form. Each such row is shown to fail on a wrong version of the new script, for i
 
 ---
 
+## Phase 9: After review of the PR (2026-10-08)
+
+**Purpose**: what the PR's internal review found and this feature fixes. What it found and this feature does
+not fix is issue #54 (spec, Assumptions).
+
+- [X] T020 In `tests/test_pre_merge_gate.py`, once, before the script. N28 "one PR" also merges PR 14 with
+  GitHub answering for it. N9 and N10 assert the whole sentence of what can be done. Two damaged records more: a
+  number with a leading zero, and digits that are not `0` to `9`. Two prompts more for G6: a number written
+  `012`, and a name with a letter from outside ASCII. N30 and N31 (contract). Seen to fail on the script as
+  pushed (`33ae8b1`): N30, N31, the two records and the two prompts.
+- [X] T021 In `scripts/pre_merge_gate.py`, once. `REPO` and `NUMBER` spell a PR's name in one place, in ASCII,
+  for `PR_URL`, `OVERRIDE` and `GRANT`. `pr_name` no longer counts the number. `_log_failure` says on stderr
+  that a log line was not written. Two comments say what holds.
+- [X] T022 Run again: the file (58 pass), the suite (744 pass), main's script (22 pass, 36 do not), quickstart
+  steps 1 to 4, the seventeen wrong versions of T014 rebuilt on the new script, and five more:
+
+  | Wrong version | The one change | Rows that must fail |
+  |---|---|---|
+  | `one-number` | `name_of` builds the name with `12` for the number | N28 (one PR) |
+  | `no-step` | `_update_grants` ends its message at `No merge override can be kept in this session` | N9, N10 |
+  | `loose-record` | `_granted` does not match a name against `GRANT` | N11, N12 |
+  | `counted` | `pr_name` passes the number through `int` | N30 |
+  | `silent-log` | `_log_failure` passes over a failed log write | N31 |
+
+  Then the spec folder's statements of what was run.
+
+---
+
 ## Dependencies & Execution Order
 
 - **Phase 1 → 2**: T001, then T002. T002 blocks every test task.
