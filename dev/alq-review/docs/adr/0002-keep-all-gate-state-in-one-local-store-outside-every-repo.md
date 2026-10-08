@@ -100,7 +100,7 @@ Rejected:
 - The ledger is in no PR, so a reviewer cannot read it there.
 - Not everything is in the store yet: until issue #36 is done, the merge override grants are kept in a
   folder of their own.
-- Decision 4 is not built: today the user has no way to delete a record.
+- Deleting a record is manual and has no tool. A tool is outside this ADR.
 - Records pile up until the user deletes them. A shim check's record holds the staged diff, so source
   stays in the store that long.
 - The two logs are not bounded by this ADR.
@@ -120,4 +120,3 @@ Rejected:
 2. [x] Decide whether the merge override grants move under the state root.
 3. [ ] List every folder the plugin writes in the README's State section.
 4. [ ] Move the merge override grants under the state root (issue #36).
-5. [ ] Build a way for the user to delete the records of a branch that is gone. No issue is open for it yet.
