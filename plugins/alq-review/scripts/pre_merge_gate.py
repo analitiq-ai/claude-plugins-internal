@@ -65,10 +65,11 @@ REVIEWED_COMMIT = re.compile(r"\*{0,2}Reviewed commit:\*{0,2}\s*[`'\"]?([0-9a-f]
 
 # A PR's name, `owner/repo#N`, is spelled once. What the user types, the address GitHub gives and what the record
 # holds all match these, so a name the gate writes is one it reads back. ASCII only, as GitHub's names are: a name
-# is kept in lower case, and a letter from outside ASCII can lower into something these do not match.
-REPO = r"[\w.-]+/[\w.-]+"
-NUMBER = r"[1-9]\d*"
-PR_URL = re.compile(rf"^https://github\.com/({REPO})/pull/({NUMBER})$", re.ASCII)
+# is kept in lower case, and a letter from outside ASCII can lower into something these do not match. The classes
+# are written out, not `\w` and `\d` under re.ASCII: that flag also moves where `\b` ends a typed number.
+REPO = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+NUMBER = r"[1-9][0-9]*"
+PR_URL = re.compile(rf"^https://github\.com/({REPO})/pull/({NUMBER})$")
 
 GATED = {"merge", "ready"}
 
@@ -90,8 +91,8 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")"}
 API_MERGE = re.compile(r"pulls/\d+/merge")
 
 # The repo is optional here only so that an override without one is answered, not passed over.
-OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#({NUMBER})\b", re.ASCII)
-GRANT = re.compile(rf"{REPO}#{NUMBER}", re.ASCII)
+OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#({NUMBER})\b")
+GRANT = re.compile(rf"{REPO}#{NUMBER}")
 GRANTS = ".merge"
 
 
@@ -246,13 +247,15 @@ def _update_grants(payload: dict, change):
     return result
 
 
-def _log_failure(said: str) -> None:
+def _logged(said: str) -> str:
+    """`said`, once written to errors.log. Where that write fails, `said` with that added, so the answer tells it."""
     try:
         import hookio
         hookio.log_error(said)
     except Exception as exc:  # a plugin module that is there but does not load raises more than ImportError
-        # The answer carries `said`. This is the one thing it does not: that the log holds no line of it.
-        print(f"alq-review: not written to errors.log: {type(exc).__name__}: {exc}", file=sys.stderr)
+        # Told in the answer, the one output this hook depends on: a line on stderr can fail as the log did.
+        return f"{said} (not written to errors.log: {type(exc).__name__}: {exc})"
+    return said
 
 
 def grant(payload: dict) -> int:
@@ -267,9 +270,8 @@ def grant(payload: dict) -> int:
         try:
             _update_grants(payload, lambda granted: granted.add(named))
         except Exception as exc:  # outside main()'s guard; an override that was not recorded is not one
-            said = (f"`override-merge {named}` could not be recorded, so nothing is granted: "
-                    f"{type(exc).__name__}: {exc}")
-            _log_failure(said)
+            said = _logged(f"`override-merge {named}` could not be recorded, so nothing is granted: "
+                           f"{type(exc).__name__}: {exc}")
         else:
             said = f"The user granted one merge of `{named}` past its unmet requirements, `--admin` included."
     # gate._tell's two fields, built here because this answer is owed when the plugin's modules cannot load.
@@ -405,9 +407,8 @@ def gated(tokens: list[str], payload: dict) -> int:
             if spend_override(payload, named):
                 return 0
         except (OSError, ValueError) as exc:
-            unread = (f"This session's merge overrides could not be used, so this merge was judged without one: "
-                      f"{type(exc).__name__}: {exc}.")
-            _log_failure(unread)
+            unread = _logged(f"This session's merge overrides could not be used, so this merge was judged without "
+                             f"one: {type(exc).__name__}: {exc}.")
             return deny(f"{unread}\n\n{refusal}")
     return deny(refusal)
 
