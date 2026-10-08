@@ -63,7 +63,12 @@ import sys
 # reason. Ten hex digits minimum -- see the module docstring.
 REVIEWED_COMMIT = re.compile(r"\*{0,2}Reviewed commit:\*{0,2}\s*[`'\"]?([0-9a-f]{10,40})", re.I)
 
-PR_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/pull/(\d+)$")
+# A PR's name, `owner/repo#N`, is spelled once. What the user types, the address GitHub gives and what the record
+# holds all match these, so a name the gate writes is one it reads back. ASCII only, as GitHub's names are: a name
+# is kept in lower case, and a letter from outside ASCII can lower into something these do not match.
+REPO = r"[\w.-]+/[\w.-]+"
+NUMBER = r"[1-9]\d*"
+PR_URL = re.compile(rf"^https://github\.com/({REPO})/pull/({NUMBER})$", re.ASCII)
 
 GATED = {"merge", "ready"}
 
@@ -84,10 +89,9 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")"}
 # The REST merge endpoint, which would otherwise walk straight around this gate.
 API_MERGE = re.compile(r"pulls/\d+/merge")
 
-REPO = r"[\w.-]+/[\w.-]+"  # a repo slug, as ledger.ROUND_REF spells one
 # The repo is optional here only so that an override without one is answered, not passed over.
-OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#(\d+)\b")
-GRANT = re.compile(rf"{REPO}#\d+")
+OVERRIDE = re.compile(rf"override-merge\s+({REPO})?#({NUMBER})\b", re.ASCII)
+GRANT = re.compile(rf"{REPO}#{NUMBER}", re.ASCII)
 GRANTS = ".merge"
 
 
@@ -204,7 +208,7 @@ def fetch(pr_ref: str | None, repo: str | None) -> tuple[dict | None, str]:
 
 def pr_name(repo: str, number: str) -> str:
     """How an override and a grant name a PR: GitHub's `owner/repo#N`, in lower case as GitHub compares names."""
-    return f"{repo.lower()}#{int(number)}"
+    return f"{repo.lower()}#{number}"
 
 
 def name_of(pr: dict) -> str | None:
@@ -224,7 +228,7 @@ def _granted(held) -> set:
 
 def _update_grants(payload: dict, change):
     """Apply `change` to the session's granted PR names under the session record's lock; returns what it returns."""
-    # Imported here for the reason released() imports github here.
+    # Imported here, not at the top: a prompt is owed an answer when this does not load, and grant() gives it.
     import hookio
     try:
         record = hookio.session_file(payload, GRANTS)
@@ -246,8 +250,9 @@ def _log_failure(said: str) -> None:
     try:
         import hookio
         hookio.log_error(said)
-    except Exception:  # a plugin module that is there but does not load raises more than ImportError
-        pass  # the answer carries the reason
+    except Exception as exc:  # a plugin module that is there but does not load raises more than ImportError
+        # The answer carries `said`. This is the one thing it does not: that the log holds no line of it.
+        print(f"alq-review: not written to errors.log: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
 def grant(payload: dict) -> int:
@@ -331,7 +336,8 @@ def admin_needs_override(how: str) -> str:
 
 
 def unmet(verb: str, args: list[str], pr: dict, named: str | None) -> str | None:
-    """Why this `gh pr merge` or `gh pr ready` is refused, or None when it is not."""
+    """What this `gh pr merge` or `gh pr ready` lacks, as the refusal it gets unless a grant stands in for it;
+    None when it lacks nothing."""
     if "--admin" in args:
         return admin_needs_override(
             f"they start a prompt with `override-merge {named}`." if named else
