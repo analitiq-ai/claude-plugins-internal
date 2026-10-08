@@ -80,8 +80,8 @@
 - [X] T022 Update `plugins/alq-review/README.md` enforcement item 5 (line ~52) to say the gate reads the spec folder the location comment names.
 - [X] T023 Grep `plugins/alq-review` for `branch_spec`, `<!-- analitiq-spec -->` and `--jq` marker filters; the marker must appear only in `speclocation.py` and `github.SPEC_MARKER`'s use. Remove orphans (no dead code).
 - [X] T024 Run `python3 -m unittest discover tests` from `dev/alq-review/`, then the quickstart steps 1–6 that can run against the fake `gh`; state which steps were not run against a real issue.
-- [ ] T025 Tripwire before the PR: `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; any file above ~3 edits is rewritten once, not patched (pr-review-loop).
-- [ ] T026 When the branch is pushed, post #25's own location comment by hand with `python3 plugins/alq-review/scripts/speclocation.py post <checkout>` (spec Edge Cases).
+- [X] T025 Tripwire before the PR: `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; any file above ~3 edits is rewritten once, not patched (pr-review-loop).
+- [X] T026 When the branch is pushed, post #25's own location comment by hand with `python3 plugins/alq-review/scripts/speclocation.py post <checkout>` (spec Edge Cases).
 
 ## Dependencies & Order
 
