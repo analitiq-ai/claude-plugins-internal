@@ -192,3 +192,8 @@ Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an in
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.
+
+## Dependencies
+
+A Python script that a hook runs imports only the standard library and the plugin's own files. Installing
+the plugin copies files and installs no package, so any other import fails on a machine that lacks it.
