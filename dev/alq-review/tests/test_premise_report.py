@@ -107,12 +107,15 @@ class Check(unittest.TestCase):
     def test_whether_the_issue_reports_wrong_behaviour_is_yes_or_no(self):
         self.assert_one_problem(report(wrong="maybe"), WRITE, "Reports wrong behaviour:", "maybe")
 
-    def test_a_stop_pick_names_the_question_it_rests_on_and_gives_a_reason(self):
+    def test_a_stop_pick_names_the_question_it_rests_on_and_gives_a_reason_that_is_filled_in(self):
         for pick in (NO_SPEC, NOT_WORTH_DOING):
             with self.subTest(pick):
                 self.assertEqual(premise_report.problems(
                     report(pick, rests_on="needs-spec", reason="a typo", wrong="no"), pick), [])
                 self.assert_one_problem(report(pick, rests_on="needs-spec", wrong="no"), pick, "Reason:")
+                self.assert_one_problem(report(pick, rests_on="needs-spec", reason="[one line]", wrong="no"), pick,
+                                        "Reason:")
+                self.assert_one_problem(report(pick, reason="a typo", wrong="no"), pick, "Rests on:", "needs-spec")
                 self.assert_one_problem(report(pick, rests_on="size", reason="a typo", wrong="no"), pick,
                                         "Rests on:", "size", "needs-spec")
 
@@ -156,10 +159,12 @@ class Check(unittest.TestCase):
         self.assertEqual(premise_report.problems(report(answers=logged), WRITE), [])
         self.assertEqual(premise_report.spec_problems(spec_section(logged)), [])
 
-    def test_a_reason_or_a_defect_flag_that_is_empty_or_on_two_lines_cannot_be_read_back(self):
+    def test_a_reason_that_is_empty_unfilled_or_on_two_lines_and_a_flag_empty_or_on_two_cannot_be_read_back(self):
         text = report(NO_SPEC, rests_on="needs-spec", reason="a typo", wrong="no")
         for read, label, unreadable in ((premise_report.reason, "Reason", text + "Reason: another\n"),
                                         (premise_report.reason, "Reason", report()),
+                                        (premise_report.reason, "Reason",
+                                         report(NO_SPEC, rests_on="needs-spec", reason="[one line]", wrong="no")),
                                         (premise_report.reports_wrong_behaviour, "Reports wrong behaviour",
                                          text + "Reports wrong behaviour: yes\n"),
                                         (premise_report.reports_wrong_behaviour, "Reports wrong behaviour",
