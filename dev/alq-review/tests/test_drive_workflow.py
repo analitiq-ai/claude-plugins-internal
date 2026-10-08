@@ -1,7 +1,7 @@
 """drive_workflow.py against the real specify CLI, in a throwaway project.
 
-A rescope run pauses at grill before any agent step. A new-spec run reaches `specify`, which gets a
-stand-in `claude` that writes the spec the test names.
+No test runs the real agent: `plan` on a rescope gets a stand-in `claude` that writes no plan, and
+`specify` on a new spec gets one that writes the spec the test names.
 """
 import json
 import os
@@ -43,14 +43,22 @@ def drive(root, env, *args):
 class Project:
     def __init__(self, spec_text=SETTLED):
         self._tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self._tmp.name)
+        self.root = Path(self._tmp.name) / "project"
+        # Stands in for the agent `plan` dispatches to: keeps its prompt, writes no plan.
+        claude = Path(self._tmp.name) / "bin" / "claude"
+        self.prompts = Path(self._tmp.name) / "claude.log"
+        self.prompts.write_text("")
+        claude.parent.mkdir()
+        claude.write_text(f'#!/bin/sh\nprintf "%s\\n" "$2" >> "{self.prompts}"\n')
+        claude.chmod(0o755)
+        self.env = {**os.environ, "PATH": f"{claude.parent}{os.pathsep}{os.environ['PATH']}"}
         # A Spec Kit project with neither the plugin's preset nor its workflow installed.
         (self.root / ".specify" / "workflows").mkdir(parents=True)
         (self.root / SPEC_DIR).mkdir(parents=True)
         (self.root / SPEC_DIR / "spec.md").write_text(spec_text)
 
     def drive(self, *args):
-        return drive(self.root, None, *args)
+        return drive(self.root, self.env, *args)
 
     def spec_file(self, text):
         path = self.root / "spec.txt"
@@ -159,10 +167,10 @@ class Install(unittest.TestCase):
 
 class AfterGrill(unittest.TestCase):
     def approved(self, spec_text):
-        project = Project(spec_text)
-        self.addCleanup(project.close)
-        _, started = project.drive("start", project.spec_file("RESCOPE x"), SPEC_DIR)
-        proc, report = project.drive("resume", started["run_id"], "grill_verdict=approve")
+        self.project = Project(spec_text)
+        self.addCleanup(self.project.close)
+        _, started = self.project.drive("start", self.project.spec_file("RESCOPE x"), SPEC_DIR)
+        proc, report = self.project.drive("resume", started["run_id"], "grill_verdict=approve")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return report
 
@@ -174,6 +182,7 @@ class AfterGrill(unittest.TestCase):
     def test_a_rescoped_spec_without_premise_answers_runs_on_to_the_settled_design_check(self):
         report = self.approved(UNANSWERED)
         self.assertEqual((report["status"], report["step"]), ("failed", "settled-design"), report)
+        self.assertIn("speckit-plan", self.project.prompts.read_text())
 
     def test_a_rescoped_spec_with_no_labelled_root_cause_stops_the_run(self):
         report = self.approved(UNTRACED)
