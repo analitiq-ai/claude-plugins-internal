@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.1.0
 id: "0012"
-title: "Find spec folders by their position and keep no list of design documents"
+title: "Find spec folders by Spec Kit's mark and keep no list of design documents"
 status: draft
 date: 2026-10-06
 deciders: []
@@ -9,7 +9,7 @@ tags: [spec-folder, settled-design, review-round]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0008"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{settled_design,gate}.py"
@@ -34,7 +34,7 @@ externalRefs:
     label: "The rule to delete, what goes, what stays and the accepted loss"
 ---
 
-# ADR-0012: Find spec folders by their position and keep no list of design documents
+# ADR-0012: Find spec folders by Spec Kit's mark and keep no list of design documents
 
 ## Context
 
@@ -62,6 +62,9 @@ per repo. The same kind of list stayed in use for design documents. Issue #29 re
 Spec Kit marks a project with a `.specify/` folder, and creates spec folders only in the `specs/` beside
 it. When a repo commits `.specify/`, every checkout of it carries the mark.
 
+Which spec folder is the spec of a change is a separate question. ADR-0008 decides it: the issue names the
+folder.
+
 Why now: issue #29 deletes the rule. A list of path patterns has to be hand-rolled and maintained.
 
 ## Decision
@@ -72,10 +75,7 @@ Why now: issue #29 deletes the rule. A list of path patterns has to be hand-roll
    checkout: the branch, the files it changes and the spec folders among them.
 3. We will not require a spec folder for a change to a design document, and we will keep no list of
    design-document paths.
-4. We will keep the rule that a spec folder a branch changes must be settled before the first internal round.
-
-Which spec folder is the spec of a change is named by its issue. Issue #25 holds that design. It is not
-decided here.
+4. We will require that a spec folder a branch changes is settled before the first internal round.
 
 ## Options considered
 
@@ -134,4 +134,4 @@ where each repo puts its documents, and the rule keeps refusing changes that dec
 2. [ ] Delete the design-document rule, its list and its tests (issue #29), from a failing test that the
    settled-design check does not refuse a README-only branch.
 3. [ ] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no
-   `.specify/` beside it is not graded. No issue is open for this.
+   `.specify/` beside it is not graded (issue #56).
