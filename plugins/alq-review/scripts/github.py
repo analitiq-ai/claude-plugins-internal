@@ -1,14 +1,12 @@
 """The GitHub lookups the gate needs, through the gh CLI (which carries the bot's token).
 
-Each returns None when gh cannot answer, and the caller decides what an unknown means there; except
-pr_target and issue_spec, which raise RuntimeError instead, since for them None is an answer (no PR, no spec).
+Most return None when gh cannot answer, and the caller decides what an unknown means there. pr_target,
+issue_comments and write_issue_comment raise RuntimeError instead.
 """
 from __future__ import annotations
 
 import json
 import subprocess
-
-SPEC_MARKER = "<!-- analitiq-spec -->"
 
 # How the org pr-gate (analitiq-ai/.github pr-gate.js) marks a version-only release: the title of its
 # `internal-review` check run. Only a run the App posted is its word: an agent's token could post the same text.
@@ -40,25 +38,17 @@ def issue_state(slug: str, number: int) -> str | None:
     return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
 
 
-def issue_spec(slug: str, number: int) -> tuple[int, str] | None:
-    """(id, body) of the comment on issue `number` that carries the spec marker; None when it has none. RuntimeError
-    when gh cannot read its comments, or when more than one carries it: either could be the wrong one."""
-    comments = [json.loads(line) for line in _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments",
-                                                     "--jq", ".[] | {id, body}").splitlines()]
-    specs = [c for c in comments if SPEC_MARKER in c["body"]]
-    if len(specs) > 1:
-        raise RuntimeError(f"{slug}#{number} has {len(specs)} `{SPEC_MARKER}` comments "
-                           f"({', '.join(str(c['id']) for c in specs)}), and only one can say where the spec is. "
-                           "Next step: delete all but one")
-    return (specs[0]["id"], specs[0]["body"]) if specs else None
+def issue_comments(slug: str, number: int) -> list[tuple[int, str]]:
+    """(id, body) of every comment on issue `number`. RuntimeError when gh cannot read them."""
+    lines = _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments", "--jq", ".[] | {id, body}")
+    return [(comment["id"], comment["body"]) for comment in map(json.loads, lines.splitlines())]
 
 
-def post_issue_spec(slug: str, number: int, body: str) -> str:
-    """Writes `body` over the issue's marker comment, or posts it as a new comment when the issue has none; the
+def write_issue_comment(slug: str, number: int, body: str, comment_id: int | None) -> str:
+    """Writes `body` over comment `comment_id`, or as a new comment on issue `number` when that is None; the
     comment's URL."""
-    found = issue_spec(slug, number)
-    method, path = (("PATCH", f"repos/{slug}/issues/comments/{found[0]}") if found
-                    else ("POST", f"repos/{slug}/issues/{number}/comments"))
+    method, path = (("POST", f"repos/{slug}/issues/{number}/comments") if comment_id is None
+                    else ("PATCH", f"repos/{slug}/issues/comments/{comment_id}"))
     # The body goes in on stdin: it holds text a user typed, which must not reach a command line.
     return _answer("api", "-X", method, path, "-F", "body=@-", "--jq", ".html_url", stdin=body)
 

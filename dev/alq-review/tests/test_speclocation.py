@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -37,11 +38,17 @@ class Form(unittest.TestCase):
             speclocation.parse(f"{MARKER}\n# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n")
         self.assertIn("/alq-review:design-doc", str(refused.exception))
 
+    def test_a_whole_spec_after_a_blank_line_is_refused_naming_design_doc(self):
+        with self.assertRaises(SpecLocationError) as refused:
+            speclocation.parse(f"{MARKER}\r\n\r\n# Demo\r\n")
+        self.assertIn("/alq-review:design-doc", str(refused.exception))
+        self.assertIn("`# Demo`", str(refused.exception))
+
     def test_every_other_shape_is_refused_stating_the_form(self):
         malformed = {
             "wrong order": f"{MARKER}\nbranch: {BRANCH}\nspec: {FOLDER}\n",
             "extra line": LOCATED + "note: x\n",
-            "text before the marker": "see below\n" + LOCATED,
+            "blank line after the marker": LOCATED.replace("\n", "\n\n", 1),
             "no branch": f"{MARKER}\nspec: {FOLDER}\n",
             "the marker alone": f"{MARKER}\n",
             "empty value": f"{MARKER}\nspec: {FOLDER}\nbranch: \n",
@@ -90,18 +97,30 @@ class Issue(Gate):
 
 
 class SpecComment(Issue):
-    def test_the_comment_comes_with_its_id(self):
+    QUOTED = "the gate said:\n" + LOCATED
+
+    def located(self):
+        return speclocation.located("acme/demo", 1)
+
+    def test_github_hands_over_every_comment_with_its_id(self):
         self.comments("unrelated chatter", LOCATED)
-        self.assertEqual(github.issue_spec("acme/demo", 1), (102, LOCATED))
+        self.assertEqual(github.issue_comments("acme/demo", 1), [(101, "unrelated chatter"), (102, LOCATED)])
 
-    def test_an_issue_without_one_has_none(self):
-        self.comments("unrelated chatter")
-        self.assertIsNone(github.issue_spec("acme/demo", 1))
+    def test_the_location_comment_is_the_one_whose_first_line_is_the_marker(self):
+        self.comments(self.QUOTED, LOCATED)
+        self.assertEqual(self.located(), Located(FOLDER, BRANCH))
 
-    def test_two_are_refused_naming_both(self):
+    def test_a_comment_that_only_quotes_the_marker_is_no_location_comment(self):
+        self.comments(self.QUOTED)
+        with self.assertRaisesRegex(SpecLocationError, "has no location comment"):
+            self.located()
+
+    def test_two_are_refused_naming_both_with_one_next_step(self):
         self.comments(LOCATED, "unrelated chatter", LOCATED)
-        with self.assertRaisesRegex(RuntimeError, "101, 103"):
-            github.issue_spec("acme/demo", 1)
+        with self.assertRaisesRegex(SpecLocationError, "101, 103") as refused:
+            self.located()
+        self.assertIn("delete all but one", str(refused.exception))
+        self.assertEqual(str(refused.exception).count("Next step"), 1)
 
 
 class Resolve(Issue):
@@ -177,9 +196,9 @@ class Cli(Issue):
         (self.project / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": "specs/001-demo"}))
         self.comments()
 
-    def run_cli(self, *args):
-        return subprocess.run([sys.executable, str(SCRIPTS / "speclocation.py"), *args], env=self.env, cwd=self.root,
-                              capture_output=True, text=True)
+    def run_cli(self, *args, cwd=None):
+        return subprocess.run([sys.executable, str(SCRIPTS / "speclocation.py"), *args], env=self.env,
+                              cwd=cwd or self.root, capture_output=True, text=True)
 
     def posted(self):
         path = Path(self.env["GH_POSTED"])
@@ -196,6 +215,11 @@ class Cli(Issue):
         self.assertEqual(self.run_cli("post", str(self.project)).returncode, 0)
         self.assertEqual(self.posted(), LOCATED)
         self.assertIn("api -X PATCH repos/acme/demo/issues/comments/102", self.gh_calls()[-1])
+
+    def test_post_writes_a_new_comment_beside_one_that_only_quotes_the_marker(self):
+        self.comments(SpecComment.QUOTED)
+        self.assertEqual(self.run_cli("post", str(self.project)).returncode, 0)
+        self.assertIn("api -X POST repos/acme/demo/issues/1/comments", self.gh_calls()[-1])
 
     def test_none_posts_the_reason_and_creates_no_folder(self):
         done = self.run_cli("none", str(self.project), "docs only")
@@ -223,6 +247,24 @@ class Cli(Issue):
         self.comments(LOCATED)
         done = self.run_cli("show", "1", "--repo", "acme/demo")
         self.assertEqual((done.returncode, done.stdout), (0, f"spec: {FOLDER}\nbranch: {BRANCH}\n"), done.stderr)
+
+    def test_show_without_repo_takes_the_repo_of_the_checkout_it_runs_in(self):
+        self.comments(LOCATED)
+        done = self.run_cli("show", "1")
+        self.assertEqual((done.returncode, done.stdout), (0, f"spec: {FOLDER}\nbranch: {BRANCH}\n"), done.stderr)
+        self.assertIn("repos/acme/demo/issues/1/comments", self.gh_calls()[-1])
+
+    def test_show_without_repo_outside_a_checkout_is_bad_usage_naming_repo(self):
+        with tempfile.TemporaryDirectory() as outside:
+            done = self.run_cli("show", "1", cwd=outside)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("--repo", done.stderr)
+
+    def test_show_refuses_two_location_comments_as_it_refuses_a_malformed_one(self):
+        self.comments(LOCATED, LOCATED)
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("101, 102", done.stderr)
 
     def test_show_prints_that_no_spec_is_needed(self):
         self.comments(speclocation.render_none("docs only"))

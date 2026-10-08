@@ -11,11 +11,12 @@ from pathlib import Path, PurePosixPath
 import github
 import worktree
 
-FORM = (f"{github.SPEC_MARKER}\nspec: <folder path from the repo root, ending specs/<feature>>\n"
+MARKER = "<!-- analitiq-spec -->"
+FORM = (f"{MARKER}\nspec: <folder path from the repo root, ending specs/<feature>>\n"
         "branch: <branch that holds it>\n"
-        f"or, for an issue that needs no spec:\n{github.SPEC_MARKER}\nspec: none\nreason: <one line>")
+        f"or, for an issue that needs no spec:\n{MARKER}\nspec: none\nreason: <one line>")
 
-_KEY_VALUE = re.compile(r"\w+: ")
+_KEY_OR_BLANK = re.compile(r"\w+:( |$)|\s*$")
 _ISSUE_IN_BRANCH = re.compile(r"^[a-z]+/(\d+)-")
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class SpecLocationError(RuntimeError):
 
 
 def _malformed(why: str) -> SpecLocationError:
-    return SpecLocationError(f"its `{github.SPEC_MARKER}` comment {why}. Next step: make the comment exactly\n{FORM}")
+    return SpecLocationError(f"its `{MARKER}` comment {why}. Next step: make the comment exactly\n{FORM}")
 
 
 def _value(line: str, key: str) -> str:
@@ -59,13 +60,13 @@ def _folder(spec: str) -> str:
 
 
 def parse(body: str) -> Located | NoSpec:
-    marker, *lines = body.strip().splitlines()
-    if marker != github.SPEC_MARKER:
-        raise _malformed("does not start with the marker")
-    if lines and not _KEY_VALUE.match(lines[0]):
+    """What a comment whose first line is the marker says."""
+    lines = body.strip().splitlines()[1:]
+    prose = next((line for line in lines if not _KEY_OR_BLANK.match(line)), None)
+    if prose is not None:
         raise SpecLocationError(
-            f"its `{github.SPEC_MARKER}` comment goes on with `{lines[0]}`, not with where a spec folder is. A spec "
-            "posted as a comment is no longer read. Next step: run `/alq-review:design-doc` on the issue; it "
+            f"its `{MARKER}` comment holds the line `{prose}`, not only where a spec folder is. The gate "
+            "no longer reads a spec posted as a comment. Next step: run `/alq-review:design-doc` on the issue; it "
             "creates the spec folder and rewrites the comment to say where the folder is.")
     if len(lines) != 2:
         raise _malformed(f"has {len(lines)} lines after the marker, not 2")
@@ -82,11 +83,11 @@ def _checked(body: str) -> str:
 
 
 def render(folder: str, branch: str) -> str:
-    return _checked(f"{github.SPEC_MARKER}\nspec: {folder}\nbranch: {branch}\n")
+    return _checked(f"{MARKER}\nspec: {folder}\nbranch: {branch}\n")
 
 
 def render_none(reason: str) -> str:
-    return _checked(f"{github.SPEC_MARKER}\nspec: none\nreason: {reason}\n")
+    return _checked(f"{MARKER}\nspec: none\nreason: {reason}\n")
 
 
 def issue_number(branch: str) -> int | None:
@@ -94,10 +95,26 @@ def issue_number(branch: str) -> int | None:
     return int(found.group(1)) if found else None
 
 
+def _comment(slug: str, issue: int) -> tuple[int, str] | None:
+    """(id, body) of the issue's location comment, the one whose first line is the marker; None when it has none.
+    A comment that only quotes the marker further down, as a pasted refusal does, is not one."""
+    found = [(id_, body) for id_, body in github.issue_comments(slug, issue)
+             if body.lstrip().splitlines()[:1] == [MARKER]]
+    if len(found) > 1:
+        raise SpecLocationError(f"{slug}#{issue} has {len(found)} location comments "
+                                f"({', '.join(str(id_) for id_, _ in found)}), and only one can say where the spec "
+                                "is. Next step: delete all but one.")
+    return found[0] if found else None
+
+
+def _upsert(slug: str, issue: int, body: str) -> str:
+    found = _comment(slug, issue)
+    return github.write_issue_comment(slug, issue, body, found and found[0])
+
+
 def located(slug: str, issue: int) -> Located | NoSpec:
-    """What the issue's location comment says. SpecLocationError when the issue has none or it is malformed; a
-    RuntimeError of github.issue_spec passes through."""
-    found = github.issue_spec(slug, issue)
+    """What the issue's location comment says."""
+    found = _comment(slug, issue)
     if found is None:
         raise SpecLocationError(f"{slug}#{issue} has no location comment, so nothing says where its spec is. "
                                 f"Next step: run `/alq-review:design-doc #{issue}`; it creates the spec folder and "
@@ -111,7 +128,7 @@ def located(slug: str, issue: int) -> Located | NoSpec:
 def resolve(slug: str, branch: str, root: str) -> FoundSpec | NoSpec | None:
     """What a change on `branch` is graded against: spec.md of the folder its issue names, as committed in the
     checkout at `root`; NoSpec when the issue needs none; None when the branch names no issue. SpecLocationError
-    when the comment or the file cannot be used; a RuntimeError of github.issue_spec passes through."""
+    when the comment or the file cannot be used; RuntimeError when gh cannot read the issue's comments."""
     issue = issue_number(branch)
     if issue is None:
         return None
@@ -146,18 +163,18 @@ def post(project: str) -> str:
     where, issue = _issue_of(project)
     feature = json.loads((Path(project) / ".specify" / "feature.json").read_text())["feature_directory"]
     folder = (Path(project).resolve() / feature).relative_to(Path(where.root).resolve()).as_posix()
-    return github.post_issue_spec(where.slug, issue, render(folder, where.branch))
+    return _upsert(where.slug, issue, render(folder, where.branch))
 
 
 def post_none(checkout: str, reason: str) -> str:
     where, issue = _issue_of(checkout)
-    return github.post_issue_spec(where.slug, issue, render_none(reason))
+    return _upsert(where.slug, issue, render_none(reason))
 
 
 def show(slug: str, issue: int) -> str:
     where = located(slug, issue)
     body = render_none(where.reason) if isinstance(where, NoSpec) else render(where.folder, where.branch)
-    return body.removeprefix(github.SPEC_MARKER + "\n")
+    return body.removeprefix(MARKER + "\n")
 
 
 def _run(parser: argparse.ArgumentParser) -> str:

@@ -505,13 +505,12 @@ def on_workflow(payload: dict) -> dict | None:
                     refused = refuse_spec(payload, action, unsettled, event)
                     if refused:
                         return refused
-            spec = None
-            if stage == "internal":
-                spec, lost = _spec(where)
-                if lost:
-                    refused = refuse(payload, action, lost, event)
-                    if refused:
-                        return refused
+            # Audits too: their reviewers ignore the spec, but their assessor's brief resolves it.
+            spec, lost = _spec(where)
+            if lost:
+                refused = refuse(payload, action, lost, event)
+                if refused:
+                    return refused
             waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",

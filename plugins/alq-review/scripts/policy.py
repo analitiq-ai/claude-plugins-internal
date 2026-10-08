@@ -110,7 +110,7 @@ def _lock_reason(state: dict) -> str | None:
                "releases the branch." if reshape_spec_ruling(state) else "")
     return (f"{why} The branch is locked until the user releases it. Stop and ask the user: {question} Once they "
             f"have decided, they start their next prompt with `unlock {unlock_ref(state)}`.{rescope} "
-            "Editing the spec comment or changing files another way does not release it.")
+            "Editing the spec or changing files another way does not release it.")
 
 
 def mutation(state: dict, *, inflight: int) -> Decision:

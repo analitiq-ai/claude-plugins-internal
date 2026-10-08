@@ -7,7 +7,7 @@ from paths import PLUGIN
 
 import helpers  # noqa: F401  puts scripts/ on the path
 
-import github
+import speclocation
 
 SKILLS = PLUGIN / "skills"
 TACKLE = SKILLS / "alq-issue-tackle" / "SKILL.md"
@@ -37,7 +37,7 @@ class SpecSource(unittest.TestCase):
     def test_tackle_root_cause_and_design_doc_do_not_spell_the_marker(self):
         for path in (TACKLE, ROOT_CAUSE, DESIGN_DOC):
             with self.subTest(skill=path.parent.name):
-                self.assertNotIn(github.SPEC_MARKER, path.read_text())
+                self.assertNotIn(speclocation.MARKER, path.read_text())
 
     def test_tackle_and_root_cause_hold_no_jq_filter(self):
         for path in (TACKLE, ROOT_CAUSE):

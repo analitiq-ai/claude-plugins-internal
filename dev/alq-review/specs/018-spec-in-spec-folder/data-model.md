@@ -25,7 +25,8 @@ malformed.
 
 ```
 branch --issue_number (in speclocation.py)--> issue | None ──None──> None (no spec handed; FR-014)
-issue --github.issue_spec--> (id, body) | None ──None──> refuse: run design-doc
+issue --_comment (first line is the marker)--> (id, body) | None ──None──> refuse: run design-doc
+                                               two or more ──> refuse: names the ids, delete all but one
 body --parse--> NoSpec(reason) ──> returned as it is
               \-> Located
 Located.folder in root?            no ──> refuse: names folder + Located.branch

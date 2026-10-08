@@ -369,6 +369,7 @@ class IssueSpec(Gate):
                 self.comments(*bodies)
                 out, _ = self.launch()
                 self.assertRefused(out, *words)
+                self.assertNotIn("gh auth status", self.reason(out))
                 self.assertEqual(self.saved()["rounds"], [])
 
     def test_an_unreadable_issue_refuses_the_launch_in_ghs_words_and_opens_no_round(self):
@@ -394,10 +395,11 @@ class IssueSpec(Gate):
         for prompt in prompts:
             self.assertNotIn(self.SPEC, prompt)
 
-    def test_an_audit_launch_is_allowed_on_an_issue_with_no_location_comment(self):
+    def test_an_audit_launch_the_spec_cannot_be_found_for_is_refused_as_an_internal_one_is(self):
         self.comments("unrelated chatter")
         out, _ = self.launch(stage="audit")
-        self.assertEqual(self.decision(out), "allow")
+        self.assertRefused(out, "/alq-review:design-doc #1")
+        self.assertEqual(self.saved()["rounds"], [])
 
     def test_the_assessor_brief_carries_the_spec_text_and_its_folder(self):
         args = self.reviewed()
@@ -416,7 +418,7 @@ class IssueSpec(Gate):
     def test_briefs_and_gate_name_neither_the_marker_nor_the_comment_lookup(self):
         for name in ("briefs.py", "gate.py"):
             source = (SCRIPTS / name).read_text()
-            self.assertFalse("--jq" in source or "SPEC_MARKER" in source or "issue_spec" in source, name)
+            self.assertFalse("--jq" in source or "MARKER" in source or "issue_comments" in source, name)
 
 
 class ReleaseReady(Gate):

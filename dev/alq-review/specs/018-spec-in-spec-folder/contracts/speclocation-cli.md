@@ -17,8 +17,8 @@ check that could not run.
 Refusals (each names the next step; the text is built in `speclocation.py`):
 
 - no location comment: run `/alq-review:design-doc #<issue>`;
-- repeated comment: `github.issue_spec` names both comment ids, and the exit is 2;
-- malformed or out-of-repo comment: states the form, and the exit is 1; an old whole-spec comment names `design-doc`;
+- repeated comment: names the comment ids and says to delete all but one;
+- malformed or out-of-repo comment: states the form; an old whole-spec comment names `design-doc`;
 - folder not in the checkout: names the folder and the `branch:` that holds it;
 - `spec.md` missing or empty: as above.
 

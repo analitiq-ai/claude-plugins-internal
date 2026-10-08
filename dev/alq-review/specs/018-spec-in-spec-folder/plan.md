@@ -72,7 +72,7 @@ specs/018-spec-in-spec-folder/
 plugins/alq-review/
 ├── scripts/
 │   ├── speclocation.py          # new: parse / render / resolve / show / post / none
-│   ├── github.py                # issue_spec returns (id, body); upsert helper
+│   ├── github.py                # issue_comments reads, write_issue_comment writes one by id
 │   ├── briefs.py                # branch_spec deleted; prompt and brief take the resolved spec
 │   └── gate.py                  # review + assess launch call resolve; refusal text
 ├── skills/
@@ -85,7 +85,7 @@ dev/alq-review/tests/
 ├── test_speclocation.py         # new
 ├── test_spec_source.py          # rewritten
 ├── test_gate.py                 # IssueSpec rewritten
-└── test_worktree_facts.py       # the one mock of github.issue_spec follows its new return
+└── test_worktree_facts.py       # its one mock of the spec lookup becomes speclocation.resolve
 ```
 
 **Structure Decision**: one new module for the location comment, because three consumers and one writer share its form
