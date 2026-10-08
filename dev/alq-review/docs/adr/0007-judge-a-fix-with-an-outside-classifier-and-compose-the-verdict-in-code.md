@@ -9,7 +9,7 @@ tags: [shim-check, classifier, verdict]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0015"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{jev,shimcheck,shimgate}.py"
@@ -45,18 +45,18 @@ reach the other sites with the same defect. A model has to give them, within thr
 
 Two later specs met the same limits and each added a rule. The rules are spread over three spec folders.
 
+ADR-0015 decides that private source may be sent to the classifier.
+
 ## Decision
 
 1. We will judge a fix with Jev, an outside one-shot classifier reached through OpenRouter.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
-3. We will compose the verdict in code, in one function.
+3. We will compose the verdict in code.
 4. We will keep the replayed questions word for word. A change to their wording or to the request's shape
    needs a new replay.
 5. We will store an answer as Jev gave it, so the ledger and the log report what it said. Code may leave an
    answer unread; it does not rewrite one.
 6. We will put a rule in code ahead of the model wherever code can decide.
-
-ADR-0015 decides that private source may be sent to the classifier.
 
 ## Options considered
 
