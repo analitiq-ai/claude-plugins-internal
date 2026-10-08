@@ -21,7 +21,8 @@ CHECK = "alq-review:shim-check"
 # Below the 60 s hooks.json gives the gate, so a Jev that stops answering fails the check before the hook is killed.
 JEV_SECONDS = 40
 # What the user types after `override`: a bug's chain, or the first 12 digits of a tree no check has run on.
-BUG = re.compile(r"shim-(?P<id>[0-9a-f]{16}|[0-9a-f]{12})")
+BUG_PREFIX = "shim-"
+BUG = re.compile(rf"{BUG_PREFIX}(?P<id>[0-9a-f]{{16}}|[0-9a-f]{{12}})")
 
 
 def _logged(repo: str, root: str | None = None) -> SimpleNamespace:
@@ -467,15 +468,17 @@ def _override_tree(prefix: str) -> list[str]:
 
 
 def on_prompt(payload: dict, word: str) -> dict | None:
-    """Answers `override <word>` where the word names a bug of the shim check; None where it does not."""
-    typed = BUG.fullmatch(word)
-    if typed is None:
+    """Answers `override <word>` where the word is written as a bug of the shim check; None where it is not.
+    `override` opens ordinary prompts too, so only a word that starts as a bug's name is taken for the command."""
+    if not word.startswith(BUG_PREFIX):
         return None
-    named = typed["id"]
-    overridden = _override_chain(named) if len(named) == 16 else _override_tree(named)
+    typed = BUG.fullmatch(word)
+    overridden = []
+    if typed:
+        overridden = _override_chain(typed["id"]) if len(typed["id"]) == 16 else _override_tree(typed["id"])
     if overridden:
-        record(payload, "shim-override", "overridden", f"shim-{named}: {', '.join(overridden)}")
-        said = (f"The user switched the shim check off for bug shim-{named} in {', '.join(overridden)}: staged changes "
+        record(payload, "shim-override", "overridden", f"{word}: {', '.join(overridden)}")
+        said = (f"The user switched the shim check off for bug {word} in {', '.join(overridden)}: staged changes "
                 "of that bug commit without the check until HEAD moves.")
     else:
         said = f"`override {word}` names no bug the shim check knows, so nothing was switched off."
