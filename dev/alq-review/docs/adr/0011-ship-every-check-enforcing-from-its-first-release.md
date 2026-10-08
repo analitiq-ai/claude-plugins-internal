@@ -51,9 +51,8 @@ Why now: the next check has two specs to follow and they disagree.
 
 ## Decision
 
-1. We will ship every new check refusing from its first release.
-2. We will give a new check no record-only phase and no accuracy bar to pass first.
-3. We will build in no threshold and no review date. The user reads the log and decides.
+We will ship every new check refusing from its first release, with no record-only phase, no accuracy bar to
+pass first, and no built-in threshold that turns it off later.
 
 ## Options considered
 
@@ -74,9 +73,9 @@ The specs keep two answers, and each new check picks one.
 Rejected for the claim check and the shim check in the clarifications quoted above. The cost: a check
 refuses before its verdicts are measured.
 
-### Option D: Enforce, with a built-in threshold or a trial review
+### Option D: Enforce, with a built-in threshold
 
-Proposed in critique. Point 3 rules it out.
+Proposed in critique. Rejected: a check that turns itself off stops guarding without anyone deciding that.
 
 ## Trade-offs
 
