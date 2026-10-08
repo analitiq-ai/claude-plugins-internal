@@ -57,9 +57,9 @@ itself to be refused, so it had to solve the problem and not step around it.
    `git add` in an earlier command.
 3. We will not start a check while a tracked file differs from the index, so the agents that read the
    checkout read what is staged.
-4. We will keep the rules of point 2 in one function that every commit check calls.
-5. We will not check a commit with nothing staged, or one that concludes a merge, cherry-pick or revert.
-6. We will not check again what a repo's own commit hook rewrites, and we will not gate the push.
+4. We will not check a commit with nothing staged, or one that concludes a merge, cherry-pick or revert.
+   The first changes nothing, and the others only combine, replay or undo commits that already exist.
+5. We will not check again what a repo's own commit hook rewrites, and we will not gate the push.
 
 ## Options considered
 
@@ -67,7 +67,7 @@ itself to be refused, so it had to solve the problem and not step around it.
 
 | Dimension | Assessment |
 |---|---|
-| What was checked is what lands | Yes, short of point 6 |
+| What was checked is what lands | Yes, short of point 5 |
 | The rule | Closed, and the same words the refusal uses: run `git commit` alone |
 | Existing tools | `git write-tree`. No tool was found that maps a commit command to its tree |
 | Cost | Two commands for each commit |
