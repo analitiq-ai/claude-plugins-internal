@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0015"
 title: "Send private source to the outside classifier"
-status: draft
+status: accepted
 date: 2026-10-07
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [classifier, private-source]
 scope: org
 reversibility: one-way-door
@@ -15,6 +15,7 @@ affects:
     pattern: "plugins/alq-review/scripts/jev.py"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -103,4 +104,4 @@ No alternative to sending private source was weighed.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.

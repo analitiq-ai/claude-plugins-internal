@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0004"
 title: "Take the user's authority from a prompt that starts with a keyword"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [release, holds, user-authority]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "plugins/alq-review/hooks/hooks.json"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -106,7 +107,7 @@ Rejected by constitution P2. A hold that an agent can release has a second way o
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Build the switch of issue #26 as a keyword prompt.
 3. [ ] Decide whether the `ledger.py unlock` command stays. It is a release route that is not a prompt.
 4. [ ] Point constitution P2 at this ADR for how the user's action is recognised, in its own PR.

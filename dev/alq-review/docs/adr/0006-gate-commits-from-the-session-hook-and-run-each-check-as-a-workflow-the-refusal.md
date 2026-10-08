@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0006"
 title: "Gate commits from the session hook and run each check as a workflow the refusal names"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, commit-gate, hooks]
 scope: component
 reversibility: two-way-door
@@ -19,6 +19,7 @@ affects:
     pattern: "plugins/alq-review/workflows/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -115,4 +116,4 @@ Rejected:
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.

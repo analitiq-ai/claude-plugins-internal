@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0008"
 title: "Keep the spec in the spec folder, not in an issue comment"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, review-round, skills]
 scope: component
 reversibility: two-way-door
@@ -19,6 +19,7 @@ affects:
     pattern: "dev/alq-review/{tests/test_spec_source.py,specs/014-review-spec/**}"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -98,6 +99,6 @@ committed beside the comment it drifts from".
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Settle the open points of issue #25 in its spec.
 3. [ ] Change the three skills, the gate's spec reader and the tests in one change.

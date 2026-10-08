@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0009"
 title: "Refuse when a check could not run and name the next step"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [failure-handling, gates]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/.specify/memory/constitution.md"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -91,6 +92,6 @@ The held-branch watch does this, and P4 allows it. Rejected: the call goes throu
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back, and confirms that `UNSURE` is an answer.
+1. [x] The ratifier ratifies this ADR, or sends it back, and confirms that `UNSURE` is an answer.
 2. [ ] Bring the gates that let a call through into line, tracked in an issue.
 3. [ ] Amend constitution P4 to say that the outcome refuses, in its own PR.

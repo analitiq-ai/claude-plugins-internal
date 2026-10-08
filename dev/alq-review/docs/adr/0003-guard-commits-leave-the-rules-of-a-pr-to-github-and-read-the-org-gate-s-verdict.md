@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0003"
 title: "Guard commits, leave the rules of a PR to GitHub and read the org gate's verdict from its check run"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [merge-gate, org-gate, github]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/specs/008-gate-check-runs-prose/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -116,6 +117,6 @@ Not chosen: the exception works today, and the org gate already rules which PRs 
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Decide whether the poller's App filter and the one in `github.py` become one reader.
 3. [ ] Decide whether the App name, run name and title prefix get a drift test.

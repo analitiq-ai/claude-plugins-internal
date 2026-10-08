@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0011"
 title: "Ship every check enforcing from its first release"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [rollout, mode, claim-check, shim-check, spec-checks]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/specs/004-spec-folder-checks/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -92,5 +93,5 @@ Proposed in critique. Rejected: a check that turns itself off stops guarding wit
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Settle how a check is switched off (issue #26).

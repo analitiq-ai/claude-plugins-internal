@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0012"
 title: "Find spec folders by Spec Kit's mark and keep no list of design documents"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec-folder, settled-design, review-round]
 scope: component
 reversibility: two-way-door
@@ -21,6 +21,7 @@ affects:
     pattern: "dev/alq-review/specs/{004-spec-folder-checks,015-nested-spec-folders}/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -130,7 +131,7 @@ where each repo puts its documents, and the rule keeps refusing changes that dec
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Delete the design-document rule, its list and its tests (issue #29), from a failing test that the
    settled-design check does not refuse a README-only branch.
 3. [ ] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no

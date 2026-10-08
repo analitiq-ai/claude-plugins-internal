@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0013"
 title: "Start the count again when a file is moved"
-status: draft
+status: accepted
 date: 2026-10-07
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, holds]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/specs/005-claim-check-gate/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -82,5 +83,5 @@ accurate way to detect that a file was moved.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Carry it into the design of ADR-0001's rule (issue #17).

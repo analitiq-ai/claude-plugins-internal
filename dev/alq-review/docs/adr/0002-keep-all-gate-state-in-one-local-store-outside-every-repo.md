@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0002"
 title: "Keep all gate state in one local store outside every repo"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [state, ledger]
 scope: component
 reversibility: two-way-door
@@ -15,6 +15,7 @@ affects:
     pattern: "plugins/alq-review/scripts/{ledger,hookio,pre_merge_gate}.py"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -116,7 +117,7 @@ Rejected:
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [x] Decide whether the merge override grants move under the state root.
 3. [ ] List every folder the plugin writes in the README's State section.
 4. [ ] Move the merge override grants under the state root (issue #36).

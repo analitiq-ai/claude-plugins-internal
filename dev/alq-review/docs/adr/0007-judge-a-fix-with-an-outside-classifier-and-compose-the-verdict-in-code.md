@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0007"
 title: "Judge a fix with an outside classifier and compose the verdict in code"
-status: draft
+status: accepted
 date: 2026-10-06
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [shim-check, classifier, verdict]
 scope: component
 reversibility: two-way-door
@@ -17,6 +17,7 @@ affects:
     pattern: "dev/alq-review/specs/{006-shim-check-gate,011-shim-no-site-left,012-tests-only-tree}/**"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -94,4 +95,4 @@ Rejected: its overall answer would differ from its two answers.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
