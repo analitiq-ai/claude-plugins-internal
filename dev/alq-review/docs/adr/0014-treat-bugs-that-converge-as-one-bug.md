@@ -46,10 +46,9 @@ weigh merging.
 
 ## Decision
 
-We will treat bugs that converge as one bug. When two bugs that are tracked apart converge, they are one bug
-from then on, and every later step applies to them together.
-
-We leave open how the refusals of the merged bug are counted.
+1. We will treat two tracked bugs as one bug from the moment one staged change overlaps both. Every later
+   step applies to them together.
+2. We will give the merged bug the higher of the two counts of refusals.
 
 ## Options considered
 
@@ -60,6 +59,7 @@ We leave open how the refusals of the merged bug are counted.
 | One check of a change that overlaps two bugs | One verdict for one bug |
 | Deep sweep | One, for both together |
 | Later steps | Applied to both together |
+| Count of refusals | The higher of the two |
 
 ### Option B: Do nothing
 
@@ -71,9 +71,18 @@ override.
 Each bug keeps its own count and gets its own deep sweep at its own third refusal. Rejected: a commit that
 fixes two bugs and is ruled a patch needs both sent for the deeper sweep together.
 
+### Option D: Add the two counts
+
+Rejected: the sum can reach the limit at once, so a commit is held although neither bug had reached it.
+
+### Option E: Start the merged bug's count again
+
+Rejected: a commit that touches two bugs would wipe both counts.
+
 ## Trade-offs
 
 - Two bugs that converged stay one bug, with one hold, when they are in fact unrelated.
+- The bug with fewer refusals takes on the count of the other.
 
 ## Consequences
 
