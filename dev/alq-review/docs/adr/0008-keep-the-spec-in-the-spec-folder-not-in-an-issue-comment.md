@@ -47,18 +47,18 @@ The `design-doc` skill writes a spec folder, `<dir>/specs/<feature>/`, for the s
 folders each open by saying that the acceptance criteria are the issue comment. So a reader has to open two places to know what a change must do, and nothing keeps
 the two in step.
 
+The format of the comment in which an issue names its spec folder, and the points still open, are in
+issue #25.
+
 Why now: issue #25 moves the spec into the spec folder, and the skills and the gate still read the comment.
 
 ## Decision
 
-1. We will keep the spec of a change in its spec folder. An issue comment is no longer its home.
+1. We will keep the spec of a change in its spec folder.
 2. We will have every part of the plugin that reads the spec read it from the spec folder: the skills that
    shape and tackle an issue, and what the gate hands to the internal reviewers and to the assessor.
-3. We will switch them in one change. Otherwise the skills say the spec is in the folder while the gate
-   still grades each review against the comment.
-
-How an issue names its spec folder, and the points still open, are in issue #25. They are settled there,
-not here.
+3. We will have the issue name its spec folder, in one comment. The gate refuses when the comment is
+   missing or names a folder that is not there.
 
 ## Options considered
 
