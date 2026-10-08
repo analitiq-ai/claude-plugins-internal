@@ -44,10 +44,11 @@ class Form(unittest.TestCase):
         self.assertIn("/alq-review:design-doc", str(refused.exception))
 
     def test_text_with_no_spec_line_is_refused_naming_design_doc_and_not_the_form(self):
-        with self.assertRaises(SpecLocationError) as refused:
-            speclocation.parse(f"{MARKER}\nGoal: x\nScope: y\n")
-        self.assertIn("/alq-review:design-doc", str(refused.exception))
-        self.assertNotIn("spec: <folder", str(refused.exception))
+        for body in (f"{MARKER}\nGoal: x\nScope: y\n", f"{MARKER}\nGoal: move the spec: x\nScope: y\n"):
+            with self.subTest(body), self.assertRaises(SpecLocationError) as refused:
+                speclocation.parse(body)
+            self.assertIn("/alq-review:design-doc", str(refused.exception))
+            self.assertNotIn("spec: <folder", str(refused.exception))
 
     def test_every_other_shape_is_refused_stating_the_form(self):
         malformed = {
@@ -57,6 +58,7 @@ class Form(unittest.TestCase):
             "extra rule line": LOCATED + "---\n",
             "prose after none": f"{MARKER}\nspec: none\nreason: docs only\n(agreed with K.)\n",
             "no space after the key": f"{MARKER}\nspec:{FOLDER}\nbranch: {BRANCH}\n",
+            "indented spec line": f"{MARKER}\n  spec: {FOLDER}\nbranch: {BRANCH}\n",
             "blank line after the marker": LOCATED.replace("\n", "\n\n", 1),
             "no branch": f"{MARKER}\nspec: {FOLDER}\n",
             "the marker alone": f"{MARKER}\n",
