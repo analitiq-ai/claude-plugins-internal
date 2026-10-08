@@ -50,4 +50,4 @@ A grant that cannot be recorded does not exist (R4). Grants that cannot be read 
 merge that needed one is told so (R5).
 
 No other record changes. `ledger.db`, `gate.log` and the session's switch are not touched. A failure is one
-line in `errors.log` (R4, R5); when that line cannot be written, the hook says so on stderr.
+line in `errors.log` (R4, R5); when that line cannot be written, the answer says so.

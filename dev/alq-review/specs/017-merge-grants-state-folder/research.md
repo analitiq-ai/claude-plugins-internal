@@ -117,8 +117,10 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   Without a repo (R8):
   `` `override-merge #N` does not say which repo's PR that is, so nothing is granted. The user names the PR: `override-merge owner/repo#N`. ``
   A failure to record is also written to `errors.log`, inside a guard that lets any failure of that step pass:
-  the answer already carries the reason, and the guard says on stderr that the log line was not written. The
-  hook exits 0 and the rest of the prompt goes on. `grant` catches
+  the answer already carries the reason, and where the log line could not be written the answer says that too.
+  Nothing is written to stderr: run on 2026-10-08, a line printed there by the script of review round 1
+  (`4ac61ee`) ended the hook at exit 120 with no answer when stderr was a pipe nobody reads.
+  The hook exits 0 and the rest of the prompt goes on. `grant` catches
   every exception: it runs outside `main`'s guard, so it is the last thing between a failure and a program
   trace.
 - **Rationale**: FR-005, FR-009, FR-016, FR-017. The recorded line is shown to the user so that silence means
@@ -270,8 +272,8 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   seventeen fails the tests the table names for it.
 - **Measured again** (2026-10-08, with what review of the PR added): 58 tests in the file. On main's script 22
   pass and 36 do not: 34 fail and 2 end in an error. On the new script all 58 pass, and the whole suite's 744.
-  Twenty-two wrong versions, the seventeen rebuilt on the new script and five more (contract: N9 to N12, N28,
-  N30, N31): each fails the tests named for it.
+  Twenty-six wrong versions, the seventeen rebuilt on the new script and nine more from the two rounds of
+  review (tasks, Phase 9): each fails the tests named for it.
 - **Not run by anyone**: the test that makes a folder read-only, as root. It skips that half there.
 
 ## R8: An override and a grant name the PR as `owner/repo#N`
@@ -281,6 +283,7 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   round reference spells one. At a merge: the name is read from the address `gh pr view` already returns, by
   `PR_URL`, which gains a group for the number. A name is spelled in one place, `REPO` and `NUMBER`, in ASCII
   and with no leading zero, and the typed form, GitHub's address and the record are each matched against it.
+  The ASCII is in the classes themselves, not in a flag on each pattern.
   The record holds names and a grant is found by comparing the
   whole name. `override-merge #N` is matched only to be answered with what to type (R4); it grants nothing.
   The `--admin` refusal gives the line in full, `override-merge acme/demo#12`. Where a PR has no name, no grant
@@ -322,3 +325,6 @@ callers today are `gate.py` (reviewers running, held Bash calls) and `claimgate.
   print nothing and write nothing. On the script as first pushed (`33ae8b1`) the second was recorded as a name
   with a letter from outside ASCII, which the record's own reader refuses: the next override in that session
   was answered as not recorded. That is why a name is ASCII on every side, and why it is spelled once.
+  `override-merge acme/demo#1２`, its second digit full-width, and `override-merge acme/demo#12é` print nothing
+  and write nothing. On the script of review round 1 (`4ac61ee`), which made the patterns ASCII by a flag, the
+  first granted `acme/demo#1` and the second `acme/demo#12`: the flag also moved where a typed number ends.
