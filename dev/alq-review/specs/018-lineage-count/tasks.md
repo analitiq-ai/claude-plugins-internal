@@ -31,10 +31,10 @@ texts, the new tables).
 
 **Purpose**: the three facts the plan marks "To measure" are settled before code rests on them.
 
-- [ ] T001 Run `python3 -m pip install diff-match-patch` in a scratch venv and on the system Python: record the latest PyPI version and whether the command named in the refusal succeeds on a system-managed Python (R13). Write both into the R13 "To measure" paragraph of `specs/018-lineage-count/research.md`; if the plain command fails there, record the form that works, which the refusal must then name.
-- [ ] T002 [P] Measure R3: in a scratch repo write two texts as blobs with `git hash-object -w --stdin`, run `git diff -U0 <old blob> <new blob>`, and confirm `worktree._hunks` in `plugins/alq-review/scripts/worktree.py` parses the `+++ b/<sha>` header. Record the result in R3 of `research.md`.
-- [ ] T003 [P] Measure R4: time `diff_main` with `Diff_Timeout = 0` then `diff_cleanupSemantic` on one replaced range of 2,000 lines. Record the time in R4 of `research.md` and choose the single budget constant `lineage.py` will use, inside the hook's 60 s.
-- [ ] T004 Add the pinned `diff-match-patch` install (version from T001) to `.github/workflows/tests.yml`, before the test step. Depends on T001.
+- [X] T001 Run `python3 -m pip install diff-match-patch` in a scratch venv and on the system Python: record the latest PyPI version and whether the command named in the refusal succeeds on a system-managed Python (R13). Write both into the R13 "To measure" paragraph of `specs/018-lineage-count/research.md`; if the plain command fails there, record the form that works, which the refusal must then name.
+- [X] T002 [P] Measure R3: in a scratch repo write two texts as blobs with `git hash-object -w --stdin`, run `git diff -U0 <old blob> <new blob>`, and confirm `worktree._hunks` in `plugins/alq-review/scripts/worktree.py` parses the `+++ b/<sha>` header. Record the result in R3 of `research.md`.
+- [X] T003 [P] Measure R4: time `diff_main` with `Diff_Timeout = 0` then `diff_cleanupSemantic` on one replaced range of 2,000 lines. Record the time in R4 of `research.md` and choose the single budget constant `lineage.py` will use, inside the hook's 60 s.
+- [X] T004 Add the pinned `diff-match-patch` install (version from T001) to `.github/workflows/tests.yml`, before the test step. Depends on T001.
 
 ---
 
@@ -54,7 +54,7 @@ texts, the new tables).
 ### Implementation
 
 - [ ] T009 [P] Add `text_hunks(root, old, new)` to `plugins/alq-review/scripts/worktree.py`: write both texts with `git hash-object -w --stdin`, run `git diff -U0 <old blob> <new blob>`, return what `_hunks` returns (R3). Reuse `_hunks` and `_stdin`. Depends on T002, T007.
-- [ ] T010 Create `plugins/alq-review/scripts/lineage.py` with: `Unavailable` (library missing) and `BudgetExceeded` (the T003 budget passed), both naming the next step; `differ()` importing `diff_match_patch` inside the function, `Diff_Timeout = 0`, raising `Unavailable` with the install command from T001; `span_of(text, line, quote)` (R5, reusing `claimcheck.plain` and `claimcheck._COMMENT_MARK`); `carry(spans, old, new, hunks)` (R4: ends mapped apart, shift outside hunks, `diff_main` + `diff_cleanupSemantic` + `diff_xIndex` inside). No I/O. Depends on T003, T005.
+- [ ] T010 Create `plugins/alq-review/scripts/lineage.py` with: `Unavailable` (library missing) and `BudgetExceeded` (the T003 budget passed), both naming the next step; `differ()` importing `diff_match_patch` inside the function, `Diff_Timeout = 0`, raising `Unavailable` with `install_step(...)` (R13: the pip form, or the OS package where the interpreter is managed); `span_of(text, line, quote)` (R5, reusing `claimcheck.plain` and `claimcheck._COMMENT_MARK`); `carry(spans, old, new, hunks)` (R4: ends mapped apart, shift outside hunks, `diff_main` + `diff_cleanupSemantic` + `diff_xIndex` inside). No I/O. Depends on T003, T005.
 - [ ] T011 In `plugins/alq-review/scripts/lineage.py` add `succeed(lineages, old, new, hunks, claims, count)` per R6: inheritance by place (several = split), then by id, merge at the higher `count(lineage)` with the others ended `merged` naming it, a lineage with no place left ended `deleted`, a place carried to unread text kept. Returns the lineages and `{claim id: [lineage ids]}`. `count` is passed in so the module stays pure and does not import `claimcheck`. Depends on T010, T006.
 - [ ] T012 [P] Add the tables `claim_lineages`, `shim_bugs`, `seen_files` to `SCHEMA` in `plugins/alq-review/scripts/ledger.py` with their accessors (documents as in `data-model.md`; `claim_checks` gains `branch` and `lineages`). Do not remove `claim_holds`, `shim_chains`, `chains_at` yet: their callers are replaced in US1 and US4 and the removal is T029. Depends on T008.
 

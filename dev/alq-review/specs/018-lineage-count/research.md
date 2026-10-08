@@ -58,7 +58,8 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
 - **Existing tools**: `worktree._hunks`, `worktree._stdin`: reused. `git diff --no-index`: needs two files on
   disk outside the repo and exits 1 on a difference; not used. `difflib.unified_diff`: a second differ beside
   git's, whose hunks would not agree with the ones the check reads; not used.
-- **To measure**: that `_hunks` reads the header git prints for two bare blobs (`+++ b/<sha>`).
+- **Measured** (git 2.47.3, 2026-10-08): `git diff -U0 <old blob> <new blob>` prints `diff --git a/<sha> b/<sha>`, `---`, `+++ b/<sha>` and the
+  hunks; `_hunks` reads it and gives each hunk's `file` as the new blob's sha, with removed and added lines. Nothing to change.
 
 ## R4: A span is carried by shifting outside the changed ranges and by `diff-match-patch` inside them
 
@@ -76,10 +77,14 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   `worktree.Hunk`: gives each hunk's removed and added lines, the two texts the mapping needs; reused. For the
   shift past earlier hunks: None fit. Looked at: `worktree.added_lines`, `claimcheck.paragraph`, the survey of
   2026-10-06 in #17 (Gerrit, GitLab, Phabricator and Sourcegraph port comments this way but ship no library).
-- **To measure**: the time of `diff_main` with no timeout on one replaced range of 2,000 lines, to set the
-  budget for one mapping inside the hook's 60 s. A mapping that exceeds the budget is a failed check that names
-  the next step (split the change), never a pass: a hook killed by its timeout is not a refusal (constitution P4).
-  The measurement picks the budget, not the behaviour.
+- **Measured** (`diff-match-patch` 20241021, `Diff_Timeout = 0`, Python 3.14, two unrelated texts of random words, the
+  worst case; texts that share most of their words took 0.01 s for 200 lines): 2,558 chars each 0.69 s; 5,114
+  chars 2.57 s; 12,673 chars 16.8 s. Time grows with the product of the two sizes, so a 2,000-line range cannot fit the
+  hook's 60 s. The budget is therefore on size, not on the clock, which keeps the answer a function of the two
+  texts: `lineage.CHAR_DIFF_BUDGET = 5 * 10**7`, the sum over a check's replaced ranges of `len(removed) *
+  len(added)` characters (about 7,000 characters each side, about 5 s worst case). A change over it is a failed
+  check that names the next step (split the change), never a pass: a hook killed by its timeout is not a
+  refusal (constitution P4).
 
 ## R5: A sentence's span is found from the reader's line and quote
 
@@ -212,8 +217,11 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
 - **Decision**: `lineage.py` imports `diff_match_patch` inside the one function that builds the differ and
   raises `lineage.Unavailable` when the import fails. `claimgate` and `shimgate` call it first in `on_launch`
   and `on_commit`, whether or not a mapping is needed, and refuse through `refuse_claim` / `refuse_shim`: the
-  check could not run, the work is not at fault, and the install command for the interpreter running the hook
-  (`<sys.executable> -m pip install diff-match-patch`). CI installs a pinned version in `tests.yml`. The
+  check could not run, the work is not at fault, and the install step for the interpreter running the hook:
+  `<sys.executable> -m pip install diff-match-patch` where pip can install into it, and where the interpreter is
+  OS-managed (PEP 668: an `EXTERNALLY-MANAGED` file in its stdlib folder, outside a venv) the OS package
+  `python3-diff-match-patch` (Debian and Ubuntu: `sudo apt install python3-diff-match-patch`) or a venv. The
+  choice is a pure function, `lineage.install_step(executable, in_venv, externally_managed)`. CI installs a pinned version in `tests.yml`. The
   README's Dependencies section names the package and says which hooks need it.
 - **Rationale**: #17 D7, FR-017, ADR-0009. An import at the top of the module would be reached from
   `gate.py`'s own imports, before `main()`'s guard: the hook would exit with a traceback, which Claude Code
@@ -222,9 +230,12 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
 - **Existing tools**: `hookio.refuse_claim`, `refuse_shim`: reused, so `log` mode is respected.
   `gate.main`'s crash path: refuses, but tells the agent to set `ALQ_REVIEW_MODE=log`, the wrong next step
   here; not relied on. Vendoring the library: ADR-0001 Option N, rejected by the user.
-- **To measure**: the latest release on PyPI, for the CI pin. Whether the named command succeeds on a Python
-  the system manages (Debian refuses `pip install` there); ADR-0009 point 3 needs the named step to be able to
-  succeed, so if it does not, the message names the form that does.
+- **Measured** (2026-10-08): latest release on PyPI is 20241021 (uploaded 2024-10-21): the CI pin. On the
+  system `python3` of this machine (Debian, 3.13.5, `EXTERNALLY-MANAGED` present) the named command fails: that
+  interpreter has no `pip` and no `ensurepip`, and `uv pip install --python /usr/bin/python3` is refused for the
+  same reason (PEP 668). In a venv made with `uv venv --seed` the command succeeds. The distro package
+  `python3-diff-match-patch` is 20241021-1, the same version. ADR-0009 point 3 needs the named step to be able to
+  succeed, and the hooks run the system `python3` (`hooks/hooks.json`): which form the refusal names is open.
 
 ## R14: Records written before this change are not read and not deleted
 
