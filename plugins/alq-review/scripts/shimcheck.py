@@ -282,6 +282,13 @@ def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], hunks_
             if new == old:
                 ranges.append(r)
                 continue
+            if not old:
+                # The text it was measured in had no such file: the range was the whole file as staged, and the file
+                # is now there. A diff from nothing maps no span, so the range is the whole file as it stands.
+                whole = {"file": r["file"], "old_start": 1, "old_count": len(new.splitlines()) or 1}
+                ranges += [whole] if whole not in ranges else []
+                reached = True
+                continue
             hunks = hunks_of(r["file"])
             reached = reached or overlaps([r], [{"file": r["file"], "old_start": h.old_start, "old_count": h.old_count}
                                                 for h in hunks])

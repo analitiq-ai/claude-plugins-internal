@@ -265,6 +265,12 @@ class Carried(unittest.TestCase):
         [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], "")
         self.assertEqual(gone["state"], "ended")
 
+    def test_a_range_in_a_file_the_text_lacked_becomes_the_whole_file_once_it_exists(self):
+        file = "src/new.py"
+        [moved] = shimcheck.carried([bug(ranges=[hunk(file, old=(0, 0))])], {file: ""}, {file: "a\nb\nc\n"},
+                                    lambda _: self.hunks_for("", "a\nb\nc\n")(file))
+        self.assertEqual((moved["ranges"], moved["state"]), ([hunk(file, old=(1, 3))], "open"))
+
     def test_a_range_in_another_file_is_kept_when_one_range_is_dropped(self):
         new = "".join(line for n, line in enumerate(self.old.splitlines(True), 1) if not 9 <= n <= 12)
         [kept] = shimcheck.carried([bug(ranges=[hunk(old=(10, 2)), hunk("src/save.py", old=(3, 1))])],
