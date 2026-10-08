@@ -78,6 +78,28 @@ CREATE TABLE IF NOT EXISTS shim_rulings (
   doc      TEXT NOT NULL,
   PRIMARY KEY (repo, chain_id, site_id)
 );
+CREATE TABLE IF NOT EXISTS claim_lineages (
+  repo   TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  id     TEXT NOT NULL,
+  opened TEXT NOT NULL,
+  doc    TEXT NOT NULL,
+  PRIMARY KEY (repo, branch, id, opened)
+);
+CREATE TABLE IF NOT EXISTS seen_files (
+  repo   TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  gate   TEXT NOT NULL,
+  file   TEXT NOT NULL,
+  doc    TEXT NOT NULL,
+  PRIMARY KEY (repo, branch, gate, file)
+);
+CREATE TABLE IF NOT EXISTS shim_bugs (
+  repo TEXT NOT NULL,
+  id   TEXT NOT NULL,
+  doc  TEXT NOT NULL,
+  PRIMARY KEY (repo, id)
+);
 """
 
 
@@ -205,15 +227,26 @@ class _Records:
     def __init__(self, conn: sqlite3.Connection, repo: str):
         self._conn, self.repo = conn, repo
 
-    def _get(self, table: str, column: str, key: str):
-        row = self._conn.execute(f"SELECT doc FROM {table} WHERE repo = ? AND {column} = ?", (self.repo, key)).fetchone()
+    def _lookup(self, table: str, columns: tuple[str, ...], keys: tuple[str, ...]):
+        where = " AND ".join(f"{column} = ?" for column in ("repo", *columns))
+        row = self._conn.execute(f"SELECT doc FROM {table} WHERE {where}", (self.repo, *keys)).fetchone()
         return json.loads(row[0]) if row else None
+
+    def _get(self, table: str, column: str, key: str):
+        return self._lookup(table, (column,), (key,))
 
     def _put(self, table: str, columns: tuple[str, ...], keys: tuple[str, ...], doc) -> None:
         names = ", ".join(("repo", *columns, "doc"))
         marks = ", ".join("?" * (len(columns) + 2))
         self._conn.execute(f"INSERT OR REPLACE INTO {table} ({names}) VALUES ({marks})",
                            (self.repo, *keys, json.dumps(doc)))
+
+    def seen(self, branch: str, gate: str, file: str) -> dict | None:
+        """The text of `file` as the last completed check of `gate` on `branch` saw it, with that check's ref."""
+        return self._lookup("seen_files", ("branch", "gate", "file"), (branch, gate, file))
+
+    def save_seen(self, branch: str, gate: str, file: str, seen: dict) -> None:
+        self._put("seen_files", ("branch", "gate", "file"), (branch, gate, file), seen)
 
 
 class Claims(_Records):
@@ -238,6 +271,23 @@ class Claims(_Records):
     def save_verdict(self, claim_id: str, entry: dict) -> None:
         self._put("claim_verdicts", ("claim_id",), (claim_id,), entry)
 
+    def save_lineage(self, branch: str, lineage: dict) -> None:
+        self._put("claim_lineages", ("branch", "id", "opened"), (branch, lineage["id"], lineage["opened"]), lineage)
+
+    def open_lineage(self, branch: str, lineage_id: str) -> dict | None:
+        """The one open lineage `lineage_id` on `branch`; an ended one is never opened again, so none or one."""
+        rows = self._conn.execute("SELECT doc FROM claim_lineages WHERE repo = ? AND branch = ? AND id = ? "
+                                  "AND json_extract(doc, '$.state') = 'open'", (self.repo, branch, lineage_id))
+        found = [json.loads(doc) for (doc,) in rows]
+        return found[0] if found else None
+
+    def open_lineages(self, branch: str, file: str | None = None) -> list[dict]:
+        rows = self._conn.execute("SELECT doc FROM claim_lineages WHERE repo = ? AND branch = ? "
+                                  "AND json_extract(doc, '$.state') = 'open' "
+                                  "AND (? IS NULL OR json_extract(doc, '$.file') = ?) ORDER BY id, opened",
+                                  (self.repo, branch, file, file))
+        return [json.loads(doc) for (doc,) in rows]
+
     def holds(self, base: str, file: str) -> list[dict]:
         row = self._conn.execute("SELECT doc FROM claim_holds WHERE repo = ? AND base = ? AND file = ?",
                                  (self.repo, base, file)).fetchone()
@@ -259,6 +309,19 @@ class Shims(_Records):
     def unfinished_at(self, root: str) -> list[dict]:
         rows = self._conn.execute("SELECT doc FROM shim_checks WHERE repo = ? AND json_extract(doc, '$.root') = ? "
                                   "AND json_extract(doc, '$.status') IN ('sweeping', 'judging')", (self.repo, root))
+        return [json.loads(doc) for (doc,) in rows]
+
+    def save_bug(self, bug: dict) -> None:
+        self._put("shim_bugs", ("id",), (bug["id"],), bug)
+
+    def bug(self, bug_id: str) -> dict | None:
+        return self._get("shim_bugs", "id", bug_id)
+
+    def open_bugs(self, branch: str) -> list[dict]:
+        """The bugs still tracked on `branch`: every state but `ended` and `merged`."""
+        rows = self._conn.execute("SELECT doc FROM shim_bugs WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
+                                  "AND json_extract(doc, '$.state') NOT IN ('ended', 'merged') ORDER BY id",
+                                  (self.repo, branch))
         return [json.loads(doc) for (doc,) in rows]
 
     def chain(self, chain_id: str) -> dict | None:

@@ -81,7 +81,7 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   worst case; texts that share most of their words took 0.01 s for 200 lines): 2,558 chars each 0.69 s; 5,114
   chars 2.57 s; 12,673 chars 16.8 s. Time grows with the product of the two sizes, so a 2,000-line range cannot fit the
   hook's 60 s. The budget is therefore on size, not on the clock, which keeps the answer a function of the two
-  texts: `lineage.CHAR_DIFF_BUDGET = 5 * 10**7`, the sum over a check's replaced ranges of `len(removed) *
+  texts: `lineage.CHAR_DIFF_BUDGET = 5 * 10**7`, the sum, over the replaced ranges one file's spans fall in, of `len(removed) *
   len(added)` characters (about 7,000 characters each side, about 5 s worst case). A change over it is a failed
   check that names the next step (split the change), never a pass: a hook killed by its timeout is not a
   refusal (constitution P4).

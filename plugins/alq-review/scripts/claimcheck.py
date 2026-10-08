@@ -30,13 +30,25 @@ _CHECK_REF = re.compile(r"(?P<repo>[\w.-]+/[\w.-]+)#tree:(?P<tree>[0-9a-f]{40}|[
 _CITATION = re.compile(r"(?<![\w/.:-])(?P<path>[\w./-]+):(?P<line>\d+)\b")
 _URL = re.compile(r"https://[^\s<>\"'`)\]]+")
 _COMMENT_MARK = re.compile(r"^\s*(?:#+|//+|/\*+|\*+/?|--|>|;+|<!--)\s?")
+_WORD = re.compile(r"\S+")
 
 Located = Callable[[str], "int | None"]  # path -> its line count in the checked tree, None when it is not there
 
 
+def words(text: str) -> list[tuple[str, int, int]]:
+    """Each word of a text with its start and end offset, comment markers at line starts left out."""
+    found, line_start = [], 0
+    for line in text.split("\n"):
+        mark = _COMMENT_MARK.match(line)
+        found += [(m.group(), line_start + m.start(), line_start + m.end())
+                  for m in _WORD.finditer(line, mark.end() if mark else 0)]
+        line_start += len(line) + 1
+    return found
+
+
 def plain(text: str) -> str:
-    """The words of a text: comment markers at line starts and every run of whitespace reduced to one space."""
-    return " ".join(" ".join(_COMMENT_MARK.sub("", line) for line in text.split("\n")).split())
+    """The words of a text, each run of white space and each comment marker at a line start reduced to one space."""
+    return " ".join(word for word, _, _ in words(text))
 
 
 def claim_id(file: str, quote: str) -> str:

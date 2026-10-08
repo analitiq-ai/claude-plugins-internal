@@ -69,6 +69,16 @@ class Ids(unittest.TestCase):
         for bad in ("acme/demo#7:internal-0.1", "acme/demo#tree:xyz", f"demo#tree:{TREE}"):
             self.assertIsNone(claimcheck.parse_check_ref(bad), bad)
 
+    def test_words_carry_the_offsets_of_the_words_plain_joins(self):
+        text = "  # The validator\n  rejects  an\n\n// empty list"
+        found = claimcheck.words(text)
+        self.assertEqual([w for w, _, _ in found], ["The", "validator", "rejects", "an", "empty", "list"])
+        self.assertTrue(all(text[start:end] == w for w, start, end in found))
+        self.assertEqual(claimcheck.plain(text), "The validator rejects an empty list")
+
+    def test_a_comment_marker_only_counts_at_the_start_of_a_line(self):
+        self.assertEqual(claimcheck.plain("a # b\n> c"), "a # b c")
+
     def test_the_vocabularies(self):
         self.assertEqual(claimcheck.CATEGORIES, tuple(f"K{i}" for i in range(1, 10)))
         self.assertEqual(claimcheck.JUDGED, ("K1", "K9"))
