@@ -296,6 +296,10 @@ held Bash calls) and `claimgate.py` (the contest judge's hosts).
   with seven rebuilt on the reader of words and nineteen more, six of them in `pre_merge_gate.py`, eleven in
   `gate.py`, one each in `claimgate.py` and `shimgate.py`: each fails the tests the contract names for it.
   The quickstart's steps 2 to 4 print what it says.
+- **Measured again** (2026-10-08, review round 4, `b7841f8` and `b47b05f`): two tests added and three given
+  more cases (contract N56, G11; G10, N53, N54). On the scripts of `8d366a7` N56 does not pass: the five
+  words are answered with nothing. On the new scripts the whole suite's 772 pass. Eight wrong versions, each
+  in a copy of the tree, each fail the test named for it.
 - **Not run by anyone**: the test that makes a folder read-only, as root. It skips that half there.
 
 ## R8: An override and a grant name the PR as `owner/repo#N`
@@ -382,7 +386,8 @@ held Bash calls) and `claimgate.py` (the contest judge's hosts).
   inside a guard, with an answer for a reader that did not load: a new way to fail, bought for tidiness. The
   cost is that `gate.py` loads a script that is also a hook's program.
 - **What it changes for the user**: a word with a mark joined to it is that word, so `unlock #7,`,
-  `unlock claim-<id>.` and `override shim-<id>.` no longer name what they start with. A number with a leading
+  `unlock claim-<id>.` and `override shim-<id>.` no longer name what they start with; each is answered that it
+  names nothing. A number with a leading
   zero or a digit from outside ASCII is not that number. A no-break space, a line separator, a vertical tab
   and the like neither part words nor are passed over. Capitals in `unlock owner/repo#N` do not count.
   `alq-review` followed by anything but the switch is answered with the two forms, where `alq-review offline`
@@ -400,6 +405,13 @@ held Bash calls) and `claimgate.py` (the contest judge's hosts).
   `alq-review off` is passed over, and a no-break space between `unlock` and `#7` parts them; the same space
   after `override-merge` does not. `alq-review offline` is answered with nothing.
 - **Measured** (2026-10-08, this round's tests): R7.
+- **Review round 4** (2026-10-08, on `8d366a7`): `override shim-<id>.` was answered with nothing. `override`
+  opens ordinary prompts, so it is not answered whatever follows, as `unlock` is; it is answered when its
+  word starts `shim-` (contract N56). Left as they are: a no-break space between a command's words gets no
+  answer, since answering it means judging a word by its start, which is what this decision removes, and
+  nothing is granted or unlocked by it. `gate.py` does not load when `pre_merge_gate.py` does not, as with
+  each script it loads. One PR kept in two ledgers, under two spellings of its repo's capitals, is not
+  unlocked by its name: the ledger's key, issue #54.
 - **Not done here**: where the plugin reads a repo it or git wrote, it spells one by patterns of their own:
   `ledger.ROUND_REF`, `claimcheck._CHECK_REF`, `shimcheck._CHECK_REF`, `shell._COMMENTS_API`,
   `worktree._GITHUB_REMOTE`. None reads what the user typed, and a ledger is keyed by the repo as the remote

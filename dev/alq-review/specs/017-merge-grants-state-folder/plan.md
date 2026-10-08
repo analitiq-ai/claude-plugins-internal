@@ -140,10 +140,10 @@ plugins/alq-review/
 
 dev/alq-review/tests/
 ├── test_pre_merge_gate.py        # state under ALQ_REVIEW_STATE_DIR; the contract's rows N1 to N45, G1 to G7, K1 to K3
-├── test_gate.py                  # N46 to N50, G8, G10
+├── test_gate.py                  # N46 to N50, G8, G10, G11
 ├── test_switch.py                # N51 to N53, G9
 ├── test_claim_gate.py            # N54
-└── test_shim_gate.py             # N55
+└── test_shim_gate.py             # N55, N56
 ```
 
 **Structure Decision**: the plugin's existing layout, one PR.

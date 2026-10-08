@@ -9,8 +9,8 @@ description: "Task list for merge override grants in the state folder"
 
 **Prerequisites**: plan.md, spec.md, research.md (R1–R9), data-model.md, contracts/merge-override.md, quickstart.md
 
-**Tests**: Required (constitution IV). The contract's last table is the test list. Its rows are numbered N1–N55
-(new), G1–G10 (guard) and K1–K3 (kept), and a task names a row by that number. Tests run
+**Tests**: Required (constitution IV). The contract's last table is the test list. Its rows are numbered N1–N56
+(new), G1–G11 (guard) and K1–K3 (kept), and a task names a row by that number. Tests run
 `scripts/pre_merge_gate.py` and `scripts/gate.py` as programs, with hook payloads and a stub `gh`. None calls a
 model or the network.
 
@@ -460,6 +460,11 @@ T027 replaced, and this folder describing the script of round 2 (research R9).
   `claimgate.py`, `shimgate.py`: `on_prompt` takes the typed word; `UNLOCK_CLAIM` and `OVERRIDE` go. The
   README says how a typed command is read.
 - [X] T031 Run again: research R7's last entry says what, and what each run showed.
+- [X] T033 Review round 4, on `8d366a7`: `override shim-<id>.` was answered with nothing, where `unlock #7.`
+  and `override-merge acme/demo#12.` are told what they do not name. In `tests/test_shim_gate.py` N56, and N55
+  without the words it now answers; then `shimgate.on_prompt` answers every `override` whose word starts
+  `shim-`. What review found and this feature leaves is in research R9. The test reviewer broke five
+  behaviours no test held: G11, and cases added to G10, N53 and N54 (contract).
 - [X] T032 This folder, each document written once from the code as it is. The contract tells what each
   answer says and no longer copies its words. Counts of tests are kept in research R7 only.
 

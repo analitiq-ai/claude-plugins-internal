@@ -128,9 +128,9 @@ Three kinds.
   has, and in where its state is kept (SC-004). One that shows a refusal also shows the same override letting
   its own merge through; without that it passes on a gate that grants nothing.
 
-Rows N1 to N45, G1 to G7 and K1 to K3 are tests of `tests/test_pre_merge_gate.py`. N46 to N50, G8 and G10 are
-in `tests/test_gate.py`; N51 to N53 and G9 in `tests/test_switch.py`; N54 in `tests/test_claim_gate.py`; N55 in
-`tests/test_shim_gate.py`. What was run, when and by whom is in research R7.
+Rows N1 to N45, G1 to G7 and K1 to K3 are tests of `tests/test_pre_merge_gate.py`. N46 to N50, G8, G10 and G11 are
+in `tests/test_gate.py`; N51 to N53 and G9 in `tests/test_switch.py`; N54 in `tests/test_claim_gate.py`; N55 and
+N56 in `tests/test_shim_gate.py`. What was run, when and by whom is in research R7.
 
 On main a typed `override-merge owner/repo#N` is not taken: it is answered with nothing and grants nothing. A
 row that types one fails on main for that, whatever more its cell says of main.
@@ -191,7 +191,8 @@ row that types one fails on main for that, whatever more its cell says of main.
 | N52 | new | the switch's line ends at a line break only: a line separator, a vertical tab, a form feed or a next-line mark after `off` leaves it one line, which is not a switch | main ends a line at each of them | every kind of line break ending a line |
 | N53 | new | `alq-review` alone, or followed by anything but `on` or `off` alone on its line, changes nothing and is answered with the two forms | main answers only when `on` or `off` comes next | the answer given only when `on` or `off` comes next; the words read across lines |
 | N54 | new | `unlock claim-<id>`: a no-break space for the blank, or a line separator first, is not answered; a mark joined to the id releases nothing; blanks of the three kinds release the claim | main takes all four | a claim's name found at the start of a longer word; and as N46 |
-| N55 | new | `override shim-<id>`: the same four, an id one digit short and `overrides` are not answered and leave the commit refused; blanks of the three kinds switch the check off | main takes the first four | a bug's name found at the start of a longer word; a word that starts with `override` taken for it; and as N46 |
+| N55 | new | `override shim-<id>`: a no-break space for the blank, a line separator first, `overrides`, `Shim-` and a second word that does not start `shim-` are not answered and leave the commit refused; blanks of the three kinds switch the check off | main takes the first two | a bug's name found at the start of a longer word; a word that starts with `override` taken for it; and as N46 |
+| N56 | new | `override` and a word that starts `shim-` and is no bug's name (a mark joined to the id, an id one digit short, `shim-` alone) is answered that it names no bug, and the commit stays refused | the script before it answers nothing | the answer kept for a whole bug's name only |
 | G1 | guard | an attested merge passes over each damaged record and leaves it as found | | the grant asked for before `unmet` |
 | G2 | guard | an attested merge passes under an id that is not a plain name | | the same |
 | G3 | guard | over a damaged record, `gh pr ready`, `--undo`, `--disable-auto`, a merge `gh pr view` cannot name and a `gh api` merge are judged as today | | the grants read at the top of `gated` |
@@ -201,7 +202,8 @@ row that types one fails on main for that, whatever more its cell says of main.
 | G7 | guard | the line an `--admin` refusal gives, typed as given, lets that merge through | | the refusal giving `override-merge #12` |
 | G8 | guard | spaces, tabs and line breaks before `unlock` and between its words are passed over, and what follows on later lines is not read | | none: it is the form every other test of `unlock` types, with more blanks |
 | G9 | guard | a first word that is not the plugin's name is not answered: a mark joined to it, a letter more, a capital, backticks | | a word that starts with the plugin's name taken for it |
-| G10 | guard | a word that only starts like a command's word is not it: `unlocked`, `unlock#7`, `Unlock`, the skill's name with a letter or a mark more, `rescoped`, the rescope without its PR | | a word that starts with `unlock`, or with the rescope's words, taken for it |
+| G10 | guard | a word that only starts like a command's word is not it: `unlocked`, `unlock#7`, `Unlock`, the skill's name with a letter or a mark more or under another plugin's name, `rescoped` | | a word that starts with `unlock`, or with the rescope's words, taken for it |
+| G11 | guard | a prompt with too few words for a command is not answered and nothing is unlocked: empty, blanks only, `unlock` or `override` alone, the rescope without its PR | | a command taken from its first word alone; a prompt's first word read where it has none |
 | K1 | kept | a held grant does not publish a draft; an `--admin` merge then passes on it | main does not take the name | a grant asked for by a publish too |
 | K2 | kept | a grant is not spent while `gh pr view` fails; once it answers, the merge passes on it | the same | none built: the PR's name comes from the answer that failed |
 | K3 | kept | an override quoted lower in a prompt grants nothing; typed at the start it does | the same | the keyword looked for anywhere in the prompt |
@@ -225,6 +227,8 @@ Added on 2026-10-08, after the PR was opened.
   they are answered; twenty-one wrong versions.
 - The audit of the branch: N39 to N41 on the reader of words, N45 to N55, G8 to G10; nineteen wrong versions,
   and seven of round 3's rebuilt on the reader of words.
+- Review round 4: N56, and N55 without the words N56 now answers. G11; in G10 a rescope under another plugin's
+  name; in N53 `on` or `off` as a third word; in N54 a claim nobody holds. Eight wrong versions.
 
 The damaged records: `[12]`, text that is not JSON, an empty file, a list nested 100,000 deep, a second key,
 numbers for names, a name in capitals, `true` for a name, a number with a leading zero, digits that are not
