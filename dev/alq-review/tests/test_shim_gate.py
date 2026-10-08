@@ -952,6 +952,17 @@ class ShimOverride(ShimGate):
         self.labelled({"b.py": (FIXED.replace("b3 checked", "b3 checked twice"), "CODE")})
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
+    def test_an_override_is_its_two_whole_words_parted_by_a_blank(self):
+        tree = self.labelled({"b.py": (FIXED, "CODE")})
+        for prompt in (f"override\u00a0shim-{tree[:12]}", f"\u2028override shim-{tree[:12]}", f"override shim-{tree[:12]}.",
+                       f"override shim-{tree[:12]}\u200b", f"override shim-{tree[:11]}", f"overrides shim-{tree[:12]}"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {})
+        self.assertEqual(self.decision(self.git_commit()), "deny")
+        said = self.hook("UserPromptSubmit", prompt=f" \n\toverride \r\n shim-{tree[:12]}\nand carry on")
+        self.assertIn("switched the shim check off", json.dumps(said))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
     def test_an_override_does_not_reach_another_bug(self):
         tree = self.labelled({"b.py": (FIXED, "CODE")})
         self.override(tree[:12])

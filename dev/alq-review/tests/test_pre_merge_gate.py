@@ -672,31 +672,33 @@ class NameReader(unittest.TestCase):
                     pre_merge_gate.PullRequest(*parts)
 
 
-class OverrideWord(unittest.TestCase):
-    """A prompt is an override when its first word is the keyword, and it names its PR with its second word, "" when
-    it has none. A blank parts words: a space, a tab or a line break, so nothing unseen can end a word early."""
+class Words(unittest.TestCase):
+    """What the user types is read as words. A blank parts them: a space, a tab or a line break, so nothing unseen
+    starts, ends or joins a word. Every command of the plugin is read from a prompt's first words, gate.py's too."""
 
-    def word(self, prompt):
-        return pre_merge_gate.override_word(prompt)
+    def test_only_a_blank_parts_two_words(self):
+        parts = {c for c in every_character() if pre_merge_gate.first_words(f"a{c}b", 2) == ["a", "b"]}
+        self.assertEqual(parts, BLANKS)
 
-    def test_only_a_blank_ends_the_word(self):
-        ends = {c for c in every_character() if self.word(f"override-merge acme/demo#1{c}2") != f"acme/demo#1{c}2"}
-        self.assertEqual(ends, BLANKS)
-        self.assertEqual({self.word(f"override-merge acme/demo#1{blank}2") for blank in BLANKS}, {"acme/demo#1"})
+    def test_only_blanks_are_dropped_before_the_first_word(self):
+        dropped = {c for c in every_character() if pre_merge_gate.first_words(f"{c}a", 1) == ["a"]}
+        self.assertEqual(dropped, BLANKS)
 
-    def test_only_blanks_come_before_the_keyword_and_between_it_and_the_word(self):
-        self.assertEqual({c for c in every_character() if self.word(f"override-merge{c}{NAME}") is not None}, BLANKS)
-        self.assertEqual({c for c in every_character() if self.word(f"{c}{TYPED}") is not None}, BLANKS)
-        self.assertEqual({self.word(f"{blank}override-merge{blank}{NAME}") for blank in BLANKS}, {NAME})
+    def test_the_first_words_of_a_prompt(self):
+        for prompt, count, words in (("", 2, []), (" \n", 2, []), ("a", 2, ["a"]), ("a \n", 2, ["a"]),
+                                     (" \n\ta \t b\r\nc", 2, ["a", "b"]), ("a b c", 3, ["a", "b", "c"]),
+                                     ("a b c d", 3, ["a", "b", "c"]), ("a b", 1, ["a"]),
+                                     (f"{TYPED}.", 2, ["override-merge", f"{NAME}."])):
+            with self.subTest(prompt=prompt, count=count):
+                self.assertEqual(pre_merge_gate.first_words(prompt, count), words)
 
-    def test_the_word_of_a_prompt(self):
-        for prompt, word in ((TYPED, NAME), (f"{TYPED} the reviewers are wrong", NAME),
-                             (f" \n\toverride-merge \t{NAME}\r\nand more\n", NAME), (f"{TYPED}.", f"{NAME}."),
-                             ("override-merge #12", "#12"), ("override-merge acme/demo #12", "acme/demo"),
-                             ("override-merge", ""), ("override-merge \n", ""), (f"override-merges {NAME}", None),
-                             (f"Override-merge {NAME}", None), (f"Work on this:\n\n{TYPED}", None), ("", None)):
+    def test_a_line_ends_at_a_line_break_and_nowhere_else(self):
+        ends = {c for c in every_character() if pre_merge_gate.first_line(f"a{c}b") == "a"}
+        self.assertEqual(ends, set("\r\n"))
+        for prompt, line in (("", ""), (" \n", ""), ("a b", "a b"), (" \n\t a  b \t\r\nc", "a  b"),
+                             ("\u00a0a\u2028b\u00a0\nc", "\u00a0a\u2028b\u00a0")):
             with self.subTest(prompt=prompt):
-                self.assertEqual(self.word(prompt), word)
+                self.assertEqual(pre_merge_gate.first_line(prompt), line)
 
 
 class Address(unittest.TestCase):
