@@ -1,4 +1,5 @@
-"""The location comment: the one comment on an issue that says where its spec folder is, or that it needs none."""
+"""The location comment: the one comment on an issue that says where its spec folder is, that it needs none, or
+that it is not worth doing."""
 from __future__ import annotations
 
 import argparse
@@ -12,9 +13,11 @@ import github
 import worktree
 
 MARKER = "<!-- analitiq-spec -->"
+NOT_WORTH_DOING = "not worth doing"
 FORM = (f"{MARKER}\nspec: <folder path from the repo root, ending specs/<feature>>\n"
         "branch: <branch that holds it>\n"
-        f"or, for an issue that needs no spec:\n{MARKER}\nspec: none\nreason: <one line>")
+        f"or, for an issue that needs no spec:\n{MARKER}\nspec: none\nreason: <one line>\n"
+        f"or, for an issue that is not worth doing:\n{MARKER}\nspec: {NOT_WORTH_DOING}\nreason: <one line>")
 
 _ISSUE_IN_BRANCH = re.compile(r"^[a-z]+/(\d+)-")
 
@@ -26,6 +29,11 @@ class Located:
 
 @dataclass(frozen=True)
 class NoSpec:
+    reason: str
+
+
+@dataclass(frozen=True)
+class NotWorthDoing:
     reason: str
 
 
@@ -58,7 +66,7 @@ def _folder(spec: str) -> str:
     return str(path)
 
 
-def parse(body: str) -> Located | NoSpec:
+def parse(body: str) -> Located | NoSpec | NotWorthDoing:
     """What a comment whose first line is the marker says."""
     lines = body.strip().splitlines()[1:]
     if any(line.strip() for line in lines) and not any(line.lstrip().startswith("spec:") for line in lines):
@@ -71,6 +79,8 @@ def parse(body: str) -> Located | NoSpec:
     spec = _value(lines[0], "spec")
     if spec == "none":
         return NoSpec(_value(lines[1], "reason"))
+    if spec == NOT_WORTH_DOING:
+        return NotWorthDoing(_value(lines[1], "reason"))
     return Located(_folder(spec), _value(lines[1], "branch"))
 
 
@@ -86,6 +96,10 @@ def render(folder: str, branch: str) -> str:
 
 def render_none(reason: str) -> str:
     return _checked(f"{MARKER}\nspec: none\nreason: {reason}\n")
+
+
+def render_not_worth_doing(reason: str) -> str:
+    return _checked(f"{MARKER}\nspec: {NOT_WORTH_DOING}\nreason: {reason}\n")
 
 
 def issue_number(branch: str) -> int | None:
@@ -110,17 +124,29 @@ def _upsert(slug: str, issue: int, body: str) -> str:
     return github.write_issue_comment(slug, issue, body, found and found[0])
 
 
-def located(slug: str, issue: int) -> Located | NoSpec:
-    """What the issue's location comment says."""
+def _read(slug: str, issue: int) -> Located | NoSpec | NotWorthDoing | None:
+    """What the issue's location comment says; None when it has none."""
     found = _comment(slug, issue)
     if found is None:
-        raise SpecLocationError(f"{slug}#{issue} has no location comment, so nothing says where its spec is. "
-                                f"Next step: run `/alq-review:design-doc #{issue}`; it creates the spec folder and "
-                                "posts the comment.")
+        return None
     try:
         return parse(found[1])
     except SpecLocationError as exc:
         raise SpecLocationError(f"{slug}#{issue}: {exc}") from exc
+
+
+def located(slug: str, issue: int) -> Located | NoSpec:
+    """Where the issue's spec is, or that it needs none: what work on the issue can start from."""
+    where = _read(slug, issue)
+    if where is None:
+        raise SpecLocationError(f"{slug}#{issue} has no location comment, so nothing says where its spec is. "
+                                f"Next step: run `/alq-review:design-doc #{issue}`; it creates the spec folder and "
+                                "posts the comment.")
+    if isinstance(where, NotWorthDoing):
+        raise SpecLocationError(f"{slug}#{issue} was judged not worth doing: {where.reason}. Next step: run "
+                                f"/alq-review:design-doc #{issue} to put the question again; its premise step "
+                                "replaces this comment.")
+    return where
 
 
 def resolve(slug: str, branch: str, root: str) -> FoundSpec | NoSpec | None:
@@ -169,36 +195,58 @@ def post_none(checkout: str, reason: str) -> str:
     return _upsert(where.slug, issue, render_none(reason))
 
 
+def post_not_worth_doing(checkout: str, reason: str) -> str:
+    where, issue = _issue_of(checkout)
+    return _upsert(where.slug, issue, render_not_worth_doing(reason))
+
+
+def status(slug: str, issue: int) -> str:
+    """Which of the four states the issue is in, for a caller that treats none of them as a refusal."""
+    where = _read(slug, issue)
+    if where is None:
+        return "no comment"
+    return {Located: "located", NoSpec: "none", NotWorthDoing: NOT_WORTH_DOING}[type(where)]
+
+
 def show(slug: str, issue: int) -> str:
     where = located(slug, issue)
     body = render_none(where.reason) if isinstance(where, NoSpec) else render(where.folder, where.branch)
     return body.removeprefix(MARKER + "\n")
 
 
+_POST_WITH_REASON = {"none": post_none, "not-worth-doing": post_not_worth_doing}
+
+
 def _run(parser: argparse.ArgumentParser) -> str:
     args = parser.parse_args()
     if args.command == "post":
         return post(args.checkout) + "\n"
-    if args.command == "none":
+    if args.command in _POST_WITH_REASON:
         if not args.reason.strip():
-            parser.error("none needs a reason")
-        return post_none(args.checkout, args.reason) + "\n"
+            parser.error(f"{args.command} needs a reason")
+        return _POST_WITH_REASON[args.command](args.checkout, args.reason) + "\n"
     here = worktree.locate(".")
     if not (args.repo or here):
-        parser.error("show needs --repo outside a checkout of a GitHub repo")
+        parser.error(f"{args.command} needs --repo outside a checkout of a GitHub repo")
+    if args.command == "status":
+        return status(args.repo or here.slug, args.issue) + "\n"
     return show(args.repo or here.slug, args.issue)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read or post an issue's location comment.")
     commands = parser.add_subparsers(dest="command", required=True)
-    shown = commands.add_parser("show", help="print where the issue's spec is")
-    shown.add_argument("issue", type=int)
-    shown.add_argument("--repo", help="<owner>/<repo>; the current checkout's when left out")
+    for name, said in (("show", "print where the issue's spec is"),
+                       ("status", "print located, none, not worth doing or no comment")):
+        reads = commands.add_parser(name, help=said)
+        reads.add_argument("issue", type=int)
+        reads.add_argument("--repo", help="<owner>/<repo>; the current checkout's when left out")
     commands.add_parser("post", help="point the branch's issue at its spec folder").add_argument("checkout")
-    none = commands.add_parser("none", help="record that the branch's issue needs no spec")
-    none.add_argument("checkout")
-    none.add_argument("reason")
+    for name, said in (("none", "record that the branch's issue needs no spec"),
+                       ("not-worth-doing", "record that the branch's issue is not worth doing")):
+        posts = commands.add_parser(name, help=said)
+        posts.add_argument("checkout")
+        posts.add_argument("reason")
     try:
         print(_run(parser), end="")
     except SpecLocationError as exc:

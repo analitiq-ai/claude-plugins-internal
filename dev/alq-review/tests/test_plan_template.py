@@ -1,4 +1,4 @@
-"""The settled-design preset teaches the format the settled-design check reads; these pin the two together."""
+"""The settled-design preset teaches the formats alq-review's checks read; these pin each format to its check."""
 import json
 import os
 import re
@@ -16,6 +16,7 @@ sys.path.insert(0, str(DRIVER))
 import drive_workflow  # noqa: E402
 
 sys.path.insert(0, str(drive_workflow.PLUGIN / "scripts"))
+import rootcause  # noqa: E402
 import settled_design  # noqa: E402
 
 PRESET = drive_workflow.PRESET[0]
@@ -51,6 +52,34 @@ def composed_plan() -> str:
     return (feature / "plan.md").read_text()
 
 
+def composed_spec_template() -> str:
+    """The spec template as speckit.specify resolves it."""
+    return subprocess.run(["bash", ".specify/scripts/bash/resolve-template.sh", "spec-template"], cwd=PROJECT.name,
+                          check=True, capture_output=True, text=True).stdout
+
+
+def installed_skill_carries(command: str) -> bool:
+    addition = (PRESET / "commands" / f"{command}.md").read_text().split("---\n", 2)[2].strip()
+    skill = Path(PROJECT.name) / ".claude" / "skills" / command.replace(".", "-") / "SKILL.md"
+    return skill.read_text().rstrip().endswith(addition)
+
+
+class SpecTemplate(unittest.TestCase):
+    def test_the_composed_spec_template_has_the_premise_and_root_cause_sections(self):
+        headings = [line for line in composed_spec_template().splitlines() if line.startswith("## ")]
+        self.assertEqual(headings[-2:], ["## Why this is worth doing", rootcause.HEADING])
+        self.assertIn("## Requirements *(mandatory)*", headings)
+
+    def test_the_root_cause_section_as_the_template_gives_it_passes_the_check(self):
+        self.assertEqual(rootcause.problems(composed_spec_template(), None), [])
+
+    def test_the_template_spells_the_no_defect_sentence_as_the_check_reads_it(self):
+        self.assertIn(f"`{rootcause.NOT_A_DEFECT}`", composed_spec_template())
+
+    def test_the_installed_specify_command_says_where_the_premise_answers_come_from(self):
+        self.assertTrue(installed_skill_carries("speckit.specify"), "speckit-specify lacks the settled-design preset")
+
+
 class PlanTemplate(unittest.TestCase):
     def test_the_composed_plan_templates_example_passes_the_check(self):
         plan = composed_plan()
@@ -62,9 +91,7 @@ class PlanTemplate(unittest.TestCase):
             self.assertEqual(settled_design.problems(Path(tmp)), [])
 
     def test_the_installed_plan_command_carries_the_presets_research_format(self):
-        addition = (PRESET / "commands" / "speckit.plan.md").read_text().split("---\n", 2)[2].strip()
-        skill = (Path(PROJECT.name) / ".claude" / "skills" / "speckit-plan" / "SKILL.md").read_text()
-        self.assertTrue(skill.rstrip().endswith(addition), "speckit-plan SKILL.md lacks the settled-design preset")
+        self.assertTrue(installed_skill_carries("speckit.plan"), "speckit-plan SKILL.md lacks the settled-design preset")
 
 
 if __name__ == "__main__":
