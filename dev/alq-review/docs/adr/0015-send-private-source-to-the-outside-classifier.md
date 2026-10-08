@@ -52,12 +52,9 @@ every repo, and it cannot be undone for code already sent.
 
 ## Decision
 
-1. We will let an alq-review check that judges a staged change send it to Jev, through OpenRouter and
-   TypeSafe, from every repo the plugin is installed in, private repos included.
+1. We will let an alq-review check that judges a staged change send it to Jev, an outside classifier, from
+   every repo the plugin is installed in, private repos included.
 2. We will send only the staged change and what the plugin's agents wrote about the code.
-3. We will require a new ADR for anything outside points 1 and 2: another receiver, content that is not
-   part of the staged change, such as other files of the repo or issue and PR text, or a use that is not a
-   check of a staged change.
 
 ## Options considered
 
@@ -68,7 +65,7 @@ every repo, and it cannot be undone for code already sent.
 | What leaves the org | The staged change, and what the plugin's agents wrote about the code |
 | Who may send | Any alq-review check that judges a staged change |
 | Repos covered | Every repo the plugin is installed in |
-| Who receives it | OpenRouter and TypeSafe |
+| Who receives it | The provider that carries the request to Jev. Today OpenRouter and TypeSafe |
 | Can be taken back | No, for what was already sent |
 
 ### Option B: Do nothing
@@ -85,6 +82,8 @@ No alternative to sending private source was weighed.
 ## Trade-offs
 
 - Private source leaves the org, to two companies. What was sent cannot be taken back.
+- Which provider carries a request is not decided here. A switch of provider sends private source to a new
+  company with no new ADR.
 - The terms are taken as accepted. Nothing in the repo records what they say about keeping or using what
   is sent.
 - Nothing asks per repo. Installing the plugin in a repo means its code is sent.
@@ -100,7 +99,7 @@ No alternative to sending private source was weighed.
 - **How we would know this was wrong:** a provider changes its terms for private source; source that was
   sent to the classifier turns up outside the org; or a check is found sending content outside point 2.
 - Revisit if: a judge inside the org or inside the session can do the same job, the plugin is to be
-  installed in a repo whose source may not leave the org, or a check needs another receiver.
+  installed in a repo whose source may not leave the org, or a check needs a classifier other than Jev.
 
 ## Action items
 
