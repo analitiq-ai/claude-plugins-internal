@@ -48,6 +48,9 @@ and every agent session act as it".
 A second force is automation. The same docstring says the cron bot's prompts quote issue and PR text that
 anyone can write. A release word found anywhere in a prompt could come from a stranger.
 
+The keywords today are `unlock <ref>`, `/alq-review:design-doc rescope <ref>`, `unlock claim-<id>`,
+`override shim-<id>`, `override-merge #N`, `alq-review off` and `alq-review on`.
+
 Why now: the same answer was reached three times, for the merge override, the claim hold and the shim
 override. It is written as a rule nowhere. Issue #26 plans a further user-only action, an on/off switch
 for the two commit checks.
@@ -59,10 +62,7 @@ for the two commit checks.
 2. We will require the prompt to start with the release's keyword. A keyword later in the prompt releases
    nothing.
 3. We will not accept a command, a file edit, a setting or an agent's message as a release.
-4. We will give each new user-only action a keyword of its own. The switch of issue #26 follows this rule.
-
-The keywords today are `unlock <ref>`, `/alq-review:design-doc rescope <ref>`, `unlock claim-<id>`,
-`override shim-<id>` and `override-merge #N`.
+4. We will give each new user-only action a keyword of its own.
 
 ## Options considered
 
