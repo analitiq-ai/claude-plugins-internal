@@ -16,7 +16,6 @@ FORM = (f"{MARKER}\nspec: <folder path from the repo root, ending specs/<feature
         "branch: <branch that holds it>\n"
         f"or, for an issue that needs no spec:\n{MARKER}\nspec: none\nreason: <one line>")
 
-_KEY_OR_BLANK = re.compile(r"\w+:( |$)|\s*$")
 _ISSUE_IN_BRANCH = re.compile(r"^[a-z]+/(\d+)-")
 
 @dataclass(frozen=True)
@@ -62,12 +61,11 @@ def _folder(spec: str) -> str:
 def parse(body: str) -> Located | NoSpec:
     """What a comment whose first line is the marker says."""
     lines = body.strip().splitlines()[1:]
-    prose = next((line for line in lines if not _KEY_OR_BLANK.match(line)), None)
-    if prose is not None:
+    if any(line.strip() for line in lines) and not any(line.lstrip().startswith("spec:") for line in lines):
         raise SpecLocationError(
-            f"its `{MARKER}` comment holds the line `{prose}`, not only where a spec folder is. The gate "
-            "no longer reads a spec posted as a comment. Next step: run `/alq-review:design-doc` on the issue; it "
-            "creates the spec folder and rewrites the comment to say where the folder is.")
+            f"its `{MARKER}` comment has text after the marker and no `spec:` line, so it does not say where a "
+            "spec folder is. Next step: run `/alq-review:design-doc` on the issue; it creates the spec folder and "
+            "rewrites the comment to say where the folder is.")
     if len(lines) != 2:
         raise _malformed(f"has {len(lines)} lines after the marker, not 2")
     spec = _value(lines[0], "spec")
