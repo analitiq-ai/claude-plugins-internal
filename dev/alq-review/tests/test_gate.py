@@ -460,6 +460,9 @@ class BrokenGate(Gate):
         self.assertIn("failed open", out.get("systemMessage", ""))
 
 
+ODD_BLANKS = ("\u00a0", "\u2028", "\x0b", "\u3000")
+
+
 class HeldBranch(Gate):
     """A RESHAPE_SPEC or ESCALATE lock: only the user releases it, and no route around it goes unnoticed."""
 
@@ -573,6 +576,73 @@ class HeldBranch(Gate):
         self.assertEqual(self.decision(self.edit()), "deny")
         self.say("unlock acme/demo#7")
         self.assertEqual(self.edit(), {})
+
+    def test_an_unlock_or_rescope_parted_by_anything_but_a_blank_releases_nothing(self):
+        """A no-break space, a line separator, a vertical tab and an ideographic space: none is typed or seen as a
+        blank, so none starts a command or parts its words."""
+        self.lock()
+        for odd in ODD_BLANKS:
+            for prompt in (f"{odd}unlock #7", f"unlock{odd}#7", f"{odd}/design-doc rescope #7",
+                           f"/design-doc{odd}rescope #7", f"/design-doc rescope{odd}#7"):
+                with self.subTest(prompt=prompt):
+                    self.assertEqual(self.say(prompt), "")
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_word_that_only_starts_like_a_commands_word_is_not_it(self):
+        self.lock()
+        for prompt in ("unlocked #7", "unlock#7", "Unlock #7", "/design-docs rescope #7", "/design-doc rescoped #7",
+                       "design-doc rescope #7", "/alq-review:design-doc: rescope #7", "/other:design-doc rescope #7",
+                       "/alq-review:other-design-doc rescope #7"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.say(prompt), "")
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_prompt_with_too_few_words_for_a_command_is_not_answered(self):
+        self.lock()
+        for prompt in ("", " \r\n\t", "unlock", "unlock \n", "override", "/design-doc", "/design-doc rescope"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {})
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_blanks_before_and_between_the_words_of_an_unlock_are_passed_over(self):
+        self.lock()
+        self.assertIn("The user unlocked acme/demo#7", self.say(" \r\n\tunlock \t\r\n#7\nand carry on"))
+        self.assertEqual(self.edit(), {})
+
+    def test_the_word_after_unlock_or_rescope_is_read_whole(self):
+        """Each of these was once read as the PR whose number it starts with: the pattern stopped where it stopped
+        understanding, and what it stopped at was judged by nothing. Each word has a locked PR of its own to
+        release, so one that does release it fails alone."""
+        words = ("#{n},", "#{n}.", "#0{n}", "#{wide}", "#{n}\u200b", "#{n}\u200b1", "acme/demo#{n}.", "acme/demo#0{n}",
+                 "acme/demo#{wide}", "acme/demo#{n}\u200b1", "acme/demo #{n}")
+        typed = [(command, form) for form in words for command in ("unlock", "/design-doc rescope")]
+        for n, (command, form) in enumerate(typed, start=11):
+            self.lock(pr=n)
+            word = form.format(n=n, wide="".join(chr(0xFF10 + int(digit)) for digit in str(n)))
+            with self.subTest(command=command, word=word):
+                self.assertIn("names no locked PR, so nothing was unlocked", self.say(f"{command} {word}"))
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            held = sorted(state["pr"] for state in ledger.all_states() if policy.locked(state))
+        self.assertEqual(held, list(range(11, 11 + len(typed))))
+
+    def test_a_prs_name_unlocks_whatever_its_capitals(self):
+        self.lock()
+        self.lock(repo="Acme/Other", pr=9)
+        self.assertIn("The user unlocked acme/demo#7", self.say("unlock Acme/Demo#7"))
+        self.assertIn("The user unlocked Acme/Other#9", self.say("unlock acme/other#9"))
+
+    def test_a_word_that_is_no_name_does_not_unlock_a_pr_whose_repo_is_no_name(self):
+        """Neither reads as a PR's name, and two texts that are both no name are not the same name."""
+        self.lock(repo="acm\u00e9/demo")
+        for word in ("junk", "acm\u00e9/demo#7", "acme/demo#7"):
+            with self.subTest(word=word):
+                self.assertIn("names no locked PR, so nothing was unlocked", self.say(f"unlock {word}"))
+        self.assertIn("The user unlocked acm\u00e9/demo#7", self.say("unlock #7"))
+
+    def test_an_answer_names_the_command_by_its_words(self):
+        self.lock()
+        self.assertIn("`unlock #8` names no locked PR", self.say("unlock \t #8\nand more"))
+        self.assertIn("`/design-doc rescope #8` names no locked PR", self.say("/design-doc  rescope\n#8 now"))
 
     def test_writing_a_held_branch_through_bash_is_caught_wherever_the_command_runs(self):
         self.lock()

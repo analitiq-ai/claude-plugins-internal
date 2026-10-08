@@ -34,9 +34,10 @@ checkout rather than keeping a copy that drifts when the gate changes.
 The user can overrule the reviewers. Analitiq-Bot is an org admin, and the user and
 every agent session act as it, so GitHub cannot tell the user's override from an
 agent's: the permission is taken from the user's own words instead. A prompt that
-*starts* with `override-merge #N` grants one `gh pr merge` of PR N in that session,
-past both this gate and the server's rules. It must start the prompt because the
-cron bot's prompts quote issue and PR text that anyone can write.
+*starts* with `override-merge owner/repo#N` grants one `gh pr merge` of that PR in that
+session, past both this gate and the server's rules. It names the repo because every repo has
+a PR N. It must start the prompt because the cron bot's prompts quote issue and PR text that
+anyone can write.
 
 The user can also switch alq-review off for a session (`alq-review off`, spec 016). That lifts
 this gate too -- `--admin` and `gh api` merges included -- because it is the user's decision to
@@ -50,22 +51,27 @@ a false deny costs one command and a false allow costs a merge.
 
 from __future__ import annotations
 
-import fcntl
 import json
-import os
 import re
 import shlex
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from dataclasses import dataclass
 
 # The commit the attestation covers. Bold markers optional because GitHub
 # surfaces render the same body differently; backticks optional for the same
 # reason. Ten hex digits minimum -- see the module docstring.
 REVIEWED_COMMIT = re.compile(r"\*{0,2}Reviewed commit:\*{0,2}\s*[`'\"]?([0-9a-f]{10,40})", re.I)
 
-PR_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/pull/\d+$")
+# A PR's name, `owner/repo#N`, has one reader, PullRequest.named, and it takes a whole text or refuses it. A reader
+# that finds a name at the start of a text ends the name wherever it stops understanding, and what it stopped at --
+# a digit from another alphabet, a character nobody sees -- is then judged by nothing. ASCII only, as GitHub's names
+# are: a name is kept in lower case, and a letter from outside ASCII can lower into one from inside it.
+NAME_PART = r"[A-Za-z0-9_.-]+"
+NUMBER = r"[1-9][0-9]*"
+NAME = re.compile(rf"({NAME_PART}/{NAME_PART})#({NUMBER})")
+GITHUB = "https://github.com/"
 
 GATED = {"merge", "ready"}
 
@@ -86,8 +92,42 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")"}
 # The REST merge endpoint, which would otherwise walk straight around this gate.
 API_MERGE = re.compile(r"pulls/\d+/merge")
 
-OVERRIDE = re.compile(r"override-merge\s+#(\d+)\b")
-SESSION_ID = re.compile(r"[\w-]+")
+KEYWORD = "override-merge"
+# What the user types is read as words, each whole. gate.py reads its commands with this script's reader, and the
+# reader is kept here because this script must answer an override when the plugin's other scripts cannot load.
+# A blank parts words: space, tab, line break. Written out, not `\s`, str.split() or str.splitlines(): those also
+# take characters nobody types or sees.
+LINE_BREAK = "\r\n"
+BLANK = " \t" + LINE_BREAK
+WORDS = re.compile(rf"[{BLANK}]+")
+NOT_A_NAME = ("`override-merge` is not followed by a PR's name, so nothing is granted. The user names the PR in one "
+              "word, with its repo: `override-merge owner/repo#N`.")
+GRANTS = ".merge"
+
+
+def _name_parts(text: str) -> tuple[str, str] | None:
+    found = NAME.fullmatch(text)
+    return (found.group(1).lower(), found.group(2)) if found else None
+
+
+@dataclass(frozen=True)
+class PullRequest:
+    """A PR as an override and a grant name it: GitHub's `owner/repo#N`."""
+    repo: str  # owner/repo, in lower case as GitHub compares names
+    number: str  # text, as written: it is compared, never counted
+
+    def __post_init__(self):
+        if _name_parts(str(self)) != (self.repo, self.number):
+            raise ValueError(f"{str(self)!r} is not a PR's name in lower case")
+
+    @classmethod
+    def named(cls, text: str) -> PullRequest | None:
+        """The PR the whole of `text` names, whatever its capitals; None when `text` is not one name."""
+        parts = _name_parts(text)
+        return cls(*parts) if parts else None
+
+    def __str__(self) -> str:
+        return f"{self.repo}#{self.number}"
 
 
 def deny(reason: str) -> int:
@@ -201,50 +241,96 @@ def fetch(pr_ref: str | None, repo: str | None) -> tuple[dict | None, str]:
         return None, f"could not parse `gh pr view` output: {exc}"
 
 
-def _overrides(session: str) -> Path | None:
-    if not SESSION_ID.fullmatch(session or ""):
-        return None  # not a name to build a path from; such a session holds no override
-    root = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "analitiq-merge-gate"
-    root.mkdir(parents=True, exist_ok=True)
-    return root / f"{session}.json"
+def name_of(pr: dict) -> PullRequest | None:
+    """The PR `gh pr view` found, named from its address; None when that is not a github.com PR's."""
+    address = pr.get("url") or ""
+    if not address.startswith(GITHUB):
+        return None
+    # Rewritten as the name it would be, so the address too is judged by the one reader.
+    repo, _, number = address[len(GITHUB):].rpartition("/pull/")
+    return PullRequest.named(f"{repo}#{number}")
 
 
-def _update_overrides(session: str, change) -> bool:
-    """Apply `change` to the session's granted PR numbers under one lock; returns what it returns."""
-    path = _overrides(session)
-    if path is None:
-        return False
-    with open(path.with_suffix(".lock"), "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        granted = set(json.loads(path.read_text())) if path.exists() else set()
-        result = change(granted)
-        path.write_text(json.dumps(sorted(granted)))
+def first_words(prompt: str, count: int) -> list[str]:
+    """A prompt's first `count` words, fewer when it has fewer."""
+    return [word for word in WORDS.split(prompt.lstrip(BLANK), maxsplit=count)[:count] if word]
+
+
+def first_line(prompt: str) -> str:
+    """A prompt's first line that has a word, without the blanks round it."""
+    return re.split(f"[{LINE_BREAK}]", prompt.lstrip(BLANK), maxsplit=1)[0].rstrip(BLANK)
+
+
+def _granted(held) -> set[PullRequest]:
+    """The PRs a grants record names; ValueError when the record is not one this gate wrote."""
+    names = held.get("granted", []) if isinstance(held, dict) and set(held) <= {"granted"} else None
+    # The gate writes a name in lower case, so one in capitals was not written here.
+    granted = [PullRequest.named(name) if isinstance(name, str) and name == name.lower() else None
+               for name in names] if isinstance(names, list) else None
+    if granted is None or None in granted:
+        raise ValueError('it is not {"granted": [PR names]}')
+    return set(granted)
+
+
+def _update_grants(payload: dict, change):
+    """Apply `change` to the PRs the session may merge, under the session record's lock; returns what it returns."""
+    # Imported here, not at the top: a prompt is owed an answer when this does not load, and grant() gives it.
+    import hookio
+    try:
+        record = hookio.session_file(payload, GRANTS)
+    except ValueError as exc:
+        raise ValueError(f"{exc}. No merge override can be kept in this session: the merge waits for what it "
+                         f"lacks, or is run from another session") from exc
+    try:
+        with hookio.session_state(payload, GRANTS) as held:
+            granted = _granted(held)
+            result = change(granted)
+            held["granted"] = sorted(map(str, granted))
+    except (ValueError, RecursionError) as exc:  # what the record holds, not where it is kept
+        raise ValueError(f"{record} is not a record the merge gate wrote ({exc}). The user deletes it and types "
+                         f"the override again") from exc
     return result
 
 
-def grant(payload: dict) -> int:
-    typed = OVERRIDE.match((payload.get("prompt") or "").lstrip())
-    if not typed:
-        return 0
-    number = int(typed.group(1))
+def _logged(said: str) -> str:
+    """`said`, once written to errors.log. Where that write fails, `said` with that added, so the answer tells it."""
+    try:
+        import hookio
+        hookio.log_error(said)
+    except Exception as exc:  # a plugin module that is there but does not load raises more than ImportError
+        # Told in the answer, the one output this hook depends on: a line on stderr can fail as the log did.
+        return f"{said} (not written to errors.log: {type(exc).__name__}: {exc})"
+    return said
 
-    def add(granted):
-        granted.add(number)
-        return True
-    if _update_overrides(payload.get("session_id"), add):
-        json.dump({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
-                   f"The user granted one `gh pr merge {number}` past its unmet requirements, "
-                   f"`--admin` included."}}, sys.stdout)
+
+def grant(payload: dict) -> int:
+    typed = first_words(payload.get("prompt") or "", 2)
+    if typed[:1] != [KEYWORD]:
+        return 0
+    named = PullRequest.named(typed[1]) if len(typed) == 2 else None
+    if named is None:
+        said = NOT_A_NAME
+    else:
+        try:
+            _update_grants(payload, lambda granted: granted.add(named))
+        except Exception as exc:  # outside main()'s guard; an override that was not recorded is not one
+            said = _logged(f"`override-merge {named}` could not be recorded, so nothing is granted: "
+                           f"{type(exc).__name__}: {exc}")
+        else:
+            said = f"The user granted one merge of `{named}` past its unmet requirements, `--admin` included."
+    # gate._tell's two fields, built here because this answer is owed when the plugin's modules cannot load.
+    json.dump({"systemMessage": f"[alq-review] {said}", "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}, sys.stdout)
     return 0
 
 
-def spend_override(session: str, number: int) -> bool:
+def spend_override(payload: dict, named: PullRequest) -> bool:
     def spend(granted):
-        if number not in granted:
+        if named not in granted:
             return False
-        granted.discard(number)
+        granted.discard(named)
         return True
-    return _update_overrides(session, spend)
+    return _update_grants(payload, spend)
 
 
 def attested(comments: list[dict], head: str) -> bool:
@@ -261,13 +347,12 @@ def attested(comments: list[dict], head: str) -> bool:
     return False
 
 
-def released(pr: dict, head: str) -> bool:
+def released(named: PullRequest | None, head: str) -> bool:
     """Did pr-gate pass the head as a version-only release? An unreadable answer is no."""
     # Imported here, under main()'s refuse-on-error guard: a reader that fails to load must close the gate, not crash
     # the hook, which Claude Code treats as a non-blocking error.
     import github
-    repo = PR_URL.match(pr.get("url") or "")
-    return repo is not None and github.released(repo.group(1), head) is not None
+    return named is not None and github.released(named.repo, head) is not None
 
 
 def how_to_attest(number: int, head: str, verb: str) -> str:
@@ -286,13 +371,30 @@ def how_to_attest(number: int, head: str, verb: str) -> str:
     )
 
 
-def refuse_admin(number) -> int:
-    return deny(
+def admin_needs_override(how: str) -> str:
+    """`how` says how the user overrules it here, or why no override can."""
+    return (
         "`gh pr merge --admin` merges in spite of every check the branch requires -- "
         "CI, DeepSource, the Codex verdict, unresolved threads, the approval. Only the "
-        f"user overrules them: they start a prompt with `override-merge #{number}`. "
-        "Tell them what is unmet and stop."
+        f"user overrules them: {how} Tell them what is unmet and stop."
     )
+
+
+def unmet(verb: str, args: list[str], pr: dict, named: PullRequest | None) -> str | None:
+    """What this `gh pr merge` or `gh pr ready` lacks, as the refusal it gets unless a grant stands in for it;
+    None when it lacks nothing."""
+    if "--admin" in args:
+        return admin_needs_override(
+            f"they start a prompt with `override-merge {named}`." if named else
+            "an override names a PR by its repo, and `gh pr view` gave no github.com address for this one.")
+    if verb == "ready" and not pr.get("isDraft"):
+        return None  # already published; nothing to gate
+    head = (pr.get("headRefOid") or "").lower()
+    if not head:
+        return f"`gh pr view` returned no head commit for PR {pr.get('number')}."
+    if attested(pr.get("comments") or [], head) or released(named, head):
+        return None
+    return how_to_attest(pr.get("number"), head, verb)
 
 
 def switched_off(payload: dict) -> bool:
@@ -303,7 +405,6 @@ def switched_off(payload: dict) -> bool:
 
 
 def gated(tokens: list[str], payload: dict) -> int:
-    session = payload.get("session_id")
     bypass = api_merge_bypass(tokens)
     subcommand_at = None if bypass else find_invocation(tokens)
     if not bypass and subcommand_at is None:
@@ -328,7 +429,9 @@ def gated(tokens: list[str], payload: dict) -> int:
     pr_ref, repo = target(args)
     if shutil.which("gh") is None:
         # A bare `gh` cannot run either; one named by path still can.
-        return refuse_admin(pr_ref or "N") if "--admin" in args else 0
+        return deny(admin_needs_override(
+            "an override names the PR `gh pr view` finds, and `gh` is not on this hook's path, so none can be "
+            "applied until it is.")) if "--admin" in args else 0
 
     pr, error = fetch(pr_ref, repo)
     if pr is None:
@@ -337,23 +440,20 @@ def gated(tokens: list[str], payload: dict) -> int:
             f"{error}. Resolve that and retry -- this gate refuses rather than guesses."
         )
 
-    if verb == "merge" and spend_override(session, pr.get("number")):
+    named = name_of(pr)
+    refusal = unmet(verb, args, pr, named)
+    if refusal is None:
         return 0
-
-    if "--admin" in args:
-        return refuse_admin(pr.get("number"))
-
-    if verb == "ready" and not pr.get("isDraft"):
-        return 0  # already published; nothing to gate
-
-    head = (pr.get("headRefOid") or "").lower()
-    if not head:
-        return deny(f"`gh pr view` returned no head commit for PR {pr.get('number')}.")
-
-    if attested(pr.get("comments") or [], head) or released(pr, head):
-        return 0
-
-    return deny(how_to_attest(pr.get("number"), head, verb))
+    if verb == "merge" and named is not None:
+        # Asked last, so an override is spent only by a merge that needs it and no other merge waits on its record.
+        try:
+            if spend_override(payload, named):
+                return 0
+        except (OSError, ValueError) as exc:
+            unread = _logged(f"This session's merge overrides could not be used, so this merge was judged without "
+                             f"one: {type(exc).__name__}: {exc}.")
+            return deny(f"{unread}\n\n{refusal}")
+    return deny(refusal)
 
 
 def main() -> int:

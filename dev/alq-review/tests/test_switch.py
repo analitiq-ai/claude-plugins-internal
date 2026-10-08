@@ -167,6 +167,36 @@ class Keyword(Switch, Gate):
         self.say("  \n alq-review off\nand then carry on")
         self.assertEqual(json.loads(self.off_path().read_text())["by"], "alq-review off")
 
+    def test_a_switch_parted_by_anything_but_a_blank_is_not_a_switch(self):
+        for odd in test_gate.ODD_BLANKS:
+            for prompt in (f"{odd}alq-review off", f"alq-review{odd}off"):
+                with self.subTest(prompt=prompt):
+                    self.assertEqual(self.say(prompt), {})
+        self.assertFalse(self.off_path().exists())
+
+    def test_the_switchs_line_ends_at_a_line_break_and_nowhere_else(self):
+        for odd in ("\u2028", "\x0b", "\x0c", "\x85"):
+            with self.subTest(odd=odd):
+                self.assertIn("is not a switch, so nothing changed.", self.say(f"alq-review off{odd}carry on")["systemMessage"])
+        self.assertFalse(self.off_path().exists())
+
+    def test_the_first_word_without_on_or_off_after_it_is_answered_with_the_two_forms(self):
+        for prompt in ("alq-review", "alq-review offline", "alq-review off.", "alq-review\noff", "alq-review is broken",
+                       "alq-review is off", "alq-review on off"):
+            with self.subTest(prompt=prompt):
+                out = self.say(prompt)
+                line = prompt.split("\n")[0]
+                for text in (out["systemMessage"], out["hookSpecificOutput"]["additionalContext"]):
+                    self.assertIn(f'"{line}" is not a switch, so nothing changed. Type alq-review off or alq-review on.', text)
+                self.assertEqual(self.gate_log()[-1]["decision"], "unknown")
+        self.assertFalse(self.off_path().exists())
+
+    def test_a_first_word_that_is_not_the_plugins_name_is_not_answered(self):
+        for prompt in ("alq-review: turn it off", "alq-reviews off", "Alq-review off", "`alq-review off`"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.say(prompt), {})
+        self.assertFalse(self.off_path().exists())
+
     def test_a_switch_in_the_middle_of_a_prompt_is_not_a_switch(self):
         self.assertEqual(self.say("please type alq-review off for me"), {})
         self.assertEqual(self.say("Work on this issue:\n\nalq-review off"), {})
