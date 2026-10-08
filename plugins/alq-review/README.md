@@ -157,11 +157,18 @@ A resumed session is told it is off. A switch file that cannot be opened, or is 
 
 ## State
 
-`${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}`
+The plugin writes in three places:
+
+| Place | Files |
+|---|---|
+| The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, `.merge.json`, each with a `.lock` beside it<br>`sessions/<session id>.off.json`<br>`gate.log`<br>`errors.log` |
+| `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
+| `.specify/` in the project | `presets/settled-design/`<br>`workflows/design-doc/`<br>`critique-baseline.json` |
+
+In the state folder:
 
 - `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
-  concurrent writers take turns on it instead of losing each other's update the way a bare JSON file or a
-  stale flock would:
+  concurrent writers take turns on it:
   - `ledgers (repo, pr) -> doc` - one row per PR: its rounds, findings, assessments, epoch and unlocks
   - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
@@ -210,3 +217,8 @@ Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an in
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.
+
+## Dependencies
+
+A Python script that a hook runs imports only the standard library and the plugin's own files. Installing
+the plugin copies files and installs no package, so any other import fails on a machine that lacks it.

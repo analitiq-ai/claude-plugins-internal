@@ -9,8 +9,8 @@
   hand-maintained list, and `config.json` is plugin-wide, not per repo. None of the seven Analitiq repos
   tracks a nested `*/specs/<x>/` path today, so no folder changes classification; a future non-spec
   `specs/<x>/` folder fails loud (its missing `plan.md` is named), not silently.
-- **Existing tools**: `.specify/` marks a Spec Kit project, but no Analitiq repo commits it, so a checkout
-  the gate reads does not have it. `design_documents` path patterns in `config.json`: a configured list,
+- **Existing tools**: `.specify/` marks a Spec Kit project, but only this repo commits it, so a checkout of
+  another repo the gate reads does not have it. `design_documents` path patterns in `config.json`: a configured list,
   rejected for the reason above.
 
 ## R2: One recogniser for the gate and the design-doc rescope
