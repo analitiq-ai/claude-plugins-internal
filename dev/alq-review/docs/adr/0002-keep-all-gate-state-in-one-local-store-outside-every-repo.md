@@ -12,7 +12,7 @@ blastRadius: component
 relatesTo: []
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{ledger,hookio,pre_merge_gate,snapshot}.py"
+    pattern: "plugins/alq-review/scripts/{ledger,hookio,pre_merge_gate}.py"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -43,9 +43,6 @@ poller knows a PR but no checkout. The hooks know a checkout but no PR. The modu
 The claim check then added records about a commit that is not made yet. A commit has no PR, so the
 store needed a second kind of key, and the choice was between the existing store and a new one.
 
-The shim check met the opposite pull. Its sweeper agents read a copy of `HEAD`, and a read outside the
-project needs an allow from a hook.
-
 Why now: the rule is written only in a docstring and two research files. Issue #26 will add a per-repo
 switch that needs a place to live.
 
@@ -56,9 +53,7 @@ switch that needs a place to live.
 2. We will keep records that outlive a session in one SQLite file there, written inside a
    `BEGIN IMMEDIATE` transaction.
 3. We will keep no record anywhere else without an ADR that names it. A record is what a gate has to
-   remember to decide later. A copy of the code that agents only read is not a record: the shim check's
-   copy of `HEAD` sits inside the project, beside the worktrees, because agents can read there without an
-   allow.
+   remember to decide later.
 4. We will keep a gate's record for as long as its local branch exists. Once the branch is gone, the user
    deletes the record by hand.
 5. We will let nothing else delete a record: no agent, and not the removal of a branch or a worktree. A
@@ -89,11 +84,7 @@ Rejected: a second store would need its own locking.
 Rejected. The plugin had left that design for this reason: with a bare JSON file, writers at the same
 time lose each other's update, and a file lock can go stale.
 
-### Option E: The sweeper's copy in the state folder
-
-Rejected: the folder is outside the project, so every read depends on the allow.
-
-### Option F: The state in the worktree of the issue
+### Option E: The state in the worktree of the issue
 
 Rejected:
 
