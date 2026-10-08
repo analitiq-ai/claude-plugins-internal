@@ -49,7 +49,7 @@ ADR-0015 decides that private source may be sent to the classifier.
 
 ## Decision
 
-1. We will judge a fix with Jev, an outside one-shot classifier reached through OpenRouter.
+1. We will judge a fix with Jev, an outside one-shot classifier.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
 3. We will compose the verdict in code.
 4. We will keep the replayed questions word for word. A change to their wording or to the request's shape
