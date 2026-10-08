@@ -1,15 +1,18 @@
-"""The claim check's hook handlers (spec 005): the commit decision, the workflow launch, the agents'
-outputs, the contest judge's fetches, and the user's release. The rules they apply are claimcheck's; this module
-reads git and the ledger for them and records what they decide."""
+"""The claim check's hook handlers: the commit decision, the workflow launch, the agents' outputs, the contest
+judge's fetches, and the user's release. The rules they apply are claimcheck's and the mapping of words from one
+version of a file to the next is lineage's; this module reads git and the ledger for them and records what they
+decide. Nothing here is keyed on HEAD, a tree or a commit: a claim's count belongs to its lineage on a branch."""
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import briefs
 import claimcheck
 import config
 import ledger
+import lineage
 import worktree
 from hookio import deny, record, refuse_claim, session_state
 from shell import Action
@@ -45,19 +48,88 @@ def _spans(hunks: list[dict], text_of) -> list[dict]:
     return [claimcheck.span(h, text_of(h["file"]) or []) for h in hunks]
 
 
-def _holds(claims: ledger.Claims, base: str, hunks: list[dict]) -> list[dict]:
-    return [hold for file in sorted({h["file"] for h in hunks}) for hold in claims.holds(base, file)]
+def _files(hunks: list[dict]) -> list[str]:
+    return sorted({h["file"] for h in hunks})
 
 
-def _save_holds(claims: ledger.Claims, base: str, holds: list[dict]) -> None:
-    for file in sorted({h["file"] for h in holds}):
-        claims.save_holds(base, file, [h for h in holds if h["file"] == file])
+def _carried(claims: ledger.Claims, root: str, tree: str, branch: str, file: str, read: list[dict], ref: str):
+    """(open lineages of `file` before, after, {claim id: [lineage id]}, the file's text) once the lineages are carried
+    from the text a completed check last saw to the text in `tree`, `read` being the claims found in it; None when
+    `tree` does not have the file, so its lineages are left alone. Saves nothing."""
+    text = worktree.tree_text(root, tree, file)
+    if text is None:
+        return None
+    before = claims.open_lineages(branch, file)
+    if not before:
+        return before, [], {}, text
+    seen = claims.seen(branch, "claim", file)
+    if seen is None:
+        raise RuntimeError(f"{file} has open lineages on {branch} and no saved text to carry them from")
+    after, inherited = lineage.succeed(before, seen["text"], text, worktree.text_hunks(root, seen["text"], text), read,
+                                       claimcheck.count, ref)
+    return before, after, inherited, text
+
+
+def _held(claims: ledger.Claims, root: str, tree: str, branch: str, hunks: list[dict]) -> tuple[list[dict], set[str]]:
+    """The lineages that still have words in the staged files and are held, and the ids of the words the user released
+    in them. Saves nothing: a hold is decided before any reader runs."""
+    held, released = [], set()
+    for file in _files(hunks):
+        found = _carried(claims, root, tree, branch, file, [], "")
+        for item in found[1] if found else []:
+            if item["state"] == "open":
+                held += [item] if claimcheck.held(item) else []
+                released |= set(item["released"]["claims"]) if item["released"] else set()
+    return held, released
+
+
+def _mint(claim: dict, ref: str, text: str) -> dict:
+    found = claimcheck.new_lineage(claim, ref)
+    start, end = lineage.span_of(text, claim["line"], claim["quote"])
+    found["places"] = [{"start": start, "end": end, "claim": claim["id"]}]
+    return found
+
+
+def _correct(found: dict, claim_id: str, ref: str) -> None:
+    """A CORRECT ruling takes its words out of the lineage; with none left the lineage ends."""
+    found["places"] = [place for place in found["places"] if place["claim"] != claim_id]
+    if not found["places"]:
+        found.update(state="ended", ended={"by": "correct", "ref": ref, "into": None})
 
 
 def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
-    """A check that just completed refuses each hunk it ruled a claim WRONG in, once."""
-    holds = claimcheck.count_refusals(_holds(claims, check["base"], check["hunks"]), check)
-    _save_holds(claims, check["base"], holds)
+    """A check that just completed moves each file's lineages to the text it checked, enters its rulings in their
+    chains once, starts a lineage for each WRONG claim that continues none, and keeps that text to carry from next."""
+    branch, ref = check["branch"], check["ref"]
+    lineages = {}
+    for file in _files(check["hunks"]):
+        read = sorted((c for c in check["claims"].values() if c["file"] == file), key=lambda c: (c["line"], c["id"]))
+        carried = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
+        if carried is None:
+            continue
+        before, after, inherited, text = carried
+        claimcheck.keep_holds(before, after)
+        by_id = {item["id"]: item for item in after}
+        for claim in read:
+            verdict = check["verdicts"].get(claim["id"])
+            if verdict is None:
+                continue
+            found = by_id[inherited[claim["id"]][0]] if claim["id"] in inherited else None
+            if found is None and verdict["verdict"] == "WRONG":
+                found = by_id[claim["id"]] = _mint(claim, ref, text)
+                after.append(found)
+            if found is None:
+                continue
+            inherited[claim["id"]] = [found["id"]]
+            claimcheck.enter(found, ref, claim, verdict)
+            if verdict["verdict"] == "CORRECT":
+                _correct(found, claim["id"], ref)
+        for item in after:
+            claims.save_lineage(branch, item)
+        if any(item["state"] == "open" for item in after):
+            claims.save_seen(branch, "claim", file, {"text": text, "ref": ref})
+        lineages.update({cid: owned[0] for cid, owned in inherited.items()})
+    check["lineages"] = lineages
     verdicts = [v["verdict"] for v in check["verdicts"].values()]
     record(payload, "claim-check", "complete",
            f"{check['ref']}: {check['cost']['judged']} judged, {check['cost']['agents']} agents, "
@@ -66,7 +138,7 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
 
 def _settle(payload: dict, claims: ledger.Claims, check: dict) -> None:
     """A check is settled once: a contest answered after it completed replaces a verdict without completing the
-    check again, so its refusals are not counted twice."""
+    check again, so its rulings are not entered twice."""
     if check["status"] == "complete":
         return
     claimcheck.settle(check)
@@ -84,12 +156,22 @@ def on_commit(payload: dict, action: Action) -> dict | None:
     tree, base = worktree.staged_tree(root), worktree.head_tree(root)
     empty = tree == base and not action.staging
     concluding = worktree.concluding(root)
+    decided = claimcheck.commit_preconditions(empty=empty, concluding=concluding, staging=action.staging,
+                                              alone=action.alone)
+    held, released, refusal = [], set(), None
     with ledger.open_claims(where.slug) as claims:
         check = claims.check(tree)
         if check is not None and check["base"] != base:
             check = None
-        hunks = [] if empty or concluding else (check["hunks"] if check else worktree.tree_hunks(root, base, tree))
-        held, released = claimcheck.standing(_holds(claims, base, hunks), hunks)
+        hunks = [] if decided else (check["hunks"] if check else worktree.tree_hunks(root, base, tree))
+        if hunks:
+            try:
+                lineage.differ()
+                held, released = _held(claims, root, tree, where.branch, hunks)
+            except (lineage.Unavailable, lineage.BudgetExceeded) as exc:
+                refusal = str(exc)
+    if refusal:
+        return refuse_claim(payload, "commit", refusal, _logged(where.slug, root))
     decision = claimcheck.commit_decision(check, empty=empty, concluding=concluding, staging=action.staging,
                                           alone=action.alone, held=held, released=released, root=root)
     if not decision.allow:
@@ -99,8 +181,9 @@ def on_commit(payload: dict, action: Action) -> dict | None:
 
 # --- the launch ---------------------------------------------------------------------------------------
 
-def _new_check(repo: str, root: str, tree: str, base: str, hunks: list[dict]) -> dict:
-    return {"repo": repo, "root": root, "tree": tree, "base": base, "ref": claimcheck.check_ref(repo, tree),
+def _new_check(repo: str, root: str, branch: str, tree: str, base: str, hunks: list[dict]) -> dict:
+    return {"repo": repo, "root": root, "branch": branch, "tree": tree, "base": base,
+            "ref": claimcheck.check_ref(repo, tree),
             "status": "reading", "hunks": hunks, "batches": [], "labels": {}, "claims": {}, "verdicts": {},
             "contests": {}, "cost": {"judged": 0, "agents": 0}}
 
@@ -154,6 +237,10 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         return deny(f"{CHECK} needs args.worktree: the absolute path of the checkout whose staged change is checked, "
                     "with a GitHub origin.")
     root, repo, logged = where.root, where.slug, _logged(where.slug, where.root)
+    try:
+        lineage.differ()
+    except lineage.Unavailable as exc:
+        return refuse_claim(payload, "claim-launch", str(exc), logged)
     unstaged = worktree.unstaged(root)
     if unstaged:
         return refuse_claim(payload, "claim-launch", "The check reads the staged change from the checkout, and these "
@@ -169,8 +256,10 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         if earlier is not None and earlier["base"] != base:
             earlier = None
         hunks = earlier["hunks"] if earlier else worktree.tree_hunks(root, base, tree)
-        holds = _holds(claims, base, hunks)
-        held, _ = claimcheck.standing(holds, hunks)
+        try:
+            held, _ = _held(claims, root, tree, where.branch, hunks)
+        except lineage.BudgetExceeded as exc:
+            return refuse_claim(payload, "claim-launch", str(exc), logged)
         if held:
             return refuse_claim(payload, "claim-launch", claimcheck.user_question(held), logged)
         if contests:
@@ -189,7 +278,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
             if earlier is not None and earlier["status"] == "complete":
                 return refuse_claim(payload, "claim-launch", f"This staged change was already checked ({earlier['ref']}). "
                                     "Commit it, change it, or contest a WRONG verdict with evidence.", logged)
-            check = _new_check(repo, root, tree, base, hunks)
+            check = _new_check(repo, root, where.branch, tree, base, hunks)
             to_read = _reuse(claims, check, earlier)
             injected = briefs.claim_check_args(check, to_read=to_read, contests=[],
                                                warn_over=config.load()["claim_warn_over"])
@@ -289,9 +378,12 @@ def after_output(payload: dict) -> None:
             cid = claimcheck.claim_id(body["file"], body["quote"])
             verdict = {k: v for k, v in body.items() if k != "check_ref"}
             if agent_type == briefs.CLAIM_CONTEST_JUDGE:
-                holds = _holds(claims, check["base"], check["hunks"])
-                outcome = f"contest of {claimcheck.claim_ref(cid)} {claimcheck.contest_outcome(check, holds, cid, verdict)}"
-                _save_holds(claims, check["base"], holds)
+                found = claims.open_lineage(check["branch"], check["lineages"][cid])
+                if found is None:
+                    raise RuntimeError(f"{claimcheck.claim_ref(cid)} has no open lineage on {check['branch']} to enter "
+                                       "the contest in")
+                outcome = f"contest of {claimcheck.claim_ref(cid)} {claimcheck.contest_outcome(check, found, cid, verdict)}"
+                claims.save_lineage(check["branch"], found)
             else:
                 check["verdicts"][cid] = verdict
                 check["cost"]["judged"] += 1
@@ -323,23 +415,24 @@ def on_webfetch(payload: dict) -> dict | None:
 
 
 def on_prompt(payload: dict, word: str) -> dict | None:
-    """Answers `unlock <word>` where the word is a claim's name; None where it is not, and the unlock is a branch's."""
+    """Answers `unlock <word>` where the word is a claim's name; None where it is not, and the unlock is a branch's.
+    The name may be a lineage's id or the id of words a lineage holds now."""
     cid = claimcheck.parse_claim_ref(word)
     if cid is None:
         return None
-    released = []
-    for repo, base, file in ledger.claim_holders(cid):
+    at, released = ledger.stamp(datetime.now(timezone.utc)), []
+    for repo, branch, lineage_id in ledger.claim_lineage_holders(cid):
         with ledger.open_claims(repo) as claims:
-            holds = claims.holds(base, file)
-            for hold in holds:
-                if any(c["id"] == cid for c in hold["claims"]):
-                    claimcheck.release(hold)
-            claims.save_holds(base, file, holds)
-        released.append(f"{repo} {file}")
+            found = claims.open_lineage(branch, lineage_id)
+            if found is None or not claimcheck.held(found):
+                continue
+            claimcheck.release(found, at)
+            claims.save_lineage(branch, found)
+        released.append(f"{repo} {found['file']}")
     if released:
         record(payload, "claim-unlock", "released", f"{claimcheck.claim_ref(cid)}: {', '.join(released)}")
-        said = (f"The user released {claimcheck.claim_ref(cid)} in {', '.join(released)}: while those words stay as they are, its WRONG "
-                "verdict no longer refuses the commit. Changed words are checked again.")
+        said = (f"The user released {claimcheck.claim_ref(cid)} in {', '.join(released)}: the words it holds now may be "
+                "committed. Its count stays, so one more WRONG ruling on any version of it holds it again.")
     else:
         said = f"`unlock {word}` names no claim a check is holding, so nothing was released."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}

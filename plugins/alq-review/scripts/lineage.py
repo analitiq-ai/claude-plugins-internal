@@ -3,6 +3,7 @@ texts arrive as arguments, so every answer is a function of them."""
 from __future__ import annotations
 
 import copy
+import re
 import sys
 import sysconfig
 from bisect import bisect_right
@@ -57,16 +58,25 @@ def differ():
 
 
 def span_of(text: str, line: int, quote: str) -> Span:
-    """The offsets of the first and last word of `quote` in `text`, from the start of 1-based `line` on. The words
-    are those `claimcheck.plain` hashes, so the span and the claim id agree on what the words are."""
-    wanted = claimcheck.plain(quote).split(" ")
-    found = claimcheck.words(text)
+    """The offsets of the first and last character of `quote` in `text`, from the start of 1-based `line` on. The words
+    are those `claimcheck.plain` hashes, so the span and the claim id agree on what the words are. A quote of whole
+    words is found as such; one that is part of a word (a test's name inside its `def`) where it stands."""
+    wanted = claimcheck.plain(quote)
     starts = _line_starts(text)
-    if line > len(starts) or not wanted[0]:
+    if line > len(starts) or not wanted:
         raise SpanNotFound(f"{quote!r} is not at line {line}")
-    for i in range(len(found) - len(wanted) + 1):
-        if found[i][1] >= starts[line - 1] and [w for w, _, _ in found[i:i + len(wanted)]] == wanted:
-            return found[i][1], found[i + len(wanted) - 1][2]
+    flat, origin, floor = "", [], None
+    for word, start, _ in claimcheck.words(text):
+        if flat:
+            flat, origin = flat + " ", origin + [origin[-1]]
+        if floor is None and start >= starts[line - 1]:
+            floor = len(flat)
+        flat, origin = flat + word, origin + list(range(start, start + len(word)))
+    escaped = re.escape(wanted)
+    for pattern in (rf"(?<!\S){escaped}(?!\S)", escaped):
+        found = re.compile(pattern).search(flat, len(flat) if floor is None else floor)
+        if found:
+            return origin[found.start()], origin[found.end() - 1] + 1
     raise SpanNotFound(f"{quote!r} is not in the text from line {line}")
 
 
@@ -118,6 +128,9 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
                 survivor[lid] = winner
                 found[lid].update(state="ended", ended={"by": "merged", "ref": ref, "into": winner})
         inherited[claim["id"]] = [winner]
+    for lid in survivor:
+        found[lid]["ended"]["into"] = live(lid)
+    inherited = {cid: [live(lid) for lid in owned] for cid, owned in inherited.items()}
     for lid, item in found.items():
         if lid in survivor:
             continue

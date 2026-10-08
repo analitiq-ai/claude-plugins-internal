@@ -47,6 +47,17 @@ class SpanOfTest(unittest.TestCase):
         span = lineage.span_of(text, 1, "The claim is here.")
         self.assertEqual(text[span[0]:span[1]], "The claim is here.")
 
+    def test_a_quote_that_is_part_of_a_word_is_found_where_it_stands(self):
+        text = "import x\ndef test_an_empty_list_is_rejected():\n    pass\n"
+        span = lineage.span_of(text, 2, "test_an_empty_list_is_rejected")
+        self.assertEqual(text[span[0]:span[1]], "test_an_empty_list_is_rejected")
+
+    def test_whole_words_win_over_an_earlier_match_inside_a_word(self):
+        text = "This is safe.\n"
+        span = lineage.span_of(text, 1, "is safe.")
+        self.assertEqual(text[span[0]:span[1]], "is safe.")
+        self.assertEqual(span[0], 5)
+
     def test_raises_when_the_words_are_not_there(self):
         with self.assertRaises(lineage.SpanNotFound):
             lineage.span_of("Intro\nSomething else.\n", 1, "The validator rejects an empty list.")
@@ -253,6 +264,20 @@ class SucceedTest(unittest.TestCase):
         came_back = {"id": "L1", "line": 2, "quote": "Other."}
         lineages, inherited = self.succeed([self.lineage("L1", old, "The tool is quick.")], old, new, [came_back])
         self.assertEqual(inherited, {"L1": ["L1"]})
+
+    def test_merges_made_one_after_another_all_end_in_the_last_survivor(self):
+        text = "aaa bbb ccc ddd\n"
+
+        def holding(lid, start, end):
+            return {"id": lid, "state": "open", "ended": None, "chain": [],
+                    "places": [{"start": start, "end": end, "claim": lid}]}
+        before = [holding("L1", 0, 3), holding("L2", 4, 11), holding("L3", 12, 15)]
+        first, second = {"id": "X", "line": 1, "quote": "aaa bbb"}, {"id": "Y", "line": 1, "quote": "ccc ddd"}
+        lineages, inherited = self.succeed(before, text, text, [first, second], counts={"L1": 1, "L2": 2, "L3": 3})
+        found = self.by_id(lineages)
+        self.assertEqual(inherited, {"X": ["L3"], "Y": ["L3"]})
+        self.assertEqual([(lid, found[lid]["ended"]["into"]) for lid in ("L1", "L2")], [("L1", "L3"), ("L2", "L3")])
+        self.assertEqual(found["L3"]["state"], "open")
 
     def test_the_lineages_it_is_given_are_not_changed(self):
         old, new = "Intro.\nThe tool is fast.\n", "Intro.\n"

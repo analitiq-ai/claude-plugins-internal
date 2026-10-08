@@ -120,12 +120,23 @@ def site_range(site: dict) -> dict:
     return {"file": site["file"], "old_start": site["line"], "old_count": 1}
 
 
+def _old_range(item: dict) -> tuple[int, int]:
+    return item["old_start"], item["old_start"] + max(item["old_count"], 1) - 1
+
+
+def touches(a: dict, b: dict) -> bool:
+    """Whether two old-side ranges of one file overlap or are adjacent, a pure insertion counting as the line it follows;
+    the caller passes both in the numbering of one base."""
+    (start_a, end_a), (start_b, end_b) = _old_range(a), _old_range(b)
+    return a["file"] == b["file"] and start_a <= end_b + 1 and start_b <= end_a + 1
+
+
 def overlaps(ranges: list[dict], hunks: list[dict]) -> bool:
-    return any(claimcheck.touches(r, h) for r in ranges for h in hunks)
+    return any(touches(r, h) for r in ranges for h in hunks)
 
 
 def touched(sites: list[dict], hunks: list[dict]) -> dict[str, bool]:
-    """Per site id, whether `claimcheck.touches` holds for a hunk and the site's line."""
+    """Per site id, whether `touches` holds for a hunk and the site's line."""
     return {site_id(s["file"], s["function"]): overlaps([site_range(s)], hunks) for s in sites}
 
 

@@ -163,7 +163,6 @@ class Store(unittest.TestCase):
         self.assertEqual(self.primary_key("claim_checks"), ["repo", "tree"])
         self.assertEqual(self.primary_key("claim_reads"), ["repo", "patch_id"])
         self.assertEqual(self.primary_key("claim_verdicts"), ["repo", "claim_id"])
-        self.assertEqual(self.primary_key("claim_holds"), ["repo", "base", "file"])
 
     def test_claim_records_round_trip_inside_one_transaction(self):
         with ledger.open_claims("acme/demo") as claims:
@@ -171,13 +170,10 @@ class Store(unittest.TestCase):
             claims.save_check({"tree": "t1", "status": "reading"})
             claims.save_read("p1", {"kind": "PROSE", "claims": []})
             claims.save_verdict("c1", {"evidence_blobs": {"a.py": "b1"}})
-            claims.save_holds("base1", "README.md", [{"refusals": 1}])
         with ledger.open_claims("acme/demo") as claims:
             self.assertEqual(claims.check("t1")["status"], "reading")
             self.assertEqual(claims.read("p1")["kind"], "PROSE")
             self.assertEqual(claims.verdict("c1")["evidence_blobs"], {"a.py": "b1"})
-            self.assertEqual(claims.holds("base1", "README.md"), [{"refusals": 1}])
-            self.assertEqual(claims.holds("base1", "other.md"), [])
         with ledger.open_claims("other/repo") as claims:
             self.assertIsNone(claims.check("t1"))
 
@@ -198,11 +194,19 @@ class Store(unittest.TestCase):
         with ledger.open_claims("acme/demo") as claims:
             claims.save_check({"tree": "t1", "status": "reading"})
 
-    def test_held_claims_are_found_by_query(self):
+    def test_lineages_are_found_by_their_own_id_or_by_the_id_of_words_they_hold(self):
+        def open_one(lid, claim, state="open"):
+            return {"id": lid, "opened": "r:1", "file": "README.md", "state": state,
+                    "places": [{"start": 0, "end": 5, "claim": claim}]}
         with ledger.open_claims("acme/demo") as claims:
-            claims.save_holds("base1", "README.md", [{"claims": [{"id": "abc", "quote": "zzz"}], "refusals": 3}])
-        self.assertEqual(ledger.claim_holders("abc"), [("acme/demo", "base1", "README.md")])
-        self.assertEqual(ledger.claim_holders("zzz"), [])
+            claims.save_lineage("feat/1-x", open_one("aaa", "now"))
+            claims.save_lineage("feat/1-x", open_one("bbb", "bbb", state="ended"))
+        with ledger.open_claims("other/repo") as claims:
+            claims.save_lineage("feat/2-y", open_one("aaa", "aaa"))
+        self.assertEqual(ledger.claim_lineage_holders("aaa"), [("acme/demo", "feat/1-x", "aaa"), ("other/repo", "feat/2-y", "aaa")])
+        self.assertEqual(ledger.claim_lineage_holders("now"), [("acme/demo", "feat/1-x", "aaa")])
+        self.assertEqual(ledger.claim_lineage_holders("bbb"), [])
+        self.assertEqual(ledger.claim_lineage_holders("zzz"), [])
 
     def test_lineage_tables_are_keyed_by_what_names_one_row(self):
         self.assertEqual(self.primary_key("claim_lineages"), ["repo", "branch", "id", "opened"])

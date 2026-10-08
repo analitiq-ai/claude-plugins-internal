@@ -52,13 +52,6 @@ CREATE TABLE IF NOT EXISTS claim_verdicts (
   doc      TEXT NOT NULL,
   PRIMARY KEY (repo, claim_id)
 );
-CREATE TABLE IF NOT EXISTS claim_holds (
-  repo TEXT NOT NULL,
-  base TEXT NOT NULL,
-  file TEXT NOT NULL,
-  doc  TEXT NOT NULL,
-  PRIMARY KEY (repo, base, file)
-);
 CREATE TABLE IF NOT EXISTS shim_checks (
   repo TEXT NOT NULL,
   tree TEXT NOT NULL,
@@ -250,8 +243,8 @@ class _Records:
 
 
 class Claims(_Records):
-    """The claim check's records: by git's own fingerprints (a tree id, a hunk's patch-id), by a claim id, and its holds by
-    base and file."""
+    """The claim check's records: by git's own fingerprints (a tree id, a hunk's patch-id), by a claim id, and its
+    lineages and the text they were last carried from by branch."""
 
     def check(self, tree: str) -> dict | None:
         return self._get("claim_checks", "tree", tree)
@@ -287,14 +280,6 @@ class Claims(_Records):
                                   "AND (? IS NULL OR json_extract(doc, '$.file') = ?) ORDER BY id, opened",
                                   (self.repo, branch, file, file))
         return [json.loads(doc) for (doc,) in rows]
-
-    def holds(self, base: str, file: str) -> list[dict]:
-        row = self._conn.execute("SELECT doc FROM claim_holds WHERE repo = ? AND base = ? AND file = ?",
-                                 (self.repo, base, file)).fetchone()
-        return json.loads(row[0]) if row else []
-
-    def save_holds(self, base: str, file: str, holds: list[dict]) -> None:
-        self._put("claim_holds", ("base", "file"), (base, file), holds)
 
 
 class Shims(_Records):
@@ -389,14 +374,14 @@ def open_claims(repo: str):
         yield Claims(conn, repo)
 
 
-def claim_holders(claim_id: str) -> list[tuple[str, str, str]]:
-    """(repo, base, file) of every hold that names `claim_id`, which is how a user's `unlock claim-<id>` finds it."""
+def claim_lineage_holders(claim_id: str) -> list[tuple[str, str, str]]:
+    """(repo, branch, lineage id) of every open lineage that `claim_id` names: by its own id or by the id of words it
+    holds now, which is how a user's `unlock claim-<id>` finds it."""
     with closing(_connect()) as conn:
-        rows = conn.execute("SELECT repo, base, file FROM claim_holds, json_each(claim_holds.doc) AS hold, "
-                            "json_each(hold.value, '$.claims') AS named WHERE json_extract(named.value, '$.id') = ? "
-                            "ORDER BY repo, base, file",
-                            (claim_id,))
-        return sorted(set(rows))
+        rows = conn.execute("SELECT repo, branch, id FROM claim_lineages WHERE json_extract(doc, '$.state') = 'open' "
+                            "AND (id = ?1 OR EXISTS (SELECT 1 FROM json_each(doc, '$.places') AS place "
+                            "WHERE json_extract(place.value, '$.claim') = ?1)) ORDER BY repo, branch, id", (claim_id,))
+        return list(rows)
 
 
 def parse_ref(ref: str) -> tuple[str, int]:
