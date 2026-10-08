@@ -19,15 +19,14 @@ malformed.
 - `Located(folder: str, branch: str)`
 - `NoSpec(reason: str)`
 - `FoundSpec(folder: str, text: str)`: `text` is `spec.md` as committed at HEAD of the checkout.
-- `NoSpecNeeded(reason: str)`
 - `SpecLocationError(RuntimeError)`: message = what is missing + one next step.
 
 ## Resolution (`resolve(slug, branch, root)`)
 
 ```
-branch --issue_number--> issue | None ──None──> None (no spec handed; FR-014)
+branch --issue_number (in speclocation.py)--> issue | None ──None──> None (no spec handed; FR-014)
 issue --github.issue_spec--> (id, body) | None ──None──> refuse: run design-doc
-body --parse--> NoSpec ──> NoSpecNeeded(reason)
+body --parse--> NoSpec(reason) ──> returned as it is
               \-> Located
 Located.folder in root?            no ──> refuse: names folder + Located.branch
 spec.md at HEAD, non-empty?        no ──> refuse: as folder missing

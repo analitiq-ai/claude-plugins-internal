@@ -1,0 +1,250 @@
+"""speclocation.py, and the marker-comment read and write in github.py (spec 018)."""
+import json
+import os
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from test_gate import SCRIPTS, Gate
+from test_worktree_facts import git
+
+import github
+import speclocation
+from speclocation import Located, NoSpec, SpecLocationError
+
+MARKER = "<!-- analitiq-spec -->"
+FOLDER, BRANCH = "dev/demo/specs/001-demo", "feat/1-demo"
+LOCATED = f"{MARKER}\nspec: {FOLDER}\nbranch: {BRANCH}\n"
+
+
+class Form(unittest.TestCase):
+    def test_a_located_comment_reads_back_as_it_was_written(self):
+        self.assertEqual(speclocation.render(FOLDER, BRANCH), LOCATED)
+        self.assertEqual(speclocation.parse(LOCATED), Located(FOLDER, BRANCH))
+
+    def test_a_no_spec_comment_reads_back_as_it_was_written(self):
+        body = speclocation.render_none("docs only")
+        self.assertEqual(body, f"{MARKER}\nspec: none\nreason: docs only\n")
+        self.assertEqual(speclocation.parse(body), NoSpec("docs only"))
+
+    def test_github_line_endings_are_read(self):
+        self.assertEqual(speclocation.parse(LOCATED.replace("\n", "\r\n")), Located(FOLDER, BRANCH))
+
+    def test_a_whole_spec_under_the_marker_is_refused_naming_design_doc(self):
+        with self.assertRaises(SpecLocationError) as refused:
+            speclocation.parse(f"{MARKER}\n# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n")
+        self.assertIn("/alq-review:design-doc", str(refused.exception))
+
+    def test_every_other_shape_is_refused_stating_the_form(self):
+        malformed = {
+            "wrong order": f"{MARKER}\nbranch: {BRANCH}\nspec: {FOLDER}\n",
+            "extra line": LOCATED + "note: x\n",
+            "text before the marker": "see below\n" + LOCATED,
+            "no branch": f"{MARKER}\nspec: {FOLDER}\n",
+            "the marker alone": f"{MARKER}\n",
+            "empty value": f"{MARKER}\nspec: {FOLDER}\nbranch: \n",
+            "none without a reason": f"{MARKER}\nspec: none\nbranch: {BRANCH}\n",
+            "absolute": f"{MARKER}\nspec: /{FOLDER}\nbranch: {BRANCH}\n",
+            "leaves the repo": f"{MARKER}\nspec: ../other/specs/001-demo\nbranch: {BRANCH}\n",
+            "not under specs": f"{MARKER}\nspec: dev/demo/001-demo\nbranch: {BRANCH}\n",
+        }
+        for name, body in malformed.items():
+            with self.subTest(name), self.assertRaises(SpecLocationError) as refused:
+                speclocation.parse(body)
+            self.assertIn("spec: <folder", str(refused.exception))
+
+    def test_render_refuses_an_absolute_folder_a_two_line_branch_and_a_two_line_or_blank_reason(self):
+        for write in (lambda: speclocation.render("/abs/specs/x", BRANCH), lambda: speclocation.render(FOLDER, "a\nb"),
+                      lambda: speclocation.render_none("two\nlines"), lambda: speclocation.render_none(" ")):
+            with self.assertRaises(SpecLocationError):
+                write()
+
+
+class Issue(Gate):
+    """A checkout on feat/1-demo whose issue's comments the fake gh hands over."""
+    SPEC = "# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n"
+
+    def setUp(self):
+        super().setUp()
+        patched = mock.patch.dict(os.environ, self.env)
+        patched.start()
+        self.addCleanup(patched.stop)
+
+    def comments(self, *bodies):
+        """One comment per body, ids from 101."""
+        self.env["GH_ISSUE_COMMENTS"] = os.environ["GH_ISSUE_COMMENTS"] = "\n".join(
+            json.dumps({"id": 101 + i, "body": b}) for i, b in enumerate(bodies))
+
+    def commit_spec(self, folder=FOLDER, text=SPEC):
+        (self.root / folder).mkdir(parents=True, exist_ok=True)
+        return self.commit(f"{folder}/spec.md", text, f"spec in {folder}")
+
+    def resolve(self, branch=BRANCH):
+        return speclocation.resolve("acme/demo", branch, str(self.root))
+
+    def gh_calls(self):
+        log = Path(self.env["GH_LOG"])
+        return log.read_text().splitlines() if log.exists() else []
+
+
+class SpecComment(Issue):
+    def test_the_comment_comes_with_its_id(self):
+        self.comments("unrelated chatter", LOCATED)
+        self.assertEqual(github.issue_spec("acme/demo", 1), (102, LOCATED))
+
+    def test_an_issue_without_one_has_none(self):
+        self.comments("unrelated chatter")
+        self.assertIsNone(github.issue_spec("acme/demo", 1))
+
+    def test_two_are_refused_naming_both(self):
+        self.comments(LOCATED, "unrelated chatter", LOCATED)
+        with self.assertRaisesRegex(RuntimeError, "101, 103"):
+            github.issue_spec("acme/demo", 1)
+
+
+class Resolve(Issue):
+    def test_the_spec_is_spec_md_of_the_named_folder_as_committed(self):
+        self.commit_spec()
+        self.comments(LOCATED)
+        (self.root / FOLDER / "spec.md").write_text("an uncommitted edit\n")
+        self.assertEqual(self.resolve(), speclocation.FoundSpec(FOLDER, self.SPEC))
+
+    def test_the_named_folder_wins_over_those_committed_before_and_after_it(self):
+        self.commit_spec("dev/demo/specs/000-earlier", "# Earlier\n")
+        self.commit_spec()
+        self.commit_spec("dev/demo/specs/002-later", "# Later\n")
+        self.comments(LOCATED)
+        self.assertEqual(self.resolve(), speclocation.FoundSpec(FOLDER, self.SPEC))
+
+    def test_an_issue_that_needs_no_spec_says_why(self):
+        self.comments(speclocation.render_none("docs only"))
+        self.assertEqual(self.resolve(), NoSpec("docs only"))
+
+    def test_a_branch_naming_no_issue_has_no_spec_and_asks_github_nothing(self):
+        self.assertIsNone(self.resolve("chore/no-issue"))
+        self.assertEqual(self.gh_calls(), [])
+
+    def refusal(self):
+        with self.assertRaises(SpecLocationError) as refused:
+            self.resolve()
+        return str(refused.exception)
+
+    def test_no_location_comment_is_refused_naming_design_doc(self):
+        self.comments("unrelated chatter")
+        self.assertIn("/alq-review:design-doc #1", self.refusal())
+
+    def test_a_folder_the_checkout_does_not_hold_is_refused_naming_it_and_its_branch(self):
+        self.comments(speclocation.render(FOLDER, "feat/1-elsewhere"))
+        refusal = self.refusal()
+        self.assertIn(FOLDER, refusal)
+        self.assertIn("feat/1-elsewhere", refusal)
+
+    def test_a_missing_or_empty_spec_md_is_refused_the_same_way(self):
+        self.comments(LOCATED)
+        for text in (None, " \n"):
+            if text is None:
+                (self.root / FOLDER).mkdir(parents=True)
+                self.commit(f"{FOLDER}/plan.md", "# Plan\n", "plan only")
+            else:
+                self.commit_spec(text=text)
+            with self.subTest(text):
+                refusal = self.refusal()
+                self.assertIn(f"{FOLDER}/spec.md", refusal)
+                self.assertIn(BRANCH, refusal)
+
+    def test_a_malformed_comment_is_refused_stating_the_form_and_the_issue(self):
+        self.comments(f"{MARKER}\nspec: ../x/specs/001-demo\nbranch: {BRANCH}\n")
+        refusal = self.refusal()
+        self.assertIn("acme/demo#1", refusal)
+        self.assertIn("spec: <folder", refusal)
+
+    def test_a_github_that_cannot_answer_is_not_a_missing_comment(self):
+        self.env["GH_COMMENTS_ERROR"] = os.environ["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
+        with self.assertRaisesRegex(RuntimeError, "HTTP 502") as refused:
+            self.resolve()
+        self.assertNotIsInstance(refused.exception, SpecLocationError)
+
+
+class Cli(Issue):
+    """scripts/speclocation.py as the skills run it (specs/018-spec-in-spec-folder/contracts/speclocation-cli.md)."""
+
+    def setUp(self):
+        super().setUp()
+        self.project = self.root / "dev" / "demo"
+        (self.project / ".specify").mkdir(parents=True)
+        (self.project / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": "specs/001-demo"}))
+        self.comments()
+
+    def run_cli(self, *args):
+        return subprocess.run([sys.executable, str(SCRIPTS / "speclocation.py"), *args], env=self.env, cwd=self.root,
+                              capture_output=True, text=True)
+
+    def posted(self):
+        path = Path(self.env["GH_POSTED"])
+        return path.read_text() if path.exists() else None
+
+    def test_post_creates_the_comment_from_the_checkouts_branch_and_feature_folder(self):
+        done = self.run_cli("post", str(self.project))
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, "https://github.test/comment"), done.stderr)
+        self.assertEqual(self.posted(), LOCATED)
+        self.assertIn("api -X POST repos/acme/demo/issues/1/comments", self.gh_calls()[-1])
+
+    def test_post_again_rewrites_the_same_comment(self):
+        self.comments("unrelated chatter", speclocation.render(FOLDER, "feat/1-old"))
+        self.assertEqual(self.run_cli("post", str(self.project)).returncode, 0)
+        self.assertEqual(self.posted(), LOCATED)
+        self.assertIn("api -X PATCH repos/acme/demo/issues/comments/102", self.gh_calls()[-1])
+
+    def test_none_posts_the_reason_and_creates_no_folder(self):
+        done = self.run_cli("none", str(self.project), "docs only")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.posted(), speclocation.render_none("docs only"))
+        self.assertFalse((self.project / "specs").exists())
+
+    def test_none_without_a_reason_is_bad_usage_and_posts_nothing(self):
+        self.assertEqual(self.run_cli("none", str(self.project), " ").returncode, 2)
+        self.assertIsNone(self.posted())
+
+    def test_the_reason_reaches_gh_on_stdin_and_not_on_its_command_line(self):
+        self.assertEqual(self.run_cli("none", str(self.project), "a reason with $(words)").returncode, 0)
+        self.assertIn("a reason with $(words)", self.posted())
+        self.assertNotIn("words", "\n".join(self.gh_calls()))
+
+    def test_post_from_a_branch_naming_no_issue_is_refused(self):
+        git(self.root, "branch", "-m", "chore/no-issue")
+        done = self.run_cli("post", str(self.project))
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("chore/no-issue", done.stderr)
+        self.assertIsNone(self.posted())
+
+    def test_show_prints_where_the_spec_is(self):
+        self.comments(LOCATED)
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual((done.returncode, done.stdout), (0, f"spec: {FOLDER}\nbranch: {BRANCH}\n"), done.stderr)
+
+    def test_show_prints_that_no_spec_is_needed(self):
+        self.comments(speclocation.render_none("docs only"))
+        self.assertEqual(self.run_cli("show", "1", "--repo", "acme/demo").stdout, "spec: none\nreason: docs only\n")
+
+    def test_show_refuses_an_issue_with_no_comment_naming_design_doc(self):
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual((done.returncode, done.stdout), (1, ""))
+        self.assertIn("/alq-review:design-doc #1", done.stderr)
+
+    def test_show_refuses_a_malformed_comment(self):
+        self.comments(f"{MARKER}\n# Demo\n")
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("design-doc", done.stderr)
+
+    def test_a_github_that_cannot_answer_is_a_check_that_could_not_run(self):
+        self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("HTTP 502", done.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

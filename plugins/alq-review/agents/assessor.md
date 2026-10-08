@@ -19,7 +19,7 @@ Your prompt carries `--ref '<round_ref>'`. Run:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/briefs.py --ref '<round_ref>'
 ```
 
-It prints the checkout, the diff and history commands, the issue spec itself (`spec`),
+It prints the checkout, the diff and history commands, the spec's text (`spec`) and the folder it is in (`spec_folder`),
 the earlier rounds with every ruling made so far, the round verdicts admissible for this round,
 and `facts` computed from git and the ledger. The facts are measurements: build on them, do not
 re-argue them. Copy `brief_token` into your answer; without it the answer is rejected.

@@ -7,15 +7,18 @@ check that could not run.
 | Command | Does | stdout |
 |---|---|---|
 | `show <issue> [--repo <owner/repo>]` | reads the issue's location comment | `spec: <folder>` and `branch: <branch>`, or `spec: none` and `reason: <text>` |
-| `post <checkout>` | upserts the location comment for the checkout's branch and its `.specify/feature.json` folder | the comment's URL |
+| `post <project dir>` | upserts the location comment for the checkout's branch and its `.specify/feature.json` folder | the comment's URL |
 | `none <checkout> <reason>` | upserts `spec: none` + reason; creates no folder; exit 2 on an empty reason | the comment's URL |
 
-`show` without `--repo` takes the repo from the current directory's `gh` default, as the skills' `gh api` calls did.
+`show` without `--repo` takes the repo from the checkout it is run in (`worktree.locate`), not from `gh`.
+
+`post`'s argument is the Spec Kit project directory in the checkout, the directory that holds `.specify/`.
 
 Refusals (each names the next step; the text is built in `speclocation.py`):
 
 - no location comment: run `/alq-review:design-doc #<issue>`;
-- malformed, repeated or out-of-repo comment: states the form; an old whole-spec comment names `design-doc`;
+- repeated comment: `github.issue_spec` names both comment ids, and the exit is 2;
+- malformed or out-of-repo comment: states the form, and the exit is 1; an old whole-spec comment names `design-doc`;
 - folder not in the checkout: names the folder and the `branch:` that holds it;
 - `spec.md` missing or empty: as above.
 

@@ -17,10 +17,10 @@ RELEASE_CHECK = "internal-review"
 RELEASE_PREFIX = "version-only release:"
 
 
-def _answer(*args: str) -> str:
+def _answer(*args: str, stdin: str | None = None) -> str:
     """gh's answer; RuntimeError in gh's own words when it gives none."""
     try:
-        done = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=20)
+        done = subprocess.run(["gh", *args], input=stdin, capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError(f"gh {' '.join(args[:2])} could not run: {exc}") from exc
     if done.returncode != 0:
@@ -40,17 +40,27 @@ def issue_state(slug: str, number: int) -> str | None:
     return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
 
 
-def issue_spec(slug: str, number: int) -> str | None:
-    """The body of issue `number`'s spec comment; None when it has none. RuntimeError when gh cannot read its
-    comments, or when more than one is a spec: alq-review:alq-shape updates its spec in place rather than posting a second, so with two either
-    could be the wrong one."""
+def issue_spec(slug: str, number: int) -> tuple[int, str] | None:
+    """(id, body) of the comment on issue `number` that carries the spec marker; None when it has none. RuntimeError
+    when gh cannot read its comments, or when more than one carries it: either could be the wrong one."""
     comments = [json.loads(line) for line in _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments",
                                                      "--jq", ".[] | {id, body}").splitlines()]
     specs = [c for c in comments if SPEC_MARKER in c["body"]]
     if len(specs) > 1:
-        raise RuntimeError(f"{slug}#{number} has {len(specs)} spec comments ({', '.join(str(c['id']) for c in specs)}), "
-                           "and only one is the spec")
-    return specs[0]["body"] if specs else None
+        raise RuntimeError(f"{slug}#{number} has {len(specs)} `{SPEC_MARKER}` comments "
+                           f"({', '.join(str(c['id']) for c in specs)}), and only one can say where the spec is. "
+                           "Next step: delete all but one")
+    return (specs[0]["id"], specs[0]["body"]) if specs else None
+
+
+def post_issue_spec(slug: str, number: int, body: str) -> str:
+    """Writes `body` over the issue's marker comment, or posts it as a new comment when the issue has none; the
+    comment's URL."""
+    found = issue_spec(slug, number)
+    method, path = (("PATCH", f"repos/{slug}/issues/comments/{found[0]}") if found
+                    else ("POST", f"repos/{slug}/issues/{number}/comments"))
+    # The body goes in on stdin: it holds text a user typed, which must not reach a command line.
+    return _answer("api", "-X", method, path, "-F", "body=@-", "--jq", ".html_url", stdin=body)
 
 
 def repo_visibility(slug: str) -> str | None:

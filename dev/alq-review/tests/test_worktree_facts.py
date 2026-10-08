@@ -257,7 +257,7 @@ class RoundFacts(Repo):
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], git(self.root, "rev-parse", "HEAD"))
         rnd["root"] = str(self.root)
         self.assertEqual(rnd["base_sha"], moved)
-        with mock.patch("github.issue_spec", return_value=None):  # no network: the issue has no spec
+        with mock.patch("speclocation.resolve", return_value=None):  # no network
             self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
 
     def test_first_round_never_carries_a_burden(self):

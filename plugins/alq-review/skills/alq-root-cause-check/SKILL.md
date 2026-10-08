@@ -1,6 +1,6 @@
 ---
 name: alq-root-cause-check
-description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Reads the issue spec's Root cause section, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-review:alq-issue-tackle's review step. Report-only.
+description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Reads the Root cause section of the spec, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-review:alq-issue-tackle's review step. Report-only.
 colour: red
 ---
 
@@ -22,17 +22,20 @@ the wrong value, not its address.
 
 ## Step 1 - get the spec
 
-`<n>` from the branch (`^(bugfix|hotfix|feat|...)/(\d+)-`) or from the invoker. Fetch the
-spec from the issue, its only home:
+`<n>` from the branch (`^(bugfix|hotfix|feat|...)/(\d+)-`) or from the invoker. SPECLOC is
+`../../scripts/speclocation.py` from this skill's base directory. Run:
 
 ```
-gh api repos/{owner}/{repo}/issues/<n>/comments --paginate \
-  --jq '.[] | select(.body | contains("<!-- analitiq-spec -->")) | .body'
+python3 SPECLOC show <n>
 ```
 
-Stop and say so, with no verdict, when: there is no spec, there is no `## Root cause` section,
-or the section reads `Not a defect report.` The first two are findings in themselves - report
-them as **CANNOT TELL** and name what is missing. Never invent the cause yourself and grade
+It prints the spec folder and its branch, or `spec: none` and a reason. Read `<folder>/spec.md` in the checkout.
+
+Stop and say so, with no verdict, when the section reads `Not a defect report.` Report
+**CANNOT TELL** and name what is missing when: `show` exits non-zero (with no location comment,
+name `/alq-review:design-doc #<n>` as the next step), it prints `spec: none`, or spec.md has no
+`## Root cause` section. A spec written by /alq-review:design-doc has no Root cause section yet,
+so this check returns CANNOT TELL for it. Never invent the cause yourself and grade
 against that; a cause you derived from the diff will always agree with the diff.
 
 ## Step 2 - read the Root cause, and check how much of it was measured

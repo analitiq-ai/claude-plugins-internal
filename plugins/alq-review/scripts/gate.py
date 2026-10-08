@@ -29,6 +29,7 @@ from pre_merge_gate import PullRequest, first_line, first_words
 import settled_design
 import shimgate
 import shell
+import speclocation
 import worktree
 
 REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round"
@@ -434,6 +435,18 @@ def _spec_problems(root: str, base: str) -> str | None:
             "the existing tools looked at. Then launch again.\n" + "\n".join(found))
 
 
+def _spec(where: worktree.Worktree) -> tuple[briefs.Spec, str | None]:
+    """(what speclocation.resolve found for the branch, None), or (None, why the spec cannot be found and the next
+    step). (None, None) is a branch that names no issue."""
+    try:
+        return speclocation.resolve(where.slug, where.branch, where.root), None
+    except speclocation.SpecLocationError as exc:
+        return None, str(exc)
+    except RuntimeError as exc:
+        return None, (f"The location comment of this branch's issue could not be read: {exc}. Next step: check "
+                      "`gh auth status`, then launch again.")
+
+
 def on_workflow(payload: dict) -> dict | None:
     call = payload["tool_input"]
     if call.get("name") == claimgate.CHECK:
@@ -467,6 +480,12 @@ def on_workflow(payload: dict) -> dict | None:
                     rnd["base_sha"] = _review_base(where, merges_into)
                 except RuntimeError as exc:
                     return refuse(payload, action, str(exc), event)
+            # The assessor's brief resolves the spec the same way and would fail there, inside the assessor's run.
+            _, lost = _spec(where)
+            if lost:
+                refused = refuse(payload, action, lost, event)
+                if refused:
+                    return refused
             rnd.update(root=where.root, session=payload["session_id"])
             injected = briefs.assess_args(state, rnd, where)
         else:
@@ -488,12 +507,9 @@ def on_workflow(payload: dict) -> dict | None:
                         return refused
             spec = None
             if stage == "internal":
-                try:
-                    spec = briefs.branch_spec(where.slug, where.branch)
-                except RuntimeError as exc:
-                    refused = refuse(payload, action, f"The spec of this branch's issue could not be settled: {exc}. "
-                                     "Next step: check `gh auth status`, or leave exactly one spec comment on the "
-                                     "issue, then launch again.", event)
+                spec, lost = _spec(where)
+                if lost:
+                    refused = refuse(payload, action, lost, event)
                     if refused:
                         return refused
             waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
