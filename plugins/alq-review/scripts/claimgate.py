@@ -4,7 +4,6 @@ reads git and the ledger for them and records what they decide."""
 from __future__ import annotations
 
 import os
-import re
 from types import SimpleNamespace
 
 import briefs
@@ -16,7 +15,6 @@ from hookio import deny, record, refuse_claim, session_state
 from shell import Action
 
 CHECK = "alq-review:claim-check"
-UNLOCK_CLAIM = re.compile(rf"unlock\s+{claimcheck.CLAIM_REF.pattern}\b")
 _AGENTS = (briefs.CLAIM_READER, briefs.CLAIM_JUDGE, briefs.CLAIM_CONTEST_JUDGE)
 
 
@@ -324,8 +322,11 @@ def on_webfetch(payload: dict) -> dict | None:
                         f"({', '.join(hosts) or 'none'}), not {url}.")
 
 
-def on_prompt(payload: dict, typed: re.Match) -> dict:
-    cid = typed["claim"]
+def on_prompt(payload: dict, word: str) -> dict | None:
+    """Answers `unlock <word>` where the word is a claim's name; None where it is not, and the unlock is a branch's."""
+    cid = claimcheck.parse_claim_ref(word)
+    if cid is None:
+        return None
     released = []
     for repo, base, file in ledger.claim_holders(cid):
         with ledger.open_claims(repo) as claims:
@@ -340,5 +341,5 @@ def on_prompt(payload: dict, typed: re.Match) -> dict:
         said = (f"The user released {claimcheck.claim_ref(cid)} in {', '.join(released)}: while those words stay as they are, its WRONG "
                 "verdict no longer refuses the commit. Changed words are checked again.")
     else:
-        said = f"`{typed.group(0)}` names no claim a check is holding, so nothing was released."
+        said = f"`unlock {word}` names no claim a check is holding, so nothing was released."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}

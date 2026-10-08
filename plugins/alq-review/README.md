@@ -128,19 +128,42 @@ plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is
 key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
 failed, and a failed check refuses the commit as a patch does.
 
+## What the user types
+
+`unlock`, `override`, `override-merge`, the rescope and the switch are read from a prompt's first words, by
+one reader. A space, a tab or a line break parts two words, and nothing else does. A word is read whole:
+`unlock #7.` names no PR, since `#7.` is not a number. A PR's name is `owner/repo#N`, in ASCII, its number
+without a leading zero; capitals in it do not matter.
+
+## Switch
+
+A prompt that starts with `alq-review off` switches the plugin off for the session it was typed in, and
+`alq-review on` switches it on again. Anything else after `alq-review` on that line changes nothing and is
+answered with the two forms. The switch covers that session, its subagents and workflows
+included, and ends with it; no other session is affected.
+
+Off lifts every rule: the commit checks, the order of the stages, locked branches, the attestation, and the
+ready and merge rules, `--admin` and `gh api` merges included. Nothing is released: locks, counts, holds and
+overrides stay recorded and apply again when it is on.
+
+Still running while off: `unlock`, `override` and `override-merge`; the count of reviewers already running;
+and the confinement of the plugin's own agents. A launch of `review-round`, `assess-round`, `claim-check` or
+`shim-check` while off is refused, in `log` mode too, with `alq-review on` as the keyword that turns it on,
+and the agent is told to carry on without it.
+
+Off differs from `log`: in `log` the rules still run, as Mode describes; off, the rules listed above do not.
+
+A resumed session is told it is off. A switch file that cannot be opened, or is not one the plugin wrote, counts as on and is reported.
+
 ## State
 
-The plugin writes in four places:
+The plugin writes in three places:
 
 | Place | Files |
 |---|---|
-| The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, each with a `.lock` beside it<br>`gate.log`<br>`errors.log` |
-| The merge-gate folder, `${XDG_STATE_HOME:-~/.local/state}/analitiq-merge-gate` | `<session id>.json` and its `.lock` |
+| The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, `.merge.json`, each with a `.lock` beside it<br>`sessions/<session id>.off.json`<br>`gate.log`<br>`errors.log` |
 | `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
 | `.specify/` in the project | `presets/settled-design/`<br>`workflows/design-doc/`<br>`critique-baseline.json` |
-
-The merge-gate folder is to be folded into the state folder (ADR-0002): issue #36 moves the merge
-override grants to `sessions/<session id>.merge.json` there. Until it lands, the grants are where the table says.
 
 In the state folder:
 
@@ -155,6 +178,8 @@ In the state folder:
     chains of fixes of one bug, and the rulings on contested sites
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
+- `sessions/<session id>.off.json` - present while the user has the plugin switched off in that session
+- `sessions/<session id>.merge.json` - the merge overrides the user typed in that session and no merge has used, one `owner/repo#N` per PR
 - `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
 
 ```
@@ -179,9 +204,9 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/shimgate.py` | the shim check's hook handlers |
 | `scripts/jev.py` | the Jev questions the shim check asks |
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
-| `scripts/hookio.py` | settings, refusals, `gate.log` and session state, shared by the handlers |
+| `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
-| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge #N` |
+| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
 | `skills/` | `alq-shape`, `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
 | `speckit/` | the settled-design preset and design-doc workflow, installed into the project by each `design-doc` start |
 | `workflows/` | orchestration only; everything else is injected by the hook |

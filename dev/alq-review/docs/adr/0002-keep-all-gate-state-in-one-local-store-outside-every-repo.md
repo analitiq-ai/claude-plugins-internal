@@ -99,8 +99,6 @@ Rejected:
 
 - State is per machine. A hold or a ledger on one machine is not known on another.
 - The ledger is in no PR, so a reviewer cannot read it there.
-- Not everything is in the store yet: until issue #36 is done, the merge override grants are kept in a
-  folder of their own.
 - Deleting a record is manual and has no tool. A tool is outside this ADR.
 - Records pile up until the user deletes them. A shim check's record holds the staged diff, so source
   stays in the store that long.
@@ -119,5 +117,5 @@ Rejected:
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [x] Decide whether the merge override grants move under the state root.
-3. [ ] List every folder the plugin writes in the README's State section.
-4. [ ] Move the merge override grants under the state root (issue #36).
+3. [x] List every folder the plugin writes in the README's State section.
+4. [x] Move the merge override grants under the state root (issue #36).
