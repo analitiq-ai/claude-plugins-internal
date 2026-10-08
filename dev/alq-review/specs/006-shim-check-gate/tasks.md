@@ -344,11 +344,13 @@ the chain holds and asks the user. Misses are logged.
 
 ## Phase 8: Amendment of 2026-10-06 — a bug is followed across commits (ADR-0001, issue #17)
 
-**Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes every task line that names a removed mechanism: the
-touched mark (T007, the Phase 3 goal, T019), the stored chain `state` and its `HEAD` end (T009, T019, T031,
-T042), the count at one `HEAD` (the Phase 5 goal, T038), the "one commit touching two chains counts for both"
-case of T038, and the "after `HEAD` moves, the bug is checked again"
-case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrated.
+**Goal**: FR-015, FR-017 and FR-018 as amended. Supersedes every task line that names a removed mechanism. The
+list is what a search of this file for each mechanism returns: the touched mark (T007, the Phase 3 goal, T019);
+the overlap test on old-side ranges (`overlaps` in T007, T039); `override_id` as "the chain id, or the tree
+prefix when no chain matches" (T007); the `shim_chains` key without the branch (T009); the stored chain `state`
+and its `HEAD` end (T009, T019, T031, T042); the count at one `HEAD` (the Phase 5 goal, T038); the "one commit
+touching two chains counts for both" case of T038; the chain that `override shim-<tree12>` opens (T031); and the "after `HEAD` moves, the bug is checked
+again" case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrated.
 
 **Independent test**: quickstart §4.
 
@@ -361,18 +363,29 @@ case of T031. Needs spec 005 Phase 7 (T052) first. Stored chains are not migrate
   states whose range moved is still matched, at commit and at launch. Run them; each fails.
 - [ ] T062 Implement the carry in `shimcheck` on the lineage module, applied before the overlap test, and key
   chains by `(repo, branch, chain id)` in `scripts/ledger.py` and `shimgate`. T060 and T061 pass.
-- [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure: one per entry of the State
-  list of data-model `shim_chains`, one per clause of its Tree rule, one per row of its merged-chain table, one
-  per cell of its Transitions table that can occur, and one per sentence of the paragraphs after that table.
-  Run them; each fails.
+- [ ] T063 [P] Write tests, not written yet, in `tests/test_shimcheck.py`, pure, for these labels of data-model
+  `shim_chains`: one per entry of State, per clause of Tree rule, per row of the Merged chain table and per
+  cell of the Transitions table that can occur; and one per sentence of Chain identity, Storing a merge, A
+  merge and the hold, Printed override, Held and overridden chains, Override of a held chain, Opening a chain and After an
+  override. Run them; each fails.
 - [ ] T064 Write gate tests, not written yet, in `tests/test_shim_gate.py`, driving the hooks: clauses 2 and 3
   of the Tree rule of data-model `shim_chains` at the launch and at the commit; a launch for a tree that
-  matches two chains, asserting the stored merged chain and the other chain's `ended`; both forms of the
-  user's override, and an agent's, asserting the stored `override`; a tree that matches two held chains,
-  asserting that the word the refusal prints, once typed, lets that tree commit. Run them; those for a changed
-  rule fail, and the rest pin behaviour that must not change.
+  matches two chains, asserting the stored merged chain and the other chain's `ended`; a refused launch and a
+  commit attempt for a tree that matches a held chain and a checked one, asserting one open chain that is
+  held (Storing a merge); both forms of the user's override, and an agent's, asserting the stored `override`,
+  and for a tree that matches no chain no new chain and the `override` of its `shim_checks` row (Override
+  forms); a tree that matches two
+  held chains, asserting that the word the refusal prints, once typed, lets that tree commit. For the labels
+  whose effect is a ledger write: Rulings of a merged chain, asserting the `shim_rulings` rows after a
+  two-chain launch, one site ruled differently included; Stored coordinates, asserting the stored `tree` and
+  `ranges` after a launch and after an override by tree id; Chain identity, with the first tree of an ended
+  chain staged and ruled `patch` again, asserting two rows with different ids; Old trees, with the stored
+  tree pruned from git, asserting that the tree still matches the chain. Run them and record which fail. One
+  that passes already, such as the agent's override that stores nothing, is marked as pinning a rule this
+  phase does not change.
 - [ ] T065 Replace the stored `state` and its transitions by the rules of data-model `shim_chains`. T063 and
-  T064 pass.
+  T064 pass. Then delete or rewrite every test that asserts a removed rule: search `tests/` for the stored
+  `state`, for a count at one `HEAD` and for one `patch` counted on two chains.
 - [ ] T066 Failing test, then code: a `patch` refusal prints, per listed site, the staged-tree line ranges of the
   hunks in its file, and no touched mark. Green.
 - [ ] T067 Failing test, then code: a sweep miss is logged only against earlier checks that swept the same

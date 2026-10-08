@@ -14,8 +14,9 @@ and `test_worktree_facts.Repo`):
    "the validator rejects an empty list". Run `git commit`: refused, naming the workflow call (spec US1 scenario 1).
 2. Run the workflow call it names. Expected: `status: WRONG`, one entry quoting the sentence, with the failing
    case and `validator.py:<line>`.
-3. Run the workflow again without fixing the sentence (reword it if you like): `WRONG` again. A repeated `git commit`
-   against the same check adds no refusal. After the third check that rules that claim `WRONG`, the
+3. Reword the sentence without fixing it, stage it and run the workflow again: `WRONG` again. The rewording is
+   needed: a check of the same staged tree with no contest, like a repeated `git commit` against the same check, adds no refusal
+   (data-model Lineage, Minting). After the third check that rules that claim `WRONG`, the
    refusal asks the user and prints `unlock claim-<id>` (US2 scenario 4). A second claim ruled `WRONG` once in
    the same checks is still at 1. A launch in that state is refused with the same question (US2 scenario 5).
 4. As the user, type `unlock claim-<id>`. Fix the sentence, stage, run the workflow: `COMPLETE`, and the commit goes through. Only the changed claim was

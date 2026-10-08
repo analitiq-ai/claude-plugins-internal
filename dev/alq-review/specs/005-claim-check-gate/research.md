@@ -205,9 +205,10 @@ Git behaviour stated as "probed" was run in a scratch repo on git 2.47.3.
   `git diff -U0 <old blob> <new blob>`; commits play no part. A line outside every hunk is shifted past the
   hunks above it. A sentence inside a replaced range has its character span mapped into the new blob by
   `diff-match-patch`, and the claims found in that span continue the lineage: a split forks it into one row
-  per part, each starting at the parent's count, and when two rows arrive at one claim the row with the
-  larger count continues and the other ends (data-model Lineage, Who wins a claim). A claim whose words are unchanged at another
-  place in the file is found by its claim id. A lineage with nothing mapped and no id found ends. Two pieces
+  per part, and which row continues a claim that several rows arrive at is in data-model Lineage (Who wins a
+  claim; the Split and Merged rows of its Transitions table). A claim whose words are unchanged at another
+  place in the file is found by its claim id. The old version of the file is read from the ledger, as data-model Lineage
+  says (Old trees). Two pieces
   are hand-rolled: shifting a line past earlier hunks, and locating a sentence's character span.
   `diff-match-patch` is a required dependency: the hooks import it and fail with a message naming the install
   command when it is missing. It is not vendored. The shim check carries its chain ranges with the same module

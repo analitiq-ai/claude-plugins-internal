@@ -24,7 +24,8 @@ A commit with an empty staged diff, or one that concludes a merge, cherry-pick o
 Launch: `args = {worktree: <absolute path>, contests?: [{claim, evidence}]}`, where `claim` is a claim id printed
 in the refusal. `evidence` holds a `path:line` in the staged tree or an `https://` URL; a contest without one is
 refused at launch, before any agent runs. So is a contest of a claim that is not the current claim of an open
-lineage row: the refusal says to change the staged change, so that a new check rules the claim. A launch is
+lineage row: the refusal says to change the staged change, so that a new check rules the claim. A contest of
+the claim of a `stopped` row is refused with the question for the user (data-model Lineage, Contests). A launch is
 also refused when the tree rule of data-model Lineage refuses it, with the same text as the commit.
 
 The gate replaces `args` at launch with the hunks, the reader and judge prompts and schemas, and `check_ref`

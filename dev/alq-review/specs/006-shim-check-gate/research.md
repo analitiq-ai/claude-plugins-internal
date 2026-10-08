@@ -176,10 +176,10 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   the staged tree, at launch and at commit alike, whatever the chain's state. The carry is done by the lineage
   module (spec 005 R12) over `git diff -U0 <old blob> <new blob>` of each file: a range outside every hunk is
   shifted, a range that overlaps a replaced range grows to cover the replacing lines, a range whose lines are
-  all deleted is dropped. The commit hook computes the carry and stores nothing; a launch stores the carried
-  ranges with the staged tree. A staged tree matches every chain one of whose carried ranges a new-side range
-  of its hunks overlaps. Chains that one tree matches become one bug; how, and what a completed check then does
-  to it, is in data-model `shim_chains`.
+  all deleted is dropped. Which events store the carried ranges, which chains a staged tree matches, how
+  matched chains become one bug and what a completed check then does to it are in data-model `shim_chains`
+  (Stored coordinates, Tree rule, Merged chain, Transitions). The blobs the carry reads are kept readable as
+  spec 005 data-model Lineage says (Old trees).
   A commit, an amend or a rebase changes no chain. A refusal prints, per listed site, the staged-tree line
   ranges of the hunks in that site's file.
 - **Rationale**: FR-015 and ADR-0001. The earlier key, `(repo, branch, HEAD sha)`, lost the chain whenever a
@@ -208,16 +208,11 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
 ## R11: Every refusal names an override; a user's override switches the check off for that bug until a commit lands
 
 - **Decision**: Every refusal of this check (not checked, running, failed, `patch`, held) ends with
-  `override shim-<id>`: the chain id when the staged tree matches a chain (R9), else the tree's 12-hex prefix.
-  `gate.on_prompt` learns that word; for a tree id that matches no chain it opens a chain seeded with that
-  tree's hunk ranges. The override records the branch's `HEAD` and the chain's count on the chain and is logged
-  (`shim-override`). A chain's four states (`checked`, `deep due`, `held`, `overridden`), what every event does
-  to a chain and what a staged tree that matches several chains gets are in data-model `shim_chains`, and
-  nowhere else. The decisions that section carries out: a bug is held at its 4th refusal; while it is held, the
-  launch is refused as well as the commit; an override lasts while the branch's `HEAD` is the recorded one and
-  does not lower the count; a bug that was held when it was overridden is held again at its next `patch`; an
-  override lets a tree through only when no chain it matches is held; bugs that one staged tree overlaps are
-  one bug from then on (decision record 0014). The recorded `HEAD` decides how long a
+  `override shim-<id>`, and `gate.on_prompt` learns that word. Which id a refusal prints, and what each form
+  of the override reads and stores, are in data-model `shim_chains` (Printed override, Override forms). The
+  override is logged (`shim-override`). A chain's four states (`checked`, `deep due`, `held`, `overridden`),
+  what every event does to a chain and what a staged tree that matches several chains gets are in that section,
+  and nowhere else. It carries out the user's decisions of 2026-10-06 and decision record 0014. The recorded `HEAD` decides how long a
   release lasts, not which bug a change belongs to. The override touches only this check; the claim check keeps
   its own release. Only a prompt typed by the user overrides (FR-017).
 - **Rationale**: FR-007/FR-017 and the user's choice (critique E2, option B): one override per check, lasting for
@@ -226,9 +221,9 @@ produced its evidence table. Jev's request shape and limits are from the `jev` s
   entity may release a hold and nothing may start it again (constitution P2); for the same reason no check runs
   on a held chain, since a `complete` verdict would end the hold without the user (user decision, 2026-10-06).
   Once the override is over, the bug's next staged tree is checked before the user is asked again (user
-  decision, 2026-10-06). A bug overridden before its 4th refusal goes on from its count, because the state is
-  a function of the count and that answer was about a held bug. A held bug is asked about before an override of
-  another bug is honoured, because the override names one bug (FR-017).
+  decision, 2026-10-06). That answer was about a held bug, and the state is a function of the count, which is
+  why data-model `shim_chains` treats a bug overridden earlier differently (After an override). A held bug is
+  asked about before an override of another bug is honoured, because the override names one bug (FR-017).
 - **Existing tools**: `gate.on_prompt`, `claimgate.UNLOCK_CLAIM`: fit as the pattern.
 
 ## R12: Sweep misses are found by comparing lists inside a chain

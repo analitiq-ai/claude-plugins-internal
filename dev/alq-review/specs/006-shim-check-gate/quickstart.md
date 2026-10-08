@@ -35,8 +35,8 @@ Feed four recorded sweep outputs that each list one new site, with a commit of a
 the first → refusals 1–3, the third naming
 the deep sweep; the deep launch runs three agents; one more `patch` → held, and a launch is refused too; a user prompt `override shim-<id>` →
 that tree commits, and so does a re-staged tree of the same bug, with no launch; a tree of an unrelated bug is
-still refused; after the commit lands, a new tree of that bug is checked again: a `patch` is held at once, a `complete` ends the bug. Override a `not checked` refusal
-by its tree id → that tree commits, and the bug goes on from count 0. `gate.log` holds a `shim-miss` per newly listed site and one `shim-override`.
+still refused; after the commit lands, a new tree of that bug is checked again: a `patch` is held at once, a `complete` ends the bug (data-model `shim_chains`, After an override). Override a `not checked` refusal
+by its tree id → that tree commits, and no bug is opened (data-model `shim_chains`, Override forms). `gate.log` holds one `shim-override`, and a `shim-miss` for each newly listed site that an earlier check of the same `HEAD` did not list: none for the first check after the unrelated commit (R12).
 A `patch` refusal gives, per listed site, the staged-tree line ranges of the hunks in its file.
 
 ## 5. Restart a stopped check

@@ -316,7 +316,8 @@ transitions of T036, and T038. No migration of `claim_holds` rows.
 
 - [ ] T050 Write gate tests, not written yet, for the two reported defects, on the current code: a commit of another file
   between two `WRONG` checks of one claim leaves its count at 2 (#15); one check that rules two claims of one
-  hunk `WRONG` adds one to each claim and two to neither (#16). Run them; both fail for those reasons.
+  hunk `WRONG` adds one to each claim and two to neither (#16). The first covers one clause of Keys in data-model
+  Lineage: no count is keyed on `HEAD` or a commit. Run them; both fail for those reasons.
 - [ ] T051 [P] Write tests, not written yet, in `tests/test_lineage.py` for the pure module (R12): one per row
   under **Succession** in the Transitions table of data-model Lineage, and one per sentence of its "Who wins a
   claim", "Minting" and "Not followed" paragraphs. Each is a sequence of file versions. The Split case asserts
@@ -325,15 +326,18 @@ transitions of T036, and T038. No migration of `claim_holds` rows.
   claims in, new rows out. `diff-match-patch` maps a sentence's character span. T051 passes.
 - [ ] T053 Failing test: a hook that imports `lineage` without `diff-match-patch` installed fails with a message
   naming the install command. Implement. Green.
-- [ ] T054 [P] Write tests, not written yet, in `tests/test_claimcheck.py`, pure: one per entry of the State
-  list of data-model Lineage, one per cell under **Ruling** and **Other events** of its Transitions table, and
-  one per clause of its Tree rule, the path set given as input. They include the same check applied twice,
-  which asserts the count after the second time. Run them; each fails.
+- [ ] T054 [P] Write tests, not written yet, in `tests/test_claimcheck.py`, pure, for these labels of data-model
+  Lineage: one per entry of State, per cell under **Ruling** and **Other events** of the Transitions table and
+  per clause of Tree rule, the path set given as input; and one per sentence of Count, Stopped rows and Unlock
+  of a stopped row. They include the same check applied twice, which asserts the count after the second time.
+  Run them; each fails.
 - [ ] T055 Write gate tests, not written yet, in `tests/test_claim_gate.py`, driving the hooks: the Tree rule
   of data-model Lineage at the launch and at the commit, with a staged move of a stopped row's file asserting
   both refusals; the `unlock` row of its Transitions table, typed by the user and by an agent, asserting the
-  stored `released`; and contract §2 for a contest, asserting the stored `contests[]`. Run them; each
-  fails, because each sets up or reads rows of `claim_lineages`, which does not exist yet.
+  stored `released`; Which row an unlock names, with one id that is the current claim of one open row and the
+  row id of another, asserting which row is released; Contests, with contract §2, asserting the stored
+  `contests[]`; and Old trees, with the stored tree pruned from git, asserting that succession still
+  carries the row. Run them; each fails, because each sets up or reads rows of `claim_lineages`, which does not exist yet.
 - [ ] T056 Replace `claim_holds` by `claim_lineages` in `scripts/ledger.py`, and the hold functions of
   `scripts/claimcheck.py` and their callers in `scripts/claimgate.py` by the rules of data-model Lineage and the
   module of T052. T050, T054 and T055 pass. Then delete the hold code and its tests.

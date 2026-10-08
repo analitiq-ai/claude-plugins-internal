@@ -53,7 +53,7 @@ Questions `level` and `coverage`, instructions and criteria verbatim from the de
 - patch: level, coverage, every SAME OPERATION site with id and the staged-tree line ranges of the hunks in that
   site's file (none when the file is not in the change), the chain count; at count 3 the deep-sweep step; how to contest a site.
 - held: the question for the user.
-- every refusal ends with `override shim-<id>` (the chain id when the tree matches one chain, else the tree prefix; data-model `shim_chains`).
+- every refusal ends with `override shim-<id>`; which id it prints is in data-model `shim_chains` (Printed override).
 
 ## User override
 
