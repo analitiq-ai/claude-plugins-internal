@@ -181,7 +181,8 @@ class Keyword(Switch, Gate):
         self.assertFalse(self.off_path().exists())
 
     def test_the_first_word_without_on_or_off_after_it_is_answered_with_the_two_forms(self):
-        for prompt in ("alq-review", "alq-review offline", "alq-review off.", "alq-review\noff", "alq-review is broken"):
+        for prompt in ("alq-review", "alq-review offline", "alq-review off.", "alq-review\noff", "alq-review is broken",
+                       "alq-review is off", "alq-review on off"):
             with self.subTest(prompt=prompt):
                 out = self.say(prompt)
                 line = prompt.split("\n")[0]

@@ -431,6 +431,9 @@ class ClaimCheckRepair(ClaimGate):
             self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {}, prompt)
         for glued in (f"unlock claim-{claim}.", f"unlock claim-{claim}\u200b"):
             self.assertIn("names no locked PR, so nothing was unlocked", json.dumps(self.hook("UserPromptSubmit", prompt=glued)))
+        other = "".join("0" if digit != "0" else "1" for digit in claim)
+        self.assertEqual(self.hook("UserPromptSubmit", prompt=f"unlock claim-{other}")["hookSpecificOutput"]["additionalContext"],
+                         f"[alq-review] `unlock claim-{other}` names no claim a check is holding, so nothing was released.")
         self.assertEqual(self.decision(self.git_commit()), "deny")
         released = self.hook("UserPromptSubmit", prompt=f" \n\tunlock \r\n claim-{claim}\nand carry on")
         self.assertIn("released", json.dumps(released))

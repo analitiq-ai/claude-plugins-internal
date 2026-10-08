@@ -591,9 +591,17 @@ class HeldBranch(Gate):
     def test_a_word_that_only_starts_like_a_commands_word_is_not_it(self):
         self.lock()
         for prompt in ("unlocked #7", "unlock#7", "Unlock #7", "/design-docs rescope #7", "/design-doc rescoped #7",
-                       "design-doc rescope #7", "/alq-review:design-doc: rescope #7", "/design-doc rescope"):
+                       "design-doc rescope #7", "/alq-review:design-doc: rescope #7", "/other:design-doc rescope #7",
+                       "/alq-review:other-design-doc rescope #7"):
             with self.subTest(prompt=prompt):
                 self.assertEqual(self.say(prompt), "")
+        self.assertEqual(self.decision(self.edit()), "deny")
+
+    def test_a_prompt_with_too_few_words_for_a_command_is_not_answered(self):
+        self.lock()
+        for prompt in ("", " \r\n\t", "unlock", "unlock \n", "override", "/design-doc", "/design-doc rescope"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {})
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_blanks_before_and_between_the_words_of_an_unlock_are_passed_over(self):
