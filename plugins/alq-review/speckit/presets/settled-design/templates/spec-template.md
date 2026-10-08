@@ -1,12 +1,34 @@
 ## Why this is worth doing
 
 <!--
-  ACTION REQUIRED: Copy the answers of the premise report, one bullet per question of the report, each
-  followed by its source as the report gives it. Do not answer the questions again here: the report is
-  what the user picked on.
+  ACTION REQUIRED: Under each heading, copy that question's `Answer:` and `Source:` lines from the premise
+  report, as the report gives them. Do not answer the questions again here: the report is what the user
+  picked on.
 -->
 
-- **[question heading]**: [answer] ([source])
+### harm
+Answer: [the report's answer]
+Source: [the report's source]
+
+### reachable
+Answer: [the report's answer]
+Source: [the report's source]
+
+### change-alters
+Answer: [the report's answer]
+Source: [the report's source]
+
+### owner
+Answer: [the report's answer]
+Source: [the report's source]
+
+### inherited
+Answer: [the report's answer]
+Source: [the report's source]
+
+### needs-spec
+Answer: [the report's answer]
+Source: [the report's source]
 
 ## Root cause
 

@@ -31,11 +31,11 @@ One comment per issue, replaced in place by the upsert. A new pick replaces the 
 
 ## Root cause section
 
-In `spec.md`, the heading `## Root cause`, whose first non-blank line is `Observed: …` or `Not a defect report.` The second is refused when the premise report says `Reports wrong behaviour: yes`.
+In `spec.md`, the heading `## Root cause`, whose first non-blank line is `Observed: …` (with something after the label that is not the template's bracketed placeholder) or `Not a defect report.` The second is refused when the premise report says `Reports wrong behaviour: yes`.
 
 ## Premise answers in `spec.md`
 
-The `## Why this is worth doing` section: the six answers, each followed by its source, copied from the report.
+The `## Why this is worth doing` section: a `### <question>` heading per question, each with the `Answer:` and `Source:` lines copied from the report. `premise_report.py spec` grades it as it grades the report's answers.
 
 ## Workflow state
 
@@ -48,5 +48,7 @@ The `## Why this is worth doing` section: the six answers, each followed by its 
 | `specify` (command) | choice is `write the spec` | as before |
 | `grill` to `tasks`, each top-level in an `if` of its own | `inputs.spec_dir` set, or choice is `write the spec` | as before |
 | `root-cause` (shell) | choice is `write the spec`, after `specify` | exit code |
+| `premise-answers` (shell) | choice is `write the spec`, after `root-cause` | exit code |
 | `root-cause-after-grill` (shell) | new spec, after `no-open-markers` | exit code; the same script, with the report |
+| `premise-answers-after-grill` (shell) | new spec, after `root-cause-after-grill` | exit code; the same script as `premise-answers` |
 | `root-cause-of-rescope` (shell) | re-scope, after `no-open-markers` | exit code; the same script, no report |

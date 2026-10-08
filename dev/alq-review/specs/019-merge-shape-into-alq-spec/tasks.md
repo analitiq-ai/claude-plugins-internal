@@ -102,5 +102,4 @@ MVP is Phases 1–3: the premise gate, the two checks and the stop outcomes work
 
 ## Notes
 
-- Spec and plan scope the `alq-shape` and `design-doc` pins to `plugins/`, `dev/alq-review/tests/` and `.github/` (R9), while FR-012 and SC-001 say "the repo". `docs/adr/` records (0004, 0008, 0012) name both. They are accepted records and are left as written.
 - Verify each new test fails for the stated reason before writing the code that makes it pass.

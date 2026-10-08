@@ -3,10 +3,12 @@
 exists, and what the user picked there.
 
 The form below is the one place the questions are worded. A report is graded on its form and on each answer naming
-a source, not on whether the answer is right: the user's pick is the judgement.
+a source, not on whether the answer is right: the user's pick is the judgement. spec.md has an answer
+and a source per question under `## Why this is worth doing`, graded on the same form and not against the report.
 
-Usage: premise_report.py form | check <report> <pick> | record <report> <pick>. `check` prints one problem per line
-and exits 1 when there are any; 2 means the command could not run. `record` runs from the issue's worktree.
+Usage: premise_report.py form | check <report> <pick> | record <report> <pick> | spec <spec folder>. `check` and
+`spec` print one problem per line and exit 1 when there are any, 2 when they could not run. `record` runs from the
+issue's worktree.
 """
 from __future__ import annotations
 
@@ -30,6 +32,7 @@ QUESTIONS = {
 SOURCES = ("code:", "reproduction:", "user:")
 WRONG, RECOMMENDATION, PICK, RESTS_ON, REASON = ("Reports wrong behaviour", "Recommendation", "Pick", "Rests on",
                                                  "Reason")
+SPEC_HEADING = "## Why this is worth doing"
 _STOP_ONLY = "required unless the pick is write the spec"
 
 
@@ -54,12 +57,17 @@ def _lines(text: str) -> list[str]:
     return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).splitlines()
 
 
-def _sections(lines: list[str]) -> dict[str, list[str]]:
-    """The lines under each `## <question>` heading."""
+def filled(value: str) -> bool:
+    """Whether a label has a value that does not start with `[`, which is how a template's placeholder starts."""
+    return bool(value) and not value.startswith("[")
+
+
+def _sections(lines: list[str], mark: str) -> dict[str, list[str]]:
+    """The lines under each heading that starts with `mark`."""
     sections, into = {}, []
     for line in lines:
-        if line.startswith("## "):
-            into = sections.setdefault(line[3:].strip(), [])
+        if line.startswith(mark):
+            into = sections.setdefault(line[len(mark):].strip(), [])
         else:
             into.append(line)
     return sections
@@ -70,7 +78,10 @@ def reason(text: str) -> str:
 
 
 def reports_wrong_behaviour(text: str) -> bool:
-    return _field(_lines(text), WRONG) == "yes"
+    said = _field(_lines(text), WRONG)
+    if said not in ("yes", "no"):
+        raise ValueError(f"the premise report's `{WRONG}:` is `{said}`, not `yes` or `no`")
+    return said == "yes"
 
 
 def _graded(pick: str, rests_on: str) -> list[str]:
@@ -80,16 +91,17 @@ def _graded(pick: str, rests_on: str) -> list[str]:
     return names if pick == WRITE else names[:names.index(rests_on) + 1] if rests_on in names else []
 
 
-def _answer_problems(name: str, lines: list[str]) -> list[str]:
+def _answer_problems(heading: str, name: str, lines: list[str]) -> list[str]:
+    """What is wrong with the answer to question `name` among `lines`, the ones under `heading`."""
     answer, source = _field(lines, "Answer"), _field(lines, "Source")
-    found = [f"`## {name}` has no `{field}:`. Next step: fill it in." for field, value
-             in (("Answer", answer), ("Source", source)) if not value]
-    if source and not any(source.startswith(kind) and source[len(kind):].strip() for kind in SOURCES):
-        found.append(f"`## {name}` has the source `{source}`, which does not say where the answer came from. "
+    found = [f"`{heading}` has no `{field}:`. Next step: fill it in." for field, value
+             in (("Answer", answer), ("Source", source)) if not filled(value)]
+    if filled(source) and not any(source.startswith(kind) and source[len(kind):].strip() for kind in SOURCES):
+        found.append(f"`{heading}` has the source `{source}`, which does not say where the answer came from. "
                      f"Next step: start it with {', '.join(f'`{kind}`' for kind in SOURCES[:-1])} or `{SOURCES[-1]}` "
                      "and then say what.")
-    if name == "reachable" and answer and not answer.startswith(("observed", "predicted")):
-        found.append("`## reachable` does not say whether the answer was seen or reasoned. Next step: start the "
+    if name == "reachable" and filled(answer) and not answer.startswith(("observed", "predicted")):
+        found.append(f"`{heading}` does not say whether the answer was seen or reasoned. Next step: start the "
                      "answer with `observed` or `predicted`.")
     return found
 
@@ -98,7 +110,7 @@ def problems(text: str, pick: str) -> list[str]:
     """What stops `text` from being the report of a run whose user picked `pick`; empty when nothing does."""
     # A field outside the questions is named once in the form, so it is found wherever in the report it sits.
     lines = _lines(text)
-    sections = _sections(lines)
+    sections = _sections(lines, "## ")
     wrong, recommended, written, rests_on = (_field(lines, name) for name in (WRONG, RECOMMENDATION, PICK, RESTS_ON))
     found = [f"it has no `## {name}` section. Next step: write the report on the form `premise_report.py form` "
              "prints." for name in QUESTIONS if name not in sections]
@@ -118,10 +130,30 @@ def problems(text: str, pick: str) -> list[str]:
                          "reason in one line.")
     for name in _graded(pick, rests_on):
         if name in sections:
-            found += _answer_problems(name, sections[name])
+            found += _answer_problems(f"## {name}", name, sections[name])
     if wrong == "yes" and recommended == NO_SPEC:
         found.append(f"`{WRONG}: yes` and the recommendation is `{NO_SPEC}`: the size of a defect's fix is known "
                      f"only once it is traced. Next step: recommend `{WRITE}` or `{NOT_WORTH_DOING}`.")
+    return found
+
+
+def spec_problems(spec: str) -> list[str]:
+    """What stops `spec`, a spec.md, from holding the premise answers: each question as a `### <question>` heading
+    under `SPEC_HEADING`, with its `Answer:` and `Source:` as the report gives them. A spec is written only on a
+    pick that answered every question, so every question is graded."""
+    lines = _lines(spec)
+    if SPEC_HEADING not in lines:
+        return [f"it has no `{SPEC_HEADING}` section. Next step: add the section as the spec template gives it."]
+    section = lines[lines.index(SPEC_HEADING) + 1:]
+    section = section[:next((at for at, line in enumerate(section) if line.startswith("## ")), len(section))]
+    answers = _sections(section, "### ")
+    found = []
+    for name in QUESTIONS:
+        if name in answers:
+            found += _answer_problems(f"### {name}", name, answers[name])
+        else:
+            found.append(f"`{SPEC_HEADING}` has no `### {name}`. Next step: copy the question's `Answer:` and "
+                         "`Source:` from the premise report under that heading.")
     return found
 
 
@@ -139,6 +171,9 @@ def _run(argv: list[str]) -> tuple[str, list[str]]:
     """(what to print, the problems found)."""
     if argv == ["form"]:
         return form(), []
+    if len(argv) == 2 and argv[0] == "spec":
+        spec = Path(argv[1]) / "spec.md"
+        return "", [f"{spec}: {problem}" for problem in spec_problems(spec.read_text())]
     if len(argv) != 3 or argv[0] not in ("check", "record") or argv[2] not in OUTCOMES:
         raise ValueError(__doc__)
     command, path, pick = argv[0], Path(argv[1]), argv[2]

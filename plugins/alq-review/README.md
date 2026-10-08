@@ -201,8 +201,8 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
 | `scripts/speclocation.py` | reads and writes the issue's location comment, and resolves it to the spec folder |
 | `scripts/settled_design.py` | the settled-design check over one spec folder or a branch |
-| `scripts/premise_report.py` | the form of the premise report, its check, and the location comment a stop pick leaves |
-| `scripts/rootcause.py` | the check that a spec's `## Root cause` section is there and labelled |
+| `scripts/premise_report.py` | the form of the premise report, its check, the check that a spec's `## Why this is worth doing` section holds its answers, and the location comment a stop pick leaves |
+| `scripts/rootcause.py` | the check that a spec's `## Root cause` section is there and opens with an `Observed:` line that says something, or with `Not a defect report.` unless the premise report says the issue reports wrong behaviour |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |
 | `scripts/claimgate.py` | the claim check's hook handlers |

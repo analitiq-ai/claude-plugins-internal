@@ -82,7 +82,7 @@ names `alq-shape`. Uses of "design document" that mean the settled-design rule (
 
 **Acceptance Scenarios**:
 
-1. **Given** the change is done, **When** the repo is searched for `alq-shape`, **Then** nothing matches and `skills/alq-shape/` does not exist.
+1. **Given** the change is done, **When** `plugins/` and `dev/alq-review/tests/` are searched for `alq-shape`, **Then** nothing matches and `skills/alq-shape/` does not exist.
 2. **Given** the change is done, **When** the repo is searched for `design-doc` as a skill or workflow name, **Then** nothing matches. The workflow id, its install path, the skill folder, the gate, the policy, the settled-design check, the config, the README, the CI workflow and the tests all use `alq-spec`.
 3. **Given** the change is done, **When** a user runs `/alq-review:alq-spec #<issue>`, **Then** the merged skill runs.
 4. **Given** text that uses "design document" for the settled-design rule, **When** the rename is applied, **Then** that text is unchanged.
@@ -131,7 +131,7 @@ names `alq-shape`. Uses of "design document" that mean the settled-design rule (
 - **FR-009**: `alq-shape`'s list of hand-maintained surfaces MUST NOT be carried into the workflow. It goes with `alq-shape`.
 - **FR-010**: For an issue whose premise holds, `spec.md` MUST hold the premise answers, with their sources, since `spec.md` is the one file `alq-issue-tackle`, `alq-root-cause-check` and the review gate read.
 - **FR-011**: The checks in FR-001 to FR-010 MUST be steps of the planning workflow itself, so a run that skips one fails; they MUST NOT be prose a skill asks the model to remember. A script step right after `premise` MUST fail the run when the premise report is missing, lacks an answer to a premise question or to the needs-a-spec judgement, or holds an answer with no source. For "write the spec" every question MUST be answered. For "no spec needed" and "not worth doing" the script MUST require only the questions up to and including the one the outcome rests on, and the reason; it MUST NOT make the skill invent an answer to a question the outcome made moot.
-- **FR-012**: `plugins/alq-review/skills/alq-shape/` MUST be deleted, and no file in the repo may name `alq-shape`.
+- **FR-012**: `plugins/alq-review/skills/alq-shape/` MUST be deleted, and no file under `plugins/` or `dev/alq-review/tests/` may name `alq-shape`. Accepted ADRs and other spec folders are records and are left as written.
 - **FR-013**: The skill and its workflow MUST be renamed from `design-doc` to `alq-spec`, in every place the skill or workflow is named: the skill folder, the workflow id, the workflow's install path, the gate, the policy, the settled-design check, the plugin config, the README, the CI workflow and the tests. Uses of "design document" that mean the settled-design rule MUST be left alone.
 - **FR-014**: `alq-issue-tackle` MUST name the merged skill where it named `alq-shape`: `design-doc` after the first pull request, `alq-spec` after the second.
 - **FR-019**: Of `alq-shape`, only the premise test, the needs-a-spec judgement and the root cause (FR-001 to FR-008, FR-010) move into the workflow. Its rule for a defect's acceptance criteria (#59), its source tag on every decision, and its answering from industry practice MUST NOT be carried over. Text in another skill that depends on a dropped behaviour, such as `alq-issue-tackle`'s instruction to re-check a decision tagged `(code)`, MUST be removed with it.
@@ -152,7 +152,7 @@ names `alq-shape`. Uses of "design document" that mean the settled-design rule (
 
 ### Measurable Outcomes
 
-- **SC-001**: A search of the repo for `alq-shape` returns no matches.
+- **SC-001**: A search of `plugins/` and `dev/alq-review/tests/` for `alq-shape` returns no matches.
 - **SC-002**: A search of the repo for `design-doc` as a skill or workflow name returns no matches; the only remaining uses of "design document" are the settled-design rule's.
 - **SC-003**: A run on a defect issue with a holding premise leaves one spec folder in which both the premise answers and a root cause with an `Observed:` line are present.
 - **SC-004**: A run where the user picks "not worth doing" leaves zero new spec folders and a location comment on the issue that says it is not worth doing, with the reason; a run where the user picks "no spec needed" leaves zero new spec folders and a `spec: none` location comment on the issue.

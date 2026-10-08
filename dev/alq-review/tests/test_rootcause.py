@@ -6,11 +6,11 @@ import unittest
 from pathlib import Path
 
 from test_gate import SCRIPTS
-from test_premise_report import report
+from test_premise_report import report, spec_section
 
 import rootcause
 
-SPEC = "# Demo\n\n## Why this is worth doing\n\nIt fails.\n\n## Root cause\n\n{section}\n\n## Requirements\n\n- x\n"
+SPEC = "# Demo\n\n" + spec_section() + "## Root cause\n\n{section}\n\n## Requirements\n\n- x\n"
 DEFECT, NOT_A_DEFECT = report(wrong="yes"), report(wrong="no")
 
 
@@ -37,6 +37,18 @@ class Section(unittest.TestCase):
                         "<!-- Observed: fill this in -->\nThe ledger drops the verdict."):
             with self.subTest(section):
                 self.assert_one_problem(self.problems(section, DEFECT), "Observed:")
+
+    def test_an_observed_line_that_names_nothing_is_a_problem(self):
+        for section in ("Observed:", "Observed:   ", "Observed: [the failing test this trace is anchored to]"):
+            with self.subTest(section):
+                self.assert_one_problem(self.problems(f"{section}\n\nThe ledger drops the verdict.", DEFECT),
+                                        "Observed:")
+
+    def test_a_premise_report_that_does_not_say_yes_or_no_cannot_grade_the_section(self):
+        for text in ("garbage", report(wrong="Yes")):
+            with self.subTest(text[:30]):
+                with self.assertRaises(ValueError):
+                    self.problems(rootcause.NOT_A_DEFECT, text)
 
     def test_a_change_that_is_no_defect_says_so_under_the_heading(self):
         self.assertEqual(self.problems(rootcause.NOT_A_DEFECT, NOT_A_DEFECT), [])
@@ -83,6 +95,13 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli().returncode, 2)
         (self.folder / "spec.md").write_text(SPEC.format(section="Observed: a KeyError."))
         self.assertEqual(self.run_cli(str(self.report) + ".gone").returncode, 2)
+
+    def test_a_report_that_cannot_be_read_is_a_check_that_could_not_run(self):
+        (self.folder / "spec.md").write_text(SPEC.format(section=rootcause.NOT_A_DEFECT))
+        self.report.write_text("garbage")
+        done = self.run_cli(str(self.report))
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("Reports wrong behaviour:", done.stderr)
 
 
 if __name__ == "__main__":

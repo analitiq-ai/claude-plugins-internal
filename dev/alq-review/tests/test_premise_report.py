@@ -38,6 +38,12 @@ def report(pick=WRITE, recommendation=None, rests_on="", reason="", wrong="yes",
     return text
 
 
+def spec_section(answers=ANSWERS):
+    """`## Why this is worth doing` as `specify` copies the report's answers into spec.md."""
+    return premise_report.SPEC_HEADING + "\n\n" + "".join(
+        f"### {question}\nAnswer: {answer}\nSource: {source}\n\n" for question, (answer, source) in answers.items())
+
+
 class Form(unittest.TestCase):
     def test_the_form_asks_the_six_questions_in_order_each_with_an_answer_and_a_source(self):
         form = premise_report.form()
@@ -133,6 +139,45 @@ class Check(unittest.TestCase):
         self.assertFalse(premise_report.reports_wrong_behaviour(text))
         self.assertTrue(premise_report.reports_wrong_behaviour(report()))
 
+    def test_a_report_that_does_not_say_yes_or_no_cannot_say_whether_it_is_a_defect(self):
+        for text in ("garbage", report(wrong="Yes"), report(wrong="")):
+            with self.subTest(text[:30]):
+                with self.assertRaisesRegex(ValueError, "Reports wrong behaviour:"):
+                    premise_report.reports_wrong_behaviour(text)
+
+
+class InSpec(unittest.TestCase):
+    """The premise answers as spec.md holds them, graded on the report's own form."""
+
+    def spec(self, section):
+        return f"# Demo\n\n{section}## Root cause\n\nNot a defect report.\n\n## Requirements\n\n- x\n"
+
+    def assert_one_problem(self, section, *said):
+        found = premise_report.spec_problems(self.spec(section))
+        self.assertEqual(len(found), 1, found)
+        for phrase in (*said, "Next step:"):
+            self.assertIn(phrase, found[0])
+
+    def test_the_six_answers_each_with_a_source_pass(self):
+        self.assertEqual(premise_report.spec_problems(self.spec(spec_section())), [])
+
+    def test_a_spec_without_the_section_or_without_one_of_its_questions_is_a_problem(self):
+        self.assert_one_problem("", premise_report.SPEC_HEADING)
+        self.assert_one_problem(spec_section({k: v for k, v in ANSWERS.items() if k != "owner"}), "### owner")
+
+    def test_an_answer_is_filled_and_sourced_as_in_the_report(self):
+        for answer, said in ((("", "code: a.py"), "Answer:"), (("[answer]", "code: a.py"), "Answer:"),
+                             (("nothing guards it", ""), "Source:"), (("nothing guards it", "the README"), "code:")):
+            with self.subTest(answer):
+                self.assert_one_problem(spec_section({**ANSWERS, "owner": answer}), "### owner", said)
+        self.assert_one_problem(spec_section({**ANSWERS, "reachable": ("yes", "code: a.py")}), "### reachable",
+                                "observed", "predicted")
+
+    def test_a_question_heading_outside_the_section_is_not_the_sections(self):
+        without_owner = spec_section({k: v for k, v in ANSWERS.items() if k != "owner"})
+        found = premise_report.spec_problems(self.spec(without_owner) + "\n### owner\nAnswer: x\nSource: code: a\n")
+        self.assertEqual(len(found), 1, found)
+
 
 class Cli(Issue):
     """scripts/premise_report.py as the workflow's steps run it, from the project in the issue's worktree."""
@@ -176,6 +221,18 @@ class Cli(Issue):
         done = self.run_cli("check", str(self.path), WRITE)
         self.assertEqual(done.returncode, 1)
         self.assertIn("premise_report.py form", done.stderr)
+
+    def test_spec_passes_a_spec_folder_that_holds_the_answers_and_fails_one_that_does_not(self):
+        folder = self.root / "specs" / "001-demo"
+        folder.mkdir(parents=True)
+        (folder / "spec.md").write_text(spec_section())
+        done = self.run_cli("spec", str(folder))
+        self.assertEqual((done.returncode, done.stderr), (0, ""))
+        (folder / "spec.md").write_text("# Demo\n")
+        done = self.run_cli("spec", str(folder))
+        self.assertEqual(done.returncode, 1)
+        self.assertTrue(done.stderr.startswith(f"{folder / 'spec.md'}: "), done.stderr)
+        self.assertEqual(self.run_cli("spec", str(folder) + ".gone").returncode, 2)
 
     def test_check_cannot_run_on_a_pick_that_is_no_outcome(self):
         self.path.write_text(report())

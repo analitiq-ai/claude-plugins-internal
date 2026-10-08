@@ -101,6 +101,12 @@ steps:
           set -eu
           dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
           python3 "$ALQ_REVIEW_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+      - id: premise-answers
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" spec "$dir"
 
   # grill interviews the author, which a headless command step cannot do.
   - id: to-grill
@@ -132,7 +138,8 @@ steps:
             *) exit "$found" ;;
           esac
 
-  # Grill may rewrite the section, so it is graded again. A re-scope has no premise report to grade it against.
+  # Grill may rewrite the root cause section, so it is graded again; on a new spec, the premise answers too. A
+  # re-scope has no premise report: its premise answers are not graded, and its root cause is graded without one.
   - id: to-root-cause-regrade
     type: if
     condition: *spec-is-written
@@ -154,6 +161,12 @@ steps:
               set -eu
               dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
               python3 "$ALQ_REVIEW_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          - id: premise-answers-after-grill
+            type: shell
+            run: |
+              set -eu
+              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+              python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" spec "$dir"
 
   - id: to-plan
     type: if

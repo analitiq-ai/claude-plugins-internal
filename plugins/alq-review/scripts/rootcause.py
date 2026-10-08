@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Checks that a spec folder's spec.md carries a labelled `## Root cause` section.
 
-The section opens with an `Observed:` line, or with the one sentence that says the issue reports no defect. Whether
-the issue reports one is the premise report's answer, so a report that says it does refuses that sentence. Only the
-label is graded: whether the trace is right is for the user in grill and for alq-root-cause-check.
+The section opens with an `Observed:` line that says something, or with the one sentence that says the issue reports
+no defect. Whether the issue reports one is the premise report's answer, so a report that says it does refuses that
+sentence. Whether the trace is right is not graded: that is for the user in grill and for alq-root-cause-check.
 
 Usage: rootcause.py check <spec folder> [<premise report>]. Prints one problem per line and exits 1 when there are
 any, 2 when the check cannot run. A re-scope has no premise report and names none.
@@ -36,16 +36,18 @@ def _opening(spec: str) -> str | None:
 
 
 def problems(spec: str, report: str | None) -> list[str]:
+    defect = report is not None and premise_report.reports_wrong_behaviour(report)
     opening = _opening(spec)
     if opening is None:
         return [f"it has no `{HEADING}` section. Next step: add the section as the spec template gives it."]
     if opening == NOT_A_DEFECT:
-        if report is not None and premise_report.reports_wrong_behaviour(report):
+        if defect:
             return [f"`{HEADING}` says `{NOT_A_DEFECT}` and the premise report says `{premise_report.WRONG}: yes`. "
                     f"Next step: trace the behaviour to its cause and open the section with `{OBSERVED}`."]
         return []
-    if not opening.startswith(OBSERVED):
-        return [f"`{HEADING}` does not open with an `{OBSERVED}` line. Next step: open it with `{OBSERVED}` and "
+    if not (opening.startswith(OBSERVED) and premise_report.filled(opening[len(OBSERVED):].strip())):
+        return [f"`{HEADING}` does not open with an `{OBSERVED}` line that says something. Next step: open it with "
+                f"`{OBSERVED}` and "
                 f"what was seen, or that the trace is a hypothesis; for an issue that reports no defect, with "
                 f"`{NOT_A_DEFECT}`."]
     return []

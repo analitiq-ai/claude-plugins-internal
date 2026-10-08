@@ -71,7 +71,7 @@ says so and the first task proves it with a failing test (R10).
 ## R4: The settled-design preset adds the premise and root cause sections to the spec template, and tells `specify` where to take them from
 
 - **Decision**: The preset gains a `spec-template` template (`strategy: append`) that adds a `## Why this is worth doing`
-  section (the premise answers, each with its source) and a `## Root cause` section whose guidance reproduces what
+  section (a `### <question>` heading per premise question, each with the report's `Answer:` and `Source:` lines) and a `## Root cause` section whose guidance reproduces what
   `alq-shape` asked for, kept to the part FR-006 to FR-008 move: open with `Observed:` or the statement that it does
   not apply, keep what was examined and ruled out apart from what was not investigated, label each claim about other
   callers verified or predicted. It also gains a `speckit.specify` command (`strategy: append`) saying: copy the premise answers
@@ -89,13 +89,16 @@ says so and the first task proves it with a failing test (R10).
 ## R5: A second script checks the section, right after `specify` and again after grill
 
 - **Decision**: A new `plugins/alq-review/scripts/rootcause.py` has one command, `check <spec folder> [<premise report>]`. It fails, with a next step,
-  when `spec.md` has no `## Root cause` heading, the first non-blank line under it neither starts `Observed:` nor
-  is `Not a defect report.`, or it is `Not a defect report.` while the report says `Reports wrong behaviour: yes`. The
+  when `spec.md` has no `## Root cause` heading, the first non-blank line under it is neither an `Observed:` line that says something
+  (not empty, not the template's bracketed placeholder) nor `Not a defect report.`, or it is `Not a defect report.` while the report says `Reports wrong behaviour: yes`. The
   report's flag is the one answer to "is this a defect"; the section does not get a second say. The workflow runs the
   script as `root-cause`, directly after `specify`, and as `root-cause-after-grill`, after
   `no-open-markers`, because the user may edit the section in grill. Both steps call the one script. On a re-scope there
   is no report and no `specify`: the first step is skipped and the second runs as `root-cause-of-rescope`, without the
-  report argument. The constant `Not a defect report.` is defined here and the
+  report argument. A report whose `Reports wrong behaviour:` is neither `yes` nor `no` is a check that could not run (exit 2).
+  `premise_report.py spec <spec folder>` grades the `## Why this is worth doing` section on the report's own form (every
+  question, answer filled, source named), as the steps `premise-answers` and `premise-answers-after-grill`, each right after
+  its root cause step; a re-scope has neither. The constant `Not a defect report.` is defined here and the
   template (R4) names the same sentence.
 - **Rationale**: FR-021 asks for exactly this check: the section is there and labelled, not that the trace is
   right. `alq-root-cause-check` already looks for the `## Root cause` heading and an `Observed:` line, and

@@ -16,6 +16,7 @@ sys.path.insert(0, str(DRIVER))
 import drive_workflow  # noqa: E402
 
 sys.path.insert(0, str(drive_workflow.PLUGIN / "scripts"))
+import premise_report  # noqa: E402
 import rootcause  # noqa: E402
 import settled_design  # noqa: E402
 
@@ -70,8 +71,20 @@ class SpecTemplate(unittest.TestCase):
         self.assertEqual(headings[-2:], ["## Why this is worth doing", rootcause.HEADING])
         self.assertIn("## Requirements *(mandatory)*", headings)
 
-    def test_the_root_cause_section_as_the_template_gives_it_passes_the_check(self):
-        self.assertEqual(rootcause.problems(composed_spec_template(), None), [])
+    def test_the_template_asks_for_the_reports_questions_under_its_headings(self):
+        asked = [line[4:] for line in composed_spec_template().splitlines() if line.startswith("### ")
+                 and line[4:] in premise_report.QUESTIONS]
+        self.assertEqual(asked, list(premise_report.QUESTIONS))
+
+    def test_the_template_as_shipped_fails_both_checks_and_passes_them_once_filled(self):
+        template = composed_spec_template()
+        self.assertEqual(len(premise_report.spec_problems(template)), 2 * len(premise_report.QUESTIONS))
+        self.assertEqual(len(rootcause.problems(template, None)), 1)
+        filled = re.sub(r"^(Answer|Source|Observed): \[.*\]$",
+                        lambda line: f"{line[1]}: {'code: scripts/gate.py' if line[1] == 'Source' else 'observed: a KeyError'}",
+                        template, flags=re.MULTILINE)
+        self.assertEqual(premise_report.spec_problems(filled), [])
+        self.assertEqual(rootcause.problems(filled, None), [])
 
     def test_the_template_spells_the_no_defect_sentence_as_the_check_reads_it(self):
         self.assertIn(f"`{rootcause.NOT_A_DEFECT}`", composed_spec_template())

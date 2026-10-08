@@ -14,6 +14,7 @@ from unittest import mock
 
 from paths import PLUGIN
 from test_premise_report import report as premise_report_text
+from test_premise_report import spec_section
 from test_rootcause import SPEC as SPEC_WITH
 from test_speclocation import Issue
 
@@ -31,6 +32,7 @@ import drive_workflow  # noqa: E402
 SPEC_DIR = "specs/001-demo"
 TRACED, UNTRACED = SPEC_WITH.format(section="Observed: test_gate fails on main."), "# Demo\n\nSettled.\n"
 SETTLED = SPEC_WITH.format(section="Not a defect report.")
+UNANSWERED = TRACED.replace(spec_section(), "")
 
 
 def drive(root, env, *args):
@@ -169,6 +171,10 @@ class AfterGrill(unittest.TestCase):
         self.assertEqual((report["status"], report["step"]), ("failed", "no-open-markers"))
         self.assertTrue(report["open_markers"])
 
+    def test_a_rescoped_spec_without_premise_answers_runs_on_to_the_settled_design_check(self):
+        report = self.approved(UNANSWERED)
+        self.assertEqual((report["status"], report["step"]), ("failed", "settled-design"), report)
+
     def test_a_rescoped_spec_with_no_labelled_root_cause_stops_the_run(self):
         report = self.approved(UNTRACED)
         self.assertEqual((report["status"], report["step"]), ("failed", "root-cause-of-rescope"))
@@ -257,6 +263,19 @@ class Premise(Issue):
         report = self.resume(f"premise_verdict={WRITE}", premise_report_text(wrong="yes"))
         self.assertEqual((report["status"], report["step"]), ("failed", "root-cause"), report)
         self.assertIn("Reports wrong behaviour: yes", report["stderr"])
+
+    def test_a_new_spec_without_the_premise_answers_stops_the_run(self):
+        self.env["CLAUDE_SPEC"] = UNANSWERED
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise-answers"), report)
+        self.assertIn("## Why this is worth doing", report["stderr"])
+
+    def test_premise_answers_that_grill_removed_stop_the_run(self):
+        self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        (self.root / self.NEW / "spec.md").write_text(UNANSWERED)
+        report = self.resume("grill_verdict=approve")
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise-answers-after-grill"), report)
+        self.assertIn("## Why this is worth doing", report["stderr"])
 
     def test_a_root_cause_that_grill_left_unlabelled_stops_the_run(self):
         self.resume(f"premise_verdict={WRITE}", premise_report_text(wrong="yes"))
