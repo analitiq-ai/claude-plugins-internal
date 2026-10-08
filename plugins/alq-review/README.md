@@ -49,10 +49,13 @@ that is under review.
    round whose base cannot be read is refused. Later rounds review only what changed since the
    previous round, and reviewers are told what has already been ruled on. Re-running a round on an
    unchanged commit is refused. On a branch named for an issue (`<type>/<n>-...`), every internal
-   round, delta rounds included, puts that issue's `<!-- analitiq-spec -->` comment in full into each
-   reviewer's prompt, and each Acceptance criterion the change does not meet is a finding; the
-   assessor's brief carries the same text. A launch is refused when gh cannot read the issue's
-   comments, or finds more than one spec among them. Audit reviewers are not given the spec.
+   round, delta rounds included, reads the issue's location comment, takes `spec.md` from the folder it
+   names as committed at `HEAD`, and puts it in full, with the folder's path, into each reviewer's prompt;
+   each Acceptance criterion the change does not meet is a finding; the assessor's brief carries the same
+   text. A review or assess launch is refused, with the next step, when the issue has no location comment,
+   the comment is malformed or repeated, the folder or its `spec.md` is not in the checkout, or gh cannot
+   read the issue. An issue whose comment says `spec: none` is reviewed with no spec, and so is a
+   branch that names no issue. Audit reviewers are not given the spec.
 6. **A settled design before the first round.** The first internal round on a branch that changes a
    spec folder (`<dir>/specs/<feature>/` at any depth, so each plugin of a repo can keep its own `specs/`) runs
    `scripts/settled_design.py` on each such folder: every
@@ -196,6 +199,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
+| `scripts/speclocation.py` | reads and writes the issue's location comment, and resolves it to the spec folder |
 | `scripts/settled_design.py` | the settled-design check over one spec folder or a branch |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |

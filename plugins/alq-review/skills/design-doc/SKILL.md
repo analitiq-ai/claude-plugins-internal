@@ -1,13 +1,16 @@
 ---
 name: design-doc
-description: Scope or re-scope a change in a spec folder before it is built, by running the design-doc Spec Kit workflow (specify → grill → plan → critique → tasks). Use for a GitHub issue that needs scoping (`/alq-review:design-doc #<issue>`) or a PR whose review round was ruled RESHAPE_SPEC (`/alq-review:design-doc rescope <ref>`).
-argument-hint: "#<issue> [<dir>] | rescope <#pr | owner/repo#pr | branch>"
+description: Scope or re-scope a change in a spec folder before it is built, by running the design-doc Spec Kit workflow (specify → grill → plan → critique → tasks). Use for a GitHub issue that needs scoping (`/alq-review:design-doc #<issue>`) or a PR whose review round was ruled RESHAPE_SPEC (`/alq-review:design-doc rescope <ref>`). Use `/alq-review:design-doc #<issue> none <reason>` to record that an issue needs no spec.
+argument-hint: "#<issue> [<dir>] | rescope <#pr | owner/repo#pr | branch> | #<issue> none <reason>"
 ---
 
 Drive the `design-doc` Spec Kit workflow (this plugin's `speckit/workflows/design-doc/workflow.yml`, which each
 start installs into the checkout with the settled-design preset). The workflow owns
 the step order and the checks; this skill picks the checkout and the inputs, runs the two interactive steps
 in this session, and passes the user's verdicts on resume. Never reimplement a workflow step here.
+
+The spec's home is the spec folder. The issue carries one location comment that says where the folder is, and
+this skill posts it. `SPECLOC` is `../../scripts/speclocation.py` from this skill's base directory.
 
 ## 1. Resolve the entry point
 
@@ -32,7 +35,12 @@ in this session, and passes the user's verdicts on resume. Never reimplement a w
   With the Write tool, write `SPEC_FILE`: `RESCOPE of <SPEC_DIR> (<REPO>#<PR>). Open decision: … Why: … Spec gaps: …`
   (from the line).
 
-Anything else: tell the user the two forms and stop.
+- **`#<issue> none <reason>`** - the user has decided the issue needs no spec. `CHECKOUT` is the issue's
+  worktree (create it per the repo's branch rules if there is none). Run
+  `python3 SPECLOC none <CHECKOUT> "<reason>"`, report the comment URL it prints, and stop. This entry starts no workflow and creates no spec folder.
+  `#<issue> none` with no reason: ask the user for the reason and post nothing until they give one.
+
+Anything else: tell the user the three forms and stop.
 
 `SPEC_FILE` is a new file in the session scratchpad. Issue and ruling text never go into a command line.
 
@@ -55,7 +63,9 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    spec.md/plan.md only the findings the user accepts.
 5. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
    (or `reject`). Expect `completed`.
-6. Report the run status and the spec folder path.
+6. When the report says `completed`, in `CHECKOUT`: stage the spec folder, `git commit` it, `git push` the
+   branch, then run `python3 SPECLOC post <PROJECT>`. Report the run status, the spec folder path and the
+   comment URL it prints. A run that is rejected or fails commits nothing, pushes nothing and posts no location comment.
 
 A verdict is the user's decision. Never pass `approve` without the user saying so in this session.
 

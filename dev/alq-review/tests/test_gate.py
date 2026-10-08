@@ -21,6 +21,7 @@ import gate
 import helpers
 import ledger
 import policy
+import speclocation
 import test_policy
 import test_settled_design
 
@@ -38,8 +39,9 @@ class Gate(Repo):
         self.head = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
         self.serve_remote()
         # No network in tests: gh knows the branch's open PR ("<number> <base>", PR 7 by default; empty for none),
-        # when GH_ISSUE_STATE is set, every issue's state, and an issue's comments as GH_ISSUE_COMMENTS (none by
-        # default; GH_COMMENTS_ERROR makes that read fail); every other lookup sees a gh that cannot answer.
+        # when GH_ISSUE_STATE is set, every issue's state, and an issue's comments as GH_ISSUE_COMMENTS (one by
+        # default, set below; GH_COMMENTS_ERROR makes that read fail), and keeps what a write sends on stdin in
+        # GH_POSTED; every other lookup sees a gh that cannot answer.
         stub = Path(self.tmp.name) / "bin"
         stub.mkdir()
         (stub / "gh").write_text('#!/bin/sh\necho "$*" >> "$GH_LOG"\ncase "$*" in\n  "pr list"*) echo "$GH_OPEN_PR" ;;\n'
@@ -47,10 +49,14 @@ class Gate(Repo):
                                  '  "api --paginate repos/"*/issues/*/comments*)\n'
                                  '    [ -n "$GH_COMMENTS_ERROR" ] && { echo "$GH_COMMENTS_ERROR" >&2; exit 1; }\n'
                                  '    printf "%s" "$GH_ISSUE_COMMENTS" ;;\n'
+                                 '  "api -X "*) cat > "$GH_POSTED"; echo https://github.test/comment ;;\n'
                                  '  *) exit 1 ;;\nesac\n')
         (stub / "gh").chmod(0o755)
         self.env = dict(os.environ, ALQ_REVIEW_STATE_DIR=str(self.state_dir), PATH=f"{stub}{os.pathsep}{os.environ['PATH']}",
                         GH_OPEN_PR="7 main", GH_LOG=str(Path(self.tmp.name) / "gh.log"),
+                        GH_POSTED=str(Path(self.tmp.name) / "gh.posted"),
+                        # Most tests are not about the spec: their issue says it needs none.
+                        GH_ISSUE_COMMENTS=json.dumps({"id": 100, "body": speclocation.render_none("a test fixture")}),
                         # The claim and shim checks have their own tests (test_claim_gate.py, test_shim_gate.py); here a
                         # commit is judged by the review alone.
                         ALQ_REVIEW_CLAIM_CHECKS="log", ALQ_REVIEW_SHIM_CHECKS="log")
@@ -264,95 +270,155 @@ class InternalRound(Gate):
 
 
 class IssueSpec(Gate):
-    """Internal reviewers are given the spec of the issue their branch names, when it has one (engineering#62)."""
-    SPEC = "<!-- analitiq-spec -->\n# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n"
+    """Internal reviewers and the assessor grade a change against spec.md of the folder its issue's location comment
+    names (spec 018)."""
+    FOLDER = "dev/demo/specs/001-demo"
+    SPEC = "# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n"
+
+    def setUp(self):
+        super().setUp()
+        self.env["ALQ_REVIEW_SPEC_CHECKS"] = "log"  # the settled-design check of a spec folder has its own tests
+        (self.root / self.FOLDER).mkdir(parents=True)
+        self.head = self.commit(f"{self.FOLDER}/spec.md", self.SPEC, "spec")
+        self.comments("unrelated chatter", speclocation.render(self.FOLDER, "feat/1-demo"))
 
     def comments(self, *bodies):
         """What gh hands over for the issue's comments, one per line, ids from 101."""
         self.env["GH_ISSUE_COMMENTS"] = "\n".join(json.dumps({"id": 101 + i, "body": b}) for i, b in enumerate(bodies))
 
     def assertGradesAgainstSpec(self, args):
+        self.assertEqual([[r["type"] for r in wave] for wave in args["waves"]], [briefs.INTERNAL_REVIEWERS])
         for reviewer in args["waves"][0]:
             self.assertIn(self.SPEC, reviewer["prompt"])
+            self.assertIn(self.FOLDER, reviewer["prompt"])
             self.assertIn("Acceptance criterion the change does not meet is a finding", reviewer["prompt"])
 
-    def test_every_reviewer_of_a_full_round_is_given_the_spec_and_asked_to_grade_against_it(self):
-        self.comments("unrelated chatter", self.SPEC)
+    def reviewed(self):
+        """A round every reviewer has reported on, one finding in it; its launch args."""
+        _, args = self.launch()
+        first = args["waves"][0][0]
+        self.found = [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3, "severity": "HIGH",
+                       "detail": "d"}]
+        self.run_reviewers(args, self.found)
+        return args
+
+    def brief(self, ref):
+        return subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", ref], env=self.env,
+                              capture_output=True, text=True)
+
+    def test_every_reviewer_of_a_full_round_is_given_the_spec_and_its_folder(self):
         out, args = self.launch()
         self.assertEqual(self.decision(out), "allow")
         self.assertGradesAgainstSpec(args)
 
     def test_a_delta_round_carries_the_spec_too(self):
-        self.comments(self.SPEC)
-        _, args = self.launch()
-        first = args["waves"][0][0]
-        found = [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3, "severity": "HIGH", "detail": "d"}]
-        self.run_reviewers(args, found)
-        self.submit_assessment(self.assessment(args["round_ref"], [found[0]["id"]]))
+        args = self.reviewed()
+        self.submit_assessment(self.assessment(args["round_ref"], [self.found[0]["id"]]))
         self.commit("b.py", "fixed\n", "fix: b")
         _, second = self.launch()
         self.assertIn(f"git diff {self.head}..HEAD", second["waves"][0][0]["prompt"])
         self.assertGradesAgainstSpec(second)
 
-    def expected_prompt(self, branch, reviewer):
-        """The internal reviewer prompt as it stood before engineering#62, word for word."""
+    def test_the_folder_the_comment_names_is_the_one_graded_against_whatever_the_branch_changed(self):
+        (self.root / "dev/demo/specs/002-other").mkdir()
+        self.commit("dev/demo/specs/002-other/spec.md", "# Another feature\n", "another spec")
+        _, args = self.launch()
+        self.assertGradesAgainstSpec(args)
+        self.assertNotIn("Another feature", args["waves"][0][0]["prompt"])
+
+    def expected_prompt(self, branch, reviewer, graded=""):
         main = git(self.root, "rev-parse", "main")
         return (f"Review branch {branch} of acme/demo.\nIn {self.root}, run: git diff {main}...HEAD\n"
                 "That is the whole change under review.\n\n"
                 "Report only what must change before this merges: a defect, a broken contract, a violated project "
                 "rule. No style preferences, no praise, no summary. An empty findings list is a normal and expected "
-                f"answer.\n\nAnswer through StructuredOutput, numbering findings {reviewer}-1, {reviewer}-2, ...")
+                f"answer.{graded}\n\nAnswer through StructuredOutput, numbering findings {reviewer}-1, {reviewer}-2, ...")
 
-    def test_an_issue_with_no_spec_leaves_the_prompts_as_they_were(self):
-        self.comments("unrelated chatter")
+    def test_an_issue_that_needs_no_spec_tells_the_reviewers_so_with_the_reason(self):
+        self.comments(speclocation.render_none("docs only"))
         _, args = self.launch()
-        self.assertEqual([r["prompt"] for r in args["waves"][0]],
-                         [self.expected_prompt("feat/1-demo", r["short"]) for r in args["waves"][0]])
+        for reviewer in args["waves"][0]:
+            self.assertIn("needs no spec: docs only", reviewer["prompt"])
+            self.assertNotIn("Acceptance criterion", reviewer["prompt"])
 
-    def test_a_branch_naming_no_issue_leaves_the_prompts_as_they_were_and_asks_github_nothing(self):
+    def test_a_branch_naming_no_issue_is_reviewed_with_no_spec_and_reads_no_issue_comments(self):
         git(self.root, "branch", "-m", "chore/no-issue")
-        self.comments(self.SPEC)
-        _, args = self.launch()
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
         self.assertEqual([r["prompt"] for r in args["waves"][0]],
                          [self.expected_prompt("chore/no-issue", r["short"]) for r in args["waves"][0]])
         self.assertNotIn("/comments", Path(self.env["GH_LOG"]).read_text())
 
+    def assertRefused(self, out, *words):
+        self.assertEqual(self.decision(out), "deny")
+        for word in words:
+            self.assertIn(word, self.reason(out))
+
+    def test_a_launch_the_spec_cannot_be_found_for_is_refused_with_its_next_step_and_opens_no_round(self):
+        states = {
+            "no location comment": (["unrelated chatter"], ["/alq-review:design-doc #1"]),
+            "a folder the checkout does not hold": ([speclocation.render("dev/demo/specs/009-gone", "feat/1-elsewhere")],
+                                                    ["dev/demo/specs/009-gone", "feat/1-elsewhere"]),
+            "a whole spec in the comment": (["<!-- analitiq-spec -->\n" + self.SPEC], ["design-doc"]),
+            "a path out of the repo": (["<!-- analitiq-spec -->\nspec: ../specs/001-demo\nbranch: feat/1-demo\n"],
+                                       ["spec: <folder"]),
+            "two location comments": ([speclocation.render(self.FOLDER, "feat/1-demo")] * 2, ["101", "102"]),
+        }
+        for name, (bodies, words) in states.items():
+            with self.subTest(name):
+                self.comments(*bodies)
+                out, _ = self.launch()
+                self.assertRefused(out, *words)
+                self.assertNotIn("gh auth status", self.reason(out))
+                self.assertEqual(self.saved()["rounds"], [])
+
     def test_an_unreadable_issue_refuses_the_launch_in_ghs_words_and_opens_no_round(self):
-        self.comments(self.SPEC)
         self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
         out, _ = self.launch()
-        self.assertEqual(self.decision(out), "deny")
-        self.assertIn("HTTP 502: Bad Gateway", self.reason(out))
+        self.assertRefused(out, "HTTP 502: Bad Gateway")
+        self.assertNotIn("no location comment", self.reason(out))
         self.assertEqual(self.saved()["rounds"], [])
 
-    def test_two_spec_comments_refuse_the_launch_naming_both(self):
-        self.comments(self.SPEC, "unrelated chatter", self.SPEC + "revised\n")
-        out, _ = self.launch()
-        self.assertEqual(self.decision(out), "deny")
-        self.assertIn("101", self.reason(out))
-        self.assertIn("103", self.reason(out))
-        self.assertEqual(self.saved()["rounds"], [])
+    def test_an_assessment_the_spec_cannot_be_found_for_is_refused_the_same_way(self):
+        self.reviewed()
+        self.comments("unrelated chatter")
+        out, _ = self.launch(ASSESS)
+        self.assertRefused(out, "/alq-review:design-doc #1")
+        self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
+        out, _ = self.launch(ASSESS)
+        self.assertRefused(out, "HTTP 502: Bad Gateway")
 
-    def test_audit_reviewers_are_not_given_the_spec(self):
-        self.comments(self.SPEC)
+    def test_audit_reviewers_are_not_given_the_spec_text(self):
         _, args = self.launch(stage="audit")
-        for reviewer in (r for wave in args["waves"] for r in wave):
-            self.assertNotIn("Acceptance", reviewer["prompt"])
+        prompts = [r["prompt"] for wave in args["waves"] for r in wave]
+        self.assertEqual(len(prompts), sum(len(wave) for wave in briefs.AUDIT_WAVES))
+        for prompt in prompts:
+            self.assertNotIn(self.SPEC, prompt)
 
-    def test_the_assessor_brief_carries_the_spec_text_itself(self):
-        self.comments(self.SPEC)
-        _, args = self.launch()
-        first = args["waves"][0][0]
-        self.run_reviewers(args, [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3,
-                                   "severity": "HIGH", "detail": "d"}])
-        brief = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", args["round_ref"]], env=self.env,
-                               capture_output=True, text=True, check=True)
-        self.assertEqual(json.loads(brief.stdout)["spec"], self.SPEC)
+    def test_an_audit_launch_the_spec_cannot_be_found_for_is_refused_as_an_internal_one_is(self):
+        self.comments("unrelated chatter")
+        out, _ = self.launch(stage="audit")
+        self.assertRefused(out, "/alq-review:design-doc #1")
+        self.assertEqual(self.saved()["rounds"], [])
 
-    def test_the_spec_is_selected_by_github_issue_spec_alone(self):
-        """One selector of the spec comment: the briefs hold no marker filter of their own."""
-        source = (SCRIPTS / "briefs.py").read_text()
-        self.assertFalse("--jq" in source or "SPEC_MARKER" in source)
+    def test_the_assessor_brief_carries_the_spec_text_and_its_folder(self):
+        args = self.reviewed()
+        out, _ = self.launch(ASSESS)
+        self.assertEqual(self.decision(out), "allow")
+        brief = json.loads(self.brief(args["round_ref"]).stdout)
+        self.assertEqual((brief["spec"], brief["spec_folder"]), (self.SPEC, self.FOLDER))
+
+    def test_the_assessor_brief_says_why_there_is_no_spec(self):
+        args = self.reviewed()
+        self.comments(speclocation.render_none("docs only"))
+        brief = json.loads(self.brief(args["round_ref"]).stdout)
+        self.assertIn("docs only", brief["spec"])
+        self.assertIsNone(brief["spec_folder"])
+
+    def test_briefs_and_gate_name_neither_the_marker_nor_the_comment_lookup(self):
+        for name in ("briefs.py", "gate.py"):
+            source = (SCRIPTS / name).read_text()
+            self.assertFalse("--jq" in source or "MARKER" in source or "issue_comments" in source, name)
 
 
 class ReleaseReady(Gate):
