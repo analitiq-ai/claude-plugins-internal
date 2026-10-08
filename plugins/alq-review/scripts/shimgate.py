@@ -1,5 +1,6 @@
-"""The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's; this module reads git
-and the ledger for them and records what they decide."""
+"""The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's and the mapping of lines
+from one version of a file to the next is lineage's; this module reads git and the ledger for them and records what
+they decide. A bug belongs to its branch: nothing here is keyed on HEAD but the check's own record."""
 from __future__ import annotations
 
 import os
@@ -11,6 +12,7 @@ import briefs
 import github
 import jev
 import ledger
+import lineage
 import shimcheck
 import snapshot
 import worktree
@@ -38,6 +40,35 @@ def _hunks_and_labels(repo: str, root: str, tree: str, base: str) -> tuple[list[
     return claim["hunks"], claim["labels"]
 
 
+def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dict]:
+    """The branch's open bugs with their ranges carried to the text of `head`, the version commits are measured
+    against, from the text they were last carried in (R9). Saves nothing."""
+    bugs = shims.open_bugs(branch)
+    olds = {}
+    for file in sorted({r["file"] for bug in bugs for r in bug["ranges"]}):
+        seen = shims.seen(branch, "shim", file)
+        if seen is None:
+            raise RuntimeError(f"a bug of {branch} has a range in {file} and no saved text to carry it from")
+        olds[file] = seen["text"]
+    news = {file: worktree.tree_text(root, head, file) for file in olds}
+    return shimcheck.carried(bugs, olds, news, lambda file: worktree.text_hunks(root, olds[file], news[file]))
+
+
+def _persist(shims: ledger.Shims, root: str, branch: str, head: str, bugs: list[dict], ref: str) -> None:
+    """Saves every bug of the branch as carried or settled, and the text of `head` their ranges are in. A file `head`
+    does not have gives a range nothing to be carried from later, so the range is dropped."""
+    texts = {r["file"]: worktree.tree_text(root, head, r["file"]) for b in bugs if shimcheck.tracked(b)
+             for r in b["ranges"]}
+    for bug in bugs:
+        if shimcheck.tracked(bug):
+            kept = [r for r in bug["ranges"] if texts[r["file"]] is not None]
+            bug = dict(bug, ranges=kept, state=bug["state"] if kept else "ended")
+        shims.save_bug(bug)
+    for file, text in texts.items():
+        if text is not None:
+            shims.save_seen(branch, "shim", file, {"text": text, "ref": ref})
+
+
 def on_commit(payload: dict, action: Action) -> dict | None:
     where = worktree.locate(action.cwd)
     if where is None:
@@ -48,11 +79,20 @@ def on_commit(payload: dict, action: Action) -> dict | None:
     concluding = worktree.concluding(root)
     hunks, labels = ([], {}) if empty or concluding else _hunks_and_labels(repo, root, tree, base)
     head = worktree.head_sha(root)
+    refusal, chains = None, []
     with ledger.open_shims(repo) as shims:
         check = shims.check(tree)
         if check is not None and check["head"] != head:
             check = None
-        chains = shimcheck.matching_chains(shims.chains_at(where.branch, head), shimcheck.swept(hunks, labels))
+        if hunks:
+            try:
+                lineage.differ()
+                chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head),
+                                                   shimcheck.swept(hunks, labels))
+            except (lineage.Unavailable, lineage.BudgetExceeded) as exc:
+                refusal = str(exc)
+    if refusal:
+        return refuse_shim(payload, "shim-commit", refusal, _logged(repo, root))
     decision = shimcheck.commit_decision(check, chains, empty=empty, concluding=concluding, staging=action.staging,
                                          alone=action.alone, hunks=hunks, labels=labels, tree=tree, root=root)
     if not decision.allow:
@@ -143,6 +183,10 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         return deny(f"{CHECK} needs args.worktree: the absolute path of the checkout whose staged change is checked, "
                     "with a GitHub origin.")
     root, repo, logged = where.root, where.slug, _logged(where.slug, where.root)
+    try:
+        lineage.differ()
+    except lineage.Unavailable as exc:
+        return refuse_shim(payload, "shim-launch", str(exc), logged)
     deadline = time.monotonic() + JEV_SECONDS
     unstaged = worktree.unstaged(root)
     if unstaged:
@@ -161,9 +205,12 @@ def on_launch(payload: dict, call: dict) -> dict | None:
     code = shimcheck.swept(hunks, labels)
     with ledger.open_shims(repo) as shims:
         earlier = shims.check(tree)
-        chains = shimcheck.matching_chains(shims.chains_at(where.branch, head), code)
+        try:
+            chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head), code)
+        except lineage.BudgetExceeded as exc:
+            return refuse_shim(payload, "shim-launch", str(exc), logged)
     held = next((c for c in chains if c["state"] == "held"), None)
-    overridden = next((c for c in chains if c["state"] == "overridden"), None)
+    overridden = chains[0] if chains and all(c["state"] == "overridden" for c in chains) else None
     unread = _drop_closed_deferrals(payload, repo, chains, logged)
     if unread:
         return refuse_shim(payload, "shim-launch", unread, logged)
@@ -194,7 +241,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         # Jev's `kind` reads only the files with a code hunk (FR-005); everything else reads every file with a staged
         # hunk, so the lists are judged against the diff they were swept from.
         diff, code_diff = (_diff_of(root, base, tree, hunks), _diff_of(root, base, tree, code)) if code else ("", "")
-        check = _new_check(where, tree, head, next(iter(chains), None), code, diff, code_diff)
+        check = _new_check(where, tree, head, shimcheck.survivor(chains) if chains else None, code, diff, code_diff)
     _end_replaced(payload, check)
     mode = None
     try:
@@ -355,22 +402,27 @@ def _judge(check: dict, deadline: float) -> None:
 
 
 def _save(payload: dict, check: dict) -> None:
-    """Store the check; one that completed settles the bug chains it reaches (R9), and logs the sites its list adds
-    to one of them as the misses of the earlier checks (R12)."""
+    """Store the check; one that completed settles the bugs it reaches (R9), and logs the sites its list adds to one of
+    them as the misses of the earlier checks (R12)."""
     found = []
     with ledger.open_shims(check["repo"]) as shims:
         if check["status"] == "complete":
-            before = {c["id"]: c for c in shims.chains_at(check["branch"], check["head"])}
+            before = {b["id"]: b for b in _tracked(shims, check["root"], check["branch"], check["head"])}
             settled = shimcheck.settled_chains(list(before.values()), check)
-            # A first refusal opens its chain only now; the chain a check is contested on is the one it names. A bug
-            # the user overrode while it was swept settles no chain.
-            if check["verdict"] == "patch" and check["chain"] is None and settled:
-                check["chain"] = settled[0]["id"]
-            for chain in settled:
-                # A refusal's list, or the deep sweep's whatever its verdict (FR-018).
-                if chain["id"] in before and (check["verdict"] == "patch" or check["mode"] == "deep"):
-                    found += [(chain["id"], sid, tree) for sid, tree in shimcheck.misses(before[chain["id"]], check)]
-                shims.save_chain(chain)
+            # A first refusal opens its bug only now, and a bug that absorbed others is the one a contest names. A bug
+            # the user overrode while it was swept settles nothing.
+            if check["verdict"] == "patch":
+                check["chain"] = next((b["id"] for b in settled if b["state"] != "merged"), check["chain"])
+            for bug in settled:
+                if bug["state"] == "merged":
+                    mine = shims.rulings(bug["into"])
+                    for sid, ruling in shims.rulings(bug["id"]).items():
+                        if sid not in mine:
+                            shims.save_ruling(bug["into"], sid, ruling)
+                elif bug["id"] in before and (check["verdict"] == "patch" or check["mode"] == "deep"):
+                    found += [(bug["id"], sid, tree) for sid, tree in shimcheck.misses(before[bug["id"]], check)]
+            _persist(shims, check["root"], check["branch"], check["head"],
+                     list({**before, **{b["id"]: b for b in settled}}.values()), check["ref"])
         shims.save_check(check)
     for chain_id, sid, tree in found:
         record(payload, "shim-miss", sid, f"chain {chain_id}: left out by {shimcheck.check_ref(check['repo'], tree)}",
@@ -439,17 +491,15 @@ def after_output(payload: dict) -> None:
 
 def _override_chain(chain_id: str) -> list[str]:
     overridden = []
-    for repo in ledger.shim_chain_repos(chain_id):
+    for repo in ledger.shim_bug_repos(chain_id):
         with ledger.open_shims(repo) as shims:
-            chain = shims.chain(chain_id)
-            chain["state"] = "overridden"
-            shims.save_chain(chain)
+            shims.save_bug(dict(shims.bug(chain_id), state="overridden"))
         overridden.append(repo)
     return overridden
 
 
 def _override_tree(prefix: str) -> list[str]:
-    """Override the bugs of each staged tree the prefix names: every chain it reaches, or one seeded with its hunks."""
+    """Override the bugs of each staged tree the prefix names: every bug it reaches, or one seeded with its hunks."""
     overridden = []
     for repo, tree, root in ledger.checked_roots(prefix):
         where = worktree.locate(root)
@@ -460,9 +510,11 @@ def _override_tree(prefix: str) -> list[str]:
         code = shimcheck.swept(hunks, labels) if labels else hunks
         head = worktree.head_sha(root)
         with ledger.open_shims(repo) as shims:
-            for chain in (shimcheck.matching_chains(shims.chains_at(where.branch, head), code)
-                          or [shimcheck.new_chain(repo, where.branch, head, tree, code)]):
-                shims.save_chain(dict(chain, state="overridden"))
+            tracked = {b["id"]: b for b in _tracked(shims, root, where.branch, head)}
+            reached = shimcheck.matching_chains(list(tracked.values()), code) or [
+                shimcheck.new_chain(repo, where.branch, tree, code)]
+            tracked.update({b["id"]: dict(b, state="overridden") for b in reached})
+            _persist(shims, root, where.branch, head, list(tracked.values()), shimcheck.check_ref(repo, tree))
         overridden.append(repo)
     return overridden
 

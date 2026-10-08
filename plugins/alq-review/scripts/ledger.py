@@ -58,12 +58,6 @@ CREATE TABLE IF NOT EXISTS shim_checks (
   doc  TEXT NOT NULL,
   PRIMARY KEY (repo, tree)
 );
-CREATE TABLE IF NOT EXISTS shim_chains (
-  repo     TEXT NOT NULL,
-  chain_id TEXT NOT NULL,
-  doc      TEXT NOT NULL,
-  PRIMARY KEY (repo, chain_id)
-);
 CREATE TABLE IF NOT EXISTS shim_rulings (
   repo     TEXT NOT NULL,
   chain_id TEXT NOT NULL,
@@ -283,7 +277,7 @@ class Claims(_Records):
 
 
 class Shims(_Records):
-    """The shim check's records: checks by staged tree, bug chains by id, and rulings by chain and site."""
+    """The shim check's records: checks by staged tree, bugs by id, and rulings by bug and site."""
 
     def check(self, tree: str) -> dict | None:
         return self._get("shim_checks", "tree", tree)
@@ -309,17 +303,6 @@ class Shims(_Records):
                                   (self.repo, branch))
         return [json.loads(doc) for (doc,) in rows]
 
-    def chain(self, chain_id: str) -> dict | None:
-        return self._get("shim_chains", "chain_id", chain_id)
-
-    def save_chain(self, chain: dict) -> None:
-        self._put("shim_chains", ("chain_id",), (chain["id"],), chain)
-
-    def chains_at(self, branch: str, head: str) -> list[dict]:
-        rows = self._conn.execute("SELECT doc FROM shim_chains WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
-                                  "AND json_extract(doc, '$.head') = ? ORDER BY rowid", (self.repo, branch, head))
-        return [json.loads(doc) for (doc,) in rows]
-
     def rulings(self, chain_id: str) -> dict[str, dict]:
         rows = self._conn.execute("SELECT site_id, doc FROM shim_rulings WHERE repo = ? AND chain_id = ?",
                                   (self.repo, chain_id))
@@ -340,10 +323,10 @@ def open_shims(repo: str):
         yield Shims(conn, repo)
 
 
-def shim_chain_repos(chain_id: str) -> list[str]:
-    """Every repo with a chain `chain_id`, which is how a user's `override shim-<id>` finds it."""
+def shim_bug_repos(bug_id: str) -> list[str]:
+    """Every repo with a bug `bug_id`, which is how a user's `override shim-<id>` finds it."""
     with closing(_connect()) as conn:
-        return sorted(r for (r,) in conn.execute("SELECT repo FROM shim_chains WHERE chain_id = ?", (chain_id,)))
+        return sorted(r for (r,) in conn.execute("SELECT repo FROM shim_bugs WHERE id = ?", (bug_id,)))
 
 
 def _trees(table: str, prefix: str) -> list[tuple[str, str, dict]]:

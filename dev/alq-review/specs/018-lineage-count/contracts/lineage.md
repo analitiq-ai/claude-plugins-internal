@@ -9,8 +9,9 @@ No I/O. Git's hunks and the texts reach it as arguments.
 | Function | Takes | Gives |
 |---|---|---|
 | `span_of(text, line, quote)` | a file's text, a claim's line and quote | `(start, end)` of the sentence; raises when the words are not there |
+| `line_span(text, first, count)`, `lines_of(text, span)` | a range of lines; a span | the span from the start of the first line to the end of the last; the first line and line count a span covers. How a bug's lines are carried by `carry` and turned back |
 | `carry(spans, old, new, hunks)` | spans in `old`, the two texts, their `-U0` hunks | each span in `new`, or none when it is gone |
-| `succeed(lineages, old, new, hunks, claims)` | the file's open lineages, the two texts, their hunks, the claims read in `new` | the lineages with places moved and ended ones marked, and `{claim id: [lineage ids]}` |
+| `succeed(lineages, old, new, hunks, claims, count, ref)` | the file's open lineages, the two texts, their hunks, the claims read in `new`, `count(lineage)` to choose the higher in a merge, and the check ref that ends a lineage | the lineages with places moved and ended ones marked, and `{claim id: [lineage ids]}` |
 | `differ()` | | the `diff-match-patch` object, timeout off; raises `Unavailable` naming the install command |
 
 Callers: `claimgate.on_launch`, `on_commit` and the completion step (`carry`, `succeed`);

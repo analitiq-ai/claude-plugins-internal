@@ -272,27 +272,19 @@ class Store(unittest.TestCase):
 
     def test_shim_tables_are_keyed_by_repo_and_what_they_record(self):
         self.assertEqual(self.primary_key("shim_checks"), ["repo", "tree"])
-        self.assertEqual(self.primary_key("shim_chains"), ["repo", "chain_id"])
         self.assertEqual(self.primary_key("shim_rulings"), ["repo", "chain_id", "site_id"])
 
     def test_shim_records_round_trip_inside_one_transaction(self):
         with ledger.open_shims("acme/demo") as shims:
             self.assertIsNone(shims.check("t1"))
-            self.assertIsNone(shims.chain("c1"))
             self.assertEqual(shims.rulings("c1"), {})
             shims.save_check({"tree": "t1", "status": "sweeping"})
-            shims.save_chain({"id": "c1", "branch": "feat/1-x", "head": "h1", "state": "open"})
-            shims.save_chain({"id": "c2", "branch": "feat/1-x", "head": "h0", "state": "open"})
-            shims.save_chain({"id": "c3", "branch": "feat/2-y", "head": "h1", "state": "open"})
             shims.save_ruling("c1", "s1", {"ruling": "not_shared", "reason": "r"})
         with ledger.open_shims("acme/demo") as shims:
             self.assertEqual(shims.check("t1")["status"], "sweeping")
-            self.assertEqual(shims.chain("c1")["state"], "open")
-            self.assertEqual([c["id"] for c in shims.chains_at("feat/1-x", "h1")], ["c1"])
             self.assertEqual(shims.rulings("c1"), {"s1": {"ruling": "not_shared", "reason": "r"}})
         with ledger.open_shims("other/repo") as shims:
             self.assertIsNone(shims.check("t1"))
-            self.assertEqual(shims.chains_at("feat/1-x", "h1"), [])
 
     def test_a_failed_shims_transaction_writes_nothing(self):
         with self.assertRaises(RuntimeError):
@@ -304,12 +296,12 @@ class Store(unittest.TestCase):
 
     def test_an_override_id_is_found_as_a_chain_or_a_tree_prefix(self):
         with ledger.open_shims("acme/demo") as shims:
-            shims.save_chain({"id": "c" * 16, "state": "open"})
+            shims.save_bug({"id": "c" * 16, "branch": "feat/1-x", "state": "open"})
             shims.save_check({"tree": "0123456789ab" + "f" * 28, "status": "complete"})
         with ledger.open_shims("other/repo") as shims:
             shims.save_check({"tree": "0123456789ab" + "e" * 28, "status": "complete"})
-        self.assertEqual(ledger.shim_chain_repos("c" * 16), ["acme/demo"])
-        self.assertEqual(ledger.shim_chain_repos("d" * 16), [])
+        self.assertEqual(ledger.shim_bug_repos("c" * 16), ["acme/demo"])
+        self.assertEqual(ledger.shim_bug_repos("d" * 16), [])
         self.assertEqual(ledger.shim_trees("0123456789ab"),
                          [("acme/demo", "0123456789ab" + "f" * 28), ("other/repo", "0123456789ab" + "e" * 28)])
 

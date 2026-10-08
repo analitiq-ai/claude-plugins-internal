@@ -67,6 +67,28 @@ class SpanOfTest(unittest.TestCase):
             lineage.span_of("The claim.\nOther.\n", 2, "The claim.")
 
 
+class LinesTest(unittest.TestCase):
+    """A range of lines is a span from the start of its first line to the end of its last, so `carry` maps it."""
+    text = "aaa\nbbb\nccc\nddd\n"
+
+    def test_lines_make_a_span_and_a_span_gives_its_lines_back(self):
+        span = lineage.line_span(self.text, 2, 2)
+        self.assertEqual(self.text[span[0]:span[1]], "bbb\nccc")
+        self.assertEqual(lineage.lines_of(self.text, span), (2, 2))
+
+    def test_the_last_line_of_a_file_without_a_final_newline(self):
+        span = lineage.line_span("aaa\nbbb", 2, 1)
+        self.assertEqual(("aaa\nbbb")[span[0]:span[1]], "bbb")
+
+    def test_a_pure_insertion_is_the_line_it_follows(self):
+        span = lineage.line_span(self.text, 2, 0)
+        self.assertEqual(self.text[span[0]:span[1]], "bbb")
+
+    def test_a_range_past_the_text_is_held_to_its_lines(self):
+        span = lineage.line_span(self.text, 4, 9)
+        self.assertEqual(self.text[span[0]:span[1]], "ddd")
+
+
 class CarryTest(unittest.TestCase):
     def test_a_span_below_an_insertion_moves_down_by_its_lines(self):
         old, new = "aaa\nbbb\nccc\nddd\n", "xxx\naaa\nbbb\nccc\nddd\n"

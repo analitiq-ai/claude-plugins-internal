@@ -354,7 +354,7 @@ class StillRunsWhileOffShim(Switch, ShimGate):
         self.turn_off()
         self.assertIn("switched the shim check off", json.dumps(self.say("override shim-" + "c" * 16)))
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["state"], "overridden")
+            self.assertEqual(shims.bug("c" * 16)["state"], "overridden")
 
 
 class LaunchWhileOff(Switch, Gate):

@@ -80,6 +80,23 @@ def span_of(text: str, line: int, quote: str) -> Span:
     raise SpanNotFound(f"{quote!r} is not in the text from line {line}")
 
 
+def line_span(text: str, first: int, count: int) -> Span:
+    """From the start of 1-based line `first` to the end of its last of `count` lines. A pure insertion (no line) is the
+    line it follows, and lines past the text are held to the text's own."""
+    starts = _line_starts(text)
+    total = max(len(starts) - text.endswith("\n"), 1)
+    first = min(max(first, 1), total)
+    last = min(first + max(count, 1) - 1, total)
+    return starts[first - 1], (starts[last] - 1 if last < len(starts) else len(text))
+
+
+def lines_of(text: str, span: Span) -> tuple[int, int]:
+    """(first line, line count) of a span: the lines its first and its last character are on."""
+    starts = _line_starts(text)
+    first, last = bisect_right(starts, span[0]), bisect_right(starts, max(span[1] - 1, span[0]))
+    return first, last - first + 1
+
+
 def carry(spans: list[Span], old: str, new: str, hunks: list[Hunk]) -> list[Span | None]:
     """Each span of `old` in `new`, or None where it is gone. The two ends of a span are mapped apart. Outside every
     hunk an offset moves by the lines the hunks above it added or removed. Inside a replaced range it follows a
