@@ -47,9 +47,7 @@ Why now: spec 005 cannot be amended to ADR-0001 while this is open.
 
 ## Decision
 
-We will not carry a count to a moved file. When a file with a running count is moved, the count does not
-follow it, because git gives no way to identify a move: it is a delete and a create. The count starts from
-scratch at the new path.
+We will not carry a count to a moved file. The count starts again at the new path.
 
 ## Options considered
 
