@@ -10,7 +10,6 @@ any, 2 when the check cannot run. A re-scope has no premise report and names non
 """
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -21,25 +20,15 @@ OBSERVED = "Observed:"
 NOT_A_DEFECT = "Not a defect report."
 
 
-def _opening(spec: str) -> str | None:
-    """The first non-blank line under the heading, empty when the section has none; None when the heading is
-    missing."""
-    lines = re.sub(r"<!--.*?-->", "", spec, flags=re.DOTALL).splitlines()
-    if HEADING not in lines:
-        return None
-    for line in lines[lines.index(HEADING) + 1:]:
-        if line.startswith("## "):
-            break
-        if line.strip():
-            return line.strip()
-    return ""
-
-
 def problems(spec: str, report: str | None) -> list[str]:
     defect = report is not None and premise_report.reports_wrong_behaviour(report)
-    opening = _opening(spec)
-    if opening is None:
+    try:
+        under = premise_report.section(spec, HEADING)
+    except premise_report.Repeated as exc:
+        return [str(exc)]
+    if under is None:
         return [f"it has no `{HEADING}` section. Next step: add the section as the spec template gives it."]
+    opening = next((line.strip() for line in under if line.strip()), "")
     if opening == NOT_A_DEFECT:
         if defect:
             return [f"`{HEADING}` says `{NOT_A_DEFECT}` and the premise report says `{premise_report.WRONG}: yes`. "

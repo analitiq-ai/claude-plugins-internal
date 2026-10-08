@@ -5,6 +5,8 @@ exists, and what the user picked there.
 The form below is the one place the questions are worded. A report is graded on its form and on each answer naming
 a source, not on whether the answer is right: the user's pick is the judgement. spec.md has an answer
 and a source per question under `## Why this is worth doing`, graded on the same form and not against the report.
+A heading that is there twice, or a label that is twice in the lines it is read from, is refused: no one line is
+then what the document says.
 
 Usage: premise_report.py form | check <report> <pick> | record <report> <pick> | spec <spec folder>. `check` and
 `spec` print one problem per line and exit 1 when there are any, 2 when they could not run. `record` runs from the
@@ -12,6 +14,7 @@ issue's worktree.
 """
 from __future__ import annotations
 
+import functools
 import re
 import sys
 from pathlib import Path
@@ -45,40 +48,74 @@ def form() -> str:
             f"- {REASON} is one line; {_STOP_ONLY}.\n-->\n")
 
 
-def _field(lines: list[str], name: str) -> str:
-    """The value of the first `<name>: <value>` line; empty when the line is missing or has no value."""
-    for line in lines:
-        if line.startswith(f"{name}:"):
-            return line[len(name) + 1:].strip()
-    return ""
+class Repeated(ValueError):
+    """A label or heading that its scope holds more than once, so that no one line is what it says."""
 
 
 def _lines(text: str) -> list[str]:
     return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).splitlines()
 
 
+def _field(lines: list[str], name: str, scope: str) -> str:
+    """The value of the one `<name>: <value>` line among `lines`, which are those of `scope`; empty when the line
+    is missing or has no value."""
+    values = [line[len(name) + 1:].strip() for line in lines if line.startswith(f"{name}:")]
+    if len(values) > 1:
+        raise Repeated(f"{scope} has {len(values)} `{name}:` lines. Next step: keep the one that is meant.")
+    return values[0] if values else ""
+
+
 def filled(value: str) -> bool:
-    """Whether a label has a value that does not start with `[`, which is how a template's placeholder starts."""
-    return bool(value) and not value.startswith("[")
+    """Whether a label has a value that is not a template's placeholder, which is one bracketed span and no more."""
+    return bool(value) and not re.fullmatch(r"\[[^\]]*\]", value)
 
 
-def _sections(lines: list[str], mark: str) -> dict[str, list[str]]:
-    """The lines under each heading that starts with `mark`."""
+def _sections(lines: list[str], mark: str, scope: str) -> dict[str, list[str]]:
+    """The lines under each heading that starts with `mark`, among `lines`, which are those of `scope`."""
     sections, into = {}, []
     for line in lines:
         if line.startswith(mark):
-            into = sections.setdefault(line[len(mark):].strip(), [])
+            name = line[len(mark):].strip()
+            if name in sections:
+                raise Repeated(f"{scope} has more than one `{mark}{name}` heading. Next step: keep one.")
+            into = sections[name] = []
         else:
             into.append(line)
     return sections
 
 
+def section(text: str, heading: str) -> list[str] | None:
+    """The lines under the one `heading` line of `text`, up to the next `## ` heading; None without the heading."""
+    lines = _lines(text)
+    if lines.count(heading) > 1:
+        raise Repeated(f"it has more than one `{heading}` heading. Next step: keep one.")
+    if heading not in lines:
+        return None
+    under = lines[lines.index(heading) + 1:]
+    return under[:next((at for at, line in enumerate(under) if line.startswith("## ")), len(under))]
+
+
+def _repeat_is_the_problem(grade):
+    """`grade`, with a repeated label or heading as the one problem it finds: nothing else is graded until it is
+    there once."""
+    @functools.wraps(grade)
+    def graded(*args) -> list[str]:
+        try:
+            return grade(*args)
+        except Repeated as exc:
+            return [str(exc)]
+    return graded
+
+
 def reason(text: str) -> str:
-    return _field(_lines(text), REASON)
+    said = _field(_lines(text), REASON, "the premise report")
+    if not filled(said):
+        raise ValueError(f"the premise report's `{REASON}:` is `{said}`, not a reason")
+    return said
 
 
 def reports_wrong_behaviour(text: str) -> bool:
-    said = _field(_lines(text), WRONG)
+    said = _field(_lines(text), WRONG, "the premise report")
     if said not in ("yes", "no"):
         raise ValueError(f"the premise report's `{WRONG}:` is `{said}`, not `yes` or `no`")
     return said == "yes"
@@ -93,7 +130,7 @@ def _graded(pick: str, rests_on: str) -> list[str]:
 
 def _answer_problems(heading: str, name: str, lines: list[str]) -> list[str]:
     """What is wrong with the answer to question `name` among `lines`, the ones under `heading`."""
-    answer, source = _field(lines, "Answer"), _field(lines, "Source")
+    answer, source = _field(lines, "Answer", f"`{heading}`"), _field(lines, "Source", f"`{heading}`")
     found = [f"`{heading}` has no `{field}:`. Next step: fill it in." for field, value
              in (("Answer", answer), ("Source", source)) if not filled(value)]
     if filled(source) and not any(source.startswith(kind) and source[len(kind):].strip() for kind in SOURCES):
@@ -106,14 +143,20 @@ def _answer_problems(heading: str, name: str, lines: list[str]) -> list[str]:
     return found
 
 
+@_repeat_is_the_problem
 def problems(text: str, pick: str) -> list[str]:
     """What stops `text` from being the report of a run whose user picked `pick`; empty when nothing does."""
-    # A field outside the questions is named once in the form, so it is found wherever in the report it sits.
+    # A field outside the questions is read over the whole report, wherever it sits: a line of an answer that starts
+    # with its label is a second one.
     lines = _lines(text)
-    sections = _sections(lines, "## ")
-    wrong, recommended, written, rests_on = (_field(lines, name) for name in (WRONG, RECOMMENDATION, PICK, RESTS_ON))
+    sections = _sections(lines, "## ", "it")
+    wrong, recommended, written, rests_on, why = (_field(lines, name, "it") for name
+                                                  in (WRONG, RECOMMENDATION, PICK, RESTS_ON, REASON))
     found = [f"it has no `## {name}` section. Next step: write the report on the form `premise_report.py form` "
              "prints." for name in QUESTIONS if name not in sections]
+    if found:
+        # The lines of a question with no heading sit under the heading before it, whose answer is then not its own.
+        return found
     if wrong not in ("yes", "no"):
         found.append(f"`{WRONG}:` is `{wrong}`. Next step: make it `yes` or `no`.")
     for field, value in ((RECOMMENDATION, recommended), (PICK, written)):
@@ -125,36 +168,30 @@ def problems(text: str, pick: str) -> list[str]:
         if rests_on not in QUESTIONS:
             found.append(f"`{RESTS_ON}:` is `{rests_on}`, and a stop names the question it rests on. Next step: "
                          f"make it one of {', '.join(QUESTIONS)}.")
-        if not _field(lines, REASON):
+        if not filled(why):
             found.append(f"`{REASON}:` is empty, and it is what the issue's comment will say. Next step: give the "
                          "reason in one line.")
     for name in _graded(pick, rests_on):
-        if name in sections:
-            found += _answer_problems(f"## {name}", name, sections[name])
+        found += _answer_problems(f"## {name}", name, sections[name])
     if wrong == "yes" and recommended == NO_SPEC:
         found.append(f"`{WRONG}: yes` and the recommendation is `{NO_SPEC}`: the size of a defect's fix is known "
                      f"only once it is traced. Next step: recommend `{WRITE}` or `{NOT_WORTH_DOING}`.")
     return found
 
 
+@_repeat_is_the_problem
 def spec_problems(spec: str) -> list[str]:
     """What stops `spec`, a spec.md, from holding the premise answers: each question as a `### <question>` heading
     under `SPEC_HEADING`, with its `Answer:` and `Source:` as the report gives them. A spec is written only on a
     pick that answered every question, so every question is graded."""
-    lines = _lines(spec)
-    if SPEC_HEADING not in lines:
+    under = section(spec, SPEC_HEADING)
+    if under is None:
         return [f"it has no `{SPEC_HEADING}` section. Next step: add the section as the spec template gives it."]
-    section = lines[lines.index(SPEC_HEADING) + 1:]
-    section = section[:next((at for at, line in enumerate(section) if line.startswith("## ")), len(section))]
-    answers = _sections(section, "### ")
-    found = []
-    for name in QUESTIONS:
-        if name in answers:
-            found += _answer_problems(f"### {name}", name, answers[name])
-        else:
-            found.append(f"`{SPEC_HEADING}` has no `### {name}`. Next step: copy the question's `Answer:` and "
-                         "`Source:` from the premise report under that heading.")
-    return found
+    answers = _sections(under, "### ", f"`{SPEC_HEADING}`")
+    missing = [f"`{SPEC_HEADING}` has no `### {name}`. Next step: copy the question's `Answer:` and `Source:` from "
+               "the premise report under that heading." for name in QUESTIONS if name not in answers]
+    return missing or [problem for name in QUESTIONS
+                       for problem in _answer_problems(f"### {name}", name, answers[name])]
 
 
 def record(text: str, pick: str, checkout: str) -> str:

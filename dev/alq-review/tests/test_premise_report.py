@@ -139,6 +139,35 @@ class Check(unittest.TestCase):
         self.assertFalse(premise_report.reports_wrong_behaviour(text))
         self.assertTrue(premise_report.reports_wrong_behaviour(report()))
 
+    def test_a_second_line_of_a_report_field_or_of_an_answer_and_a_second_harm_heading_are_each_the_one_problem(self):
+        stop = report(NOT_WORTH_DOING, recommendation=NO_SPEC, rests_on="harm", reason="the real reason")
+        for label, second in (("Reason", "a line of the answer"), ("Recommendation", WRITE), ("Pick", WRITE),
+                              ("Rests on", "owner"), ("Reports wrong behaviour", "no")):
+            with self.subTest(label):
+                self.assert_one_problem(stop.replace("Answer: a run", f"{label}: {second}\nAnswer: a run"),
+                                        NOT_WORTH_DOING, f"`{label}:` lines")
+        self.assert_one_problem(report().replace("Source: code: scripts/policy.py",
+                                                 "Answer: [answer]\nSource: code: scripts/policy.py"), WRITE,
+                                "## owner", "`Answer:` lines")
+        self.assert_one_problem(report() + "## harm\nAnswer:\nSource:\n", WRITE, "`## harm` heading")
+
+    def test_an_answer_that_starts_with_a_bracket_and_goes_on_is_an_answer(self):
+        logged = {**ANSWERS, "harm": ("[WARN] the row is logged and dropped", "code: scripts/gate.py")}
+        self.assertEqual(premise_report.problems(report(answers=logged), WRITE), [])
+        self.assertEqual(premise_report.spec_problems(spec_section(logged)), [])
+
+    def test_a_reason_or_a_defect_flag_that_is_empty_or_on_two_lines_cannot_be_read_back(self):
+        text = report(NO_SPEC, rests_on="needs-spec", reason="a typo", wrong="no")
+        for read, label, unreadable in ((premise_report.reason, "Reason", text + "Reason: another\n"),
+                                        (premise_report.reason, "Reason", report()),
+                                        (premise_report.reports_wrong_behaviour, "Reports wrong behaviour",
+                                         text + "Reports wrong behaviour: yes\n"),
+                                        (premise_report.reports_wrong_behaviour, "Reports wrong behaviour",
+                                         report(wrong=""))):
+            with self.subTest(label, text=unreadable[-40:]):
+                with self.assertRaisesRegex(ValueError, f"{label}:"):
+                    read(unreadable)
+
     def test_a_report_that_does_not_say_yes_or_no_cannot_say_whether_it_is_a_defect(self):
         for text in ("garbage", report(wrong="Yes"), report(wrong="")):
             with self.subTest(text[:30]):
@@ -164,6 +193,7 @@ class InSpec(unittest.TestCase):
     def test_a_spec_without_the_section_or_without_one_of_its_questions_is_a_problem(self):
         self.assert_one_problem("", premise_report.SPEC_HEADING)
         self.assert_one_problem(spec_section({k: v for k, v in ANSWERS.items() if k != "owner"}), "### owner")
+        self.assert_one_problem(spec_section().replace("### owner\n", ""), "### owner")
 
     def test_an_answer_is_filled_and_sourced_as_in_the_report(self):
         for answer, said in ((("", "code: a.py"), "Answer:"), (("[answer]", "code: a.py"), "Answer:"),
@@ -172,6 +202,15 @@ class InSpec(unittest.TestCase):
                 self.assert_one_problem(spec_section({**ANSWERS, "owner": answer}), "### owner", said)
         self.assert_one_problem(spec_section({**ANSWERS, "reachable": ("yes", "code: a.py")}), "### reachable",
                                 "observed", "predicted")
+
+    def test_a_second_answer_line_question_heading_or_section_heading_is_the_specs_one_problem(self):
+        self.assert_one_problem(spec_section().replace("Source: code: scripts/policy.py",
+                                                       "Answer: [answer]\nSource: code: scripts/policy.py"),
+                                "### owner", "`Answer:` lines")
+        self.assert_one_problem(spec_section() + "### harm\nAnswer:\nSource:\n\n", "`### harm` heading")
+        found = premise_report.spec_problems(self.spec(spec_section()) + f"\n{premise_report.SPEC_HEADING}\n")
+        self.assertEqual(len(found), 1, found)
+        self.assertIn(f"`{premise_report.SPEC_HEADING}` heading", found[0])
 
     def test_a_question_heading_outside_the_section_is_not_the_sections(self):
         without_owner = spec_section({k: v for k, v in ANSWERS.items() if k != "owner"})

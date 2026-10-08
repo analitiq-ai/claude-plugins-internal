@@ -55,8 +55,13 @@ start `code:`, `reproduction:` or `user:` with text after it; the `reachable` an
 `Recommendation:` or `Pick:` is not one of the three outcomes; `Pick:` differs from `<pick>`; the pick is not `write the spec`
 and `Reason:` is empty or `Rests on:` names no question; `Reports wrong behaviour: yes` and the recommendation is `no spec needed`.
 
+A label outside the questions (`Reports wrong behaviour:`, `Recommendation:`, `Pick:`, `Rests on:`, `Reason:`) is read over the
+whole report, so a line of an answer that starts with one is a second one. A label or a question heading that is there
+twice fails the check with that one problem. A value that is one bracketed span and nothing else is a placeholder and counts as empty.
+
 ## `record <report> <pick>`
 
 For `no spec needed`: posts the location comment `spec: none` with the report's `Reason:` (`speclocation.post_none`). For
 `not worth doing`: posts `spec: not worth doing` with the `Reason:` (`speclocation.post_not_worth_doing`). For `write the spec`: does nothing.
 Prints the comment URL. Run from the project in the issue's worktree.
+For either stop pick, a `Reason:` that is empty or there twice is a command that could not run (exit 2); nothing is posted.

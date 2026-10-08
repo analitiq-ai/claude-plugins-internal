@@ -44,8 +44,15 @@ class Section(unittest.TestCase):
                 self.assert_one_problem(self.problems(f"{section}\n\nThe ledger drops the verdict.", DEFECT),
                                         "Observed:")
 
+    def test_an_observed_line_that_starts_with_a_bracket_and_goes_on_passes(self):
+        self.assertEqual(self.problems("Observed: [ERROR] pipeline 12 failed at load, in the run log", DEFECT), [])
+
+    def test_a_second_root_cause_heading_is_a_problem(self):
+        twice = SPEC.format(section="Observed: a KeyError.") + f"\n{rootcause.HEADING}\n\n{rootcause.NOT_A_DEFECT}\n"
+        self.assert_one_problem(rootcause.problems(twice, DEFECT), f"`{rootcause.HEADING}` heading")
+
     def test_a_premise_report_that_does_not_say_yes_or_no_cannot_grade_the_section(self):
-        for text in ("garbage", report(wrong="Yes")):
+        for text in ("garbage", report(wrong="Yes"), NOT_A_DEFECT + "Reports wrong behaviour: yes\n"):
             with self.subTest(text[:30]):
                 with self.assertRaises(ValueError):
                     self.problems(rootcause.NOT_A_DEFECT, text)
