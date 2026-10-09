@@ -13,7 +13,7 @@ incomplete premise report, a step that posts the location comment for the two st
 that fails the run when `spec.md` has no labelled `## Root cause` and runs again after grill. The settled-design preset adds the premise and root cause
 sections to the spec template. One new script owns the report's form (`premise_report.py`), one checks the section
 (`rootcause.py`), and `speclocation.py` gains a third form of the location comment. `alq-shape` is deleted. Pull request 2
-renames `design-doc` to `alq-spec` everywhere and changes no behaviour.
+renames `design-doc` to `alq-spec` everywhere and changes no behaviour other than five corrected next-step messages (FR-022).
 
 ## Technical Context
 

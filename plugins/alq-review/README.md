@@ -17,9 +17,9 @@ that is under review.
    `ESCALATE` hand the branch to the user: it stays locked until the user starts a prompt with
    `unlock #<pr>` (or `unlock <branch>`, or `unlock <owner>/<repo>#<pr>` when two repos share the number),
    and the refusal tells the agent to ask for exactly that. A spec edit does not release it: the agent can
-   make one. A `RESHAPE_SPEC` lock is also released by a prompt starting `/alq-review:design-doc rescope <same ref>`: the
+   make one. A `RESHAPE_SPEC` lock is also released by a prompt starting `/alq-review:alq-spec rescope <same ref>`: the
    session is handed the ruling (open decision, rationale, `spec_gap` findings) and the round's worktree, and
-   the `alq-review:design-doc` skill re-scopes that worktree's spec folder. Any other lock refuses it and names `unlock`. While a branch is held, every Bash command of the session that launched its round is checked
+   the `alq-review:alq-spec` skill re-scopes that worktree's spec folder. Any other lock refuses it and names `unlock`. While a branch is held, every Bash command of the session that launched its round is checked
    against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
    change there, as they stood before the command. A file written or a commit made by any route is caught
    and the agent told to put it back, even if the command then leaves the branch; checking another branch
@@ -166,7 +166,7 @@ The plugin writes in three places:
 |---|---|
 | The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, `.merge.json`, each with a `.lock` beside it<br>`sessions/<session id>.off.json`<br>`gate.log`<br>`errors.log` |
 | `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
-| `.specify/` in the project | `presets/settled-design/`<br>`workflows/design-doc/`<br>`critique-baseline.json` |
+| `.specify/` in the project | `presets/settled-design/`<br>`workflows/alq-spec/`<br>`critique-baseline.json` |
 
 In the state folder:
 
@@ -213,13 +213,13 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
-| `skills/` | `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `design-doc` |
-| `speckit/` | the settled-design preset and design-doc workflow, installed into the project by each `design-doc` start |
+| `skills/` | `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `alq-spec` |
+| `speckit/` | the settled-design preset and alq-spec workflow, installed into the project by each `alq-spec` start |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
 
-Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy. The design-doc driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
+Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy. The alq-spec driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.

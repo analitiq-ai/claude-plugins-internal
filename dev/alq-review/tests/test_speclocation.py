@@ -38,22 +38,28 @@ class Form(unittest.TestCase):
     def test_github_line_endings_are_read(self):
         self.assertEqual(speclocation.parse(LOCATED.replace("\n", "\r\n")), Located(FOLDER, BRANCH))
 
-    def test_a_whole_spec_under_the_marker_is_refused_naming_design_doc(self):
+    def test_a_whole_spec_under_the_marker_is_refused_naming_alq_spec(self):
         with self.assertRaises(SpecLocationError) as refused:
             speclocation.parse(f"{MARKER}\n# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n")
-        self.assertIn("/alq-review:design-doc", str(refused.exception))
+        self.assertIn("/alq-review:alq-spec", str(refused.exception))
 
-    def test_a_whole_spec_after_a_blank_line_is_refused_naming_design_doc(self):
+    def test_a_whole_spec_after_a_blank_line_is_refused_naming_alq_spec(self):
         with self.assertRaises(SpecLocationError) as refused:
             speclocation.parse(f"{MARKER}\r\n\r\n# Demo\r\n")
-        self.assertIn("/alq-review:design-doc", str(refused.exception))
+        self.assertIn("/alq-review:alq-spec", str(refused.exception))
 
-    def test_text_with_no_spec_line_is_refused_naming_design_doc_and_not_the_form(self):
+    def test_text_with_no_spec_line_is_refused_naming_alq_spec_and_not_the_form(self):
         for body in (f"{MARKER}\nGoal: x\nScope: y\n", f"{MARKER}\nGoal: move the spec: x\nScope: y\n"):
             with self.subTest(body), self.assertRaises(SpecLocationError) as refused:
                 speclocation.parse(body)
-            self.assertIn("/alq-review:design-doc", str(refused.exception))
+            self.assertIn("/alq-review:alq-spec", str(refused.exception))
             self.assertNotIn("spec: <folder", str(refused.exception))
+
+    def test_text_with_no_spec_line_is_refused_with_deleting_the_comment_then_alq_spec_as_the_next_step(self):
+        with self.assertRaises(SpecLocationError) as refused:
+            speclocation.parse(f"{MARKER}\nGoal: x\nScope: y\n")
+        self.assertEqual(str(refused.exception).partition("Next step: ")[2],
+                         "delete that comment, then run `/alq-review:alq-spec` on the issue.")
 
     def test_every_other_shape_is_refused_stating_the_form(self):
         malformed = {
@@ -141,8 +147,7 @@ class SpecComment(Issue):
             self.located()
         self.assertEqual(str(refused.exception),
                          "acme/demo#1 was judged not worth doing: nothing goes wrong today. Next step: run "
-                         "/alq-review:design-doc #1 to put the question again; its premise step replaces this "
-                         "comment.")
+                         "/alq-review:alq-spec #1 to put the question again.")
 
     def test_two_are_refused_naming_both_with_one_next_step(self):
         self.comments(LOCATED, "unrelated chatter", LOCATED)
@@ -183,9 +188,13 @@ class Resolve(Issue):
             self.resolve()
         return str(refused.exception)
 
-    def test_no_location_comment_is_refused_naming_design_doc(self):
+    def test_no_location_comment_is_refused_naming_alq_spec(self):
         self.comments("unrelated chatter")
-        self.assertIn("/alq-review:design-doc #1", self.refusal())
+        self.assertIn("/alq-review:alq-spec #1", self.refusal())
+
+    def test_no_location_comment_is_refused_with_running_alq_spec_as_the_whole_next_step(self):
+        self.comments("unrelated chatter")
+        self.assertEqual(self.refusal().partition("Next step: ")[2], "run `/alq-review:alq-spec #1`.")
 
     def test_a_folder_the_checkout_does_not_hold_is_refused_naming_it_and_its_branch(self):
         self.comments(speclocation.render(FOLDER, "feat/1-elsewhere"))
@@ -302,7 +311,7 @@ class Cli(Issue):
                 self.assertEqual((done.returncode, done.stdout), (0, status + "\n"), done.stderr)
 
     def test_status_refuses_a_comment_it_cannot_read_and_two_comments(self):
-        for bodies, said in (([f"{MARKER}\n# Demo\n"], "design-doc"), ([LOCATED, LOCATED], "101, 102")):
+        for bodies, said in (([f"{MARKER}\n# Demo\n"], "alq-spec"), ([LOCATED, LOCATED], "101, 102")):
             self.comments(*bodies)
             done = self.run_cli("status", "1", "--repo", "acme/demo")
             with self.subTest(said):
@@ -343,16 +352,16 @@ class Cli(Issue):
         self.comments(speclocation.render_none("docs only"))
         self.assertEqual(self.run_cli("show", "1", "--repo", "acme/demo").stdout, "spec: none\nreason: docs only\n")
 
-    def test_show_refuses_an_issue_with_no_comment_naming_design_doc(self):
+    def test_show_refuses_an_issue_with_no_comment_naming_alq_spec(self):
         done = self.run_cli("show", "1", "--repo", "acme/demo")
         self.assertEqual((done.returncode, done.stdout), (1, ""))
-        self.assertIn("/alq-review:design-doc #1", done.stderr)
+        self.assertIn("/alq-review:alq-spec #1", done.stderr)
 
     def test_show_refuses_a_malformed_comment(self):
         self.comments(f"{MARKER}\n# Demo\n")
         done = self.run_cli("show", "1", "--repo", "acme/demo")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("design-doc", done.stderr)
+        self.assertIn("alq-spec", done.stderr)
 
     def test_a_github_that_cannot_answer_is_a_check_that_could_not_run(self):
         self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"

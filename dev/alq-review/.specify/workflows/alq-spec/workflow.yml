@@ -1,7 +1,7 @@
 schema_version: "1.0"
 workflow:
-  id: "design-doc"
-  name: "Design Document Cycle"
+  id: "alq-spec"
+  name: "Spec Cycle"
   version: "1.5.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
@@ -25,7 +25,7 @@ inputs:
     type: string
     default: "claude"
     prompt: "Integration to use"
-  # Gate verdicts for runs driven without a terminal (the /alq-review:design-doc skill passes them on resume).
+  # Gate verdicts for runs driven without a terminal (the /alq-review:alq-spec skill passes them on resume).
   premise_verdict:
     type: string
     default: ""
@@ -196,7 +196,7 @@ steps:
     then:
       - id: mark-critiques
         type: shell
-        run: python3 .specify/workflows/design-doc/critique_report.py mark
+        run: python3 .specify/workflows/alq-spec/critique_report.py mark
 
   - id: to-critique
     type: if
@@ -213,7 +213,7 @@ steps:
       - id: new-critique
         type: shell
         output_format: json
-        run: python3 .specify/workflows/design-doc/critique_report.py find
+        run: python3 .specify/workflows/alq-spec/critique_report.py find
 
   - id: to-review-critique
     type: if

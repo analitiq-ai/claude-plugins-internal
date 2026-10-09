@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start or resume the design-doc workflow from the checkout, then print where the run stands as JSON.
+"""Start or resume the alq-spec workflow from the checkout, then print where the run stands as JSON.
 
     drive_workflow.py start <spec file> [<spec dir>]
     drive_workflow.py resume <run id> [<input>=<value>]
@@ -19,7 +19,7 @@ RUNS = Path(".specify/workflows/runs")
 PLUGIN = Path(__file__).resolve().parents[3]
 # Spec Kit applies only presets and workflows installed in the project, so each start installs the plugin's.
 PRESET = (PLUGIN / "speckit" / "presets" / "settled-design", Path(".specify/presets/settled-design"))
-WORKFLOW = (PLUGIN / "speckit" / "workflows" / "design-doc", Path(".specify/workflows/design-doc"))
+WORKFLOW = (PLUGIN / "speckit" / "workflows" / "alq-spec", Path(".specify/workflows/alq-spec"))
 ENV = {"ALQ_REVIEW_ROOT": str(PLUGIN)}
 # The headless agent steps get only what they need to write the spec folder.
 AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Edit Bash(bash .specify/*) '
@@ -89,7 +89,7 @@ def start(spec_file, spec_dir):
         env["SPEC_DIR"] = spec_dir
     install()
     before = set(RUNS.iterdir()) if RUNS.is_dir() else set()
-    proc = _specify(["run", "design-doc", *inputs], env)
+    proc = _specify(["run", "alq-spec", *inputs], env)
     new = set(RUNS.iterdir()) - before if RUNS.is_dir() else set()
     if len(new) != 1:
         sys.exit(f"specify started no run:\n{proc.stdout}{proc.stderr}")

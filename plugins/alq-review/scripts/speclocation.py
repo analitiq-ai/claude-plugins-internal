@@ -72,8 +72,7 @@ def parse(body: str) -> Located | NoSpec | NotWorthDoing:
     if any(line.strip() for line in lines) and not any(line.lstrip().startswith("spec:") for line in lines):
         raise SpecLocationError(
             f"its `{MARKER}` comment has text after the marker and no `spec:` line, so it does not say where a "
-            "spec folder is. Next step: run `/alq-review:design-doc` on the issue; it creates the spec folder and "
-            "rewrites the comment to say where the folder is.")
+            "spec folder is. Next step: delete that comment, then run `/alq-review:alq-spec` on the issue.")
     if len(lines) != 2:
         raise _malformed(f"has {len(lines)} lines after the marker, not 2")
     spec = _value(lines[0], "spec")
@@ -140,12 +139,10 @@ def located(slug: str, issue: int) -> Located | NoSpec:
     where = _read(slug, issue)
     if where is None:
         raise SpecLocationError(f"{slug}#{issue} has no location comment, so nothing says where its spec is. "
-                                f"Next step: run `/alq-review:design-doc #{issue}`; it creates the spec folder and "
-                                "posts the comment.")
+                                f"Next step: run `/alq-review:alq-spec #{issue}`.")
     if isinstance(where, NotWorthDoing):
         raise SpecLocationError(f"{slug}#{issue} was judged not worth doing: {where.reason}. Next step: run "
-                                f"/alq-review:design-doc #{issue} to put the question again; its premise step "
-                                "replaces this comment.")
+                                f"/alq-review:alq-spec #{issue} to put the question again.")
     return where
 
 

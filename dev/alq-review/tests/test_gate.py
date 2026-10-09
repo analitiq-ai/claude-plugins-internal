@@ -356,10 +356,10 @@ class IssueSpec(Gate):
 
     def test_a_launch_the_spec_cannot_be_found_for_is_refused_with_its_next_step_and_opens_no_round(self):
         states = {
-            "no location comment": (["unrelated chatter"], ["/alq-review:design-doc #1"]),
+            "no location comment": (["unrelated chatter"], ["/alq-review:alq-spec #1"]),
             "a folder the checkout does not hold": ([speclocation.render("dev/demo/specs/009-gone", "feat/1-elsewhere")],
                                                     ["dev/demo/specs/009-gone", "feat/1-elsewhere"]),
-            "a whole spec in the comment": (["<!-- analitiq-spec -->\n" + self.SPEC], ["design-doc"]),
+            "a whole spec in the comment": (["<!-- analitiq-spec -->\n" + self.SPEC], ["alq-spec"]),
             "a path out of the repo": (["<!-- analitiq-spec -->\nspec: ../specs/001-demo\nbranch: feat/1-demo\n"],
                                        ["spec: <folder"]),
             "two location comments": ([speclocation.render(self.FOLDER, "feat/1-demo")] * 2, ["101", "102"]),
@@ -383,7 +383,7 @@ class IssueSpec(Gate):
         self.reviewed()
         self.comments("unrelated chatter")
         out, _ = self.launch(ASSESS)
-        self.assertRefused(out, "/alq-review:design-doc #1")
+        self.assertRefused(out, "/alq-review:alq-spec #1")
         self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
         out, _ = self.launch(ASSESS)
         self.assertRefused(out, "HTTP 502: Bad Gateway")
@@ -398,7 +398,7 @@ class IssueSpec(Gate):
     def test_an_audit_launch_the_spec_cannot_be_found_for_is_refused_as_an_internal_one_is(self):
         self.comments("unrelated chatter")
         out, _ = self.launch(stage="audit")
-        self.assertRefused(out, "/alq-review:design-doc #1")
+        self.assertRefused(out, "/alq-review:alq-spec #1")
         self.assertEqual(self.saved()["rounds"], [])
 
     def test_the_assessor_brief_carries_the_spec_text_and_its_folder(self):
@@ -579,13 +579,13 @@ class HeldBranch(Gate):
 
     def test_a_rescope_releases_a_reshape_spec_lock_and_hands_the_session_the_ruling(self):
         """The user starting the re-scope is the decision the lock waits for; the skill re-scopes from the ruling.
-        The design-doc skill parses this reply by its labels, so the whole of it is pinned."""
+        The alq-spec skill parses this reply by its labels, so the whole of it is pinned."""
         self.lock()
         with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
             with ledger.open_ledger("acme/demo", 7) as state:
                 ledger.current_round(state)["assessment"]["findings"][0].update(
                     kind="spec_gap", mechanism="the canonical root is chosen round by round")
-        said = self.say("/design-doc rescope #7")
+        said = self.say("/alq-spec rescope #7")
         self.assertEqual(self.edit(), {})
         self.assertEqual(said, (
             "[alq-review] The user unlocked acme/demo#7 (feat/1-demo); its code may change again. "
@@ -594,16 +594,16 @@ class HeldBranch(Gate):
             "Spec gaps: the canonical root is chosen round by round (n/a)."))
 
     def test_the_plugin_qualified_rescope_releases_the_lock_as_the_bare_one_does(self):
-        """Claude Code runs a plugin skill as `/alq-review:design-doc`, and as `/design-doc` only while no other
+        """Claude Code runs a plugin skill as `/alq-review:alq-spec`, and as `/alq-spec` only while no other
         command has that name."""
         self.lock()
-        self.assertIn("The user unlocked acme/demo#7", self.say("/alq-review:design-doc rescope #7"))
+        self.assertIn("The user unlocked acme/demo#7", self.say("/alq-review:alq-spec rescope #7"))
         self.assertEqual(self.edit(), {})
 
     def test_a_rescope_releases_nothing_but_a_reshape_spec_lock(self):
         """An ESCALATE lock asks a question a re-scope does not answer."""
         self.lock(verdict="ESCALATE")
-        said = self.say("/design-doc rescope #7")
+        said = self.say("/alq-spec rescope #7")
         self.assertIn("`unlock #7`", said)
         self.assertIn("nothing was unlocked", said)
         self.assertEqual(self.decision(self.edit()), "deny")
@@ -614,25 +614,25 @@ class HeldBranch(Gate):
                 state["branch"] = "feat/1-demo"
                 test_policy.spend_audits(state, verdict="RESHAPE_SPEC")
                 ledger.current_round(state)["root"] = str(self.root)
-        said = self.say("/design-doc rescope #7")
+        said = self.say("/alq-spec rescope #7")
         self.assertIn("`unlock #7`", said)
         self.assertIn("nothing was unlocked", said)
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_a_rescope_quoted_inside_a_prompt_releases_nothing(self):
         self.lock()
-        self.say("Work on this issue:\n\n/design-doc rescope #7")
+        self.say("Work on this issue:\n\n/alq-spec rescope #7")
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_a_rescope_two_repos_could_mean_releases_nothing(self):
         self.lock()
         self.lock(repo="acme/other")
-        self.assertIn("nothing was unlocked", self.say("/design-doc rescope #7"))
+        self.assertIn("nothing was unlocked", self.say("/alq-spec rescope #7"))
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_a_rescope_naming_no_locked_pr_releases_nothing(self):
         self.lock()
-        self.assertIn("nothing was unlocked", self.say("/design-doc rescope #8"))
+        self.assertIn("nothing was unlocked", self.say("/alq-spec rescope #8"))
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_an_unlock_two_repos_could_mean_is_refused_until_the_repo_is_named(self):
@@ -648,24 +648,24 @@ class HeldBranch(Gate):
         blank, so none starts a command or parts its words."""
         self.lock()
         for odd in ODD_BLANKS:
-            for prompt in (f"{odd}unlock #7", f"unlock{odd}#7", f"{odd}/design-doc rescope #7",
-                           f"/design-doc{odd}rescope #7", f"/design-doc rescope{odd}#7"):
+            for prompt in (f"{odd}unlock #7", f"unlock{odd}#7", f"{odd}/alq-spec rescope #7",
+                           f"/alq-spec{odd}rescope #7", f"/alq-spec rescope{odd}#7"):
                 with self.subTest(prompt=prompt):
                     self.assertEqual(self.say(prompt), "")
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_a_word_that_only_starts_like_a_commands_word_is_not_it(self):
         self.lock()
-        for prompt in ("unlocked #7", "unlock#7", "Unlock #7", "/design-docs rescope #7", "/design-doc rescoped #7",
-                       "design-doc rescope #7", "/alq-review:design-doc: rescope #7", "/other:design-doc rescope #7",
-                       "/alq-review:other-design-doc rescope #7"):
+        for prompt in ("unlocked #7", "unlock#7", "Unlock #7", "/alq-specs rescope #7", "/alq-spec rescoped #7",
+                       "alq-spec rescope #7", "/alq-review:alq-spec: rescope #7", "/other:alq-spec rescope #7",
+                       "/alq-review:other-alq-spec rescope #7"):
             with self.subTest(prompt=prompt):
                 self.assertEqual(self.say(prompt), "")
         self.assertEqual(self.decision(self.edit()), "deny")
 
     def test_a_prompt_with_too_few_words_for_a_command_is_not_answered(self):
         self.lock()
-        for prompt in ("", " \r\n\t", "unlock", "unlock \n", "override", "/design-doc", "/design-doc rescope"):
+        for prompt in ("", " \r\n\t", "unlock", "unlock \n", "override", "/alq-spec", "/alq-spec rescope"):
             with self.subTest(prompt=prompt):
                 self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {})
         self.assertEqual(self.decision(self.edit()), "deny")
@@ -681,7 +681,7 @@ class HeldBranch(Gate):
         release, so one that does release it fails alone."""
         words = ("#{n},", "#{n}.", "#0{n}", "#{wide}", "#{n}\u200b", "#{n}\u200b1", "acme/demo#{n}.", "acme/demo#0{n}",
                  "acme/demo#{wide}", "acme/demo#{n}\u200b1", "acme/demo #{n}")
-        typed = [(command, form) for form in words for command in ("unlock", "/design-doc rescope")]
+        typed = [(command, form) for form in words for command in ("unlock", "/alq-spec rescope")]
         for n, (command, form) in enumerate(typed, start=11):
             self.lock(pr=n)
             word = form.format(n=n, wide="".join(chr(0xFF10 + int(digit)) for digit in str(n)))
@@ -708,7 +708,7 @@ class HeldBranch(Gate):
     def test_an_answer_names_the_command_by_its_words(self):
         self.lock()
         self.assertIn("`unlock #8` names no locked PR", self.say("unlock \t #8\nand more"))
-        self.assertIn("`/design-doc rescope #8` names no locked PR", self.say("/design-doc  rescope\n#8 now"))
+        self.assertIn("`/alq-spec rescope #8` names no locked PR", self.say("/alq-spec  rescope\n#8 now"))
 
     def test_writing_a_held_branch_through_bash_is_caught_wherever_the_command_runs(self):
         self.lock()
@@ -1390,7 +1390,7 @@ class DesignDocuments(SpecChecks):
                 self.assertEqual(self.decision(out), "deny")
                 self.assertIn(f"{name}:1: ", self.reason(out))
                 self.assertIn("a design-document change comes with a spec folder", self.reason(out))
-                self.assertIn("Next step: settle the design in a spec folder (/alq-review:design-doc", self.reason(out))
+                self.assertIn("Next step: settle the design in a spec folder (/alq-review:alq-spec", self.reason(out))
                 self.assertEqual(self.saved()["rounds"], [])
 
     def test_a_design_document_with_a_settled_spec_folder_launches(self):

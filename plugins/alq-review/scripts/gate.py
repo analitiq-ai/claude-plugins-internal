@@ -119,7 +119,7 @@ def _names(state: dict, word: str) -> bool:
 
 
 def _rescope_brief(state: dict, ruling: dict) -> str:
-    """What the alq-review:design-doc skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
+    """What the alq-review:alq-spec skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
     gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
     return (f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {ledger.current_round(state)['root']}. Open decision: "
             f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")

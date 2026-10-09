@@ -62,7 +62,7 @@
 
 ## Phase 5: PR 1 review
 
-- [ ] T023 Before opening PR 1, run the tripwire `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; any file above ~3 edits means split or rewrite once (pr-review-loop). Commit with the `alq-session-id` trailer, push, open the PR as a draft, run the internal review loop. No Codex or DeepSource loop for this repo; merge after internal review and CI.
+- [x] T023 Before opening PR 1, run the tripwire `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; any file above ~3 edits means split or rewrite once (pr-review-loop). Commit with the `alq-session-id` trailer, push, open the PR as a draft, run the internal review loop. No Codex or DeepSource loop for this repo; merge after internal review and CI.
 
 ## Phase 6: User Story 2 - There is one skill name, and it fits (P1) — PR 2, after PR 1 merges
 
@@ -70,11 +70,12 @@
 
 **Independent test**: `grep -rn "design-doc" plugins dev/alq-review/tests .github` finds nothing; `/alq-review:alq-spec #<issue>` runs the skill.
 
-- [ ] T024 [US2] Create a fresh branch and worktree for PR 2 from the merged `main`. Write a failing test in `dev/alq-review/tests/test_spec_source.py` that nothing under `plugins/`, `dev/alq-review/tests/` or `.github/` names `design-doc` as a skill or workflow, allowing "design document" where it means the settled-design rule (R9). Confirm it fails on the current hits.
-- [ ] T025 [US2] Rename `plugins/alq-review/skills/design-doc/` to `plugins/alq-review/skills/alq-spec/` and `plugins/alq-review/speckit/workflows/design-doc/` to `plugins/alq-review/speckit/workflows/alq-spec/` (`git mv`); change the workflow `id`, `name` and install path, and the dev project's installed copy `dev/alq-review/.specify/workflows/design-doc/` (regenerate by a start).
-- [ ] T026 [US2] Change the names inside `plugins/alq-review/skills/alq-spec/scripts/drive_workflow.py` (constants, docstring), `plugins/alq-review/scripts/policy.py` (`RESCOPE_SKILL`), `gate.py`, `speclocation.py` (including the refusal text's `/alq-review:design-doc`), `settled_design.py` (line 151's skill name only; the "design document" wording at lines 10, 123, 141 and 150 is the settled-design rule from #29 and stays), `plugins/alq-review/skills/alq-spec/SKILL.md`, `alq-issue-tackle/SKILL.md`, `alq-root-cause-check/SKILL.md`, the rows and the `/alq-review:design-doc rescope` keyword text in `plugins/alq-review/README.md`, and `.github/workflows/tests.yml`. Read each hit; do not sed.
-- [ ] T027 [US2] Update the tests that name `design-doc` (`test_gate.py`, `test_policy.py`, `test_speclocation.py`, `test_drive_workflow.py`, `test_plan_template.py`, `test_critique_report.py`, `test_spec_source.py`), reading each hit: `test_gate.py`'s typed-prompt cases depend on the keyword. Make T024 pass and the full suite pass with no other behaviour change.
-- [ ] T028 [US2] Confirm no behaviour moved: `git diff main --stat` shows renames and name changes only; open PR 2 as a draft and run the internal review loop, then merge.
+- [x] T024 [US2] Create a fresh branch and worktree for PR 2 from the merged `main`. Write a failing test in `dev/alq-review/tests/test_spec_source.py` that nothing under `plugins/`, `dev/alq-review/tests/` or `.github/` names `design-doc` as a skill or workflow, allowing "design document" where it means the settled-design rule (R9). Confirm it fails on the current hits.
+- [x] T025 [US2] Rename `plugins/alq-review/skills/design-doc/` to `plugins/alq-review/skills/alq-spec/` and `plugins/alq-review/speckit/workflows/design-doc/` to `plugins/alq-review/speckit/workflows/alq-spec/` (`git mv`); change the workflow `id`, `name` and install path, and the dev project's installed copy `dev/alq-review/.specify/workflows/design-doc/` (regenerate by a start).
+- [x] T026 [US2] Change the names inside `plugins/alq-review/skills/alq-spec/scripts/drive_workflow.py` (constants, docstring), `plugins/alq-review/scripts/policy.py` (`RESCOPE_SKILL`), `gate.py`, `speclocation.py` (including the refusal text's `/alq-review:design-doc`), `settled_design.py` (line 151's skill name only; the "design document" wording at lines 10, 123, 141 and 150 is the settled-design rule from #29 and stays), `plugins/alq-review/skills/alq-spec/SKILL.md`, `alq-issue-tackle/SKILL.md`, `alq-root-cause-check/SKILL.md`, the rows and the `/alq-review:design-doc rescope` keyword text in `plugins/alq-review/README.md`, and `.github/workflows/tests.yml`. Read each hit; do not sed.
+- [x] T027 [US2] Update the tests that name `design-doc` (`test_gate.py`, `test_policy.py`, `test_speclocation.py`, `test_drive_workflow.py`, `test_plan_template.py`, `test_critique_report.py`, `test_spec_source.py`), reading each hit: `test_gate.py`'s typed-prompt cases depend on the keyword. Make T024 pass and the full suite pass with no other behaviour change.
+- [x] T031 [US2] Correct the five next-step messages of #64 (FR-022) in `speclocation.py` and `alq-issue-tackle/SKILL.md`, a failing test first for each.
+- [ ] T028 [US2] Confirm no behaviour moved: `git diff main --stat` shows renames, name changes and what FR-022 allows only; open PR 2 as a draft and run the internal review loop, then merge.
 
 **Checkpoint**: one name, `alq-spec`.
 
