@@ -9,7 +9,7 @@ tags: [spec-folder, settled-design, review-round]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0008"]
+relatesTo: ["0008", "0016", "0017"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{settled_design,gate}.py"
