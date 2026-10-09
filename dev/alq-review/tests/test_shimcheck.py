@@ -261,6 +261,12 @@ class Carried(unittest.TestCase):
         [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], new)
         self.assertEqual((gone["state"], gone["ranges"]), ("ended", []))
 
+    def test_a_bugs_lines_moved_elsewhere_in_the_file_end_it(self):
+        lines = self.old.splitlines(True)
+        new = "".join(lines[:9] + lines[11:] + lines[9:11])
+        [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], new)
+        self.assertEqual((gone["state"], gone["ranges"]), ("ended", []))
+
     def test_a_file_that_is_no_longer_there_takes_its_ranges(self):
         [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], "")
         self.assertEqual(gone["state"], "ended")
@@ -286,6 +292,13 @@ class Carried(unittest.TestCase):
                                    {"src/load.py": new, "src/save.py": "x\ny\nz\n"}, set(),
                                    lambda file: __import__("worktree").text_hunks(self.root, self.old, new))
         self.assertEqual((kept["state"], kept["ranges"]), ("open", [hunk("src/save.py", old=(3, 1))]))
+
+    def test_an_override_ends_when_a_change_takes_one_of_the_bugs_files_away(self):
+        taken = "src/save.py"
+        overridden = bug(count=4, state="overridden", ranges=[hunk(old=(10, 2)), hunk(taken, old=(3, 1))])
+        [back] = shimcheck.carried([overridden], {"src/load.py": self.old, taken: "x\ny\nz\n"},
+                                   {"src/load.py": self.old, taken: ""}, {taken}, lambda _: [])
+        self.assertEqual((back["state"], back["ranges"]), ("held", [hunk(old=(10, 2))]))
 
     def test_an_override_ends_when_a_change_reaches_the_bugs_lines_and_not_before(self):
         elsewhere = self.old.replace("line 18\n", "changed 18\n")

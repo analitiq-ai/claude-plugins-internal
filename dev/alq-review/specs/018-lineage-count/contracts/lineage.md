@@ -4,19 +4,20 @@ What the rest of the plugin, the agent and the user can rely on. Shapes are in [
 
 ## The module: `scripts/lineage.py`
 
-No I/O. Git's hunks and the texts reach it as arguments.
+It reads no repository, ledger or file: git's hunks and the texts reach it as arguments. Only `differ` looks outside them, at the interpreter and the libraries it can import.
 
 | Function | Takes | Gives |
 |---|---|---|
-| `span_of(text, line, quote)` | a file's text, a claim's line and quote | `(start, end)` of the sentence; raises when the words are not there |
+| `lines(text)` | a file's text | its lines as git numbers them: split at `\n` only, so a form feed or U+2028 does not shift a number. Every line number a reader, a sweeper or a bug is given is this one |
+| `Words(text)` | a file's text | its index of words, built once. `.span(line, quote)` is `(start, end)` of the quote from that line on, half-open like a slice: found as whole words, else where it stands inside a word; it raises when the words are nowhere from that line on. `.find(quote)` is where the words stand anywhere in the text, found the same way, or none |
 | `line_span(text, first, count)`, `lines_of(text, span)` | a range of lines; a span | the span from the start of the first line to the end of the last; the first line and line count a span covers. How a bug's lines are carried by `carry` and turned back |
-| `carry(spans, old, new, hunks)` | spans in `old`, the two texts, their `-U0` hunks | each span in `new`, or none when it is gone |
-| `succeed(lineages, old, new, hunks, claims, count, ref)` | the file's open lineages, the two texts, their hunks, the claims read in `new`, `count(lineage)` to choose the higher in a merge, and the check ref that ends a lineage | the lineages with places moved and ended ones marked, and `{claim id: [lineage ids]}` |
+| `carry(spans, old, new, hunks)` | spans in `old`, the two texts, their `-U0` hunks | each span in `new`, or none when it is gone. The ranges that hold a span are diffed from the top of the file down while their cost (the product of the two lengths) stays within the budget in total; a span in a range that would take it past maps to the whole replacement: it is kept unless that replacement has no characters |
+| `succeed(lineages, old, new, hunks, claims, count, ref)` | the file's open lineages, the two texts, their hunks, the claims read in `new`, `count(lineage)` to choose the higher in a merge, and the check ref that ends a lineage | the lineages with places moved and ended ones marked (a merged-away lineage's places go to the one that goes on), and `{claim id: [lineage ids]}`. The words of a place carried to nothing, and a lineage's first words when none of its places was carried or found, are looked for in `new`, so launch, commit and completion agree on which lineages have words left. Raises `BudgetExceeded` when the replaced ranges holding a place together cost more than the budget: a guess there would count the wrong lineage |
 | `differ()` | | the `diff-match-patch` object, timeout off; raises `Unavailable` naming the install command |
 
-Callers: `claimgate.on_launch`, `on_commit` and the completion step (`carry`, `succeed`);
-`shimgate.on_launch`, `on_commit` and `_save` through `shimcheck` (`carry`); all four launch and commit
-handlers (`differ`, first).
+Callers: `claimgate.on_launch`, `on_commit` and the completion step (`succeed`, `Words`, `lines`);
+`shimgate.on_launch`, `on_commit`, the save of a completed check and the override of a tree, through
+`shimcheck.carried` (`carry`, `lines`); all four launch and commit handlers (`differ`, first).
 
 ## What the user types
 
@@ -65,13 +66,16 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | C18 | held; reword without `unlock` | launch refused, still held |
 | C19 | at 2; split, second half placed elsewhere | first half in the lineage; second a new claim |
 | C20 | lineages at 3 (released) and 1; merge; `WRONG` | held |
+| C23 | held at 3; move the words unchanged within the file; launch | refused before any reader runs |
+| C24 | a form feed and a U+2028 above a claim; `WRONG` | one lineage; the line the reader named is the line git numbers |
+| C25 | `unlock` naming a lineage below 3, already released, or ended | changes nothing |
 
 ### Bugs
 
 | # | Steps | Result |
 |---|---|---|
 | B1 | patch; commit another file; patch the same lines | one bug, count 2 |
-| B2 | bugs at 1 and 3; one change overlaps both; patch | one bug, 3 from the merge and 4 once this patch counts, so held; the other `merged`, its count not raised |
+| B2 | bugs at 1 and 3; one change overlaps both; patch | one bug, 3 from the merge and 4 once this patch counts, so held; the other `merged`, its count not raised; its site rulings pass to the survivor, which keeps its own where both ruled a site |
 | B3 | a site at line 329; the staged change edits line 333 | the refusal lists 333 for that site |
 | B4 | a bug's lines deleted by a commit | bug `ended` |
 | B8 | a bug in a never-committed file; unstage it, check another file, stage it again and patch | same bug, count 2 |
@@ -79,10 +83,12 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | B5 | lines added above a bug by a commit; patch the bug | same bug, count 2 |
 | B6 | held; `override`; commit; patch again | held |
 | B7 | an overridden bug and another; one change overlaps both | the check is required |
+| B10 | a bug's lines rewritten by a commit by more than the budget; launch; commit; override | the bug goes on over the whole rewritten range, count kept; nothing refuses |
+| B11 | `override shim-<id>` naming an ended or merged bug | says it names no bug the check knows; changes nothing |
 
 ### Both
 
 | # | Steps | Result |
 |---|---|---|
 | X1 | `diff_match_patch` not importable; launch; commit | both refused, the install command named; in `log` mode recorded only |
-| X2 | a character diff over its budget; launch; commit | both refused as a failed check, the next step named (split the change); never a pass; in `log` mode recorded only |
+| X2 | a staged change rewrites claim text by more than the diff budget; launch; commit | both refused as a failed check, the next step named (split the change); never a pass; in `log` mode recorded only. A bug's range rewritten by a commit has nothing to split: B10 |

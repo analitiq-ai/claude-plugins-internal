@@ -43,7 +43,7 @@ the test list: one failing test per row before any code. `tests.yml` installs th
 
 **Performance Goals**: a file with no open lineage or bug costs nothing new. A file with one costs two
 `git hash-object`, one `git diff` and one character diff per rewritten range that holds its text, inside the
-hook's 60 s; a mapping over its budget is a failed check, not a pass (R4). Not measured; R4 names the measurement
+hook's 60 s; a staged claim change over its budget is a failed check, not a pass, and a committed rewrite keeps its bug whole (R4). Not measured; R4 names the measurement
 
 **Constraints**: nothing keyed on `HEAD`, a tree or a commit; no model and no similarity threshold decides
 succession (ADR-0001 point 4); the mapping is a function of the two texts alone (R4); a missing library
@@ -61,12 +61,12 @@ refuses, never passes (ADR-0009)
 | I. Contract-first | No shape from the contracts map is added. The lineage and bug docs are defined once, in `data-model.md` and `ledger.py`. Pass. |
 | II. Ownership & trust boundaries | All in alq-review, this repo. The file texts and reader quotes the mapping takes are the ones the gate already validates. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | No migration and no reader for old rows (R14). A missing library refuses (R13). A quote that cannot be found in its file raises (R5). Three places where this layer cannot meet the rule are named with the real fix: a site is one line (R9), an unmeasured cost (R4), the install command on a system-managed Python (R13). Pass. |
-| IV. Test-first | The contract's 29 sequences are written and seen to fail first (R15). The mapping is a pure function tested without git. Pass. |
+| IV. Test-first | The contract's sequences are written and seen to fail first (R15). The mapping is a pure function tested without git. Pass. |
 | V. Smallest complete change | One module. The hunk hold is deleted, not kept beside the lineage: `touches`, `find_hold`, `hunk_state`, `_refuse_hunk`, `_name_claims`, `count_refusals`, `standing`, `release`, `_old_side`, `Claims.holds`, `save_holds`, `claim_holders`, `chains_at`, `shimcheck.touched`. Pass. |
 | VI. Governing rule ships apart | No rule file, lint, guard or schema check changes. The README describes the plugin and changes with it, its sentence on imports included: no test or hook enforces that sentence. `tests.yml` gains one install line and grades nothing differently. The note ADR-0001 needs on merging is a decision record and goes in its own PR. Pass. |
 | P1. Code decides | Succession, count, hold and release are computed on the hook path. Each refusal names its next step: `unlock`, `override`, or the install command. Pass. |
 | P2. Only an approved entity releases a hold | Claim lineage: the user, `unlock claim-<id>`. Bug: the user, `override shim-<id>`. Nothing else lowers a count. A lineage ends, without the user, on `CORRECT` or deletion, which ADR-0001 point 3 names as the end of the churn. A moved file and a moved-and-reworded sentence start a count again: see Complexity Tracking. |
-| P3. Rules are pure | `lineage.py` does no I/O. Count, hold and merge live in `claimcheck.py` and `shimcheck.py`. The handlers read git and the ledger, call them and save. Pass. |
+| P3. Rules are pure | `lineage.py` reads no repository, ledger or file (only `differ` looks at the interpreter). Count, hold and merge live in `claimcheck.py` and `shimcheck.py`. The handlers read git and the ledger, call them and save. Pass. |
 | P4. A check that could not run is its own outcome | The missing library is a failed check with a next step, in both checks, at launch and at commit (R13). Pass. |
 | P5. Settled design | Every mechanism below cites a decision with its existing tools. R3, R4 and R13 each hold a fact to measure as a first task. Pass. |
 
@@ -92,7 +92,7 @@ specs/018-lineage-count/
 ```text
 plugins/alq-review/
 ├── scripts/
-│   ├── lineage.py        # new: span_of, carry, succeed, differ
+│   ├── lineage.py        # new: lines, Words, carry, succeed, differ
 │   ├── claimcheck.py     # the hunk-hold section replaced by count, held, release, the chain's wording
 │   ├── claimgate.py      # launch and commit carry without saving; completion and contests settle lineages
 │   ├── shimcheck.py      # range overlap moves in; merge; altered ranges; held at 4 or more

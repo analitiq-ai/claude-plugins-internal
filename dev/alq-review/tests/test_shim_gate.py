@@ -12,7 +12,7 @@ from unittest import mock
 
 from paths import PLUGIN
 
-from test_claim_gate import HARNESS, ClaimGate
+from test_claim_gate import HARNESS, INSTALL_COMMAND, ClaimGate
 from test_worktree_facts import git
 
 import hookio
@@ -441,8 +441,8 @@ class ShimAltered(ShimGate):
 
 
 class ShimLibrary(ShimGate):
-    """Both handlers of the shim check refuse, naming the install, when the diff library cannot be imported (X1), and
-    when a range is rewritten by more than the diff may map (X2)."""
+    """The shim check's launch, and a commit that stages a change, refuse naming the install when the diff library
+    cannot be imported (X1)."""
 
     def setUp(self):
         super().setUp()
@@ -457,8 +457,7 @@ class ShimLibrary(ShimGate):
         for refused in (self.shim_launch()[0], self.git_commit()):
             self.assertEqual(self.decision(refused), "deny")
             self.assertIn("could not run", self.reason(refused))
-            self.assertIn("diff-match-patch", self.reason(refused))
-            self.assertIn("install", self.reason(refused))
+            self.assertRegex(self.reason(refused), INSTALL_COMMAND)
 
     def test_a_missing_library_is_only_recorded_in_log_mode(self):  # X1
         self.labelled({"b.py": (FIXED, "CODE")})
@@ -469,18 +468,6 @@ class ShimLibrary(ShimGate):
         logged = [(e["action"], e["decision"]) for e in self.gate_log()]
         self.assertIn(("shim-launch", "would_deny"), logged)
         self.assertIn(("shim-commit", "would_deny"), logged)
-
-    def test_a_range_rewritten_by_more_than_the_diff_may_map_is_a_failed_check_never_a_pass(self):  # X2
-        words = lambda tag: "".join(f"{tag}{i:04d} " + "x" * 80 + "\n" for i in range(120))
-        self.commit("big.py", words("a"), "feat: big")
-        self.chain(ranges=[{"file": "big.py", "old_start": 1, "old_count": 120}])
-        git(self.root, "checkout", "-q", "HEAD", "--", ".")
-        self.commit("big.py", words("b"), "feat: rewrite big")
-        self.labelled({"b.py": (FIXED, "CODE")})
-        for refused in (self.shim_launch()[0], self.git_commit()):
-            self.assertEqual(self.decision(refused), "deny")
-            self.assertIn("could not run", self.reason(refused))
-            self.assertIn("split", self.reason(refused))
 
 
 class ShimSweep(Staged):
@@ -568,7 +555,7 @@ class ShimSweep(Staged):
 
 
 class ShimContest(Staged):
-    """The author contests a listed site; one judge rules it once per bug, and the tree is judged again (R8)."""
+    """Contesting the sites a shim check listed."""
     OTHER = {"file": "b.py", "line": 10, "function": "save", "does": "writes b unchecked"}
     LOAD, SAVE = shimcheck.site_id("c.py", "load"), shimcheck.site_id("b.py", "save")
 
@@ -588,6 +575,9 @@ class ShimContest(Staged):
 
     def test_a_contest_is_refused_before_any_agent_for_an_unlisted_site_or_an_empty_reason(self):
         for contests, said in (([{"site": "0" * 16, "reason": "x"}], "not in"),
+                               ([{"site": [self.LOAD], "reason": "x"}], "not in"),
+                               ([{"site": {"id": self.LOAD}, "reason": "x"}], "not in"),
+                               ([{"reason": "x"}], "not in"),
                                ([{"site": self.LOAD, "reason": " "}], "reason is empty"),
                                ([], "non-empty list")):
             out, args = self.shim_launch(contests=contests)
@@ -766,7 +756,8 @@ def lines_changed(*numbers, mark="checked"):
 
 
 class ShimChain(ShimGate):
-    """A refused bug is counted on one branch at one HEAD (R9)."""
+    """A refused bug is counted on its branch, not on HEAD: a commit of other files, or one that adds lines above its
+    lines, leaves its count, and one that deletes all its lines ends it."""
 
     def setUp(self):
         super().setUp()
@@ -904,6 +895,37 @@ class ShimChain(ShimGate):
         self.assertEqual((merged["state"], merged["into"], merged["count"]), ("merged", "a" * 16, 1))
         self.assertIn("ask the user", self.reason(self.git_commit()))
 
+    def test_a_bug_merged_into_another_hands_over_its_rulings_and_the_survivor_keeps_its_own(self):  # B2
+        deep = {"same_operation": [SITE], "callers": []}
+        a, b = "a" * 16, "b" * 16
+        self.chain(id=a, count=3, state="deep_done", target=deep, members=["t1", "t2", "t3"],
+                   ranges=[{"file": "b.py", "old_start": 4, "old_count": 1}])
+        self.chain(id=b, count=1, members=["t4"], ranges=[{"file": "b.py", "old_start": 16, "old_count": 1}])
+        ruling = lambda why: {"ruling": "not_shared", "reason": why, "evidence": "b.py:1"}
+        with self.shims() as shims:
+            shims.save_ruling(b, "only-in-b", ruling("b"))
+            shims.save_ruling(b, "in-both", ruling("b"))
+            shims.save_ruling(a, "in-both", ruling("a"))
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.labelled({"b.py": (lines_changed(4, 16), "CODE")})
+        self.shim_launch()
+        with self.shims() as shims:
+            self.assertEqual(shims.rulings(a), {"only-in-b": ruling("b"), "in-both": ruling("a")})
+
+    def test_a_range_rewritten_past_the_diff_budget_by_a_commit_keeps_its_bug_whole(self):  # B10
+        words = lambda tag: "".join(f"{tag}{i:04d} " + "x" * 80 + "\n" for i in range(120))
+        self.commit("big.py", words("a"), "feat: big")
+        self.chain(ranges=[{"file": "big.py", "old_start": 1, "old_count": 120}])
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("big.py", words("b"), "feat: rewrite big")
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        self.labelled({"b.py": (FIXED, "CODE")})
+        out, args = self.shim_launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.sweep(args, [])
+        self.assertEqual([(b["id"], b["count"], b["state"], b["ranges"]) for b in self.bugs() if b["id"] == "c" * 16],
+                         [("c" * 16, 1, "open", [{"file": "big.py", "old_start": 1, "old_count": 120}])])
+
     def by_id(self, ident):
         return next(b for b in self.bugs() if b["id"] == ident)
 
@@ -966,19 +988,22 @@ class ShimChain(ShimGate):
 
 
 class ShimDeep(ShimChain):
-    """At a bug's third refusal the next check sweeps deeper, and later checks reuse its list (R10)."""
+    """At a bug's third refusal the next check sweeps deeper, and the check after that is judged against its list."""
     OTHER = {"file": "b.py", "line": 10, "function": "save", "does": "writes b unchecked"}
 
     def refused_three_times(self):
-        for mark in ("one", "two", "three"):
-            self.checked(lines_changed(4, mark=mark))
+        """The trees of the three checks, each of which listed `SITE` alone."""
+        return [self.checked(lines_changed(4, mark=mark)) for mark in ("one", "two", "three")]
 
-    def deep(self):
-        self.refused_three_times()
+    def deep_sweep(self):
         out, args = self.shim_launch()
         for i, sites in enumerate(([SITE], [SITE, self.OTHER], [self.OTHER])):
             self.sweep(args, sites, agent_id=f"d{i}")
         return out, args
+
+    def deep(self):
+        self.refused_three_times()
+        return self.deep_sweep()
 
     def test_the_third_refusal_names_the_deep_sweep(self):
         self.refused_three_times()
@@ -1019,7 +1044,7 @@ class ShimDeep(ShimChain):
         [after] = self.chains()
         self.assertEqual((after["count"], after["members"]), (before["count"], before["members"]))
 
-    def test_later_checks_of_the_bug_are_judged_against_the_target_with_no_sweep(self):
+    def test_the_check_after_the_deep_sweep_is_judged_against_its_list_with_no_sweep(self):
         self.deep()
         Jev.seen.clear()
         git(self.root, "checkout", "-q", "HEAD", "--", ".")
@@ -1032,8 +1057,8 @@ class ShimDeep(ShimChain):
 
 
 class ShimMiss(ShimDeep):
-    """A site a later list of the same bug names, which an earlier check left out, is logged as that check's miss
-    (R12)."""
+    """A site a later refusal's or deep sweep's list of the same bug names, which an earlier check left out, is logged
+    as that check's miss."""
 
     def misses(self):
         return [(e["decision"], e["reason"]) for e in self.gate_log() if e["action"] == "shim-miss"]
@@ -1047,22 +1072,30 @@ class ShimMiss(ShimDeep):
         self.checked(lines_changed(4, mark="three"), sites=[SITE, self.OTHER])
         self.assertEqual(len(self.misses()), 1)
 
+    def missed_by(self, trees):
+        """The misses logged when a list names `OTHER`, which each check of `trees` left out."""
+        [chain] = self.chains()
+        missed = shimcheck.site_id("b.py", "save")
+        return sorted((missed, f"chain {chain['id']}: left out by {shimcheck.check_ref('acme/demo', tree)}")
+                      for tree in trees)
+
     def test_the_deep_list_logs_a_miss_against_every_check_that_left_the_site_out(self):
-        self.deep()
-        self.assertEqual([d for d, _ in self.misses()], [shimcheck.site_id("b.py", "save")] * 3)
+        trees = self.refused_three_times()
+        self.deep_sweep()
+        self.assertEqual(sorted(self.misses()), self.missed_by(trees))
 
     def test_a_deep_sweep_that_ends_complete_still_logs_its_misses(self):
-        self.refused_three_times()
+        trees = self.refused_three_times()
         Jev.answers["coverage"] = "all"
         _, args = self.shim_launch()
         for i in range(3):
             self.sweep(args, [SITE, self.OTHER], agent_id=f"d{i}")
-        self.assertEqual(len(self.misses()), 3)
+        self.assertEqual(sorted(self.misses()), self.missed_by(trees))
         self.assertEqual([c["state"] for c in self.chains()], ["ended"])
 
 
 class ShimHold(ShimDeep):
-    """At a bug's fourth refusal the check stops and asks the user (R11)."""
+    """At a bug's fourth refusal the check stops and asks the user."""
 
     def held(self):
         self.deep()
@@ -1182,6 +1215,28 @@ class ShimOverride(ShimGate):
         self.assertEqual((Jev.seen, self.snapshots()), ([], []))
         with self.shims() as shims:
             self.assertEqual(shims.bug("c" * 16)["state"], "overridden")
+
+    def test_an_override_names_a_bug_only_while_the_check_tracks_it(self):  # B11, FR-006
+        for state in ("ended", "merged"):
+            with self.subTest(state=state):
+                self.chain(state=state)
+                said = self.override("c" * 16)
+                self.assertIn("nothing was switched off", json.dumps(said))
+                with self.shims() as shims:
+                    self.assertEqual(shims.bug("c" * 16)["state"], state)
+
+    def test_an_override_by_tree_works_over_a_range_rewritten_past_the_diff_budget(self):  # B10
+        words = lambda tag: "".join(f"{tag}{i:04d} " + "x" * 80 + "\n" for i in range(120))
+        self.commit("big.py", words("a"), "feat: big")
+        self.chain(ranges=[{"file": "big.py", "old_start": 1, "old_count": 120}])
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("big.py", words("b"), "feat: rewrite big")
+        tree = self.labelled({"b.py": (FIXED, "CODE")})
+        refused = self.git_commit()
+        self.assertEqual(self.decision(refused), "deny")
+        self.assertIn(f"override shim-{tree[:12]}", self.reason(refused))
+        self.assertIn("switched the shim check off", json.dumps(self.override(tree[:12])))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
     def test_an_unknown_id_overrides_nothing(self):
         said = self.override("0" * 16)

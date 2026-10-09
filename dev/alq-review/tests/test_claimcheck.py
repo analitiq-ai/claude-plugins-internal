@@ -258,6 +258,15 @@ class Count(unittest.TestCase):
             claimcheck.enter(found, "r1", claim(), verdict("WRONG"))
         self.assertEqual([e["ref"] for e in found["chain"]], ["r1"])
 
+    def test_the_halves_of_a_split_claim_each_enter_a_ruling_under_the_one_check(self):
+        found = lineage()
+        other_half = dict(claim(), id="other-half", line=4, quote="it logs the reason")
+        for half in (claim(), other_half, claim(), other_half):
+            claimcheck.enter(found, "r1", half, verdict("WRONG"))
+        self.assertEqual([(e["ref"], e["claim"]) for e in found["chain"]],
+                         [("r1", claim()["id"]), ("r1", "other-half")])
+        self.assertEqual(claimcheck.count(found), 1)
+
     def test_an_entry_keeps_where_and_what_the_ruling_was(self):
         found = lineage()
         claimcheck.enter(found, "r1", claim(), verdict("WRONG"))
@@ -443,6 +452,16 @@ class ContestOutcome(unittest.TestCase):
             self.assertEqual((outcome, claimcheck.count(found)), ("upheld", 2), kind)
             self.assertEqual((found["chain"][-1]["ref"], found["chain"][-1]["ruling"]), ("r1/contest-1", kind))
             self.assertEqual(current["verdicts"][claim()["id"]]["verdict"], kind)
+
+    def test_an_upheld_contest_ruled_unsure_keeps_the_claims_place_and_the_lineage_open(self):
+        current, found = self.contested()
+        claimcheck.contest_outcome(current, found, claim()["id"], verdict("UNSURE"))
+        self.assertEqual(([p["claim"] for p in found["places"]], found["state"]), ([claim()["id"]], "open"))
+
+    def test_an_upheld_contest_ruled_correct_takes_the_claims_place_out_and_ends_the_lineage(self):
+        current, found = self.contested()
+        claimcheck.contest_outcome(current, found, claim()["id"], verdict("CORRECT"))
+        self.assertEqual((found["places"], found["state"], found["ended"]["by"]), ([], "ended", "correct"))
 
     def test_a_contest_of_a_released_claim_counts_nothing(self):
         current, found = self.contested(chain=[entry("r0"), entry("r1")])

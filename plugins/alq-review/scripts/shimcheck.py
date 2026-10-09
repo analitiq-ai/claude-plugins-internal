@@ -60,7 +60,7 @@ def validate_sweep(output: dict, located: Located) -> list[str]:
 
 
 def contest_errors(contests, check: dict | None, chain: dict | None, ruled: set[str]) -> list[str]:
-    """Reasons `contests` is refused before any judge runs (R8)."""
+    """Reasons `contests` is refused before any judge runs."""
     if not isinstance(contests, list) or not contests or not all(isinstance(c, dict) for c in contests):
         return ["args.contests is a non-empty list of {site, reason}"]
     if check is None or check["status"] != "complete" or check["verdict"] != "patch" or chain is None:
@@ -69,15 +69,16 @@ def contest_errors(contests, check: dict | None, chain: dict | None, ruled: set[
     errors, named = [], set()
     for contest in contests:
         site, reason = contest.get("site"), contest.get("reason")
-        if site not in listed:
+        if not isinstance(site, str) or site not in listed:
             errors.append(f"site {site!r} is not in this check's SAME OPERATION list")
         elif site in ruled:
             errors.append(f"site {site} was already ruled for this bug; a site is ruled once")
         elif site in named:
             errors.append(f"site {site} is contested twice")
+        else:
+            named.add(site)
         if not isinstance(reason, str) or not reason.strip():
             errors.append(f"site {site!r}: the reason is empty")
-        named.add(site)
     return errors
 
 
@@ -160,7 +161,7 @@ def _with_ranges(chain: dict, ranges: list[dict]) -> dict:
 
 
 def new_chain(repo: str, branch: str, tree: str, ranges: list[dict], state: str = "open") -> dict:
-    """A bug opened by `tree` (R9); `members` are the trees counted in it. It belongs to its branch, not to a commit."""
+    """A bug opened by `tree`; `members` are the trees counted in it. It belongs to its branch, not to a commit."""
     return _with_ranges({"id": hashlib.sha256(f"{repo}\0{branch}\0{tree}".encode()).hexdigest()[:16],
                          "branch": branch, "count": 0, "members": [], "state": state, "target": None,
                          "seen": {}, "ranges": []}, ranges)
@@ -199,8 +200,8 @@ def _listed(chain: dict, check: dict) -> dict:
 
 
 def misses(chain: dict, check: dict) -> list[tuple[str, str]]:
-    """(site id, tree): for each site `check` lists, the counted trees of `chain` after the last counted tree that
-    listed it (R12)."""
+    """(site id, tree): for each site `check` lists, the counted trees of `chain` after the last one that listed it, or
+    all of them when none did."""
     order, found = chain["members"], []
     for site in check["same_operation"]:
         sid = site_id(site["file"], site["function"])
@@ -230,7 +231,7 @@ def _union(first: list, second: list) -> list:
 
 def _merged(chains: list[dict]) -> list[dict]:
     """The bug that goes on with the ranges, counted trees and listed sites of all, then the others as `merged` naming
-    it. It is held if any was; an override on any of them is not carried (R10)."""
+    it. It is held if any was; an override on any of them is not carried."""
     keep = survivor(chains)
     others = [c for c in chains if c is not keep]
     seen = {sid: list(trees) for sid, trees in keep["seen"].items()}
@@ -246,8 +247,9 @@ def _merged(chains: list[dict]) -> list[dict]:
 
 
 def settled_chains(chains: list[dict], check: dict) -> list[dict]:
-    """The bugs `check` changes (R9, R10), those it merged away included; an overridden bug alone is left as the user
-    set it (FR-017). A tree is counted at most once per bug, so a re-run check counts nothing twice."""
+    """The bugs `check` changes, those it merged away included; an overridden bug the check reaches alone is left as
+    the user set it (FR-017), one merged with another is not (an override is not carried). A tree is counted at most
+    once per bug, so a re-run check counts nothing twice."""
     matched = matching_chains(chains, check["hunks"])
     if check["verdict"] == "complete":
         return [dict(c, state="ended") for c in matched if c["state"] != "overridden"]
@@ -270,18 +272,19 @@ def settled_chains(chains: list[dict], check: dict) -> list[dict]:
 
 
 def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], gone: set[str], hunks_of) -> list[dict]:
-    """`bugs` with each range moved from the text of its file in `olds` to the text in `news` (R9): the same mapping
-    `lineage.carry` gives a claim's words, the lines turned to a span and back. A range with no place in the new text is
-    dropped, and a bug with none left is `ended`; so is every range in a file of `gone` (moved or deleted, nothing maps
-    it). A range measured in empty old text (the file had none) becomes the whole new file once the file has text, and
-    counts as reached. An overridden bug goes back to the state its count gives when a change reached any of its
-    lines and a range is left (R11).
-    `hunks_of(file)` gives the hunks between the two texts of a file."""
+    """`bugs` with each range moved from the text of its file in `olds` to the text in `news`; a bug with no range left
+    is `ended`. A range in a file of `gone` (moved or deleted, nothing maps it) is dropped. Of the rest, a range in a
+    file whose text did not change is kept as it is, one measured in empty old text becomes the whole new file once the
+    file has text, and any other goes through `lineage.carry`, the lines turned to a span and back, with the hunks
+    `hunks_of(file)` gives, and is dropped when it has no place in the new text. An overridden bug that keeps a range
+    goes back to the state its count gives when any of its ranges was in a file of `gone`, was measured in empty old
+    text in a file that now has text, or was touched by a hunk (on its lines or right beside them)."""
     moved = []
     for bug in bugs:
         ranges, reached = [], False
         for r in bug["ranges"]:
             if r["file"] in gone:
+                reached = True
                 continue
             old, new = olds[r["file"]], news[r["file"]]
             if new == old:
@@ -290,7 +293,7 @@ def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], gone: 
             if not old:
                 # The range was measured in empty text. A diff from nothing maps no span, so once the
                 # file has text the range widens to the whole file.
-                whole = {"file": r["file"], "old_start": 1, "old_count": len(new.splitlines()) or 1}
+                whole = {"file": r["file"], "old_start": 1, "old_count": len(lineage.lines(new)) or 1}
                 ranges += [whole] if whole not in ranges else []
                 reached = True
                 continue

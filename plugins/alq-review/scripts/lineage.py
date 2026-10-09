@@ -1,23 +1,24 @@
-"""Where a piece of text is after an edit: the pure core of the lineage rule (ADR-0001). No I/O: git's hunks and the
-texts arrive as arguments, so every answer is a function of them."""
+"""Where a piece of text is after an edit: the core of the lineage rule (ADR-0001). It reads no repository, ledger or
+file: git's hunks and the texts arrive as arguments. Only `differ` looks outside them, at the interpreter and the
+libraries it can import."""
 from __future__ import annotations
 
 import copy
 import re
 import sys
 import sysconfig
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 import claimcheck
 from worktree import Hunk
 
 LIBRARY = "diff-match-patch"
-# Character-diff time grows with the product of the two sizes (research R4: 12,673 characters each took 16.8 s), so the
+# Character-diff time grows with the product of the two sizes (measured: 12,673 characters each took 16.8 s), so the
 # bound is on size, not on the clock: that keeps the answer a function of the two texts.
 CHAR_DIFF_BUDGET = 5 * 10**7
 
-Span = tuple[int, int]
+Span = tuple[int, int]  # (offset of the first character, offset one past the last): half-open, as a slice
 
 
 class Unavailable(RuntimeError):
@@ -25,7 +26,9 @@ class Unavailable(RuntimeError):
 
 
 class BudgetExceeded(RuntimeError):
-    """A replaced range is too large to map within the budget: the check could not run."""
+    """Following the lineages through a staged change costs more than the budget, so the check could not run. A replaced
+    range costs the product of its two lengths, so lines rewritten together cost less when staged and committed in
+    smaller pieces."""
 
 
 class SpanNotFound(ValueError):
@@ -57,27 +60,64 @@ def differ():
     return found
 
 
-def span_of(text: str, line: int, quote: str) -> Span:
-    """The offsets of the first and last character of `quote` in `text`, from the start of 1-based `line` on. The words
-    are those `claimcheck.plain` hashes, so the span and the claim id agree on what the words are. A quote of whole
-    words is found as such; one that is part of a word (a test's name inside its `def`) where it stands."""
-    wanted = claimcheck.plain(quote)
-    starts = _line_starts(text)
-    if line > len(starts) or not wanted:
-        raise SpanNotFound(f"{quote!r} is not at line {line}")
-    flat, origin, floor = "", [], None
-    for word, start, _ in claimcheck.words(text):
-        if flat:
-            flat, origin = flat + " ", origin + [origin[-1]]
-        if floor is None and start >= starts[line - 1]:
-            floor = len(flat)
-        flat, origin = flat + word, origin + list(range(start, start + len(word)))
-    escaped = re.escape(wanted)
-    for pattern in (rf"(?<!\S){escaped}(?!\S)", escaped):
-        found = re.compile(pattern).search(flat, len(flat) if floor is None else floor)
-        if found:
-            return origin[found.start()], origin[found.end() - 1] + 1
-    raise SpanNotFound(f"{quote!r} is not in the text from line {line}")
+def lines(text: str) -> list[str]:
+    """The lines of a text as git numbers them: split at "\\n" only, the final "\\n" ending the last line and starting
+    none. `str.splitlines` also splits at a form feed or U+2028, so a line number from it is not one git or a reader
+    of the file gives."""
+    found = text.split("\n")
+    return found[:-1] if found[-1] == "" else found
+
+
+class Words:
+    """A text's words as one string with single spaces between them, built once, and where each of its characters came
+    from: any number of searches then cost the search alone. The words are those `claimcheck.plain` hashes, so a span
+    and a claim id agree on what the words are."""
+
+    def __init__(self, text: str):
+        self._starts = _line_starts(text)
+        parts: list[str] = []
+        self._origin: list[int] = []
+        self._word_starts: list[int] = []
+        self._flat_at: list[int] = []
+        flat_length = 0
+        for word, start, _ in claimcheck.words(text):
+            if parts:
+                parts.append(" ")
+                self._origin.append(self._origin[-1])
+                flat_length += 1
+            self._word_starts.append(start)
+            self._flat_at.append(flat_length)
+            parts.append(word)
+            self._origin.extend(range(start, start + len(word)))
+            flat_length += len(word)
+        self._flat = "".join(parts)
+
+    def span(self, line: int, quote: str) -> Span:
+        """Where `quote` stands, from the start of 1-based `line` on: the offset of its first character and the offset
+        one past its last. A quote of whole words is found as such; one that is part of a word (a test's name inside
+        its `def`) where it stands. Raises SpanNotFound when the words are nowhere from that line on."""
+        wanted = claimcheck.plain(quote)
+        if line > len(self._starts) or not wanted:
+            raise SpanNotFound(f"{quote!r} is not at line {line}")
+        first = bisect_left(self._word_starts, self._starts[line - 1])
+        found = self._search(wanted, self._flat_at[first] if first < len(self._flat_at) else len(self._flat))
+        if found is None:
+            raise SpanNotFound(f"{quote!r} is not in the text from line {line}")
+        return found
+
+    def find(self, quote: str) -> Span | None:
+        """Where `quote` stands anywhere in the text, found as `span` finds it: as whole words if they stand so
+        anywhere, else where they stand inside a word. None when the words are nowhere."""
+        wanted = claimcheck.plain(quote)
+        return self._search(wanted, 0) if wanted else None
+
+    def _search(self, wanted: str, floor: int) -> Span | None:
+        escaped = re.escape(wanted)
+        for pattern in (rf"(?<!\S){escaped}(?!\S)", escaped):
+            found = re.compile(pattern).search(self._flat, floor)
+            if found:
+                return self._origin[found.start()], self._origin[found.end() - 1] + 1
+        return None
 
 
 def line_span(text: str, first: int, count: int) -> Span:
@@ -100,26 +140,42 @@ def lines_of(text: str, span: Span) -> tuple[int, int]:
 def carry(spans: list[Span], old: str, new: str, hunks: list[Hunk]) -> list[Span | None]:
     """Each span of `old` in `new`, or None where it is gone. The two ends of a span are mapped apart. Outside every
     hunk an offset moves by the lines the hunks above it added or removed. Inside a replaced range it follows a
-    character diff of that range. Inside a pure deletion it lands where the text was, and a span whose two ends meet
-    is gone."""
-    ground = _Ground(old, new, hunks)
-    ground.check_budget([pos for span in spans for pos in span])
-    mapped = [(ground.position(start), ground.position(end)) for start, end in spans]
-    return [(start, end) if end > start else None for start, end in mapped]
+    character diff of that range, while the diffs together stay within `CHAR_DIFF_BUDGET`: a span in a range that would
+    take them past it maps to the whole replacement, so it is kept unless that replacement has no characters. Inside a
+    pure deletion it lands where the text was, and a span whose two ends meet is gone."""
+    return _Ground(old, new, hunks).carry(spans)
 
 
 def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims: list[dict], count, ref: str
             ) -> tuple[list[dict], dict[str, list[str]]]:
     """Which lineage each claim read in `new` belongs to, and where every lineage's words now are. `lineages` are a
-    file's open ones, with `places` in `old`. A claim inherits a lineage whose carried place it overlaps, else one
-    whose id is the claim's id or the id of words it held (words moved unchanged); several is a split. A claim that
-    inherits several lineages merges them: the one with the higher `count(lineage)` goes on (the smaller id on a
-    tie), the others end as `merged` naming it. A place carried to text no claim was read in stays. A lineage with no
-    place left ends as `deleted`. Returns every lineage given, and `{claim id: [lineage id]}`."""
+    file's open ones, with `places` in `old`. The words of a place carried to nothing, and a lineage's first words when
+    none of its places was carried or found, are looked for in `new`, so a lineage whose words are still in the file is
+    not ended as `deleted`
+    for want of a claim read there. A claim inherits a lineage whose place it overlaps, else one whose id is the claim's
+    id or the id of words it held; several is a split. A claim that inherits several lineages merges them: the one with
+    the higher `count(lineage)` goes on (the smaller id on a tie) with the places of all of them, the others end as
+    `merged` naming it. A place in text no claim was read in stays. A lineage with no place left ends as `deleted`.
+    The returned map has no key for a claim that belongs to no lineage.
+    Raises BudgetExceeded when the replaced ranges holding a place together cost more than the budget: unlike `carry`,
+    a guess about which lineage a claim belongs to would count the wrong one."""
     found = {item["id"]: copy.deepcopy(item) for item in lineages}
-    carried = {item["id"]: list(zip(item["places"], carry([(p["start"], p["end"]) for p in item["places"]], old, new,
-                                                          hunks))) for item in lineages}
-    spans = {c["id"]: span_of(new, c["line"], c["quote"]) for c in claims}
+    index = Words(new)
+    spans = {c["id"]: index.span(c["line"], c["quote"]) for c in claims}
+    ground = _Ground(old, new, hunks)
+    placed = [(lid, place) for lid, item in found.items() for place in item["places"]]
+    mapped = ground.carry([(place["start"], place["end"]) for _, place in placed])
+    if ground.widened:
+        raise BudgetExceeded(ground.refusal())
+    carried: dict[str, list[tuple[dict, Span | None]]] = {lid: [] for lid in found}
+    for (lid, place), span in zip(placed, mapped):
+        carried[lid].append((place, span or index.find(old[place["start"]:place["end"]])))
+    for lid, item in found.items():
+        if not any(span for _, span in carried[lid]):
+            first = next((entry["words"] for entry in item["chain"] if entry["claim"] == lid), None)
+            span = first and index.find(first)
+            if span:
+                carried[lid].append(({"claim": lid}, span))
     survivor: dict[str, str] = {}  # a merged lineage's id -> the lineage it went into
 
     def live(lid: str) -> str:
@@ -153,7 +209,8 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
             continue
         read = [{"start": spans[c][0], "end": spans[c][1], "claim": c}
                 for c, owned in inherited.items() if owned == [lid]]
-        unread = [{"start": span[0], "end": span[1], "claim": place["claim"]} for place, span in carried[lid]
+        unread = [{"start": span[0], "end": span[1], "claim": place["claim"]}
+                  for member in found if live(member) == lid for place, span in carried[member]
                   if span and not any(overlaps(span, spans[c["id"]]) for c in claims)]
         item["places"] = sorted(read + unread, key=lambda p: p["start"])
         if not item["places"]:
@@ -166,22 +223,25 @@ def _line_starts(text: str) -> list[int]:
 
 
 class _Ground:
-    """The two texts, their line tables and the hunks between them, with each replaced range's diff kept once."""
+    """The two texts, their line tables and the hunks between them, with each replaced range's diff kept once and the
+    ranges the budget could not afford noted in `widened`."""
 
     def __init__(self, old: str, new: str, hunks: list[Hunk]):
         self.old, self.new, self.hunks = old, new, sorted(hunks, key=lambda h: h.old_start)
         self.old_starts, self.new_starts = _line_starts(old), _line_starts(new)
+        self.widened: set[Hunk] = set()
+        self.cost = 0
         self._differ = None
         self._diffs: dict[Hunk, list] = {}
 
-    def _line_text(self, text: str, starts: list[int], first: int, count: int) -> str:
+    def _extent(self, text: str, starts: list[int], first: int, count: int) -> Span:
         last = first + count - 1
-        end = starts[last] - 1 if last < len(starts) else len(text)
-        return text[starts[first - 1]:end]
+        return starts[first - 1], starts[last] - 1 if last < len(starts) else len(text)
 
     def _replaced(self, hunk: Hunk) -> tuple[str, str]:
-        return (self._line_text(self.old, self.old_starts, hunk.old_start, hunk.old_count),
-                self._line_text(self.new, self.new_starts, hunk.new_start, hunk.new_count))
+        removed = self._extent(self.old, self.old_starts, hunk.old_start, hunk.old_count)
+        added = self._extent(self.new, self.new_starts, hunk.new_start, hunk.new_count)
+        return self.old[removed[0]:removed[1]], self.new[added[0]:added[1]]
 
     def _line_of(self, pos: int) -> int:
         """The 1-based old line a position is on. A span ends on its last word, never at the start of a line."""
@@ -190,16 +250,31 @@ class _Ground:
     def _covering(self, line: int) -> Hunk | None:
         return next((h for h in self.hunks if h.old_count and h.old_start <= line < h.old_start + h.old_count), None)
 
-    def check_budget(self, positions: list[int]) -> None:
-        used = {h for h in map(self._covering, map(self._line_of, positions)) if h and h.new_count}
-        cost = sum(len(removed) * len(added) for removed, added in map(self._replaced, used))
-        if cost > CHAR_DIFF_BUDGET:
-            raise BudgetExceeded(f"The check could not run: the text it has to follow was rewritten by more than it "
-                                 f"can map ({cost} against a budget of {CHAR_DIFF_BUDGET}). Next step: split the "
-                                 "change into smaller edits, stage and commit them one after another, and run the "
-                                 "check again.")
+    def carry(self, spans: list[Span]) -> list[Span | None]:
+        self._afford([pos for span in spans for pos in span])
+        mapped = [(self._position(start, False), self._position(end, True)) for start, end in spans]
+        return [(start, end) if end > start else None for start, end in mapped]
 
-    def position(self, pos: int) -> int:
+    def _afford(self, positions: list[int]) -> None:
+        """Spends the budget on the replaced ranges the positions are in, from the top of the file down: a range that
+        would take it past the budget is widened instead."""
+        used = {h for h in map(self._covering, map(self._line_of, positions)) if h and h.new_count}
+        spent = 0
+        for hunk in sorted(used, key=lambda h: h.old_start):
+            removed, added = self._replaced(hunk)
+            cost = len(removed) * len(added)
+            self.cost += cost
+            if spent + cost > CHAR_DIFF_BUDGET:
+                self.widened.add(hunk)
+            else:
+                spent += cost
+
+    def refusal(self) -> str:
+        return (f"The check could not run: the text it has to follow was rewritten by more than it can map "
+                f"({self.cost} against a budget of {CHAR_DIFF_BUDGET}). Next step: split the change into smaller edits, "
+                "and stage, check and commit them one at a time.")
+
+    def _position(self, pos: int, is_end: bool) -> int:
         line = self._line_of(pos)
         hunk = self._covering(line)
         if hunk is None:
@@ -208,6 +283,8 @@ class _Ground:
             return self.new_starts[line + shift - 1] + pos - self.old_starts[line - 1]
         if not hunk.new_count:
             return self.new_starts[hunk.new_start] if hunk.new_start < len(self.new_starts) else len(self.new)
+        if hunk in self.widened:
+            return self._extent(self.new, self.new_starts, hunk.new_start, hunk.new_count)[1 if is_end else 0]
         removed, added = self._replaced(hunk)
         if self._differ is None:
             self._differ = differ()

@@ -1,7 +1,8 @@
 """The claim check's hook handlers: the commit decision, the workflow launch, the agents' outputs, the contest
 judge's fetches, and the user's release. The rules they apply are claimcheck's and the mapping of words from one
 version of a file to the next is lineage's; this module reads git and the ledger for them and records what they
-decide. Nothing here is keyed on HEAD, a tree or a commit: a claim's count belongs to its lineage on a branch."""
+decide. A claim's count, and the hold it brings, belong to its lineage on a branch: none is looked up by HEAD, a
+tree or a commit. Only the record of one check is kept by the tree it checked."""
 from __future__ import annotations
 
 import os
@@ -36,11 +37,11 @@ def _reader_of(root: str, tree: str):
 
     def located(path: str) -> int | None:
         found = text(path)
-        return None if found is None else len(found.splitlines())
+        return None if found is None else len(lineage.lines(found))
 
     def text_of(path: str) -> list[str] | None:
         found = text(path)
-        return None if found is None else found.splitlines()
+        return None if found is None else lineage.lines(found)
     return located, text_of
 
 
@@ -81,9 +82,9 @@ def _held(claims: ledger.Claims, root: str, tree: str, branch: str, hunks: list[
     return held, released
 
 
-def _mint(claim: dict, ref: str, text: str) -> dict:
+def _mint(claim: dict, ref: str, words: lineage.Words) -> dict:
     found = claimcheck.new_lineage(claim, ref)
-    start, end = lineage.span_of(text, claim["line"], claim["quote"])
+    start, end = words.span(claim["line"], claim["quote"])
     found["places"] = [{"start": start, "end": end, "claim": claim["id"]}]
     return found
 
@@ -108,6 +109,7 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
         read = sorted((c for c in check["claims"].values() if c["file"] == file), key=lambda c: (c["line"], c["id"]))
         before, after, inherited, text = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
         claimcheck.keep_holds(before, after)
+        words = lineage.Words(text)
         by_id = {item["id"]: item for item in after}
         for claim in read:
             verdict = check["verdicts"].get(claim["id"])
@@ -115,7 +117,7 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
                 continue
             found = by_id[inherited[claim["id"]][0]] if claim["id"] in inherited else None
             if found is None and verdict["verdict"] == "WRONG":
-                found = by_id[claim["id"]] = _mint(claim, ref, text)
+                found = by_id[claim["id"]] = _mint(claim, ref, words)
                 after.append(found)
             if found is None:
                 continue

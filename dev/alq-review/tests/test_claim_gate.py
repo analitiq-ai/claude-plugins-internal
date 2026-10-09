@@ -2,6 +2,7 @@
 and judge outputs standing for the agents."""
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -20,6 +21,8 @@ import hookio
 import ledger
 
 HARNESS = Path(__file__).resolve().parent / "workflow_harness.mjs"
+# The command a refusal gives for a missing diff library: the pip form, or the system package where pip is refused.
+INSTALL_COMMAND = re.compile(r"`(?:\S+ -m pip install diff-match-patch|sudo apt install python3-diff-match-patch)`")
 WORKFLOW = PLUGIN / "workflows" / "claim-check.js"
 CHECK = "alq-review:claim-check"
 READER, JUDGE, CONTEST = "alq-review:claim-reader", "alq-review:claim-judge", "alq-review:claim-contest-judge"
@@ -502,6 +505,14 @@ class ClaimLineages(ClaimGate):
         [fresh] = self.lineages()
         self.assertEqual((fresh["id"], claimcheck.count(fresh)), (claimcheck.claim_id("README.md", V[3]), 1))
 
+    def test_a_file_with_a_unicode_line_break_above_a_claim_is_checked_like_any_other(self):  # C24
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", f"Intro\u2028still the intro\x0c\n{V[0]}\n")
+        self.ruling({"README.md": [(2, V[0], "WRONG")]})
+        [found] = self.lineages()
+        self.assertEqual((found["id"], claimcheck.count(found)), (claimcheck.claim_id("README.md", V[0]), 1))
+        self.assertEqual([found["places"][0]["claim"]], [claimcheck.claim_id("README.md", V[0])])
+
     def contest(self, text, kind):
         cid = claimcheck.claim_id("README.md", text)
         _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
@@ -578,6 +589,38 @@ class ClaimRelease(ClaimGate):
         self.assertEqual(said, f"[alq-review] `unlock claim-{other}` names no claim a check is holding, so nothing was released.")
         self.assertIsNone(self.lineages()[0]["released"])
         self.assertEqual(self.decision(self.git_commit()), "deny")
+
+    def reworded(self, text):
+        self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
+        self.ruling({"README.md": [(2, text, "WRONG")]})
+
+    def test_an_unlock_changes_nothing_in_a_lineage_below_the_bound_or_already_released(self):  # C25
+        self.stage("validator.py", VALIDATOR)
+        lid = claimcheck.claim_id("README.md", V[0])
+        self.reworded(V[0])
+        self.reworded(V[1])
+        below = self.lineages()
+        self.assertEqual([claimcheck.count(item) for item in below], [2])
+        self.unlock(lid)
+        self.assertEqual(self.lineages(), below)
+        self.reworded(V[2])
+        self.unlock(lid)
+        [released] = self.lineages()
+        self.assertEqual(released["released"]["count"], 3)
+        self.unlock(lid)
+        self.assertEqual(self.lineages(), [released])
+
+    def test_an_unlock_changes_nothing_in_a_lineage_that_ended_at_the_bound_unreleased(self):  # C25
+        self.stage("validator.py", VALIDATOR)
+        for text in V[:3]:
+            self.reworded(text)
+        self.stage("README.md", "Intro.\nOutro.\n")
+        self.ruling({"README.md": []})
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((claimcheck.count(ended), ended["state"], ended["ended"]["by"], ended["released"]),
+                         (3, "ended", "deleted", None))
+        self.unlock(claimcheck.claim_id("README.md", V[0]))
+        self.assertEqual(self.lineages(ended=True), [ended])
 
     def test_a_reword_without_the_release_is_refused_at_launch(self):  # C18
         self.held()
@@ -747,6 +790,18 @@ class ClaimReshaping(ClaimGate):
         self.ruling({"README.md": [(1, first, "UNSURE"), (3, second, "WRONG")]})
         self.assertEqual(self.counts(), [1, 2])
 
+    def test_a_held_claim_moved_unchanged_is_held_before_any_reader_runs(self):  # C23, FR-011
+        self.stage("validator.py", VALIDATOR)
+        for text in V[:3]:
+            self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
+            self.ruling({"README.md": [(2, text, "WRONG")]})
+        self.stage("README.md", f"Intro.\nOutro.\n{V[2]}\n")
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "deny")
+        self.assertIsNone(args)
+        for part in (*V[:3], f"unlock claim-{claimcheck.claim_id('README.md', V[0])}", "Stop and ask the user"):
+            self.assertIn(part, self.reason(launched))
+
 
 class ClaimLibrary(ClaimGate):
     def setUp(self):
@@ -764,8 +819,7 @@ class ClaimLibrary(ClaimGate):
         for refused in (self.check_launch()[0], self.git_commit()):
             self.assertEqual(self.decision(refused), "deny")
             self.assertIn("could not run", self.reason(refused))
-            self.assertIn("diff-match-patch", self.reason(refused))
-            self.assertIn("install", self.reason(refused))
+            self.assertRegex(self.reason(refused), INSTALL_COMMAND)
 
     def test_a_missing_library_is_only_recorded_in_log_mode(self):  # X1
         self.env["ALQ_REVIEW_CLAIM_CHECKS"] = "log"
@@ -783,7 +837,7 @@ class ClaimLibrary(ClaimGate):
         for refused in (self.check_launch()[0], self.git_commit()):
             self.assertEqual(self.decision(refused), "deny")
             self.assertIn("could not run", self.reason(refused))
-            self.assertIn("split", self.reason(refused))
+            self.assertIn("split the change", self.reason(refused))
 
 
 class ClaimCheckContest(ClaimGate):

@@ -83,15 +83,20 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   chars 2.57 s; 12,673 chars 16.8 s. Time grows with the product of the two sizes, so a 2,000-line range cannot fit the
   hook's 60 s. The budget is therefore on size, not on the clock, which keeps the answer a function of the two
   texts: `lineage.CHAR_DIFF_BUDGET = 5 * 10**7`, the sum, over the replaced ranges one file's spans fall in, of `len(removed) *
-  len(added)` characters (about 7,000 characters each side, about 5 s worst case). A change over it is a failed
-  check that names the next step (split the change), never a pass: a hook killed by its timeout is not a
-  refusal (constitution P4).
+  len(added)` characters (about 7,000 characters each side, about 5 s worst case). Ranges are diffed from the top of the
+  file down while the total stays within the budget, and a span in a range that would take it past maps to the whole replacement. For a claim,
+  a staged change over the budget is a failed check that names the next step (split the change), never a pass: a
+  hook killed by its timeout is not a refusal (constitution P4), and a guess about which lineage a claim belongs
+  to would count the wrong one. For a bug there is nothing to split, since its ranges are measured against text a
+  commit already holds: the bug keeps its count over the whole replaced range (FR-002, FR-006).
 
 ## R5: A sentence's span is found from the reader's line and quote
 
-- **Decision**: `lineage.span_of(text, line, quote)` walks the file from the start of `line` and matches the
-  words of `claimcheck.plain(quote)` in order, skipping white space and the comment marks `plain` drops. It
-  returns the offsets of the first and last word matched, and raises when the words are not there.
+- **Decision**: `lineage.Words(text)` flattens the file's words, the ones `claimcheck.plain` hashes, once; `.span(line,
+  quote)` finds the words of the quote from the start of `line` on and returns the offset of the first character
+  and the offset one past the last (half-open, as a slice), and raises when the words are not there. A line is what
+  git numbers, split at `\n` only (`lineage.lines`): `str.splitlines` also splits at a form feed or U+2028, so a
+  number from it is not the one git or the reader gives.
 - **Rationale**: a claim is stored as a line and a quote; the mapping needs offsets. The reader's quote is
   accepted only when `validate_reader` found those words from that line on, so a miss is a defect of the gate,
   not an input to tolerate.
@@ -107,10 +112,11 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   - every claim whose span overlaps a carried place inherits the lineage; several is a split;
   - a claim that inherited nothing by place inherits by id, when its id is a lineage's id or the id of one of
     its places (the words moved unchanged, or R1's first words came back);
-  - a claim that inherits several lineages merges them: the one with the higher count goes on, the others end
-    as `merged` and name it;
-  - a place carried to nothing, with no claim found by id, is dropped; a lineage with no place left ends as
-    `deleted`;
+  - a claim that inherits several lineages merges them: the one with the higher count goes on with the places of
+    all of them, the others end as `merged` and name it;
+  - a place carried to nothing is looked for by its words in the new text, and a lineage with no place left by
+    its first words; what is found stays, so launch and commit, which read no claims, decide as completion does;
+    a lineage with no place left ends as `deleted`;
   - **Derived**: a place carried to text that no claim was read in stays, moved, and the lineage stays open.
 - **Rationale**: #17 D2 and ADR-0001 point 2 for the first four. The fifth is forced by how the check reads:
   it reads only the paragraphs of the staged hunks, and its readers are models. A sentence that is still there
@@ -125,12 +131,12 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
 - **Decision**: a chain entry is `{ref, claim, line, words, ruling}` plus the failing case and evidence of a
   `WRONG`. A check's ruling has the check's ref; the nth rejected contest of a claim in a check has
   `<check ref>/contest-<n>`. `claimcheck.count(lineage)` is the number of distinct refs whose ruling is `WRONG`
-  and which the user had not released. Adding an entry whose ref is already there changes nothing. A lineage
+  and which the user had not released. An entry is added once per ref and claim id, so the same check ruled again adds nothing. A lineage
   is held when its count is 3 or more and above the count it had when last released. `unlock claim-<id>`
   records the count and the ids of the words as they stand; a later `WRONG` on those same words is entered as
   released and neither counts nor refuses the commit. `CORRECT` removes the claim's place, and a lineage with
-  no place left ends as `correct`. **Derived**: a contest that is upheld adds its ruling to the chain and
-  removes nothing, so it lowers no count; a held lineage stays held when its words change, until the user
+  no place left ends as `correct`. **Derived**: a contest that is upheld enters its ruling under its own ref
+  and lowers no count, and when the ruling is `CORRECT` it takes the claim's place out like any `CORRECT` ruling; a held lineage stays held when its words change, until the user
   releases it or the words are deleted.
 - **Rationale**: #17 D3 and D4, FR-003 to FR-008. Refs make the second run of a check, and the second call of
   the completion step that #16 shows, add nothing. Comparing the count to the count at release is what makes

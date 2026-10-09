@@ -1,6 +1,7 @@
 """The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's and the mapping of lines
 from one version of a file to the next is lineage's; this module reads git and the ledger for them and records what
-they decide. A bug belongs to its branch: nothing here is keyed on HEAD but the check's own record."""
+they decide. A bug belongs to its branch: it is read by branch (the bugs still tracked) or by id (an override), never
+by HEAD. HEAD gives the text a bug's lines are carried to; a check's record stands only at the HEAD it was made on."""
 from __future__ import annotations
 
 import os
@@ -32,7 +33,8 @@ def _logged(repo: str, root: str | None = None) -> SimpleNamespace:
 
 
 def _hunks_and_labels(repo: str, root: str, tree: str, base: str) -> tuple[list[dict], dict[str, str]]:
-    """The staged hunks and the claim check's labels for them (R2); no labels until that check has read the tree."""
+    """The staged hunks and the labels the claim check of this tree has given them so far; none while it has no record
+    of the tree at this base."""
     with ledger.open_claims(repo) as claims:
         claim = claims.check(tree)
     if claim is None or claim["base"] != base:
@@ -42,7 +44,7 @@ def _hunks_and_labels(repo: str, root: str, tree: str, base: str) -> tuple[list[
 
 def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dict]:
     """The branch's open bugs with their ranges carried to the text of `head`, the version commits are measured
-    against, from the text they were last carried in (R9). Saves no bug and no text."""
+    against, from the text they were last carried in. Saves no bug and no saved text of a file."""
     bugs = shims.open_bugs(branch)
     olds = {}
     for file in sorted({r["file"] for bug in bugs for r in bug["ranges"]}):
@@ -91,7 +93,7 @@ def on_commit(payload: dict, action: Action) -> dict | None:
                 lineage.differ()
                 chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head),
                                                    shimcheck.swept(hunks, labels))
-            except (lineage.Unavailable, lineage.BudgetExceeded) as exc:
+            except lineage.Unavailable as exc:
                 refusal = str(exc)
     if refusal:
         return refuse_shim(payload, "shim-commit", refusal, _logged(repo, root))
@@ -121,7 +123,7 @@ def _new_check(where: worktree.Worktree, tree: str, head: str, chain: dict | Non
 
 
 def _finish(check: dict, status: str, reason: str | None = None) -> None:
-    """A check that ends gives back its snapshot (R3); its seconds run from the launch."""
+    """A check that ends gives back its snapshot; its seconds run from the launch."""
     check["status"], check["reason"] = status, reason
     check["cost"]["seconds"] = round(time.time() - check["started"])
     if check["snapshot"]:
@@ -131,7 +133,7 @@ def _finish(check: dict, status: str, reason: str | None = None) -> None:
 
 def _end_replaced(payload: dict, check: dict) -> None:
     """Sweeping or judging checks of another tree or `HEAD` at this checkout can no longer commit, so they end and
-    give back their snapshots (R3)."""
+    give back their snapshots."""
     with ledger.open_shims(check["repo"]) as shims:
         replaced = [old for old in shims.unfinished_at(check["root"])
                     if (old["tree"], old["head"]) != (check["tree"], check["head"])]
@@ -207,10 +209,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
     code = shimcheck.swept(hunks, labels)
     with ledger.open_shims(repo) as shims:
         earlier = shims.check(tree)
-        try:
-            chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head), code)
-        except lineage.BudgetExceeded as exc:
-            return refuse_shim(payload, "shim-launch", str(exc), logged)
+        chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head), code)
     held = next((c for c in chains if c["state"] == "held"), None)
     overridden = chains[0] if chains and all(c["state"] == "overridden" for c in chains) else None
     unread = _drop_closed_deferrals(payload, repo, chains, logged)
@@ -228,13 +227,15 @@ def on_launch(payload: dict, call: dict) -> dict | None:
     if "contests" in args:
         current = earlier if earlier is not None and earlier["head"] == head else None
         return _contest(payload, call, current, chains, args["contests"], logged)
-    # A complete tree is checked again only for its bug's deep sweep (R10), and a stopped contest resumes.
+    # Below, the check stored for this tree counts only if it was made at this HEAD: one left ruling resumes its
+    # contest, and a complete one is refused as already checked unless a bug of the change is due a deep sweep.
     if earlier is not None and earlier["head"] == head and earlier["status"] == "ruling":
         return _allowed(payload, call, earlier, "contest", logged)
     if earlier is not None and earlier["head"] == head and earlier["status"] == "complete" and not deep_due:
         return refuse_shim(payload, "shim-launch", f"This staged change was already checked ({earlier['ref']}). "
                            "Commit it or change it.", logged)
-    # A check that stopped is restarted, not begun again: what it recorded stands (R13).
+    # An earlier check of this tree at this HEAD is taken up again and keeps its ref.
+    # One that stopped after recording all its lists judges them again.
     restarted = earlier is not None and earlier["head"] == head
     if restarted:
         check = earlier
@@ -277,7 +278,7 @@ def _allowed(payload: dict, call: dict, check: dict, mode: str, logged) -> dict:
 
 
 def _drop_closed_deferrals(payload: dict, repo: str, chains: list[dict], logged) -> str | None:
-    """A deferral lasts while its issue is open (R8); the reason to refuse when an issue's state cannot be read."""
+    """A deferral lasts while its issue is open; the reason to refuse when an issue's state cannot be read."""
     for chain in chains:
         with ledger.open_shims(repo) as shims:
             deferred = {sid: r for sid, r in shims.rulings(chain["id"]).items() if r["ruling"] == "deferred"}
@@ -333,14 +334,14 @@ def _stored(ref) -> dict | None:
 def _located_in_head(check: dict):
     def located(path: str) -> int | None:
         text = worktree.tree_text(check["root"], check["head"], path)
-        return None if text is None else len(text.splitlines())
+        return None if text is None else len(lineage.lines(text))
     return located
 
 
 def _located_in_staged(check: dict):
     def located(path: str) -> int | None:
         text = worktree.tree_text(check["root"], check["tree"], path)
-        return None if text is None else len(text.splitlines())
+        return None if text is None else len(lineage.lines(text))
     return located
 
 
@@ -384,8 +385,8 @@ def _merged(outputs: list[dict], name: str) -> list[dict]:
 
 
 def _judge(check: dict, deadline: float) -> None:
-    """Ask Jev `level` and `coverage` over the recorded lists less the sites ruled out of the bug, and compose the
-    verdict (R6, R7, R8)."""
+    """Ask Jev `level` and `coverage` over the recorded same-operation sites less those ruled out of the bug, and the
+    callers, and compose the verdict."""
     if check["chain"]:
         with ledger.open_shims(check["repo"]) as shims:
             out = shimcheck.ruled_out(shims.rulings(check["chain"]))
@@ -404,8 +405,7 @@ def _judge(check: dict, deadline: float) -> None:
 
 
 def _save(payload: dict, check: dict) -> None:
-    """Store the check; one that completed settles the bugs it reaches (R9), and logs the sites its list adds to one of
-    them as the misses of the earlier checks (R12)."""
+    """Store the check; a completed one also saves the bugs it settled."""
     found = []
     with ledger.open_shims(check["repo"]) as shims:
         if check["status"] == "complete":
@@ -492,11 +492,14 @@ def after_output(payload: dict) -> None:
 # --- the user's override ----------------------------------------------------------------------------------
 
 def _override_chain(chain_id: str) -> list[str]:
+    """Override bug `chain_id` in each repo that still tracks it: an ended or merged bug is no longer counted."""
     overridden = []
     for repo in ledger.shim_bug_repos(chain_id):
         with ledger.open_shims(repo) as shims:
-            shims.save_bug(dict(shims.bug(chain_id), state="overridden"))
-        overridden.append(repo)
+            bug = shims.bug(chain_id)
+            if shimcheck.tracked(bug):
+                shims.save_bug(dict(bug, state="overridden"))
+                overridden.append(repo)
     return overridden
 
 
