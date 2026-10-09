@@ -321,6 +321,22 @@ class SucceedTest(unittest.TestCase):
             with self.assertRaises(lineage.BudgetExceeded):
                 self.succeed(both, old, new, [])
 
+    def relocate(self, lineages, old, new):
+        return lineage.relocate(lineages, old, new, worktree.text_hunks(self.root, old, new))
+
+    def test_relocating_a_place_in_a_range_replaced_past_the_budget_widens_it_and_never_raises(self):
+        old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
+        with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
+            [moved] = self.relocate([self.lineage("L1", old, "three")], old, new)
+        self.assertEqual((moved["state"], self.words_at(new, moved)), ("open", ["One two THREE four."]))
+
+    def test_relocating_a_place_whose_words_are_gone_drops_it_and_leaves_ending_the_lineage_to_succeed(self):
+        old, new = "Intro.\nOne two three four.\nOutro.\n", "Intro.\nOutro.\n"
+        [moved] = self.relocate([self.lineage("L1", old, "three")], old, new)
+        self.assertEqual((moved["state"], moved["places"]), ("open", []))
+        [ended], _ = self.succeed([moved], new, new, [])
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+
     def test_a_long_file_with_many_claims_is_followed_in_a_time_a_scan_of_the_file_per_claim_could_not_meet(self):
         # The scan per claim this replaced took 19.8 s on this text.
         lines = [f"Line {i} of the guide says the validator rejects an empty list." for i in range(1000)]

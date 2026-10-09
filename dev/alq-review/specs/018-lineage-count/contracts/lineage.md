@@ -12,10 +12,13 @@ It reads no repository, ledger or file: git's hunks and the texts reach it as ar
 | `Words(text)` | a file's text | its index of words, built once. `.span(line, quote)` is `(start, end)` of the quote from that line on, half-open like a slice: found as whole words, else where it stands inside a word; it raises when the words are nowhere from that line on. `.find(quote)` is where the words stand anywhere in the text, found the same way, or none |
 | `line_span(text, first, count)`, `lines_of(text, span)` | a range of lines; a span | the span from the start of the first line to the end of the last; the first line and line count a span covers. How a bug's lines are carried by `carry` and turned back |
 | `carry(spans, old, new, hunks)` | spans in `old`, the two texts, their `-U0` hunks | each span in `new`, or none when it is gone. The ranges that hold a span are diffed from the top of the file down while their cost (the product of the two lengths) stays within the budget in total; a span in a range that would take it past maps to the whole replacement: it is kept unless that replacement has no characters |
+| `relocate(lineages, old, new, hunks)` | the file's open lineages with places in `old`, the two texts, their hunks | the same lineages with each place carried to `new` as `carry` does, and a place carried to nothing looked for in `new` as `succeed` does. A range replaced past the budget widens, so it never raises and no count changes. A place found nowhere is dropped; ending a lineage with none left is `succeed`'s |
 | `succeed(lineages, old, new, hunks, claims, count, ref)` | the file's open lineages, the two texts, their hunks, the claims read in `new`, `count(lineage)` to choose the higher in a merge, and the check ref that ends a lineage | the lineages with places moved and ended ones marked (a merged-away lineage's places go to the one that goes on), and `{claim id: [lineage ids]}`. The words of a place carried to nothing, and a lineage's first words when none of its places was carried or found, are looked for in `new`, so launch, commit and completion agree on which lineages have words left. Raises `BudgetExceeded` when the replaced ranges holding a place together cost more than the budget: a guess there would count the wrong lineage |
 | `differ()` | | the `diff-match-patch` object, timeout off; raises `Unavailable` naming the install command |
 
-Callers: `claimgate.on_launch`, `on_commit` and the completion step (`succeed`, `Words`, `lines`);
+A claim's lineage is followed by one function that launch, commit and completion all call, from the text the last completed check saw to the staged text. When a commit has changed the file since that check (the file's blob in `HEAD` is not the one the check was measured against), it goes in two legs: to the file in `HEAD` (`relocate`, which history may exceed the budget in), then to the staged text (`succeed`, the only leg that may refuse). Otherwise `HEAD` holds an older version than the one the check saw, and the one leg is `succeed`. A file `HEAD` lacks has the second leg alone.
+
+Callers: `claimgate.on_launch`, `on_commit` and the completion step (`relocate`, `succeed`, `Words`, `lines`);
 `shimgate.on_launch`, `on_commit`, the save of a completed check and the override of a tree, through
 `shimcheck.carried` (`carry`, `lines`); all four launch and commit handlers (`differ`, first).
 
@@ -69,6 +72,9 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | C23 | held at 3; move the words unchanged within the file; launch | refused before any reader runs |
 | C24 | a form feed and a U+2028 above a claim; `WRONG` | one lineage; the line the reader named is the line git numbers |
 | C25 | `unlock` naming a lineage below 3, already released, or ended | changes nothing |
+| C26 | at 1; a commit the gate did not check (plain git, or a merge) rewrites its words by more than the budget; stage one more line; launch; commit | allowed; the lineage keeps its id and count and goes on over the whole rewritten range |
+| C27 | a staged file whose path has a space; a check completes with a `WRONG` claim in it | one lineage under the real path |
+| C28 | a staged gitlink (no text); a check completes | completes; the gitlink has no claims |
 
 ### Bugs
 
@@ -91,4 +97,4 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | # | Steps | Result |
 |---|---|---|
 | X1 | `diff_match_patch` not importable; launch; commit | both refused, the install command named; in `log` mode recorded only |
-| X2 | a staged change rewrites claim text by more than the diff budget; launch; commit | both refused as a failed check, the next step named (split the change); never a pass; in `log` mode recorded only. A bug's range rewritten by a commit has nothing to split: B10 |
+| X2 | a staged change rewrites claim text by more than the diff budget; launch; commit | both refused as a failed check, the next step named (split the change); never a pass; in `log` mode recorded only. A rewrite a commit already holds has nothing to split and is never refused: C26 for a claim, B10 for a bug |

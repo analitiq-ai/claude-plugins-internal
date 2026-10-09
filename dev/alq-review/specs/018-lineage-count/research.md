@@ -87,8 +87,12 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   file down while the total stays within the budget, and a span in a range that would take it past maps to the whole replacement. For a claim,
   a staged change over the budget is a failed check that names the next step (split the change), never a pass: a
   hook killed by its timeout is not a refusal (constitution P4), and a guess about which lineage a claim belongs
-  to would count the wrong one. For a bug there is nothing to split, since its ranges are measured against text a
-  commit already holds: the bug keeps its count over the whole replaced range (FR-002, FR-006).
+  to would count the wrong one. Only the staged change can be split. A rewrite a commit already holds is not
+  refused: when a commit has changed the file since the last completed check, a claim's places are first carried from
+  the text that check saw to the file in `HEAD` by `relocate`, which widens past the budget and keeps the count (C26),
+  and only the span from `HEAD` to the staged text may exceed it. When none has, `HEAD` holds an older version than
+  the one the check saw, and the staged text is carried from the saved text alone. A bug is measured against text a commit already holds, so it keeps its count over the whole replaced
+  range (FR-002, FR-006).
 
 ## R5: A sentence's span is found from the reader's line and quote
 

@@ -163,19 +163,9 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
     index = Words(new)
     spans = {c["id"]: index.span(c["line"], c["quote"]) for c in claims}
     ground = _Ground(old, new, hunks)
-    placed = [(lid, place) for lid, item in found.items() for place in item["places"]]
-    mapped = ground.carry([(place["start"], place["end"]) for _, place in placed])
+    carried = _followed(found, index, ground)
     if ground.widened:
         raise BudgetExceeded(ground.refusal())
-    carried: dict[str, list[tuple[dict, Span | None]]] = {lid: [] for lid in found}
-    for (lid, place), span in zip(placed, mapped):
-        carried[lid].append((place, span or index.find(old[place["start"]:place["end"]])))
-    for lid, item in found.items():
-        if not any(span for _, span in carried[lid]):
-            first = next((entry["words"] for entry in item["chain"] if entry["claim"] == lid), None)
-            span = first and index.find(first)
-            if span:
-                carried[lid].append(({"claim": lid}, span))
     survivor: dict[str, str] = {}  # a merged lineage's id -> the lineage it went into
 
     def live(lid: str) -> str:
@@ -216,6 +206,34 @@ def succeed(lineages: list[dict], old: str, new: str, hunks: list[Hunk], claims:
         if not item["places"]:
             claimcheck.end(item, "deleted", ref)
     return list(found.values()), inherited
+
+
+def relocate(lineages: list[dict], old: str, new: str, hunks: list[Hunk]) -> list[dict]:
+    """`lineages` with each place carried from `old` to `new`, found there as `succeed` finds it. A place in a range
+    replaced past the budget widens to the whole replacement, so this never raises and no count changes; a place found
+    nowhere is dropped, and ending a lineage with none left is `succeed`'s."""
+    found = {item["id"]: copy.deepcopy(item) for item in lineages}
+    for lid, followed in _followed(found, Words(new), _Ground(old, new, hunks)).items():
+        found[lid]["places"] = sorted(({"start": span[0], "end": span[1], "claim": place["claim"]}
+                                       for place, span in followed if span), key=lambda p: p["start"])
+    return list(found.values())
+
+
+def _followed(found: dict[str, dict], index: Words, ground: _Ground) -> dict[str, list[tuple[dict, Span | None]]]:
+    """Each place of each lineage in `found` with where its words are in the new text: carried through the hunks, else
+    looked for in `index`. A lineage with no place found takes the place of its first words, when they are there."""
+    placed = [(lid, place) for lid, item in found.items() for place in item["places"]]
+    mapped = ground.carry([(place["start"], place["end"]) for _, place in placed])
+    carried: dict[str, list[tuple[dict, Span | None]]] = {lid: [] for lid in found}
+    for (lid, place), span in zip(placed, mapped):
+        carried[lid].append((place, span or index.find(ground.old[place["start"]:place["end"]])))
+    for lid, item in found.items():
+        if not any(span for _, span in carried[lid]):
+            first = next((entry["words"] for entry in item["chain"] if entry["claim"] == lid), None)
+            span = first and index.find(first)
+            if span:
+                carried[lid].append(({"claim": lid}, span))
+    return carried
 
 
 def _line_starts(text: str) -> list[int]:

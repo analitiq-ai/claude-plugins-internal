@@ -839,6 +839,37 @@ class ClaimLibrary(ClaimGate):
             self.assertIn("could not run", self.reason(refused))
             self.assertIn("split the change", self.reason(refused))
 
+    def test_a_rewrite_a_commit_already_holds_is_not_refused_and_keeps_the_count(self):  # C26
+        filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", f"{V[0]} {filler('a')}\n")
+        self.ruling({"README.md": [(1, V[0], "WRONG")]})
+        [first] = self.lineages()
+        self.stage("README.md", f"{V[1]} {filler('b')}\n")
+        git(self.root, "commit", "-qm", "rewritten outside the gate")
+        self.stage("README.md", f"{V[1]} {filler('b')}\nOne more line.\n")
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "allow")
+        self.read(args, {"README.md": ("PROSE", [])})
+        [kept] = self.lineages()
+        self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
+    def test_a_staged_file_with_a_space_in_its_name_is_followed_under_its_real_path(self):  # C27
+        self.stage("validator.py", VALIDATOR)
+        self.stage("my notes.md", FALSE)
+        self.ruling({"my notes.md": [(1, FALSE.strip(), "WRONG")]})
+        [item] = self.lineages("my notes.md")
+        self.assertEqual(claimcheck.count(item), 1)
+
+    def test_a_staged_gitlink_has_no_claims_and_the_check_completes(self):  # C28
+        (self.root / "vendor" / "sub").mkdir(parents=True)
+        head = git(self.root, "rev-parse", "HEAD").strip()
+        git(self.root, "update-index", "--add", "--cacheinfo", f"160000,{head},vendor/sub")
+        _, args = self.check_launch()
+        self.read(args, {"vendor/sub": ("CODE", [])})
+        self.assertEqual(self.stored()["status"], "complete")
+
 
 class ClaimCheckContest(ClaimGate):
     def test_a_contest_with_evidence_is_judged_by_a_fresh_judge(self):

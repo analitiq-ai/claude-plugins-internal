@@ -45,6 +45,7 @@ open --unlock claim-<id>--> open, released
 | `gate` | `claim` or `shim` |
 | `text` | `claim`: the staged file as the last completed claim check that had it saw it. `shim`: the file in the tree commits were measured against when its bugs were last carried |
 | `ref` | the check that wrote it |
+| `base_blob` | `claim` only: the file's blob in the tree that check was measured against, None when that tree lacked it. A carry goes through the file in `HEAD` only when this differs from the blob there now, which is when a commit has changed the file since (C26) |
 
 Every place of an open claim lineage, and every range of an open bug, in `file` is in the numbering of this
 text. Written only together with them.

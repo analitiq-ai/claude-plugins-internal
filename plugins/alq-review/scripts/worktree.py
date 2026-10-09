@@ -191,7 +191,8 @@ def _hunks(diff: str) -> list[Hunk]:
         elif current is None and not line.startswith("@@"):
             header.append(line)
             if line.startswith("+++ "):
-                path = line[6:] if line.startswith("+++ b/") else None
+                # Git ends the name with a TAB when it holds a space.
+                path = line[6:].removesuffix("\t") if line.startswith("+++ b/") else None
         elif hunk := _HUNK.match(line):
             current = None
             if path:
