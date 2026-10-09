@@ -61,24 +61,23 @@ ADR-0002, decision 3, allows no record outside the one store, the ledger, withou
 
 ## Decision
 
-1. We will have every review-round launch carry two values: `worktree` and `spec`.
+1. We will have every review-round launch name its spec in `spec`, beside the `worktree` that ADR-0012,
+   decision 2, already takes.
 2. We will take `spec` as a spec folder path from the repo root, or as `null` for a change with no spec.
    A launch with no `spec` key is refused. No reason is taken: whether a change needs a spec is planning's
    decision, and review only takes the answer. This replaces the part of ADR-0009, decision 4, about an
    issue that says it has no spec: the answer is now given at launch. The rest of that decision stands.
 3. We will verify a named spec folder against HEAD and search for nothing: it is a spec folder by
-   ADR-0012, decision 1, and its `spec.md` is in HEAD and not empty. A failure refuses the launch and names
-   what failed.
+   ADR-0012, decision 1, and its `spec.md` is in HEAD and not empty.
 4. We will record, in a PR's ledger at its first round, the `spec` value and, for a spec folder, the git
    blob id of its `spec.md` in HEAD. That record is the binding, and it is what every round and assessment
    of the PR reads.
 5. We will refuse a later launch on the same PR whose `spec` differs from the binding. The bound `spec`
-   value never changes. There is no rebind command. The caller names the right spec.
+   value never changes. There is no rebind command.
 6. We will hold a PR whose `spec.md` in HEAD has a blob id other than the bound one, as a `RESHAPE_SPEC`
    ruling holds it. The refusal shows the diff from the bound text to HEAD's. The user's `unlock <ref>` is
    the one release, whether or not a ruling asked for the change; the next launch binds the blob id HEAD
-   then has. A `spec.md` put back to the bound text ends the hold by itself.
-7. We will remove the location comment. Nothing reads or writes it.
+   then has.
 
 This replaces ADR-0008, decision 3, and the "spec folders among them" part of ADR-0012, decision 2. The
 rest of ADR-0012, decision 2, stands: the repo, the branch, the PR and the base are read from git and
