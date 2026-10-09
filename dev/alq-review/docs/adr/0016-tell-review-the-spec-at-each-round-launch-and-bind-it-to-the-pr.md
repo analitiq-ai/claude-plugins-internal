@@ -62,9 +62,10 @@ ADR-0002, decision 3, allows no record outside the one store, the ledger, withou
 ## Decision
 
 1. We will have every review-round launch carry two values: `worktree` and `spec`.
-2. We will take `spec` as a spec folder path from the repo root, or as a statement that the change has no
-   spec, with a reason that is not empty. This replaces the part of ADR-0009, decision 4, about an issue
-   that says it has no spec: a change with no spec is now stated at launch. The rest of that decision stands.
+2. We will take `spec` as a spec folder path from the repo root, or as `null` for a change with no spec.
+   A launch with no `spec` key is refused. No reason is taken: whether a change needs a spec is planning's
+   decision, and review only takes the answer. This replaces the part of ADR-0009, decision 4, about an
+   issue that says it has no spec: the answer is now given at launch. The rest of that decision stands.
 3. We will verify a named spec folder against HEAD and search for nothing: it is a spec folder by
    ADR-0012, decision 1, and its `spec.md` is in HEAD and not empty. A failure refuses the launch and names
    what failed.
@@ -105,7 +106,7 @@ This is what ADR-0012 rejected as Option D. Its objection had two halves:
 | Tested against | HEAD: a spec folder by ADR-0012's mark, with a `spec.md` that is not empty |
 | Can change during the PR | The folder: no. Its `spec.md`: only by the user's `unlock`, shown the diff |
 | Record kept | The `spec` value and the blob id of its `spec.md`, in the PR's ledger, the store ADR-0002 allows |
-| A change with no spec | Stated at launch, with a reason |
+| A change with no spec | `spec: null` at launch |
 
 ### Option B: Do nothing
 
@@ -121,7 +122,7 @@ and never finds it, and that the location comment goes.
 - A session can edit `spec.md` and ask for the unlock. The user reading the diff is the only check on that.
 - The verification proves that the folder is a spec folder. It does not prove that it is this change's
   spec. The gate trusts the session for that.
-- A session can state that a change has no spec, with any reason that is not empty.
+- A session can pass `spec: null` for a change that had a spec folder. Nothing in review checks that.
 
 ## Consequences
 
@@ -130,7 +131,7 @@ and never finds it, and that the location comment goes.
 - Harder: every caller of review-round passes `spec`. The skills, scripts and tests built on the location
   comment change together.
 - **How we would know this was wrong:** PRs bound to the wrong spec with no way out; rounds launched
-  as having no spec where a spec folder existed; or `spec.md` holds unlocked without the diff being read.
+  with `spec: null` where a spec folder existed; or `spec.md` holds unlocked without the diff being read.
 - Revisit if: a caller cannot know the spec folder when it launches a round.
 
 ## Action items
