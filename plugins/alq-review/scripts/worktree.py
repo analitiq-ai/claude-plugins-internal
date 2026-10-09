@@ -246,10 +246,10 @@ def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
              "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
 
 
-def deleted_files(root: str, base: str, tree: str) -> list[str]:
-    """The files tree `base` has and tree `tree` has not. A rename is a deleted path and a new one: a moved file starts
-    again (ADR-0013), and a deleted file has no hunk to say so."""
-    return git(root, "diff", "--no-renames", "--diff-filter=D", "--name-only", base, tree).splitlines()
+def on_disk(root: str, file: str) -> bool:
+    """Whether the checkout still has `file`. A file taken out of the stage but still on disk is not gone; a moved or deleted one is,
+    and the staged tree cannot tell the two apart for a file no commit ever held."""
+    return os.path.exists(os.path.join(root, file))
 
 
 def text_hunks(root: str, old: str, new: str) -> list[Hunk]:

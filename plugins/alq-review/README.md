@@ -80,8 +80,9 @@ that is under review.
    with a `path:line` or an `https://` page; a fresh judge, which may read only the cited hosts, upholds it or
    rejects it, and a rejection counts as a refusal. A claim is counted as one lineage that follows its words from
    edit to edit, whatever else is committed in between: the staged file is diffed against the text the last
-   completed check saw (`diff-match-patch` inside a rewritten range, a shift outside it), and a lineage is ended
-   by a `CORRECT` ruling, by its words being deleted, or by a move of the file. At 3 `WRONG` rulings the agent must stop
+   completed check saw (`diff-match-patch` inside a rewritten range, a shift outside it), and a lineage ends
+   when its last words are ruled `CORRECT`, deleted or merged into another lineage's, or when its file leaves both the
+   staged change and the disk (a file only unstaged keeps its count). At 3 `WRONG` rulings the agent must stop
    and ask the user, who lets the words stand by typing `unlock claim-<id>`; one more `WRONG` ruling holds it again.
    What the repo's own commit hook changes during the commit is cosmetic and is not checked again.
 8. **A fix reaches every site of its bug before it is committed.** A `git commit` that stages code is also refused
@@ -95,7 +96,7 @@ that is under review.
    `git commit` alone. An overridden bug lets the commit through only after the claim check has labelled every
    staged hunk. A bug belongs to its branch, not to a `HEAD`: its line ranges are carried from commit to commit
    by the same diff that follows a claim's words, bugs that one staged change reaches become one at the higher
-   count, a bug whose lines are all deleted ends, and an override lasts until a commit changes the bug's code. The
+   count, a bug whose lines are all deleted or whose file left both HEAD and the disk ends, and an override lasts until a commit changes the bug's code. The
    deep sweep comes at a count of 3 and the hold at 4. A refusal lists, per site, the lines the staged change
    alters in its file. The full rules are in this repo's
    `dev/alq-review/specs/006-shim-check-gate/`, amended by `dev/alq-review/specs/011-shim-no-site-left/`.

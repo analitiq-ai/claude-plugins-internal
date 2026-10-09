@@ -269,22 +269,27 @@ def settled_chains(chains: list[dict], check: dict) -> list[dict]:
     return [*gone, *(c for c, before in zip(counted, updated) if gone or c is not before)]
 
 
-def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], hunks_of) -> list[dict]:
+def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], gone: set[str], hunks_of) -> list[dict]:
     """`bugs` with each range moved from the text of its file in `olds` to the text in `news` (R9): the same mapping
     `lineage.carry` gives a claim's words, the lines turned to a span and back. A range with no place in the new text is
-    dropped, and a bug with none left is `ended`. An overridden bug whose lines a change reached goes back to the state
-    its count gives (R11). `hunks_of(file)` gives the hunks between the two texts of a file."""
+    dropped, and a bug with none left is `ended`; so is every range in a file of `gone` (moved or deleted, nothing maps
+    it). A range measured in empty old text (the file had none) becomes the whole new file once the file has text, and
+    counts as reached. An overridden bug goes back to the state its count gives when a change reached any of its
+    lines and a range is left (R11).
+    `hunks_of(file)` gives the hunks between the two texts of a file."""
     moved = []
     for bug in bugs:
         ranges, reached = [], False
         for r in bug["ranges"]:
+            if r["file"] in gone:
+                continue
             old, new = olds[r["file"]], news[r["file"]]
             if new == old:
                 ranges.append(r)
                 continue
             if not old:
-                # The text it was measured in had no such file: the range was the whole file as staged, and the file
-                # is now there. A diff from nothing maps no span, so the range is the whole file as it stands.
+                # The range was measured in empty text. A diff from nothing maps no span, so once the
+                # file has text the range widens to the whole file.
                 whole = {"file": r["file"], "old_start": 1, "old_count": len(new.splitlines()) or 1}
                 ranges += [whole] if whole not in ranges else []
                 reached = True

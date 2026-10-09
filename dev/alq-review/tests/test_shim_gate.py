@@ -850,6 +850,35 @@ class ShimChain(ShimGate):
         [bug] = [c for c in self.chains() if c["state"] != "ended"]
         self.assertEqual((bug["id"], bug["count"]), (first["id"], 2))
 
+    def test_a_bug_in_a_never_committed_file_removed_from_disk_ends(self):  # B1, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        self.labelled({"n.py": ("def load():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [first] = self.chains()
+        git(self.root, "rm", "-q", "-f", "n.py")
+        self.labelled({"m.py": ("def save():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        self.assertEqual({c["id"]: c["state"] for c in self.chains()}[first["id"]], "ended")
+
+    def test_a_bug_in_a_never_committed_file_unstaged_but_on_disk_keeps_its_count(self):  # B1, FR-002
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        text = "def load():\n    return 'first'\n"
+        self.labelled({"n.py": (text, "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [first] = self.chains()
+        git(self.root, "rm", "-q", "--cached", "n.py")
+        self.labelled({"m.py": ("def save():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        self.labelled({"n.py": (text.replace("first", "second"), "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [bug] = [c for c in self.chains() if c["id"] == first["id"]]
+        self.assertEqual((bug["count"], bug["state"]), (2, "open"))
+
     def test_one_patch_reaching_two_bugs_makes_them_one_at_the_higher_count_and_counts_once(self):
         self.checked(lines_changed(4))
         Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch

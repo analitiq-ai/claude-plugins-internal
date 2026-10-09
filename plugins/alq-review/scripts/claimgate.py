@@ -54,12 +54,9 @@ def _files(hunks: list[dict]) -> list[str]:
 
 def _carried(claims: ledger.Claims, root: str, tree: str, branch: str, file: str, read: list[dict], ref: str):
     """(open lineages of `file` before, after, {claim id: [lineage id]}, the file's text) once the lineages are carried
-    from the text a completed check last saw to the text in `tree`, `read` being the claims found in it; None when
-    `tree` does not have the file. The callers ask only for files the change touched, so that file was deleted and its
-    words are gone. Saves nothing."""
+    from the text a completed check last saw to the text in `tree`, `read` being the claims found in it. The callers ask
+    only for files the staged change touched, which `tree` has. Saves no lineage and no text."""
     text = worktree.tree_text(root, tree, file)
-    if text is None:
-        return None
     before = claims.open_lineages(branch, file)
     if not before:
         return before, [], {}, text
@@ -73,11 +70,11 @@ def _carried(claims: ledger.Claims, root: str, tree: str, branch: str, file: str
 
 def _held(claims: ledger.Claims, root: str, tree: str, branch: str, hunks: list[dict]) -> tuple[list[dict], set[str]]:
     """The lineages that still have words in the staged files and are held, and the ids of the words the user released
-    in them. Saves nothing: a hold is decided before any reader runs."""
+    in them. Saves no lineage and no text: a hold is decided before any reader runs."""
     held, released = [], set()
     for file in _files(hunks):
         found = _carried(claims, root, tree, branch, file, [], "")
-        for item in found[1] if found else []:
+        for item in found[1]:
             if item["state"] == "open":
                 held += [item] if claimcheck.held(item) else []
                 released |= set(item["released"]["claims"]) if item["released"] else set()
@@ -91,20 +88,25 @@ def _mint(claim: dict, ref: str, text: str) -> dict:
     return found
 
 
+def _end_gone(claims: ledger.Claims, check: dict) -> None:
+    """Ends the open lineages of each file the staged tree and the checkout both lack: a moved file starts again
+    (ADR-0013), and a deleted one has no hunk to say so. A file only unstaged is still on disk and keeps its lineages."""
+    root, tree, branch = check["root"], check["tree"], check["branch"]
+    for item in claims.open_lineages(branch):
+        if worktree.tree_text(root, tree, item["file"]) is None and not worktree.on_disk(root, item["file"]):
+            claimcheck.end(item, "deleted", check["ref"])
+            claims.save_lineage(branch, item)
+
+
 def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
     """A check that just completed moves each file's lineages to the text it checked, enters its rulings in their
     chains once, starts a lineage for each WRONG claim that continues none, and keeps that text to carry from next."""
     branch, ref = check["branch"], check["ref"]
     lineages = {}
-    for file in sorted({*_files(check["hunks"]), *worktree.deleted_files(check["root"], check["base"], check["tree"])}):
+    _end_gone(claims, check)
+    for file in _files(check["hunks"]):
         read = sorted((c for c in check["claims"].values() if c["file"] == file), key=lambda c: (c["line"], c["id"]))
-        carried = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
-        if carried is None:
-            for item in claims.open_lineages(branch, file):
-                claimcheck.end(item, "deleted", ref)
-                claims.save_lineage(branch, item)
-            continue
-        before, after, inherited, text = carried
+        before, after, inherited, text = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
         claimcheck.keep_holds(before, after)
         by_id = {item["id"]: item for item in after}
         for claim in read:

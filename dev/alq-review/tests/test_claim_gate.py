@@ -713,7 +713,22 @@ class ClaimReshaping(ClaimGate):
         self.at_two()
         git(self.root, "mv", "README.md", "GUIDE.md")
         self.ruling({"GUIDE.md": [(1, V[1], "WRONG")]})
-        self.assertEqual((self.counts("GUIDE.md"), self.counts("README.md")), ([1], [2]))
+        self.assertEqual((self.counts("GUIDE.md"), self.counts("README.md")), ([1], []))
+        self.assertEqual([item["ended"]["by"] for item in self.lineages(ended=True)], ["deleted"])
+
+    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):  # C6, FR-010
+        self.at_two()
+        git(self.root, "rm", "-q", "-f", "README.md")
+        self.check_launch()
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+
+    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):  # C2 (#15)
+        self.at_two()
+        git(self.root, "rm", "-q", "--cached", "README.md")
+        self.stage("docs/other.md", "The validator returns True.\n")
+        self.ruling({"docs/other.md": [(1, "The validator returns True.", "CORRECT")]})
+        self.assertEqual(self.counts(), [2])
 
     def test_a_reflow_with_the_words_unchanged_keeps_the_lineage(self):  # C14
         self.stage("validator.py", VALIDATOR)

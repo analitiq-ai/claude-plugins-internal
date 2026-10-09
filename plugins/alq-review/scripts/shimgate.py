@@ -42,7 +42,7 @@ def _hunks_and_labels(repo: str, root: str, tree: str, base: str) -> tuple[list[
 
 def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dict]:
     """The branch's open bugs with their ranges carried to the text of `head`, the version commits are measured
-    against, from the text they were last carried in (R9). Saves nothing."""
+    against, from the text they were last carried in (R9). Saves no bug and no text."""
     bugs = shims.open_bugs(branch)
     olds = {}
     for file in sorted({r["file"] for bug in bugs for r in bug["ranges"]}):
@@ -51,12 +51,14 @@ def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dic
             raise RuntimeError(f"a bug of {branch} has a range in {file} and no saved text to carry it from")
         olds[file] = seen["text"]
     news = {file: _head_text(root, head, file) for file in olds}
-    return shimcheck.carried(bugs, olds, news, lambda file: worktree.text_hunks(root, olds[file], news[file]))
+    gone = {file for file, text in news.items() if not text and not worktree.on_disk(root, file)}
+    return shimcheck.carried(bugs, olds, news, gone, lambda file: worktree.text_hunks(root, olds[file], news[file]))
 
 
 def _head_text(root: str, head: str, file: str) -> str:
     """The file as `head` has it, empty when `head` has not got it yet: a bug in a file only the staged change holds is
-    measured against nothing, so the next check finds it where this one left it."""
+    measured against nothing. While `head` lacks the file and the checkout has it, the next check finds the bug where this one left
+    it; once `head` gains text there, `shimcheck.carried` widens the range to the whole file."""
     return worktree.tree_text(root, head, file) or ""
 
 

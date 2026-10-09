@@ -55,7 +55,9 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | C10 | three claims in one hunk of a new file, each `WRONG` once over three checks | three lineages at 1, no hold |
 | C11 | two held claims; one hunk rewrites both | both continue, each with its own chain |
 | C12 | at 2; move and reword in one step; `WRONG` | new lineage at 1; the old one `deleted` |
-| C13 | at 2; move the file; `WRONG` at the new path | new lineage at 1 (ADR-0013) |
+| C13 | at 2; move the file; `WRONG` at the new path | new lineage at 1; the old path's `deleted` (ADR-0013) |
+| C21 | at 2; the file never committed; unstage it, commit another file | count 2 kept: the file is still on disk |
+| C22 | at 2; the file never committed; delete it from disk; a check completes | ended `deleted` |
 | C14 | at 2; reflow the paragraph, words unchanged | count 2, same lineage |
 | C15 | at 2; reword; `CORRECT`; reword; `WRONG` | first ended `correct`; a new lineage at 1 |
 | C16 | `WRONG`; contest rejected | count 2 |
@@ -72,6 +74,8 @@ Each row is one test, written and seen to fail before the code. Counts are after
 | B2 | bugs at 1 and 3; one change overlaps both; patch | one bug, 3 from the merge and 4 once this patch counts, so held; the other `merged`, its count not raised |
 | B3 | a site at line 329; the staged change edits line 333 | the refusal lists 333 for that site |
 | B4 | a bug's lines deleted by a commit | bug `ended` |
+| B8 | a bug in a never-committed file; unstage it, check another file, stage it again and patch | same bug, count 2 |
+| B9 | a bug in a never-committed file; delete it from disk; a check completes | bug `ended` |
 | B5 | lines added above a bug by a commit; patch the bug | same bug, count 2 |
 | B6 | held; `override`; commit; patch again | held |
 | B7 | an overridden bug and another; one change overlaps both | the check is required |

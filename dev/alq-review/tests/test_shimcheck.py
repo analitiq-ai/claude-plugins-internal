@@ -244,7 +244,7 @@ class Carried(unittest.TestCase):
         subprocess.run(["git", "init", "-q", self.root], check=True)
 
     def carry(self, bugs, new, file="src/load.py"):
-        return shimcheck.carried(bugs, {file: self.old}, {file: new}, self.hunks_for(self.old, new))
+        return shimcheck.carried(bugs, {file: self.old}, {file: new}, set(), self.hunks_for(self.old, new))
 
     def test_lines_added_above_a_bug_move_it_down(self):
         new = "top\ntop2\n" + self.old
@@ -268,14 +268,22 @@ class Carried(unittest.TestCase):
     def test_a_range_in_a_file_the_text_lacked_becomes_the_whole_file_once_it_exists(self):
         file = "src/new.py"
         [moved] = shimcheck.carried([bug(ranges=[hunk(file, old=(0, 0))])], {file: ""}, {file: "a\nb\nc\n"},
-                                    lambda _: self.hunks_for("", "a\nb\nc\n")(file))
+                                    set(), lambda _: self.hunks_for("", "a\nb\nc\n")(file))
         self.assertEqual((moved["ranges"], moved["state"]), ([hunk(file, old=(1, 3))], "open"))
+
+    def test_a_range_in_a_file_gone_from_the_checkout_is_dropped_and_one_still_there_is_kept(self):
+        file = "src/new.py"
+        bugs = [bug(ranges=[hunk(file, old=(0, 0))])]
+        args = ({file: ""}, {file: ""})
+        [kept] = shimcheck.carried(bugs, *args, set(), lambda _: [])
+        [dropped] = shimcheck.carried(bugs, *args, {file}, lambda _: [])
+        self.assertEqual((kept["state"], dropped["state"], dropped["ranges"]), ("open", "ended", []))
 
     def test_a_range_in_another_file_is_kept_when_one_range_is_dropped(self):
         new = "".join(line for n, line in enumerate(self.old.splitlines(True), 1) if not 9 <= n <= 12)
         [kept] = shimcheck.carried([bug(ranges=[hunk(old=(10, 2)), hunk("src/save.py", old=(3, 1))])],
                                    {"src/load.py": self.old, "src/save.py": "x\ny\nz\n"},
-                                   {"src/load.py": new, "src/save.py": "x\ny\nz\n"},
+                                   {"src/load.py": new, "src/save.py": "x\ny\nz\n"}, set(),
                                    lambda file: __import__("worktree").text_hunks(self.root, self.old, new))
         self.assertEqual((kept["state"], kept["ranges"]), ("open", [hunk("src/save.py", old=(3, 1))]))
 
