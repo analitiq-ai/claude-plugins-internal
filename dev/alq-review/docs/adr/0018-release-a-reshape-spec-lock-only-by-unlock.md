@@ -48,7 +48,8 @@ Constitution P2, as ADR-0004 quotes it, asks every hold to name the one entity a
 the one action by which it does, and fails a hold "with any second way out".
 
 Issue #63 splits planning out of alq-review (ADR-0019). The rescope command moves to the planning plugin.
-ADR-0016 binds each PR to its spec, or to `none`, and lets nothing change the binding.
+ADR-0016 binds each PR to its spec, or to no spec, and to the content of its `spec.md`. Only the user's
+`unlock` re-takes that content.
 
 ## Decision
 
@@ -56,7 +57,7 @@ ADR-0016 binds each PR to its spec, or to `none`, and lets nothing change the bi
    longer releases it.
 2. We will have the unlock reply give the open decision, its rationale, the spec gaps and the bound spec
    folder. The user then runs planning's rescope with that folder.
-3. We will not rescope a PR that is bound to `spec: none` and ruled `RESHAPE_SPEC`: it is closed, and the
+3. We will not rescope a PR that is bound to no spec and ruled `RESHAPE_SPEC`: it is closed, and the
    work restarts on a new PR bound to a new spec. The unlock reply says so.
 
 ## Options considered
@@ -69,7 +70,7 @@ ADR-0016 binds each PR to its spec, or to `none`, and lets nothing change the bi
 | By what | One action, `unlock <ref>` |
 | Ways out of the lock | One |
 | Review needs the planning plugin | No |
-| A PR bound to `none` | Not rescoped: it is closed, and the work restarts on a new PR bound to a new spec |
+| A PR bound to no spec | Not rescoped: it is closed, and the work restarts on a new PR bound to a new spec |
 
 ### Option B: Do nothing
 
@@ -81,7 +82,7 @@ of another plugin.
 
 - The user takes two steps, the unlock and then the rescope, where one prompt did both.
 - Nothing makes the user rescope after the unlock. The unlock reply only names what to do.
-- A PR bound to `none` cannot be rescoped in place. Its work moves to a new PR.
+- A PR bound to no spec cannot be rescoped in place. Its work moves to a new PR.
 
 ## Consequences
 

@@ -9,7 +9,7 @@ tags: [spec, review-round, ledger]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0008", "0009", "0012", "0019"]
+relatesTo: ["0002", "0008", "0009", "0012", "0018", "0019"]
 affects:
   - type: path
     pattern: "plugins/alq-review/workflows/{review-round,assess-round}.js"
@@ -62,30 +62,29 @@ ADR-0002, decision 3, allows no record outside the one store, the ledger, withou
 ## Decision
 
 1. We will have every review-round launch carry two values: `worktree` and `spec`.
-2. We will take `spec` as a spec folder path from the repo root, or as `none: <reason>` with a reason that
-   is not empty. This replaces the part of ADR-0009, decision 4, about an issue that says it has no spec:
-   a change with no spec is now stated at launch as `none: <reason>`. The rest of that decision stands.
-3. We will read the repo, the branch, the PR and the base from git and GitHub. They are never passed.
-4. We will refuse a launch that has no `spec`, and show the full call in the refusal.
-5. We will verify a spec folder against HEAD, in this order:
-   1. the path is relative, has no `..`, and its parent is named `specs`;
-   2. `<parent of specs>/.specify` is a folder in HEAD;
-   3. `<folder>/spec.md` is in HEAD and is not empty.
+2. We will take `spec` as a spec folder path from the repo root, or as a statement that the change has no
+   spec, with a reason that is not empty. This replaces the part of ADR-0009, decision 4, about an issue
+   that says it has no spec: a change with no spec is now stated at launch. The rest of that decision stands.
+3. We will verify a named spec folder against HEAD and search for nothing: it is a spec folder by
+   ADR-0012, decision 1, and its `spec.md` is in HEAD and not empty. A failure refuses the launch and names
+   what failed.
+4. We will record, in a PR's ledger at its first round, the `spec` value and, for a spec folder, the git
+   blob id of its `spec.md` in HEAD. That record is the binding, and it is what every round and assessment
+   of the PR reads.
+5. We will refuse a later launch on the same PR whose `spec` differs from the binding. The bound `spec`
+   value never changes. There is no rebind command. The caller names the right spec.
+6. We will hold a PR whose `spec.md` in HEAD has a blob id other than the bound one, as a `RESHAPE_SPEC`
+   ruling holds it. The refusal shows the diff from the bound text to HEAD's. The user's `unlock <ref>` is
+   the one release, whether or not a ruling asked for the change; the next launch binds the blob id HEAD
+   then has. A `spec.md` put back to the bound text ends the hold by itself.
+7. We will remove the location comment. Nothing reads or writes it.
 
-   Any failure refuses the launch and names the step that failed. Nothing is searched for.
-6. We will launch a `none` round with no spec, and show the reason.
-7. We will record the `spec` value of a PR's first round in that PR's ledger. That record is the binding.
-8. We will refuse a later launch on the same PR whose `spec` differs from the binding.
-9. We will let nothing change a binding. There is no rebind command. The caller names the right spec.
-10. We will have assess-round take the spec from the binding.
-11. We will remove the location comment entirely. Nothing reads or writes it. A premise pick of "not worth
-    doing" closes the issue as not planned, with the reason. A pick of "no spec needed" posts nothing.
-12. We will keep no backwards compatibility with the location comment.
-
-This replaces ADR-0008, decision 3, and the "spec folders among them" part of ADR-0012, decision 2.
-ADR-0008, decision 1, stands: the spec lives in the spec folder. So does the part of ADR-0008, decision 2,
-about what the gate hands to the internal reviewers and to the assessor. Its part about the skills that
-shape and tackle an issue is left to ADR-0019 and the new plugins' logs.
+This replaces ADR-0008, decision 3, and the "spec folders among them" part of ADR-0012, decision 2. The
+rest of ADR-0012, decision 2, stands: the repo, the branch, the PR and the base are read from git and
+GitHub, never passed. ADR-0008, decision 1, stands: the spec lives in the spec folder. So does the part of
+ADR-0008, decision 2, about what the gate hands to the internal reviewers and to the assessor. Its part
+about the skills that shape and tackle an issue, and what planning does with an issue that needs no spec or
+is not worth doing, are left to the new plugins' logs (ADR-0019, decision 4).
 
 ## Options considered
 
@@ -96,17 +95,17 @@ This is what ADR-0012 rejected as Option D. Its objection had two halves:
 - "The gate would take the word of the session it checks." It does, on one point only: which spec folder
   is this change's spec. It takes that word once per PR. The first round binds the value in the ledger, and
   no later round can name a different spec.
-- "It would still have to test the folder against git." It does, by design: three ordered steps against
-  HEAD. A failure refuses and names the step. Nothing is searched for.
+- "It would still have to test the folder against git." It does, by design: the folder's shape and its
+  `spec.md` are checked in HEAD. A failure refuses and names what failed. Nothing is searched for.
 
 | Dimension | Assessment |
 |---|---|
 | Where the spec comes from | The launch |
 | Searched for | Nothing |
-| Tested against | HEAD, in three named steps |
-| Can change during the PR | No |
-| Record kept | One value in the PR's ledger, the store ADR-0002 allows |
-| A change with no spec | `none: <reason>`, shown at launch |
+| Tested against | HEAD: a spec folder by ADR-0012's mark, with a `spec.md` that is not empty |
+| Can change during the PR | The folder: no. Its `spec.md`: only by the user's `unlock`, shown the diff |
+| Record kept | The `spec` value and the blob id of its `spec.md`, in the PR's ledger, the store ADR-0002 allows |
+| A change with no spec | Stated at launch, with a reason |
 
 ### Option B: Do nothing
 
@@ -118,18 +117,20 @@ and never finds it, and that the location comment goes.
 
 - The caller has to know the spec folder at every launch.
 - A wrong value on the first round is bound for the life of the PR. No command fixes it.
+- Any edit to `spec.md` after the first round, a typo fix included, holds the PR until the user unlocks it.
+- A session can edit `spec.md` and ask for the unlock. The user reading the diff is the only check on that.
 - The verification proves that the folder is a spec folder. It does not prove that it is this change's
   spec. The gate trusts the session for that.
-- `none: <reason>` lets a session skip the spec with any reason that is not empty.
+- A session can state that a change has no spec, with any reason that is not empty.
 
 ## Consequences
 
 - Easier: review needs nothing from the issue or from the planning plugin to know its spec. Every round of
-  a PR, and its assessment, reads the same spec.
+  a PR, and its assessment, reads the same spec text, so a session cannot move the target between rounds.
 - Harder: every caller of review-round passes `spec`. The skills, scripts and tests built on the location
   comment change together.
-- **How we would know this was wrong:** PRs bound to the wrong spec with no way out; or rounds launched
-  with `none` where a spec folder existed.
+- **How we would know this was wrong:** PRs bound to the wrong spec with no way out; rounds launched
+  as having no spec where a spec folder existed; or `spec.md` holds unlocked without the diff being read.
 - Revisit if: a caller cannot know the spec folder when it launches a round.
 
 ## Action items
