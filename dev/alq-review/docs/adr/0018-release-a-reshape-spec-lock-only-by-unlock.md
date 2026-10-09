@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0018"
 title: "Release a RESHAPE_SPEC lock only by unlock"
-status: draft
+status: accepted
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [release, holds, user-authority, spec]
@@ -21,6 +21,7 @@ affects:
     pattern: "dev/alq-review/tests/{test_gate,test_policy}.py"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -89,5 +90,5 @@ constitution P2.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Plan issue #63 against this ADR.
