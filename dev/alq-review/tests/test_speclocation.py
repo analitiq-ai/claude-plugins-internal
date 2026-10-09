@@ -1,4 +1,4 @@
-"""speclocation.py, and the marker-comment read and write in github.py (spec 018)."""
+"""speclocation.py, and the marker-comment read and write in github.py."""
 import json
 import os
 import subprocess
@@ -229,7 +229,7 @@ class Resolve(Issue):
 
 
 class Cli(Issue):
-    """scripts/speclocation.py as the skills run it (specs/018-spec-in-spec-folder/contracts/speclocation-cli.md)."""
+    """scripts/speclocation.py as the skills run it."""
 
     def setUp(self):
         super().setUp()

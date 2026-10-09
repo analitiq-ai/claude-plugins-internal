@@ -271,7 +271,7 @@ class InternalRound(Gate):
 
 class IssueSpec(Gate):
     """Internal reviewers and the assessor grade a change against spec.md of the folder its issue's location comment
-    names (spec 018)."""
+    names."""
     FOLDER = "dev/demo/specs/001-demo"
     SPEC = "# Demo\n\n## Acceptance\n- b.py prints 20 lines.\n"
 

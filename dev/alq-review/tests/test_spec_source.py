@@ -1,4 +1,4 @@
-"""What the alq-issue-tackle, alq-root-cause-check and alq-spec skills say about where the spec is (spec 018)."""
+"""What the alq-issue-tackle, alq-root-cause-check and alq-spec skills say about where the spec is."""
 import re
 import subprocess
 import unittest
