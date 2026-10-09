@@ -1,5 +1,4 @@
-"""premise_report.py: the premise report's form, its check, and the comment a stop pick leaves
-(specs/019-merge-shape-into-alq-spec/contracts/premise-report.md)."""
+"""premise_report.py: the premise report's form, its check, and the comment a stop pick leaves."""
 import subprocess
 import sys
 import unittest
