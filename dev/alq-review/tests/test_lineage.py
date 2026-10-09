@@ -305,37 +305,18 @@ class SucceedTest(unittest.TestCase):
         _, inherited = self.succeed([self.lineage("L1", old, "The tool is fast.")], old, new, [outside])
         self.assertEqual(inherited, {})
 
-    def test_a_lineage_in_a_range_replaced_past_the_budget_is_a_failed_check_not_a_guess(self):  # X2
+    def test_a_claim_in_a_range_replaced_past_the_budget_keeps_its_lineage(self):  # X2
+        old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
+        reread = self.claim(new, "THREE")
+        with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
+            [kept], inherited = self.succeed([self.lineage("L1", old, "three")], old, new, [reread])
+        self.assertEqual((kept["state"], inherited), ("open", {reread["id"]: ["L1"]}))
+
+    def test_words_in_a_range_replaced_past_the_budget_go_on_over_the_whole_replacement(self):  # X2
         old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
         with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
-            with self.assertRaises(lineage.BudgetExceeded) as raised:
-                self.succeed([self.lineage("L1", old, "three")], old, new, [self.claim(new, "THREE")])
-        self.assertIn("split", str(raised.exception))
-
-    def test_the_budget_is_spent_over_every_lineage_of_the_file(self):  # X2
-        old = "aaaa bbbb\nkeep\ncccc dddd\n"
-        new = "aaaa BBBB\nkeep\ncccc DDDD\n"
-        both = [self.lineage("L1", old, "bbbb"), self.lineage("L2", old, "dddd")]
-        with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 100):  # one range costs 81, both 162
-            self.succeed(both[:1], old, new, [])
-            with self.assertRaises(lineage.BudgetExceeded):
-                self.succeed(both, old, new, [])
-
-    def relocate(self, lineages, old, new):
-        return lineage.relocate(lineages, old, new, worktree.text_hunks(self.root, old, new))
-
-    def test_relocating_a_place_in_a_range_replaced_past_the_budget_widens_it_and_never_raises(self):
-        old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
-        with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
-            [moved] = self.relocate([self.lineage("L1", old, "three")], old, new)
-        self.assertEqual((moved["state"], self.words_at(new, moved)), ("open", ["One two THREE four."]))
-
-    def test_relocating_a_place_whose_words_are_gone_drops_it_and_leaves_ending_the_lineage_to_succeed(self):
-        old, new = "Intro.\nOne two three four.\nOutro.\n", "Intro.\nOutro.\n"
-        [moved] = self.relocate([self.lineage("L1", old, "three")], old, new)
-        self.assertEqual((moved["state"], moved["places"]), ("open", []))
-        [ended], _ = self.succeed([moved], new, new, [])
-        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+            [kept], _ = self.succeed([self.lineage("L1", old, "three")], old, new, [])
+        self.assertEqual((kept["state"], self.words_at(new, kept)), ("open", ["One two THREE four."]))
 
     def test_a_long_file_with_many_claims_is_followed_in_a_time_a_scan_of_the_file_per_claim_could_not_meet(self):
         # The scan per claim this replaced took 19.8 s on this text.

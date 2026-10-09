@@ -53,14 +53,11 @@ def _files(hunks: list[dict]) -> list[str]:
     return sorted({h["file"] for h in hunks})
 
 
-def _carried(claims: ledger.Claims, root: str, base: str, tree: str, branch: str, file: str, read: list[dict],
-             ref: str):
+def _carried(claims: ledger.Claims, root: str, tree: str, branch: str, file: str, read: list[dict], ref: str):
     """(open lineages of `file` before, after, {claim id: [lineage id]}, the file's text) once the lineages are carried
-    from the text a completed check last saw to the text in `tree`, `read` being the claims found in `tree`. A commit
-    the gate never checked may have rewritten the file since that check, past the budget; then the carry goes in two
-    legs, to the file in `base` and from there to `tree`, and only the staged leg may exceed the budget. When no commit
-    has changed the file since, `base` holds an older version than the one the check saw and is no part of the path.
-    None when `tree` has no text for the file (a gitlink): it has no claims. Saves no lineage and no text."""
+    from the text a completed check last saw to the text in `tree`, `read` being the claims found in it. The callers ask
+    only for files the staged change touched. None when `tree` has no text for the file (a gitlink): it has no claims.
+    Saves no lineage and no text."""
     text = worktree.tree_text(root, tree, file)
     if text is None:
         return None
@@ -70,22 +67,17 @@ def _carried(claims: ledger.Claims, root: str, base: str, tree: str, branch: str
     seen = claims.seen(branch, "claim", file)
     if seen is None:
         raise RuntimeError(f"{file} has open lineages on {branch} and no saved text to carry them from")
-    old, moved = seen["text"], before
-    committed = worktree.tree_text(root, base, file)
-    if committed is not None and committed != old and seen["base_blob"] != worktree.tree_blob(root, base, file):
-        moved, old = lineage.relocate(before, old, committed, worktree.text_hunks(root, old, committed)), committed
-    after, inherited = lineage.succeed(moved, old, text, worktree.text_hunks(root, old, text), read, claimcheck.count,
-                                       ref)
+    after, inherited = lineage.succeed(before, seen["text"], text, worktree.text_hunks(root, seen["text"], text), read,
+                                       claimcheck.count, ref)
     return before, after, inherited, text
 
 
-def _held(claims: ledger.Claims, root: str, base: str, tree: str, branch: str, hunks: list[dict]
-          ) -> tuple[list[dict], set[str]]:
+def _held(claims: ledger.Claims, root: str, tree: str, branch: str, hunks: list[dict]) -> tuple[list[dict], set[str]]:
     """The lineages that still have words in the staged files and are held, and the ids of the words the user released
     in them. Saves no lineage and no text: a hold is decided before any reader runs."""
     held, released = [], set()
     for file in _files(hunks):
-        found = _carried(claims, root, base, tree, branch, file, [], "")
+        found = _carried(claims, root, tree, branch, file, [], "")
         if found is None:
             continue
         for item in found[1]:
@@ -120,7 +112,7 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
     _end_gone(claims, check)
     for file in _files(check["hunks"]):
         read = sorted((c for c in check["claims"].values() if c["file"] == file), key=lambda c: (c["line"], c["id"]))
-        carried = _carried(claims, check["root"], check["base"], check["tree"], branch, file, read, ref)
+        carried = _carried(claims, check["root"], check["tree"], branch, file, read, ref)
         if carried is None:
             continue
         before, after, inherited, text = carried
@@ -143,8 +135,7 @@ def _completed(payload: dict, claims: ledger.Claims, check: dict) -> None:
         for item in after:
             claims.save_lineage(branch, item)
         if any(item["state"] == "open" for item in after):
-            base_blob = worktree.tree_blob(check["root"], check["base"], file)
-            claims.save_seen(branch, "claim", file, {"text": text, "ref": ref, "base_blob": base_blob})
+            claims.save_seen(branch, "claim", file, {"text": text, "ref": ref})
         lineages.update({cid: owned[0] for cid, owned in inherited.items()})
     check["lineages"] = lineages
     verdicts = [v["verdict"] for v in check["verdicts"].values()]
@@ -184,8 +175,8 @@ def on_commit(payload: dict, action: Action) -> dict | None:
         if hunks:
             try:
                 lineage.differ()
-                held, released = _held(claims, root, base, tree, where.branch, hunks)
-            except (lineage.Unavailable, lineage.BudgetExceeded) as exc:
+                held, released = _held(claims, root, tree, where.branch, hunks)
+            except lineage.Unavailable as exc:
                 refusal = str(exc)
     if refusal:
         return refuse_claim(payload, "commit", refusal, _logged(where.slug, root))
@@ -273,10 +264,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         if earlier is not None and earlier["base"] != base:
             earlier = None
         hunks = earlier["hunks"] if earlier else worktree.tree_hunks(root, base, tree)
-        try:
-            held, _ = _held(claims, root, base, tree, where.branch, hunks)
-        except lineage.BudgetExceeded as exc:
-            return refuse_claim(payload, "claim-launch", str(exc), logged)
+        held, _ = _held(claims, root, tree, where.branch, hunks)
         if held:
             return refuse_claim(payload, "claim-launch", claimcheck.user_question(held), logged)
         if contests:

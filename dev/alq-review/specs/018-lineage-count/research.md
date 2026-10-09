@@ -84,15 +84,11 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
   hook's 60 s. The budget is therefore on size, not on the clock, which keeps the answer a function of the two
   texts: `lineage.CHAR_DIFF_BUDGET = 5 * 10**7`, the sum, over the replaced ranges one file's spans fall in, of `len(removed) *
   len(added)` characters (about 7,000 characters each side, about 5 s worst case). Ranges are diffed from the top of the
-  file down while the total stays within the budget, and a span in a range that would take it past maps to the whole replacement. For a claim,
-  a staged change over the budget is a failed check that names the next step (split the change), never a pass: a
-  hook killed by its timeout is not a refusal (constitution P4), and a guess about which lineage a claim belongs
-  to would count the wrong one. Only the staged change can be split. A rewrite a commit already holds is not
-  refused: when a commit has changed the file since the last completed check, a claim's places are first carried from
-  the text that check saw to the file in `HEAD` by `relocate`, which widens past the budget and keeps the count (C26),
-  and only the span from `HEAD` to the staged text may exceed it. When none has, `HEAD` holds an older version than
-  the one the check saw, and the staged text is carried from the saved text alone. A bug is measured against text a commit already holds, so it keeps its count over the whole replaced
-  range (FR-002, FR-006).
+  file down while the total stays within the budget, and a span in a range that would take it past maps to the whole
+  replacement. A claim and a bug are treated alike: a rewrite past the budget, whoever made it, is never refused, and what it replaced keeps its count
+  (C26, X2, B10). A refusal was tried and rejected: it fired on rewrites a commit already held, which nothing can
+  split, and it needed a second path through `HEAD` whose every case was a guess about where the saved text came
+  from. Widening costs a false hold on a claim that was new in the replacement; `unlock` clears it (FR-002, FR-006).
 
 ## R5: A sentence's span is found from the reader's line and quote
 

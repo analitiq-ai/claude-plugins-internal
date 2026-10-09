@@ -43,7 +43,7 @@ the test list: one failing test per row before any code. `tests.yml` installs th
 
 **Performance Goals**: a file with no open lineage or bug costs nothing new. A file with one costs two
 `git hash-object`, one `git diff` and one character diff per rewritten range that holds its text, inside the
-hook's 60 s; a staged claim change over its budget is a failed check, not a pass, and a committed rewrite keeps its claim or its bug whole (R4). Not measured; R4 names the measurement
+hook's 60 s; a rewrite past its budget widens a claim or a bug to the whole replacement and keeps its count (R4). Not measured; R4 names the measurement
 
 **Constraints**: nothing keyed on `HEAD`, a tree or a commit; no model and no similarity threshold decides
 succession (ADR-0001 point 4); the mapping is a function of the two texts alone (R4); a missing library

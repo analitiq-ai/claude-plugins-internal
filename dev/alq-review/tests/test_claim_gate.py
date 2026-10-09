@@ -828,16 +828,18 @@ class ClaimLibrary(ClaimGate):
         self.assertNotEqual(self.decision(self.check_launch()[0]), "deny")
         self.assertIn("would_deny", [e["decision"] for e in self.gate_log() if e["action"] == "claim-launch"])
 
-    def test_a_diff_over_its_budget_is_a_failed_check_never_a_pass(self):  # X2
+    def test_a_staged_rewrite_past_the_budget_is_not_refused_and_keeps_the_count(self):  # X2
         filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
         self.stage("validator.py", VALIDATOR)
         self.stage("README.md", f"{V[0]} {filler('a')}\n")
         self.ruling({"README.md": [(1, V[0], "WRONG")]})
+        [first] = self.lineages()
         self.stage("README.md", f"{V[1]} {filler('b')}\n")
-        for refused in (self.check_launch()[0], self.git_commit()):
-            self.assertEqual(self.decision(refused), "deny")
-            self.assertIn("could not run", self.reason(refused))
-            self.assertIn("split the change", self.reason(refused))
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "allow")
+        self.read(args, {"README.md": ("PROSE", [])})
+        [kept] = self.lineages()
+        self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
 
     def test_a_rewrite_a_commit_already_holds_is_not_refused_and_keeps_the_count(self):  # C26
         filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
