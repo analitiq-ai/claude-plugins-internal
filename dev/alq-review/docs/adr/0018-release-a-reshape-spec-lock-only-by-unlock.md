@@ -53,12 +53,8 @@ ADR-0016 binds each PR to its spec, or to no spec, and to the content of its `sp
 
 ## Decision
 
-1. We will release a `RESHAPE_SPEC` lock only by the user's `unlock <ref>`. Planning's rescope command no
-   longer releases it.
-2. We will have the unlock reply give the open decision, its rationale, the spec gaps and the bound spec
-   folder. The user then runs planning's rescope with that folder.
-3. We will not rescope a PR that is bound to no spec and ruled `RESHAPE_SPEC`: it is closed, and the
-   work restarts on a new PR bound to a new spec. The unlock reply says so.
+We will release a `RESHAPE_SPEC` lock only by the user's `unlock <ref>`. Planning's rescope command no
+longer releases it.
 
 ## Options considered
 
