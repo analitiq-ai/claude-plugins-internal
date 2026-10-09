@@ -145,7 +145,8 @@ says so and the first task proves it with a failing test (R10).
 
 ## R8: Order the delivery as two pull requests; the rename is mechanical
 
-- **Decision**: PR 1 is R1 to R7 and every test for them. PR 2 renames `design-doc` to `alq-spec` and nothing else: the skill
+- **Decision**: PR 1 is R1 to R7 and every test for them. PR 2 renames `design-doc` to `alq-spec` and, by the user's decision of 2026-10-09, applies FR-022 (the five next-step
+  messages of #64, and two test names that said more than their tests check), and nothing else. The rename covers the skill
   folder; the workflow id, title and folder, and the dev project's installed copy; `drive_workflow.py` constants and docstring;
   `policy.py` `RESCOPE_SKILL`; the names in `gate.py`, `speclocation.py` messages and `settled_design.py` messages; the README
   rows and the `/alq-review:design-doc rescope` keyword text; `.github/workflows/tests.yml`; and the tests that name it.
@@ -153,6 +154,7 @@ says so and the first task proves it with a failing test (R10).
   #29 and stays; line 151's `/alq-review:design-doc` is the skill's name and changes.
 - **Rationale**: FR-020. A rename that changes no behaviour is reviewable as a rename only if it carries no other
   change (FR-017). Principle VI is not engaged: no rule file moves with the code it governs.
+  FR-022 is the one exception to "no other change".
 - **Existing tools**: `grep -rn "design-doc"` is the list of places; a test pins that none is left (R9). A sed script was
   looked at and does not fit for the tests: `test_gate.py` has `/design-doc` typed-prompt cases whose expected
   results depend on the keyword, so each hit is read.

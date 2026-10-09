@@ -55,6 +55,12 @@ class Form(unittest.TestCase):
             self.assertIn("/alq-review:alq-spec", str(refused.exception))
             self.assertNotIn("spec: <folder", str(refused.exception))
 
+    def test_text_with_no_spec_line_is_refused_with_deleting_the_comment_then_alq_spec_as_the_next_step(self):
+        with self.assertRaises(SpecLocationError) as refused:
+            speclocation.parse(f"{MARKER}\nGoal: x\nScope: y\n")
+        self.assertEqual(str(refused.exception).partition("Next step: ")[2],
+                         "delete that comment, then run `/alq-review:alq-spec` on the issue.")
+
     def test_every_other_shape_is_refused_stating_the_form(self):
         malformed = {
             "wrong order": f"{MARKER}\nbranch: {BRANCH}\nspec: {FOLDER}\n",
@@ -185,6 +191,10 @@ class Resolve(Issue):
     def test_no_location_comment_is_refused_naming_alq_spec(self):
         self.comments("unrelated chatter")
         self.assertIn("/alq-review:alq-spec #1", self.refusal())
+
+    def test_no_location_comment_is_refused_with_running_alq_spec_as_the_whole_next_step(self):
+        self.comments("unrelated chatter")
+        self.assertEqual(self.refusal().partition("Next step: ")[2], "run `/alq-review:alq-spec #1`.")
 
     def test_a_folder_the_checkout_does_not_hold_is_refused_naming_it_and_its_branch(self):
         self.comments(speclocation.render(FOLDER, "feat/1-elsewhere"))

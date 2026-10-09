@@ -42,6 +42,12 @@ class SpecSource(unittest.TestCase):
                 self.assertIn("SPECLOC show", text)
                 self.assertIn("/alq-review:alq-spec #<n>", text)
 
+    def test_tackle_holds_its_wrong_spec_sentence_and_its_no_comment_sentence_word_for_word(self):
+        text = squashed(TACKLE)
+        self.assertIn("Treat a verdict of AT SYMPTOM or SPEC WRONG as blocking: the first means going back to Step 3, "
+                      "the second means no more code: tell the user what the spec's trace got wrong.", text)
+        self.assertIn("With no location comment, the next step is `/alq-review:alq-spec #<n>`.", text)
+
     def test_tackle_root_cause_and_alq_spec_do_not_spell_the_marker(self):
         for path in (TACKLE, ROOT_CAUSE, ALQ_SPEC):
             with self.subTest(skill=path.parent.name):
