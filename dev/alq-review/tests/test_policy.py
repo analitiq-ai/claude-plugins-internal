@@ -108,18 +108,18 @@ class Mutation(unittest.TestCase):
         state = state_with_round()
         assess(state, "RESHAPE_SPEC")
         reason = mutation(state).reason
-        self.assertIn("`/alq-review:design-doc rescope #7`", reason)
+        self.assertIn("`/alq-review:alq-spec rescope #7`", reason)
         self.assertIn("`unlock #7`", reason)
 
     def test_an_escalate_lock_offers_no_rescope(self):
         state = state_with_round()
         assess(state, "ESCALATE")
-        self.assertNotIn("/design-doc", mutation(state).reason)
+        self.assertNotIn("/alq-spec", mutation(state).reason)
 
     def test_spent_audits_offer_no_rescope_even_when_the_last_audit_ruled_reshape_spec(self):
         """The spent-audit question is whether to go on at all; a re-scope of one ruling does not answer it."""
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7), verdict="RESHAPE_SPEC")
-        self.assertNotIn("/design-doc", mutation(state).reason)
+        self.assertNotIn("/alq-spec", mutation(state).reason)
 
     def test_an_unlock_grants_a_fresh_audit_budget(self):
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))

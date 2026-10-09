@@ -23,7 +23,7 @@ import yaml  # Spec Kit's own dependency
 import speclocation
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
 
-SKILL = PLUGIN / "skills" / "design-doc"
+SKILL = PLUGIN / "skills" / "alq-spec"
 DRIVER = SKILL / "scripts" / "drive_workflow.py"
 SPECKIT = PLUGIN / "speckit"
 sys.path.insert(0, str(DRIVER.parent))
@@ -116,7 +116,7 @@ class Rescope(unittest.TestCase):
 def workflow_steps(steps=None):
     """Every step of the plugin's workflow, the ones nested in an `if` included."""
     if steps is None:
-        steps = yaml.safe_load((SPECKIT / "workflows" / "design-doc" / "workflow.yml").read_text())["steps"]
+        steps = yaml.safe_load((SPECKIT / "workflows" / "alq-spec" / "workflow.yml").read_text())["steps"]
     for step in steps:
         yield step
         yield from workflow_steps(step.get("then", []) + step.get("else", []))
@@ -129,13 +129,13 @@ def same_files(source: Path, installed: Path) -> bool:
 
 
 class Install(unittest.TestCase):
-    """A start installs the plugin's settled-design preset and design-doc workflow into the project it runs in."""
+    """A start installs the plugin's settled-design preset and alq-spec workflow into the project it runs in."""
 
     def setUp(self):
         self.project = Project()
         self.addCleanup(self.project.close)
         self.preset = self.project.root / ".specify" / "presets" / "settled-design"
-        self.workflow = self.project.root / ".specify" / "workflows" / "design-doc"
+        self.workflow = self.project.root / ".specify" / "workflows" / "alq-spec"
 
     def start(self):
         proc, report = self.project.drive("start", self.project.spec_file("RESCOPE x"), SPEC_DIR)
@@ -145,7 +145,7 @@ class Install(unittest.TestCase):
     def test_a_project_without_them_gets_both(self):
         self.start()
         self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
-        self.assertTrue(same_files(SPECKIT / "workflows" / "design-doc", self.workflow))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", self.workflow))
 
     def test_an_installed_copy_that_differs_from_the_plugins_is_replaced(self):
         self.start()
@@ -153,7 +153,7 @@ class Install(unittest.TestCase):
         (self.workflow / "critique_report.py").write_text("stale\n")
         self.start()
         self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
-        self.assertTrue(same_files(SPECKIT / "workflows" / "design-doc", self.workflow))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", self.workflow))
 
     def test_the_settled_design_step_runs_the_check_under_the_root_specify_runs_with(self):
         """The step runs in the project, which has no copy of alq-review's scripts; the driver says where they are."""

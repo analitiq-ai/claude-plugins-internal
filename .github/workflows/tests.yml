@@ -39,7 +39,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      # design-doc drives the real Spec Kit CLI, at the minimum version its workflow declares.
+      # alq-spec drives the real Spec Kit CLI, at the minimum version its workflow declares.
       - run: pip install specify-cli==1.0.7
       - name: Run suite
         working-directory: claude-plugins-internal/${{ matrix.suite }}

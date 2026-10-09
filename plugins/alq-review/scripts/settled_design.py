@@ -148,7 +148,7 @@ def branch_problems(root: str, base: str, patterns: list[str]) -> list[str]:
     folders = spec_folders(root, changed)
     if not folders:
         return [f"{doc}:1: a design document changed and no spec folder the branch keeps did; a design-document change comes with a "
-                "spec folder. Next step: settle the design in a spec folder (/alq-review:design-doc #<issue>)."
+                "spec folder. Next step: settle the design in a spec folder (/alq-review:alq-spec #<issue>)."
                 for doc in design_documents(changed, patterns)]
     return [p for folder in folders for p in problems(Path(root) / folder)]
 

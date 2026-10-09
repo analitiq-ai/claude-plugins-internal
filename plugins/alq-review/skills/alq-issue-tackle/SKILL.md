@@ -1,6 +1,6 @@
 ---
 name: alq-issue-tackle
-description: Implement the fix for a GitHub issue given its issue number, working in a git worktree against the spec in the spec folder that the issue's location comment names. Reads that spec from the folder, stops and names /alq-review:design-doc when the issue has no location comment, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, and reviews the diff against the spec before opening a PR. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
+description: Implement the fix for a GitHub issue given its issue number, working in a git worktree against the spec in the spec folder that the issue's location comment names. Reads that spec from the folder, stops and names /alq-review:alq-spec when the issue has no location comment, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, and reviews the diff against the spec before opening a PR. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
 ---
 
 You will be given a number that represents an issue open in GitHub. Call it `<n>`.
@@ -15,7 +15,7 @@ A location that changed since the last run must win. There are three outcomes:
 - It prints `spec: <folder>` and `branch: <branch>`: the spec is in that folder on that branch.
 - It prints `spec: none` and a reason: the user decided the issue needs no spec. Work from the issue itself.
 - It exits non-zero: show the user its message and stop. Write no code. With no location comment,
-  the next step is `/alq-review:design-doc #<n>`, which creates the spec folder and posts the comment.
+  the next step is `/alq-review:alq-spec #<n>`.
   An issue that was judged not worth doing is refused here too, and the message says so.
 
 ## Step 2 - worktree and spec
@@ -61,7 +61,7 @@ diff that is clean on its own terms and does not satisfy the spec is a failure.
 Then invoke the `alq-review:alq-root-cause-check` skill. A symptom patch is clean code by every other measure,
 so it passes every reviewer not specifically asked whether the fix reached the cause - that
 skill is the one that asks. Treat a verdict of AT SYMPTOM or SPEC WRONG as blocking: the first
-means going back to Step 3, the second means re-scoping it with /alq-review:design-doc before any more code.
+means going back to Step 3, the second means no more code: tell the user what the spec's trace got wrong.
 
 ## Step 5 - PR
 

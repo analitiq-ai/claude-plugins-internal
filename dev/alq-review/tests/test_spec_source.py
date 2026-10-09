@@ -1,5 +1,6 @@
-"""What the alq-issue-tackle, alq-root-cause-check and design-doc skills say about where the spec is (spec 018)."""
+"""What the alq-issue-tackle, alq-root-cause-check and alq-spec skills say about where the spec is (spec 018)."""
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -14,10 +15,13 @@ import speclocation
 SKILLS = PLUGIN / "skills"
 TACKLE = SKILLS / "alq-issue-tackle" / "SKILL.md"
 ROOT_CAUSE = SKILLS / "alq-root-cause-check" / "SKILL.md"
-DESIGN_DOC = SKILLS / "design-doc" / "SKILL.md"
+ALQ_SPEC = SKILLS / "alq-spec" / "SKILL.md"
 GATE = PLUGIN / "scripts" / "gate.py"
 # Spelled in two halves so that this file is not itself a hit.
 DELETED_SKILL = "alq-" + "shape"
+# The planning skill's old name, with a hyphen or an underscore, in any case. "design document" is the
+# settled-design rule's term and stays.
+OLD_SKILL_NAME = re.compile("design[-_]" + "doc(?!ument)", re.I)
 OLD_HOME_PHRASES = ("spec lives on the issue", "spec lives **on the issue**", "its only home")
 
 
@@ -30,16 +34,16 @@ def squashed(path: Path) -> str:
 
 
 class SpecSource(unittest.TestCase):
-    def test_tackle_and_root_cause_name_the_show_command_and_design_doc(self):
+    def test_tackle_and_root_cause_name_the_show_command_and_alq_spec(self):
         for path in (TACKLE, ROOT_CAUSE):
             text = path.read_text()
             with self.subTest(skill=path.parent.name):
                 self.assertIn("speclocation.py", text)
                 self.assertIn("SPECLOC show", text)
-                self.assertIn("/alq-review:design-doc #<n>", text)
+                self.assertIn("/alq-review:alq-spec #<n>", text)
 
-    def test_tackle_root_cause_and_design_doc_do_not_spell_the_marker(self):
-        for path in (TACKLE, ROOT_CAUSE, DESIGN_DOC):
+    def test_tackle_root_cause_and_alq_spec_do_not_spell_the_marker(self):
+        for path in (TACKLE, ROOT_CAUSE, ALQ_SPEC):
             with self.subTest(skill=path.parent.name):
                 self.assertNotIn(speclocation.MARKER, path.read_text())
 
@@ -61,8 +65,16 @@ class SpecSource(unittest.TestCase):
                  and DELETED_SKILL in path.read_text(errors="ignore")]
         self.assertEqual(named, [])
 
-    def test_design_doc_says_to_stop_on_located_ahead_of_the_start_command(self):
-        text = squashed(DESIGN_DOC)
+    def test_no_tracked_file_of_the_plugin_its_tests_the_spec_kit_files_or_ci_names_the_skill_by_its_old_name(self):
+        # Tracked files only: a Spec Kit run leaves ignored state in the dev project, named after the workflow it ran.
+        tracked = subprocess.run(["git", "ls-files", "-z", "plugins", "dev/alq-review/tests", "dev/alq-review/.specify",
+                                  ".github"], cwd=REPO, capture_output=True, text=True, check=True).stdout
+        named = [path for path in tracked.split("\0")
+                 if path and OLD_SKILL_NAME.search(path + (REPO / path).read_text(errors="ignore"))]
+        self.assertEqual(named, [])
+
+    def test_alq_spec_says_to_stop_on_located_ahead_of_the_start_command(self):
+        text = squashed(ALQ_SPEC)
         self.assertIn("SPECLOC status <issue>", text)
         stop = ("`located`: the issue's location comment names a spec folder. Run `python3 SPECLOC show <issue>`, "
                 "show the user the location, and stop.")
@@ -72,8 +84,8 @@ class SpecSource(unittest.TestCase):
                 self.assertIn(f"`{state}`", text)
         self.assertLess(text.find(stop), text.find("DRIVE start"))
 
-    def test_design_doc_names_the_premise_form_the_report_its_fields_and_the_resume_in_that_order(self):
-        text = squashed(DESIGN_DOC)
+    def test_alq_spec_names_the_premise_form_the_report_its_recommendation_and_pick_and_the_resume_in_that_order(self):
+        text = squashed(ALQ_SPEC)
         steps = ["PREMISE form", ".specify/workflows/runs/<run_id>/premise-report.md",
                  f"`{premise_report.RECOMMENDATION}:`", f"`{premise_report.PICK}:`", 'premise_verdict=<pick>"',
                  "/speckit-grill-me"]
@@ -93,25 +105,25 @@ class SpecSource(unittest.TestCase):
                 self.assertIn(phrase, text)
         self.assertNotIn("no Root cause section yet", text)
 
-    def test_design_doc_names_the_location_script_and_its_commands(self):
-        text = DESIGN_DOC.read_text()
+    def test_alq_spec_names_the_location_script_its_post_and_none_commands_and_the_none_form(self):
+        text = ALQ_SPEC.read_text()
         for phrase in ("speclocation.py", "SPECLOC post", "SPECLOC none", "#<issue> none <reason>"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
 
-    def test_design_doc_commits_then_pushes_then_posts_the_location_comment(self):
-        text = DESIGN_DOC.read_text()
+    def test_alq_spec_commits_then_pushes_then_posts_the_location_comment(self):
+        text = ALQ_SPEC.read_text()
         positions = [text.find(step) for step in ("git commit", "git push", "SPECLOC post")]
         self.assertNotIn(-1, positions, positions)
         self.assertEqual(positions, sorted(positions))
 
-    def test_design_doc_says_a_failed_run_leaves_nothing_behind(self):
-        text = squashed(DESIGN_DOC)
+    def test_alq_spec_says_a_failed_run_leaves_nothing_behind(self):
+        text = squashed(ALQ_SPEC)
         self.assertIn("A run that is rejected or fails commits nothing, pushes nothing and posts no location comment.", text)
         self.assertIn("starts no workflow", text)
 
-    def test_tackle_root_cause_design_doc_and_the_gate_hold_none_of_the_old_home_phrases(self):
-        for path in (TACKLE, ROOT_CAUSE, DESIGN_DOC, GATE):
+    def test_tackle_root_cause_alq_spec_and_the_gate_hold_none_of_the_old_home_phrases(self):
+        for path in (TACKLE, ROOT_CAUSE, ALQ_SPEC, GATE):
             text = squashed(path).lower()
             for phrase in OLD_HOME_PHRASES:
                 with self.subTest(file=path.relative_to(PLUGIN).as_posix(), phrase=phrase):

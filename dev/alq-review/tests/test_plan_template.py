@@ -11,7 +11,7 @@ from pathlib import Path
 
 from paths import PLUGIN
 
-DRIVER = PLUGIN / "skills" / "design-doc" / "scripts"
+DRIVER = PLUGIN / "skills" / "alq-spec" / "scripts"
 sys.path.insert(0, str(DRIVER))
 import drive_workflow  # noqa: E402
 
@@ -24,7 +24,7 @@ PRESET = drive_workflow.PRESET[0]
 
 
 def setUpModule():
-    """A new Claude Code Spec Kit project with the preset installed the way a design-doc start installs it."""
+    """A new Claude Code Spec Kit project with the preset installed the way an alq-spec start installs it."""
     global PROJECT
     PROJECT = tempfile.TemporaryDirectory()
     subprocess.run(["specify", "init", "--here", "--integration", "claude", "--script", "sh", "--ignore-agent-tools",

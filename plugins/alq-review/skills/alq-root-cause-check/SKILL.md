@@ -33,7 +33,7 @@ It prints the spec folder and its branch, or `spec: none` and a reason. Read `<f
 
 Stop and say so, with no verdict, when the section reads `Not a defect report.` Report
 **CANNOT TELL** and name what is missing when: `show` exits non-zero (with no location comment,
-name `/alq-review:design-doc #<n>` as the next step), it prints `spec: none`, or spec.md has no
+name `/alq-review:alq-spec #<n>` as the next step), it prints `spec: none`, or spec.md has no
 `## Root cause` section. Never invent the cause yourself and grade
 against that; a cause you derived from the diff will always agree with the diff.
 
