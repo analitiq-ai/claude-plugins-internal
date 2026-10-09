@@ -450,7 +450,7 @@ V = ("The validator rejects an empty list.", "The validator refuses an empty lis
 
 
 class ClaimLineages(ClaimGate):
-    def test_a_reworded_wrong_claim_is_one_lineage_with_a_rising_count(self):  # C1
+    def test_a_reworded_wrong_claim_is_one_lineage_with_a_rising_count(self):
         self.wrong(V[0])
         self.wrong(V[1])
         [found] = self.lineages()
@@ -463,7 +463,7 @@ class ClaimLineages(ClaimGate):
         self.ruling({"docs/other.md": [(1, "The validator returns True.", "CORRECT")]})
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
-    def test_a_commit_of_another_file_in_between_does_not_reset_the_count(self):  # C2 (#15)
+    def test_a_commit_of_another_file_in_between_does_not_reset_the_count(self):  # #15
         self.wrong(V[0])
         self.wrong(V[1])
         self.commit_another_file()
@@ -478,7 +478,7 @@ class ClaimLineages(ClaimGate):
         self.assertEqual(self.decision(launched), "deny")
         self.assertIn("Stop and ask the user", self.reason(launched))
 
-    def test_an_amend_does_not_reset_the_count(self):  # C3
+    def test_an_amend_does_not_reset_the_count(self):
         self.wrong(V[0])
         self.wrong(V[1])
         self.commit_another_file()
@@ -486,7 +486,7 @@ class ClaimLineages(ClaimGate):
         self.wrong(V[2])
         self.assertEqual(self.counts(), [3])
 
-    def test_the_completion_step_run_twice_counts_once(self):  # C9 (#16)
+    def test_the_completion_step_run_twice_counts_once(self):  # #16
         self.wrong(V[0])
         with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
             with ledger.open_claims("acme/demo") as claims:
@@ -498,7 +498,7 @@ class ClaimLineages(ClaimGate):
         self.assertEqual(self.stored()["status"], "complete")
         self.assertEqual(self.counts(), [1])
 
-    def test_a_correct_ruling_ends_the_lineage_and_the_next_wrong_starts_at_one(self):  # C15
+    def test_a_correct_ruling_ends_the_lineage_and_the_next_wrong_starts_at_one(self):
         self.wrong(V[0])
         self.wrong(V[1])
         self.stage("README.md", V[2] + "\n")
@@ -510,7 +510,7 @@ class ClaimLineages(ClaimGate):
         [fresh] = self.lineages()
         self.assertEqual((fresh["id"], claimcheck.count(fresh)), (claimcheck.claim_id("README.md", V[3]), 1))
 
-    def test_a_file_with_a_unicode_line_break_above_a_claim_is_checked_like_any_other(self):  # C24
+    def test_a_file_with_a_unicode_line_break_above_a_claim_is_checked_like_any_other(self):
         self.stage("validator.py", VALIDATOR)
         self.stage("README.md", f"Intro\u2028still the intro\x0c\n{V[0]}\n")
         self.ruling({"README.md": [(2, V[0], "WRONG")]})
@@ -523,20 +523,20 @@ class ClaimLineages(ClaimGate):
         _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
         self.judge(args, "README.md", text, kind, agent_type=CONTEST)
 
-    def test_a_rejected_contest_is_one_more_wrong(self):  # C16
+    def test_a_rejected_contest_is_one_more_wrong(self):
         self.wrong(V[0])
         self.contest(V[0], "WRONG")
         self.assertEqual(self.counts(), [2])
         self.assertEqual(self.decision(self.git_commit()), "deny")
 
-    def test_an_upheld_contest_lowers_nothing_and_lets_the_commit_through(self):  # C17
+    def test_an_upheld_contest_lowers_nothing_and_lets_the_commit_through(self):
         self.wrong(V[0])
         self.wrong(V[1])
         self.contest(V[1], "UNSURE")
         self.assertEqual(self.counts(), [2])
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
-    def test_an_upheld_contest_that_finds_the_claim_correct_ends_the_lineage(self):  # C17, FR-008
+    def test_an_upheld_contest_that_finds_the_claim_correct_ends_the_lineage(self):
         self.wrong(V[0])
         self.wrong(V[1])
         self.contest(V[1], "CORRECT")
@@ -545,7 +545,7 @@ class ClaimLineages(ClaimGate):
         self.wrong(V[2])
         self.assertEqual(self.counts(), [1])
 
-    def test_reshaping_text_that_shares_a_hunk_keeps_each_claim_its_own_lineage(self):  # C10
+    def test_reshaping_text_that_shares_a_hunk_keeps_each_claim_its_own_lineage(self):
         self.stage("validator.py", VALIDATOR)
         lines = [f"The validator rejects {word} lists." for word in ("empty", "short", "long")]
         for n, wrong in enumerate(lines):
@@ -562,7 +562,7 @@ class ClaimRelease(ClaimGate):
             self.wrong(text)
         return claimcheck.claim_id("README.md", V[0])
 
-    def test_the_user_releases_a_hold_and_one_more_wrong_brings_them_back(self):  # C8
+    def test_the_user_releases_a_hold_and_one_more_wrong_brings_them_back(self):
         lid = self.held()
         self.assertEqual(self.decision(self.git_commit()), "deny")
         said = self.unlock(lid)["hookSpecificOutput"]["additionalContext"]
@@ -599,7 +599,7 @@ class ClaimRelease(ClaimGate):
         self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
         self.ruling({"README.md": [(2, text, "WRONG")]})
 
-    def test_an_unlock_changes_nothing_in_a_lineage_below_the_bound_or_already_released(self):  # C25
+    def test_an_unlock_changes_nothing_in_a_lineage_below_the_bound_or_already_released(self):
         self.stage("validator.py", VALIDATOR)
         lid = claimcheck.claim_id("README.md", V[0])
         self.reworded(V[0])
@@ -615,7 +615,7 @@ class ClaimRelease(ClaimGate):
         self.unlock(lid)
         self.assertEqual(self.lineages(), [released])
 
-    def test_an_unlock_changes_nothing_in_a_lineage_that_ended_at_the_bound_unreleased(self):  # C25
+    def test_an_unlock_changes_nothing_in_a_lineage_that_ended_at_the_bound_unreleased(self):
         self.stage("validator.py", VALIDATOR)
         for text in V[:3]:
             self.reworded(text)
@@ -627,7 +627,7 @@ class ClaimRelease(ClaimGate):
         self.unlock(claimcheck.claim_id("README.md", V[0]))
         self.assertEqual(self.lineages(ended=True), [ended])
 
-    def test_a_reword_without_the_release_is_refused_at_launch(self):  # C18
+    def test_a_reword_without_the_release_is_refused_at_launch(self):
         self.held()
         self.stage("README.md", V[3] + "\n")
         out = self.check_launch()[0]
@@ -639,7 +639,7 @@ class ClaimRelease(ClaimGate):
         self.assertEqual(self.decision(self.hook("PreToolUse", "Bash", {"command": f"python3 /p/alq-review/scripts/ledger.py unlock claim-{lid}"})), "deny")
         self.assertIsNone(self.lineages()[0]["released"])
 
-    def test_a_released_lineage_merged_with_a_lower_one_is_held_by_the_next_wrong(self):  # C20
+    def test_a_released_lineage_merged_with_a_lower_one_is_held_by_the_next_wrong(self):
         self.stage("validator.py", VALIDATOR)
         first, second = "The tool is fast.", "It is safe."
         self.stage("README.md", f"{first}\n{second}\n")
@@ -666,7 +666,7 @@ class ClaimReshaping(ClaimGate):
             self.ruling({"README.md": [(1, text, "WRONG")]})
         return self.lineages()
 
-    def test_a_split_in_place_keeps_both_halves_in_the_lineage(self):  # C4
+    def test_a_split_in_place_keeps_both_halves_in_the_lineage(self):
         self.stage("validator.py", VALIDATOR)
         for verb in ("rejects", "refuses"):
             long = f"The validator {verb} an empty list and it logs the reason."
@@ -689,15 +689,15 @@ class ClaimReshaping(ClaimGate):
         self.stage("README.md", "\n".join(halves) + "\n")
         self.ruling({"README.md": [(1, halves[0], first), (2, halves[1], second)]})
 
-    def test_a_split_whose_first_half_is_correct_and_second_wrong_still_counts(self):  # C4, FR-003
+    def test_a_split_whose_first_half_is_correct_and_second_wrong_still_counts(self):
         self.halves_ruled("CORRECT", "WRONG")
         self.assertEqual(self.counts(), [3])
 
-    def test_a_split_whose_first_half_is_wrong_and_second_correct_still_counts(self):  # C4, FR-003
+    def test_a_split_whose_first_half_is_wrong_and_second_correct_still_counts(self):
         self.halves_ruled("WRONG", "CORRECT")
         self.assertEqual(self.counts(), [3])
 
-    def test_a_file_the_tree_lacks_ends_its_lineages(self):  # C6, FR-010
+    def test_a_file_the_tree_lacks_ends_its_lineages(self):
         self.commit("README.md", "Placeholder.\n", "docs: readme")
         self.at_two("Other text.")
         git(self.root, "rm", "-q", "-f", "README.md")
@@ -705,7 +705,7 @@ class ClaimReshaping(ClaimGate):
         [ended] = self.lineages(ended=True)
         self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
 
-    def test_two_lineages_merged_into_one_sentence_continue_as_the_higher(self):  # C5
+    def test_two_lineages_merged_into_one_sentence_continue_as_the_higher(self):
         self.stage("validator.py", VALIDATOR)
         second = "It is safe."
         self.stage("README.md", f"{V[0]}\n{second}\n")
@@ -720,21 +720,21 @@ class ClaimReshaping(ClaimGate):
         [loser] = [item for item in self.lineages(ended=True) if item["state"] == "ended"]
         self.assertEqual((loser["ended"]["by"], loser["ended"]["into"]), ("merged", survivor["id"]))
 
-    def test_deleted_words_end_the_lineage(self):  # C6
+    def test_deleted_words_end_the_lineage(self):
         self.at_two("Other text.")
         self.stage("README.md", "Other text.\n")
         self.ruling({})
         [ended] = self.lineages(ended=True)
         self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
 
-    def test_words_moved_unchanged_in_the_file_keep_the_lineage(self):  # C7
+    def test_words_moved_unchanged_in_the_file_keep_the_lineage(self):
         self.at_two("Other text.")
         self.stage("README.md", f"Other text.\n{V[1]}\n")
         self.ruling({"README.md": [(2, V[1], "WRONG")]})
         self.assertEqual(self.counts(), [3])
         self.assertEqual(len(self.lineages()), 1)
 
-    def test_one_hunk_over_two_held_claims_continues_both(self):  # C11
+    def test_one_hunk_over_two_held_claims_continues_both(self):
         self.stage("validator.py", VALIDATOR)
         for n in range(3):
             first, second = f"The validator rejects an empty list ({n}).", f"The validator logs the reason ({n})."
@@ -749,7 +749,7 @@ class ClaimReshaping(ClaimGate):
         self.ruling({"README.md": [(1, first, "WRONG"), (2, second, "WRONG")]})
         self.assertEqual(self.counts(), [4, 4])
 
-    def test_words_moved_and_reworded_in_one_step_are_a_new_claim(self):  # C12
+    def test_words_moved_and_reworded_in_one_step_are_a_new_claim(self):
         self.at_two("Other text.")
         self.stage("README.md", f"Other text.\n{V[2]}\n")
         self.ruling({"README.md": [(2, V[2], "WRONG")]})
@@ -757,28 +757,28 @@ class ClaimReshaping(ClaimGate):
         [old] = [item for item in self.lineages(ended=True) if item["state"] == "ended"]
         self.assertEqual(old["ended"]["by"], "deleted")
 
-    def test_a_moved_file_starts_again(self):  # C13
+    def test_a_moved_file_starts_again(self):
         self.at_two()
         git(self.root, "mv", "README.md", "GUIDE.md")
         self.ruling({"GUIDE.md": [(1, V[1], "WRONG")]})
         self.assertEqual((self.counts("GUIDE.md"), self.counts("README.md")), ([1], []))
         self.assertEqual([item["ended"]["by"] for item in self.lineages(ended=True)], ["deleted"])
 
-    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):  # C22, FR-010
+    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):
         self.at_two()
         git(self.root, "rm", "-q", "-f", "README.md")
         self.check_launch()
         [ended] = self.lineages(ended=True)
         self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
 
-    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):  # C21, FR-002
+    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):
         self.at_two()
         git(self.root, "rm", "-q", "--cached", "README.md")
         self.stage("docs/other.md", "The validator returns True.\n")
         self.ruling({"docs/other.md": [(1, "The validator returns True.", "CORRECT")]})
         self.assertEqual(self.counts(), [2])
 
-    def test_a_reflow_with_the_words_unchanged_keeps_the_lineage(self):  # C14
+    def test_a_reflow_with_the_words_unchanged_keeps_the_lineage(self):
         self.stage("validator.py", VALIDATOR)
         for text in ("The validator rejects\nan empty list.", "The validator refuses\nan empty list."):
             self.stage("README.md", text + "\n")
@@ -788,14 +788,14 @@ class ClaimReshaping(ClaimGate):
         self.assertEqual(self.counts(), [2])
         self.assertEqual(len(self.lineages()), 1)
 
-    def test_a_split_whose_second_half_is_placed_elsewhere_inherits_only_the_first(self):  # C19
+    def test_a_split_whose_second_half_is_placed_elsewhere_inherits_only_the_first(self):
         self.at_two("Other text.")
         first, second = "The validator refuses an empty list.", "It logs the reason."
         self.stage("README.md", f"{first}\nOther text.\n{second}\n")
         self.ruling({"README.md": [(1, first, "UNSURE"), (3, second, "WRONG")]})
         self.assertEqual(self.counts(), [1, 2])
 
-    def test_a_held_claim_moved_unchanged_is_held_before_any_reader_runs(self):  # C23, FR-011
+    def test_a_held_claim_moved_unchanged_is_held_before_any_reader_runs(self):
         self.stage("validator.py", VALIDATOR)
         for text in V[:3]:
             self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
@@ -821,7 +821,7 @@ class ClaimLibraryMissing(ThroughProcess, ClaimGate):
     def without_the_library(self):
         self.env["PYTHONPATH"] = str(self.blocked)
 
-    def test_a_missing_library_refuses_the_launch_and_the_commit_and_names_the_install(self):  # X1
+    def test_a_missing_library_refuses_the_launch_and_the_commit_and_names_the_install(self):
         self.stage("README.md", TRUE)
         self.without_the_library()
         for refused in (self.check_launch()[0], self.git_commit()):
@@ -829,7 +829,7 @@ class ClaimLibraryMissing(ThroughProcess, ClaimGate):
             self.assertIn("could not run", self.reason(refused))
             self.assertRegex(self.reason(refused), INSTALL_COMMAND)
 
-    def test_a_missing_library_is_only_recorded_in_log_mode(self):  # X1
+    def test_a_missing_library_is_only_recorded_in_log_mode(self):
         self.env["ALQ_REVIEW_CLAIM_CHECKS"] = "log"
         self.stage("README.md", TRUE)
         self.without_the_library()
@@ -838,7 +838,7 @@ class ClaimLibraryMissing(ThroughProcess, ClaimGate):
 
 
 class ClaimLibrary(ClaimGate):
-    def test_a_staged_rewrite_past_the_budget_is_not_refused_and_keeps_the_count(self):  # X2
+    def test_a_staged_rewrite_past_the_budget_is_not_refused_and_keeps_the_count(self):
         filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
         self.stage("validator.py", VALIDATOR)
         self.stage("README.md", f"{V[0]} {filler('a')}\n")
@@ -851,7 +851,7 @@ class ClaimLibrary(ClaimGate):
         [kept] = self.lineages()
         self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
 
-    def test_a_rewrite_a_commit_already_holds_is_not_refused_and_keeps_the_count(self):  # C26
+    def test_a_rewrite_a_commit_already_holds_is_not_refused_and_keeps_the_count(self):
         filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
         self.stage("validator.py", VALIDATOR)
         self.stage("README.md", f"{V[0]} {filler('a')}\n")
@@ -867,14 +867,14 @@ class ClaimLibrary(ClaimGate):
         self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
-    def test_a_staged_file_with_a_space_in_its_name_is_followed_under_its_real_path(self):  # C27
+    def test_a_staged_file_with_a_space_in_its_name_is_followed_under_its_real_path(self):
         self.stage("validator.py", VALIDATOR)
         self.stage("my notes.md", FALSE)
         self.ruling({"my notes.md": [(1, FALSE.strip(), "WRONG")]})
         [item] = self.lineages("my notes.md")
         self.assertEqual(claimcheck.count(item), 1)
 
-    def test_a_staged_gitlink_has_no_claims_and_the_check_completes(self):  # C28
+    def test_a_staged_gitlink_has_no_claims_and_the_check_completes(self):
         (self.root / "vendor" / "sub").mkdir(parents=True)
         head = git(self.root, "rev-parse", "HEAD").strip()
         git(self.root, "update-index", "--add", "--cacheinfo", f"160000,{head},vendor/sub")
