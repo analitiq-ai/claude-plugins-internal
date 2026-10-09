@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0017"
 title: "Leave the spec folder's contents to planning; review reads only spec.md"
-status: draft
+status: accepted
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, spec-folder, settled-design, review-round, mode]
@@ -21,6 +21,7 @@ affects:
     pattern: "dev/alq-review/tests/{test_gate,test_settled_design}.py"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -95,5 +96,5 @@ its `design_documents` list, which ADR-0012, decision 3, already says should not
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Plan issue #63 against this ADR.

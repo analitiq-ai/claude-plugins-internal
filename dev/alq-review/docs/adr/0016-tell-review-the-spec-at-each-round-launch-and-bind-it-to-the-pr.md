@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0016"
 title: "Tell review the spec at each round launch and bind it to the PR"
-status: draft
+status: accepted
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, review-round, ledger]
@@ -23,6 +23,7 @@ affects:
     pattern: "dev/alq-review/tests/{test_gate,test_ledger,test_speclocation,test_spec_source,test_premise_report}.py"
 provenance:
   authoredBy: agent-drafted
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -134,5 +135,5 @@ and never finds it, and that the location comment goes.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.
 2. [ ] Plan issue #63 against this ADR.
