@@ -716,14 +716,14 @@ class ClaimReshaping(ClaimGate):
         self.assertEqual((self.counts("GUIDE.md"), self.counts("README.md")), ([1], []))
         self.assertEqual([item["ended"]["by"] for item in self.lineages(ended=True)], ["deleted"])
 
-    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):  # C6, FR-010
+    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):  # C22, FR-010
         self.at_two()
         git(self.root, "rm", "-q", "-f", "README.md")
         self.check_launch()
         [ended] = self.lineages(ended=True)
         self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
 
-    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):  # C2 (#15)
+    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):  # C21, FR-002
         self.at_two()
         git(self.root, "rm", "-q", "--cached", "README.md")
         self.stage("docs/other.md", "The validator returns True.\n")

@@ -33,6 +33,7 @@ State transitions:
 open --WRONG, UNSURE, a place moved--> open
 open --CORRECT on its last place--> ended (correct)
 open --its last place carried to nothing--> ended (deleted)
+open --its file is in neither the staged tree nor the checkout--> ended (deleted)
 open --a claim inherits it and a lineage with a higher count--> ended (merged, into)
 open --unlock claim-<id>--> open, released
 ```

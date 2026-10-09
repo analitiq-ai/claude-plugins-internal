@@ -32,12 +32,13 @@ A decision marked **Derived** is not in #17 or an ADR. It follows from them, but
 - **Decision**: a new table `seen_files (repo, branch, gate, file)` keeps the file's text as the last
   completed check of that gate on that branch saw it. A check moves a file's lineages, and replaces its seen
   text, only when the file is among its staged hunks, and only when it completes. **Derived**: a file that is
-  not in the check is left alone, lineages and seen text both. That includes a file that was deleted or moved
-  away: its lineages stay open and unused, and are not marked ended.
+  not in the check is left alone, lineages and seen text both, unless the staged tree and the checkout both lack it:
+  a deleted or moved-away file has its lineages ended `deleted`.
 - **Rationale**: this is what makes #15 hold. To commit another file the agent must unstage the wrong words, so
-  the check of that commit sees the file as `HEAD` has it. Diffing that against the last version would read the
-  claim as deleted, end the lineage, and start the words at 1 when they are staged again: the same reset by
-  another route. Leaving the file alone keeps the count at 2 (US1-2). The text is kept, not a blob id, because
+  the staged tree of that commit has a file `HEAD` holds as `HEAD` has it plus any hunk still staged, and lacks a
+  file no commit ever held. Ending the lineage of the second kind would start the words at 1 when they are staged again: the same reset by
+  another route. So the disk decides: a file still on it keeps its count at 2 (US1-2), and only one gone from
+  both the staged tree and the disk ends. The text is kept, not a blob id, because
   wrong words never reach a commit: their blob is unreachable and `git gc` prunes it after two weeks, and a
   check that then cannot map has no next step that can succeed (ADR-0009 point 3). Advancing at completion,
   inside the ledger's transaction, means a check that is replaced before it completes moves nothing.

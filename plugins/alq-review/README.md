@@ -81,8 +81,8 @@ that is under review.
    rejects it, and a rejection counts as a refusal. A claim is counted as one lineage that follows its words from
    edit to edit, whatever else is committed in between: the staged file is diffed against the text the last
    completed check saw (`diff-match-patch` inside a rewritten range, a shift outside it), and a lineage ends
-   when its last words are ruled `CORRECT`, deleted or merged into another lineage's, or when its file leaves both the
-   staged change and the disk (a file only unstaged keeps its count). At 3 `WRONG` rulings the agent must stop
+   when its last words are ruled `CORRECT`, deleted or merged into another lineage's, or when the staged tree no longer
+   has its file and the disk has none either (a file only unstaged keeps its count). At 3 `WRONG` rulings the agent must stop
    and ask the user, who lets the words stand by typing `unlock claim-<id>`; one more `WRONG` ruling holds it again.
    What the repo's own commit hook changes during the commit is cosmetic and is not checked again.
 8. **A fix reaches every site of its bug before it is committed.** A `git commit` that stages code is also refused

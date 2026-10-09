@@ -136,7 +136,8 @@ Derived, for the user to confirm; the plan is written as if each stands:
 4. An upheld contest lowers no count, and a held lineage stays held when reworded (R7).
 5. An override of a bug lasts until a commit changes that bug's code (R11).
 6. Converging bugs at 1 and 3 are one bug at 3, and the patch that merged them then counts once, to 4 (R10).
-7. A deleted or moved file's lineages are left open and unused, not marked ended (R2).
+7. A file the staged tree and the checkout both lack has its lineages ended `deleted`; a file only unstaged keeps
+   them (R2).
 
 To measure first: git's header for two blobs (R3), the character diff's time on a large range (R4), the
 install command and the version to pin (R13).

@@ -850,7 +850,7 @@ class ShimChain(ShimGate):
         [bug] = [c for c in self.chains() if c["state"] != "ended"]
         self.assertEqual((bug["id"], bug["count"]), (first["id"], 2))
 
-    def test_a_bug_in_a_never_committed_file_removed_from_disk_ends(self):  # B1, FR-001
+    def test_a_bug_in_a_never_committed_file_removed_from_disk_ends(self):  # B9, FR-001
         Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         self.labelled({"n.py": ("def load():\n    return 'first'\n", "CODE")})
         _, args = self.shim_launch()
@@ -862,7 +862,7 @@ class ShimChain(ShimGate):
         self.sweep(args, [])
         self.assertEqual({c["id"]: c["state"] for c in self.chains()}[first["id"]], "ended")
 
-    def test_a_bug_in_a_never_committed_file_unstaged_but_on_disk_keeps_its_count(self):  # B1, FR-002
+    def test_a_bug_in_a_never_committed_file_unstaged_but_on_disk_keeps_its_count(self):  # B8, FR-002
         Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         text = "def load():\n    return 'first'\n"
         self.labelled({"n.py": (text, "CODE")})
