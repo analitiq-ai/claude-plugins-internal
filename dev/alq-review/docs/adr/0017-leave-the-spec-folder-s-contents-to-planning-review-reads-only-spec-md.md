@@ -9,7 +9,7 @@ tags: [spec, spec-folder, settled-design, review-round, mode]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0011", "0012", "0016", "0019"]
+relatesTo: ["0011", "0012", "0016"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{gate,hookio,briefs,settled_design}.py"
@@ -31,7 +31,7 @@ externalRefs:
   - type: issue
     id: "63"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Split the planning plugin out of alq-review"
+    label: "Move planning (alq-spec) out of alq-review into its own plugin"
 ---
 
 # ADR-0017: Leave the spec folder's contents to planning; review reads only spec.md
@@ -50,7 +50,7 @@ Today review checks the spec folder, not only the spec:
 - The spec checks have their own setting, `spec_checks`, and their own refusal, `refuse_spec`. ADR-0011,
   Option A, names the brake for a new check: the user reads the log and sets that check to `log`.
 
-Issue #63 splits planning out of alq-review (ADR-0019). ADR-0016 tells review the spec folder at launch and
+Issue #63 moves planning out of alq-review. ADR-0016 tells review the spec folder at launch and
 verifies it against HEAD. The user decided that the folder's contents are planning's to check, not review's.
 
 ## Decision
@@ -78,7 +78,7 @@ decision 3, checks. ADR-0012, decision 3, is carried out by deleting `design_doc
 ### Option B: Do nothing
 
 Review keeps the settled-design check, its own `spec_checks` setting, and the design-document rule with
-its `design_documents` list, which ADR-0012, decision 3, already says should not exist. Once planning is its own plugin, review keeps checking the output of a plugin it no longer holds.
+its `design_documents` list, which ADR-0012, decision 3, already says should not exist.
 
 ## Trade-offs
 

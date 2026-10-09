@@ -9,7 +9,7 @@ tags: [spec, review-round, ledger]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0008", "0009", "0012", "0018", "0019"]
+relatesTo: ["0002", "0008", "0009", "0012", "0018"]
 affects:
   - type: path
     pattern: "plugins/alq-review/workflows/{review-round,assess-round}.js"
@@ -33,7 +33,7 @@ externalRefs:
   - type: issue
     id: "63"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Split the planning plugin out of alq-review"
+    label: "Move planning (alq-spec) out of alq-review into its own plugin"
 ---
 
 # ADR-0016: Tell review the spec at each round launch and bind it to the PR
@@ -54,7 +54,7 @@ ADR-0012 weighed the other way and rejected it, as its Option D: the session nam
 launches the gate. The objection was that "the gate would take the word of the session it checks, and would
 still have to test the folder against git."
 
-Issue #63 splits planning out of alq-review (ADR-0019). The user decided that review is told the spec and
+Issue #63 moves planning out of alq-review. The user decided that review is told the spec and
 never finds it, and that the location comment goes.
 
 ADR-0002, decision 3, allows no record outside the one store, the ledger, without an ADR that names it.
@@ -84,7 +84,7 @@ rest of ADR-0012, decision 2, stands: the repo, the branch, the PR and the base 
 GitHub, never passed. ADR-0008, decision 1, stands: the spec lives in the spec folder. So does the part of
 ADR-0008, decision 2, about what the gate hands to the internal reviewers and to the assessor. Its part
 about the skills that shape and tackle an issue, and what planning does with an issue that needs no spec or
-is not worth doing, are left to the new plugins' logs (ADR-0019, decision 4).
+is not worth doing, are not decided here.
 
 ## Options considered
 
@@ -125,8 +125,7 @@ and never finds it, and that the location comment goes.
 
 ## Consequences
 
-- Easier: review needs nothing from the issue or from the planning plugin to know its spec. Every round of
-  a PR, and its assessment, reads the same spec text, so a session cannot move the target between rounds.
+- Easier: review needs nothing from the issue to know its spec. Every round of a PR, and its assessment, reads the same spec text, so a session cannot move the target between rounds.
 - Harder: every caller of review-round passes `spec`. The skills, scripts and tests built on the location
   comment change together.
 - **How we would know this was wrong:** PRs bound to the wrong spec with no way out; rounds launched
