@@ -2,22 +2,24 @@
   "schema_version": "1.0",
   "presets": {
     "settled-design": {
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "local",
-      "manifest_hash": "sha256:1ddf31ef0507e246b1276f7263ead8f0bd9198f3bacfe75b39548344145e4d5b",
+      "manifest_hash": "sha256:58d0395a6faccd92a05782b082ff017c45bd2028a0e45b4904f234b404d891ca",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
         "claude": [
+          "speckit.specify",
           "speckit.plan"
         ]
       },
       "registered_skills": {
         "claude": [
+          "speckit-specify",
           "speckit-plan"
         ]
       },
-      "installed_at": "2026-10-06T09:47:56.841309+00:00"
+      "installed_at": "2026-10-08T18:25:41.438486+00:00"
     }
   }
 }

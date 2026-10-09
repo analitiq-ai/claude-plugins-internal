@@ -13,11 +13,12 @@ from test_worktree_facts import git
 
 import github
 import speclocation
-from speclocation import Located, NoSpec, SpecLocationError
+from speclocation import Located, NoSpec, NotWorthDoing, SpecLocationError
 
 MARKER = "<!-- analitiq-spec -->"
 FOLDER, BRANCH = "dev/demo/specs/001-demo", "feat/1-demo"
 LOCATED = f"{MARKER}\nspec: {FOLDER}\nbranch: {BRANCH}\n"
+NOT_WORTH_DOING = f"{MARKER}\nspec: not worth doing\nreason: nothing goes wrong today\n"
 
 
 class Form(unittest.TestCase):
@@ -29,6 +30,10 @@ class Form(unittest.TestCase):
         body = speclocation.render_none("docs only")
         self.assertEqual(body, f"{MARKER}\nspec: none\nreason: docs only\n")
         self.assertEqual(speclocation.parse(body), NoSpec("docs only"))
+
+    def test_a_not_worth_doing_comment_reads_back_as_it_was_written(self):
+        self.assertEqual(speclocation.render_not_worth_doing("nothing goes wrong today"), NOT_WORTH_DOING)
+        self.assertEqual(speclocation.parse(NOT_WORTH_DOING), NotWorthDoing("nothing goes wrong today"))
 
     def test_github_line_endings_are_read(self):
         self.assertEqual(speclocation.parse(LOCATED.replace("\n", "\r\n")), Located(FOLDER, BRANCH))
@@ -64,6 +69,8 @@ class Form(unittest.TestCase):
             "the marker alone": f"{MARKER}\n",
             "empty value": f"{MARKER}\nspec: {FOLDER}\nbranch: \n",
             "none without a reason": f"{MARKER}\nspec: none\nbranch: {BRANCH}\n",
+            "not worth doing without a reason": f"{MARKER}\nspec: not worth doing\nbranch: {BRANCH}\n",
+            "not worth doing with a third line": NOT_WORTH_DOING + "failed: harm\n",
             "absolute": f"{MARKER}\nspec: /{FOLDER}\nbranch: {BRANCH}\n",
             "leaves the repo": f"{MARKER}\nspec: ../other/specs/001-demo\nbranch: {BRANCH}\n",
             "not under specs": f"{MARKER}\nspec: dev/demo/001-demo\nbranch: {BRANCH}\n",
@@ -75,7 +82,9 @@ class Form(unittest.TestCase):
 
     def test_render_refuses_an_absolute_folder_a_two_line_branch_and_a_two_line_or_blank_reason(self):
         for write in (lambda: speclocation.render("/abs/specs/x", BRANCH), lambda: speclocation.render(FOLDER, "a\nb"),
-                      lambda: speclocation.render_none("two\nlines"), lambda: speclocation.render_none(" ")):
+                      lambda: speclocation.render_none("two\nlines"), lambda: speclocation.render_none(" "),
+                      lambda: speclocation.render_not_worth_doing("two\nlines"),
+                      lambda: speclocation.render_not_worth_doing(" ")):
             with self.assertRaises(SpecLocationError):
                 write()
 
@@ -126,6 +135,15 @@ class SpecComment(Issue):
         with self.assertRaisesRegex(SpecLocationError, "has no location comment"):
             self.located()
 
+    def test_an_issue_judged_not_worth_doing_is_refused_with_its_reason_and_one_next_step(self):
+        self.comments(NOT_WORTH_DOING)
+        with self.assertRaises(SpecLocationError) as refused:
+            self.located()
+        self.assertEqual(str(refused.exception),
+                         "acme/demo#1 was judged not worth doing: nothing goes wrong today. Next step: run "
+                         "/alq-review:design-doc #1 to put the question again; its premise step replaces this "
+                         "comment.")
+
     def test_two_are_refused_naming_both_with_one_next_step(self):
         self.comments(LOCATED, "unrelated chatter", LOCATED)
         with self.assertRaisesRegex(SpecLocationError, "101, 103") as refused:
@@ -151,6 +169,10 @@ class Resolve(Issue):
     def test_an_issue_that_needs_no_spec_says_why(self):
         self.comments(speclocation.render_none("docs only"))
         self.assertEqual(self.resolve(), NoSpec("docs only"))
+
+    def test_an_issue_judged_not_worth_doing_has_no_spec_to_grade_against(self):
+        self.comments(NOT_WORTH_DOING)
+        self.assertIn("was judged not worth doing: nothing goes wrong today", self.refusal())
 
     def test_a_branch_naming_no_issue_has_no_spec_and_asks_github_nothing(self):
         self.assertIsNone(self.resolve("chore/no-issue"))
@@ -246,6 +268,46 @@ class Cli(Issue):
         self.assertEqual(self.run_cli("none", str(self.project), "a reason with $(words)").returncode, 0)
         self.assertIn("a reason with $(words)", self.posted())
         self.assertNotIn("words", "\n".join(self.gh_calls()))
+
+    def test_not_worth_doing_posts_the_reason_on_stdin_and_creates_no_folder(self):
+        done = self.run_cli("not-worth-doing", str(self.project), "nothing goes $(wrong) today")
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, "https://github.test/comment"), done.stderr)
+        self.assertEqual(self.posted(), speclocation.render_not_worth_doing("nothing goes $(wrong) today"))
+        self.assertNotIn("wrong", "\n".join(self.gh_calls()))
+        self.assertFalse((self.project / "specs").exists())
+
+    def test_not_worth_doing_rewrites_the_issues_one_comment(self):
+        self.comments(LOCATED)
+        self.assertEqual(self.run_cli("not-worth-doing", str(self.project), "nothing goes wrong today").returncode, 0)
+        self.assertEqual(self.posted(), NOT_WORTH_DOING)
+        self.assertIn("api -X PATCH repos/acme/demo/issues/comments/101", self.gh_calls()[-1])
+
+    def test_not_worth_doing_without_a_reason_is_bad_usage_and_posts_nothing(self):
+        self.assertEqual(self.run_cli("not-worth-doing", str(self.project), " ").returncode, 2)
+        self.assertIsNone(self.posted())
+
+    def test_show_refuses_an_issue_judged_not_worth_doing(self):
+        self.comments(NOT_WORTH_DOING)
+        done = self.run_cli("show", "1", "--repo", "acme/demo")
+        self.assertEqual((done.returncode, done.stdout), (1, ""))
+        self.assertIn("was judged not worth doing: nothing goes wrong today", done.stderr)
+
+    def test_status_names_which_of_the_four_states_the_issue_is_in(self):
+        states = {"located": [LOCATED], "none": [speclocation.render_none("docs only")],
+                  "not worth doing": [NOT_WORTH_DOING], "no comment": ["unrelated chatter"]}
+        for status, bodies in states.items():
+            self.comments(*bodies)
+            done = self.run_cli("status", "1", "--repo", "acme/demo")
+            with self.subTest(status):
+                self.assertEqual((done.returncode, done.stdout), (0, status + "\n"), done.stderr)
+
+    def test_status_refuses_a_comment_it_cannot_read_and_two_comments(self):
+        for bodies, said in (([f"{MARKER}\n# Demo\n"], "design-doc"), ([LOCATED, LOCATED], "101, 102")):
+            self.comments(*bodies)
+            done = self.run_cli("status", "1", "--repo", "acme/demo")
+            with self.subTest(said):
+                self.assertEqual((done.returncode, done.stdout), (1, ""))
+                self.assertIn(said, done.stderr)
 
     def test_post_from_a_branch_naming_no_issue_is_refused(self):
         git(self.root, "branch", "-m", "chore/no-issue")

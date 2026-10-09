@@ -1,15 +1,17 @@
 ---
-name: "speckit-specify"
-description: "Create or update the feature specification from a natural language feature description."
+name: speckit-specify
+description: Create or update the feature specification from a natural language feature
+  description.
 argument-hint: "Describe the feature you want to specify"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: "github-spec-kit"
-  source: "templates/commands/specify.md"
+  author: github-spec-kit
+  source: preset:settled-design
 user-invocable: true
 disable-model-invocation: false
 ---
 
+# Speckit Specify Skill
 
 ## User Input
 
@@ -346,3 +348,15 @@ Success criteria must be:
 - [ ] Specification written to `SPEC_FILE` and validated against quality checklist
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with feature directory, spec file path, and checklist results
+
+
+
+## Premise answers and root cause
+
+The last line of the arguments names a premise report. Read it before writing the spec.
+
+- Under each heading of `## Why this is worth doing`, copy that question's `Answer:` and `Source:` lines from
+  the report, as they are written there.
+- When the report says `Reports wrong behaviour: yes`, trace the behaviour through the code and write
+  `## Root cause` as the spec template directs. When it says `no`, the section is the one line the template
+  gives for that case.
