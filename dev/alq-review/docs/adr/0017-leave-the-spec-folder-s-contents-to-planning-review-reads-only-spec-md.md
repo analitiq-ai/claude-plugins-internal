@@ -55,20 +55,13 @@ verifies it against HEAD. The user decided that the folder's contents are planni
 
 ## Decision
 
-1. We will not have review validate the spec folder. Review reads only `spec.md`.
-2. We will refuse a round whose `spec.md` is missing or empty, with a refusal that names the file. That
-   refusal never comes from the gate's top-level handler, which fails open.
-3. We will take the settled-design check out of review. Planning checks its own output.
-4. We will name no spec headings in the reviewer prompt. Every requirement the spec states that the change
-   does not meet is a finding. What the spec excludes bounds what a reviewer may ask for.
-5. We will delete `spec_checks`, `design_documents`, the refusal they govern (`refuse_spec`) and the
-   design-document rule. Spec refusals fall under the plugin's `mode`.
+1. We will not have review validate the spec folder. Planning checks its own output; review reads only
+   `spec.md`.
+2. We will name no spec headings in the reviewer prompt.
+3. We will give spec refusals no switch of their own. The plugin's `mode` governs them.
 
-This reverses ADR-0012, decision 4. ADR-0012, decision 1, stays only as the folder-shape step of the launch
-verification in ADR-0016: `<parent of specs>/.specify` must be a folder in HEAD. ADR-0012, decision 3, is
-carried out by deleting `design_documents`.
-
-Deleting `spec_checks` removes, for spec refusals, the per-check `log` brake that ADR-0011, Option A, names.
+This reverses ADR-0012, decision 4. ADR-0012, decision 1, stays only as the spec-folder mark that ADR-0016,
+decision 3, checks. ADR-0012, decision 3, is carried out by deleting `design_documents`.
 
 ## Options considered
 
