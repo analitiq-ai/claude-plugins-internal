@@ -52,24 +52,11 @@ CREATE TABLE IF NOT EXISTS claim_verdicts (
   doc      TEXT NOT NULL,
   PRIMARY KEY (repo, claim_id)
 );
-CREATE TABLE IF NOT EXISTS claim_holds (
-  repo TEXT NOT NULL,
-  base TEXT NOT NULL,
-  file TEXT NOT NULL,
-  doc  TEXT NOT NULL,
-  PRIMARY KEY (repo, base, file)
-);
 CREATE TABLE IF NOT EXISTS shim_checks (
   repo TEXT NOT NULL,
   tree TEXT NOT NULL,
   doc  TEXT NOT NULL,
   PRIMARY KEY (repo, tree)
-);
-CREATE TABLE IF NOT EXISTS shim_chains (
-  repo     TEXT NOT NULL,
-  chain_id TEXT NOT NULL,
-  doc      TEXT NOT NULL,
-  PRIMARY KEY (repo, chain_id)
 );
 CREATE TABLE IF NOT EXISTS shim_rulings (
   repo     TEXT NOT NULL,
@@ -77,6 +64,28 @@ CREATE TABLE IF NOT EXISTS shim_rulings (
   site_id  TEXT NOT NULL,
   doc      TEXT NOT NULL,
   PRIMARY KEY (repo, chain_id, site_id)
+);
+CREATE TABLE IF NOT EXISTS claim_lineages (
+  repo   TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  id     TEXT NOT NULL,
+  opened TEXT NOT NULL,
+  doc    TEXT NOT NULL,
+  PRIMARY KEY (repo, branch, id, opened)
+);
+CREATE TABLE IF NOT EXISTS seen_files (
+  repo   TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  gate   TEXT NOT NULL,
+  file   TEXT NOT NULL,
+  doc    TEXT NOT NULL,
+  PRIMARY KEY (repo, branch, gate, file)
+);
+CREATE TABLE IF NOT EXISTS shim_bugs (
+  repo TEXT NOT NULL,
+  id   TEXT NOT NULL,
+  doc  TEXT NOT NULL,
+  PRIMARY KEY (repo, id)
 );
 """
 
@@ -205,9 +214,13 @@ class _Records:
     def __init__(self, conn: sqlite3.Connection, repo: str):
         self._conn, self.repo = conn, repo
 
-    def _get(self, table: str, column: str, key: str):
-        row = self._conn.execute(f"SELECT doc FROM {table} WHERE repo = ? AND {column} = ?", (self.repo, key)).fetchone()
+    def _lookup(self, table: str, columns: tuple[str, ...], keys: tuple[str, ...]):
+        where = " AND ".join(f"{column} = ?" for column in ("repo", *columns))
+        row = self._conn.execute(f"SELECT doc FROM {table} WHERE {where}", (self.repo, *keys)).fetchone()
         return json.loads(row[0]) if row else None
+
+    def _get(self, table: str, column: str, key: str):
+        return self._lookup(table, (column,), (key,))
 
     def _put(self, table: str, columns: tuple[str, ...], keys: tuple[str, ...], doc) -> None:
         names = ", ".join(("repo", *columns, "doc"))
@@ -215,10 +228,17 @@ class _Records:
         self._conn.execute(f"INSERT OR REPLACE INTO {table} ({names}) VALUES ({marks})",
                            (self.repo, *keys, json.dumps(doc)))
 
+    def seen(self, branch: str, gate: str, file: str) -> dict | None:
+        """The text of `file` as the last completed check of `gate` on `branch` saw it, with that check's ref."""
+        return self._lookup("seen_files", ("branch", "gate", "file"), (branch, gate, file))
+
+    def save_seen(self, branch: str, gate: str, file: str, seen: dict) -> None:
+        self._put("seen_files", ("branch", "gate", "file"), (branch, gate, file), seen)
+
 
 class Claims(_Records):
-    """The claim check's records: by git's own fingerprints (a tree id, a hunk's patch-id), by a claim id, and its holds by
-    base and file."""
+    """The claim check's records: by git's own fingerprints (a tree id, a hunk's patch-id), by a claim id, and its
+    lineages and the text they were last carried from by branch."""
 
     def check(self, tree: str) -> dict | None:
         return self._get("claim_checks", "tree", tree)
@@ -238,17 +258,26 @@ class Claims(_Records):
     def save_verdict(self, claim_id: str, entry: dict) -> None:
         self._put("claim_verdicts", ("claim_id",), (claim_id,), entry)
 
-    def holds(self, base: str, file: str) -> list[dict]:
-        row = self._conn.execute("SELECT doc FROM claim_holds WHERE repo = ? AND base = ? AND file = ?",
-                                 (self.repo, base, file)).fetchone()
-        return json.loads(row[0]) if row else []
+    def save_lineage(self, branch: str, lineage: dict) -> None:
+        self._put("claim_lineages", ("branch", "id", "opened"), (branch, lineage["id"], lineage["opened"]), lineage)
 
-    def save_holds(self, base: str, file: str, holds: list[dict]) -> None:
-        self._put("claim_holds", ("base", "file"), (base, file), holds)
+    def open_lineage(self, branch: str, lineage_id: str) -> dict | None:
+        """The one open lineage `lineage_id` on `branch`; an ended one is never opened again, so none or one."""
+        rows = self._conn.execute("SELECT doc FROM claim_lineages WHERE repo = ? AND branch = ? AND id = ? "
+                                  "AND json_extract(doc, '$.state') = 'open'", (self.repo, branch, lineage_id))
+        found = [json.loads(doc) for (doc,) in rows]
+        return found[0] if found else None
+
+    def open_lineages(self, branch: str, file: str | None = None) -> list[dict]:
+        rows = self._conn.execute("SELECT doc FROM claim_lineages WHERE repo = ? AND branch = ? "
+                                  "AND json_extract(doc, '$.state') = 'open' "
+                                  "AND (? IS NULL OR json_extract(doc, '$.file') = ?) ORDER BY id, opened",
+                                  (self.repo, branch, file, file))
+        return [json.loads(doc) for (doc,) in rows]
 
 
 class Shims(_Records):
-    """The shim check's records: checks by staged tree, bug chains by id, and rulings by chain and site."""
+    """The shim check's records: checks by staged tree, bugs by id, and rulings by bug and site."""
 
     def check(self, tree: str) -> dict | None:
         return self._get("shim_checks", "tree", tree)
@@ -261,15 +290,17 @@ class Shims(_Records):
                                   "AND json_extract(doc, '$.status') IN ('sweeping', 'judging')", (self.repo, root))
         return [json.loads(doc) for (doc,) in rows]
 
-    def chain(self, chain_id: str) -> dict | None:
-        return self._get("shim_chains", "chain_id", chain_id)
+    def save_bug(self, bug: dict) -> None:
+        self._put("shim_bugs", ("id",), (bug["id"],), bug)
 
-    def save_chain(self, chain: dict) -> None:
-        self._put("shim_chains", ("chain_id",), (chain["id"],), chain)
+    def bug(self, bug_id: str) -> dict | None:
+        return self._get("shim_bugs", "id", bug_id)
 
-    def chains_at(self, branch: str, head: str) -> list[dict]:
-        rows = self._conn.execute("SELECT doc FROM shim_chains WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
-                                  "AND json_extract(doc, '$.head') = ? ORDER BY rowid", (self.repo, branch, head))
+    def open_bugs(self, branch: str) -> list[dict]:
+        """The bugs still tracked on `branch`: every state but `ended` and `merged`."""
+        rows = self._conn.execute("SELECT doc FROM shim_bugs WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
+                                  "AND json_extract(doc, '$.state') NOT IN ('ended', 'merged') ORDER BY id",
+                                  (self.repo, branch))
         return [json.loads(doc) for (doc,) in rows]
 
     def rulings(self, chain_id: str) -> dict[str, dict]:
@@ -292,10 +323,10 @@ def open_shims(repo: str):
         yield Shims(conn, repo)
 
 
-def shim_chain_repos(chain_id: str) -> list[str]:
-    """Every repo with a chain `chain_id`, which is how a user's `override shim-<id>` finds it."""
+def shim_bug_repos(bug_id: str) -> list[str]:
+    """Every repo with a bug `bug_id`, which is how a user's `override shim-<id>` finds it."""
     with closing(_connect()) as conn:
-        return sorted(r for (r,) in conn.execute("SELECT repo FROM shim_chains WHERE chain_id = ?", (chain_id,)))
+        return sorted(r for (r,) in conn.execute("SELECT repo FROM shim_bugs WHERE id = ?", (bug_id,)))
 
 
 def _trees(table: str, prefix: str) -> list[tuple[str, str, dict]]:
@@ -326,14 +357,14 @@ def open_claims(repo: str):
         yield Claims(conn, repo)
 
 
-def claim_holders(claim_id: str) -> list[tuple[str, str, str]]:
-    """(repo, base, file) of every hold that names `claim_id`, which is how a user's `unlock claim-<id>` finds it."""
+def claim_lineage_holders(claim_id: str) -> list[tuple[str, str, str]]:
+    """(repo, branch, lineage id) of every open lineage that `claim_id` names: by its own id or by the id of words it
+    holds now, which is how a user's `unlock claim-<id>` finds it."""
     with closing(_connect()) as conn:
-        rows = conn.execute("SELECT repo, base, file FROM claim_holds, json_each(claim_holds.doc) AS hold, "
-                            "json_each(hold.value, '$.claims') AS named WHERE json_extract(named.value, '$.id') = ? "
-                            "ORDER BY repo, base, file",
-                            (claim_id,))
-        return sorted(set(rows))
+        rows = conn.execute("SELECT repo, branch, id FROM claim_lineages WHERE json_extract(doc, '$.state') = 'open' "
+                            "AND (id = ?1 OR EXISTS (SELECT 1 FROM json_each(doc, '$.places') AS place "
+                            "WHERE json_extract(place.value, '$.claim') = ?1)) ORDER BY repo, branch, id", (claim_id,))
+        return list(rows)
 
 
 def parse_ref(ref: str) -> tuple[str, int]:

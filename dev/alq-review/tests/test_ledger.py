@@ -163,7 +163,6 @@ class Store(unittest.TestCase):
         self.assertEqual(self.primary_key("claim_checks"), ["repo", "tree"])
         self.assertEqual(self.primary_key("claim_reads"), ["repo", "patch_id"])
         self.assertEqual(self.primary_key("claim_verdicts"), ["repo", "claim_id"])
-        self.assertEqual(self.primary_key("claim_holds"), ["repo", "base", "file"])
 
     def test_claim_records_round_trip_inside_one_transaction(self):
         with ledger.open_claims("acme/demo") as claims:
@@ -171,13 +170,10 @@ class Store(unittest.TestCase):
             claims.save_check({"tree": "t1", "status": "reading"})
             claims.save_read("p1", {"kind": "PROSE", "claims": []})
             claims.save_verdict("c1", {"evidence_blobs": {"a.py": "b1"}})
-            claims.save_holds("base1", "README.md", [{"refusals": 1}])
         with ledger.open_claims("acme/demo") as claims:
             self.assertEqual(claims.check("t1")["status"], "reading")
             self.assertEqual(claims.read("p1")["kind"], "PROSE")
             self.assertEqual(claims.verdict("c1")["evidence_blobs"], {"a.py": "b1"})
-            self.assertEqual(claims.holds("base1", "README.md"), [{"refusals": 1}])
-            self.assertEqual(claims.holds("base1", "other.md"), [])
         with ledger.open_claims("other/repo") as claims:
             self.assertIsNone(claims.check("t1"))
 
@@ -198,35 +194,97 @@ class Store(unittest.TestCase):
         with ledger.open_claims("acme/demo") as claims:
             claims.save_check({"tree": "t1", "status": "reading"})
 
-    def test_held_claims_are_found_by_query(self):
+    def test_lineages_are_found_by_their_own_id_or_by_the_id_of_words_they_hold(self):
+        def open_one(lid, claim, state="open"):
+            return {"id": lid, "opened": "r:1", "file": "README.md", "state": state,
+                    "places": [{"start": 0, "end": 5, "claim": claim}]}
         with ledger.open_claims("acme/demo") as claims:
-            claims.save_holds("base1", "README.md", [{"claims": [{"id": "abc", "quote": "zzz"}], "refusals": 3}])
-        self.assertEqual(ledger.claim_holders("abc"), [("acme/demo", "base1", "README.md")])
-        self.assertEqual(ledger.claim_holders("zzz"), [])
+            claims.save_lineage("feat/1-x", open_one("aaa", "now"))
+            claims.save_lineage("feat/1-x", open_one("bbb", "bbb", state="ended"))
+        with ledger.open_claims("other/repo") as claims:
+            claims.save_lineage("feat/2-y", open_one("aaa", "aaa"))
+        self.assertEqual(ledger.claim_lineage_holders("aaa"), [("acme/demo", "feat/1-x", "aaa"), ("other/repo", "feat/2-y", "aaa")])
+        self.assertEqual(ledger.claim_lineage_holders("now"), [("acme/demo", "feat/1-x", "aaa")])
+        self.assertEqual(ledger.claim_lineage_holders("bbb"), [])
+        self.assertEqual(ledger.claim_lineage_holders("zzz"), [])
+
+    def test_lineage_tables_are_keyed_by_what_names_one_row(self):
+        self.assertEqual(self.primary_key("claim_lineages"), ["repo", "branch", "id", "opened"])
+        self.assertEqual(self.primary_key("seen_files"), ["repo", "branch", "gate", "file"])
+        self.assertEqual(self.primary_key("shim_bugs"), ["repo", "id"])
+
+    def lineage(self, lid, opened="r:1", file="README.md", state="open"):
+        return {"id": lid, "opened": opened, "file": file, "state": state, "ended": None, "chain": [],
+                "places": [{"start": 0, "end": 5, "claim": lid}], "released": None}
+
+    def test_lineages_round_trip_by_branch_and_file(self):
+        with ledger.open_claims("acme/demo") as claims:
+            claims.save_lineage("feat/1-x", self.lineage("a"))
+            claims.save_lineage("feat/1-x", self.lineage("b", file="docs/b.md"))
+            claims.save_lineage("feat/2-y", self.lineage("a"))
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertEqual([item["id"] for item in claims.open_lineages("feat/1-x")], ["a", "b"])
+            self.assertEqual([item["id"] for item in claims.open_lineages("feat/1-x", "docs/b.md")], ["b"])
+            self.assertEqual(claims.open_lineage("feat/1-x", "a")["places"], [{"start": 0, "end": 5, "claim": "a"}])
+            self.assertIsNone(claims.open_lineage("feat/1-x", "zz"))
+        with ledger.open_claims("other/repo") as claims:
+            self.assertEqual(claims.open_lineages("feat/1-x"), [])
+
+    def test_an_ended_lineage_keeps_its_row_and_the_same_words_open_a_new_one(self):
+        with ledger.open_claims("acme/demo") as claims:
+            claims.save_lineage("feat/1-x", self.lineage("a", opened="r:1", state="ended"))
+            self.assertIsNone(claims.open_lineage("feat/1-x", "a"))
+            claims.save_lineage("feat/1-x", self.lineage("a", opened="r:2"))
+            self.assertEqual(claims.open_lineage("feat/1-x", "a")["opened"], "r:2")
+            self.assertEqual([item["opened"] for item in claims.open_lineages("feat/1-x")], ["r:2"])
+        with closing(sqlite3.connect(ledger.state_root() / "ledger.db")) as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM claim_lineages").fetchone(), (2,))
+
+    def test_seen_files_round_trip_per_gate(self):
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertIsNone(claims.seen("feat/1-x", "claim", "README.md"))
+            claims.save_seen("feat/1-x", "claim", "README.md", {"text": "one\n", "ref": "r:1"})
+            claims.save_seen("feat/1-x", "shim", "README.md", {"text": "two\n", "ref": "t1"})
+        with ledger.open_shims("acme/demo") as shims:
+            self.assertEqual(shims.seen("feat/1-x", "claim", "README.md"), {"text": "one\n", "ref": "r:1"})
+            self.assertEqual(shims.seen("feat/1-x", "shim", "README.md"), {"text": "two\n", "ref": "t1"})
+            self.assertIsNone(shims.seen("feat/2-y", "shim", "README.md"))
+
+    def test_a_claim_check_keeps_its_branch_and_lineages(self):
+        with ledger.open_claims("acme/demo") as claims:
+            claims.save_check({"tree": "t1", "status": "reading", "branch": "feat/1-x", "lineages": {"c1": "a"}})
+        with ledger.open_claims("acme/demo") as claims:
+            self.assertEqual(claims.check("t1")["lineages"], {"c1": "a"})
+
+    def test_bugs_round_trip_and_open_bugs_are_found_by_branch(self):
+        def bug(bid, branch, state):
+            return {"id": bid, "branch": branch, "state": state, "count": 1, "members": [], "ranges": []}
+        with ledger.open_shims("acme/demo") as shims:
+            for each in (bug("b1", "feat/1-x", "open"), bug("b2", "feat/1-x", "held"), bug("b3", "feat/1-x", "ended"),
+                         bug("b4", "feat/1-x", "merged"), bug("b5", "feat/2-y", "open")):
+                shims.save_bug(each)
+        with ledger.open_shims("acme/demo") as shims:
+            self.assertEqual(shims.bug("b1")["state"], "open")
+            self.assertIsNone(shims.bug("zz"))
+            self.assertEqual([each["id"] for each in shims.open_bugs("feat/1-x")], ["b1", "b2"])
+        with ledger.open_shims("other/repo") as shims:
+            self.assertEqual(shims.open_bugs("feat/1-x"), [])
 
     def test_shim_tables_are_keyed_by_repo_and_what_they_record(self):
         self.assertEqual(self.primary_key("shim_checks"), ["repo", "tree"])
-        self.assertEqual(self.primary_key("shim_chains"), ["repo", "chain_id"])
         self.assertEqual(self.primary_key("shim_rulings"), ["repo", "chain_id", "site_id"])
 
     def test_shim_records_round_trip_inside_one_transaction(self):
         with ledger.open_shims("acme/demo") as shims:
             self.assertIsNone(shims.check("t1"))
-            self.assertIsNone(shims.chain("c1"))
             self.assertEqual(shims.rulings("c1"), {})
             shims.save_check({"tree": "t1", "status": "sweeping"})
-            shims.save_chain({"id": "c1", "branch": "feat/1-x", "head": "h1", "state": "open"})
-            shims.save_chain({"id": "c2", "branch": "feat/1-x", "head": "h0", "state": "open"})
-            shims.save_chain({"id": "c3", "branch": "feat/2-y", "head": "h1", "state": "open"})
             shims.save_ruling("c1", "s1", {"ruling": "not_shared", "reason": "r"})
         with ledger.open_shims("acme/demo") as shims:
             self.assertEqual(shims.check("t1")["status"], "sweeping")
-            self.assertEqual(shims.chain("c1")["state"], "open")
-            self.assertEqual([c["id"] for c in shims.chains_at("feat/1-x", "h1")], ["c1"])
             self.assertEqual(shims.rulings("c1"), {"s1": {"ruling": "not_shared", "reason": "r"}})
         with ledger.open_shims("other/repo") as shims:
             self.assertIsNone(shims.check("t1"))
-            self.assertEqual(shims.chains_at("feat/1-x", "h1"), [])
 
     def test_a_failed_shims_transaction_writes_nothing(self):
         with self.assertRaises(RuntimeError):
@@ -238,12 +296,12 @@ class Store(unittest.TestCase):
 
     def test_an_override_id_is_found_as_a_chain_or_a_tree_prefix(self):
         with ledger.open_shims("acme/demo") as shims:
-            shims.save_chain({"id": "c" * 16, "state": "open"})
+            shims.save_bug({"id": "c" * 16, "branch": "feat/1-x", "state": "open"})
             shims.save_check({"tree": "0123456789ab" + "f" * 28, "status": "complete"})
         with ledger.open_shims("other/repo") as shims:
             shims.save_check({"tree": "0123456789ab" + "e" * 28, "status": "complete"})
-        self.assertEqual(ledger.shim_chain_repos("c" * 16), ["acme/demo"])
-        self.assertEqual(ledger.shim_chain_repos("d" * 16), [])
+        self.assertEqual(ledger.shim_bug_repos("c" * 16), ["acme/demo"])
+        self.assertEqual(ledger.shim_bug_repos("d" * 16), [])
         self.assertEqual(ledger.shim_trees("0123456789ab"),
                          [("acme/demo", "0123456789ab" + "f" * 28), ("other/repo", "0123456789ab" + "e" * 28)])
 

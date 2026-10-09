@@ -191,7 +191,8 @@ def _hunks(diff: str) -> list[Hunk]:
         elif current is None and not line.startswith("@@"):
             header.append(line)
             if line.startswith("+++ "):
-                path = line[6:] if line.startswith("+++ b/") else None
+                # Git ends the name with a TAB when it holds a space.
+                path = line[6:].removesuffix("\t") if line.startswith("+++ b/") else None
         elif hunk := _HUNK.match(line):
             current = None
             if path:
@@ -244,6 +245,19 @@ def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
     return [{"id": f"h{i + 1}", "file": h.file, "old_start": h.old_start, "old_count": h.old_count,
              "new_start": h.new_start, "new_count": h.new_count, "removed": list(h.removed), "added": list(h.added),
              "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
+
+
+def on_disk(root: str, file: str) -> bool:
+    """Whether the checkout still has `file`. A file taken out of the stage but still on disk is not gone; a moved or deleted one is,
+    and the staged tree cannot tell the two apart for a file no commit ever held."""
+    return os.path.exists(os.path.join(root, file))
+
+
+def text_hunks(root: str, old: str, new: str) -> list[Hunk]:
+    """The hunks that turn text `old` into text `new`, as git diffs them. Both are written as blobs first, so the
+    answer never depends on which objects the repository kept."""
+    blobs = [_stdin(root, text, "hash-object", "-w", "--stdin").strip() for text in (old, new)]
+    return _hunks(git(root, "diff", "-U0", *blobs))
 
 
 def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:

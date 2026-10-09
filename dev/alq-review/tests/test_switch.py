@@ -12,7 +12,7 @@ from unittest import mock
 
 from paths import PLUGIN
 
-from test_claim_gate import CONTEST, ClaimGate
+from test_claim_gate import CONTEST, V, ClaimGate
 import test_gate
 from test_gate import ASSESS, GATE, REVIEW, Gate
 from test_shim_gate import FIXED, ShimGate
@@ -333,11 +333,12 @@ class StillRunsWhileOff(Switch, Gate):
 
 class StillRunsWhileOffClaim(Switch, ClaimGate):
     def test_unlock_claim_releases_the_hold_and_the_contest_judge_stays_confined(self):
-        self.wrong_readme()
-        cid = f"claim-{claimcheck.claim_id('README.md', 'The validator rejects an empty list.')}"
+        for text in V[:3]:
+            self.wrong(text)
+        cid = f"claim-{claimcheck.claim_id('README.md', V[0])}"
         self.assertEqual(self.decision(self.git_commit()), "deny")
         self.turn_off()
-        self.assertIn("released", json.dumps(self.say(f"unlock {cid}")))
+        self.assertIn("The user released", json.dumps(self.say(f"unlock {cid}")))
         refused = self.hook("PreToolUse", "WebFetch", {"url": "https://elsewhere.example/", "prompt": "p"},
                             agent_id="c1", agent_type=CONTEST)
         self.assertEqual(self.decision(refused), "deny")
@@ -353,7 +354,7 @@ class StillRunsWhileOffShim(Switch, ShimGate):
         self.turn_off()
         self.assertIn("switched the shim check off", json.dumps(self.say("override shim-" + "c" * 16)))
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["state"], "overridden")
+            self.assertEqual(shims.bug("c" * 16)["state"], "overridden")
 
 
 class LaunchWhileOff(Switch, Gate):

@@ -2,6 +2,7 @@
 and judge outputs standing for the agents."""
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -20,6 +21,8 @@ import hookio
 import ledger
 
 HARNESS = Path(__file__).resolve().parent / "workflow_harness.mjs"
+# The command a refusal gives for a missing diff library: the pip form, or the system package where pip is refused.
+INSTALL_COMMAND = re.compile(r"`(?:\S+ -m pip install diff-match-patch|sudo apt install python3-diff-match-patch)`")
 WORKFLOW = PLUGIN / "workflows" / "claim-check.js"
 CHECK = "alq-review:claim-check"
 READER, JUDGE, CONTEST = "alq-review:claim-reader", "alq-review:claim-judge", "alq-review:claim-contest-judge"
@@ -83,10 +86,37 @@ class ClaimGate(Gate):
             with ledger.open_claims("acme/demo") as claims:
                 return claims.check(tree)
 
-    def holds(self, file="README.md"):
+    def lineages(self, file="README.md", ended=False):
+        """The branch's open lineages of `file` (with `ended`, every lineage the ledger keeps)."""
         with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
-            with ledger.open_claims("acme/demo") as claims:
-                return claims.holds(git(self.root, "rev-parse", "HEAD^{tree}"), file)
+            with closing(sqlite3.connect(self.state_dir / "ledger.db")) as conn:
+                rows = conn.execute("SELECT doc FROM claim_lineages WHERE branch = ? ORDER BY id, opened",
+                                    (git(self.root, "branch", "--show-current"),)).fetchall()
+        found = [json.loads(doc) for (doc,) in rows]
+        return [item for item in found if item["file"] == file and (ended or item["state"] == "open")]
+
+    def counts(self, file="README.md"):
+        return sorted(claimcheck.count(item) for item in self.lineages(file))
+
+    def ruling(self, claims, **judge):
+        """Check the staged change as agents would: the reader quotes `claims` ({file: [(line, quote, ruling)]}) and the
+        judge gives each its ruling. A staged `.py` file is code and has none."""
+        _, args = self.check_launch()
+        files = [h["file"] for r in args["readers"] for h in r["hunks"]]
+        self.read(args, {f: ("CODE", []) if f.endswith(".py") else
+                         ("PROSE", [(line, quote, "K1") for line, quote, _ in claims.get(f, [])]) for f in files})
+        for file, quoted in claims.items():
+            for _, quote, kind in quoted:
+                self.judge(args, file, quote, kind, **judge)
+        return args
+
+    def wrong(self, text, file="README.md"):
+        self.stage("validator.py", VALIDATOR)
+        self.stage(file, text + "\n")
+        return self.ruling({file: [(1, text, "WRONG")]})
+
+    def unlock(self, lineage_id):
+        return self.hook("UserPromptSubmit", prompt=f"unlock claim-{lineage_id}")
 
     def gate_log(self):
         return [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
@@ -397,55 +427,6 @@ class ClaimCheckRepair(ClaimGate):
         self.judge(args, "docs/guide.md", "The validator returns True.", "CORRECT")
         return args
 
-    def test_a_repeated_commit_against_one_check_counts_once(self):
-        self.wrong_readme()
-        self.git_commit()
-        self.git_commit()
-        self.assertEqual([h["refusals"] for h in self.holds()], [1])
-
-    def test_the_third_refusal_of_one_hunk_asks_the_user_and_the_user_releases_it(self):
-        self.stage("validator.py", VALIDATOR)
-        third = "Empty lists are rejected by the validator."
-        for n, text in enumerate(("The validator rejects an empty list.", "The validator refuses an empty list.", third)):
-            self.stage("README.md", text + "\n")
-            _, args = self.check_launch()
-            labels = {"README.md": ("PROSE", [(1, text, "K1")])}
-            if n == 0:
-                labels["validator.py"] = ("CODE", [])
-            self.read(args, labels)
-            self.judge(args, "README.md", text)
-        self.assertEqual([h["refusals"] for h in self.holds()], [3])
-        asked = self.git_commit()
-        self.assertEqual(self.decision(asked), "deny")
-        claim = claimcheck.claim_id("README.md", third)
-        shown = (f"README.md:1 \"{third}\"", "check([]) returns True", f"unlock claim-{claim}")
-        for part in shown:
-            self.assertIn(part, self.reason(asked))
-        self.stage("README.md", "A fourth try.\n")
-        launched = self.reason(self.check_launch()[0])
-        for part in shown:
-            self.assertIn(part, launched)
-        self.stage("README.md", third + "\n")
-
-        for prompt in (f"unlock\u00a0claim-{claim}", f"\u2028unlock claim-{claim}"):
-            self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {}, prompt)
-        for glued in (f"unlock claim-{claim}.", f"unlock claim-{claim}\u200b"):
-            self.assertIn("names no locked PR, so nothing was unlocked", json.dumps(self.hook("UserPromptSubmit", prompt=glued)))
-        other = "".join("0" if digit != "0" else "1" for digit in claim)
-        self.assertEqual(self.hook("UserPromptSubmit", prompt=f"unlock claim-{other}")["hookSpecificOutput"]["additionalContext"],
-                         f"[alq-review] `unlock claim-{other}` names no claim a check is holding, so nothing was released.")
-        self.assertEqual(self.decision(self.git_commit()), "deny")
-        released = self.hook("UserPromptSubmit", prompt=f" \n\tunlock \r\n claim-{claim}\nand carry on")
-        self.assertIn("released", json.dumps(released))
-        self.stage("docs/other.md", "The validator returns True.\n")
-        _, args = self.check_launch()
-        self.assertEqual([h["file"] for r in args["readers"] for h in r["hunks"]], ["docs/other.md"])
-        self.read(args, {"docs/other.md": ("PROSE", [(1, "The validator returns True.", "K1")])})
-        self.judge(args, "docs/other.md", "The validator returns True.", "CORRECT")
-        self.judge(args, "README.md", third)
-        self.assertEqual(self.holds("docs/other.md"), [])
-        self.assertNotEqual(self.decision(self.git_commit()), "deny")
-
     def test_an_agent_cannot_release_a_hold(self):
         refused = self.hook("PreToolUse", "Bash", {"command": "python3 /p/alq-review/scripts/ledger.py unlock --worktree /w "
                                                              "--reason x"})
@@ -457,6 +438,439 @@ class ClaimCheckRepair(ClaimGate):
         _, args = self.check_launch()
         self.assertEqual(args["readers"][0]["hunks"][0]["file"], "validator.py")
         self.assertEqual([c["quote"] for c in args["claims"]], [FALSE.strip()])
+
+
+V = ("The validator rejects an empty list.", "The validator refuses an empty list.",
+     "Empty lists are rejected by the validator.", "An empty list never passes the validator.")
+
+
+class ClaimLineages(ClaimGate):
+    def test_a_reworded_wrong_claim_is_one_lineage_with_a_rising_count(self):  # C1
+        self.wrong(V[0])
+        self.wrong(V[1])
+        [found] = self.lineages()
+        self.assertEqual((found["id"], claimcheck.count(found)), (claimcheck.claim_id("README.md", V[0]), 2))
+        self.assertEqual([item["words"] for item in found["chain"]], [V[0], V[1]])
+
+    def commit_another_file(self):
+        git(self.root, "reset", "-q", "--", "README.md")
+        self.stage("docs/other.md", "The validator returns True.\n")
+        self.ruling({"docs/other.md": [(1, "The validator returns True.", "CORRECT")]})
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
+    def test_a_commit_of_another_file_in_between_does_not_reset_the_count(self):  # C2 (#15)
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.commit_another_file()
+        self.assertEqual(self.counts(), [2])
+        self.wrong(V[2])
+        self.assertEqual(self.counts(), [3])
+        asked = self.git_commit()
+        self.assertEqual(self.decision(asked), "deny")
+        self.assertIn(f"unlock claim-{claimcheck.claim_id('README.md', V[0])}", self.reason(asked))
+        self.stage("README.md", V[3] + "\n")
+        launched = self.check_launch()[0]
+        self.assertEqual(self.decision(launched), "deny")
+        self.assertIn("Stop and ask the user", self.reason(launched))
+
+    def test_an_amend_does_not_reset_the_count(self):  # C3
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.commit_another_file()
+        self.assertNotEqual(self.decision(self.git_commit(f"git -C {self.root} commit -q --amend --no-edit")), "deny")
+        self.wrong(V[2])
+        self.assertEqual(self.counts(), [3])
+
+    def test_the_completion_step_run_twice_counts_once(self):  # C9 (#16)
+        self.wrong(V[0])
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_claims("acme/demo") as claims:
+                again = claims.check(git(self.root, "write-tree"))
+                again["status"] = "judging"
+                again["verdicts"] = {}
+                claims.save_check(again)
+        self.judge({"check_ref": again["ref"]}, "README.md", V[0])
+        self.assertEqual(self.stored()["status"], "complete")
+        self.assertEqual(self.counts(), [1])
+
+    def test_a_correct_ruling_ends_the_lineage_and_the_next_wrong_starts_at_one(self):  # C15
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.stage("README.md", V[2] + "\n")
+        self.ruling({"README.md": [(1, V[2], "CORRECT")]})
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "correct"))
+        self.assertEqual(self.lineages(), [])
+        self.wrong(V[3])
+        [fresh] = self.lineages()
+        self.assertEqual((fresh["id"], claimcheck.count(fresh)), (claimcheck.claim_id("README.md", V[3]), 1))
+
+    def test_a_file_with_a_unicode_line_break_above_a_claim_is_checked_like_any_other(self):  # C24
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", f"Intro\u2028still the intro\x0c\n{V[0]}\n")
+        self.ruling({"README.md": [(2, V[0], "WRONG")]})
+        [found] = self.lineages()
+        self.assertEqual((found["id"], claimcheck.count(found)), (claimcheck.claim_id("README.md", V[0]), 1))
+        self.assertEqual([found["places"][0]["claim"]], [claimcheck.claim_id("README.md", V[0])])
+
+    def contest(self, text, kind):
+        cid = claimcheck.claim_id("README.md", text)
+        _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
+        self.judge(args, "README.md", text, kind, agent_type=CONTEST)
+
+    def test_a_rejected_contest_is_one_more_wrong(self):  # C16
+        self.wrong(V[0])
+        self.contest(V[0], "WRONG")
+        self.assertEqual(self.counts(), [2])
+        self.assertEqual(self.decision(self.git_commit()), "deny")
+
+    def test_an_upheld_contest_lowers_nothing_and_lets_the_commit_through(self):  # C17
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.contest(V[1], "UNSURE")
+        self.assertEqual(self.counts(), [2])
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
+    def test_an_upheld_contest_that_finds_the_claim_correct_ends_the_lineage(self):  # C17, FR-008
+        self.wrong(V[0])
+        self.wrong(V[1])
+        self.contest(V[1], "CORRECT")
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "correct"))
+        self.wrong(V[2])
+        self.assertEqual(self.counts(), [1])
+
+    def test_reshaping_text_that_shares_a_hunk_keeps_each_claim_its_own_lineage(self):  # C10
+        self.stage("validator.py", VALIDATOR)
+        lines = [f"The validator rejects {word} lists." for word in ("empty", "short", "long")]
+        for n, wrong in enumerate(lines):
+            self.stage("README.md", "\n".join(lines) + f"\nRevision {n}.\n")
+            self.ruling({"README.md": [(i + 1, line, "WRONG" if line == wrong else "UNSURE")
+                                       for i, line in enumerate(lines)]})
+        self.assertEqual(self.counts(), [1, 1, 1])
+        self.assertEqual(self.reason(self.git_commit()).count("Stop and ask the user"), 0)
+
+
+class ClaimRelease(ClaimGate):
+    def held(self):
+        for text in V[:3]:
+            self.wrong(text)
+        return claimcheck.claim_id("README.md", V[0])
+
+    def test_the_user_releases_a_hold_and_one_more_wrong_brings_them_back(self):  # C8
+        lid = self.held()
+        self.assertEqual(self.decision(self.git_commit()), "deny")
+        said = self.unlock(lid)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("released", said)
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+        self.assertEqual(git(self.root, "show", "HEAD:README.md"), V[2])
+        self.wrong(V[3])
+        self.assertEqual(self.counts(), [4])
+        again = self.git_commit()
+        for part in (V[0], V[1], V[2], V[3], f"unlock claim-{lid}"):
+            self.assertIn(part, self.reason(again))
+
+    def test_the_lineage_or_its_current_words_may_be_named_in_the_release(self):
+        lid = self.held()
+        current = claimcheck.claim_id("README.md", V[2])
+        for named in (lid, current):
+            with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+                with ledger.open_claims("acme/demo") as claims:
+                    [found] = claims.open_lineages(git(self.root, "branch", "--show-current"))
+                    found["released"] = None
+                    claims.save_lineage(git(self.root, "branch", "--show-current"), found)
+            self.assertIn("released", self.unlock(named)["hookSpecificOutput"]["additionalContext"], named)
+            self.assertEqual(self.lineages()[0]["released"]["count"], 3)
+
+    def test_an_unlock_naming_nothing_says_so_and_changes_nothing(self):
+        self.held()
+        other = "0" * 16
+        said = self.unlock(other)["hookSpecificOutput"]["additionalContext"]
+        self.assertEqual(said, f"[alq-review] `unlock claim-{other}` names no claim a check is holding, so nothing was released.")
+        self.assertIsNone(self.lineages()[0]["released"])
+        self.assertEqual(self.decision(self.git_commit()), "deny")
+
+    def reworded(self, text):
+        self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
+        self.ruling({"README.md": [(2, text, "WRONG")]})
+
+    def test_an_unlock_changes_nothing_in_a_lineage_below_the_bound_or_already_released(self):  # C25
+        self.stage("validator.py", VALIDATOR)
+        lid = claimcheck.claim_id("README.md", V[0])
+        self.reworded(V[0])
+        self.reworded(V[1])
+        below = self.lineages()
+        self.assertEqual([claimcheck.count(item) for item in below], [2])
+        self.unlock(lid)
+        self.assertEqual(self.lineages(), below)
+        self.reworded(V[2])
+        self.unlock(lid)
+        [released] = self.lineages()
+        self.assertEqual(released["released"]["count"], 3)
+        self.unlock(lid)
+        self.assertEqual(self.lineages(), [released])
+
+    def test_an_unlock_changes_nothing_in_a_lineage_that_ended_at_the_bound_unreleased(self):  # C25
+        self.stage("validator.py", VALIDATOR)
+        for text in V[:3]:
+            self.reworded(text)
+        self.stage("README.md", "Intro.\nOutro.\n")
+        self.ruling({"README.md": []})
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((claimcheck.count(ended), ended["state"], ended["ended"]["by"], ended["released"]),
+                         (3, "ended", "deleted", None))
+        self.unlock(claimcheck.claim_id("README.md", V[0]))
+        self.assertEqual(self.lineages(ended=True), [ended])
+
+    def test_a_reword_without_the_release_is_refused_at_launch(self):  # C18
+        self.held()
+        self.stage("README.md", V[3] + "\n")
+        out = self.check_launch()[0]
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("Stop and ask the user", self.reason(out))
+
+    def test_an_agent_cannot_release_a_hold(self):
+        lid = self.held()
+        self.assertEqual(self.decision(self.hook("PreToolUse", "Bash", {"command": f"python3 /p/alq-review/scripts/ledger.py unlock claim-{lid}"})), "deny")
+        self.assertIsNone(self.lineages()[0]["released"])
+
+    def test_a_released_lineage_merged_with_a_lower_one_is_held_by_the_next_wrong(self):  # C20
+        self.stage("validator.py", VALIDATOR)
+        first, second = "The tool is fast.", "It is safe."
+        self.stage("README.md", f"{first}\n{second}\n")
+        self.ruling({"README.md": [(1, first, "WRONG"), (2, second, "WRONG")]})
+        for text in V[:2]:
+            self.stage("README.md", f"{text}\n{second}\n")
+            self.ruling({"README.md": [(1, text, "WRONG")]})
+        self.assertEqual(self.counts(), [1, 3])
+        [top] = [item for item in self.lineages() if claimcheck.count(item) == 3]
+        self.unlock(top["id"])
+        merged = "The validator refuses an empty list and it is safe."
+        self.stage("README.md", merged + "\n")
+        self.ruling({"README.md": [(1, merged, "WRONG")]})
+        [survivor] = self.lineages()
+        self.assertEqual((survivor["id"], claimcheck.count(survivor), claimcheck.held(survivor)), (top["id"], 4, True))
+
+
+class ClaimReshaping(ClaimGate):
+    def at_two(self, *lines):
+        """README.md holds `lines` with the first reworded and ruled WRONG twice."""
+        self.stage("validator.py", VALIDATOR)
+        for text in V[:2]:
+            self.stage("README.md", "\n".join((text, *lines)) + "\n")
+            self.ruling({"README.md": [(1, text, "WRONG")]})
+        return self.lineages()
+
+    def test_a_split_in_place_keeps_both_halves_in_the_lineage(self):  # C4
+        self.stage("validator.py", VALIDATOR)
+        for verb in ("rejects", "refuses"):
+            long = f"The validator {verb} an empty list and it logs the reason."
+            self.stage("README.md", long + "\n")
+            self.ruling({"README.md": [(1, long, "WRONG")]})
+        halves = ("The validator refuses an empty list.", "It logs the reason.")
+        self.stage("README.md", "\n".join(halves) + "\n")
+        self.ruling({"README.md": [(1, halves[0], "UNSURE"), (2, halves[1], "UNSURE")]})
+        [found] = self.lineages()
+        self.assertEqual((claimcheck.count(found), len(found["places"])), (2, 2))
+
+    def halves_ruled(self, first, second):
+        """Two wrong rewordings of one sentence, then its halves ruled `first` and `second`."""
+        self.stage("validator.py", VALIDATOR)
+        for verb in ("rejects", "refuses"):
+            long = f"The validator {verb} an empty list and it logs the reason."
+            self.stage("README.md", long + "\n")
+            self.ruling({"README.md": [(1, long, "WRONG")]})
+        halves = ("The validator refuses an empty list.", "It logs the reason.")
+        self.stage("README.md", "\n".join(halves) + "\n")
+        self.ruling({"README.md": [(1, halves[0], first), (2, halves[1], second)]})
+
+    def test_a_split_whose_first_half_is_correct_and_second_wrong_still_counts(self):  # C4, FR-003
+        self.halves_ruled("CORRECT", "WRONG")
+        self.assertEqual(self.counts(), [3])
+
+    def test_a_split_whose_first_half_is_wrong_and_second_correct_still_counts(self):  # C4, FR-003
+        self.halves_ruled("WRONG", "CORRECT")
+        self.assertEqual(self.counts(), [3])
+
+    def test_a_file_the_tree_lacks_ends_its_lineages(self):  # C6, FR-010
+        self.commit("README.md", "Placeholder.\n", "docs: readme")
+        self.at_two("Other text.")
+        git(self.root, "rm", "-q", "-f", "README.md")
+        self.check_launch()
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+
+    def test_two_lineages_merged_into_one_sentence_continue_as_the_higher(self):  # C5
+        self.stage("validator.py", VALIDATOR)
+        second = "It is safe."
+        self.stage("README.md", f"{V[0]}\n{second}\n")
+        self.ruling({"README.md": [(1, V[0], "WRONG"), (2, second, "WRONG")]})
+        self.stage("README.md", f"{V[1]}\n{second}\n")
+        self.ruling({"README.md": [(1, V[1], "WRONG")]})
+        merged = "The validator refuses an empty list and it is safe."
+        self.stage("README.md", merged + "\n")
+        self.ruling({"README.md": [(1, merged, "WRONG")]})
+        [survivor] = self.lineages()
+        self.assertEqual(claimcheck.count(survivor), 3)
+        [loser] = [item for item in self.lineages(ended=True) if item["state"] == "ended"]
+        self.assertEqual((loser["ended"]["by"], loser["ended"]["into"]), ("merged", survivor["id"]))
+
+    def test_deleted_words_end_the_lineage(self):  # C6
+        self.at_two("Other text.")
+        self.stage("README.md", "Other text.\n")
+        self.ruling({})
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+
+    def test_words_moved_unchanged_in_the_file_keep_the_lineage(self):  # C7
+        self.at_two("Other text.")
+        self.stage("README.md", f"Other text.\n{V[1]}\n")
+        self.ruling({"README.md": [(2, V[1], "WRONG")]})
+        self.assertEqual(self.counts(), [3])
+        self.assertEqual(len(self.lineages()), 1)
+
+    def test_one_hunk_over_two_held_claims_continues_both(self):  # C11
+        self.stage("validator.py", VALIDATOR)
+        for n in range(3):
+            first, second = f"The validator rejects an empty list ({n}).", f"The validator logs the reason ({n})."
+            self.stage("README.md", f"{first}\n{second}\n")
+            self.ruling({"README.md": [(1, first, "WRONG"), (2, second, "WRONG")]})
+        held = self.reason(self.git_commit())
+        for item in self.lineages():
+            self.assertIn(f"unlock claim-{item['id']}", held)
+            self.unlock(item["id"])
+        first, second = "The validator refuses an empty list (3).", "The validator records the reason (3)."
+        self.stage("README.md", f"{first}\n{second}\n")
+        self.ruling({"README.md": [(1, first, "WRONG"), (2, second, "WRONG")]})
+        self.assertEqual(self.counts(), [4, 4])
+
+    def test_words_moved_and_reworded_in_one_step_are_a_new_claim(self):  # C12
+        self.at_two("Other text.")
+        self.stage("README.md", f"Other text.\n{V[2]}\n")
+        self.ruling({"README.md": [(2, V[2], "WRONG")]})
+        self.assertEqual(self.counts(), [1])
+        [old] = [item for item in self.lineages(ended=True) if item["state"] == "ended"]
+        self.assertEqual(old["ended"]["by"], "deleted")
+
+    def test_a_moved_file_starts_again(self):  # C13
+        self.at_two()
+        git(self.root, "mv", "README.md", "GUIDE.md")
+        self.ruling({"GUIDE.md": [(1, V[1], "WRONG")]})
+        self.assertEqual((self.counts("GUIDE.md"), self.counts("README.md")), ([1], []))
+        self.assertEqual([item["ended"]["by"] for item in self.lineages(ended=True)], ["deleted"])
+
+    def test_a_never_committed_file_removed_from_disk_ends_its_lineages(self):  # C22, FR-010
+        self.at_two()
+        git(self.root, "rm", "-q", "-f", "README.md")
+        self.check_launch()
+        [ended] = self.lineages(ended=True)
+        self.assertEqual((ended["state"], ended["ended"]["by"]), ("ended", "deleted"))
+
+    def test_a_never_committed_file_unstaged_but_on_disk_keeps_its_lineages(self):  # C21, FR-002
+        self.at_two()
+        git(self.root, "rm", "-q", "--cached", "README.md")
+        self.stage("docs/other.md", "The validator returns True.\n")
+        self.ruling({"docs/other.md": [(1, "The validator returns True.", "CORRECT")]})
+        self.assertEqual(self.counts(), [2])
+
+    def test_a_reflow_with_the_words_unchanged_keeps_the_lineage(self):  # C14
+        self.stage("validator.py", VALIDATOR)
+        for text in ("The validator rejects\nan empty list.", "The validator refuses\nan empty list."):
+            self.stage("README.md", text + "\n")
+            self.ruling({"README.md": [(1, text.replace("\n", " "), "WRONG")]})
+        self.stage("README.md", "The validator refuses an\nempty list.\n")
+        self.ruling({"README.md": [(1, V[1], "UNSURE")]})
+        self.assertEqual(self.counts(), [2])
+        self.assertEqual(len(self.lineages()), 1)
+
+    def test_a_split_whose_second_half_is_placed_elsewhere_inherits_only_the_first(self):  # C19
+        self.at_two("Other text.")
+        first, second = "The validator refuses an empty list.", "It logs the reason."
+        self.stage("README.md", f"{first}\nOther text.\n{second}\n")
+        self.ruling({"README.md": [(1, first, "UNSURE"), (3, second, "WRONG")]})
+        self.assertEqual(self.counts(), [1, 2])
+
+    def test_a_held_claim_moved_unchanged_is_held_before_any_reader_runs(self):  # C23, FR-011
+        self.stage("validator.py", VALIDATOR)
+        for text in V[:3]:
+            self.stage("README.md", f"Intro.\n{text}\nOutro.\n")
+            self.ruling({"README.md": [(2, text, "WRONG")]})
+        self.stage("README.md", f"Intro.\nOutro.\n{V[2]}\n")
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "deny")
+        self.assertIsNone(args)
+        for part in (*V[:3], f"unlock claim-{claimcheck.claim_id('README.md', V[0])}", "Stop and ask the user"):
+            self.assertIn(part, self.reason(launched))
+
+
+class ClaimLibrary(ClaimGate):
+    def setUp(self):
+        super().setUp()
+        self.blocked = Path(self.tmp.name) / "blocked"
+        self.blocked.mkdir()
+        (self.blocked / "diff_match_patch.py").write_text("raise ImportError('blocked for the test')\n")
+
+    def without_the_library(self):
+        self.env["PYTHONPATH"] = str(self.blocked)
+
+    def test_a_missing_library_refuses_the_launch_and_the_commit_and_names_the_install(self):  # X1
+        self.stage("README.md", TRUE)
+        self.without_the_library()
+        for refused in (self.check_launch()[0], self.git_commit()):
+            self.assertEqual(self.decision(refused), "deny")
+            self.assertIn("could not run", self.reason(refused))
+            self.assertRegex(self.reason(refused), INSTALL_COMMAND)
+
+    def test_a_missing_library_is_only_recorded_in_log_mode(self):  # X1
+        self.env["ALQ_REVIEW_CLAIM_CHECKS"] = "log"
+        self.stage("README.md", TRUE)
+        self.without_the_library()
+        self.assertNotEqual(self.decision(self.check_launch()[0]), "deny")
+        self.assertIn("would_deny", [e["decision"] for e in self.gate_log() if e["action"] == "claim-launch"])
+
+    def test_a_staged_rewrite_past_the_budget_is_not_refused_and_keeps_the_count(self):  # X2
+        filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", f"{V[0]} {filler('a')}\n")
+        self.ruling({"README.md": [(1, V[0], "WRONG")]})
+        [first] = self.lineages()
+        self.stage("README.md", f"{V[1]} {filler('b')}\n")
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "allow")
+        self.read(args, {"README.md": ("PROSE", [])})
+        [kept] = self.lineages()
+        self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
+
+    def test_a_rewrite_a_commit_already_holds_is_not_refused_and_keeps_the_count(self):  # C26
+        filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
+        self.stage("validator.py", VALIDATOR)
+        self.stage("README.md", f"{V[0]} {filler('a')}\n")
+        self.ruling({"README.md": [(1, V[0], "WRONG")]})
+        [first] = self.lineages()
+        self.stage("README.md", f"{V[1]} {filler('b')}\n")
+        git(self.root, "commit", "-qm", "rewritten outside the gate")
+        self.stage("README.md", f"{V[1]} {filler('b')}\nOne more line.\n")
+        launched, args = self.check_launch()
+        self.assertEqual(self.decision(launched), "allow")
+        self.read(args, {"README.md": ("PROSE", [])})
+        [kept] = self.lineages()
+        self.assertEqual((kept["id"], claimcheck.count(kept)), (first["id"], 1))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+
+    def test_a_staged_file_with_a_space_in_its_name_is_followed_under_its_real_path(self):  # C27
+        self.stage("validator.py", VALIDATOR)
+        self.stage("my notes.md", FALSE)
+        self.ruling({"my notes.md": [(1, FALSE.strip(), "WRONG")]})
+        [item] = self.lineages("my notes.md")
+        self.assertEqual(claimcheck.count(item), 1)
+
+    def test_a_staged_gitlink_has_no_claims_and_the_check_completes(self):  # C28
+        (self.root / "vendor" / "sub").mkdir(parents=True)
+        head = git(self.root, "rev-parse", "HEAD").strip()
+        git(self.root, "update-index", "--add", "--cacheinfo", f"160000,{head},vendor/sub")
+        _, args = self.check_launch()
+        self.read(args, {"vendor/sub": ("CODE", [])})
+        self.assertEqual(self.stored()["status"], "complete")
 
 
 class ClaimCheckContest(ClaimGate):
@@ -482,14 +896,6 @@ class ClaimCheckContest(ClaimGate):
         self.judge(args, "README.md", FALSE.strip(), "CORRECT", evidence="https://docs.example/validator",
                    agent_type=CONTEST)
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
-
-    def test_a_rejected_contest_is_a_refusal(self):
-        self.wrong_readme()
-        cid = claimcheck.claim_id("README.md", FALSE.strip())
-        _, args = self.check_launch(contests=[{"claim": f"claim-{cid}", "evidence": "validator.py:1"}])
-        self.judge(args, "README.md", FALSE.strip(), agent_type=CONTEST)
-        self.assertEqual([h["refusals"] for h in self.holds()], [2])
-        self.assertEqual(self.decision(self.git_commit()), "deny")
 
     def test_a_contest_without_evidence_is_refused_before_any_agent(self):
         self.wrong_readme()

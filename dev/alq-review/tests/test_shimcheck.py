@@ -81,12 +81,21 @@ class Overlap(unittest.TestCase):
         self.assertEqual(shimcheck.site_range(site(line=7)), {"file": "src/load.py", "old_start": 7, "old_count": 1})
 
 
-class Touched(unittest.TestCase):
-    def test_each_site_is_marked_by_whether_a_staged_hunk_reaches_its_line(self):
-        sites = [site(), site("src/save.py", 3, "main")]
-        marks = shimcheck.touched(sites, [hunk(old=(12, 2))])
-        self.assertEqual(marks, {shimcheck.site_id("src/load.py", "load"): True,
-                                 shimcheck.site_id("src/save.py", "main"): False})
+class Altered(unittest.TestCase):
+    def test_each_site_gets_the_lines_the_staged_change_alters_in_its_file(self):
+        sites = [site(line=329), site("src/save.py", 3, "main"), site("src/other.py", 1, "run")]
+        marks = shimcheck.altered(sites, [hunk(old=(333, 1)), hunk(old=(340, 13)), hunk("src/save.py", old=(9, 2))])
+        self.assertEqual(marks, {shimcheck.site_id("src/load.py", "load"): [(333, 333), (340, 352)],
+                                 shimcheck.site_id("src/save.py", "main"): [(9, 10)],
+                                 shimcheck.site_id("src/other.py", "run"): None})
+
+    def test_a_pure_insertion_is_the_line_it_follows(self):
+        marks = shimcheck.altered([site()], [hunk(old=(7, 0))])
+        self.assertEqual(marks, {shimcheck.site_id("src/load.py", "load"): [(7, 7)]})
+
+    def test_the_lines_are_written_for_the_refusal(self):
+        self.assertEqual(shimcheck.lines_text([(333, 333), (340, 352)]), "alters lines 333, 340-352 of this file")
+        self.assertEqual(shimcheck.lines_text(None), "this file is not in the staged change")
 
 
 class OverrideId(unittest.TestCase):
@@ -129,8 +138,8 @@ class Swept(unittest.TestCase):
 
 class CommitDecision(unittest.TestCase):
     def test_a_held_bug_refuses_though_another_bug_the_tree_reaches_is_overridden(self):
-        held = shimcheck.new_chain("acme/demo", "main", "a" * 40, "b" * 40, [hunk()], state="held")
-        overridden = dict(shimcheck.new_chain("acme/demo", "main", "a" * 40, "c" * 40, [hunk()]), state="overridden")
+        held = shimcheck.new_chain("acme/demo", "main", "b" * 40, [hunk()], state="held")
+        overridden = dict(shimcheck.new_chain("acme/demo", "main", "c" * 40, [hunk()]), state="overridden")
         for chains in ([overridden, held], [held, overridden]):
             decided = shimcheck.commit_decision(None, chains, empty=False, concluding=False, staging=False, alone=True,
                                                 hunks=[dict(hunk(), id="h1")], labels={"h1": "CODE"}, tree="d" * 40,
@@ -139,18 +148,167 @@ class CommitDecision(unittest.TestCase):
             self.assertIn(f"override shim-{held['id']}", decided.reason)
 
 
+    def decide(self, chains):
+        return shimcheck.commit_decision(None, chains, empty=False, concluding=False, staging=False, alone=True,
+                                         hunks=[dict(hunk(), id="h1")], labels={"h1": "CODE"}, tree="d" * 40, root="/w")
+
+    def test_an_overridden_bug_lets_the_commit_through_only_when_no_other_bug_is_reached(self):
+        overridden = dict(shimcheck.new_chain("acme/demo", "main", "c" * 40, [hunk()]), state="overridden")
+        other = shimcheck.new_chain("acme/demo", "main", "d" * 40, [hunk()])
+        self.assertTrue(self.decide([overridden]).allow)
+        refused = self.decide([overridden, other])
+        self.assertFalse(refused.allow)
+        self.assertIn("has not been shim-checked", refused.reason)
+        self.assertFalse(self.decide([]).allow)
+
+
+def bug(ident="c" * 16, count=1, state="open", ranges=None, **more):
+    return {"id": ident, "branch": "main", "count": count, "members": [f"t{i}" for i in range(count)], "state": state,
+            "target": None, "seen": {}, "ranges": [hunk()] if ranges is None else ranges, **more}
+
+
 class SettledChains(unittest.TestCase):
-    def check(self, mode="sweep", verdict="patch"):
-        return {"repo": "acme/demo", "branch": "main", "head": "a" * 40, "tree": "e" * 40, "hunks": [hunk()],
-                "same_operation": [site()], "callers": [], "mode": mode, "verdict": verdict}
+    def check(self, mode="sweep", verdict="patch", hunks=None, sites=None):
+        return {"repo": "acme/demo", "branch": "main", "head": "a" * 40, "tree": "e" * 40,
+                "hunks": [hunk()] if hunks is None else hunks, "same_operation": [site()] if sites is None else sites,
+                "callers": [], "mode": mode, "verdict": verdict}
+
+    def by_id(self, settled):
+        return {item["id"]: item for item in settled}
 
     def test_an_overridden_bug_is_left_as_the_user_set_it(self):
         for count in (2, 3):
-            overridden = dict(shimcheck.new_chain("acme/demo", "main", "a" * 40, "c" * 40, [hunk()]),
-                              count=count, members=["d" * 40] * count, state="overridden")
+            overridden = bug(count=count, state="overridden")
             for mode, verdict in (("sweep", "patch"), ("deep", "patch"), ("sweep", "complete")):
                 with self.subTest(count=count, mode=mode, verdict=verdict):
                     self.assertEqual(shimcheck.settled_chains([overridden], self.check(mode, verdict)), [])
+
+    def test_a_new_bug_has_no_head_and_is_opened_by_its_tree(self):
+        [opened] = shimcheck.settled_chains([], self.check())
+        self.assertNotIn("head", opened)
+        self.assertEqual((opened["count"], opened["members"], opened["state"]), (1, ["e" * 40], "open"))
+
+    def test_bugs_at_1_and_3_become_one_at_3_and_then_4_with_this_patch_so_held(self):
+        low, high = bug("a" * 16, 1, ranges=[hunk(old=(11, 1))]), bug("b" * 16, 3, state="deep_due",
+                                                                      ranges=[hunk(old=(12, 1))])
+        merged = self.by_id(shimcheck.settled_chains([low, high], self.check()))
+        self.assertEqual((merged["b" * 16]["count"], merged["b" * 16]["state"]), (4, "held"))
+        self.assertEqual((merged["a" * 16]["state"], merged["a" * 16]["into"], merged["a" * 16]["count"]),
+                         ("merged", "b" * 16, 1))
+        self.assertEqual(len(merged["b" * 16]["ranges"]), 2)
+        self.assertEqual(merged["b" * 16]["members"], ["t0", "t1", "t2", "e" * 40])
+
+    def test_the_smaller_id_goes_on_when_the_counts_tie(self):
+        merged = self.by_id(shimcheck.settled_chains([bug("b" * 16, 2), bug("a" * 16, 2)], self.check()))
+        self.assertEqual((merged["a" * 16]["state"], merged["b" * 16]["state"], merged["a" * 16]["count"]),
+                         ("deep_due", "merged", 3))
+
+    def test_a_merged_bug_is_held_if_any_was_and_an_override_is_not_carried(self):
+        held, overridden = bug("a" * 16, 4, state="held"), bug("b" * 16, 2, state="overridden")
+        merged = self.by_id(shimcheck.settled_chains([overridden, held], self.check()))
+        self.assertEqual(merged["a" * 16]["state"], "held")
+        only = self.by_id(shimcheck.settled_chains([bug("a" * 16, 3, state="deep_due"), overridden],
+                                                   self.check("deep")))
+        self.assertEqual(only["a" * 16]["state"], "deep_done")
+
+    def test_the_merged_survivor_counts_once_though_it_absorbed_the_counting_tree(self):
+        counted = bug("a" * 16, 2, members=["t0", "e" * 40])
+        [again] = [item for item in shimcheck.settled_chains([counted, bug("b" * 16, 1)], self.check())
+                   if item["state"] != "merged"]
+        self.assertEqual(again["count"], 2)
+
+    def test_a_count_of_3_is_deep_due_and_4_or_more_is_held(self):
+        for before, state in ((1, "open"), (2, "deep_due"), (3, "held"), (4, "held")):
+            with self.subTest(before=before):
+                [after] = shimcheck.settled_chains([bug(count=before)], self.check())
+                self.assertEqual((after["count"], after["state"]), (before + 1, state))
+
+    def test_a_complete_verdict_ends_the_bugs_it_reaches(self):
+        ended = shimcheck.settled_chains([bug("a" * 16, 1), bug("b" * 16, 3)], self.check(verdict="complete"))
+        self.assertEqual([item["state"] for item in ended], ["ended", "ended"])
+
+
+class Carried(unittest.TestCase):
+    """Bug ranges move with the file from the text they were measured in to the text commits are measured against."""
+    old = "".join(f"line {n}\n" for n in range(1, 21))
+
+    def hunks_for(self, old, new):
+        import worktree
+        return lambda file: worktree.text_hunks(self.root, old, new)
+
+    def setUp(self):
+        import subprocess, tempfile
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = self.dir.name
+        subprocess.run(["git", "init", "-q", self.root], check=True)
+
+    def carry(self, bugs, new, file="src/load.py"):
+        return shimcheck.carried(bugs, {file: self.old}, {file: new}, set(), self.hunks_for(self.old, new))
+
+    def test_lines_added_above_a_bug_move_it_down(self):
+        new = "top\ntop2\n" + self.old
+        [moved] = self.carry([bug(ranges=[hunk(old=(10, 2))])], new)
+        self.assertEqual(moved["ranges"], [hunk(old=(12, 2))])
+        self.assertEqual(moved["state"], "open")
+
+    def test_a_text_that_did_not_change_leaves_the_ranges_alone(self):
+        [same] = self.carry([bug(ranges=[hunk(old=(10, 2))])], self.old)
+        self.assertEqual(same["ranges"], [hunk(old=(10, 2))])
+
+    def test_a_bug_whose_lines_are_deleted_is_ended(self):
+        new = "".join(line for n, line in enumerate(self.old.splitlines(True), 1) if not 9 <= n <= 12)
+        [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], new)
+        self.assertEqual((gone["state"], gone["ranges"]), ("ended", []))
+
+    def test_a_bugs_lines_moved_elsewhere_in_the_file_end_it(self):
+        lines = self.old.splitlines(True)
+        new = "".join(lines[:9] + lines[11:] + lines[9:11])
+        [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], new)
+        self.assertEqual((gone["state"], gone["ranges"]), ("ended", []))
+
+    def test_a_file_that_is_no_longer_there_takes_its_ranges(self):
+        [gone] = self.carry([bug(ranges=[hunk(old=(10, 2))])], "")
+        self.assertEqual(gone["state"], "ended")
+
+    def test_a_range_in_a_file_the_text_lacked_becomes_the_whole_file_once_it_exists(self):
+        file = "src/new.py"
+        [moved] = shimcheck.carried([bug(ranges=[hunk(file, old=(0, 0))])], {file: ""}, {file: "a\nb\nc\n"},
+                                    set(), lambda _: self.hunks_for("", "a\nb\nc\n")(file))
+        self.assertEqual((moved["ranges"], moved["state"]), ([hunk(file, old=(1, 3))], "open"))
+
+    def test_a_range_in_a_file_gone_from_the_checkout_is_dropped_and_one_still_there_is_kept(self):
+        file = "src/new.py"
+        bugs = [bug(ranges=[hunk(file, old=(0, 0))])]
+        args = ({file: ""}, {file: ""})
+        [kept] = shimcheck.carried(bugs, *args, set(), lambda _: [])
+        [dropped] = shimcheck.carried(bugs, *args, {file}, lambda _: [])
+        self.assertEqual((kept["state"], dropped["state"], dropped["ranges"]), ("open", "ended", []))
+
+    def test_a_range_in_another_file_is_kept_when_one_range_is_dropped(self):
+        new = "".join(line for n, line in enumerate(self.old.splitlines(True), 1) if not 9 <= n <= 12)
+        [kept] = shimcheck.carried([bug(ranges=[hunk(old=(10, 2)), hunk("src/save.py", old=(3, 1))])],
+                                   {"src/load.py": self.old, "src/save.py": "x\ny\nz\n"},
+                                   {"src/load.py": new, "src/save.py": "x\ny\nz\n"}, set(),
+                                   lambda file: __import__("worktree").text_hunks(self.root, self.old, new))
+        self.assertEqual((kept["state"], kept["ranges"]), ("open", [hunk("src/save.py", old=(3, 1))]))
+
+    def test_an_override_ends_when_a_change_takes_one_of_the_bugs_files_away(self):
+        taken = "src/save.py"
+        overridden = bug(count=4, state="overridden", ranges=[hunk(old=(10, 2)), hunk(taken, old=(3, 1))])
+        [back] = shimcheck.carried([overridden], {"src/load.py": self.old, taken: "x\ny\nz\n"},
+                                   {"src/load.py": self.old, taken: ""}, {taken}, lambda _: [])
+        self.assertEqual((back["state"], back["ranges"]), ("held", [hunk(old=(10, 2))]))
+
+    def test_an_override_ends_when_a_change_reaches_the_bugs_lines_and_not_before(self):
+        elsewhere = self.old.replace("line 18\n", "changed 18\n")
+        [still] = self.carry([bug(count=4, state="overridden", ranges=[hunk(old=(10, 2))])], elsewhere)
+        self.assertEqual(still["state"], "overridden")
+        inside = self.old.replace("line 11\n", "changed 11\n")
+        [back] = self.carry([bug(count=4, state="overridden", ranges=[hunk(old=(10, 2))])], inside)
+        self.assertEqual(back["state"], "held")
+        [open_again] = self.carry([bug(count=1, state="overridden", ranges=[hunk(old=(10, 2))])], inside)
+        self.assertEqual(open_again["state"], "open")
 
 
 class Shapes(unittest.TestCase):

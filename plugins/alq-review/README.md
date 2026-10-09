@@ -81,9 +81,13 @@ that is under review.
    only while its claim keeps its category and every file it cited is unchanged (never for
    every/only/all/exactly/always/never claims). An author who thinks a verdict is wrong contests it
    with a `path:line` or an `https://` page; a fresh judge, which may read only the cited hosts, upholds it or
-   rejects it, and a rejection counts as a refusal. After 3 refusals of one hunk the agent must stop and ask
-   the user, who lets the words stand by typing `unlock claim-<id>`. What the repo's own commit hook changes
-   during the commit is cosmetic and is not checked again.
+   rejects it, and a rejection counts as a refusal. A claim is counted as one lineage that follows its words from
+   edit to edit, whatever else is committed in between: the staged file is diffed against the text the last
+   completed check saw (`diff-match-patch` inside a rewritten range, a shift outside it), and a lineage ends
+   when its last words are ruled `CORRECT`, deleted or merged into another lineage's, or when the staged tree no longer
+   has its file and the disk has none either (a file only unstaged keeps its count). At 3 `WRONG` rulings the agent must stop
+   and ask the user, who lets the words stand by typing `unlock claim-<id>`; one more `WRONG` ruling holds it again.
+   What the repo's own commit hook changes during the commit is cosmetic and is not checked again.
 8. **A fix reaches every site of its bug before it is committed.** A `git commit` that stages code is also refused
    until the `shim-check` workflow has checked that staged tree, or the user has overridden its bug; each refusal
    names the next step. Jev answers whether the change fixes a defect. For a fix, sweepers list the sites doing the
@@ -93,7 +97,11 @@ that is under review.
    refused. With no listed site left, a fix at the cause is complete. Only the user overrides a bug, by typing the
    `override shim-<id>` that this check's refusal of a commit names, except the refusal that says to run
    `git commit` alone. An overridden bug lets the commit through only after the claim check has labelled every
-   staged hunk. The full rules are in this repo's
+   staged hunk. A bug belongs to its branch, not to a `HEAD`: its line ranges are carried from commit to commit
+   by the same diff that follows a claim's words, bugs that one staged change reaches become one at the higher
+   count, a bug whose lines are all deleted or whose file left both HEAD and the disk ends, and an override lasts until a commit changes the bug's code. The
+   deep sweep comes at a count of 3 and the hold at 4. A refusal lists, per site, the lines the staged change
+   alters in its file. The full rules are in this repo's
    `dev/alq-review/specs/006-shim-check-gate/`, amended by `dev/alq-review/specs/011-shim-no-site-left/`.
    A commit whose code is all in test files skips this check (`dev/alq-review/specs/012-tests-only-tree/`).
 
@@ -176,9 +184,13 @@ In the state folder:
   - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
   - `claim_checks (repo, tree)`, `claim_reads (repo, patch_id)`, `claim_verdicts (repo, claim_id)`,
-    `claim_holds (repo, base, file)` - the claim checks, keyed by repo, git's own fingerprints and the claim id, since a commit has no PR
-  - `shim_checks (repo, tree)`, `shim_chains (repo, id)`, `shim_rulings (repo, chain, site)` - the shim checks, the
-    chains of fixes of one bug, and the rulings on contested sites
+    `claim_lineages (repo, branch, id, opened)` - the claim checks, keyed by repo, git's own fingerprints and the
+    claim id, and each claim's lineage, kept per branch since a commit has no PR
+  - `shim_checks (repo, tree)`, `shim_bugs (repo, id)`, `shim_rulings (repo, chain, site)` - the shim checks, the
+    bugs (the fixes of one defect) with their line ranges, and the rulings on contested sites
+  - `seen_files (repo, branch, gate, file)` - each file's text as the last completed check saw it, which the
+    lineages and the bug ranges of that file are measured in. Rows of the old `claim_holds` and `shim_chains`
+    tables stay in a store that has them; nothing reads them
 - `inbox/<owner>__<repo>__<pr>.json` - written by `alq-github-pr-review/poll-pr-review.sh` on CLEAN and
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
 - `sessions/<session id>.off.json` - present while the user has the plugin switched off in that session
@@ -204,9 +216,10 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/premise_report.py` | the form of the premise report, its check, the check that a spec's `## Why this is worth doing` section holds its answers, and the location comment a stop pick leaves |
 | `scripts/rootcause.py` | the check that a spec's `## Root cause` section is there and opens with an `Observed:` line that says something, or with `Not a defect report.` unless the premise report says the issue reports wrong behaviour |
 | `scripts/config.py` | reads `config.json` |
-| `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its holds and git's answers |
+| `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |
+| `scripts/lineage.py` | where a piece of text is after an edit: the mapping both checks use to carry a claim or a bug across versions |
 | `scripts/claimgate.py` | the claim check's hook handlers |
-| `scripts/shimcheck.py` | the shim check's rules - pure functions of a check and its chains |
+| `scripts/shimcheck.py` | the shim check's rules - pure functions of a check and its bugs |
 | `scripts/shimgate.py` | the shim check's hook handlers |
 | `scripts/jev.py` | the Jev questions the shim check asks |
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
@@ -226,5 +239,9 @@ Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the review
 
 ## Dependencies
 
-A Python script that a hook runs imports only the standard library and the plugin's own files. Installing
-the plugin copies files and installs no package, so any other import fails on a machine that lacks it.
+A Python script that a hook runs imports only the standard library and the plugin's own files, with one
+exception: `diff-match-patch`, which the claim check and the shim check need to follow words and lines across
+edits. Installing the plugin copies files and installs no package, so install it for the interpreter that runs the
+hooks (`python3 -m pip install diff-match-patch`; on a Debian or Ubuntu system Python without a virtual environment,
+`sudo apt install python3-diff-match-patch`). Without it both checks refuse a launch and a commit as a check that
+could not run, and the refusal names this step. Any other import fails on a machine that lacks it.

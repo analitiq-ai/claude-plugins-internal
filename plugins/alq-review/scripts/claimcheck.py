@@ -1,10 +1,11 @@
 """The claim check's rules: what a reader and a judge must say, when a check is complete, when a commit may land,
-and how often one hunk may be refused before the user decides. No I/O: git and the ledger reach these functions as
-arguments, the way `policy.py` takes a ledger the gate has already read; a function that updates a check or its
-holds changes the argument in place.
+and how often one claim, followed through its rewordings, may be ruled wrong before the user decides. No I/O: git and
+the ledger reach these functions as arguments, the way `policy.py` takes a ledger the gate has already read; a
+function that updates a check or a lineage changes the argument in place.
 
-A check is one staged tree's record (see dev/alq-review/specs/005-claim-check-gate/data-model.md): its hunks, the reader's label
-and claims per hunk, and a verdict per judged claim.
+A check is one staged tree's record: its hunks, the reader's label and claims per hunk, and a verdict per judged
+claim. A lineage is the chain of one claim's versions, with the ruling on each; where its words sit in the file is
+`lineage.py`'s business.
 """
 from __future__ import annotations
 
@@ -30,13 +31,25 @@ _CHECK_REF = re.compile(r"(?P<repo>[\w.-]+/[\w.-]+)#tree:(?P<tree>[0-9a-f]{40}|[
 _CITATION = re.compile(r"(?<![\w/.:-])(?P<path>[\w./-]+):(?P<line>\d+)\b")
 _URL = re.compile(r"https://[^\s<>\"'`)\]]+")
 _COMMENT_MARK = re.compile(r"^\s*(?:#+|//+|/\*+|\*+/?|--|>|;+|<!--)\s?")
+_WORD = re.compile(r"\S+")
 
 Located = Callable[[str], "int | None"]  # path -> its line count in the checked tree, None when it is not there
 
 
+def words(text: str) -> list[tuple[str, int, int]]:
+    """Each word of a text with its start and end offset, comment markers at line starts left out."""
+    found, line_start = [], 0
+    for line in text.split("\n"):
+        mark = _COMMENT_MARK.match(line)
+        found += [(m.group(), line_start + m.start(), line_start + m.end())
+                  for m in _WORD.finditer(line, mark.end() if mark else 0)]
+        line_start += len(line) + 1
+    return found
+
+
 def plain(text: str) -> str:
-    """The words of a text: comment markers at line starts and every run of whitespace reduced to one space."""
-    return " ".join(" ".join(_COMMENT_MARK.sub("", line) for line in text.split("\n")).split())
+    """The words of a text, each run of white space and each comment marker at a line start reduced to one space."""
+    return " ".join(word for word, _, _ in words(text))
 
 
 def claim_id(file: str, quote: str) -> str:
@@ -201,45 +214,104 @@ def settle(check: dict) -> dict:
 
 
 def wrong_claims(check: dict, released: set[str] = frozenset()) -> list[dict]:
+    """The claims the check ruled WRONG, but those whose words the user released."""
     return [check["claims"][cid] for cid, v in check["verdicts"].items()
-            if v["verdict"] == "WRONG" and check["claims"][cid]["hunk"] not in released]
+            if v["verdict"] == "WRONG" and cid not in released]
+
+
+# --- a claim's lineage: the chain of its versions' rulings ------------------------------------------
+
+def new_lineage(claim: dict, ref: str) -> dict:
+    """The lineage `claim` opens when ruled WRONG with no lineage to join; `ref` is the check that ruled it."""
+    return {"id": claim["id"], "opened": ref, "file": claim["file"], "state": "open", "ended": None, "places": [],
+            "chain": [], "released": None}
+
+
+def end(lineage: dict, by: str, ref: str, into: str | None = None) -> None:
+    """Close a lineage, keeping it on record: `by` is `correct`, `deleted` or `merged` (into the lineage `into`)."""
+    lineage.update(state="ended", ended={"by": by, "ref": ref, "into": into})
+
+
+def _broken(verdict: dict) -> dict:
+    return next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
+
+
+def enter(lineage: dict, ref: str, claim: dict, verdict: dict) -> None:
+    """Add a ruling to the chain, once per `ref` and claim: the same check ruled again, or its completion step run
+    again, adds nothing, while the halves of a split claim each enter theirs. A WRONG ruling on words the user released
+    is entered as released, so it counts nothing. A CORRECT ruling takes its words out of the lineage, and with none
+    left the lineage ends."""
+    if any(item["ref"] == ref and item["claim"] == claim["id"] for item in lineage["chain"]):
+        return
+    wrong = verdict["verdict"] == "WRONG"
+    released = lineage["released"]
+    item = {"ref": ref, "claim": claim["id"], "line": claim["line"], "words": claim["quote"],
+            "ruling": verdict["verdict"], "released": wrong and bool(released) and claim["id"] in released["claims"]}
+    if wrong:
+        item.update(failing_case=verdict["failing_case"], evidence=_broken(verdict)["evidence"])
+    lineage["chain"].append(item)
+    if verdict["verdict"] == "CORRECT":
+        lineage["places"] = [place for place in lineage["places"] if place["claim"] != claim["id"]]
+        if not lineage["places"]:
+            end(lineage, "correct", ref)
+
+
+def count(lineage: dict) -> int:
+    """The checks that ruled a version of the claim WRONG, a check counting once."""
+    return len({item["ref"] for item in lineage["chain"] if item["ruling"] == "WRONG" and not item["released"]})
+
+
+def held(lineage: dict) -> bool:
+    """Only the user's release lowers the bar: after it, the count must pass the count it had then."""
+    floor = lineage["released"]["count"] if lineage["released"] else 0
+    return lineage["state"] == "open" and REFUSALS_BEFORE_USER <= count(lineage) and floor < count(lineage)
+
+
+def keep_holds(before: list[dict], after: list[dict]) -> None:
+    """A hold the user has not released survives a merge: the lineage that goes on, whatever its own release, is held
+    again when any lineage it absorbed was held."""
+    was_held = {item["id"] for item in before if held(item)}
+    goes_on = {item["id"]: item for item in after}
+    for item in after:
+        if item["state"] == "ended" and item["ended"]["by"] == "merged" and item["id"] in was_held:
+            goes_on[item["ended"]["into"]]["released"] = None
+
+
+def release(lineage: dict, at: str) -> None:
+    """The user let the words the lineage holds now stand; its chain and count stay."""
+    lineage["released"] = {"count": count(lineage), "claims": sorted({p["claim"] for p in lineage["places"]}), "at": at}
 
 
 # --- the commit ----------------------------------------------------------------------------------
-
-def _old_side(hold: dict) -> str:
-    if hold["old_count"]:
-        return f"old lines {hold['old_start']}-{hold['old_start'] + hold['old_count'] - 1}"
-    return "new file" if hold["old_start"] == 0 else f"added after old line {hold['old_start']}"
-
-
-def ruled_wrong(claim: dict, verdict: dict) -> dict:
-    """A claim with the WRONG verdict that refused it, as a hold keeps it: the hold outlives the check, and a reworded
-    claim gets a new id, so the user can be shown it only from here."""
-    broken = next((e for e in verdict["assertions"] if not e["confirmed"]), verdict["assertions"][0])
-    return {"id": claim["id"], "file": claim["file"], "line": claim["line"], "quote": claim["quote"],
-            "failing_case": verdict["failing_case"], "evidence": broken["evidence"]}
-
 
 def _named(claim: dict) -> str:
     return f"{claim['file']}:{claim['line']} \"{claim['quote']}\" ({claim_ref(claim['id'])})"
 
 
-def _wrong_line(wrong: dict) -> str:
-    return f"- {_named(wrong)}. Fails when: {wrong['failing_case']}. Evidence: {wrong['evidence']}"
+def _version(file: str, item: dict) -> str:
+    return f"- {file}:{item['line']} \"{item['words']}\" - {item['ruling']} ({item['ref']})"
 
 
-def user_question(held: list[dict]) -> str:
-    hunks = "\n".join(f"{h['file']} ({_old_side(h)}), refused {h['refusals']} times:\n" +
-                      "\n".join(f"{_wrong_line(c)}. Release: `unlock {claim_ref(c['id'])}`" for c in h["claims"])
-                      for h in held)
-    return ("Do not try these hunks again. Stop and ask the user: is the claim wrong, or is the checker? "
-            "Show them each claim last ruled WRONG, with the case it fails in and the evidence:\n"
-            f"{hunks}\nReleasing a hunk is the user's call: they type one of its `unlock` lines.")
+def _chain_text(lineage: dict) -> str:
+    last = next(item for item in reversed(lineage["chain"]) if item["ruling"] == "WRONG")
+    versions = "\n".join(_version(lineage["file"], item) for item in lineage["chain"])
+    return (f"ruled WRONG {count(lineage)} times, version by version:\n{versions}\n"
+            f"Fails when: {last['failing_case']}. Evidence: {last['evidence']}. "
+            f"Release: `unlock {claim_ref(lineage['id'])}`")
+
+
+def user_question(held_lineages: list[dict]) -> str:
+    chains = "\n".join(_chain_text(item) for item in held_lineages)
+    return ("Do not try these claims again. Stop and ask the user: is the claim wrong, or is the checker? "
+            "Show them each claim's chain, with the case it last failed in and the evidence:\n"
+            f"{chains}\nReleasing a claim is the user's call: they type its `unlock` line.")
 
 
 def _wrong_report(check: dict, claims: list[dict]) -> str:
-    return "\n".join(_wrong_line(ruled_wrong(claim, check["verdicts"][claim["id"]])) for claim in claims)
+    def line(claim: dict) -> str:
+        verdict = check["verdicts"][claim["id"]]
+        return f"- {_named(claim)}. Fails when: {verdict['failing_case']}. Evidence: {_broken(verdict)['evidence']}"
+    return "\n".join(line(claim) for claim in claims)
 
 
 def commit_preconditions(*, empty: bool, concluding: bool, staging: bool, alone: bool) -> Decision | None:
@@ -276,88 +348,6 @@ def commit_decision(check: dict | None, *, empty: bool, concluding: bool, stagin
     return Decision(True)
 
 
-# --- the bound on refusals, per git hunk ------------------------------------------------------------
-
-def _old_range(item: dict) -> tuple[int, int]:
-    return item["old_start"], item["old_start"] + max(item["old_count"], 1) - 1
-
-
-def touches(hold: dict, hunk: dict) -> bool:
-    """Whether two old-side ranges of one file overlap or are adjacent, a pure insertion counting as the line it follows;
-    the caller passes both in the numbering of one base."""
-    (a, b), (c, d) = _old_range(hold), _old_range(hunk)
-    return hold["file"] == hunk["file"] and a <= d + 1 and c <= b + 1
-
-
-def find_hold(holds: list[dict], hunk: dict) -> dict | None:
-    return next((h for h in holds if touches(h, hunk)), None)
-
-
-def hunk_state(holds: list[dict], hunk: dict) -> str:
-    """open: the check may run and refuse; held: only the user can release it; released: the user let these words
-    stand, so their WRONG verdicts do not refuse."""
-    hold = find_hold(holds, hunk)
-    if hold is None:
-        return "open"
-    if hold["released_patch_id"]:
-        return "released" if hold["released_patch_id"] == hunk["patch_id"] else "open"
-    return "held" if hold["refusals"] >= REFUSALS_BEFORE_USER else "open"
-
-
-def _refuse_hunk(holds: list[dict], hunk: dict) -> dict | None:
-    """Count one refusal on the hold `hunk` continues, appending a new hold to `holds` when none does; None when the
-    user released these words, which counts nothing."""
-    hold = find_hold(holds, hunk)
-    if hold is None:
-        hold = {"file": hunk["file"], "old_start": hunk["old_start"], "old_count": hunk["old_count"], "refusals": 0,
-                "claims": [], "patch_id": hunk["patch_id"], "released_patch_id": None}
-        holds.append(hold)
-    elif hold["released_patch_id"] == hunk["patch_id"]:
-        return None
-    elif hold["released_patch_id"]:
-        hold.update(refusals=0, released_patch_id=None)
-    (a, b), (c, d) = _old_range(hold), _old_range(hunk)
-    start, end = min(a, c), max(b, d)
-    hold.update(old_start=start, old_count=end - start + 1 if hold["old_count"] or hunk["old_count"] else 0,
-                refusals=hold["refusals"] + 1, patch_id=hunk["patch_id"])
-    return hold
-
-
-def _name_claims(hold: dict, check: dict) -> None:
-    """Keep on `hold` the claims `check` ruled WRONG in every hunk it covers, not only the hunk that refused last."""
-    hunks = {h["id"]: h for h in check["hunks"]}
-    hold["claims"] = sorted((ruled_wrong(c, check["verdicts"][c["id"]]) for c in wrong_claims(check)
-                             if touches(hold, hunks[c["hunk"]])), key=lambda c: (c["line"], c["id"]))
-
-
-def count_refusals(holds: list[dict], check: dict) -> list[dict]:
-    """One refusal per hunk for a completed check that ruled any claim in it WRONG (spec FR-017)."""
-    holds = list(holds)
-    wrong = {c["hunk"] for c in wrong_claims(check)}
-    for hold in [_refuse_hunk(holds, h) for h in check["hunks"] if h["id"] in wrong]:
-        if hold is not None:
-            _name_claims(hold, check)
-    return holds
-
-
-def standing(holds: list[dict], hunks: list[dict]) -> tuple[list[dict], set[str]]:
-    """The holds that stop these hunks until the user answers, and the ids of the hunks the user released."""
-    held, released = [], set()
-    for hunk in hunks:
-        state = hunk_state(holds, hunk)
-        if state == "held":
-            hold = find_hold(holds, hunk)
-            if hold not in held:
-                held.append(hold)
-        elif state == "released":
-            released.add(hunk["id"])
-    return held, released
-
-
-def release(hold: dict) -> None:
-    hold["released_patch_id"] = hold["patch_id"]
-
-
 # --- contests ------------------------------------------------------------------------------------
 
 def accept_contest(contest: dict, check: dict, located: Located) -> tuple[str | None, list[str]]:
@@ -390,20 +380,15 @@ def fetch_allowed(url: str, hosts: list[str]) -> bool:
     return parts.scheme == "https" and parts.hostname in hosts
 
 
-def contest_outcome(check: dict, holds: list[dict], cid: str, verdict: dict) -> str:
-    """A fresh judge's ruling on a contested claim replaces its verdict: upheld lifts the WRONG; rejected refuses its
-    hunk as a completed check's WRONG does (critique P2). `holds` are the holds of every file in the check, changed in
-    place."""
-    hunk = next(h for h in check["hunks"] if h["id"] == check["claims"][cid]["hunk"])
+def contest_outcome(check: dict, lineage: dict, cid: str, verdict: dict) -> str:
+    """A fresh judge's ruling on a contested claim replaces its verdict and enters the claim's chain under a ref of
+    its own: a rejected contest is one more WRONG, an upheld one lowers nothing (only the user's release does) and, when it
+    finds the claim CORRECT, ends the lineage like any CORRECT ruling."""
     check["verdicts"][cid] = verdict
-    if verdict["verdict"] == "WRONG":
-        hold = _refuse_hunk(holds, hunk)
-        outcome = "rejected"
-    else:
-        hold = find_hold(holds, hunk)
-        outcome = "upheld"
-    if hold is not None:
-        _name_claims(hold, check)
+    prefix = f"{check['ref']}/contest-"
+    nth = 1 + sum(1 for item in lineage["chain"] if item["claim"] == cid and item["ref"].startswith(prefix))
+    enter(lineage, f"{prefix}{nth}", check["claims"][cid], verdict)
+    outcome = "rejected" if verdict["verdict"] == "WRONG" else "upheld"
     check.setdefault("contests", {})[cid] = outcome
     return outcome
 

@@ -12,7 +12,7 @@ from unittest import mock
 
 from paths import PLUGIN
 
-from test_claim_gate import HARNESS, ClaimGate
+from test_claim_gate import HARNESS, INSTALL_COMMAND, ClaimGate
 from test_worktree_facts import git
 
 import hookio
@@ -100,12 +100,26 @@ class ShimGate(ClaimGate):
         return check
 
     def chain(self, **fields):
-        chain = {"id": "c" * 16, "branch": git(self.root, "branch", "--show-current"),
-                 "head": git(self.root, "rev-parse", "HEAD"), "count": 1, "members": [], "state": "open",
-                 "ranges": [{"file": "b.py", "old_start": 4, "old_count": 1}], "seen": {}, **fields}
+        """A bug of the branch as the gate would have stored it, with HEAD's text of the files its ranges are in."""
+        chain = {"id": "c" * 16, "branch": git(self.root, "branch", "--show-current"), "count": 1, "members": [],
+                 "state": "open", "target": None, "ranges": [{"file": "b.py", "old_start": 4, "old_count": 1}],
+                 "seen": {}, **fields}
         with self.shims() as shims:
-            shims.save_chain(chain)
+            shims.save_bug(chain)
+            for file in {r["file"] for r in chain["ranges"]}:
+                shims.save_seen(chain["branch"], "shim", file, {"text": self.head_text(file), "ref": "seed"})
         return chain
+
+    def head_text(self, file):
+        return subprocess.run(["git", "-C", str(self.root), "show", f"HEAD:{file}"], capture_output=True, text=True,
+                              check=True).stdout
+
+    def bugs(self):
+        """Every bug of the branch, ended ones too."""
+        with self.shims() as shims:
+            rows = shims._conn.execute("SELECT doc FROM shim_bugs WHERE repo = ? AND json_extract(doc, '$.branch') = ? "
+                                       "ORDER BY id", ("acme/demo", git(self.root, "branch", "--show-current")))
+            return [json.loads(doc) for (doc,) in rows]
 
 
 class ShimCommit(ShimGate):
@@ -144,7 +158,7 @@ class ShimCommit(ShimGate):
             self.assertIn(said, self.reason(refused))
             self.assertIn(f"Workflow(name='{LAUNCH}'", self.reason(refused))
 
-    def test_a_patch_lists_every_site_marked_touched_or_not(self):
+    def test_a_patch_lists_every_site_with_the_lines_the_staged_change_alters_in_its_file(self):
         tree = self.labelled({"b.py": (FIXED, "CODE")})
         touched = {"file": "b.py", "line": 4, "function": "b3", "does": "reads b unchecked"}
         self.record(tree, verdict="patch", kind="fix", level="cause", coverage="edited_only",
@@ -153,9 +167,9 @@ class ShimCommit(ShimGate):
         refused = self.git_commit()
         self.assertEqual(self.decision(refused), "deny")
         reason = self.reason(refused)
-        for part in ("cause", "edited_only", f"{shimcheck.site_id('b.py', 'b3')} b.py:4 b3 — reads b unchecked (touched)",
-                     f"{shimcheck.site_id('c.py', 'load')} c.py:2 load — reads b unchecked (not touched)",
-                     "refusal 2 of this bug", "override shim-" + "c" * 16):
+        for part in ("cause", "edited_only", f"{shimcheck.site_id('b.py', 'b3')} b.py:4 b3 — reads b unchecked (alters lines 4 of this file)",
+                     f"{shimcheck.site_id('c.py', 'load')} c.py:2 load — reads b unchecked "
+                     "(this file is not in the staged change)", "refusal 2 of this bug", "override shim-" + "c" * 16):
             self.assertIn(part, reason)
 
     def test_a_symptom_fix_with_no_site_left_is_refused_with_no_site_list_and_no_contest(self):
@@ -353,15 +367,17 @@ class ShimStagedDiff(ShimGate):
         self.assertIn("+b is checked", judge["prompt"])
         self.assertIn("+b3 checked", judge["prompt"])
 
-    def test_a_site_is_touched_by_a_prose_hunk_as_by_a_code_hunk(self):
+    def test_a_prose_hunk_alters_a_sites_lines_as_a_code_hunk_does(self):
         fixed = {"file": "b.py", "line": 4, "function": "b3", "does": "reads b unchecked"}
         self.record(self.tree, verdict="patch", kind="fix", level="cause", coverage="edited_only",
                     same_operation=[self.DOC, fixed, SITE], callers=[])
         reason = self.reason(self.git_commit())
-        self.assertIn(f"{shimcheck.site_id('b.py', 'b3')} b.py:4 b3 — reads b unchecked (touched)", reason)
-        self.assertIn(f"{shimcheck.site_id('docs.md', 'intro')} docs.md:1 intro — says b is read unchecked (touched)",
+        self.assertIn(f"{shimcheck.site_id('b.py', 'b3')} b.py:4 b3 — reads b unchecked (alters lines 4 of this file)",
                       reason)
-        self.assertIn(f"{shimcheck.site_id('c.py', 'load')} c.py:2 load — reads b unchecked (not touched)", reason)
+        self.assertIn(f"{shimcheck.site_id('docs.md', 'intro')} docs.md:1 intro — says b is read unchecked "
+                      "(alters lines 1 of this file)", reason)
+        self.assertIn(f"{shimcheck.site_id('c.py', 'load')} c.py:2 load — reads b unchecked "
+                      "(this file is not in the staged change)", reason)
 
 
 class ShimTestsOnly(ShimGate):
@@ -388,7 +404,7 @@ class ShimTestsOnly(ShimGate):
         self.assertEqual(Jev.seen, [])
 
     def test_a_tests_only_tree_reaching_a_held_bug_commits(self):
-        self.chain(state="held", count=4, ranges=[{"file": "tests/test_b.py", "old_start": 0, "old_count": 1}])
+        self.chain(state="held", count=4)
         self.labelled({"tests/test_b.py": (self.RED, "CODE")})
         out = self.git_commit()
         self.assertNotEqual(self.decision(out), "deny", self.reason(out))
@@ -410,6 +426,48 @@ class Staged(ShimGate):
         super().setUp()
         self.commit("c.py", "def load():\n    return open('b').read()\n", "feat: c")
         self.tree = self.labelled({"b.py": (FIXED, "CODE")})
+
+
+class ShimAltered(ShimGate):
+    def test_a_site_at_329_is_listed_with_the_line_333_the_staged_change_edits(self):  # B3
+        self.commit("big.py", "".join(f"l{i}\n" for i in range(400)), "feat: big")
+        edited = "".join("l332 edited\n" if i == 332 else f"l{i}\n" for i in range(400))
+        tree = self.labelled({"big.py": (edited, "CODE")})
+        site = {"file": "big.py", "line": 329, "function": "load", "does": "reads big unchecked"}
+        self.record(tree, verdict="patch", kind="fix", level="cause", coverage="edited_only", same_operation=[site],
+                    callers=[])
+        self.assertIn(f"{shimcheck.site_id('big.py', 'load')} big.py:329 load — reads big unchecked "
+                      "(alters lines 333 of this file)", self.reason(self.git_commit()))
+
+
+class ShimLibrary(ShimGate):
+    """The shim check's launch, and a commit that stages a change, refuse naming the install when the diff library
+    cannot be imported (X1)."""
+
+    def setUp(self):
+        super().setUp()
+        self.blocked = Path(self.tmp.name) / "blocked"
+        self.blocked.mkdir()
+        (self.blocked / "diff_match_patch.py").write_text("raise ImportError('blocked for the test')\n")
+
+    def test_a_missing_library_refuses_the_launch_and_the_commit_and_names_the_install(self):  # X1
+        self.labelled({"b.py": (FIXED, "CODE")})
+        self.env["PYTHONPATH"] = str(self.blocked)
+        self.env["ALQ_REVIEW_CLAIM_CHECKS"] = "log"
+        for refused in (self.shim_launch()[0], self.git_commit()):
+            self.assertEqual(self.decision(refused), "deny")
+            self.assertIn("could not run", self.reason(refused))
+            self.assertRegex(self.reason(refused), INSTALL_COMMAND)
+
+    def test_a_missing_library_is_only_recorded_in_log_mode(self):  # X1
+        self.labelled({"b.py": (FIXED, "CODE")})
+        self.env["PYTHONPATH"] = str(self.blocked)
+        self.env["ALQ_REVIEW_CLAIM_CHECKS"] = self.env["ALQ_REVIEW_SHIM_CHECKS"] = "log"
+        self.assertNotEqual(self.decision(self.shim_launch()[0]), "deny")
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
+        logged = [(e["action"], e["decision"]) for e in self.gate_log()]
+        self.assertIn(("shim-launch", "would_deny"), logged)
+        self.assertIn(("shim-commit", "would_deny"), logged)
 
 
 class ShimSweep(Staged):
@@ -497,7 +555,7 @@ class ShimSweep(Staged):
 
 
 class ShimContest(Staged):
-    """The author contests a listed site; one judge rules it once per bug, and the tree is judged again (R8)."""
+    """Contesting the sites a shim check listed."""
     OTHER = {"file": "b.py", "line": 10, "function": "save", "does": "writes b unchecked"}
     LOAD, SAVE = shimcheck.site_id("c.py", "load"), shimcheck.site_id("b.py", "save")
 
@@ -517,6 +575,9 @@ class ShimContest(Staged):
 
     def test_a_contest_is_refused_before_any_agent_for_an_unlisted_site_or_an_empty_reason(self):
         for contests, said in (([{"site": "0" * 16, "reason": "x"}], "not in"),
+                               ([{"site": [self.LOAD], "reason": "x"}], "not in"),
+                               ([{"site": {"id": self.LOAD}, "reason": "x"}], "not in"),
+                               ([{"reason": "x"}], "not in"),
                                ([{"site": self.LOAD, "reason": " "}], "reason is empty"),
                                ([], "non-empty list")):
             out, args = self.shim_launch(contests=contests)
@@ -572,7 +633,7 @@ class ShimContest(Staged):
         with self.shims() as shims:
             check = shims.check(self.tree)
             self.assertEqual((check["status"], check["verdict"], check["mode"]), ("complete", "complete", "rejudge"))
-            [chain] = shims.chains_at(check["branch"], check["head"])
+        [chain] = self.bugs()
         self.assertEqual((chain["count"], chain["state"]), (1, "ended"))
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
@@ -682,11 +743,11 @@ class ShimRestart(Staged):
         Jev.status = 500
         self.sweep(args, [SITE])
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["count"], 2)
+            self.assertEqual(shims.bug("c" * 16)["count"], 2)
         Jev.status, Jev.answers["coverage"] = 200, "edited_only"
         self.shim_launch()
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["count"], 3)
+            self.assertEqual(shims.bug("c" * 16)["count"], 3)
 
 
 def lines_changed(*numbers, mark="checked"):
@@ -695,7 +756,8 @@ def lines_changed(*numbers, mark="checked"):
 
 
 class ShimChain(ShimGate):
-    """A refused bug is counted on one branch at one HEAD (R9)."""
+    """A refused bug is counted on its branch, not on HEAD: a commit of other files, or one that adds lines above its
+    lines, leaves its count, and one that deletes all its lines ends it."""
 
     def setUp(self):
         super().setUp()
@@ -711,8 +773,7 @@ class ShimChain(ShimGate):
         return tree
 
     def chains(self):
-        with self.shims() as shims:
-            return shims.chains_at(git(self.root, "branch", "--show-current"), git(self.root, "rev-parse", "HEAD"))
+        return self.bugs()
 
     def test_a_first_patch_opens_a_chain_holding_its_hunks_and_sites(self):
         self.checked(lines_changed(4))
@@ -748,21 +809,144 @@ class ShimChain(ShimGate):
         self.checked(lines_changed(4, mark="again"))
         self.assertEqual(sorted((c["state"], c["count"]) for c in self.chains()), [("ended", 1), ("open", 1)])
 
-    def test_head_moving_leaves_the_chain_behind(self):
+    def test_a_commit_of_another_file_in_between_does_not_reset_the_count(self):  # B1
         self.checked(lines_changed(4))
         git(self.root, "checkout", "-q", "HEAD", "--", ".")
         self.commit("d.py", "d\n", "feat: d")
         self.checked(lines_changed(4, mark="again"))
         [chain] = self.chains()
-        self.assertEqual(chain["count"], 1)
+        self.assertEqual(chain["count"], 2)
 
-    def test_one_patch_reaching_two_chains_counts_for_both(self):
+    def test_a_file_head_lacks_patched_twice_is_one_bug_at_count_2(self):  # B1, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        for mark in ("first", "second"):
+            self.labelled({"n.py": (f"def load():\n    return '{mark}'\n", "CODE")})
+            _, args = self.shim_launch()
+            self.sweep(args, [])
+        [chain] = self.chains()
+        self.assertEqual((chain["count"], chain["state"]), (2, "open"))
+
+    def test_a_bug_in_a_file_head_then_gains_keeps_its_count(self):  # B1, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        text = "def load():\n    return 'first'\n"
+        self.labelled({"n.py": (text, "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [first] = self.chains()
+        git(self.root, "rm", "-q", "-f", "--cached", "n.py")
+        self.commit("n.py", text, "feat: n")
+        self.labelled({"n.py": (text.replace("first", "second"), "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [bug] = [c for c in self.chains() if c["state"] != "ended"]
+        self.assertEqual((bug["id"], bug["count"]), (first["id"], 2))
+
+    def test_a_bug_in_a_never_committed_file_removed_from_disk_ends(self):  # B9, FR-001
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        self.labelled({"n.py": ("def load():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [first] = self.chains()
+        git(self.root, "rm", "-q", "-f", "n.py")
+        self.labelled({"m.py": ("def save():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        self.assertEqual({c["id"]: c["state"] for c in self.chains()}[first["id"]], "ended")
+
+    def test_a_bug_in_a_never_committed_file_unstaged_but_on_disk_keeps_its_count(self):  # B8, FR-002
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        text = "def load():\n    return 'first'\n"
+        self.labelled({"n.py": (text, "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [first] = self.chains()
+        git(self.root, "rm", "-q", "--cached", "n.py")
+        self.labelled({"m.py": ("def save():\n    return 'first'\n", "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        self.labelled({"n.py": (text.replace("first", "second"), "CODE")})
+        _, args = self.shim_launch()
+        self.sweep(args, [])
+        [bug] = [c for c in self.chains() if c["id"] == first["id"]]
+        self.assertEqual((bug["count"], bug["state"]), (2, "open"))
+
+    def test_one_patch_reaching_two_bugs_makes_them_one_at_the_higher_count_and_counts_once(self):
         self.checked(lines_changed(4))
         Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
         self.checked(lines_changed(16), sites=())
         Jev.answers["level"] = "cause"
         self.checked(lines_changed(4, 16))
-        self.assertEqual(sorted(c["count"] for c in self.chains()), [2, 2])
+        survivor, absorbed = sorted(self.chains(), key=lambda c: c["state"] == "merged")
+        self.assertEqual((survivor["count"], survivor["state"], absorbed["state"], absorbed["into"], absorbed["count"]),
+                         (2, "open", "merged", survivor["id"], 1))
+        self.assertEqual(len(survivor["members"]), 3)  # the trees of both bugs and this one; the count stays the higher's + 1
+
+    def test_a_bug_at_3_and_one_at_1_are_one_bug_at_4_and_held_by_the_patch_that_reached_both(self):  # B2
+        deep = {"same_operation": [SITE], "callers": []}
+        self.chain(id="a" * 16, count=3, state="deep_done", target=deep, members=["t1", "t2", "t3"],
+                   ranges=[{"file": "b.py", "old_start": 4, "old_count": 1}])
+        self.chain(id="b" * 16, count=1, members=["t4"], ranges=[{"file": "b.py", "old_start": 16, "old_count": 1}])
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.labelled({"b.py": (lines_changed(4, 16), "CODE")})
+        out, args = self.shim_launch()
+        self.assertEqual((self.decision(out), args["mode"]), ("allow", "rejudge"))
+        kept, merged = [self.by_id(i) for i in ("a" * 16, "b" * 16)]
+        self.assertEqual((kept["count"], kept["state"]), (4, "held"))
+        self.assertEqual((merged["state"], merged["into"], merged["count"]), ("merged", "a" * 16, 1))
+        self.assertIn("ask the user", self.reason(self.git_commit()))
+
+    def test_a_bug_merged_into_another_hands_over_its_rulings_and_the_survivor_keeps_its_own(self):  # B2
+        deep = {"same_operation": [SITE], "callers": []}
+        a, b = "a" * 16, "b" * 16
+        self.chain(id=a, count=3, state="deep_done", target=deep, members=["t1", "t2", "t3"],
+                   ranges=[{"file": "b.py", "old_start": 4, "old_count": 1}])
+        self.chain(id=b, count=1, members=["t4"], ranges=[{"file": "b.py", "old_start": 16, "old_count": 1}])
+        ruling = lambda why: {"ruling": "not_shared", "reason": why, "evidence": "b.py:1"}
+        with self.shims() as shims:
+            shims.save_ruling(b, "only-in-b", ruling("b"))
+            shims.save_ruling(b, "in-both", ruling("b"))
+            shims.save_ruling(a, "in-both", ruling("a"))
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.labelled({"b.py": (lines_changed(4, 16), "CODE")})
+        self.shim_launch()
+        with self.shims() as shims:
+            self.assertEqual(shims.rulings(a), {"only-in-b": ruling("b"), "in-both": ruling("a")})
+
+    def test_a_range_rewritten_past_the_diff_budget_by_a_commit_keeps_its_bug_whole(self):  # B10
+        words = lambda tag: "".join(f"{tag}{i:04d} " + "x" * 80 + "\n" for i in range(120))
+        self.commit("big.py", words("a"), "feat: big")
+        self.chain(ranges=[{"file": "big.py", "old_start": 1, "old_count": 120}])
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("big.py", words("b"), "feat: rewrite big")
+        Jev.answers["level"] = "symptom"  # with no site listed, only the level makes a patch
+        self.labelled({"b.py": (FIXED, "CODE")})
+        out, args = self.shim_launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.sweep(args, [])
+        self.assertEqual([(b["id"], b["count"], b["state"], b["ranges"]) for b in self.bugs() if b["id"] == "c" * 16],
+                         [("c" * 16, 1, "open", [{"file": "big.py", "old_start": 1, "old_count": 120}])])
+
+    def by_id(self, ident):
+        return next(b for b in self.bugs() if b["id"] == ident)
+
+    def test_a_bugs_lines_deleted_by_a_commit_end_it(self):  # B4
+        self.chain()
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("b.py", "".join(f"b{i}\n" for i in range(20) if i != 3), "fix: drop b3")
+        Jev.answers["level"] = "symptom"
+        self.checked(lines_changed(16), sites=())
+        self.assertEqual(sorted((b["state"], b["count"]) for b in self.bugs()), [("ended", 1), ("open", 1)])
+
+    def test_lines_added_above_a_bug_by_a_commit_leave_it_the_same_bug(self):  # B5
+        Jev.answers["level"] = "symptom"
+        self.checked(lines_changed(4), sites=())
+        [first] = self.bugs()
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("b.py", "top1\ntop2\ntop3\n" + "".join(f"b{i}\n" for i in range(20)), "feat: header")
+        self.checked("top1\ntop2\ntop3\n" + lines_changed(4, mark="again"), sites=())
+        [again] = self.bugs()
+        self.assertEqual((again["id"], again["count"], again["ranges"]),
+                         (first["id"], 2, [{"file": "b.py", "old_start": 7, "old_count": 1}]))
 
     def test_a_chain_of_another_branch_never_matches(self):
         self.chain(branch="feat/9-other")
@@ -770,7 +954,7 @@ class ShimChain(ShimGate):
         [chain] = self.chains()
         self.assertEqual((chain["count"], chain["branch"]), (1, git(self.root, "branch", "--show-current")))
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["count"], 1)
+            self.assertEqual(shims.bug("c" * 16)["count"], 1)
 
     def test_a_first_patch_records_the_chain_it_opens(self):
         tree = self.checked(lines_changed(4))
@@ -804,19 +988,22 @@ class ShimChain(ShimGate):
 
 
 class ShimDeep(ShimChain):
-    """At a bug's third refusal the next check sweeps deeper, and later checks reuse its list (R10)."""
+    """At a bug's third refusal the next check sweeps deeper, and the check after that is judged against its list."""
     OTHER = {"file": "b.py", "line": 10, "function": "save", "does": "writes b unchecked"}
 
     def refused_three_times(self):
-        for mark in ("one", "two", "three"):
-            self.checked(lines_changed(4, mark=mark))
+        """The trees of the three checks, each of which listed `SITE` alone."""
+        return [self.checked(lines_changed(4, mark=mark)) for mark in ("one", "two", "three")]
 
-    def deep(self):
-        self.refused_three_times()
+    def deep_sweep(self):
         out, args = self.shim_launch()
         for i, sites in enumerate(([SITE], [SITE, self.OTHER], [self.OTHER])):
             self.sweep(args, sites, agent_id=f"d{i}")
         return out, args
+
+    def deep(self):
+        self.refused_three_times()
+        return self.deep_sweep()
 
     def test_the_third_refusal_names_the_deep_sweep(self):
         self.refused_three_times()
@@ -857,7 +1044,7 @@ class ShimDeep(ShimChain):
         [after] = self.chains()
         self.assertEqual((after["count"], after["members"]), (before["count"], before["members"]))
 
-    def test_later_checks_of_the_bug_are_judged_against_the_target_with_no_sweep(self):
+    def test_the_check_after_the_deep_sweep_is_judged_against_its_list_with_no_sweep(self):
         self.deep()
         Jev.seen.clear()
         git(self.root, "checkout", "-q", "HEAD", "--", ".")
@@ -870,8 +1057,8 @@ class ShimDeep(ShimChain):
 
 
 class ShimMiss(ShimDeep):
-    """A site a later list of the same bug names, which an earlier check left out, is logged as that check's miss
-    (R12)."""
+    """A site a later refusal's or deep sweep's list of the same bug names, which an earlier check left out, is logged
+    as that check's miss."""
 
     def misses(self):
         return [(e["decision"], e["reason"]) for e in self.gate_log() if e["action"] == "shim-miss"]
@@ -885,22 +1072,30 @@ class ShimMiss(ShimDeep):
         self.checked(lines_changed(4, mark="three"), sites=[SITE, self.OTHER])
         self.assertEqual(len(self.misses()), 1)
 
+    def missed_by(self, trees):
+        """The misses logged when a list names `OTHER`, which each check of `trees` left out."""
+        [chain] = self.chains()
+        missed = shimcheck.site_id("b.py", "save")
+        return sorted((missed, f"chain {chain['id']}: left out by {shimcheck.check_ref('acme/demo', tree)}")
+                      for tree in trees)
+
     def test_the_deep_list_logs_a_miss_against_every_check_that_left_the_site_out(self):
-        self.deep()
-        self.assertEqual([d for d, _ in self.misses()], [shimcheck.site_id("b.py", "save")] * 3)
+        trees = self.refused_three_times()
+        self.deep_sweep()
+        self.assertEqual(sorted(self.misses()), self.missed_by(trees))
 
     def test_a_deep_sweep_that_ends_complete_still_logs_its_misses(self):
-        self.refused_three_times()
+        trees = self.refused_three_times()
         Jev.answers["coverage"] = "all"
         _, args = self.shim_launch()
         for i in range(3):
             self.sweep(args, [SITE, self.OTHER], agent_id=f"d{i}")
-        self.assertEqual(len(self.misses()), 3)
+        self.assertEqual(sorted(self.misses()), self.missed_by(trees))
         self.assertEqual([c["state"] for c in self.chains()], ["ended"])
 
 
 class ShimHold(ShimDeep):
-    """At a bug's fourth refusal the check stops and asks the user (R11)."""
+    """At a bug's fourth refusal the check stops and asks the user."""
 
     def held(self):
         self.deep()
@@ -941,7 +1136,7 @@ class ShimOverride(ShimGate):
         said = self.override("c" * 16)
         self.assertIn("switched the shim check off", json.dumps(said))
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["state"], "overridden")
+            self.assertEqual(shims.bug("c" * 16)["state"], "overridden")
         self.assertNotEqual(self.decision(self.git_commit()), "deny")
         self.assertEqual([e["action"] for e in self.gate_log()].count("shim-override"), 1)
 
@@ -981,13 +1176,33 @@ class ShimOverride(ShimGate):
                                 "".join(f"b{i}\n" for i in range(16, 20)), "CODE")})
         self.assertEqual(self.decision(self.git_commit()), "deny")
 
-    def test_once_head_moves_the_bug_is_checked_again(self):
+    def test_a_commit_elsewhere_leaves_the_override_and_one_that_changes_the_bugs_code_ends_it(self):
         tree = self.labelled({"b.py": (FIXED, "CODE")})
         self.override(tree[:12])
         git(self.root, "reset", "-q", "b.py")
         self.commit("d.py", "d\n", "feat: d")
         self.labelled({"b.py": (FIXED, "CODE")})
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")  # the command commits, changing the bug's code
+        self.labelled({"b.py": (FIXED.replace("b3 checked", "b3 checked twice"), "CODE")})
         self.assertEqual(self.decision(self.git_commit()), "deny")
+
+    def test_a_held_bug_overridden_and_changed_by_a_commit_is_held_again(self):  # B6
+        self.chain(count=4, state="held")
+        self.override("c" * 16)
+        self.labelled({"b.py": (FIXED, "CODE")})
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")  # the command commits, changing the bug's code
+        self.labelled({"b.py": (FIXED.replace("b3 checked", "b3 checked twice"), "CODE")})
+        out = self.shim_launch()[0]
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("ask the user", self.reason(out))
+
+    def test_an_overridden_bug_and_another_that_one_change_reaches_need_the_check(self):  # B7
+        self.chain(id="a" * 16, count=2, state="overridden")
+        self.chain(id="b" * 16, ranges=[{"file": "b.py", "old_start": 16, "old_count": 1}])
+        self.labelled({"b.py": (lines_changed(4, 16), "CODE")})
+        refused = self.git_commit()
+        self.assertEqual(self.decision(refused), "deny")
+        self.assertIn("has not been shim-checked", self.reason(refused))
 
     def test_an_overridden_bug_is_not_swept_again(self):
         self.labelled({"b.py": (FIXED, "CODE")})
@@ -999,7 +1214,29 @@ class ShimOverride(ShimGate):
         self.assertIn("switched the shim check off for this bug", self.reason(out))
         self.assertEqual((Jev.seen, self.snapshots()), ([], []))
         with self.shims() as shims:
-            self.assertEqual(shims.chain("c" * 16)["state"], "overridden")
+            self.assertEqual(shims.bug("c" * 16)["state"], "overridden")
+
+    def test_an_override_names_a_bug_only_while_the_check_tracks_it(self):  # B11, FR-006
+        for state in ("ended", "merged"):
+            with self.subTest(state=state):
+                self.chain(state=state)
+                said = self.override("c" * 16)
+                self.assertIn("nothing was switched off", json.dumps(said))
+                with self.shims() as shims:
+                    self.assertEqual(shims.bug("c" * 16)["state"], state)
+
+    def test_an_override_by_tree_works_over_a_range_rewritten_past_the_diff_budget(self):  # B10
+        words = lambda tag: "".join(f"{tag}{i:04d} " + "x" * 80 + "\n" for i in range(120))
+        self.commit("big.py", words("a"), "feat: big")
+        self.chain(ranges=[{"file": "big.py", "old_start": 1, "old_count": 120}])
+        git(self.root, "checkout", "-q", "HEAD", "--", ".")
+        self.commit("big.py", words("b"), "feat: rewrite big")
+        tree = self.labelled({"b.py": (FIXED, "CODE")})
+        refused = self.git_commit()
+        self.assertEqual(self.decision(refused), "deny")
+        self.assertIn(f"override shim-{tree[:12]}", self.reason(refused))
+        self.assertIn("switched the shim check off", json.dumps(self.override(tree[:12])))
+        self.assertNotEqual(self.decision(self.git_commit()), "deny")
 
     def test_an_unknown_id_overrides_nothing(self):
         said = self.override("0" * 16)

@@ -1,5 +1,7 @@
-"""The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's; this module reads git
-and the ledger for them and records what they decide."""
+"""The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's and the mapping of lines
+from one version of a file to the next is lineage's; this module reads git and the ledger for them and records what
+they decide. A bug belongs to its branch: it is read by branch (the bugs still tracked) or by id (an override), never
+by HEAD. HEAD gives the text a bug's lines are carried to; a check's record stands only at the HEAD it was made on."""
 from __future__ import annotations
 
 import os
@@ -11,6 +13,7 @@ import briefs
 import github
 import jev
 import ledger
+import lineage
 import shimcheck
 import snapshot
 import worktree
@@ -30,12 +33,44 @@ def _logged(repo: str, root: str | None = None) -> SimpleNamespace:
 
 
 def _hunks_and_labels(repo: str, root: str, tree: str, base: str) -> tuple[list[dict], dict[str, str]]:
-    """The staged hunks and the claim check's labels for them (R2); no labels until that check has read the tree."""
+    """The staged hunks and the labels the claim check of this tree has given them so far; none while it has no record
+    of the tree at this base."""
     with ledger.open_claims(repo) as claims:
         claim = claims.check(tree)
     if claim is None or claim["base"] != base:
         return worktree.tree_hunks(root, base, tree), {}
     return claim["hunks"], claim["labels"]
+
+
+def _tracked(shims: ledger.Shims, root: str, branch: str, head: str) -> list[dict]:
+    """The branch's open bugs with their ranges carried to the text of `head`, the version commits are measured
+    against, from the text they were last carried in. Saves no bug and no saved text of a file."""
+    bugs = shims.open_bugs(branch)
+    olds = {}
+    for file in sorted({r["file"] for bug in bugs for r in bug["ranges"]}):
+        seen = shims.seen(branch, "shim", file)
+        if seen is None:
+            raise RuntimeError(f"a bug of {branch} has a range in {file} and no saved text to carry it from")
+        olds[file] = seen["text"]
+    news = {file: _head_text(root, head, file) for file in olds}
+    gone = {file for file, text in news.items() if not text and not worktree.on_disk(root, file)}
+    return shimcheck.carried(bugs, olds, news, gone, lambda file: worktree.text_hunks(root, olds[file], news[file]))
+
+
+def _head_text(root: str, head: str, file: str) -> str:
+    """The file as `head` has it, empty when `head` has not got it yet: a bug in a file only the staged change holds is
+    measured against nothing. While `head` lacks the file and the checkout has it, the next check finds the bug where this one left
+    it; once `head` gains text there, `shimcheck.carried` widens the range to the whole file."""
+    return worktree.tree_text(root, head, file) or ""
+
+
+def _persist(shims: ledger.Shims, root: str, branch: str, head: str, bugs: list[dict], ref: str) -> None:
+    """Saves every bug of the branch as carried or settled, and the text of `head` their ranges are in."""
+    texts = {r["file"]: _head_text(root, head, r["file"]) for b in bugs if shimcheck.tracked(b) for r in b["ranges"]}
+    for bug in bugs:
+        shims.save_bug(bug)
+    for file, text in texts.items():
+        shims.save_seen(branch, "shim", file, {"text": text, "ref": ref})
 
 
 def on_commit(payload: dict, action: Action) -> dict | None:
@@ -48,11 +83,20 @@ def on_commit(payload: dict, action: Action) -> dict | None:
     concluding = worktree.concluding(root)
     hunks, labels = ([], {}) if empty or concluding else _hunks_and_labels(repo, root, tree, base)
     head = worktree.head_sha(root)
+    refusal, chains = None, []
     with ledger.open_shims(repo) as shims:
         check = shims.check(tree)
         if check is not None and check["head"] != head:
             check = None
-        chains = shimcheck.matching_chains(shims.chains_at(where.branch, head), shimcheck.swept(hunks, labels))
+        if hunks:
+            try:
+                lineage.differ()
+                chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head),
+                                                   shimcheck.swept(hunks, labels))
+            except lineage.Unavailable as exc:
+                refusal = str(exc)
+    if refusal:
+        return refuse_shim(payload, "shim-commit", refusal, _logged(repo, root))
     decision = shimcheck.commit_decision(check, chains, empty=empty, concluding=concluding, staging=action.staging,
                                          alone=action.alone, hunks=hunks, labels=labels, tree=tree, root=root)
     if not decision.allow:
@@ -79,7 +123,7 @@ def _new_check(where: worktree.Worktree, tree: str, head: str, chain: dict | Non
 
 
 def _finish(check: dict, status: str, reason: str | None = None) -> None:
-    """A check that ends gives back its snapshot (R3); its seconds run from the launch."""
+    """A check that ends gives back its snapshot; its seconds run from the launch."""
     check["status"], check["reason"] = status, reason
     check["cost"]["seconds"] = round(time.time() - check["started"])
     if check["snapshot"]:
@@ -89,7 +133,7 @@ def _finish(check: dict, status: str, reason: str | None = None) -> None:
 
 def _end_replaced(payload: dict, check: dict) -> None:
     """Sweeping or judging checks of another tree or `HEAD` at this checkout can no longer commit, so they end and
-    give back their snapshots (R3)."""
+    give back their snapshots."""
     with ledger.open_shims(check["repo"]) as shims:
         replaced = [old for old in shims.unfinished_at(check["root"])
                     if (old["tree"], old["head"]) != (check["tree"], check["head"])]
@@ -143,6 +187,10 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         return deny(f"{CHECK} needs args.worktree: the absolute path of the checkout whose staged change is checked, "
                     "with a GitHub origin.")
     root, repo, logged = where.root, where.slug, _logged(where.slug, where.root)
+    try:
+        lineage.differ()
+    except lineage.Unavailable as exc:
+        return refuse_shim(payload, "shim-launch", str(exc), logged)
     deadline = time.monotonic() + JEV_SECONDS
     unstaged = worktree.unstaged(root)
     if unstaged:
@@ -161,9 +209,9 @@ def on_launch(payload: dict, call: dict) -> dict | None:
     code = shimcheck.swept(hunks, labels)
     with ledger.open_shims(repo) as shims:
         earlier = shims.check(tree)
-        chains = shimcheck.matching_chains(shims.chains_at(where.branch, head), code)
+        chains = shimcheck.matching_chains(_tracked(shims, root, where.branch, head), code)
     held = next((c for c in chains if c["state"] == "held"), None)
-    overridden = next((c for c in chains if c["state"] == "overridden"), None)
+    overridden = chains[0] if chains and all(c["state"] == "overridden" for c in chains) else None
     unread = _drop_closed_deferrals(payload, repo, chains, logged)
     if unread:
         return refuse_shim(payload, "shim-launch", unread, logged)
@@ -179,13 +227,15 @@ def on_launch(payload: dict, call: dict) -> dict | None:
     if "contests" in args:
         current = earlier if earlier is not None and earlier["head"] == head else None
         return _contest(payload, call, current, chains, args["contests"], logged)
-    # A complete tree is checked again only for its bug's deep sweep (R10), and a stopped contest resumes.
+    # Below, the check stored for this tree counts only if it was made at this HEAD: one left ruling resumes its
+    # contest, and a complete one is refused as already checked unless a bug of the change is due a deep sweep.
     if earlier is not None and earlier["head"] == head and earlier["status"] == "ruling":
         return _allowed(payload, call, earlier, "contest", logged)
     if earlier is not None and earlier["head"] == head and earlier["status"] == "complete" and not deep_due:
         return refuse_shim(payload, "shim-launch", f"This staged change was already checked ({earlier['ref']}). "
                            "Commit it or change it.", logged)
-    # A check that stopped is restarted, not begun again: what it recorded stands (R13).
+    # An earlier check of this tree at this HEAD is taken up again and keeps its ref.
+    # One that stopped after recording all its lists judges them again.
     restarted = earlier is not None and earlier["head"] == head
     if restarted:
         check = earlier
@@ -194,7 +244,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         # Jev's `kind` reads only the files with a code hunk (FR-005); everything else reads every file with a staged
         # hunk, so the lists are judged against the diff they were swept from.
         diff, code_diff = (_diff_of(root, base, tree, hunks), _diff_of(root, base, tree, code)) if code else ("", "")
-        check = _new_check(where, tree, head, next(iter(chains), None), code, diff, code_diff)
+        check = _new_check(where, tree, head, shimcheck.survivor(chains) if chains else None, code, diff, code_diff)
     _end_replaced(payload, check)
     mode = None
     try:
@@ -228,7 +278,7 @@ def _allowed(payload: dict, call: dict, check: dict, mode: str, logged) -> dict:
 
 
 def _drop_closed_deferrals(payload: dict, repo: str, chains: list[dict], logged) -> str | None:
-    """A deferral lasts while its issue is open (R8); the reason to refuse when an issue's state cannot be read."""
+    """A deferral lasts while its issue is open; the reason to refuse when an issue's state cannot be read."""
     for chain in chains:
         with ledger.open_shims(repo) as shims:
             deferred = {sid: r for sid, r in shims.rulings(chain["id"]).items() if r["ruling"] == "deferred"}
@@ -284,14 +334,14 @@ def _stored(ref) -> dict | None:
 def _located_in_head(check: dict):
     def located(path: str) -> int | None:
         text = worktree.tree_text(check["root"], check["head"], path)
-        return None if text is None else len(text.splitlines())
+        return None if text is None else len(lineage.lines(text))
     return located
 
 
 def _located_in_staged(check: dict):
     def located(path: str) -> int | None:
         text = worktree.tree_text(check["root"], check["tree"], path)
-        return None if text is None else len(text.splitlines())
+        return None if text is None else len(lineage.lines(text))
     return located
 
 
@@ -335,8 +385,8 @@ def _merged(outputs: list[dict], name: str) -> list[dict]:
 
 
 def _judge(check: dict, deadline: float) -> None:
-    """Ask Jev `level` and `coverage` over the recorded lists less the sites ruled out of the bug, and compose the
-    verdict (R6, R7, R8)."""
+    """Ask Jev `level` and `coverage` over the recorded same-operation sites less those ruled out of the bug, and the
+    callers, and compose the verdict."""
     if check["chain"]:
         with ledger.open_shims(check["repo"]) as shims:
             out = shimcheck.ruled_out(shims.rulings(check["chain"]))
@@ -355,22 +405,26 @@ def _judge(check: dict, deadline: float) -> None:
 
 
 def _save(payload: dict, check: dict) -> None:
-    """Store the check; one that completed settles the bug chains it reaches (R9), and logs the sites its list adds
-    to one of them as the misses of the earlier checks (R12)."""
+    """Store the check; a completed one also saves the bugs it settled."""
     found = []
     with ledger.open_shims(check["repo"]) as shims:
         if check["status"] == "complete":
-            before = {c["id"]: c for c in shims.chains_at(check["branch"], check["head"])}
+            before = {b["id"]: b for b in _tracked(shims, check["root"], check["branch"], check["head"])}
             settled = shimcheck.settled_chains(list(before.values()), check)
-            # A first refusal opens its chain only now; the chain a check is contested on is the one it names. A bug
-            # the user overrode while it was swept settles no chain.
-            if check["verdict"] == "patch" and check["chain"] is None and settled:
-                check["chain"] = settled[0]["id"]
-            for chain in settled:
-                # A refusal's list, or the deep sweep's whatever its verdict (FR-018).
-                if chain["id"] in before and (check["verdict"] == "patch" or check["mode"] == "deep"):
-                    found += [(chain["id"], sid, tree) for sid, tree in shimcheck.misses(before[chain["id"]], check)]
-                shims.save_chain(chain)
+            # A first refusal opens its bug only now, and a bug that absorbed others is the one a contest names. A bug
+            # the user overrode while it was swept settles nothing.
+            if check["verdict"] == "patch":
+                check["chain"] = next((b["id"] for b in settled if b["state"] != "merged"), check["chain"])
+            for bug in settled:
+                if bug["state"] == "merged":
+                    mine = shims.rulings(bug["into"])
+                    for sid, ruling in shims.rulings(bug["id"]).items():
+                        if sid not in mine:
+                            shims.save_ruling(bug["into"], sid, ruling)
+                elif bug["id"] in before and (check["verdict"] == "patch" or check["mode"] == "deep"):
+                    found += [(bug["id"], sid, tree) for sid, tree in shimcheck.misses(before[bug["id"]], check)]
+            _persist(shims, check["root"], check["branch"], check["head"],
+                     list({**before, **{b["id"]: b for b in settled}}.values()), check["ref"])
         shims.save_check(check)
     for chain_id, sid, tree in found:
         record(payload, "shim-miss", sid, f"chain {chain_id}: left out by {shimcheck.check_ref(check['repo'], tree)}",
@@ -438,18 +492,19 @@ def after_output(payload: dict) -> None:
 # --- the user's override ----------------------------------------------------------------------------------
 
 def _override_chain(chain_id: str) -> list[str]:
+    """Override bug `chain_id` in each repo that still tracks it: an ended or merged bug is no longer counted."""
     overridden = []
-    for repo in ledger.shim_chain_repos(chain_id):
+    for repo in ledger.shim_bug_repos(chain_id):
         with ledger.open_shims(repo) as shims:
-            chain = shims.chain(chain_id)
-            chain["state"] = "overridden"
-            shims.save_chain(chain)
-        overridden.append(repo)
+            bug = shims.bug(chain_id)
+            if shimcheck.tracked(bug):
+                shims.save_bug(dict(bug, state="overridden"))
+                overridden.append(repo)
     return overridden
 
 
 def _override_tree(prefix: str) -> list[str]:
-    """Override the bugs of each staged tree the prefix names: every chain it reaches, or one seeded with its hunks."""
+    """Override the bugs of each staged tree the prefix names: every bug it reaches, or one seeded with its hunks."""
     overridden = []
     for repo, tree, root in ledger.checked_roots(prefix):
         where = worktree.locate(root)
@@ -460,9 +515,11 @@ def _override_tree(prefix: str) -> list[str]:
         code = shimcheck.swept(hunks, labels) if labels else hunks
         head = worktree.head_sha(root)
         with ledger.open_shims(repo) as shims:
-            for chain in (shimcheck.matching_chains(shims.chains_at(where.branch, head), code)
-                          or [shimcheck.new_chain(repo, where.branch, head, tree, code)]):
-                shims.save_chain(dict(chain, state="overridden"))
+            tracked = {b["id"]: b for b in _tracked(shims, root, where.branch, head)}
+            reached = shimcheck.matching_chains(list(tracked.values()), code) or [
+                shimcheck.new_chain(repo, where.branch, tree, code)]
+            tracked.update({b["id"]: dict(b, state="overridden") for b in reached})
+            _persist(shims, root, where.branch, head, list(tracked.values()), shimcheck.check_ref(repo, tree))
         overridden.append(repo)
     return overridden
 
@@ -479,7 +536,7 @@ def on_prompt(payload: dict, word: str) -> dict | None:
     if overridden:
         record(payload, "shim-override", "overridden", f"{word}: {', '.join(overridden)}")
         said = (f"The user switched the shim check off for bug {word} in {', '.join(overridden)}: staged changes "
-                "of that bug commit without the check until HEAD moves.")
+                "of that bug commit without the check until a commit changes that bug's code.")
     else:
         said = f"`override {word}` names no bug the shim check knows, so nothing was switched off."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}
