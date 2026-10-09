@@ -1,4 +1,4 @@
-"""rootcause.py: spec.md carries a labelled `## Root cause` section (spec 019 FR-006, FR-008, FR-021)."""
+"""rootcause.py: spec.md carries a labelled `## Root cause` section."""
 import subprocess
 import sys
 import tempfile
