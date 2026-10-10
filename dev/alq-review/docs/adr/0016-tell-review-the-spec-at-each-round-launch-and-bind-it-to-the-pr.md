@@ -89,7 +89,7 @@ is not worth doing, are not decided here.
 
 ## Options considered
 
-### Option A: The session names the spec, the gate verifies it and binds it to the PR (chosen)
+### Option A: The caller names the spec, the gate verifies it and binds it to the PR (chosen)
 
 This is what ADR-0012 rejected as Option D. Its objection had two halves:
 
@@ -120,12 +120,12 @@ and never finds it, and that the location comment goes.
 - Any edit to `spec.md` after the first round, a typo fix included, holds the PR until the user unlocks it.
 - A session can edit `spec.md` and ask for the unlock. The user reading the diff is the only check on that.
 - The verification proves that the folder holds a `spec.md`. It does not prove that it is this change's
-  spec. The gate trusts the session for that.
-- A session can pass `spec: null` for a change that had a spec folder. Nothing in review checks that.
+  spec. The gate trusts the caller for that.
+- A caller can pass `spec: null` for a change that had a spec folder. Nothing in review checks that.
 
 ## Consequences
 
-- Easier: review needs nothing from the issue to know its spec. Every round of a PR, and its assessment, reads the same spec text, so a session cannot move the target between rounds.
+- Easier: review needs nothing from the issue to know its spec. Every round of a PR, and its assessment, reads the same spec text, so a caller cannot move the target between rounds.
 - Harder: every caller of review-round passes `spec`. The skills, scripts and tests built on the location
   comment change together.
 - **How we would know this was wrong:** PRs bound to the wrong spec with no way out; rounds launched
