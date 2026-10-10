@@ -61,8 +61,8 @@ verifies it against HEAD. The user decided that the folder's contents are planni
 2. We will name no spec headings in the reviewer prompt.
 3. We will give spec refusals no switch of their own. The plugin's `mode` governs them.
 
-This reverses ADR-0012, decision 4. ADR-0012, decision 1, stays only as the spec-folder mark that ADR-0016,
-decision 3, checks. ADR-0012, decision 3, is carried out by deleting `design_documents`.
+This reverses ADR-0012, decision 4. Review does not use ADR-0012, decision 1. ADR-0012, decision 3, is
+carried out by deleting `design_documents`.
 
 ## Options considered
 
