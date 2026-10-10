@@ -68,8 +68,8 @@ ADR-0002, decision 3, allows no record outside the one store, the ledger, withou
    A launch with no `spec` key is refused. No reason is taken: whether a change needs a spec is planning's
    decision, and review only takes the answer. This replaces the part of ADR-0009, decision 4, about an
    issue that says it has no spec: the answer is now given at launch. The rest of that decision stands.
-3. We will verify a named spec folder against HEAD and search for nothing: its parent folder is named
-   `specs`, and its `spec.md` is in HEAD and not empty.
+3. We will verify a named spec folder against HEAD: its parent folder is named `specs`, and its `spec.md`
+   is in HEAD and not empty.
 4. We will record, in a PR's ledger at its first round, the `spec` value and, for a spec folder, the git
    blob id of its `spec.md` in HEAD. That record is the binding, and it is what every round and assessment
    of the PR reads.
@@ -102,7 +102,6 @@ This is what ADR-0012 rejected as Option D. Its objection had two halves:
 | Dimension | Assessment |
 |---|---|
 | Where the spec comes from | The launch |
-| Searched for | Nothing |
 | Tested against | HEAD: a folder in a `specs` folder, with a `spec.md` that is not empty |
 | Can change during the PR | The folder: no. Its `spec.md`: only by the user's `unlock`, shown the diff |
 | Record kept | The `spec` value and the blob id of its `spec.md`, in the PR's ledger, the store ADR-0002 allows |
