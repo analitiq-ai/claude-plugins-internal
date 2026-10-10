@@ -1,7 +1,7 @@
 import hashlib
 import unittest
 
-import helpers  # noqa: F401  (puts scripts/ on the path)
+import helpers
 
 import briefs
 import shimcheck
@@ -30,6 +30,22 @@ class SiteId(unittest.TestCase):
         expected = hashlib.sha256(b"src/load.py\0load").hexdigest()[:16]
         self.assertEqual(shimcheck.site_id("src/load.py", "load"), expected)
         self.assertNotEqual(shimcheck.site_id("src/load.py", "load"), shimcheck.site_id("src/save.py", "load"))
+
+
+    def test_a_site_id_hashes_the_bytes_git_wrote_for_a_name_that_is_not_utf8(self):
+        self.assertEqual(shimcheck.site_id("caf\udce9.py", "load"), hashlib.sha256(b"caf\xe9.py\0load").hexdigest()[:16])
+
+    def test_a_site_id_is_the_same_where_python_names_files_in_ascii(self):
+        """An id names the site: a locale that cannot spell its name must neither change the id nor fail to make it."""
+        probe = "import shimcheck; print(shimcheck.site_id('src/load.py', 'na\\u00efve_\\u65e5'))"
+        self.assertEqual(helpers.under_ascii_file_names(probe),
+                         [hashlib.sha256("src/load.py\0na\u00efve_\u65e5".encode()).hexdigest()[:16]])
+
+
+class ChainId(unittest.TestCase):
+    def test_a_bug_on_a_branch_git_named_in_bytes_that_are_not_utf8_has_the_id_of_those_bytes(self):
+        chain = shimcheck.new_chain("acme/demo", "feat/caf\udce9", "b" * 40, [hunk()])
+        self.assertEqual(chain["id"], hashlib.sha256(b"acme/demo\0feat/caf\xe9\0" + b"b" * 40).hexdigest()[:16])
 
 
 class ValidateSweep(unittest.TestCase):

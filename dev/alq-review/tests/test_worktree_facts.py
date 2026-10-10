@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -5,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from helpers import REVIEWERS, T0, assess, finding
+from helpers import REVIEWERS, T0, assess, finding, under_ascii_file_names
 
 import briefs
 import facts
@@ -69,6 +70,42 @@ class Locate(Repo):
         self.assertFalse(worktree.is_dirty(str(self.root)))
         (self.root / "a.py").write_text("changed\n")
         self.assertTrue(worktree.is_dirty(str(self.root)))
+
+
+class GitBytes(Repo):
+    """git writes a path or a file's text as the bytes it holds, which need not be UTF-8."""
+    NAME = os.fsdecode(b"caf\xe9.py")
+
+    def test_a_changed_path_that_is_not_utf8_keeps_the_digest_of_its_file(self):
+        (self.root / self.NAME).write_bytes(b"x\n")
+        self.assertEqual(worktree.contents(str(self.root), "feat/1-demo").digests[self.NAME],
+                         hashlib.sha256(b"x\n").hexdigest())
+
+    def test_a_path_reaches_its_file_whatever_codec_python_gives_file_names(self):
+        (self.root / "caf\u00e9.py").write_bytes(b"x\n")
+        probe = ("import os, sys, worktree; "
+                 "print(worktree.contents(sys.argv[1], 'feat/1-demo').digests.get(os.fsdecode(b'caf\\xc3\\xa9.py')))")
+        self.assertEqual(under_ascii_file_names(probe, str(self.root)), [hashlib.sha256(b"x\n").hexdigest()])
+
+    def test_text_keeps_its_carriage_returns(self):
+        (self.root / "a.py").write_bytes(b"one\r\ntwo\r\n")
+        git(self.root, "add", "a.py")
+        text = worktree.tree_text(str(self.root), worktree.staged_tree(str(self.root)), "a.py")
+        self.assertEqual(worktree.as_bytes(text), b"one\r\ntwo\r\n")
+
+    def test_text_that_is_not_utf8_has_its_hunk_and_the_patch_id_of_its_own_bytes(self):
+        before = worktree.head_tree(str(self.root))
+        (self.root / "a.py").write_bytes(b"caf\xe9\r\n")
+        git(self.root, "add", "a.py")
+        after = worktree.staged_tree(str(self.root))
+        hunks = [h for h in worktree.tree_hunks(str(self.root), before, after) if h["added"]]
+        self.assertEqual(hunks[0]["added"], ["caf\udce9\r"])
+        lone = subprocess.run(["git", "-C", str(self.root), "diff", "-U0", before, after], capture_output=True,
+                              check=True).stdout
+        self.assertEqual(len(hunks), 1)
+        own = subprocess.run(["git", "-C", str(self.root), "patch-id", "--stable"], input=lone, capture_output=True,
+                             check=True).stdout.split()[0].decode()
+        self.assertEqual(hunks[0]["patch_id"], own)
 
 
 class Contents(Repo):
@@ -257,8 +294,9 @@ class RoundFacts(Repo):
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], git(self.root, "rev-parse", "HEAD"))
         rnd["root"] = str(self.root)
         self.assertEqual(rnd["base_sha"], moved)
-        with mock.patch("speclocation.resolve", return_value=None):  # no network
-            self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
+        state["spec"] = None
+        state["spec_blob"] = None
+        self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
 
     def test_first_round_never_carries_a_burden(self):
         state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)

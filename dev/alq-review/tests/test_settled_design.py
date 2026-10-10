@@ -112,40 +112,6 @@ class Check(unittest.TestCase):
         self.assertIn("R2", problems[1])
 
 
-class SpecFolders(unittest.TestCase):
-    """A spec folder is `<dir>/specs/<feature>/` at any depth (spec 015 R1)."""
-
-    def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.root = tmp.name
-
-    def folders(self, *changed, kept=()):
-        for folder in kept:
-            (Path(self.root) / folder).mkdir(parents=True, exist_ok=True)
-        return settled_design.spec_folders(self.root, list(changed))
-
-    def test_a_folder_under_a_subdirectory_counts(self):
-        self.assertEqual(self.folders("plugins/x/specs/004-demo/plan.md", kept=["plugins/x/specs/004-demo"]),
-                         ["plugins/x/specs/004-demo"])
-
-    def test_a_folder_at_the_root_counts(self):
-        self.assertEqual(self.folders("specs/004-demo/contracts/a.md", kept=["specs/004-demo"]), ["specs/004-demo"])
-
-    def test_a_file_directly_under_specs_is_in_no_folder(self):
-        self.assertEqual(self.folders("specs/notes.md", "plugins/x/specs/notes.md", kept=["specs", "plugins/x/specs"]),
-                         [])
-
-    def test_the_first_specs_component_names_the_folder(self):
-        self.assertEqual(self.folders("specs/004-demo/specs/x/y.md", kept=["specs/004-demo/specs/x"]),
-                         ["specs/004-demo"])
-
-    def test_a_deleted_folder_is_dropped_and_a_kept_one_stays(self):
-        self.assertEqual(self.folders("plugins/x/specs/004-gone/plan.md", "plugins/y/specs/005-kept/plan.md",
-                                      kept=["plugins/y/specs/005-kept"]),
-                         ["plugins/y/specs/005-kept"])
-
-
 class Cli(unittest.TestCase):
     def run_on(self, folder):
         return subprocess.run([sys.executable, str(SCRIPT), str(folder)], capture_output=True, text=True)

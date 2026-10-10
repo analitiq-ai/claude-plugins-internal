@@ -1,6 +1,7 @@
+import hashlib
 import unittest
 
-import helpers  # noqa: F401  (puts scripts/ on the path)
+import helpers
 
 import claimcheck
 
@@ -54,6 +55,15 @@ class Ids(unittest.TestCase):
         self.assertEqual(same, claimcheck.claim_id("README.md", "the  validator\n rejects"))
         self.assertNotEqual(same, claimcheck.claim_id("README.md", "the validator accepts"))
         self.assertNotEqual(same, claimcheck.claim_id("docs/x.md", "the validator rejects"))
+
+    def test_a_claim_id_hashes_the_bytes_git_wrote_for_text_that_is_not_utf8(self):
+        self.assertEqual(claimcheck.claim_id("a.md", "caf\udce9"), hashlib.sha256(b"a.md\0caf\xe9").hexdigest()[:16])
+
+    def test_a_claim_id_is_the_same_where_python_names_files_in_ascii(self):
+        """An id names the text: a locale that cannot spell the text must neither change the id nor fail to make it."""
+        probe = "import claimcheck; print(claimcheck.claim_id('a.md', 'caf\\u00e9 \\u65e5'))"
+        self.assertEqual(helpers.under_ascii_file_names(probe),
+                         [hashlib.sha256("a.md\0caf\u00e9 \u65e5".encode()).hexdigest()[:16]])
 
     def test_a_claim_is_named_claim_dash_id_and_parses_back(self):
         cid = claimcheck.claim_id("README.md", "the validator rejects")

@@ -1,4 +1,7 @@
+import os
+import subprocess
 import sys
+import unittest
 from datetime import datetime, timezone
 
 from paths import PLUGIN
@@ -9,6 +12,23 @@ import ledger  # noqa: E402
 
 T0 = datetime(2026, 9, 18, 12, 0, 0, tzinfo=timezone.utc)
 REVIEWERS = ["pr-review-toolkit:code-reviewer", "pr-review-toolkit:silent-failure-hunter"]
+
+
+ASCII_ONLY = 77
+
+
+def under_ascii_file_names(code: str, *argv: str) -> list[str]:
+    """What `code` prints, run where Python's codec for file names is ASCII: a C locale it is told not to coerce.
+    Skipped where Python names files in UTF-8 whatever the locale, as on macOS: nothing there is ASCII."""
+    probe = f"import sys\nif sys.getfilesystemencoding() != 'ascii': sys.exit({ASCII_ONLY})\n{code}"
+    done = subprocess.run([sys.executable, "-c", probe, *argv], capture_output=True, text=True,
+                          env=dict(os.environ, LC_ALL="C", PYTHONCOERCECLOCALE="0", PYTHONUTF8="0",
+                                   PYTHONPATH=str(PLUGIN / "scripts")))
+    if done.returncode == ASCII_ONLY:
+        raise unittest.SkipTest("Python here names files in an encoding other than ASCII under the C locale")
+    if done.returncode:
+        raise AssertionError(done.stderr)
+    return done.stdout.split()
 
 
 def finding(fid, file="src/a.py", line=10, title="t"):
