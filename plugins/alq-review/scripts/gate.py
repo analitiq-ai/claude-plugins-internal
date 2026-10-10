@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Hook entrypoint: one Claude Code hook payload on stdin, at most one decision on stdout.
 
-In `log` mode every refusal is recorded and nothing is blocked. Two things act in both modes,
-because the workflows cannot run without them: argument injection at workflow launch, and
-validation of the structured output that lands in the ledger.
+In `log` mode every refusal of a rule is recorded and nothing is blocked. What the workflows
+cannot run without acts in both modes: argument injection at workflow launch, the refusal of a
+launch whose round cannot open, and validation of the structured output that lands in the ledger.
 """
 from __future__ import annotations
 
@@ -19,24 +19,20 @@ from pathlib import Path
 import assessment
 import briefs
 import claimgate
-import config
 import facts
 import github
-from hookio import deny, log_error, mode, record, refuse, refuse_spec, session_file, session_state, set_switch, switch_state
+from hookio import block, deny, log_error, mode, record, refuse, session_file, session_state, set_switch, switch_state
 import ledger
 import policy
 from pre_merge_gate import PullRequest, first_line, first_words
-import settled_design
 import shimgate
 import shell
-import speclocation
+import specbinding
 import worktree
 
 REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round"
 REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
 INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
-# Claude Code also runs the skill by its bare name, while no other command has it.
-RESCOPE_SKILLS = (f"/{policy.PLUGIN}:{policy.RESCOPE_SKILL}", f"/{policy.RESCOPE_SKILL}")
 
 
 @dataclass(frozen=True)
@@ -111,18 +107,21 @@ def decide(payload: dict, target: Target, rule, **facts_for_rule) -> policy.Deci
 # --- the user hands a locked branch back ---------------------------------------------------------
 
 def _names(state: dict, word: str) -> bool:
-    """Whether `word`, typed after `unlock` or the rescope, means this locked PR: its branch, `#` and its number,
-    or its name."""
+    """Whether `word`, typed after `unlock`, means this locked PR: its branch, `#` and its number, or its name."""
     named = PullRequest.named(word)
     return (word in (state["branch"], f"#{state['pr']}")
             or (named is not None and named == PullRequest.named(f"{state['repo']}#{state['pr']}")))
 
 
-def _rescope_brief(state: dict, ruling: dict) -> str:
-    """What the alq-review:alq-spec skill re-scopes from: the ruling, and the checkout whose spec folder it rewrites."""
+def _reshape_brief(state: dict, ruling: dict) -> str:
+    """The RESHAPE_SPEC ruling the user carries to planning by hand: nothing else hands it over."""
+    opened = f"It was held by a RESHAPE_SPEC ruling. Open decision: {ruling['user_decision']}"
+    spec = briefs.bound_spec(state)
+    if not isinstance(spec, specbinding.Folder):
+        return (f"{opened} This PR has no spec. Close it and restart the work on a new PR bound to a spec that settles "
+                "this decision.")
     gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
-    return (f"Re-scope its spec from this RESHAPE_SPEC ruling. Worktree: {ledger.current_round(state)['root']}. Open decision: "
-            f"{ruling['user_decision']} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}.")
+    return (f"{opened} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}. Spec folder: {spec.path}.")
 
 
 SWITCHED_OFF_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND, claimgate.CHECK, shimgate.CHECK)
@@ -176,8 +175,7 @@ def launch_while_off(payload: dict) -> dict | None:
     # Refused in log mode too: the gate supplies these workflows' arguments, and off it supplies none.
     reason = (f"alq-review is off for this session, so {name} does not run. Carry on without it. Only the user turns "
               "it on, with alq-review on; do not ask them to.")
-    record(payload, "workflow", "deny", reason)
-    return deny(reason)
+    return block(payload, "workflow", reason)
 
 
 def on_prompt(payload: dict, switch: str) -> dict | None:
@@ -193,38 +191,33 @@ def on_prompt(payload: dict, switch: str) -> dict | None:
 
 
 def _on_release(payload: dict, prompt: str) -> dict | None:
-    typed = first_words(prompt, 3)
-    if len(typed) >= 2 and typed[0] == "unlock":
-        return claimgate.on_prompt(payload, typed[1]) or _unlock(payload, typed[:2], rescope=False)
-    if len(typed) >= 2 and typed[0] == "override":
+    typed = first_words(prompt, 2)
+    if len(typed) == 2 and typed[0] == "unlock":
+        return claimgate.on_prompt(payload, typed[1]) or _unlock(payload, typed[1])
+    if len(typed) == 2 and typed[0] == "override":
         return shimgate.on_prompt(payload, typed[1])
-    if len(typed) == 3 and typed[0] in RESCOPE_SKILLS and typed[1] == "rescope":
-        return _unlock(payload, typed, rescope=True)
     return None
 
 
-def _unlock(payload: dict, typed: list[str], rescope: bool) -> dict:
-    """Answers an unlock or a rescope: releases the one locked branch its last word names."""
-    typed_as = " ".join(typed)
+def _unlock(payload: dict, ref: str) -> dict:
+    """Answers `unlock <ref>`: releases the one locked branch `ref` names."""
     held = [state for state in ledger.all_states() if policy.locked(state)]
-    named = [state for state in held if _names(state, typed[-1])]
+    named = [state for state in held if _names(state, ref)]
 
     def refs(states):
         return ", ".join(f"{s['repo']}#{s['pr']}" for s in states)
-    if len(named) == 1 and rescope and not policy.reshape_spec_ruling(named[0]):
-        said = (f"`{typed_as}` releases only a RESHAPE_SPEC lock, and {refs(named)} is held for another reason, "
-                f"so nothing was unlocked. Its release is `unlock {policy.unlock_ref(named[0])}`.")
-    elif len(named) == 1:
-        brief = _rescope_brief(named[0], policy.reshape_spec_ruling(named[0])) if rescope else ""
+    if len(named) == 1:
+        # Read before the release: once unlocked, no ruling holds the branch.
+        ruling = policy.reshape_spec_ruling(named[0])
+        brief = _reshape_brief(named[0], ruling) if ruling else ""
         with ledger.open_ledger(named[0]["repo"], named[0]["pr"]) as state:
             ledger.unlock(state, f"user prompt: {first_line(payload['prompt'])[:200]}", datetime.now(timezone.utc))
         said = f"The user unlocked {state['repo']}#{state['pr']} ({state['branch']}); its code may change again. {brief}".rstrip()
     elif named:
-        command = policy.RESCOPE if rescope else "unlock"
-        said = (f"`{command}` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
-                f"repo: `{command} <owner>/<repo>#<number>`.")
+        said = (f"`unlock` could mean {refs(named)}, so nothing was unlocked. Ask the user to repeat it naming the "
+                "repo: `unlock <owner>/<repo>#<number>`.")
     else:
-        said = f"`{typed_as}` names no locked PR, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
+        said = f"`unlock {ref}` names no locked PR, so nothing was unlocked. Locked now: {refs(held) or 'none'}."
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": f"[alq-review] {said}"}}
 
 
@@ -387,7 +380,7 @@ def on_agent(payload: dict) -> dict | None:
         return None
     return refuse(payload, "dispatch",
                   "Reviewers run together behind a barrier and are assessed as one round; dispatched one by one, the "
-                  f"first report gets fixed before the rest arrive. Next step: {policy.REVIEW_CALL % 'internal'}.")
+                  f"first report gets fixed before the rest arrive. Next step: {policy.review_call(None, 'internal')}.")
 
 
 def on_skill(payload: dict) -> dict | None:
@@ -395,7 +388,7 @@ def on_skill(payload: dict) -> dict | None:
     if stage is None:
         return None
     return refuse(payload, "dispatch", f"The {stage} review runs as a workflow, so its findings are assessed as one round "
-                                       f"before anything is fixed. Next step: {policy.REVIEW_CALL % stage}.")
+                                       f"before anything is fixed. Next step: {policy.review_call(None, stage)}.")
 
 
 def _open_pr(where: worktree.Worktree) -> tuple[int, str]:
@@ -422,29 +415,118 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
                            f"not be read: {exc}") from exc
 
 
-def _spec_problems(root: str, base: str) -> str | None:
-    """Why this branch's design is not settled (spec 004 FR-004); None when it is."""
-    try:
-        found = settled_design.branch_problems(root, base, config.load()["design_documents"])
-    except Exception as exc:  # FR-021: a check that cannot run refuses what it was deciding
-        return f"The settled-design check could not run: {type(exc).__name__}: {exc}"
-    if not found:
-        return None
-    return ("The first internal round needs a settled design: a design-document change comes with a spec folder, "
-            "and every mechanism its plan.md lists cites a research.md decision that says what was chosen, why, and "
-            "the existing tools looked at. Then launch again.\n" + "\n".join(found))
+@dataclass(frozen=True)
+class SpecStep:
+    """What a launch's spec check does to its PR's binding: the fields the save that lets the launch through sets,
+    or the refusal, with the hold a changed spec.md puts on the PR once that refusal blocks."""
+    binds: dict
+    refusal: str | None = None
+    holds: dict | None = None
 
 
-def _spec(where: worktree.Worktree) -> tuple[briefs.Spec, str | None]:
-    """(what speclocation.resolve found for the branch, None), or (None, why the spec cannot be found and the next
-    step). (None, None) is a branch that names no issue."""
+def _spec_md_blob(root: str, head: str, folder: str) -> str | None:
+    """The blob id of `folder`/spec.md at commit `head`; None when it is missing or empty there. RuntimeError, in
+    git's words, when git cannot say."""
+    path = f"{folder}/spec.md"
+    for entry in worktree.git(root, "ls-tree", "-l", "-z", head, "--", path).split("\0"):
+        meta, _, name = entry.partition("\t")
+        if name == path:
+            _, kind, blob, size = meta.split()
+            return blob if kind == "blob" and size != "0" else None
+    return None
+
+
+def _head_spec_md(root: str, head: str, folder: str, restore: str) -> tuple[str | None, str | None]:
+    """(the blob id of `folder`/spec.md at `head`, None), or (None, the refusal) when it is missing, empty or git
+    cannot read it. `restore` is the next step when it is missing or empty."""
     try:
-        return speclocation.resolve(where.slug, where.branch, where.root), None
-    except speclocation.SpecLocationError as exc:
-        return None, str(exc)
+        blob = _spec_md_blob(root, head, folder)
     except RuntimeError as exc:
-        return None, (f"The location comment of this branch's issue could not be read: {exc}. Next step: check "
-                      "`gh auth status`, then launch again.")
+        return None, f'Step "spec.md": git could not read {folder}/spec.md at {head}: {exc}'
+    if blob is None:
+        return None, (f'Step "spec.md": {folder}/spec.md is missing or empty at {head}, the commit this round '
+                      f"reviews, and the round is reviewed against it. Next step: {restore}.")
+    return blob, None
+
+
+def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
+    """HEAD's spec.md of the PR's bound folder, `head_blob`, against the text the PR is bound to."""
+    bound, held = state["spec_blob"], state.get("spec_held")
+    step = specbinding.text_step(bound, head_blob, None if held is None else held["at"], state["unlocked_at"])
+    if step == "same":
+        return SpecStep({})
+    if step == "bind":
+        return SpecStep({"spec_blob": head_blob})
+    try:
+        shown = worktree.git(root, "diff", bound, head_blob)
+    except RuntimeError as exc:
+        # The blob ids already show the text changed; the diff only shows how.
+        shown = f"git could not make the diff: {exc}"
+    return SpecStep({}, f"{state['spec']}/spec.md at {head} is not the text this PR was bound to (blob {bound}, now "
+                        f"{head_blob}):\n{shown}\nA PR is reviewed against the spec it was bound to, so it is held until "
+                        "the user releases it. Stop and ask the user whether this PR now builds to the changed spec; they "
+                        f"release it by starting their next prompt with `unlock {policy.unlock_ref(state)}`.",
+                    holds={"bound": bound, "head": head_blob})
+
+
+def _spec_step(args: dict, state: dict, stage: str, root: str, head: str) -> SpecStep:
+    """A review-round launch's `spec`, checked in this order: present, null or a non-empty string, the folder's
+    shape, the PR's binding, its spec.md at `head` (the commit the round reviews), then the bound text."""
+    review_call = policy.review_call(state, stage)
+    if "spec" not in args:
+        return SpecStep({}, "args.spec is missing: a review round names the spec folder its PR is reviewed against, "
+                            f"or null for a change that needs no spec. Next step: {review_call}.")
+    try:
+        given = specbinding.parse(args["spec"])
+    except ValueError as exc:
+        return SpecStep({}, f"{exc}. Next step: {review_call}.")
+    value = given.path if isinstance(given, specbinding.Folder) else None
+    if value is not None:
+        problem = specbinding.shape_problem(value)
+        if problem:
+            return SpecStep({}, f'Step "shape": {problem}. Next step: name the spec folder by its path from the repo '
+                                f"root, {review_call}.")
+    if "spec" in state:
+        other = specbinding.bind(state["spec"], value)
+        if other:
+            return SpecStep({}, other)
+    if value is None:
+        return SpecStep({} if "spec" in state else {"spec": None, "spec_blob": None})
+    head_blob, unread = _head_spec_md(root, head, value, f"commit it, then {review_call}")
+    if unread:
+        return SpecStep({}, unread)
+    if "spec" not in state:
+        return SpecStep({"spec": value, "spec_blob": head_blob})
+    return _spec_text(state, root, head, head_blob)
+
+
+def _assess_spec_step(state: dict, root: str, head: str) -> SpecStep:
+    """An assess-round launch's check of the bound spec.md at `head`; a PR bound to null or to nothing has none."""
+    folder = state.get("spec")
+    if folder is None:
+        return SpecStep({})
+    # A round awaiting assessment lets no agent commit, so only the user can put spec.md back.
+    head_blob, unread = _head_spec_md(root, head, folder,
+                                      "stop and ask the user to restore it with a commit of their own")
+    if unread:
+        return SpecStep({}, unread)
+    return _spec_text(state, root, head, head_blob)
+
+
+def _refuse_spec(payload: dict, action: str, spec: SpecStep, event: Target, state: dict, now: datetime) -> dict | None:
+    """Refuses a launch by its spec check, recording the hold it puts on the PR once the refusal blocks."""
+    refused = refuse(payload, action, spec.refusal, event)
+    if refused and spec.holds:
+        state.setdefault("spec_held", dict(spec.holds, at=ledger.stamp(now)))
+    return refused
+
+
+def _admit_spec(state: dict, spec: SpecStep) -> None:
+    """Saves the binding of a launch that got through. A spec check that passed spends any hold, so the next change
+    is held again; one log mode let past spends nothing, as it put nothing on."""
+    if spec.refusal is None:
+        state.update(spec.binds)
+        state.pop("spec_held", None)
 
 
 def on_workflow(payload: dict) -> dict | None:
@@ -466,29 +548,34 @@ def on_workflow(payload: dict) -> dict | None:
     try:
         pr, merges_into = _open_pr(where)
     except RuntimeError as exc:
-        return refuse(payload, action, str(exc), Target(where.slug, None, where.branch, where.root))
+        return block(payload, action, str(exc), Target(where.slug, None, where.branch, where.root))
     event = Target(where.slug, pr, where.branch, where.root)
     head = worktree.head_sha(where.root)
     with ledger.open_checkouts_ledger(where.slug, pr, where.branch, head) as state:
         if call["name"] == ASSESS_ROUND:
             decision = policy.launch_assess(state)
             if not decision.allow:
-                return refuse(payload, action, decision.reason, event)
+                return block(payload, action, decision.reason, event)
+            spec = _assess_spec_step(state, where.root, head)
+            if spec.refusal:
+                refused = _refuse_spec(payload, action, spec, event, state, now)
+                if refused:
+                    return refused
             rnd = ledger.current_round(state)
             if rnd["base_sha"] is None:
                 try:
                     rnd["base_sha"] = _review_base(where, merges_into)
                 except RuntimeError as exc:
-                    return refuse(payload, action, str(exc), event)
-            # The assessor's brief resolves the spec the same way and would fail there, inside the assessor's run.
-            _, lost = _spec(where)
-            if lost:
-                refused = refuse(payload, action, lost, event)
-                if refused:
-                    return refused
+                    return block(payload, action, str(exc), event)
+            _admit_spec(state, spec)
             rnd.update(root=where.root, session=payload["session_id"])
             injected = briefs.assess_args(state, rnd, where)
         else:
+            spec = _spec_step(args, state, stage, where.root, head)
+            if spec.refusal:
+                refused = _refuse_spec(payload, action, spec, event, state, now)
+                if refused:
+                    return refused
             decision = policy.launch_round(state, stage, head_sha=head,
                                            dirty=worktree.is_dirty(where.root), inflight=inflight_count(payload, now))
             if not decision.allow:
@@ -498,25 +585,14 @@ def on_workflow(payload: dict) -> dict | None:
             try:
                 base = _review_base(where, merges_into)
             except RuntimeError as exc:
-                return refuse(payload, action, str(exc), event)
-            if stage == "internal" and policy.first_internal_round(state):
-                unsettled = _spec_problems(where.root, base)
-                if unsettled:
-                    refused = refuse_spec(payload, action, unsettled, event)
-                    if refused:
-                        return refused
-            # Audits too: their reviewers ignore the spec, but their assessor's brief resolves it.
-            spec, lost = _spec(where)
-            if lost:
-                refused = refuse(payload, action, lost, event)
-                if refused:
-                    return refused
+                return block(payload, action, str(exc), event)
             waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
                                     expected=[t for wave in waves for t in wave], escalation=decision.escalation, now=now)
             rnd.update(root=where.root, session=payload["session_id"])
-            injected = briefs.review_args(state, rnd, where, decision, spec)
+            _admit_spec(state, spec)
+            injected = briefs.review_args(state, rnd, where, decision, briefs.bound_spec(state))
     record(payload, "launch", "allow", rnd["ref"], event)
     # "allow" doubles as the permission a headless run needs to start a workflow at all.
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
@@ -660,15 +736,16 @@ def main() -> None:
         print(trace, file=sys.stderr)
         try:
             log_error(f"{payload.get('tool_name')}\n{trace}")
-        except OSError:
-            pass  # the trace is already on stderr
+            logged = f"The trace is in {ledger.state_root() / 'errors.log'}."
+        except Exception as unlogged:  # the answer below must not depend on the log
+            logged = f"The trace was not written to errors.log: {type(unlogged).__name__}: {unlogged}."
         where = payload.get("tool_name") or payload.get("hook_event_name")
         if _refuses(payload):
             out = deny(f"the gate crashed deciding this {where}, so it refuses rather than letting it through "
-                       f"unchecked: {type(exc).__name__}: {exc}. The trace is in "
-                       f"{ledger.state_root() / 'errors.log'}. To work while it is broken, set ALQ_REVIEW_MODE=log.")
+                       f"unchecked: {type(exc).__name__}: {exc}. {logged} To work while it is broken, set "
+                       "ALQ_REVIEW_MODE=log.")
         else:
-            out = {"systemMessage": f"alq-review gate failed open on {where}: {type(exc).__name__}: {exc}"}
+            out = {"systemMessage": f"alq-review gate failed open on {where}: {type(exc).__name__}: {exc}. {logged}"}
     if out:
         print(json.dumps(out))
 

@@ -106,6 +106,12 @@ def stamp(now: datetime) -> str:
     return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def released(at: str, unlocked_at: str | None) -> bool:
+    """Whether the unlock stamped `unlocked_at` released a hold or lock recorded at stamp `at`. Stamps count whole
+    seconds, so an unlock stamped the same second may have come first: it releases nothing."""
+    return unlocked_at is not None and at < unlocked_at
+
+
 def new_state(repo: str, branch: str | None, pr: int | None = None) -> dict:
     return {"repo": repo, "branch": branch, "pr": pr, "epoch": 0, "rounds": [],
             "unlocked_at": None, "unlocked_epoch": 0, "github_clean_sha": None}

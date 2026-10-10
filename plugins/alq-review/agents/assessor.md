@@ -19,10 +19,14 @@ Your prompt carries `--ref '<round_ref>'`. Run:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/briefs.py --ref '<round_ref>'
 ```
 
-It prints the checkout, the diff and history commands, the spec's text (`spec`) and the folder it is in (`spec_folder`),
-the earlier rounds with every ruling made so far, the round verdicts admissible for this round,
-and `facts` computed from git and the ledger. The facts are measurements: build on them, do not
-re-argue them. Copy `brief_token` into your answer; without it the answer is rejected.
+It prints the checkout, the diff and history commands, the spec folder the PR is reviewed against
+(`spec_folder`, null when the change needs no spec), the earlier rounds with every ruling made so far,
+the round verdicts admissible for this round, and `facts` computed from git and the ledger. The facts
+are measurements: build on them, do not re-argue them. Copy `brief_token` into your answer; without it
+the answer is rejected.
+
+The brief quotes no spec. When `spec_folder` is set, read `<spec_folder>/spec.md` in the checkout
+yourself.
 
 ## Rule on each finding
 
@@ -44,7 +48,7 @@ A finding you have not checked against the code gets no verdict from you.
   - `gold_plating` - asks for more than the spec does.
   - `not_real` - the reviewer misread the code.
 - `spec_ref`: the spec decision the finding touches, `spec silent` when it touches one the spec
-  should have settled and did not, `n/a` when there is no spec.
+  should have settled and did not, `n/a` when `spec_folder` is null.
 - `mechanism`: what *produces* the problem, in one line. Not where it shows. Ask of the diff what
   the root-cause check asks: does the code change how the wrong state comes to exist, or does it
   react to that state after it exists? Findings on the second kind of code keep coming back.

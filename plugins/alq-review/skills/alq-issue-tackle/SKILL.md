@@ -1,48 +1,47 @@
 ---
 name: alq-issue-tackle
-description: Implement the fix for a GitHub issue given its issue number, working in a git worktree against the spec in the spec folder that the issue's location comment names. Reads that spec from the folder, stops and names /alq-review:alq-spec when the issue has no location comment, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, and reviews the diff against the spec before opening a PR. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
+description: Implement the fix for a GitHub issue against the spec folder it is handed, as `<n> spec=<folder|null> [branch=<branch>]`. Works in a git worktree on the branch that holds the spec, reads spec.md from that branch's HEAD, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, then runs the internal review round with the same spec and the root-cause check before the PR goes to review. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
 ---
 
-You will be given a number that represents an issue open in GitHub. Call it `<n>`.
+You are given `<n> spec=<folder|null> [branch=<branch>]`. `<n>` is an issue open in GitHub, `spec` is
+the spec folder this change is built against or `null` for a change with no spec, and `branch` is the
+branch that folder was committed on.
 
-## Step 1 - find the spec
+## Step 1 - arguments
 
-Name the script once: `SPECLOC` is `../../scripts/speclocation.py`, from this skill's base directory.
+- With no `spec`, stop and give its two forms: `<n> spec=<folder> branch=<branch>` and `<n> spec=null`.
+- A folder given without `branch` is refused: stop and name `branch` as the missing argument.
 
-Run `python3 SPECLOC show <n>` **every time this skill starts**, never from memory of an earlier run.
-A location that changed since the last run must win. There are three outcomes:
-
-- It prints `spec: <folder>` and `branch: <branch>`: the spec is in that folder on that branch.
-- It prints `spec: none` and a reason: the user decided the issue needs no spec. Work from the issue itself.
-- It exits non-zero: show the user its message and stop. Write no code. With no location comment,
-  the next step is `/alq-review:alq-spec #<n>`.
-  An issue that was judged not worth doing is refused here too, and the message says so.
+Write no code before both are settled.
 
 ## Step 2 - worktree and spec
 
-Work in a worktree at `.claude/worktrees/<n>`. With a location comment that names a branch, the
-worktree is on that branch. Reuse the worktree if it exists. Never work on main. With `spec: none`,
-create the branch `<type>/<n>-<short-description>` per the branch-naming rules.
+With a folder, work in `.claude/worktrees/<n>` on `branch`: check `branch` out there, or reuse that
+worktree when it is already on `branch`. A worktree there on another branch is a stop: say which
+branch it is on.
 
-With `spec: none` there is no spec to read: the issue is what this change is for, and the rest of
-this step and every mention of the spec below do not apply.
+Run `git show HEAD:<folder>/spec.md` in the worktree; when `spec.md` is missing or empty at that HEAD,
+stop before writing any code and say so. The review gate reads `spec.md` at the head it reviews, so a
+spec not committed on the branch is no spec to it.
 
-Otherwise read `<folder>/spec.md` in the worktree before writing any code. `plan.md` and `tasks.md`
-in the same folder say how it is to be built. The Acceptance section is what this change is for.
+Then read `<folder>/spec.md`. `plan.md` and `tasks.md` in the same folder say how it is to be built.
+The requirements `spec.md` states are what this change is for.
 
-Do not start implementing before the spec exists. Each internal review round grades the diff
-against the spec the gate reads from the spec folder the location comment names; code written
-before there is one has nothing to be graded against.
+With `spec=null`, create the branch `<type>/<n>-<short-description>` per the branch-naming rules, in
+`.claude/worktrees/<n>`. There is no spec to read: the issue is what this change is for, and every
+mention of the spec below does not apply.
+
+Never work on main.
 
 ## Step 3 - implement
 
-- Implement against the spec's Acceptance section. That section is the definition of done.
+- Implement against the requirements `spec.md` states. Meeting every one is the definition of done.
 - Ask any clarification questions you may have.
 - Implement at the spec's **Root cause**, not at the site the issue reported. Working from
   the issue title instead of that section is how a symptom patch gets written.
 - If the code contradicts the Root cause section - the trace was right weeks ago and the
-  module has moved since - stop and say so. Re-scoping is cheap; a spec nobody can satisfy
-  gets silently ignored instead of corrected.
+  module has moved since - stop and say so. A spec nobody can satisfy gets silently ignored
+  instead of corrected.
 - Read the section's **Observed:** line first. If it says the trace is a hypothesis, or marks
   the affected callers as predicted rather than verified, confirm the mechanism yourself
   before building on it - reproduce it, or find the log or test that shows it. The spec was
@@ -53,20 +52,44 @@ before there is one has nothing to be graded against.
 
 ## Step 4 - review against the spec
 
-Run the internal PR review. You do not hand reviewers the spec: for an internal round, the
-alq-review gate reads `spec.md` from the folder the issue's location comment names and puts it in full
-into each reviewer's prompt, asking for each unmet Acceptance criterion as a finding. A
-diff that is clean on its own terms and does not satisfy the spec is a failure.
+If `alq-review:review-round` is not among the workflows you can run, stop before the PR: say the
+review step needs alq-review.
 
-Then invoke the `alq-review:alq-root-cause-check` skill. A symptom patch is clean code by every other measure,
-so it passes every reviewer not specifically asked whether the fix reached the cause - that
-skill is the one that asks. Treat a verdict of AT SYMPTOM or SPEC WRONG as blocking: the first
-means going back to Step 3, the second means no more code: tell the user what the spec's trace got wrong.
+Commit and push, then open the PR as a draft: a review round is recorded against its PR. Launch every
+review-round with the same `spec` this skill was given, the folder quoted or `null`:
 
-## Step 5 - PR
+```
+Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: 'internal', spec: '<folder>' | null})
+```
 
-Open the PR in DRAFT and run the review loops to green.
+The PR is bound to the value of its first round, and a different one is refused. You do not hand
+reviewers the spec: the gate tells each reviewer to read `<folder>/spec.md` and to raise every
+requirement it states that the change does not meet as a finding. A diff that is clean on its own terms and
+does not satisfy the spec is a failure. When a round has findings, the gate names each next step: take
+it, until the internal loop ends clean.
 
-## Step 6 - cleanup
+## Step 5 - root cause
+
+With `spec=null` there is no trace to check against, so the root-cause check does not run: go on to
+Step 6.
+
+Otherwise, once the internal loop ends clean, invoke the `alq-review:alq-root-cause-check` skill with
+the spec folder as its argument. A symptom patch is clean code by every other measure, so it passes
+every reviewer not asked whether the fix reached the cause; this check is the one that asks. Act on
+its verdict:
+
+- **AT CAUSE**: on to Step 6, the PR.
+- **AT SYMPTOM**: back to Step 3; the new diff goes through the review loop and this check again.
+- **SPEC WRONG**: stop writing code, and tell the user what the trace got wrong.
+- **CANNOT TELL**: stop: say which case it is and what would resolve it. The PR stays a draft.
+
+A spec whose Root cause section reads `Not a defect report.` gets no verdict, as there is no defect to
+trace: go on to Step 6.
+
+## Step 6 - PR
+
+Mark the PR ready and run the GitHub review loop to green.
+
+## Step 7 - cleanup
 
 Once the PR is merged, remove the worktree.

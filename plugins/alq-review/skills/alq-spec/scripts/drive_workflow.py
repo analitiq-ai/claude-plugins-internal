@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Start or resume the alq-spec workflow from the checkout, then print where the run stands as JSON.
 
-    drive_workflow.py start <spec file> [<spec dir>]
+    drive_workflow.py start <spec file> <issue> [<spec dir>]
     drive_workflow.py resume <run id> [<input>=<value>]
 
 Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks.
@@ -20,7 +20,7 @@ PLUGIN = Path(__file__).resolve().parents[3]
 # Spec Kit applies only presets and workflows installed in the project, so each start installs the plugin's.
 PRESET = (PLUGIN / "speckit" / "presets" / "settled-design", Path(".specify/presets/settled-design"))
 WORKFLOW = (PLUGIN / "speckit" / "workflows" / "alq-spec", Path(".specify/workflows/alq-spec"))
-ENV = {"ALQ_REVIEW_ROOT": str(PLUGIN)}
+ENV = {"ALQ_PLAN_ROOT": str(PLUGIN)}
 # The headless agent steps get only what they need to write the spec folder.
 AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Edit Bash(bash .specify/*) '
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
@@ -76,20 +76,31 @@ def _state(run_id):
     return json.loads((RUNS / run_id / "state.json").read_text())
 
 
-def start(spec_file, spec_dir):
+def _step_env(inputs):
+    """The inputs a shell step reads from its environment. A resume re-runs the step the run stopped in, so a
+    resume needs them as much as the start does."""
+    env = {"ISSUE": inputs["issue"]}
+    # The spec_dir input only picks the rescope branch.
+    if inputs.get("spec_dir"):
+        env["SPEC_DIR"] = inputs["spec_dir"]
+    return env
+
+
+def start(spec_file, issue, spec_dir):
     spec = Path(spec_file).read_text()
     if not spec.strip():
         sys.exit(f"{spec_file} is empty")
-    inputs, env = ["-i", f"spec={spec}"], {}
+    if not issue:
+        sys.exit("the issue is empty")
+    inputs = {"spec": spec, "issue": issue}
     if spec_dir is not None:
         if not spec_dir:
             sys.exit("the spec folder is empty")
-        # select-spec reads the folder from the environment; the input only picks the rescope branch.
-        inputs += ["-i", f"spec_dir={spec_dir}"]
-        env["SPEC_DIR"] = spec_dir
+        inputs["spec_dir"] = spec_dir
     install()
     before = set(RUNS.iterdir()) if RUNS.is_dir() else set()
-    proc = _specify(["run", "alq-spec", *inputs], env)
+    flags = [arg for name, value in inputs.items() for arg in ("-i", f"{name}={value}")]
+    proc = _specify(["run", "alq-spec", *flags], _step_env(inputs))
     new = set(RUNS.iterdir()) - before if RUNS.is_dir() else set()
     if len(new) != 1:
         sys.exit(f"specify started no run:\n{proc.stdout}{proc.stderr}")
@@ -99,7 +110,8 @@ def start(spec_file, spec_dir):
 def resume(run_id, verdict):
     if not (RUNS / run_id / "state.json").is_file():
         sys.exit(f"no run {run_id} under {RUNS}")
-    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], {})
+    inputs = json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(inputs))
     state = _state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
         sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")
@@ -111,12 +123,16 @@ def main():
     sub = parser.add_subparsers(dest="action", required=True)
     s = sub.add_parser("start")
     s.add_argument("spec_file")
+    s.add_argument("issue")
     s.add_argument("spec_dir", nargs="?")
     r = sub.add_parser("resume")
     r.add_argument("run_id")
     r.add_argument("verdict", nargs="?")
     args = parser.parse_args()
-    state = start(args.spec_file, args.spec_dir) if args.action == "start" else resume(args.run_id, args.verdict)
+    if args.action == "start":
+        state = start(args.spec_file, args.issue, args.spec_dir)
+    else:
+        state = resume(args.run_id, args.verdict)
     print(json.dumps(report(state)))
 
 

@@ -1,6 +1,6 @@
 ---
 name: alq-root-cause-check
-description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Reads the Root cause section of the spec, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-review:alq-issue-tackle's review step. Report-only.
+description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Takes the spec folder as its argument and reads the Root cause section of its spec.md, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-review:alq-issue-tackle's review step. Report-only.
 colour: red
 ---
 
@@ -22,20 +22,14 @@ the wrong value, not its address.
 
 ## Step 1 - get the spec
 
-`<n>` from the branch (`^(bugfix|hotfix|feat|...)/(\d+)-`) or from the invoker. SPECLOC is
-`../../scripts/speclocation.py` from this skill's base directory. Run:
-
-```
-python3 SPECLOC show <n>
-```
-
-It prints the spec folder and its branch, or `spec: none` and a reason. Read `<folder>/spec.md` in the checkout.
+The argument is the spec folder, relative to the checkout root; the invoker passes it. Read
+`<folder>/spec.md` in the checkout and find its `## Root cause` section.
 
 Stop and say so, with no verdict, when the section reads `Not a defect report.` Report
-**CANNOT TELL** and name what is missing when: `show` exits non-zero (with no location comment,
-name `/alq-review:alq-spec #<n>` as the next step), it prints `spec: none`, or spec.md has no
-`## Root cause` section. Never invent the cause yourself and grade
-against that; a cause you derived from the diff will always agree with the diff.
+**CANNOT TELL** when no folder was given or `<folder>/spec.md` does not exist, and name which.
+Report **CANNOT TELL** when spec.md has no `## Root cause` section, and give that as the reason.
+Never invent the cause yourself and grade against that; a cause you derived from the diff will
+always agree with the diff.
 
 ## Step 2 - read the Root cause, and check how much of it was measured
 
@@ -53,7 +47,7 @@ Find the `Observed:` line. It decides how much of the spec you may take as given
 
 ## Step 3 - classify what the diff does
 
-Collect the delta: `git diff $(git merge-base main HEAD)...HEAD`, plus uncommitted work if the
+Collect the delta: `git fetch -q origin main && git diff origin/main...HEAD`, plus uncommitted work if the
 invoker is mid-change. Put every substantive hunk in exactly one bucket:
 
 - **mechanism** - changes how the wrong value is produced, decided, or allowed to exist
