@@ -11,16 +11,23 @@ from paths import PLUGIN, REPO
 
 # A command as a skill, workflow or agent of one of these plugins is called: `<plugin>:<name>`.
 COMMAND = re.compile(r"\balq-(?:review|plan|build):[\w-]+")
-# What planning and building ship, alq-plan and alq-build, never alq-review.
-NOT_REVIEW = ("skills/alq-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/", "speckit/",
-              "scripts/speclocation.py", "scripts/settled_design.py", "scripts/premise_report.py", "scripts/rootcause.py")
+# Paths alq-review must never ship, whatever another plugin ships at them: the planning and building skills under
+# their names before the move, speclocation.py, deleted with them, and speckit/, the tree every Spec Kit preset and
+# workflow lives under. The overlap guard below covers only the paths alq-plan and alq-build ship today.
+NEVER_IN_REVIEW = ("skills/alq-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/",
+                   "scripts/speclocation.py", "speckit/")
 
 
-def shipped() -> list[str]:
+def shipped(plugin: Path = PLUGIN) -> list[str]:
     """The plugin's tracked files, relative to it."""
-    out = subprocess.run(["git", "ls-files", "-z", "--", str(PLUGIN)], cwd=REPO, capture_output=True, text=True,
+    out = subprocess.run(["git", "ls-files", "-z", "--", str(plugin)], cwd=REPO, capture_output=True, text=True,
                          check=True).stdout
-    return [str(Path(f).relative_to(PLUGIN.relative_to(REPO))) for f in out.split("\0") if f]
+    return [str(Path(f).relative_to(plugin.relative_to(REPO))) for f in out.split("\0") if f]
+
+
+def content(files: list[str]) -> set[str]:
+    """The plugin's files without its manifest, which every plugin ships at the same path."""
+    return {f for f in files if Path(f).parts[0] != ".claude-plugin"}
 
 
 def commands(files: list[str]) -> set[str]:
@@ -41,8 +48,14 @@ class ShippedTree(unittest.TestCase):
         tests = [f for f in tracked if f and ("tests" in PurePosixPath(f).parts or fnmatch(PurePosixPath(f).name, "test_*.py"))]
         self.assertEqual(tests, [])
 
-    def test_ships_no_planning_or_building_file(self):
-        self.assertEqual([f for f in shipped() if f.startswith(NOT_REVIEW)], [])
+    def test_ships_no_path_alq_review_must_never_ship(self):
+        self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
+
+    def test_ships_no_file_alq_plan_or_alq_build_ships(self):
+        theirs = {f for name in ("alq-plan", "alq-build") for f in content(shipped(PLUGIN.parent / name))}
+        self.assertIn("skills/issue-spec/SKILL.md", theirs)
+        self.assertIn("skills/issue-tackle/SKILL.md", theirs)
+        self.assertEqual(sorted(theirs & content(shipped())), [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
