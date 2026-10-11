@@ -578,7 +578,8 @@ class DiffConfig(Repo):
         base = self.add_submodule(gitmodules_ignore="all")
         self.bump_submodule()
         self.assertEqual(worktree.unstaged(str(self.root)), ["sub"])
-        git(self.root, "add", "sub")
+        # Since git 2.54, `git add` stages a submodule its .gitmodules ignores only when forced.
+        git(self.root, "add", "--force", "sub")
         self.assertEqual([h["file"] for h in self.staged_hunks()], ["sub"])
         git(self.root, "commit", "-q", "-m", "bump")
         self.assertEqual(self.branch_facts(base), ({"sub": [(1, 1)]}, 1, ["sub"], {"sub": 1}))
