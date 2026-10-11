@@ -2,8 +2,8 @@
 checkout whose staged fix it sweeps; its prompt names the snapshot of this check. Every other reader gets no answer
 from this hook.
 
-Runs on every Read, Glob and Grep of the session, so it and `snapshot.py` import nothing outside the standard
-library."""
+Runs on every Read, Glob and Grep of the session, so it, `snapshot.py` and `worktree.py` import nothing outside the
+standard library."""
 import json
 import os
 import sys

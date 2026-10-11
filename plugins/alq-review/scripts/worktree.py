@@ -10,6 +10,8 @@ from pathlib import Path
 
 _GITHUB_REMOTE = re.compile(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_ESCAPE = re.compile(rb'\\([0-7]{3}|.)')
+_LETTERS = {b"a": b"\a", b"b": b"\b", b"t": b"\t", b"n": b"\n", b"v": b"\v", b"f": b"\f", b"r": b"\r"}
 
 
 @dataclass(frozen=True)
@@ -175,7 +177,13 @@ def review_base(root: str, target: str) -> str:
 
 
 def changed_files(root: str, base: str) -> list[str]:
-    return [f for f in git(root, "diff", "--name-only", f"{base}...HEAD").split("\n") if f]
+    return _listed(root, "diff", "--name-only", "-z", f"{base}...HEAD")
+
+
+def _listed(root: str, *args: str) -> list[str]:
+    """The paths a `-z` listing names. Without -z, git puts a path in C quotes when it holds a byte it will not
+    write bare."""
+    return [name for name in _output(root, *args).split("\0") if name]
 
 
 @dataclass(frozen=True)
@@ -207,8 +215,9 @@ def _hunks(diff: str) -> list[Hunk]:
         elif current is None and not line.startswith("@@"):
             header.append(line)
             if line.startswith("+++ "):
-                # Git ends the name with a TAB when it holds a space.
-                path = line[6:].removesuffix("\t") if line.startswith("+++ b/") else None
+                # Git ends a bare name with a TAB when it holds a space.
+                name = _unquoted(line[4:].removesuffix("\t"))
+                path = name[2:] if name.startswith("b/") else None
         elif hunk := _HUNK.match(line):
             current = None
             if path:
@@ -221,8 +230,21 @@ def _hunks(diff: str) -> list[Hunk]:
     return found
 
 
+def _unquoted(name: str) -> str:
+    """A path as a patch header writes it. A path holding a byte git will not write bare is put in C quotes, with
+    that byte escaped: a control character by its letter, any other byte by its three octal digits."""
+    if len(name) < 2 or not name.startswith('"') or not name.endswith('"'):
+        return name
+    return os.fsdecode(_ESCAPE.sub(_unescaped, as_bytes(name[1:-1])))
+
+
+def _unescaped(escape: re.Match) -> bytes:
+    return bytes([int(escape[1], 8)]) if len(escape[1]) == 3 else _LETTERS.get(escape[1], escape[1])
+
+
 def _diff_hunks(root: str, *args: str) -> list[Hunk]:
-    return _hunks(_output(root, "diff", "-U0", *args))
+    # The prefixes are named, since the user's git config can drop them or change them.
+    return _hunks(_output(root, "diff", "-U0", "--src-prefix=a/", "--dst-prefix=b/", *args))
 
 
 def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
@@ -298,7 +320,7 @@ def tree_blob(root: str, tree: str, path: str) -> str | None:
 
 def unstaged(root: str) -> list[str]:
     """Tracked files whose checkout differs from the index."""
-    return [p for p in git(root, "diff", "--name-only").split("\n") if p]
+    return _listed(root, "diff", "--name-only", "-z")
 
 
 def concluding(root: str) -> bool:
@@ -323,7 +345,6 @@ def additions(root: str, since: str, until: str) -> int:
 
 def commits_per_file(root: str, since: str) -> dict[str, int]:
     counts: dict[str, int] = {}
-    for name in git(root, "log", "--name-only", "--format=", f"{since}..HEAD").split("\n"):
-        if name:
-            counts[name] = counts.get(name, 0) + 1
+    for name in _listed(root, "log", "--name-only", "-z", "--format=", f"{since}..HEAD"):
+        counts[name] = counts.get(name, 0) + 1
     return counts

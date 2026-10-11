@@ -21,7 +21,8 @@ import briefs
 import claimgate
 import facts
 import github
-from hookio import block, deny, log_error, mode, record, refuse, session_file, session_state, set_switch, switch_state
+from hookio import (block, claim_checks_mode, deny, log_error, mode, record, refuse, session_file, session_state,
+                    set_switch, shim_checks_mode, switch_state)
 import ledger
 import policy
 from pre_merge_gate import PullRequest, first_line, first_words
@@ -31,6 +32,7 @@ import specbinding
 import worktree
 
 REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round"
+ROUND_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND)
 REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
 INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
 
@@ -124,7 +126,7 @@ def _reshape_brief(state: dict, ruling: dict) -> str:
     return (f"{opened} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}. Spec folder: {spec.path}.")
 
 
-SWITCHED_OFF_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND, claimgate.CHECK, shimgate.CHECK)
+SWITCHED_OFF_WORKFLOWS = (*ROUND_WORKFLOWS, claimgate.CHECK, shimgate.CHECK)
 
 
 def _tell(event: str, said: str, user: bool = True) -> dict:
@@ -535,7 +537,7 @@ def on_workflow(payload: dict) -> dict | None:
         return claimgate.on_launch(payload, call)
     if call.get("name") == shimgate.CHECK:
         return shimgate.on_launch(payload, call)
-    if call.get("name") not in (REVIEW_ROUND, ASSESS_ROUND):
+    if call.get("name") not in ROUND_WORKFLOWS:
         return None
     args = call.get("args") if isinstance(call.get("args"), dict) else {}
     root, stage = args.get("worktree"), args.get("stage", "internal")
@@ -623,6 +625,11 @@ def _misdirected(session: str, ref: str, agent_type: str, rnd: dict | None) -> s
         return f"{what}, and no round launched in this session awaits output from {agent_type}"
     expected = awaiting[0] if len(awaiting) == 1 else f"one of {', '.join(awaiting)}"
     return f"{what}; round_ref must be {expected}, as your prompt gives it"
+
+
+def _checked_output(payload: dict) -> bool:
+    """Whether this StructuredOutput call is one the gate checks: a claim or shim check's, or a review round's."""
+    return claimgate.owns(payload) or shimgate.owns(payload) or _round_output(payload) is not None
 
 
 def on_structured_output(payload: dict) -> dict | None:
@@ -713,18 +720,37 @@ def handle(payload: dict) -> dict | None:
     return None
 
 
-def _refuses(payload: dict) -> bool:
-    """Whether this call was one the gate might have refused.
+def _past_a_crash(payload: dict) -> str | None:
+    """How to work past a crash deciding this call, when it was one the gate might have refused; None when it was not.
 
     Everywhere else the gate only records, so a crash there must not stand between a session and
     its work. Here it was deciding, and a decision it never reached must not be read as a yes.
     """
     if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") not in PRE:
-        return False
+        return None
+    unbroken = "To work while it is broken, set ALQ_REVIEW_MODE=log."
     try:
-        return mode() == "enforce"
+        settings = _deciding_settings(payload)
+        if not all(setting() == "enforce" for setting in settings):
+            return None
     except Exception:
-        return True  # a gate that cannot read its own mode is not one to trust with a yes
+        return unbroken  # a gate that cannot read what governs this call is not one to trust with a yes
+    return unbroken if settings else "No setting lets it through: the gate refuses it in log mode too."
+
+
+def _deciding_settings(payload: dict) -> tuple:
+    """The settings that must all enforce for the gate to refuse this call. A round's launch and an output the gate
+    checks are refused under none: log mode lets no round start without the arguments the gate gives it, and sends
+    back every output that fails its check. What only the claim or shim check judges answers to its setting too."""
+    tool, call = payload["tool_name"], payload["tool_input"]
+    workflow = call.get("name") if tool == "Workflow" else None
+    if workflow in ROUND_WORKFLOWS or (tool == "StructuredOutput" and _checked_output(payload)):
+        return ()
+    if workflow == claimgate.CHECK or tool == "WebFetch":
+        return mode, claim_checks_mode
+    if workflow == shimgate.CHECK:
+        return mode, shim_checks_mode
+    return (mode,)
 
 
 def main() -> None:
@@ -740,10 +766,10 @@ def main() -> None:
         except Exception as unlogged:  # the answer below must not depend on the log
             logged = f"The trace was not written to errors.log: {type(unlogged).__name__}: {unlogged}."
         where = payload.get("tool_name") or payload.get("hook_event_name")
-        if _refuses(payload):
+        past = _past_a_crash(payload)
+        if past:
             out = deny(f"the gate crashed deciding this {where}, so it refuses rather than letting it through "
-                       f"unchecked: {type(exc).__name__}: {exc}. {logged} To work while it is broken, set "
-                       "ALQ_REVIEW_MODE=log.")
+                       f"unchecked: {type(exc).__name__}: {exc}. {logged} {past}")
         else:
             out = {"systemMessage": f"alq-review gate failed open on {where}: {type(exc).__name__}: {exc}. {logged}"}
     if out:

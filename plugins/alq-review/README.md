@@ -202,7 +202,7 @@ In the state folder:
   FINDINGS; stored under its PR once per hook event, before anything is judged (`test_poller_contract.py` pins the two ends together)
 - `sessions/<session id>.off.json` - present while the user has the plugin switched off in that session
 - `sessions/<session id>.merge.json` - the merge overrides the user typed in that session and no merge has used, one `owner/repo#N` per PR
-- `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding and fails open everywhere else, loudly)
+- `gate.log`, `errors.log` - every refusal and recording; every gate failure (a crash refuses the call it was deciding wherever the settings let the gate refuse it, so a round's launch and an output the gate checks in log mode too, and fails open everywhere else, loudly)
 
 ```
 python3 scripts/ledger.py status --worktree /abs/checkout
