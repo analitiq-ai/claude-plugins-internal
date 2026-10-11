@@ -584,10 +584,12 @@ class SpecArgument(Gate):
         self.assertEqual(len(state["rounds"]), 1)
 
     def test_the_diff_a_hold_shows_is_the_one_git_makes_whatever_the_users_diff_config(self):
-        for key, value in (("color.ui", "always"), ("diff.external", "echo rewritten")):
+        for key, value in (("color.ui", "always"), ("diff.external", "echo rewritten"), ("diff.context", "0"),
+                           ("diff.suppressBlankEmpty", "true")):
             git(self.root, "config", key, value)
         out = self.held()
         self.assertHeldWithTheDiff(out)
+        self.assertIn("\n # Demo\n \n-b.py prints 20 lines.\n", self.reason(out))
         self.assertNotIn("\x1b", self.reason(out))
 
     def test_a_held_pr_refuses_edits_and_git_moves_with_the_lock_reason(self):
