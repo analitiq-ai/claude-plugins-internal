@@ -55,8 +55,9 @@ A change's spec had a second home: a marked comment on the issue. alq-review's A
 comment, and since PR #75 nothing reads an issue comment for the spec: review is told the spec, and
 `issue-tackle` reads no issue comment (FR-016).
 
-Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
-alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
+Why now: PR #75, on main, gave planning its present shape inside alq-review. Research R16 gives alq-plan a log of
+its own and has it land before the move into alq-plan. This record was written first, on the branch of PR #72. The
+move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
 
 ## Decision
 

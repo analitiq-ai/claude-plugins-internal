@@ -48,8 +48,10 @@ changes what it rests on:
 - Review is told the spec at each round launch, as a spec folder path from the repo root or `null` for a
   change with no spec (FR-005). `issue-tackle` launches that round.
 
-Why now: what this records already ships. PR #75 put these decisions in place and PR #76 moved the two skills
-into alq-build before its log existed. This record writes them down for alq-build (research R16).
+Why now: PR #75, on main, put these decisions in place inside alq-review. Research R16 gives alq-build a log of its
+own and has it land before the move of the two skills into alq-build. This record was written first, on the branch
+of PR #72. The move (PR #76) merged into that branch, not into main, so the move and this record reach main
+together, in PR #72.
 
 ## Decision
 

@@ -61,8 +61,15 @@ whether the run goes on.
 Review no longer checks the spec folder's contents. Planning checks its own output, and a spec folder that did not
 pass planning's checks reaches review unchecked (alq-review's ADR-0017).
 
-Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
-alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
+Today's stops do not meet decisions 2 and 3 below. When a check could not run, `settled_design.py`,
+`premise_report.py` and `rootcause.py` print the exception and exit 2, naming no next step. `settled_design.py` given
+the wrong arguments prints only its usage line, which says neither that the check failed nor what to do next. A
+failed `gh` or `git` in a shell step shows only that tool's error. Ratified, this record changes that behaviour; it
+changes no script itself (constitution VI).
+
+Why now: PR #75, on main, gave planning its present shape inside alq-review. Research R16 gives alq-plan a log of
+its own and has it land before the move into alq-plan. This record was written first, on the branch of PR #72. The
+move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
 
 ## Decision
 

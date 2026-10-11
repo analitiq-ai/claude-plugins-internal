@@ -59,8 +59,9 @@ no `..`, its parent is named `specs`, and `spec.md` is in HEAD and not empty (FR
 decision 3). Review does not use ADR-0012, decision 1 (alq-review's ADR-0017). `/alq-build:issue-tackle` takes
 `spec` in the same form (FR-015).
 
-Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
-alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
+Why now: PR #75, on main, gave planning its present shape inside alq-review. Research R16 gives alq-plan a log of
+its own and has it land before the move into alq-plan. This record was written first, on the branch of PR #72. The
+move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
 
 ## Decision
 
@@ -89,16 +90,19 @@ definition: any folder that happens to be named `specs/<x>/` counts.
 
 ## Trade-offs
 
-- Nothing after planning checks the mark. Review checks only a parent named `specs` and a `spec.md` in HEAD that is
-  not empty, and build only the `spec.md`, so a folder outside a Spec Kit project passes review.
+- Nothing checks that `.specify/` is committed. Planning's `select-spec` matches only `specs/<feature>` with a
+  `spec.md`, `speckit.specify` needs only that `.specify/` exists, review checks only a parent named `specs` and a
+  `spec.md` in HEAD that is not empty, and build only the `spec.md`. A run in a project whose `.specify/` is untracked
+  writes and commits a folder this decision does not count, and review accepts it.
 - A spec written anywhere but in Spec Kit's `specs/` is not a spec folder.
 
 ## Consequences
 
 - Easier: every folder planning writes passes review's shape check.
-- Harder: the mark holds only for folders planning writes. A folder made by hand is held only to review's check.
-- **How we would know this was wrong:** a spec has to be planned in a project where no `.specify/` is committed; or
-  Spec Kit writes spec folders outside the `specs/` beside `.specify/`.
+- Harder: no step enforces the mark. Planning writes beside `.specify/`, but nothing checks that it is committed, so
+  a folder planning writes, like one made by hand, is held only to review's check.
+- **How we would know this was wrong:** a spec folder is found committed in a project with no committed `.specify/`;
+  or Spec Kit writes spec folders outside the `specs/` beside `.specify/`.
 - Revisit if: Spec Kit changes how it marks a project.
 
 ## Action items

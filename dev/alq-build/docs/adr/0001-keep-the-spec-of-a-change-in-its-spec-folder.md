@@ -48,8 +48,9 @@ worktree that does not exist yet".
 A spec folder is `specs/<feature>/`, a folder whose parent is named `specs`. It may hold `spec.md`, `plan.md`,
 `research.md` and more (spec 019, Terms and Key Entities).
 
-Why now: what this records already ships. PR #76 moved the two skills into alq-build before its log existed. This
-record writes the decision down for alq-build (research R16).
+Why now: research R16 gives alq-build a log of its own and has it land before the move of the two skills into
+alq-build. This record was written first, on the branch of PR #72. The move (PR #76) merged into that branch, not
+into main, so the move and this record reach main together, in PR #72.
 
 ## Decision
 
