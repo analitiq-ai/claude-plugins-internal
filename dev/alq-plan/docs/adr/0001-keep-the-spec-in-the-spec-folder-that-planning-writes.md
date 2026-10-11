@@ -42,20 +42,21 @@ externalRefs:
 
 ## Context
 
-Issue #63 moves planning out of alq-review into this plugin, alq-plan, which scopes an issue into a spec folder
+Issue #63 moved planning out of alq-review into this plugin, alq-plan, which scopes an issue into a spec folder
 (spec 019, Terms). alq-review's ADR-0008, decision 1, keeps the spec of a change in its spec folder. Spec 019
 FR-023 has an existing record that binds a new plugin decided again in that plugin's log, not copied. This is that
 record for alq-plan.
 
-alq-plan writes the spec; the other two plugins read it. Review quotes the `spec.md` of the folder its caller names
-at launch (alq-review's ADR-0016). `/alq-build:issue-tackle` takes the same folder, and `/alq-build:root-cause-check`
+alq-plan writes the spec; the other two plugins read it. Review names the `spec.md` of the folder its caller gives at
+launch, and its reviewers read it (alq-review's ADR-0016). `/alq-build:issue-tackle` takes the same folder, and `/alq-build:root-cause-check`
 reads that `spec.md`'s `## Root cause` (spec 019, Key entities).
 
-A change's spec has had a second home: a marked comment on the issue. alq-review's ADR-0016 removes the location
-comment, and nothing reads an issue comment for the spec once it ships: review is told the spec, and
+A change's spec had a second home: a marked comment on the issue. alq-review's ADR-0016 removed the location
+comment, and since PR #75 nothing reads an issue comment for the spec: review is told the spec, and
 `issue-tackle` reads no issue comment (FR-016).
 
-Why now: alq-plan gets its own decision log before the code moves into it (research R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 
@@ -92,8 +93,8 @@ Rejected in alq-review's ADR-0008: the copy drifts from the one it copies.
 - A scoped issue needs a pushed branch that holds its spec folder before anyone else can pick it up.
 - Nothing on the issue says where its spec is. A spec folder's name need not carry the issue number (spec 019,
   Assumptions).
-- The bot's issue picker and the `alq-claude-bot-assign` skill find the spec through the location comment, and stop
-  finding one. Spec 019 leaves them out of scope.
+- The bot's issue picker and the `alq-claude-bot-assign` skill found the spec through the location comment, and no
+  longer find one. Spec 019 leaves them out of scope.
 
 ## Consequences
 

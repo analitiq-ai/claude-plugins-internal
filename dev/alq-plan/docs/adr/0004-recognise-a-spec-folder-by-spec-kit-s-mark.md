@@ -35,7 +35,7 @@ externalRefs:
   - type: doc
     id: "alq-review ADR-0016"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0016-tell-review-the-spec-at-each-round-launch-and-bind-it-to-the-pr.md"
-    label: "Review verifies a named spec folder by this mark"
+    label: "Review verifies a named folder by its parent `specs` and its spec.md"
 ---
 
 # ADR-0004: Recognise a spec folder by Spec Kit's mark
@@ -54,11 +54,13 @@ not count. So a planning run writes its spec folder into the `specs/` of the pro
 alq-plan's rescope takes a spec folder as its argument and does not look one up (FR-021). The folder check it makes
 is the workflow's `select-spec` step: `specs/<feature>`, with `spec.md` present (R6).
 
-Review and build are told the folder planning writes. Review verifies a named folder in HEAD by this mark: the parent is
-named `specs`, `<parent of specs>/.specify` is a folder in HEAD, and `spec.md` is in HEAD and not empty (FR-007,
-alq-review's ADR-0016, decision 3). `/alq-build:issue-tackle` takes `spec` in the same form (FR-015).
+Review and build are told the folder planning writes. Review checks less than this mark: the path is relative with
+no `..`, its parent is named `specs`, and `spec.md` is in HEAD and not empty (FR-007, alq-review's ADR-0016,
+decision 3). Review does not use ADR-0012, decision 1 (alq-review's ADR-0017). `/alq-build:issue-tackle` takes
+`spec` in the same form (FR-015).
 
-Why now: alq-plan gets its own decision log before the code moves into it (R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 
@@ -72,33 +74,31 @@ folder. A `specs/` folder with no `.specify/` beside it holds no spec folders.
 | Dimension | Assessment |
 |---|---|
 | What makes a folder a spec folder | The committed `.specify/` beside its `specs/` |
-| Same shape as review verifies and build takes | Yes |
+| Passes review's shape check | Yes, every folder planning writes: review's check is looser than the mark |
 | Hand-maintained lists | None |
 | A project that does not commit `.specify/` | Has no spec folders |
 
 ### Option B: Do nothing
 
-alq-plan's log holds no definition, and planning's idea of a spec folder can drift from the one review verifies.
+alq-plan's log holds no definition, and each change to planning decides again where it writes a spec folder.
 
 ### Option C: Any `specs/<x>/` folder, at any depth
 
-What review did before alq-review's ADR-0012. Rejected there: any folder that happens to be named `specs/<x>/`
-counts.
+What review checked before alq-review's ADR-0012, and checks again since its ADR-0016. ADR-0012 rejected it as the
+definition: any folder that happens to be named `specs/<x>/` counts.
 
 ## Trade-offs
 
-- Nothing in planning's steps checks that `.specify/` is committed (read in `select-spec`, not run). A run in a
-  project whose `.specify/` is not committed writes a folder that review refuses at its Spec Kit mark step
-  (spec 019, contracts/interfaces.md, refusal 4).
+- Nothing after planning checks the mark. Review checks only a parent named `specs` and a `spec.md` in HEAD that is
+  not empty, and build only the `spec.md`, so a folder outside a Spec Kit project passes review.
 - A spec written anywhere but in Spec Kit's `specs/` is not a spec folder.
 
 ## Consequences
 
-- Easier: planning, review and build use one shape for a spec folder, so a folder planning writes is one review
-  accepts.
-- Harder: a project has to commit `.specify/` before its spec folders pass review.
-- **How we would know this was wrong:** a planning run completes and review refuses its folder at the Spec Kit mark
-  step.
+- Easier: every folder planning writes passes review's shape check.
+- Harder: the mark holds only for folders planning writes. A folder made by hand is held only to review's check.
+- **How we would know this was wrong:** a spec has to be planned in a project where no `.specify/` is committed; or
+  Spec Kit writes spec folders outside the `specs/` beside `.specify/`.
 - Revisit if: Spec Kit changes how it marks a project.
 
 ## Action items

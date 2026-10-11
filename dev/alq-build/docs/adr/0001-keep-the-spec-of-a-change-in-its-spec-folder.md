@@ -32,7 +32,7 @@ externalRefs:
 
 ## Context
 
-Issue #63 splits alq-review into three plugins. `alq-build` takes `issue-tackle` and `root-cause-check`,
+Issue #63 split alq-review into three plugins. `alq-build` took `issue-tackle` and `root-cause-check`,
 which implement an issue against its spec and judge whether a fix reached the cause the spec names. The split
 was settled with the user on 2026-10-09 (spec 019, FR-015 to FR-017).
 
@@ -45,8 +45,11 @@ repo. A reader had to open both to know what a change must do, and nothing kept 
 had been chosen because an issue can be shaped today and picked up next week, "so the spec cannot live in a
 worktree that does not exist yet".
 
-A spec folder is `specs/<feature>/` beside a committed `.specify/` folder. It may hold `spec.md`, `plan.md`,
+A spec folder is `specs/<feature>/`, a folder whose parent is named `specs`. It may hold `spec.md`, `plan.md`,
 `research.md` and more (spec 019, Terms and Key Entities).
+
+Why now: what this records already ships. PR #76 moved the two skills into alq-build before its log existed. This
+record writes the decision down for alq-build (research R16).
 
 ## Decision
 

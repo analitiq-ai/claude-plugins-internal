@@ -47,19 +47,20 @@ the skills that shape and tackle an issue, and what the gate hands to the review
 ADR-0016 keeps the part about the gate and leaves the part about the skills undecided. Research R16 gives the part
 about the skill that shapes an issue to alq-plan's log. This is that record.
 
-The skill moves into alq-plan as `/alq-plan:issue-spec` (R2). Today, as `alq-spec`, it does more than write the spec
-(read in its `SKILL.md`):
+The skill moved into alq-plan as `/alq-plan:issue-spec` (R2). Before PR #75, as `alq-spec`, it did more than write
+the spec (read in its `SKILL.md` before #75):
 
-- It posts a location comment on the issue that names the spec folder, and on `#<issue>` it first looks that comment
-  up and stops when the issue is already located.
-- Its rescope takes a PR or a branch, parses review's reply to the release prompt for the ruling, and finds the
-  spec folder among the files the PR changes, asking the user when it finds none or more than one.
+- It posted a location comment on the issue that named the spec folder, and on `#<issue>` it first looked that
+  comment up and stopped when the issue was already located.
+- Its rescope took a PR or a branch, parsed review's reply to the release prompt for the ruling, and found the
+  spec folder among the files the PR changed, asking the user when it found none or more than one.
 
 alq-review's ADR-0016 removes the location comment: review is told the spec at launch. `/alq-build:issue-tackle` reads
 no issue comment for the spec (FR-016). A RESHAPE_SPEC lock is released only by `unlock <ref>`, and the rescope
 prompt no longer releases one (FR-013).
 
-Why now: alq-plan gets its own decision log before the code moves into it (R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 
@@ -84,14 +85,14 @@ Why now: alq-plan gets its own decision log before the code moves into it (R16).
 | Reads review's output | No |
 | How the builder learns the folder | The run's last message |
 
-### Option B: Do nothing
+### Option B: Return to posting and reading the location comment
 
-The skill keeps posting and reading the location comment. Nothing else reads it once review is told the spec
+The skill would post and read the location comment again. Nothing else reads it, since review is told the spec
 (alq-review's ADR-0016) and `issue-tackle` reads no issue comment (FR-016).
 
 ### Option C: Rescope finds the folder from the PR and the ruling from review's reply
 
-Today's rescope. Rejected: it ties planning to review's output and to the shape of its reply, and a lookup can find
+The rescope before PR #75. Rejected: it ties planning to review's output and to the shape of its reply, and a lookup can find
 no folder or more than one. The folder the PR is bound to is the one to rewrite, and the caller can name it.
 
 ## Trade-offs

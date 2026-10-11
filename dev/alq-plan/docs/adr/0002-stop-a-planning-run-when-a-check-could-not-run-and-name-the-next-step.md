@@ -61,7 +61,8 @@ whether the run goes on.
 Review no longer checks the spec folder's contents. Planning checks its own output, and a spec folder that did not
 pass planning's checks reaches review unchecked (alq-review's ADR-0017).
 
-Why now: alq-plan gets its own decision log before the code moves into it (R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 

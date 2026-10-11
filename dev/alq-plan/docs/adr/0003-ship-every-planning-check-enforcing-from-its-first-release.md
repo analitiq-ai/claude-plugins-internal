@@ -58,7 +58,8 @@ data-model.md, Plugins).
 Review no longer checks the spec folder's contents. A spec folder that is not settled is caught only if planning
 ran (alq-review's ADR-0017).
 
-Why now: alq-plan gets its own decision log before the code moves into it (R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 

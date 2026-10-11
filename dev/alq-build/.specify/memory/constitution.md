@@ -84,8 +84,8 @@ Gate: does every mechanism in `plan.md` cite a `research.md` decision carrying D
 Rationale and Existing tools (or `None fit. Looked at: <where>`), so nothing is hand-rolled
 before what already exists was looked at?
 
-Source: `plugins/alq-build/skills/issue-tackle/SKILL.md` (implement: no shims or workarounds,
-best practice first).
+Source: `plugins/alq-plan/scripts/settled_design.py`; `plugins/alq-plan/speckit/` (the
+settled-design step). alq-build's plans are made by alq-plan's planning, which grades this rule.
 
 ## Platform Constraints
 

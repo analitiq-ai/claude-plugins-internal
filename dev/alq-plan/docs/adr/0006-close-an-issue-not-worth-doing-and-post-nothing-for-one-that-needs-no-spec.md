@@ -43,17 +43,18 @@ externalRefs:
 Planning first asks whether an issue is worth a spec. In the premise step the user picks one of three outcomes:
 `write the spec`, `no spec needed` or `not worth doing`.
 
-Today both stop picks post the location comment on the issue, with the outcome and the reason from the premise
-report (`premise_report.py record`). The `#<issue> none <reason>` entry form posts the same comment for an issue the
-user has already judged to need no spec. Review read that comment as the answer that a change has no spec
-(alq-review's ADR-0009, decision 4).
+Before PR #75, both stop picks posted the location comment on the issue, with the outcome and the reason from the
+premise report (the `record` command of `premise_report.py`, removed in #75). The `#<issue> none <reason>` entry
+form posted the same comment for an issue the user had already judged to need no spec. Review read that comment as
+the answer that a change has no spec (alq-review's ADR-0009, decision 4).
 
 alq-review's ADR-0016 removes the location comment. Review takes `spec: null` at launch for a change with no spec;
 whether a change needs a spec is planning's decision, and review only takes the answer. It leaves what planning does
 with these two outcomes undecided, and research R16 gives that to alq-plan's log. Spec 019 settles it (Clarifications;
 FR-019). This is that record.
 
-Why now: alq-plan gets its own decision log before the code moves into it (R16).
+Why now: what this records already ships. PR #75 gave planning its present shape and PR #76 moved the code into
+alq-plan before its log existed. This record writes the decision down for alq-plan (research R16).
 
 ## Decision
 
@@ -62,7 +63,7 @@ Why now: alq-plan gets its own decision log before the code moves into it (R16).
    step, and a failed `gh` fails the run (R5).
 2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user to pass `spec: null` when
    the work is reviewed.
-3. We will drop the `#<issue> none <reason>` entry form, which only posted the comment (R6).
+3. We will have no `#<issue> none <reason>` entry form, which only posted the comment (R6). PR #75 removed it.
 
 ## Options considered
 
@@ -75,10 +76,10 @@ Why now: alq-plan gets its own decision log before the code moves into it (R16).
 | Comment format to keep | None |
 | Writes to GitHub | Only on `not worth doing` |
 
-### Option B: Do nothing
+### Option B: Return to posting the location comment
 
-Both stop picks keep posting the location comment. No plugin reads it once review takes `spec` at launch
-(alq-review's ADR-0016).
+Both stop picks would post the location comment again, as they did before PR #75. No plugin reads it, since review
+takes `spec` at launch (alq-review's ADR-0016).
 
 The spec weighed no other answer for these two outcomes.
 

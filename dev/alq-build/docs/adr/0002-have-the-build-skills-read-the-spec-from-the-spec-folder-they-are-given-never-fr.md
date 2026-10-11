@@ -37,15 +37,19 @@ that folder. The decisions are the user's, settled on 2026-10-09 for issue #63 (
 
 alq-review's ADR-0008, decision 2, has every part of that plugin read the spec from the spec folder, the
 skills that tackle an issue among them. Its decision 3 has the issue name its spec folder in one comment,
-the location comment, and that is how `alq-issue-tackle` and `alq-root-cause-check` find the folder today.
-Spec 019 decides this again for `alq-build` (FR-023) and changes what it rests on:
+the location comment, and before PR #75 that was how `alq-review:alq-issue-tackle` and
+`alq-review:alq-root-cause-check` found the folder. Spec 019 decides this again for `alq-build` (FR-023) and
+changes what it rests on:
 
-- `issue-tackle` and `root-cause-check` move to `alq-build` (FR-015). No plugin declares another as a
+- `issue-tackle` and `root-cause-check` moved to `alq-build` (FR-015). No plugin declares another as a
   dependency (FR-001), and no message of `issue-tackle` names a planning command (FR-016).
-- The location comment goes. Planning posts no comment on the issue; its last message gives the spec folder
+- The location comment is gone. Planning posts no comment on the issue; its last message gives the spec folder
   and the branch the spec is committed on (FR-019).
 - Review is told the spec at each round launch, as a spec folder path from the repo root or `null` for a
   change with no spec (FR-005). `issue-tackle` launches that round.
+
+Why now: what this records already ships. PR #75 put these decisions in place and PR #76 moved the two skills
+into alq-build before its log existed. This record writes them down for alq-build (research R16).
 
 ## Decision
 
@@ -70,9 +74,9 @@ Spec 019 decides this again for `alq-build` (FR-023) and changes what it rests o
 | A change with no spec | `spec: null`: no root-cause check |
 | Needs another plugin installed | No |
 
-### Option B: Do nothing: read the issue's location comment
+### Option B: Return to reading the issue's location comment
 
-The skills keep finding the folder through the comment ADR-0008, decision 3, set up. Rejected: spec 019
+The skills would again find the folder through the comment ADR-0008, decision 3, set up. Rejected: spec 019
 removes the comment, and planning no longer posts one (FR-019), so there would be nothing to read.
 
 Spec 019 weighed no other way for `alq-build` to learn its spec.
