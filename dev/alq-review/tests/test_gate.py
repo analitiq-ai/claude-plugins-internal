@@ -942,6 +942,56 @@ class BrokenGate(Gate):
         out = self.edit(mode="log")
         self.assertIn("not written to errors.log: IsADirectoryError", out.get("systemMessage", ""))
 
+    def crash(self, tool, tool_input, agent_type=None, **settings):
+        """The answer of a gate that crashes deciding this call, under these settings (enforce where unnamed)."""
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s1", "tool_name": tool, "tool_input": tool_input,
+                   "agent_type": agent_type}
+        env = {"ALQ_REVIEW_STATE_DIR": str(self.state_dir), "ALQ_REVIEW_MODE": "enforce",
+               "ALQ_REVIEW_CLAIM_CHECKS": "enforce", "ALQ_REVIEW_SHIM_CHECKS": "enforce", **settings}
+        with mock.patch.object(gate, "handle", side_effect=RuntimeError("broken")), \
+                mock.patch.dict(os.environ, env), \
+                mock.patch("sys.stdin", io.StringIO(json.dumps(payload))), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as out, \
+                mock.patch("sys.stderr", new_callable=io.StringIO):
+            gate.main()
+        return json.loads(out.getvalue())
+
+    def test_a_crash_deciding_a_round_launch_refuses_it_in_log_mode_too(self):
+        """Log mode lets no round start without the arguments the gate gives it, so a crash is no permission."""
+        for name in (REVIEW, ASSESS):
+            with self.subTest(name=name):
+                out = self.crash("Workflow", {"name": name, "args": {"worktree": str(self.root)}},
+                                 ALQ_REVIEW_MODE="log")
+                self.assertEqual(self.decision(out), "deny")
+                self.assertIn("log mode too", self.reason(out))
+                self.assertNotIn("ALQ_REVIEW_MODE=log", self.reason(out))
+
+    def test_a_crash_deciding_a_report_refuses_it_in_log_mode_too(self):
+        """An output that fails its check is sent back in every mode, so one never checked is sent back too."""
+        _, args = self.launch()
+        reviewer = args["waves"][0][0]
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.current_round(state)["expected"] = None
+        out = self.hook("PreToolUse", "StructuredOutput", {"round_ref": args["round_ref"], "findings": []},
+                        mode="log", agent_id="a1", agent_type=reviewer["type"])
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("crashed", self.reason(out))
+
+    def test_a_crash_deciding_what_only_a_logging_check_judges_lets_it_through(self):
+        """The claim and shim checks each have a setting, so either can be rolled back alone: a crash deciding a
+        call only that check judges answers to it."""
+        calls = {"claim judge's fetch": ("WebFetch", {"url": "https://example.com"}, gate.briefs.CLAIM_CONTEST_JUDGE,
+                                         "ALQ_REVIEW_CLAIM_CHECKS"),
+                 "claim check": ("Workflow", {"name": gate.claimgate.CHECK}, None, "ALQ_REVIEW_CLAIM_CHECKS"),
+                 "shim check": ("Workflow", {"name": gate.shimgate.CHECK}, None, "ALQ_REVIEW_SHIM_CHECKS")}
+        for call, (tool, tool_input, agent_type, setting) in calls.items():
+            with self.subTest(call=call):
+                self.assertEqual(self.decision(self.crash(tool, tool_input, agent_type)), "deny")
+                out = self.crash(tool, tool_input, agent_type, **{setting: "log"})
+                self.assertNotEqual(self.decision(out), "deny")
+                self.assertIn("failed open", out.get("systemMessage", ""))
+
     def test_a_crash_while_deciding_is_permission_in_log_mode(self):
         self.break_the_ledger()
         out = self.edit(mode="log")

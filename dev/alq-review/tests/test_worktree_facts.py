@@ -381,6 +381,42 @@ class RoundFacts(Repo):
         self.assertIn("CLASS_FIX", offered)
 
 
+class QuotedNames(Repo):
+    """git writes a path in C quotes, with escapes, when it holds a byte it will not write bare: one outside ASCII, a
+    control character, a quote or a backslash. Each is still read as its file's own name."""
+    NAMES = ("caf\u00e9.py", os.fsdecode(b"lat\xe9.py"), 'say "hi".md', "back\\slash.md", "tab\there.md",
+             "new\nline.md", "with space.md")
+
+    def test_a_staged_file_keeps_its_hunks(self):
+        for name in self.NAMES:
+            with self.subTest(name=name):
+                (self.root / name).write_text("one\n")
+                git(self.root, "add", "--", name)
+                hunks = worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)),
+                                            worktree.staged_tree(str(self.root)))
+                git(self.root, "reset", "-q")
+                self.assertEqual([(h["file"], h["added"]) for h in hunks], [(name, ["one"])])
+
+    def test_the_files_a_branch_changed_are_named_with_how_often(self):
+        for name in self.NAMES:
+            self.commit(name, "one\n", "add")
+        self.assertEqual(sorted(worktree.changed_files(str(self.root), "main")), sorted(self.NAMES))
+        self.assertEqual(worktree.commits_per_file(str(self.root), "main"), dict.fromkeys(self.NAMES, 1))
+
+    def test_unstaged_files_are_named(self):
+        for name in self.NAMES:
+            self.commit(name, "one\n", "add")
+            (self.root / name).write_text("two\n")
+        self.assertEqual(sorted(worktree.unstaged(str(self.root))), sorted(self.NAMES))
+
+    def test_a_diff_is_read_when_the_users_git_config_drops_its_prefixes(self):
+        git(self.root, "config", "diff.noprefix", "true")
+        (self.root / "a.py").write_text("changed\n")
+        git(self.root, "add", "a.py")
+        hunks = worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)))
+        self.assertEqual({h["file"] for h in hunks}, {"a.py"})
+
+
 class StagedHunks(Repo):
     def stage(self, name, text):
         (self.root / name).parent.mkdir(parents=True, exist_ok=True)

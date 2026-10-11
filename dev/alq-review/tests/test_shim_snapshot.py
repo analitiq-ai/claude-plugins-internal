@@ -26,6 +26,13 @@ class Snapshot(Repo):
             snapshot.remove(path)
             self.assertFalse(self.expected.exists())
 
+    def test_a_checkout_whose_path_is_not_utf8_is_exported_beside_its_worktrees(self):
+        clone = Path(self.tmp.name) / os.fsdecode(b"caf\xe9")
+        git(self.tmp.name, "clone", "-q", str(self.root), str(clone))
+        path = Path(snapshot.export(str(clone), self.tree))
+        self.assertEqual(path.parent, clone / ".claude" / "worktrees")
+        self.assertEqual((path / "load.py").read_text(), "def load():\n    pass\n")
+
     def test_the_checkout_being_committed_sees_nothing_new(self):
         before = (git(self.worktree, "status", "--porcelain"), sorted(os.listdir(self.worktree)))
         snapshot.export(str(self.worktree), self.tree)
