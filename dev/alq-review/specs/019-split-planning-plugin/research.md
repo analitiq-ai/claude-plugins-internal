@@ -24,8 +24,8 @@ main at `7179e9e`; ADRs 0016–0018 as merged in #69 (main at `0fb1766`). Nothin
 - **Decision**: `plugins/alq-plan/` holds `skills/issue-spec/` (today's `alq-spec`, with `scripts/drive_workflow.py`),
   `scripts/{premise_report,rootcause,settled_design}.py` and `speckit/`. `plugins/alq-build/` holds
   `skills/issue-tackle/` and `skills/root-cause-check/`. Each has `.claude-plugin/plugin.json` with no
-  `dependencies` field, starting at version `0.1.0`. `alq-review` goes to `0.12.0`. `.claude-plugin/marketplace.json`
-  lists all three.
+  `dependencies` field, starting at version `0.1.0`. `alq-review` goes to `0.13.0`: PR 1 released `0.12.0` with the
+  files this move removes. `.claude-plugin/marketplace.json` lists all three.
 - **Rationale**: Claude Code names a skill `/<plugin>:<skill folder>`, so the folder names give the agreed commands
   `/alq-plan:issue-spec`, `/alq-build:issue-tackle` and `/alq-build:root-cause-check`. Leaving `dependencies` out is
   what "none requires another" means in the manifest.

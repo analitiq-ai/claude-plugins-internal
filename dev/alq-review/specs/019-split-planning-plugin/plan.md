@@ -113,7 +113,7 @@ PR 2, the move:
 ```text
 plugins/alq-plan/    .claude-plugin/plugin.json, skills/issue-spec/, scripts/{premise_report,rootcause,settled_design}.py, speckit/
 plugins/alq-build/   .claude-plugin/plugin.json, skills/{issue-tackle,root-cause-check}/
-plugins/alq-review/  what remains; version 0.12.0
+plugins/alq-review/  what remains; version 0.13.0
 .claude-plugin/marketplace.json        # three plugins
 README.md                              # plugin table, install block
 dev/alq-plan/tests/, dev/alq-build/tests/   # moved suites + guard tests

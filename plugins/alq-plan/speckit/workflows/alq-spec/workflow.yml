@@ -1,0 +1,254 @@
+schema_version: "1.0"
+workflow:
+  id: "alq-spec"
+  name: "Spec Cycle"
+  version: "1.5.0"
+  author: "Analitiq"
+  description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
+
+requires:
+  speckit_version: ">=1.0.7"
+  integrations:
+    any: ["claude"]
+
+inputs:
+  spec:
+    type: string
+    required: true
+    prompt: "Describe the document change and the decisions it must make"
+  # Steps read the issue from $ISSUE, never from this input, for the reason given for spec_dir.
+  issue:
+    type: string
+    required: true
+    prompt: "GitHub issue number"
+  # Non-empty re-scopes an existing spec folder. The folder itself comes from $SPEC_DIR, never from
+  # this input: template text is spliced into shell source before the shell can validate it.
+  spec_dir:
+    type: string
+    default: ""
+  integration:
+    type: string
+    default: "claude"
+    prompt: "Integration to use"
+  # Gate verdicts for runs driven without a terminal (the /alq-plan:issue-spec skill passes them on resume).
+  premise_verdict:
+    type: string
+    default: ""
+  grill_verdict:
+    type: string
+    default: ""
+  critique_verdict:
+    type: string
+    default: ""
+
+steps:
+  # Whether the issue is worth a spec is asked before one is written. The questions are answered in the session,
+  # which a headless command step cannot do. A re-scope amends a spec that was already judged worth writing.
+  - id: new-spec
+    type: if
+    condition: "{{ not inputs.spec_dir }}"
+    then:
+      # The verdict is the outcome itself, so no pick reads as approving or rejecting another.
+      - id: premise
+        type: gate
+        message: "In Claude Code, answer the premise questions for this issue, then pick the outcome."
+        options: [write the spec, no spec needed, not worth doing]
+        verdict_input: premise_verdict
+        on_reject: skip
+
+      # The choice is one of the gate's three options by now, never the text the user typed.
+      - id: premise-report
+        type: shell
+        run: python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" check ".specify/workflows/runs/{{ context.run_id }}/premise-report.md" "{{ steps.premise.output.choice }}"
+
+      - id: not-worth-doing
+        type: if
+        condition: "{{ steps.premise.output.choice == 'not worth doing' }}"
+        then:
+          # The reason and the repo are read before gh runs: inside gh's argument list a failure would not stop
+          # the shell, and gh given an empty --repo picks a repo from the other remotes. gh exits 0 on an issue
+          # already closed without closing it or posting the reason, so an issue that is not open fails the step.
+          - id: close-not-worth-doing
+            type: shell
+            run: |
+              set -eu
+              reason=$(python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" reason ".specify/workflows/runs/{{ context.run_id }}/premise-report.md")
+              repo=$(git remote get-url origin)
+              state=$(gh issue view "$ISSUE" --repo "$repo" --json state --jq .state)
+              [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
+              gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
+
+  # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
+  # top-level and skips itself on a stop pick, instead of all of them sharing one block.
+
+  # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
+  - id: scope
+    type: if
+    condition: &spec-is-written "{{ inputs.spec_dir or steps.premise.output.choice == 'write the spec' }}"
+    then:
+      - id: scope-kind
+        type: if
+        condition: "{{ inputs.spec_dir }}"
+        then:
+          - id: select-spec
+            type: shell
+            run: |
+              set -eu
+              dir="$SPEC_DIR"
+              case "$dir" in
+                specs/*/*|*..*|*[!A-Za-z0-9._/-]*|specs/) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
+                specs/*) ;;
+                *) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
+              esac
+              test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+              printf '{\n  "feature_directory": "%s"\n}\n' "$dir" > .specify/feature.json
+        else:
+          - id: specify
+            command: speckit.specify
+            integration: "{{ inputs.integration }}"
+            input:
+              args: "{{ inputs.spec }}\n\nPremise report: .specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+
+  - id: new-spec-root-cause
+    type: if
+    condition: "{{ steps.premise.output.choice == 'write the spec' }}"
+    then:
+      - id: root-cause
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+      - id: premise-answers
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+
+  # grill interviews the author, which a headless command step cannot do.
+  - id: to-grill
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: grill
+        type: gate
+        message: "In Claude Code, run /speckit-grill-me on this spec and answer every question. Approve when grill has finished."
+        options: [approve, reject]
+        verdict_input: grill_verdict
+        on_reject: abort
+
+  - id: to-no-open-markers
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: no-open-markers
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+          found=0
+          grep -n "NEEDS CLARIFICATION" "$dir/spec.md" || found=$?
+          case $found in
+            0) echo "Open clarification markers remain in $dir/spec.md" >&2; exit 1 ;;
+            1) ;;
+            *) exit "$found" ;;
+          esac
+
+  # Grill may rewrite the root cause section, so it is graded again; on a new spec, the premise answers too. A
+  # re-scope has no premise report: its premise answers are not graded, and its root cause is graded without one.
+  - id: to-root-cause-regrade
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: root-cause-regrade
+        type: if
+        condition: "{{ inputs.spec_dir }}"
+        then:
+          - id: root-cause-of-rescope
+            type: shell
+            run: |
+              set -eu
+              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir"
+        else:
+          - id: root-cause-after-grill
+            type: shell
+            run: |
+              set -eu
+              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          - id: premise-answers-after-grill
+            type: shell
+            run: |
+              set -eu
+              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+
+  - id: to-plan
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: plan
+        command: speckit.plan
+        integration: "{{ inputs.integration }}"
+        input:
+          args: "{{ inputs.spec }}"
+
+  # Every mechanism the plan lists cites a research decision naming the existing tools looked at.
+  - id: to-settled-design
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: settled-design
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"
+
+  - id: to-mark-critiques
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: mark-critiques
+        type: shell
+        run: python3 .specify/workflows/alq-spec/critique_report.py mark
+
+  - id: to-critique
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: critique
+        command: speckit.critique.run
+        integration: "{{ inputs.integration }}"
+
+  - id: to-new-critique
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: new-critique
+        type: shell
+        output_format: json
+        run: python3 .specify/workflows/alq-spec/critique_report.py find
+
+  - id: to-review-critique
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: review-critique
+        type: gate
+        message: "Review the critique. Fix the spec/plan for every finding you accept, then approve."
+        show_file: "{{ steps.new-critique.output.data.path }}"
+        options: [approve, reject]
+        verdict_input: critique_verdict
+        on_reject: abort
+
+  - id: to-tasks
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: tasks
+        command: speckit.tasks
+        integration: "{{ inputs.integration }}"

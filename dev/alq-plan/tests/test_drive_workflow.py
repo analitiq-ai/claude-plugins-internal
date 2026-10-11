@@ -1,0 +1,405 @@
+"""drive_workflow.py against the real specify CLI, in a throwaway project.
+
+No test runs the real agent or reaches GitHub: `plan` on a rescope gets a stand-in `claude` that writes no plan,
+`specify` on a new spec gets one that writes the spec the test names, and `gh` is a stand-in that keeps each call.
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from paths import PLUGIN, REPO
+from test_premise_report import report as premise_report_text
+from test_premise_report import spec_section
+from test_rootcause import SPEC as SPEC_WITH
+
+import yaml  # Spec Kit's own dependency
+
+from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
+
+SKILL = PLUGIN / "skills" / "issue-spec"
+DRIVER = SKILL / "scripts" / "drive_workflow.py"
+SPECKIT = PLUGIN / "speckit"
+sys.path.insert(0, str(DRIVER.parent))
+import drive_workflow  # noqa: E402
+
+SPEC_DIR = "specs/001-demo"
+ISSUE = "7"
+# What the skill writes for a rescope: the issue's title and description, then the open decision.
+RESCOPE = ("https://github.test/acme/demo/issues/7\n# Demo\n\nThe gate fails on main.\n\n"
+           "Open decision: which store keeps the binding?")
+TRACED, UNTRACED = SPEC_WITH.format(section="Observed: test_gate fails on main."), "# Demo\n\nSettled.\n"
+SETTLED = SPEC_WITH.format(section="Not a defect report.")
+UNANSWERED = TRACED.replace(spec_section(), "")
+
+
+def drive(root, env, *args):
+    proc = subprocess.run([sys.executable, str(DRIVER), *args], cwd=root, env=env, capture_output=True, text=True)
+    return proc, json.loads(proc.stdout) if proc.returncode == 0 else None
+
+
+class Project:
+    """A Spec Kit project with neither the plugin's preset nor its workflow installed; `spec_text` None gives it
+    no spec folder."""
+
+    def __init__(self, spec_text=SETTLED):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name) / "project"
+        self.bin = Path(self._tmp.name) / "bin"
+        self.bin.mkdir()
+        self.prompts = Path(self._tmp.name) / "claude.log"
+        self.prompts.write_text("")
+        self.gh_log = Path(self._tmp.name) / "gh.log"
+        # Stands in for the agent `plan` dispatches to: keeps its prompt, writes no plan.
+        self.stand_in("claude", f'#!/bin/sh\nprintf "%s\\n" "$2" >> "{self.prompts}"\n')
+        # GH_FAILS makes it fail the way gh does when GitHub refuses a call; GH_ISSUE_STATE is the issue's state.
+        self.stand_in("gh", f"#!{sys.executable}\nimport json, os, sys\n"
+                            f"with open({str(self.gh_log)!r}, 'a') as log:\n"
+                            "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                            "if os.environ.get('GH_FAILS'):\n"
+                            "    sys.exit('HTTP 502: Bad Gateway')\n"
+                            "if sys.argv[1:3] == ['issue', 'view']:\n"
+                            "    print(os.environ.get('GH_ISSUE_STATE', 'OPEN'))\n")
+        self.env = {**os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
+        (self.root / ".specify" / "workflows").mkdir(parents=True)
+        if spec_text is not None:
+            (self.root / SPEC_DIR).mkdir(parents=True)
+            (self.root / SPEC_DIR / "spec.md").write_text(spec_text)
+
+    def stand_in(self, name, script):
+        path = self.bin / name
+        path.write_text(script)
+        path.chmod(0o755)
+
+    def drive(self, *args):
+        return drive(self.root, self.env, *args)
+
+    def spec_file(self, text):
+        path = self.root / "spec.txt"
+        path.write_text(text)
+        return str(path)
+
+    def runs(self):
+        runs = self.root / ".specify" / "workflows" / "runs"
+        return sorted(runs.iterdir()) if runs.is_dir() else []
+
+    def inputs(self, run_id):
+        return json.loads((self.root / ".specify" / "workflows" / "runs" / run_id / "inputs.json").read_text())["inputs"]
+
+    def gh_calls(self):
+        return [json.loads(line) for line in self.gh_log.read_text().splitlines()] if self.gh_log.exists() else []
+
+    def close(self):
+        self._tmp.cleanup()
+
+
+class Rescope(unittest.TestCase):
+    """`rescope <spec folder> #<issue>`: the driver starts on the folder with the issue the skill names."""
+
+    def setUp(self):
+        self.project = Project()
+        self.addCleanup(self.project.close)
+
+    def test_a_rescope_start_pauses_at_grill_on_the_given_folder_with_the_issue_as_its_spec(self):
+        proc, report = self.project.drive("start", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"))
+        feature = json.loads((self.project.root / ".specify" / "feature.json").read_text())
+        self.assertEqual(feature["feature_directory"], SPEC_DIR)
+        inputs = self.project.inputs(report["run_id"])
+        self.assertEqual((inputs["spec"], inputs["issue"]), (RESCOPE, ISSUE))
+
+    def test_an_empty_folder_stops_before_the_workflow_starts(self):
+        proc, _ = self.project.drive("start", self.project.spec_file(RESCOPE), ISSUE, "")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("spec folder", proc.stderr)
+        self.assertEqual(self.project.runs(), [])
+
+    def test_an_empty_issue_stops_before_the_workflow_starts(self):
+        proc, _ = self.project.drive("start", self.project.spec_file(RESCOPE), "", SPEC_DIR)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("issue", proc.stderr)
+        self.assertEqual(self.project.runs(), [])
+
+    def test_an_empty_spec_stops_before_the_workflow_starts(self):
+        proc, _ = self.project.drive("start", self.project.spec_file(" \n"), ISSUE, SPEC_DIR)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(self.project.runs(), [])
+
+    def test_spec_text_reaches_the_run_verbatim_and_runs_nothing(self):
+        text = "RESCOPE `touch PWNED1` $(touch PWNED2) a=b 'q' \"dq\""
+        proc, report = self.project.drive("start", self.project.spec_file(text), ISSUE, SPEC_DIR)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.project.inputs(report["run_id"])["spec"], text)
+        self.assertEqual(list(self.project.root.glob("PWNED*")), [])
+
+    def test_a_rejected_folder_reports_the_steps_own_error(self):
+        bad = "specs/x'; touch PWNED; echo '"
+        proc, report = self.project.drive("start", self.project.spec_file(RESCOPE), ISSUE, bad)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("failed", "select-spec"))
+        self.assertIn("spec_dir must be specs/<feature>", report["stderr"])
+        self.assertFalse(report["open_markers"])
+        self.assertFalse((self.project.root / "PWNED").exists())
+
+
+def workflow_steps(steps=None):
+    """Every step of the plugin's workflow, the ones nested in an `if` included."""
+    if steps is None:
+        steps = yaml.safe_load((SPECKIT / "workflows" / "alq-spec" / "workflow.yml").read_text())["steps"]
+    for step in steps:
+        yield step
+        yield from workflow_steps(step.get("then", []) + step.get("else", []))
+
+
+def same_files(source: Path, installed: Path) -> bool:
+    return all((installed / f.relative_to(source)).is_file()
+               and (installed / f.relative_to(source)).read_bytes() == f.read_bytes()
+               for f in source.rglob("*") if f.is_file())
+
+
+class Install(unittest.TestCase):
+    """A start installs the plugin's settled-design preset and alq-spec workflow into the project it runs in."""
+
+    def test_the_copies_installed_in_this_repo_are_the_plugins(self):
+        installed = REPO / "dev" / "alq-review" / ".specify"
+        self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", installed / "presets" / "settled-design"))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", installed / "workflows" / "alq-spec"))
+
+    def setUp(self):
+        self.project = Project()
+        self.addCleanup(self.project.close)
+        self.preset = self.project.root / ".specify" / "presets" / "settled-design"
+        self.workflow = self.project.root / ".specify" / "workflows" / "alq-spec"
+
+    def start(self):
+        proc, report = self.project.drive("start", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"))
+
+    def test_a_project_without_them_gets_both(self):
+        self.start()
+        self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", self.workflow))
+
+    def test_an_installed_copy_that_differs_from_the_plugins_is_replaced(self):
+        self.start()
+        (self.preset / "templates" / "plan-template.md").write_text("stale\n")
+        (self.workflow / "critique_report.py").write_text("stale\n")
+        self.start()
+        self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
+        self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", self.workflow))
+
+    def test_the_workflow_runs_the_plugins_scripts_under_the_plan_root_the_driver_sets(self):
+        """The steps run in the project, which has no copy of the plugin's scripts; the driver says where they are."""
+        self.assertEqual([s["id"] for s in workflow_steps() if "ALQ_REVIEW_ROOT" in s.get("run", "")], [])
+        [step] = [s for s in workflow_steps() if s["id"] == "settled-design"]
+        self.assertIn('python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"', step["run"])
+        with mock.patch.object(drive_workflow.subprocess, "run") as run, mock.patch.dict(os.environ, clear=True):
+            drive_workflow._specify(["resume", "r1"], {})
+        env = run.call_args.kwargs["env"]
+        self.assertNotIn("ALQ_REVIEW_ROOT", env)
+        self.assertTrue((Path(env["ALQ_PLAN_ROOT"]) / "scripts" / "settled_design.py").is_file())
+
+
+class AfterGrill(unittest.TestCase):
+    def approved(self, spec_text):
+        self.project = Project(spec_text)
+        self.addCleanup(self.project.close)
+        _, started = self.project.drive("start", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        proc, report = self.project.drive("resume", started["run_id"], "grill_verdict=approve")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return report
+
+    def test_resuming_past_grill_with_markers_left_says_so(self):
+        report = self.approved("# Demo\n\n[NEEDS CLARIFICATION: which store?]\n")
+        self.assertEqual((report["status"], report["step"]), ("failed", "no-open-markers"))
+        self.assertTrue(report["open_markers"])
+
+    def test_a_rescoped_spec_without_premise_answers_runs_on_to_the_settled_design_check(self):
+        report = self.approved(UNANSWERED)
+        self.assertEqual((report["status"], report["step"]), ("failed", "settled-design"), report)
+        self.assertIn("speckit-plan", self.project.prompts.read_text())
+
+    def test_a_rescoped_spec_with_no_labelled_root_cause_stops_the_run(self):
+        report = self.approved(UNTRACED)
+        self.assertEqual((report["status"], report["step"]), ("failed", "root-cause-of-rescope"))
+        self.assertIn("## Root cause", report["stderr"])
+
+
+class Premise(unittest.TestCase):
+    """A new spec: the run pauses at `premise` first, and the user's pick decides whether a spec is written."""
+    NEW = "specs/001-new"
+    REASON = "a typo, fixed by the request"
+    ORIGIN = "https://github.test/acme/demo.git"
+
+    def setUp(self):
+        self.project = Project(spec_text=None)
+        self.addCleanup(self.project.close)
+        # The issue is closed in the repo origin names, whichever repo gh would pick on its own.
+        subprocess.run(["git", "init", "-q", str(self.project.root)], check=True)
+        subprocess.run(["git", "-C", str(self.project.root), "remote", "add", "origin", self.ORIGIN], check=True)
+        # Stands in for the agent `specify` dispatches to: writes $CLAUDE_SPEC as the new spec, keeps its prompt.
+        self.project.stand_in("claude", f'#!/bin/sh\nprintf "%s\\n" "$2" >> "{self.project.prompts}"\n'
+                                        f'mkdir -p {self.NEW}\nprintf "%s" "$CLAUDE_SPEC" > {self.NEW}/spec.md\n'
+                                        f'printf \'{{"feature_directory": "{self.NEW}"}}\' > .specify/feature.json\n')
+        self.project.env["CLAUDE_SPEC"] = TRACED
+        spec_file = self.project.spec_file("https://github.test/acme/demo/issues/7\n# Demo\n")
+        proc, self.started = self.project.drive("start", spec_file, ISSUE)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.report_path = f".specify/workflows/runs/{self.started['run_id']}/premise-report.md"
+
+    def resume(self, verdict, report_text=None):
+        if report_text is not None:
+            (self.project.root / self.report_path).write_text(report_text)
+        proc, report = self.project.drive("resume", self.started["run_id"], verdict)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return report
+
+    def stop(self, pick):
+        return self.resume(f"premise_verdict={pick}", premise_report_text(
+            pick, rests_on="needs-spec", reason=self.REASON, wrong="no"))
+
+    def test_a_new_spec_pauses_at_premise_before_anything_is_written(self):
+        self.assertEqual((self.started["status"], self.started["step"]), ("paused", "premise"))
+        self.assertEqual(self.project.prompts.read_text(), "")
+
+    def test_a_new_spec_without_an_issue_starts_no_run(self):
+        proc, _ = self.project.drive("start", self.project.spec_file("# Demo\n"))
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("issue", proc.stderr)
+        self.assertEqual(len(self.project.runs()), 1)
+
+    def test_not_worth_doing_closes_the_issue_as_not_planned_with_the_reason_and_writes_no_spec(self):
+        report = self.stop(NOT_WORTH_DOING)
+        self.assertEqual(report["status"], "completed", report)
+        self.assertEqual(self.project.gh_calls(),
+                         [self.state_read(),
+                          ["issue", "close", ISSUE, "--repo", self.ORIGIN, "--reason", "not planned", "--comment",
+                           self.REASON]])
+        self.assertEqual(self.project.prompts.read_text(), "")
+        self.assertFalse((self.project.root / "specs").exists())
+
+    def state_read(self):
+        return ["issue", "view", ISSUE, "--repo", self.ORIGIN, "--json", "state", "--jq", ".state"]
+
+    def test_an_issue_closed_since_the_run_started_fails_the_run_and_is_not_closed_again(self):
+        """gh exits 0 on an issue that is already closed, without its reason or comment: the run would say it closed
+        the issue with the reason when it did neither."""
+        self.project.env["GH_ISSUE_STATE"] = "CLOSED"
+        report = self.stop(NOT_WORTH_DOING)
+        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
+        self.assertIn(f"Issue #{ISSUE} is CLOSED", report["stderr"])
+        self.assertEqual(self.project.gh_calls(), [self.state_read()])
+
+    def test_a_checkout_with_no_origin_closes_nothing_and_fails_the_run(self):
+        """gh given an empty --repo picks a repo from the other remotes: the issue it closed would be another repo's."""
+        subprocess.run(["git", "-C", str(self.project.root), "remote", "remove", "origin"], check=True)
+        report = self.stop(NOT_WORTH_DOING)
+        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
+        self.assertEqual(self.project.gh_calls(), [])
+
+    def test_a_close_that_github_refuses_fails_the_run(self):
+        self.project.env["GH_FAILS"] = "1"
+        report = self.stop(NOT_WORTH_DOING)
+        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
+        self.assertIn("HTTP 502", report["stderr"])
+
+    def test_no_spec_needed_calls_github_for_nothing_and_writes_no_spec(self):
+        report = self.stop(NO_SPEC)
+        self.assertEqual(report["status"], "completed", report)
+        self.assertEqual(self.project.gh_calls(), [])
+        self.assertEqual(self.project.prompts.read_text(), "")
+        self.assertFalse((self.project.root / "specs").exists())
+
+    def test_writing_the_spec_hands_specify_the_report_and_pauses_at_grill(self):
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"), report)
+        self.assertEqual(self.project.prompts.read_text().rstrip().splitlines()[-1],
+                         f"Premise report: {self.report_path}")
+        self.assertEqual(self.project.gh_calls(), [])
+
+    def test_a_pick_that_is_none_of_the_three_outcomes_fails_at_the_pause(self):
+        report = self.resume("premise_verdict=approve", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise"), report)
+
+    def test_a_report_that_is_incomplete_or_was_never_written_stops_the_run(self):
+        for text in (premise_report_text(answers={}), None):
+            with self.subTest(written=text is not None):
+                self.setUp()
+                report = self.resume(f"premise_verdict={WRITE}", text)
+                self.assertEqual((report["status"], report["step"]), ("failed", "premise-report"), report)
+                self.assertIn("Next step:", report["stderr"])
+                self.assertEqual(self.project.prompts.read_text(), "")
+
+    def test_a_new_spec_with_no_labelled_root_cause_stops_the_run(self):
+        self.project.env["CLAUDE_SPEC"] = UNTRACED
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("failed", "root-cause"), report)
+        self.assertIn("## Root cause", report["stderr"])
+
+    def test_a_defect_the_spec_calls_no_defect_stops_the_run(self):
+        self.project.env["CLAUDE_SPEC"] = SETTLED
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text(wrong="yes"))
+        self.assertEqual((report["status"], report["step"]), ("failed", "root-cause"), report)
+        self.assertIn("Reports wrong behaviour: yes", report["stderr"])
+
+    def test_a_new_spec_without_the_premise_answers_stops_the_run(self):
+        self.project.env["CLAUDE_SPEC"] = UNANSWERED
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise-answers"), report)
+        self.assertIn("## Why this is worth doing", report["stderr"])
+
+    def test_premise_answers_that_grill_removed_stop_the_run(self):
+        self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        (self.project.root / self.NEW / "spec.md").write_text(UNANSWERED)
+        report = self.resume("grill_verdict=approve")
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise-answers-after-grill"), report)
+        self.assertIn("## Why this is worth doing", report["stderr"])
+
+    def test_a_root_cause_that_grill_left_unlabelled_stops_the_run(self):
+        self.resume(f"premise_verdict={WRITE}", premise_report_text(wrong="yes"))
+        for text, said in ((UNTRACED, "## Root cause"), (SETTLED, "Reports wrong behaviour: yes")):
+            with self.subTest(said):
+                (self.project.root / self.NEW / "spec.md").write_text(text)
+                report = self.resume("grill_verdict=approve")
+                self.assertEqual((report["status"], report["step"]), ("failed", "root-cause-after-grill"), report)
+                self.assertIn(said, report["stderr"])
+
+
+class Report(unittest.TestCase):
+    """report() trusts a step record only when it belongs to the attempt the run stopped on: the engine
+    records nothing for a step that raises, and a resumed step keeps its previous attempt's record."""
+
+    def failed(self, step, step_results):
+        return {"run_id": "r1", "status": "failed", "current_step_id": step,
+                "error": "boom: expression failed", "step_results": step_results}
+
+    def test_a_step_that_raised_reports_the_run_error(self):
+        out = drive_workflow.report(self.failed("plan", {}))
+        self.assertEqual((out["error"], out["stderr"], out["open_markers"]),
+                         ("boom: expression failed", "", False))
+
+    def test_a_previous_attempts_open_markers_are_not_reported_again(self):
+        stale = {"status": "failed", "error": "Shell command exited with code 1.",
+                 "output": {"stderr": "Open clarification markers remain in specs/001-demo/spec.md\n"}}
+        out = drive_workflow.report(self.failed("no-open-markers", {"no-open-markers": stale}))
+        self.assertEqual((out["error"], out["stderr"], out["open_markers"]),
+                         ("boom: expression failed", "", False))
+
+    def test_a_run_paused_at_critique_review_names_the_file_the_gate_shows(self):
+        state = {
+            "run_id": "r1", "status": "paused", "current_step_id": "review-critique", "error": None,
+            "step_results": {"review-critique": {
+                "status": "paused", "output": {"show_file": "specs/001-demo/critiques/critique-2.md"}}},
+        }
+        self.assertEqual(drive_workflow.report(state)["critique"],
+                         "specs/001-demo/critiques/critique-2.md")
+
+
+if __name__ == "__main__":
+    unittest.main()
