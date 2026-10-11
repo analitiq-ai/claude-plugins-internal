@@ -548,6 +548,9 @@ class DiffConfig(Repo):
         git(inner, "add", "x.py")
         git(inner, "commit", "-q", "-m", "one")
         git(self.root, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(inner), "sub")
+        # The clone keeps none of the config of the repo it came from, and bump_submodule commits in it.
+        git(self.root / "sub", "config", "user.email", "t@example.com")
+        git(self.root / "sub", "config", "user.name", "t")
         if gitmodules_ignore:
             git(self.root, "config", "-f", ".gitmodules", "submodule.sub.ignore", gitmodules_ignore)
             git(self.root, "add", ".gitmodules")
