@@ -460,7 +460,7 @@ def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
     if step == "bind":
         return SpecStep({"spec_blob": head_blob})
     try:
-        shown = worktree.git(root, "diff", bound, head_blob)
+        shown = worktree.diff(root, bound, head_blob)
     except RuntimeError as exc:
         # The blob ids already show the text changed; the diff only shows how.
         shown = f"git could not make the diff: {exc}"

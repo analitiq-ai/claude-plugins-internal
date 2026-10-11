@@ -204,12 +204,12 @@ class Hunk:
                           *body, ""])
 
 
-def _hunks(diff: str) -> list[Hunk]:
+def _hunks(patch: str) -> list[Hunk]:
     """Every hunk of a -U0 diff of files git reads as text; a file with no `+++` side (deleted) has none."""
     found: list[Hunk] = []
     header: list[str] = []
     path, current = None, None
-    for line in diff.split("\n"):
+    for line in patch.split("\n"):
         if line.startswith("diff --git "):
             header, path, current = [line], None, None
         elif current is None and not line.startswith("@@"):
@@ -232,7 +232,8 @@ def _hunks(diff: str) -> list[Hunk]:
 
 def _unquoted(name: str) -> str:
     """A path as a patch header writes it. A path holding a byte git will not write bare is put in C quotes, with
-    that byte escaped: a control character by its letter, any other byte by its three octal digits."""
+    that byte escaped: `"` and `\\` behind a backslash, \\a \\b \\t \\n \\v \\f \\r by their letter, any other byte
+    by its three octal digits."""
     if len(name) < 2 or not name.startswith('"') or not name.endswith('"'):
         return name
     return os.fsdecode(_ESCAPE.sub(_unescaped, as_bytes(name[1:-1])))
@@ -242,9 +243,20 @@ def _unescaped(escape: re.Match) -> bytes:
     return bytes([int(escape[1], 8)]) if len(escape[1]) == 3 else _LETTERS.get(escape[1], escape[1])
 
 
+# `git diff` with every setting of the user's git config that rewrites its output pinned to git's default: colour, an
+# external diff tool, textconv drivers (hunks hold the blobs' own text), the a/ b/ prefixes, hunks fused across
+# unchanged lines, and a submodule shown as the files inside it.
+_DIFF = ("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+         "--inter-hunk-context=0", "--submodule=short")
+
+
+def diff(root: str, *args: str) -> str:
+    """`git diff` as git writes it whatever the user's git config."""
+    return git(root, *_DIFF, *args)
+
+
 def _diff_hunks(root: str, *args: str) -> list[Hunk]:
-    # The prefixes are named, since the user's git config can drop them or change them.
-    return _hunks(_output(root, "diff", "-U0", "--src-prefix=a/", "--dst-prefix=b/", *args))
+    return _hunks(_output(root, *_DIFF, "-U0", *args))
 
 
 def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
@@ -304,7 +316,7 @@ def text_hunks(root: str, old: str, new: str) -> list[Hunk]:
 
 def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
     """The diff from tree `base` to tree `tree`, of `paths` when any are named, with three lines of context."""
-    return git(root, "diff", "-U3", "-M", base, tree, "--", *paths)
+    return diff(root, "-U3", "-M", base, tree, "--", *paths)
 
 
 def tree_text(root: str, tree: str, path: str) -> str | None:
