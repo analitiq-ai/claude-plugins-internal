@@ -583,6 +583,13 @@ class SpecArgument(Gate):
         self.assertEqual(state["spec_blob"], self.bound)
         self.assertEqual(len(state["rounds"]), 1)
 
+    def test_the_diff_a_hold_shows_is_the_one_git_makes_whatever_the_users_diff_config(self):
+        for key, value in (("color.ui", "always"), ("diff.external", "echo rewritten")):
+            git(self.root, "config", key, value)
+        out = self.held()
+        self.assertHeldWithTheDiff(out)
+        self.assertNotIn("\x1b", self.reason(out))
+
     def test_a_held_pr_refuses_edits_and_git_moves_with_the_lock_reason(self):
         self.held()
         edit = self.edit()
@@ -978,19 +985,30 @@ class BrokenGate(Gate):
         self.assertEqual(self.decision(out), "deny")
         self.assertIn("crashed", self.reason(out))
 
-    def test_a_crash_deciding_what_only_a_logging_check_judges_lets_it_through(self):
-        """The claim and shim checks each have a setting, so either can be rolled back alone: a crash deciding a
-        call only that check judges answers to it."""
+    def test_a_crash_deciding_a_claim_or_shim_check_output_refuses_it_in_log_mode_too(self):
+        """Each is an output the gate checks, sent back in every mode when it fails, so one never checked is too."""
+        for agent_type in (gate.briefs.CLAIM_READER, gate.briefs.CLAIM_JUDGE, gate.briefs.CLAIM_CONTEST_JUDGE,
+                           gate.briefs.SHIM_SWEEPER, gate.briefs.SHIM_SITE_JUDGE):
+            with self.subTest(agent_type=agent_type):
+                out = self.crash("StructuredOutput", {"check_ref": "c1"}, agent_type, ALQ_REVIEW_MODE="log")
+                self.assertEqual(self.decision(out), "deny")
+                self.assertIn("log mode too", self.reason(out))
+
+    def test_a_crash_deciding_what_only_a_check_judges_lets_it_through_when_either_of_its_settings_logs(self):
+        """The claim and shim checks each have a setting, so either can be rolled back alone, and log mode rolls back
+        every check: a crash deciding a call only that check judges answers to both."""
         calls = {"claim judge's fetch": ("WebFetch", {"url": "https://example.com"}, gate.briefs.CLAIM_CONTEST_JUDGE,
                                          "ALQ_REVIEW_CLAIM_CHECKS"),
                  "claim check": ("Workflow", {"name": gate.claimgate.CHECK}, None, "ALQ_REVIEW_CLAIM_CHECKS"),
                  "shim check": ("Workflow", {"name": gate.shimgate.CHECK}, None, "ALQ_REVIEW_SHIM_CHECKS")}
-        for call, (tool, tool_input, agent_type, setting) in calls.items():
+        for call, (tool, tool_input, agent_type, own_setting) in calls.items():
             with self.subTest(call=call):
                 self.assertEqual(self.decision(self.crash(tool, tool_input, agent_type)), "deny")
-                out = self.crash(tool, tool_input, agent_type, **{setting: "log"})
-                self.assertNotEqual(self.decision(out), "deny")
-                self.assertIn("failed open", out.get("systemMessage", ""))
+            for setting in (own_setting, "ALQ_REVIEW_MODE"):
+                with self.subTest(call=call, logging=setting):
+                    out = self.crash(tool, tool_input, agent_type, **{setting: "log"})
+                    self.assertNotEqual(self.decision(out), "deny")
+                    self.assertIn("failed open", out.get("systemMessage", ""))
 
     def test_a_crash_while_deciding_is_permission_in_log_mode(self):
         self.break_the_ledger()

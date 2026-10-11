@@ -409,12 +409,84 @@ class QuotedNames(Repo):
             (self.root / name).write_text("two\n")
         self.assertEqual(sorted(worktree.unstaged(str(self.root))), sorted(self.NAMES))
 
-    def test_a_diff_is_read_when_the_users_git_config_drops_its_prefixes(self):
-        git(self.root, "config", "diff.noprefix", "true")
-        (self.root / "a.py").write_text("changed\n")
+
+class DiffConfig(Repo):
+    """`git diff` output is read for hunks and shown to agents, and the user's git config can rewrite it: under none of
+    these settings may what is read change."""
+    SETTINGS = {"color.ui": {"color.ui": "always"}, "color.diff": {"color.diff": "always"},
+                "diff.external": {"diff.external": "echo rewritten"}, "textconv": {"diff.shout.textconv": "sed s/line/LINE/"},
+                "diff.noprefix": {"diff.noprefix": "true"}, "diff.interHunkContext": {"diff.interHunkContext": "5"}}
+
+    def setUp(self):
+        super().setUp()
+        # The driver the textconv setting names; without that setting it converts nothing.
+        (self.root / ".git" / "info" / "attributes").write_text("*.py diff=shout\n")
+        self.lines = [f"line{i}\n" for i in range(30)]
+        self.lines[3], self.lines[5] = "changed three\n", "changed five\n"
+
+    def read_under_each_setting(self, read):
+        """`read()` with none of the settings, which every setting must leave as it is."""
+        plain = read()
+        for name, config in self.SETTINGS.items():
+            with self.subTest(setting=name):
+                for key, value in config.items():
+                    git(self.root, "config", key, value)
+                try:
+                    self.assertEqual(read(), plain)
+                finally:
+                    for key in config:
+                        git(self.root, "config", "--unset", key)
+        return plain
+
+    def staged_hunks(self):
+        return worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)))
+
+    def test_staged_hunks(self):
+        (self.root / "a.py").write_text("".join(self.lines))
         git(self.root, "add", "a.py")
-        hunks = worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)))
-        self.assertEqual({h["file"] for h in hunks}, {"a.py"})
+        plain = self.read_under_each_setting(self.staged_hunks)
+        self.assertEqual([(h["file"], h["removed"], h["added"]) for h in plain],
+                         [("a.py", ["line3"], ["changed three"]), ("a.py", ["line5"], ["changed five"])])
+
+    def test_hunks_between_two_texts(self):
+        old = "".join(f"line{i}\n" for i in range(30))
+        plain = self.read_under_each_setting(lambda: worktree.text_hunks(str(self.root), old, "".join(self.lines)))
+        self.assertEqual([(h.removed, h.added) for h in plain], [(("line3",), ("changed three",)),
+                                                                 (("line5",), ("changed five",))])
+
+    def test_lines_added_since_a_commit(self):
+        base = git(self.root, "rev-parse", "HEAD")
+        self.commit("a.py", "".join(self.lines), "change")
+        plain = self.read_under_each_setting(lambda: worktree.added_lines(str(self.root), base))
+        self.assertEqual(plain, {"a.py": [(4, 4), (6, 6)]})
+
+    def test_the_diff_shown_to_agents(self):
+        (self.root / "a.py").write_text("".join(self.lines))
+        git(self.root, "add", "a.py")
+        plain = self.read_under_each_setting(lambda: worktree.tree_diff(
+            str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)), ["a.py"]))
+        self.assertIn("--- a/a.py\n+++ b/a.py\n", plain)
+        self.assertIn("\n+changed three\n", plain)
+
+    def test_a_submodule_is_read_as_the_commit_it_points_at(self):
+        """Not as the files inside it, which no tree of this repo holds."""
+        inner = Path(self.tmp.name) / "inner"
+        inner.mkdir()
+        git(inner, "init", "-q", "-b", "main")
+        git(inner, "config", "user.email", "t@example.com")
+        git(inner, "config", "user.name", "t")
+        (inner / "x.py").write_text("one\n")
+        git(inner, "add", "x.py")
+        git(inner, "commit", "-q", "-m", "one")
+        git(self.root, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(inner), "sub")
+        git(self.root, "commit", "-q", "-m", "sub")
+        (self.root / "sub" / "x.py").write_text("two\n")
+        git(self.root / "sub", "commit", "-q", "-am", "two")
+        git(self.root, "add", "sub")
+        plain = self.staged_hunks()
+        git(self.root, "config", "diff.submodule", "diff")
+        self.assertEqual(self.staged_hunks(), plain)
+        self.assertEqual([h["file"] for h in plain], ["sub"])
 
 
 class StagedHunks(Repo):
