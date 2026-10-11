@@ -1,4 +1,4 @@
-"""The settled-design preset teaches the formats alq-review's checks read; these pin each format to its check."""
+"""The settled-design preset teaches the formats alq-plan's checks read; these pin each format to its check."""
 import json
 import os
 import re
@@ -11,7 +11,7 @@ from pathlib import Path
 
 from paths import PLUGIN
 
-DRIVER = PLUGIN / "skills" / "alq-spec" / "scripts"
+DRIVER = PLUGIN / "skills" / "issue-spec" / "scripts"
 sys.path.insert(0, str(DRIVER))
 import drive_workflow  # noqa: E402
 

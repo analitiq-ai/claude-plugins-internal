@@ -3,7 +3,7 @@
 
 The section opens with an `Observed:` line that says something, or with the one sentence that says the issue reports
 no defect. Whether the issue reports one is the premise report's answer, so a report that says it does refuses that
-sentence. Whether the trace is right is not graded: that is for the user in grill and for alq-root-cause-check.
+sentence. Whether the trace is right is not graded: that is for the user in grill and for alq-build's root-cause-check.
 
 Usage: rootcause.py check <spec folder> [<premise report>]. Prints one problem per line and exits 1 when there are
 any, 2 when the check cannot run. A re-scope has no premise report and names none.

@@ -215,7 +215,8 @@ class Mutation(unittest.TestCase):
             reason = mutation(state).reason
             with self.subTest(lock=lock):
                 self.assertIn("`unlock #7`", reason)
-                self.assertNotIn("alq-spec", reason)
+                for planning in ("alq-spec", "issue-spec"):
+                    self.assertNotIn(planning, reason)
 
     def test_an_unlock_grants_a_fresh_audit_budget(self):
         state = spend_audits(ledger.new_state("acme/demo", "feat/1-demo", pr=7))

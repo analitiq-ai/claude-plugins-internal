@@ -30,7 +30,7 @@ inputs:
     type: string
     default: "claude"
     prompt: "Integration to use"
-  # Gate verdicts for runs driven without a terminal (the /alq-review:alq-spec skill passes them on resume).
+  # Gate verdicts for runs driven without a terminal (the /alq-plan:issue-spec skill passes them on resume).
   premise_verdict:
     type: string
     default: ""

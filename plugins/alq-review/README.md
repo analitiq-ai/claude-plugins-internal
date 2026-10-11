@@ -172,13 +172,12 @@ A resumed session is told it is off. A switch file that cannot be opened, or is 
 
 ## State
 
-The plugin writes in three places:
+The plugin writes in two places:
 
 | Place | Files |
 |---|---|
 | The state folder, `${ALQ_REVIEW_STATE_DIR:-${XDG_STATE_HOME:-~/.local/state}/alq-review}` | `ledger.db`<br>`inbox/<owner>__<repo>__<pr>.json`<br>`sessions/<session id>.json`, `.held.json`, `.fetch.json`, `.merge.json`, each with a `.lock` beside it<br>`sessions/<session id>.off.json`<br>`gate.log`<br>`errors.log` |
 | `<main checkout>/.claude/worktrees/` | `shim-<12 hex>/`, the copy of `HEAD` a shim sweeper reads |
-| `.specify/` in the project | `presets/settled-design/`<br>`workflows/alq-spec/`<br>`critique-baseline.json` |
 
 In the state folder:
 
@@ -219,9 +218,6 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
 | `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
-| `scripts/settled_design.py` | the settled-design check over one spec folder |
-| `scripts/premise_report.py` | the form of the premise report, its check, the check that a spec's `## Why this is worth doing` section holds its answers, and the report's `Reason:` text |
-| `scripts/rootcause.py` | the check that a spec's `## Root cause` section is there and opens with an `Observed:` line that says something, or with `Not a defect report.` unless the premise report says the issue reports wrong behaviour |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |
 | `scripts/lineage.py` | where a piece of text is after an edit: the mapping both checks use to carry a claim or a bug across versions |
@@ -233,13 +229,12 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
-| `skills/` | `alq-issue-tackle`, `alq-root-cause-check`, `alq-github-pr-review`, `alq-spec` |
-| `speckit/` | the settled-design preset and alq-spec workflow, installed into the project by each `alq-spec` start |
+| `skills/` | `alq-github-pr-review` |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
 
-Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy. The alq-spec driver and plan-template tests need Spec Kit (CI pins `specify-cli==1.0.7`, the workflow's minimum);
+Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy.
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.

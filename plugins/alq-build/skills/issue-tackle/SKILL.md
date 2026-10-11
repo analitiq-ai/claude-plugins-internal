@@ -1,5 +1,5 @@
 ---
-name: alq-issue-tackle
+name: issue-tackle
 description: Implement the fix for a GitHub issue against the spec folder it is handed, as `<n> spec=<folder|null> [branch=<branch>]`. Works in a git worktree on the branch that holds the spec, reads spec.md from that branch's HEAD, implements at the root cause the spec names rather than the symptom the issue reported, refuses shims and workarounds, then runs the internal review round with the same spec and the root-cause check before the PR goes to review. Use whenever the user names a GitHub issue number to work on, fix, implement, or tackle - "tackle 477", "fix issue 512", "work on #489", "start on 503" - or asks to begin work on an open issue.
 ---
 
@@ -73,7 +73,7 @@ it, until the internal loop ends clean.
 With `spec=null` there is no trace to check against, so the root-cause check does not run: go on to
 Step 6.
 
-Otherwise, once the internal loop ends clean, invoke the `alq-review:alq-root-cause-check` skill with
+Otherwise, once the internal loop ends clean, invoke the `alq-build:root-cause-check` skill with
 the spec folder as its argument. A symptom patch is clean code by every other measure, so it passes
 every reviewer not asked whether the fix reached the cause; this check is the one that asks. Act on
 its verdict:

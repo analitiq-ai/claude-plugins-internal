@@ -1,0 +1,14 @@
+{
+  "name": "alq-build",
+  "description": "Build an issue from its spec folder and branch — write the code in the issue's worktree, launch review on the same spec, and check the fix reached the root cause the spec names rather than guarding its symptom.",
+  "version": "0.1.0",
+  "keywords": [
+    "build",
+    "implementation",
+    "root-cause",
+    "analitiq"
+  ],
+  "author": {
+    "name": "Analitiq"
+  }
+}

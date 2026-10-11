@@ -1,6 +1,6 @@
 ---
-name: alq-root-cause-check
-description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Takes the spec folder as its argument and reads the Root cause section of its spec.md, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-review:alq-issue-tackle's review step. Report-only.
+name: root-cause-check
+description: Judge whether a fix actually reached the cause its spec names, or only guards the symptom. Takes the spec folder as its argument and reads the Root cause section of its spec.md, the diff, and the code at the cause site - including the parts the diff did not touch - then returns one of four verdicts (at cause, at symptom, spec wrong, cannot tell). Use before opening or merging a PR on a bugfix/hotfix branch, when asked whether a fix is a real fix or a band-aid, whether it treats the symptom or the source, or whether it fixes the root cause, and from alq-build:issue-tackle's review step. Report-only.
 colour: red
 ---
 

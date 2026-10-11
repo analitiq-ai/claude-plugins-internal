@@ -7,6 +7,14 @@
     {
       "name": "alq-review",
       "source": "./plugins/alq-review"
+    },
+    {
+      "name": "alq-plan",
+      "source": "./plugins/alq-plan"
+    },
+    {
+      "name": "alq-build",
+      "source": "./plugins/alq-build"
     }
   ]
 }

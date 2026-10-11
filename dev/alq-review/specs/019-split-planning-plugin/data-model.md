@@ -68,7 +68,7 @@ Environment: `ALQ_PLAN_ROOT` (was `ALQ_REVIEW_ROOT`), set by the driver to the p
 
 | Plugin | Ships | Version |
 |---|---|---|
-| `alq-review` | hooks, gate, review/assess/claim/shim workflows, agents, `alq-github-pr-review` | 0.12.0 |
+| `alq-review` | hooks, gate, review/assess/claim/shim workflows, agents, `alq-github-pr-review` | 0.13.0 |
 | `alq-plan` | `skills/issue-spec`, `scripts/{premise_report,rootcause,settled_design}.py`, `speckit/` | 0.1.0 |
 | `alq-build` | `skills/issue-tackle`, `skills/root-cause-check` | 0.1.0 |
 
