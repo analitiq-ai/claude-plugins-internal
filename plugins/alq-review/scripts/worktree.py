@@ -177,7 +177,7 @@ def review_base(root: str, target: str) -> str:
 
 
 def changed_files(root: str, base: str) -> list[str]:
-    return _listed(root, "diff", "--name-only", "-z", f"{base}...HEAD")
+    return _listed(root, *_DIFF, "--name-only", "-z", f"{base}...HEAD")
 
 
 def _listed(root: str, *args: str) -> list[str]:
@@ -243,15 +243,21 @@ def _unescaped(escape: re.Match) -> bytes:
     return bytes([int(escape[1], 8)]) if len(escape[1]) == 3 else _LETTERS.get(escape[1], escape[1])
 
 
-# `git diff` with every setting of the user's git config that rewrites its output pinned to git's default: colour, an
-# external diff tool, textconv drivers (hunks hold the blobs' own text), the a/ b/ prefixes, hunks fused across
-# unchanged lines, and a submodule shown as the files inside it.
-_DIFF = ("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
-         "--inter-hunk-context=0", "--submodule=short")
+# What git writes of a change, with these settings of the user's git config held at git's defaults: colour, an
+# external diff tool, textconv drivers (hunks hold the blobs' own text), the a/ b/ prefixes, three lines of context
+# written as they are even when blank, hunks fused across unchanged lines, the diff algorithm and the indent heuristic
+# that shape hunks, the order of files, rename detection and its limit, and a submodule shown as the files inside it or
+# hidden, which a .gitmodules `ignore` (the branch's own text) can ask for too; git diff's own default hides only a
+# submodule's untracked files. Context and blank lines are pinned as config: the -U flag would add a patch to a listing.
+_PINNED_CONFIG = ("-c", "diff.context=3", "-c", "diff.suppressBlankEmpty=false")
+_PINNED_OPTIONS = ("--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+                   "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null",
+                   "--find-renames", "-l1000", "--submodule=short", "--ignore-submodules=untracked")
+_DIFF = (*_PINNED_CONFIG, "diff", *_PINNED_OPTIONS)
 
 
 def diff(root: str, *args: str) -> str:
-    """`git diff` as git writes it whatever the user's git config."""
+    """`git diff` with the settings _DIFF pins held at git's defaults."""
     return git(root, *_DIFF, *args)
 
 
@@ -288,7 +294,7 @@ def staged_tree(root: str) -> str:
 def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
     """The hunks that turn tree `base` into tree `tree`, each with git's whitespace-blind fingerprint of its own text
     (`git patch-id --stable`). Files marked linguist-generated are left out; binary files have no hunks."""
-    hunks = _diff_hunks(root, "-M", base, tree)
+    hunks = _diff_hunks(root, base, tree)
     generated = _generated(root, tree, sorted({h.file for h in hunks}))
     hunks = [h for h in hunks if h.file not in generated]
     if not hunks:
@@ -316,7 +322,7 @@ def text_hunks(root: str, old: str, new: str) -> list[Hunk]:
 
 def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
     """The diff from tree `base` to tree `tree`, of `paths` when any are named, with three lines of context."""
-    return diff(root, "-U3", "-M", base, tree, "--", *paths)
+    return diff(root, base, tree, "--", *paths)
 
 
 def tree_text(root: str, tree: str, path: str) -> str | None:
@@ -332,7 +338,7 @@ def tree_blob(root: str, tree: str, path: str) -> str | None:
 
 def unstaged(root: str) -> list[str]:
     """Tracked files whose checkout differs from the index."""
-    return _listed(root, "diff", "--name-only", "-z")
+    return _listed(root, *_DIFF, "--name-only", "-z")
 
 
 def concluding(root: str) -> bool:
@@ -351,12 +357,14 @@ def _generated(root: str, tree: str, paths: list[str]) -> set[str]:
 
 
 def additions(root: str, since: str, until: str) -> int:
-    rows = [r.split("\t") for r in git(root, "diff", "--numstat", f"{since}..{until}").split("\n") if r]
+    rows = [r.split("\t") for r in diff(root, "--numstat", f"{since}..{until}").split("\n") if r]
     return sum(int(r[0]) for r in rows if r[0] != "-")
 
 
 def commits_per_file(root: str, since: str) -> dict[str, int]:
     counts: dict[str, int] = {}
-    for name in _listed(root, "log", "--name-only", "-z", "--format=", f"{since}..HEAD"):
+    # log.showSignature would write git's verdict on a signature in among the names.
+    for name in _listed(root, *_PINNED_CONFIG, "log", *_PINNED_OPTIONS, "--no-show-signature", "--name-only", "-z",
+                        "--format=", f"{since}..HEAD"):
         counts[name] = counts.get(name, 0) + 1
     return counts
