@@ -1,14 +1,13 @@
-"""premise_report.py: the premise report's form, its check, and the comment a stop pick leaves."""
+"""premise_report.py: the premise report's form, its check, and the reason a not-worth-doing issue is closed with."""
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 from test_gate import SCRIPTS
-from test_speclocation import Issue
 
 import premise_report
-import speclocation
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
 
 QUESTIONS = ("harm", "reachable", "change-alters", "owner", "inherited", "needs-spec")
@@ -222,25 +221,18 @@ class InSpec(unittest.TestCase):
         self.assertEqual(len(found), 1, found)
 
 
-class Cli(Issue):
-    """scripts/premise_report.py as the workflow's steps run it, from the project in the issue's worktree."""
+class Cli(unittest.TestCase):
+    """scripts/premise_report.py as the workflow's steps run it, from the project's folder."""
 
     def setUp(self):
-        super().setUp()
-        self.comments()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
         self.path = self.root / "premise-report.md"
 
     def run_cli(self, *args):
-        return subprocess.run([sys.executable, str(SCRIPTS / "premise_report.py"), *args], env=self.env,
-                              cwd=self.root, capture_output=True, text=True)
-
-    def posted(self):
-        path = Path(self.env["GH_POSTED"])
-        return path.read_text() if path.exists() else None
-
-    def stop(self, pick, reason):
-        self.path.write_text(report(pick, rests_on="needs-spec", reason=reason, wrong="no"))
-        return self.run_cli("record", str(self.path), pick)
+        return subprocess.run([sys.executable, str(SCRIPTS / "premise_report.py"), *args], cwd=self.root,
+                              capture_output=True, text=True)
 
     def test_form_prints_the_form(self):
         done = self.run_cli("form")
@@ -281,34 +273,18 @@ class Cli(Issue):
         self.path.write_text(report())
         self.assertEqual(self.run_cli("check", str(self.path), "approve").returncode, 2)
 
-    def test_no_spec_needed_posts_the_no_spec_comment_with_the_reports_reason(self):
-        done = self.stop(NO_SPEC, "a typo, fixed by the request")
-        self.assertEqual((done.returncode, done.stdout.strip()), (0, "https://github.test/comment"), done.stderr)
-        self.assertEqual(self.posted(), speclocation.render_none("a typo, fixed by the request"))
+    def test_reason_prints_the_reports_reason_line(self):
+        self.path.write_text(report(NOT_WORTH_DOING, rests_on="harm", reason="nothing goes wrong today", wrong="no"))
+        done = self.run_cli("reason", str(self.path))
+        self.assertEqual((done.returncode, done.stdout), (0, "nothing goes wrong today\n"), done.stderr)
 
-    def test_not_worth_doing_posts_the_third_form_with_the_reports_reason(self):
-        done = self.stop(NOT_WORTH_DOING, "nothing goes wrong today")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(self.posted(), speclocation.render_not_worth_doing("nothing goes wrong today"))
-
-    def test_the_reason_reaches_gh_on_stdin_and_not_on_a_command_line(self):
-        self.assertEqual(self.stop(NO_SPEC, "a reason with $(words)").returncode, 0)
-        self.assertIn("a reason with $(words)", self.posted())
-        self.assertNotIn("words", "\n".join(self.gh_calls()))
-
-    def test_writing_the_spec_posts_nothing(self):
-        self.path.write_text(report())
-        done = self.run_cli("record", str(self.path), WRITE)
-        self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
-        self.assertIsNone(self.posted())
-        self.assertEqual(self.gh_calls(), [])
-
-    def test_a_github_that_cannot_answer_fails_the_record_in_its_own_words(self):
-        self.env["GH_COMMENTS_ERROR"] = "HTTP 502: Bad Gateway"
-        done = self.stop(NOT_WORTH_DOING, "nothing goes wrong today")
-        self.assertEqual(done.returncode, 2)
-        self.assertIn("HTTP 502", done.stderr)
-        self.assertIsNone(self.posted())
+    def test_reason_fails_a_report_whose_reason_is_empty(self):
+        for reason in ("", "[one line]"):
+            with self.subTest(reason=reason):
+                self.path.write_text(report(NOT_WORTH_DOING, rests_on="harm", reason=reason, wrong="no"))
+                done = self.run_cli("reason", str(self.path))
+                self.assertEqual((done.returncode, done.stdout), (1, ""), done.stderr)
+                self.assertIn("Reason:", done.stderr)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ from pathlib import Path
 
 _GITHUB_REMOTE = re.compile(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_ESCAPE = re.compile(rb'\\([0-7]{3}|.)')
+_LETTERS = {b"a": b"\a", b"b": b"\b", b"t": b"\t", b"n": b"\n", b"v": b"\v", b"f": b"\f", b"r": b"\r"}
 
 
 @dataclass(frozen=True)
@@ -19,17 +21,33 @@ class Worktree:
     branch: str
 
 
-def _run(root: str, *args: str, timeout: float | None = None) -> subprocess.CompletedProcess:
+def _run(root: str, *args: str, timeout: float | None = None, stdin: str | None = None) -> subprocess.CompletedProcess:
+    """git's answer, its output decoded as Python decodes file names: git writes a path or a file's text as the bytes
+    it holds, which need not be UTF-8, and a path read here must still reach its file. Line ends are left as written."""
     try:
         # Untranslated, because the watch reads git's messages.
-        return subprocess.run(["git", "-C", root, *args], capture_output=True, text=True, timeout=timeout,
-                              env=dict(os.environ, LC_ALL="C"))
+        done = subprocess.run(["git", "-C", root, *args], input=None if stdin is None else as_bytes(stdin),
+                              capture_output=True, timeout=timeout, env=dict(os.environ, LC_ALL="C"))
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError(f"git {' '.join(args)} could not run in {root}: {exc}") from exc
+    return subprocess.CompletedProcess(done.args, done.returncode, os.fsdecode(done.stdout), os.fsdecode(done.stderr))
+
+
+def as_bytes(text: str) -> bytes:
+    """The bytes git wrote for `text`, a string read from git."""
+    return os.fsencode(text)
 
 
 def _failure(root: str, args: tuple[str, ...], done: subprocess.CompletedProcess) -> RuntimeError:
     return RuntimeError(f"git {' '.join(args)} failed in {root}: {done.stderr.strip()}")
+
+
+def _output(root: str, *args: str, stdin: str | None = None) -> str:
+    """What git wrote, unstripped: git() strips, which eats the last line's own trailing white space."""
+    done = _run(root, *args, stdin=stdin)
+    if done.returncode != 0:
+        raise _failure(root, args, done)
+    return done.stdout
 
 
 def git(root: str, *args: str, check: bool = True) -> str:
@@ -159,7 +177,13 @@ def review_base(root: str, target: str) -> str:
 
 
 def changed_files(root: str, base: str) -> list[str]:
-    return [f for f in git(root, "diff", "--name-only", f"{base}...HEAD").split("\n") if f]
+    return _listed(root, *_DIFF, "--name-only", "-z", f"{base}...HEAD")
+
+
+def _listed(root: str, *args: str) -> list[str]:
+    """The paths a `-z` listing names. Without -z, git puts a path in C quotes when it holds a byte it will not
+    write bare."""
+    return [name for name in _output(root, *args).split("\0") if name]
 
 
 @dataclass(frozen=True)
@@ -180,19 +204,20 @@ class Hunk:
                           *body, ""])
 
 
-def _hunks(diff: str) -> list[Hunk]:
+def _hunks(patch: str) -> list[Hunk]:
     """Every hunk of a -U0 diff of files git reads as text; a file with no `+++` side (deleted) has none."""
     found: list[Hunk] = []
     header: list[str] = []
     path, current = None, None
-    for line in diff.split("\n"):
+    for line in patch.split("\n"):
         if line.startswith("diff --git "):
             header, path, current = [line], None, None
         elif current is None and not line.startswith("@@"):
             header.append(line)
             if line.startswith("+++ "):
-                # Git ends the name with a TAB when it holds a space.
-                path = line[6:].removesuffix("\t") if line.startswith("+++ b/") else None
+                # Git ends a bare name with a TAB when it holds a space.
+                name = _unquoted(line[4:].removesuffix("\t"))
+                path = name[2:] if name.startswith("b/") else None
         elif hunk := _HUNK.match(line):
             current = None
             if path:
@@ -205,6 +230,41 @@ def _hunks(diff: str) -> list[Hunk]:
     return found
 
 
+def _unquoted(name: str) -> str:
+    """A path as a patch header writes it. A path holding a byte git will not write bare is put in C quotes, with
+    that byte escaped: `"` and `\\` behind a backslash, \\a \\b \\t \\n \\v \\f \\r by their letter, any other byte
+    by its three octal digits."""
+    if len(name) < 2 or not name.startswith('"') or not name.endswith('"'):
+        return name
+    return os.fsdecode(_ESCAPE.sub(_unescaped, as_bytes(name[1:-1])))
+
+
+def _unescaped(escape: re.Match) -> bytes:
+    return bytes([int(escape[1], 8)]) if len(escape[1]) == 3 else _LETTERS.get(escape[1], escape[1])
+
+
+# What git writes of a change, with these settings of the user's git config held at git's defaults: colour, an
+# external diff tool, textconv drivers (hunks hold the blobs' own text), the a/ b/ prefixes, three lines of context
+# written as they are even when blank, hunks fused across unchanged lines, the diff algorithm and the indent heuristic
+# that shape hunks, the order of files, rename detection and its limit, and a submodule shown as the files inside it or
+# hidden, which a .gitmodules `ignore` (the branch's own text) can ask for too; git diff's own default hides only a
+# submodule's untracked files. Context and blank lines are pinned as config: the -U flag would add a patch to a listing.
+_PINNED_CONFIG = ("-c", "diff.context=3", "-c", "diff.suppressBlankEmpty=false")
+_PINNED_OPTIONS = ("--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+                   "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null",
+                   "--find-renames", "-l1000", "--submodule=short", "--ignore-submodules=untracked")
+_DIFF = (*_PINNED_CONFIG, "diff", *_PINNED_OPTIONS)
+
+
+def diff(root: str, *args: str) -> str:
+    """`git diff` with the settings _DIFF pins held at git's defaults."""
+    return git(root, *_DIFF, *args)
+
+
+def _diff_hunks(root: str, *args: str) -> list[Hunk]:
+    return _hunks(_output(root, *_DIFF, "-U0", *args))
+
+
 def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
     return Hunk(**{**hunk.__dict__, side: getattr(hunk, side) + (line,)})
 
@@ -212,7 +272,7 @@ def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
 def added_lines(root: str, since: str) -> dict[str, list[tuple[int, int]]]:
     """Per file, the line ranges (in today's numbering) written after `since`."""
     ranges: dict[str, list[tuple[int, int]]] = {}
-    for hunk in _hunks(git(root, "diff", "-U0", f"{since}..HEAD")):
+    for hunk in _diff_hunks(root, f"{since}..HEAD"):
         if hunk.new_count:
             ranges.setdefault(hunk.file, []).append((hunk.new_start, hunk.new_start + hunk.new_count - 1))
     return ranges
@@ -234,14 +294,14 @@ def staged_tree(root: str) -> str:
 def tree_hunks(root: str, base: str, tree: str) -> list[dict]:
     """The hunks that turn tree `base` into tree `tree`, each with git's whitespace-blind fingerprint of its own text
     (`git patch-id --stable`). Files marked linguist-generated are left out; binary files have no hunks."""
-    hunks = _hunks(git(root, "diff", "-U0", "-M", base, tree))
+    hunks = _diff_hunks(root, base, tree)
     generated = _generated(root, tree, sorted({h.file for h in hunks}))
     hunks = [h for h in hunks if h.file not in generated]
     if not hunks:
         return []
     # One patch-id call for all hunks: each is fed as its own "commit", named by its index.
     stream = "".join(f"commit {i:040x}\n{h.patch()}" for i, h in enumerate(hunks))
-    ids = dict(reversed(row.split()) for row in _stdin(root, stream, "patch-id", "--stable").split("\n") if row)
+    ids = dict(reversed(row.split()) for row in _output(root, "patch-id", "--stable", stdin=stream).split("\n") if row)
     return [{"id": f"h{i + 1}", "file": h.file, "old_start": h.old_start, "old_count": h.old_count,
              "new_start": h.new_start, "new_count": h.new_count, "removed": list(h.removed), "added": list(h.added),
              "patch_id": ids[f"{i:040x}"]} for i, h in enumerate(hunks)]
@@ -256,13 +316,13 @@ def on_disk(root: str, file: str) -> bool:
 def text_hunks(root: str, old: str, new: str) -> list[Hunk]:
     """The hunks that turn text `old` into text `new`, as git diffs them. Both are written as blobs first, so the
     answer never depends on which objects the repository kept."""
-    blobs = [_stdin(root, text, "hash-object", "-w", "--stdin").strip() for text in (old, new)]
-    return _hunks(git(root, "diff", "-U0", *blobs))
+    blobs = [_output(root, "hash-object", "-w", "--stdin", stdin=text).strip() for text in (old, new)]
+    return _diff_hunks(root, *blobs)
 
 
 def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
     """The diff from tree `base` to tree `tree`, of `paths` when any are named, with three lines of context."""
-    return git(root, "diff", "-U3", "-M", base, tree, "--", *paths)
+    return diff(root, base, tree, "--", *paths)
 
 
 def tree_text(root: str, tree: str, path: str) -> str | None:
@@ -278,7 +338,7 @@ def tree_blob(root: str, tree: str, path: str) -> str | None:
 
 def unstaged(root: str) -> list[str]:
     """Tracked files whose checkout differs from the index."""
-    return [p for p in git(root, "diff", "--name-only").split("\n") if p]
+    return _listed(root, *_DIFF, "--name-only", "-z")
 
 
 def concluding(root: str) -> bool:
@@ -290,30 +350,21 @@ def concluding(root: str) -> bool:
 def _generated(root: str, tree: str, paths: list[str]) -> set[str]:
     if not paths:
         return set()
-    out = _stdin(root, "\0".join(paths) + "\0", "check-attr", "--source", tree, "-z", "--stdin", "linguist-generated")
+    out = _output(root, "check-attr", "--source", tree, "-z", "--stdin", "linguist-generated",
+                  stdin="\0".join(paths) + "\0")
     fields = out.split("\0")
     return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] in ("set", "true")}
 
 
-def _stdin(root: str, text: str, *args: str) -> str:
-    try:
-        done = subprocess.run(["git", "-C", root, *args], input=text, capture_output=True, text=True,
-                              env=dict(os.environ, LC_ALL="C"))
-    except OSError as exc:
-        raise RuntimeError(f"git {' '.join(args)} could not run in {root}: {exc}") from exc
-    if done.returncode != 0:
-        raise _failure(root, args, done)
-    return done.stdout
-
-
 def additions(root: str, since: str, until: str) -> int:
-    rows = [r.split("\t") for r in git(root, "diff", "--numstat", f"{since}..{until}").split("\n") if r]
+    rows = [r.split("\t") for r in diff(root, "--numstat", f"{since}..{until}").split("\n") if r]
     return sum(int(r[0]) for r in rows if r[0] != "-")
 
 
 def commits_per_file(root: str, since: str) -> dict[str, int]:
     counts: dict[str, int] = {}
-    for name in git(root, "log", "--name-only", "--format=", f"{since}..HEAD").split("\n"):
-        if name:
-            counts[name] = counts.get(name, 0) + 1
+    # log.showSignature would write git's verdict on a signature in among the names.
+    for name in _listed(root, *_PINNED_CONFIG, "log", *_PINNED_OPTIONS, "--no-show-signature", "--name-only", "-z",
+                        "--format=", f"{since}..HEAD"):
+        counts[name] = counts.get(name, 0) + 1
     return counts

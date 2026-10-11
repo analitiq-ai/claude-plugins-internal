@@ -1,4 +1,4 @@
-"""The `HEAD` copy a shim sweeper reads (spec 006 R3). Standard library only: the `sweeper_read.py` hook imports it."""
+"""The `HEAD` copy a shim sweeper reads (spec 006 R3)."""
 from __future__ import annotations
 
 import hashlib
@@ -7,6 +7,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+
+from worktree import git
 
 _NAME = re.compile(r"shim-[0-9a-f]{12}")
 
@@ -20,17 +22,10 @@ def snapshot_of(path: str) -> str | None:
     return None
 
 
-def _git(checkout: str, *args: str) -> str:
-    done = subprocess.run(["git", "-C", checkout, *args], capture_output=True, text=True)
-    if done.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)} failed in {checkout}: {done.stderr.strip()}")
-    return done.stdout.strip()
-
-
 def folder(checkout: str, tree: str) -> str:
     """The snapshot folder of the check of staged `tree` at `checkout`'s `HEAD`; no two checks share one."""
-    main = os.path.dirname(_git(checkout, "rev-parse", "--path-format=absolute", "--git-common-dir"))
-    head = _git(checkout, "rev-parse", "HEAD")
+    main = os.path.dirname(git(checkout, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    head = git(checkout, "rev-parse", "HEAD")
     name = hashlib.sha256(f"{head}\0{tree}".encode()).hexdigest()[:12]
     return os.path.join(main, ".claude", "worktrees", f"shim-{name}")
 
@@ -38,7 +33,7 @@ def folder(checkout: str, tree: str) -> str:
 def export(checkout: str, tree: str) -> str:
     """The snapshot folder of `checkout`'s `HEAD` for the check of `tree`, written unless it exists."""
     target = folder(checkout, tree)
-    head = _git(checkout, "rev-parse", "HEAD")
+    head = git(checkout, "rev-parse", "HEAD")
     parent = os.path.dirname(target)
     if os.path.isdir(target):
         return target

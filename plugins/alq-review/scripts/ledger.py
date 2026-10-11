@@ -94,6 +94,26 @@ class LedgerError(Exception):
     pass
 
 
+class _Store(sqlite3.Connection):
+    """sqlite keeps text as UTF-8. A branch, path or file name git holds in other bytes reaches Python as text UTF-8
+    cannot spell, so it is refused by name before a statement binds it."""
+
+    def execute(self, sql: str, parameters=(), /) -> sqlite3.Cursor:
+        for value in parameters:
+            if isinstance(value, str) and not _is_utf8(value):
+                raise LedgerError(f"{value!r} is not UTF-8: git holds this name in other bytes, and alq-review keeps "
+                                  "names as UTF-8 text. Rename it to go on.")
+        return super().execute(sql, parameters)
+
+
+def _is_utf8(text: str) -> bool:
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def state_root() -> Path:
     override = os.environ.get("ALQ_REVIEW_STATE_DIR")
     if override:
@@ -106,6 +126,12 @@ def stamp(now: datetime) -> str:
     return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def released(at: str, unlocked_at: str | None) -> bool:
+    """Whether the unlock stamped `unlocked_at` released a hold or lock recorded at stamp `at`. Stamps count whole
+    seconds, so an unlock stamped the same second may have come first: it releases nothing."""
+    return unlocked_at is not None and at < unlocked_at
+
+
 def new_state(repo: str, branch: str | None, pr: int | None = None) -> dict:
     return {"repo": repo, "branch": branch, "pr": pr, "epoch": 0, "rounds": [],
             "unlocked_at": None, "unlocked_epoch": 0, "github_clean_sha": None}
@@ -115,7 +141,7 @@ def _connect() -> sqlite3.Connection:
     root = state_root()
     root.mkdir(parents=True, exist_ok=True)
     # A writer may hold the ledger across a GitHub or git fetch call; the others wait it out rather than fail.
-    conn = sqlite3.connect(root / "ledger.db", timeout=60, isolation_level=None)
+    conn = sqlite3.connect(root / "ledger.db", timeout=60, isolation_level=None, factory=_Store)
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
     return conn

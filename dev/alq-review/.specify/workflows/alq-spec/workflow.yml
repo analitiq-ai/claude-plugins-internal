@@ -16,6 +16,11 @@ inputs:
     type: string
     required: true
     prompt: "Describe the document change and the decisions it must make"
+  # Steps read the issue from $ISSUE, never from this input, for the reason given for spec_dir.
+  issue:
+    type: string
+    required: true
+    prompt: "GitHub issue number"
   # Non-empty re-scopes an existing spec folder. The folder itself comes from $SPEC_DIR, never from
   # this input: template text is spliced into shell source before the shell can validate it.
   spec_dir:
@@ -54,11 +59,24 @@ steps:
       # The choice is one of the gate's three options by now, never the text the user typed.
       - id: premise-report
         type: shell
-        run: python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" check ".specify/workflows/runs/{{ context.run_id }}/premise-report.md" "{{ steps.premise.output.choice }}"
+        run: python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" check ".specify/workflows/runs/{{ context.run_id }}/premise-report.md" "{{ steps.premise.output.choice }}"
 
-      - id: record-outcome
-        type: shell
-        run: python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" record ".specify/workflows/runs/{{ context.run_id }}/premise-report.md" "{{ steps.premise.output.choice }}"
+      - id: not-worth-doing
+        type: if
+        condition: "{{ steps.premise.output.choice == 'not worth doing' }}"
+        then:
+          # The reason and the repo are read before gh runs: inside gh's argument list a failure would not stop
+          # the shell, and gh given an empty --repo picks a repo from the other remotes. gh exits 0 on an issue
+          # already closed without closing it or posting the reason, so an issue that is not open fails the step.
+          - id: close-not-worth-doing
+            type: shell
+            run: |
+              set -eu
+              reason=$(python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" reason ".specify/workflows/runs/{{ context.run_id }}/premise-report.md")
+              repo=$(git remote get-url origin)
+              state=$(gh issue view "$ISSUE" --repo "$repo" --json state --jq .state)
+              [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
+              gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
 
   # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
   # top-level and skips itself on a stop pick, instead of all of them sharing one block.
@@ -100,13 +118,13 @@ steps:
         run: |
           set -eu
           dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_REVIEW_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
       - id: premise-answers
         type: shell
         run: |
           set -eu
           dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" spec "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
 
   # grill interviews the author, which a headless command step cannot do.
   - id: to-grill
@@ -153,20 +171,20 @@ steps:
             run: |
               set -eu
               dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_REVIEW_ROOT/scripts/rootcause.py" check "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir"
         else:
           - id: root-cause-after-grill
             type: shell
             run: |
               set -eu
               dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_REVIEW_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
           - id: premise-answers-after-grill
             type: shell
             run: |
               set -eu
               dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_REVIEW_ROOT/scripts/premise_report.py" spec "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
 
   - id: to-plan
     type: if
@@ -188,7 +206,7 @@ steps:
         run: |
           set -eu
           dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_REVIEW_ROOT/scripts/settled_design.py" "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"
 
   - id: to-mark-critiques
     type: if

@@ -1,7 +1,7 @@
 """The GitHub lookups the gate needs, through the gh CLI (which carries the bot's token).
 
-Most return None when gh cannot answer, and the caller decides what an unknown means there. pr_target,
-issue_comments and write_issue_comment raise RuntimeError instead.
+Most return None when gh cannot answer, and the caller decides what an unknown means there. pr_target raises
+RuntimeError instead.
 """
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ RELEASE_CHECK = "internal-review"
 RELEASE_PREFIX = "version-only release:"
 
 
-def _answer(*args: str, stdin: str | None = None) -> str:
+def _answer(*args: str) -> str:
     """gh's answer; RuntimeError in gh's own words when it gives none."""
     try:
-        done = subprocess.run(["gh", *args], input=stdin, capture_output=True, text=True, timeout=20)
+        done = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError(f"gh {' '.join(args[:2])} could not run: {exc}") from exc
     if done.returncode != 0:
@@ -36,21 +36,6 @@ def _gh(*args: str) -> str | None:
 def issue_state(slug: str, number: int) -> str | None:
     """`OPEN` or `CLOSED`."""
     return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
-
-
-def issue_comments(slug: str, number: int) -> list[tuple[int, str]]:
-    """(id, body) of every comment on issue `number`. RuntimeError when gh cannot read them."""
-    lines = _answer("api", "--paginate", f"repos/{slug}/issues/{number}/comments", "--jq", ".[] | {id, body}")
-    return [(comment["id"], comment["body"]) for comment in map(json.loads, lines.splitlines())]
-
-
-def write_issue_comment(slug: str, number: int, body: str, comment_id: int | None) -> str:
-    """Writes `body` over comment `comment_id`, or as a new comment on issue `number` when that is None; the
-    comment's URL."""
-    method, path = (("POST", f"repos/{slug}/issues/{number}/comments") if comment_id is None
-                    else ("PATCH", f"repos/{slug}/issues/comments/{comment_id}"))
-    # The body goes in on stdin: it holds text a user typed, which must not reach a command line.
-    return _answer("api", "-X", method, path, "-F", "body=@-", "--jq", ".html_url", stdin=body)
 
 
 def repo_visibility(slug: str) -> str | None:

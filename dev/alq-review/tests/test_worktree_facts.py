@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -5,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from helpers import REVIEWERS, T0, assess, finding
+from helpers import REVIEWERS, T0, assess, finding, under_ascii_file_names
 
 import briefs
 import facts
@@ -69,6 +70,42 @@ class Locate(Repo):
         self.assertFalse(worktree.is_dirty(str(self.root)))
         (self.root / "a.py").write_text("changed\n")
         self.assertTrue(worktree.is_dirty(str(self.root)))
+
+
+class GitBytes(Repo):
+    """git writes a path or a file's text as the bytes it holds, which need not be UTF-8."""
+    NAME = os.fsdecode(b"caf\xe9.py")
+
+    def test_a_changed_path_that_is_not_utf8_keeps_the_digest_of_its_file(self):
+        (self.root / self.NAME).write_bytes(b"x\n")
+        self.assertEqual(worktree.contents(str(self.root), "feat/1-demo").digests[self.NAME],
+                         hashlib.sha256(b"x\n").hexdigest())
+
+    def test_a_path_reaches_its_file_whatever_codec_python_gives_file_names(self):
+        (self.root / "caf\u00e9.py").write_bytes(b"x\n")
+        probe = ("import os, sys, worktree; "
+                 "print(worktree.contents(sys.argv[1], 'feat/1-demo').digests.get(os.fsdecode(b'caf\\xc3\\xa9.py')))")
+        self.assertEqual(under_ascii_file_names(probe, str(self.root)), [hashlib.sha256(b"x\n").hexdigest()])
+
+    def test_text_keeps_its_carriage_returns(self):
+        (self.root / "a.py").write_bytes(b"one\r\ntwo\r\n")
+        git(self.root, "add", "a.py")
+        text = worktree.tree_text(str(self.root), worktree.staged_tree(str(self.root)), "a.py")
+        self.assertEqual(worktree.as_bytes(text), b"one\r\ntwo\r\n")
+
+    def test_text_that_is_not_utf8_has_its_hunk_and_the_patch_id_of_its_own_bytes(self):
+        before = worktree.head_tree(str(self.root))
+        (self.root / "a.py").write_bytes(b"caf\xe9\r\n")
+        git(self.root, "add", "a.py")
+        after = worktree.staged_tree(str(self.root))
+        hunks = [h for h in worktree.tree_hunks(str(self.root), before, after) if h["added"]]
+        self.assertEqual(hunks[0]["added"], ["caf\udce9\r"])
+        lone = subprocess.run(["git", "-C", str(self.root), "diff", "-U0", before, after], capture_output=True,
+                              check=True).stdout
+        self.assertEqual(len(hunks), 1)
+        own = subprocess.run(["git", "-C", str(self.root), "patch-id", "--stable"], input=lone, capture_output=True,
+                             check=True).stdout.split()[0].decode()
+        self.assertEqual(hunks[0]["patch_id"], own)
 
 
 class Contents(Repo):
@@ -257,8 +294,9 @@ class RoundFacts(Repo):
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], git(self.root, "rev-parse", "HEAD"))
         rnd["root"] = str(self.root)
         self.assertEqual(rnd["base_sha"], moved)
-        with mock.patch("speclocation.resolve", return_value=None):  # no network
-            self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
+        state["spec"] = None
+        state["spec_blob"] = None
+        self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
 
     def test_first_round_never_carries_a_burden(self):
         state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
@@ -341,6 +379,210 @@ class RoundFacts(Repo):
         offered = briefs.assess_args(state, rnd, where)["assess"]["schema"]["properties"]["round_verdict"]["enum"]
         self.assertIn("PATCH", offered)
         self.assertIn("CLASS_FIX", offered)
+
+
+class QuotedNames(Repo):
+    """git writes a path in C quotes, with escapes, when it holds a byte it will not write bare: one outside ASCII, a
+    control character, a quote or a backslash. Each is still read as its file's own name."""
+    NAMES = ("caf\u00e9.py", os.fsdecode(b"lat\xe9.py"), 'say "hi".md', "back\\slash.md", "tab\there.md",
+             "new\nline.md", "with space.md")
+
+    def test_a_staged_file_keeps_its_hunks(self):
+        for name in self.NAMES:
+            with self.subTest(name=name):
+                (self.root / name).write_text("one\n")
+                git(self.root, "add", "--", name)
+                hunks = worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)),
+                                            worktree.staged_tree(str(self.root)))
+                git(self.root, "reset", "-q")
+                self.assertEqual([(h["file"], h["added"]) for h in hunks], [(name, ["one"])])
+
+    def test_the_files_a_branch_changed_are_named_with_how_often(self):
+        for name in self.NAMES:
+            self.commit(name, "one\n", "add")
+        self.assertEqual(sorted(worktree.changed_files(str(self.root), "main")), sorted(self.NAMES))
+        self.assertEqual(worktree.commits_per_file(str(self.root), "main"), dict.fromkeys(self.NAMES, 1))
+
+    def test_unstaged_files_are_named(self):
+        for name in self.NAMES:
+            self.commit(name, "one\n", "add")
+            (self.root / name).write_text("two\n")
+        self.assertEqual(sorted(worktree.unstaged(str(self.root))), sorted(self.NAMES))
+
+
+class DiffConfig(Repo):
+    """`git diff` and `git log` output is read for hunks, added lines and file names, and shown to agents, and the user's
+    git config can rewrite it: under none of these settings may what is read change."""
+    SETTINGS = {"color.ui": {"color.ui": "always"}, "color.diff": {"color.diff": "always"},
+                "diff.external": {"diff.external": "echo rewritten"}, "textconv": {"diff.shout.textconv": "sed s/line/LINE/"},
+                "diff.noprefix": {"diff.noprefix": "true"}, "diff.interHunkContext": {"diff.interHunkContext": "5"},
+                "diff.submodule": {"diff.submodule": "diff"}, "diff.ignoreSubmodules": {"diff.ignoreSubmodules": "all"},
+                "diff.renames=false": {"diff.renames": "false"}, "diff.renames=copies": {"diff.renames": "copies"},
+                "diff.renameLimit": {"diff.renameLimit": "1"}, "diff.context": {"diff.context": "0"},
+                "diff.suppressBlankEmpty": {"diff.suppressBlankEmpty": "true"},
+                "diff.orderFile": {"diff.orderFile": ".git/order"}, "diff.algorithm": {"diff.algorithm": "histogram"},
+                "diff.indentHeuristic": {"diff.indentHeuristic": "false"}, "log.showSignature": {"log.showSignature": "true"}}
+
+    def setUp(self):
+        super().setUp()
+        # The driver the textconv setting names; without that setting it converts nothing.
+        (self.root / ".git" / "info" / "attributes").write_text("*.py diff=shout\n")
+        # The order the orderFile setting names: the reverse of git's own.
+        (self.root / ".git" / "order").write_text("z.py\n")
+        self.lines = [f"line{i}\n" for i in range(30)]
+        self.lines[3], self.lines[5] = "changed three\n", "changed five\n"
+
+    def read_under_each_setting(self, read):
+        """`read()` with none of the settings, which every setting must leave as it is."""
+        plain = read()
+        for name, config in self.SETTINGS.items():
+            with self.subTest(setting=name):
+                for key, value in config.items():
+                    git(self.root, "config", key, value)
+                try:
+                    self.assertEqual(read(), plain)
+                finally:
+                    for key in config:
+                        git(self.root, "config", "--unset", key)
+        return plain
+
+    def staged_hunks(self):
+        return worktree.tree_hunks(str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)))
+
+    def branch_facts(self, since):
+        """What the round facts read of the commits after `since`."""
+        root = str(self.root)
+        return (worktree.added_lines(root, since), worktree.additions(root, since, "HEAD"),
+                sorted(worktree.changed_files(root, since)), worktree.commits_per_file(root, since))
+
+    def test_staged_hunks(self):
+        (self.root / "a.py").write_text("".join(self.lines))
+        (self.root / "z.py").write_text("new\n")
+        git(self.root, "add", "a.py", "z.py")
+        plain = self.read_under_each_setting(self.staged_hunks)
+        self.assertEqual([(h["id"], h["file"], h["removed"], h["added"]) for h in plain],
+                         [("h1", "a.py", ["line3"], ["changed three"]), ("h2", "a.py", ["line5"], ["changed five"]),
+                          ("h3", "z.py", [], ["new"])])
+
+    def test_hunks_between_two_texts(self):
+        old = "".join(f"line{i}\n" for i in range(30))
+        plain = self.read_under_each_setting(lambda: worktree.text_hunks(str(self.root), old, "".join(self.lines)))
+        self.assertEqual([(h.removed, h.added) for h in plain], [(("line3",), ("changed three",)),
+                                                                 (("line5",), ("changed five",))])
+
+    def test_hunks_where_git_has_more_than_one_way_to_match_the_lines(self):
+        """Texts whose hunks the diff algorithm, and the heuristic that slides a hunk to an indent, each decide."""
+        pairs = (("a\nc\na\nb\na\nb\nb\nb\n", "c\nb\na\na\nb\na\nb\nb\n"),
+                 ("def a():\n    one\n\ndef c():\n    two\n", "def a():\n    one\n\ndef c():\n    two\n    one\n\n\n    two\n"))
+        plain = self.read_under_each_setting(lambda: [worktree.text_hunks(str(self.root), old, new) for old, new in pairs])
+        self.assertEqual([[(h.old_start, h.removed, h.added) for h in hunks] for hunks in plain],
+                         [[(1, ("a",), ()), (3, ("a",), ()), (5, (), ("a",)), (6, (), ("a",))],
+                          [(4, (), ("    two", "    one", "", ""))]])
+
+    def test_lines_added_since_a_commit(self):
+        base = git(self.root, "rev-parse", "HEAD")
+        self.commit("a.py", "".join(self.lines), "change")
+        plain = self.read_under_each_setting(lambda: worktree.added_lines(str(self.root), base))
+        self.assertEqual(plain, {"a.py": [(4, 4), (6, 6)]})
+
+    def test_a_moved_file_keeps_only_its_edited_lines_as_added(self):
+        """Two files renamed with one line edited, and one edited and copied: the renames are read as their edited
+        lines, the copy as a new file."""
+        self.commit("c.py", "".join(f"cline{i}\n" for i in range(30)), "c")
+        base = self.commit("e.py", "".join(f"eline{i}\n" for i in range(30)), "e")
+        for old, new in (("a.py", "b.py"), ("e.py", "f.py")):
+            git(self.root, "mv", old, new)
+            text = (self.root / new).read_text().split("\n")
+            text[3] = "edited"
+            (self.root / new).write_text("\n".join(text))
+        edited = "".join(f"cline{i}\n" if i != 3 else "edited\n" for i in range(30))
+        (self.root / "c.py").write_text(edited)
+        (self.root / "d.py").write_text(edited)
+        git(self.root, "add", "b.py", "c.py", "d.py", "f.py")
+        git(self.root, "commit", "-q", "-m", "move")
+        plain = self.read_under_each_setting(lambda: self.branch_facts(base))
+        files = ["b.py", "c.py", "d.py", "f.py"]
+        self.assertEqual(plain, ({"b.py": [(4, 4)], "c.py": [(4, 4)], "d.py": [(1, 30)], "f.py": [(4, 4)]}, 33, files,
+                                 dict.fromkeys(files, 1)))
+
+    def test_the_files_a_signed_commit_changed_are_named(self):
+        """`log.showSignature` writes git's verdict on a signature ahead of the names the commit changed."""
+        key = Path(self.tmp.name) / "key"
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
+        (Path(self.tmp.name) / "signers").write_text(f"t@example.com {(key.parent / 'key.pub').read_text()}")
+        for setting, value in (("gpg.format", "ssh"), ("user.signingkey", f"{key}.pub"),
+                               ("gpg.ssh.allowedSignersFile", str(Path(self.tmp.name) / "signers"))):
+            git(self.root, "config", setting, value)
+        base = git(self.root, "rev-parse", "HEAD")
+        (self.root / "a.py").write_text("".join(self.lines))
+        git(self.root, "commit", "-q", "-S", "-am", "signed")
+        plain = self.read_under_each_setting(lambda: worktree.commits_per_file(str(self.root), base))
+        self.assertEqual(plain, {"a.py": 1})
+
+    def test_the_diff_shown_to_agents(self):
+        (self.root / "a.py").write_text("".join(self.lines))
+        git(self.root, "add", "a.py")
+        plain = self.read_under_each_setting(lambda: worktree.tree_diff(
+            str(self.root), worktree.head_tree(str(self.root)), worktree.staged_tree(str(self.root)), ["a.py"]))
+        self.assertIn("--- a/a.py\n+++ b/a.py\n", plain)
+        self.assertIn("\n+changed three\n", plain)
+
+    def test_the_diff_between_two_texts_shown_in_a_spec_hold(self):
+        old, new = (self.git_blob(text) for text in ("# Demo\n\nprints 20 lines.\n", "# Demo\n\nprints 21 lines.\n"))
+        plain = self.read_under_each_setting(lambda: worktree.diff(str(self.root), old, new))
+        self.assertIn("@@ -1,3 +1,3 @@\n # Demo\n \n-prints 20 lines.\n+prints 21 lines.", plain)
+
+    def git_blob(self, text):
+        return subprocess.run(["git", "-C", str(self.root), "hash-object", "-w", "--stdin"], input=text, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    def add_submodule(self, gitmodules_ignore=None):
+        """A submodule `sub` committed on the branch, with `ignore = <gitmodules_ignore>` committed in .gitmodules when
+        given; the commit that adds it."""
+        inner = Path(self.tmp.name) / "inner"
+        inner.mkdir()
+        git(inner, "init", "-q", "-b", "main")
+        git(inner, "config", "user.email", "t@example.com")
+        git(inner, "config", "user.name", "t")
+        (inner / "x.py").write_text("one\n")
+        git(inner, "add", "x.py")
+        git(inner, "commit", "-q", "-m", "one")
+        git(self.root, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(inner), "sub")
+        # The clone keeps none of the config of the repo it came from, and bump_submodule commits in it.
+        git(self.root / "sub", "config", "user.email", "t@example.com")
+        git(self.root / "sub", "config", "user.name", "t")
+        if gitmodules_ignore:
+            git(self.root, "config", "-f", ".gitmodules", "submodule.sub.ignore", gitmodules_ignore)
+            git(self.root, "add", ".gitmodules")
+        git(self.root, "commit", "-q", "-m", "sub")
+        return git(self.root, "rev-parse", "HEAD")
+
+    def bump_submodule(self):
+        """`sub` checked out at a new commit, not yet staged."""
+        (self.root / "sub" / "x.py").write_text("two\n")
+        git(self.root / "sub", "commit", "-q", "-am", "two")
+
+    def test_a_submodule_is_read_as_the_commit_it_points_at(self):
+        """Not as the files inside it, which no tree of this repo holds, and never not at all."""
+        base = self.add_submodule()
+        self.bump_submodule()
+        self.assertEqual(self.read_under_each_setting(lambda: worktree.unstaged(str(self.root))), ["sub"])
+        git(self.root, "add", "sub")
+        self.assertEqual([h["file"] for h in self.read_under_each_setting(self.staged_hunks)], ["sub"])
+        git(self.root, "commit", "-q", "-m", "bump")
+        self.assertEqual(self.read_under_each_setting(lambda: self.branch_facts(base)),
+                         ({"sub": [(1, 1)]}, 1, ["sub"], {"sub": 1}))
+
+    def test_a_submodule_its_gitmodules_tells_git_to_ignore_is_still_read(self):
+        """.gitmodules is the branch's own text, so its author decides what `ignore` it holds."""
+        base = self.add_submodule(gitmodules_ignore="all")
+        self.bump_submodule()
+        self.assertEqual(worktree.unstaged(str(self.root)), ["sub"])
+        # Since git 2.54, `git add` stages a submodule its .gitmodules ignores only when forced.
+        git(self.root, "add", "--force", "sub")
+        self.assertEqual([h["file"] for h in self.staged_hunks()], ["sub"])
+        git(self.root, "commit", "-q", "-m", "bump")
+        self.assertEqual(self.branch_facts(base), ({"sub": [(1, 1)]}, 1, ["sub"], {"sub": 1}))
 
 
 class StagedHunks(Repo):

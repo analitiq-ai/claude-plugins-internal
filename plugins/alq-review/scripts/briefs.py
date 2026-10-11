@@ -17,7 +17,7 @@ import github
 import ledger
 import policy
 import shimcheck
-import speclocation
+import specbinding
 import worktree
 
 INTERNAL_REVIEWERS = [
@@ -42,7 +42,12 @@ def short(agent_type: str) -> str:
     return agent_type.split(":")[1]
 
 
-Spec = speclocation.FoundSpec | speclocation.NoSpec | None
+# None is a PR no launch has bound: only a launch whose spec was refused in log mode opens a round and binds nothing.
+Spec = specbinding.Folder | specbinding.NoSpec | None
+
+
+def bound_spec(state: dict) -> Spec:
+    return specbinding.parse(state["spec"]) if "spec" in state else None
 
 
 def _ruled_on(state: dict) -> str:
@@ -57,14 +62,11 @@ def _ruled_on(state: dict) -> str:
 def _graded_against(spec: Spec, root: str) -> str:
     if spec is None:
         return ""
-    if isinstance(spec, speclocation.NoSpec):
-        return (f"\n\nThe issue this change is for needs no spec: {spec.reason}. Raise no finding about an unmet "
-                "requirement of a spec.")
-    # Inline, not a fetch command: it assumes nothing about which tools the reviewer agents have.
-    return (f"\n\nThis change implements the spec in {spec.folder} of {root}. Its spec.md is quoted in full between "
-            "the lines below; the folder's other files may be read. Each Acceptance criterion the change does not "
-            "meet is a finding: quote the criterion in its title. The spec's Out of scope bounds what you may ask "
-            "for.\n----- spec -----\n" + spec.text + "\n----- end of spec -----")
+    if isinstance(spec, specbinding.NoSpec):
+        return "\n\nThe caller says this change needs no spec. Raise no finding about an unmet requirement of a spec."
+    return (f"\n\nThis change implements the spec in {spec.path}/spec.md of {root}. Read it. Every requirement the "
+            "spec states that the change does not meet is a finding: quote the requirement in its title. What the spec "
+            "excludes bounds what you may ask for.")
 
 
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
@@ -114,8 +116,7 @@ def _assess_args(rnd: dict, churned_files: bool) -> dict:
 
 
 def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: Spec) -> dict:
-    """Internal reviewers grade the change against `spec`; audits ignore it. None is a branch that names no issue, or
-    a spec the gate could not find while it only logs refusals."""
+    """Internal reviewers grade the change against `spec`; audits ignore it."""
     waves = AUDIT_WAVES if rnd["stage"] == "audit" else [INTERNAL_REVIEWERS]
 
     def reviewer(agent_type: str) -> dict:
@@ -144,12 +145,7 @@ def brief_token(rnd: dict) -> str:
 
 
 def brief(state: dict, rnd: dict) -> dict:
-    spec = speclocation.resolve(state["repo"], state["branch"], rnd["root"])
-    if isinstance(spec, speclocation.FoundSpec):
-        spec_text, spec_folder = spec.text, spec.folder
-    else:
-        why = "the branch names no issue" if spec is None else f"the issue needs no spec ({spec.reason})"
-        spec_text, spec_folder = f"none: {why}, so spec_ref is 'n/a' throughout", None
+    spec = bound_spec(state)
     base = rnd["base_sha"]
     measured = facts.round_facts(state, rnd, rnd["root"])
     return {
@@ -157,8 +153,7 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec": spec_text,
-        "spec_folder": spec_folder,
+        "spec_folder": spec.path if isinstance(spec, specbinding.Folder) else None,
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],

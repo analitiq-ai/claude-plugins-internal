@@ -26,11 +26,6 @@ def mode() -> str:
     return _setting("mode", "ALQ_REVIEW_MODE")
 
 
-def spec_checks_mode() -> str:
-    """The spec-folder checks' own setting (spec 004 FR-006), so they can be rolled back alone."""
-    return _setting("spec_checks", "ALQ_REVIEW_SPEC_CHECKS")
-
-
 def claim_checks_mode() -> str:
     """The claim check's own setting (spec 005 FR-019), so it can be rolled back alone."""
     return _setting("claim_checks", "ALQ_REVIEW_CLAIM_CHECKS")
@@ -64,16 +59,17 @@ def refuse(payload: dict, action: str, reason: str, target=None) -> dict | None:
     return deny(reason) if enforcing else None
 
 
+def block(payload: dict, action: str, reason: str, target=None) -> dict:
+    """A refusal in every mode: what it refuses cannot run at all, so log mode has no rule to let it past."""
+    record(payload, action, "deny", reason, target)
+    return deny(reason)
+
+
 def _refuse_under(setting: str, payload: dict, action: str, reason: str, target=None) -> dict | None:
     if setting == "enforce":
         return refuse(payload, action, reason, target)
     record(payload, action, "would_deny", reason, target)
     return None
-
-
-def refuse_spec(payload: dict, action: str, reason: str, target) -> dict | None:
-    """A spec-folder check's refusal: it blocks only when both the plugin and the spec checks enforce."""
-    return _refuse_under(spec_checks_mode(), payload, action, reason, target)
 
 
 def refuse_claim(payload: dict, action: str, reason: str, target=None) -> dict | None:
@@ -119,7 +115,8 @@ def session_state(payload: dict, kind: str = ""):
 def log_error(text: str) -> None:
     root = ledger.state_root()
     root.mkdir(parents=True, exist_ok=True)
-    with open(root / "errors.log", "a") as log:
+    # A crash's trace can hold bytes git wrote that are not UTF-8: escaped, so the trace is still kept.
+    with open(root / "errors.log", "a", errors="backslashreplace") as log:
         log.write(f"{ledger.stamp(datetime.now(timezone.utc))} {text}\n")
 
 
