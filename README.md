@@ -6,12 +6,18 @@ Analitiq's internal Claude Code plugin marketplace. One folder per plugin under 
 | Plugin | |
 |---|---|
 | [`alq-review`](plugins/alq-review/README.md) | review rounds, commit checks and merge gates as code |
+| [`alq-plan`](plugins/alq-plan/skills/issue-spec/SKILL.md) | scoping a change into a spec folder before it is built |
+| [`alq-build`](plugins/alq-build/skills/issue-tackle/SKILL.md) | building an issue from its spec folder, then launching review on it |
+
+None requires another; `alq-build` launches `alq-review`'s review round and says so when it is not installed.
 
 ## Install
 
 ```
 claude plugin marketplace add analitiq-ai/claude-plugins-internal
 claude plugin install alq-review@alq-internal
+claude plugin install alq-plan@alq-internal
+claude plugin install alq-build@alq-internal
 ```
 
 The repo is private: the clone uses your git credentials for github.com.

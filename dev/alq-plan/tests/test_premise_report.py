@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_gate import SCRIPTS
+from paths import SCRIPTS
 
 import premise_report
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE

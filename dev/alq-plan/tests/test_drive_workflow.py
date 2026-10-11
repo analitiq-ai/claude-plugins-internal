@@ -21,7 +21,7 @@ import yaml  # Spec Kit's own dependency
 
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
 
-SKILL = PLUGIN / "skills" / "alq-spec"
+SKILL = PLUGIN / "skills" / "issue-spec"
 DRIVER = SKILL / "scripts" / "drive_workflow.py"
 SPECKIT = PLUGIN / "speckit"
 sys.path.insert(0, str(DRIVER.parent))

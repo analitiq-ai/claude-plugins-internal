@@ -8,7 +8,6 @@ from pathlib import Path
 
 from paths import PLUGIN
 
-import helpers  # noqa: F401  (puts scripts/ on the path)
 import settled_design
 
 SCRIPT = PLUGIN / "scripts" / "settled_design.py"

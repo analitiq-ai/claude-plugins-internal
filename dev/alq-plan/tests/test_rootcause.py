@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_gate import SCRIPTS
+from paths import SCRIPTS
 from test_premise_report import report, spec_section
 
 import rootcause

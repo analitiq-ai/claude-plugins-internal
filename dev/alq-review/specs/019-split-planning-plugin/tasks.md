@@ -158,7 +158,7 @@ root-cause verdict. (The move into `alq-build` is Phase 8.)
 - [X] T039 Rewrite the changed parts of `plugins/alq-review/README.md` once: What it enforces 2 (rescope), 5 (location comment), 6 (settled-design check); Mode (spec refusals under `mode`); the typed words; State (the `spec`, `spec_blob` and `spec_held` fields); the hold on a changed `spec.md` and its release by `unlock`; Layout; and every hand-written review-round call gains `spec` (R11, R12, R13, R18).
 - [X] T040 Grep the plugin and its tests for `speclocation`, `ALQ_REVIEW_ROOT`, `spec_checks`, `design_documents`, `refuse_spec`, `RESCOPE` and "location comment": none left except in `dev/alq-review/specs/` and `dev/alq-review/docs/adr/`.
 - [X] T041 Bump `plugins/alq-review/.claude-plugin/plugin.json` version to `0.12.0`.
-- [ ] T042 Run every suite (quickstart.md "Suites"); run the tripwire `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; open PR 1 as a draft. The user reviews it with `/pr-review-toolkit:review-pr` (T002).
+- [X] T042 Run every suite (quickstart.md "Suites"); run the tripwire `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; open PR 1 as a draft. The user reviews it with `/pr-review-toolkit:review-pr` (T002).
 - [ ] T043 After PR 1 merges: release, the user installs it and re-enables alq-review. PR 2 onwards is reviewed by the new gate with `spec` (R17).
 
 ---
@@ -171,18 +171,18 @@ root-cause verdict. (The move into `alq-build` is Phase 8.)
 
 ### Tests for User Story 5 (write first, see red)
 
-- [ ] T044 [P] [US5] Create `dev/alq-plan/tests/paths.py` naming `plugins/alq-plan`, a two-line `git` helper, and a fake `gh` stub that records `issue close` calls; create `dev/alq-plan/tests/test_guards.py`: every script of `plugins/alq-plan` imports from a copy holding only that plugin; no file of it names a command of `alq-review` or `alq-build` (R15).
-- [ ] T045 [P] [US5] Create `dev/alq-build/tests/paths.py` naming `plugins/alq-build` and `dev/alq-build/tests/test_guards.py`: no file of it names another plugin's command except FR-004's two exceptions (R15).
-- [ ] T046 [P] [US5] Add to `dev/alq-review/tests/test_shipped_tree.py`: `plugins/alq-review` ships none of the files FR-002 lists; every script of it imports from a copy holding only that plugin.
+- [X] T044 [P] [US5] Create `dev/alq-plan/tests/paths.py` naming `plugins/alq-plan`, a two-line `git` helper, and a fake `gh` stub that records `issue close` calls; create `dev/alq-plan/tests/test_guards.py`: every script of `plugins/alq-plan` imports from a copy holding only that plugin; no file of it names a command of `alq-review` or `alq-build` (R15).
+- [X] T045 [P] [US5] Create `dev/alq-build/tests/paths.py` naming `plugins/alq-build` and `dev/alq-build/tests/test_guards.py`: no file of it names another plugin's command except FR-004's two exceptions (R15).
+- [X] T046 [P] [US5] Add to `dev/alq-review/tests/test_shipped_tree.py`: `plugins/alq-review` ships none of the files FR-002 lists; every script of it imports from a copy holding only that plugin.
 
 ### Implementation (the move)
 
-- [ ] T047 [US5] `git mv` into `plugins/alq-plan/`: `skills/alq-spec` → `skills/issue-spec`; `scripts/premise_report.py`, `scripts/rootcause.py`, `scripts/settled_design.py`; `speckit/`. Fix `drive_workflow.py`'s `PLUGIN = parents[...]` if the depth changed (R2, R3).
-- [ ] T048 [US5] `git mv` into `plugins/alq-build/`: `skills/alq-issue-tackle` → `skills/issue-tackle`, `skills/alq-root-cause-check` → `skills/root-cause-check` (R2).
-- [ ] T049 [US5] Create `plugins/alq-plan/.claude-plugin/plugin.json` and `plugins/alq-build/.claude-plugin/plugin.json`, version `0.1.0`, no `dependencies`; list all three in `.claude-plugin/marketplace.json`; update the plugin table and install block of the root `README.md` (R2).
-- [ ] T050 [US5] Rename commands inside the moved skills: `/alq-plan:issue-spec`, `/alq-build:issue-tackle`, `/alq-build:root-cause-check` (no `alq-review:` prefix left for them).
-- [ ] T051 [US5] `git mv` tests: to `dev/alq-plan/tests/` `test_premise_report.py`, `test_rootcause.py`, `test_settled_design.py`, `test_drive_workflow.py`, `test_plan_template.py`, `test_critique_report.py`, and the planning half of `test_spec_source.py`; to `dev/alq-build/tests/` class `IssueTackle` of `test_agents.py` and the build half of `test_spec_source.py`. Each imports only its own suite's `paths.py` and helpers; replace `test_gate.SCRIPTS` and the `test_speclocation.Issue` base (R15).
-- [ ] T052 [US5] In `plugins/alq-review/README.md` Layout, remove the moved files (second README edit, the only other).
+- [X] T047 [US5] `git mv` into `plugins/alq-plan/`: `skills/alq-spec` → `skills/issue-spec`; `scripts/premise_report.py`, `scripts/rootcause.py`, `scripts/settled_design.py`; `speckit/`. Fix `drive_workflow.py`'s `PLUGIN = parents[...]` if the depth changed (R2, R3).
+- [X] T048 [US5] `git mv` into `plugins/alq-build/`: `skills/alq-issue-tackle` → `skills/issue-tackle`, `skills/alq-root-cause-check` → `skills/root-cause-check` (R2).
+- [X] T049 [US5] Create `plugins/alq-plan/.claude-plugin/plugin.json` and `plugins/alq-build/.claude-plugin/plugin.json`, version `0.1.0`, no `dependencies`; list all three in `.claude-plugin/marketplace.json`; update the plugin table and install block of the root `README.md` (R2).
+- [X] T050 [US5] Rename commands inside the moved skills: `/alq-plan:issue-spec`, `/alq-build:issue-tackle`, `/alq-build:root-cause-check` (no `alq-review:` prefix left for them).
+- [X] T051 [US5] `git mv` tests: to `dev/alq-plan/tests/` `test_premise_report.py`, `test_rootcause.py`, `test_settled_design.py`, `test_drive_workflow.py`, `test_plan_template.py`, `test_critique_report.py`, and the planning half of `test_spec_source.py`; to `dev/alq-build/tests/` class `IssueTackle` of `test_agents.py` and the build half of `test_spec_source.py`. Each imports only its own suite's `paths.py` and helpers; replace `test_gate.SCRIPTS` and the `test_speclocation.Issue` base (R15).
+- [X] T052 [US5] In `plugins/alq-review/README.md` Layout, remove the moved files (second README edit, the only other).
 
 **Checkpoint**: all three suites green; T044 to T046 green.
 

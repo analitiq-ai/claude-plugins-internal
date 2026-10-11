@@ -1159,7 +1159,8 @@ class HeldBranch(Gate):
 
     def test_a_rescope_releases_nothing_and_is_answered_as_any_other_prompt(self):
         self.lock(spec=SpecArgument.FOLDER)
-        for prompt in ("/alq-review:alq-spec rescope #7", "/alq-spec rescope #7"):
+        for prompt in ("/alq-plan:issue-spec rescope dev/x/specs/001-demo #7", "/alq-review:alq-spec rescope #7",
+                       "/alq-spec rescope #7"):
             with self.subTest(prompt=prompt):
                 self.assertEqual(self.hook("UserPromptSubmit", prompt=prompt), {})
         self.assertEqual(self.decision(self.edit()), "deny")

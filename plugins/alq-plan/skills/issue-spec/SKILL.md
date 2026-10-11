@@ -1,6 +1,6 @@
 ---
-name: alq-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-review:alq-spec #<issue>`) or a spec folder that needs re-scoping (`/alq-review:alq-spec rescope <spec folder> #<issue>`).
+name: issue-spec
+description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`) or a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`).
 argument-hint: "#<issue> [<dir>] | rescope <spec folder> #<issue>"
 ---
 
