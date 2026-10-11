@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import tempfile
 import threading
@@ -116,6 +117,14 @@ class Store(unittest.TestCase):
         with closing(sqlite3.connect(ledger.state_root() / "ledger.db")) as conn:
             columns = conn.execute(f"PRAGMA table_info({table})").fetchall()
         return [name for _, name, _, _, _, pk in sorted(columns, key=lambda c: c[5]) if pk]
+
+    def test_a_name_that_is_not_utf8_is_refused_by_name_before_it_is_stored(self):
+        """sqlite keeps text as UTF-8; a branch, path or file name git holds in other bytes has no UTF-8 to keep."""
+        branch = os.fsdecode(b"feat/caf\xe9")
+        with self.assertRaisesRegex(ledger.LedgerError, f"{re.escape(repr(branch))} is not UTF-8"):
+            ledger.open_pr("acme/demo", branch, "a" * 40, lambda: 7)
+        with self.assertRaisesRegex(ledger.LedgerError, f"{re.escape(repr(branch))} is not UTF-8"):
+            ledger.names("acme/demo", branch)
 
     def test_a_ledger_is_keyed_by_its_pr(self):
         self.assertEqual(self.primary_key("ledgers"), ["repo", "pr"])

@@ -8,9 +8,9 @@ and a source per question under `## Why this is worth doing`, graded on the same
 A heading that is there twice, or a label that is twice in the lines it is read from, is refused: no one line is
 then what the document says.
 
-Usage: premise_report.py form | check <report> <pick> | record <report> <pick> | spec <spec folder>. `check` and
-`spec` print one problem per line and exit 1 when there are any, 2 when they could not run. `record` runs from the
-issue's worktree.
+Usage: premise_report.py form | check <report> <pick> | spec <spec folder> | reason <report>. `check` and `spec`
+print one problem per line and exit 1 when there are any, 2 when they could not run. `reason` prints the report's
+`Reason:` text, and exits 1 when the report has none.
 """
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ import functools
 import re
 import sys
 from pathlib import Path
-
-import speclocation
 
 WRITE, NO_SPEC, NOT_WORTH_DOING = "write the spec", "no spec needed", "not worth doing"
 OUTCOMES = (WRITE, NO_SPEC, NOT_WORTH_DOING)
@@ -194,16 +192,6 @@ def spec_problems(spec: str) -> list[str]:
                        for problem in _answer_problems(f"### {name}", name, answers[name])]
 
 
-def record(text: str, pick: str, checkout: str) -> str:
-    """Writes the location comment a stop pick leaves on the issue of `checkout`'s branch; its URL, or nothing for
-    a pick that writes the spec."""
-    if pick == NO_SPEC:
-        return speclocation.post_none(checkout, reason(text))
-    if pick == NOT_WORTH_DOING:
-        return speclocation.post_not_worth_doing(checkout, reason(text))
-    return ""
-
-
 def _run(argv: list[str]) -> tuple[str, list[str]]:
     """(what to print, the problems found)."""
     if argv == ["form"]:
@@ -211,12 +199,17 @@ def _run(argv: list[str]) -> tuple[str, list[str]]:
     if len(argv) == 2 and argv[0] == "spec":
         spec = Path(argv[1]) / "spec.md"
         return "", [f"{spec}: {problem}" for problem in spec_problems(spec.read_text())]
-    if len(argv) != 3 or argv[0] not in ("check", "record") or argv[2] not in OUTCOMES:
+    if len(argv) == 2 and argv[0] == "reason":
+        report = Path(argv[1])
+        # Read outside the try: an undecodable report raises a ValueError too, and is one that could not be read.
+        text = report.read_text()
+        try:
+            return reason(text) + "\n", []
+        except ValueError as exc:
+            return "", [f"{report}: {exc}"]
+    if len(argv) != 3 or argv[0] != "check" or argv[2] not in OUTCOMES:
         raise ValueError(__doc__)
-    command, path, pick = argv[0], Path(argv[1]), argv[2]
-    if command == "record":
-        url = record(path.read_text(), pick, ".")
-        return url and url + "\n", []
+    path, pick = Path(argv[1]), argv[2]
     if not path.is_file():
         return "", [f"{path}: missing. Next step: write the report on the form `premise_report.py form` prints."]
     return "", [f"{path}: {problem}" for problem in problems(path.read_text(), pick)]
@@ -225,10 +218,7 @@ def _run(argv: list[str]) -> tuple[str, list[str]]:
 def main() -> None:
     try:
         out, found = _run(sys.argv[1:])
-    except speclocation.SpecLocationError as exc:
-        print(exc, file=sys.stderr)
-        sys.exit(1)
-    except (OSError, ValueError, RuntimeError, UnicodeDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         print(f"The premise report could not be handled: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(2)
     print(out, end="")

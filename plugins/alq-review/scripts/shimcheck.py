@@ -1,7 +1,6 @@
 """The shim check's rules (spec 006). No I/O: git, the ledger and Jev reach these functions as arguments."""
 from __future__ import annotations
 
-import hashlib
 import re
 
 import claimcheck
@@ -34,7 +33,7 @@ def parse_check_ref(ref) -> tuple[str, str] | None:
 
 
 def site_id(file: str, function: str) -> str:
-    return hashlib.sha256(f"{file}\0{function}".encode()).hexdigest()[:16]
+    return claimcheck.text_id(file, function)
 
 
 def validate_sweep(output: dict, located: Located) -> list[str]:
@@ -162,7 +161,7 @@ def _with_ranges(chain: dict, ranges: list[dict]) -> dict:
 
 def new_chain(repo: str, branch: str, tree: str, ranges: list[dict], state: str = "open") -> dict:
     """A bug opened by `tree`; `members` are the trees counted in it. It belongs to its branch, not to a commit."""
-    return _with_ranges({"id": hashlib.sha256(f"{repo}\0{branch}\0{tree}".encode()).hexdigest()[:16],
+    return _with_ranges({"id": claimcheck.text_id(repo, branch, tree),
                          "branch": branch, "count": 0, "members": [], "state": state, "target": None,
                          "seen": {}, "ranges": []}, ranges)
 

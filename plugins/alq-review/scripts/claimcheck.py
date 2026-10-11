@@ -52,8 +52,14 @@ def plain(text: str) -> str:
     return " ".join(word for word, _, _ in words(text))
 
 
+def text_id(*parts: str) -> str:
+    """A short id of `parts`, from their UTF-8, so text no locale's codec can spell still has one. A byte git wrote
+    that the locale's codec did not decode is hashed as git wrote it."""
+    return hashlib.sha256("\0".join(parts).encode("utf-8", "surrogateescape")).hexdigest()[:16]
+
+
 def claim_id(file: str, quote: str) -> str:
-    return hashlib.sha256(f"{file}\0{plain(quote)}".encode()).hexdigest()[:16]
+    return text_id(file, plain(quote))
 
 
 def claim_ref(cid: str) -> str:

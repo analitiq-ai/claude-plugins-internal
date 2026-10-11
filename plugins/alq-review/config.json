@@ -1,1 +1,1 @@
-{"mode": "enforce", "spec_checks": "enforce", "claim_checks": "enforce", "shim_checks": "enforce", "claim_warn_over": 20, "design_documents": ["**/README.md", "**/CLAUDE.md", "**/AGENTS.md", "docs/adr/**", ".claude/rules/**"]}
+{"mode": "enforce", "claim_checks": "enforce", "shim_checks": "enforce", "claim_warn_over": 20}

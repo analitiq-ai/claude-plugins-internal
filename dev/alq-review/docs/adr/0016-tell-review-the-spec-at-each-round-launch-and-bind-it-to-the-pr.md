@@ -68,8 +68,8 @@ ADR-0002, decision 3, allows no record outside the one store, the ledger, withou
    A launch with no `spec` key is refused. No reason is taken: whether a change needs a spec is planning's
    decision, and review only takes the answer. This replaces the part of ADR-0009, decision 4, about an
    issue that says it has no spec: the answer is now given at launch. The rest of that decision stands.
-3. We will verify a named spec folder against HEAD and search for nothing: it is a spec folder by
-   ADR-0012, decision 1, and its `spec.md` is in HEAD and not empty.
+3. We will verify a named spec folder against HEAD: its parent folder is named `specs`, and its `spec.md`
+   is in HEAD and not empty.
 4. We will record, in a PR's ledger at its first round, the `spec` value and, for a spec folder, the git
    blob id of its `spec.md` in HEAD. That record is the binding, and it is what every round and assessment
    of the PR reads.
@@ -89,7 +89,7 @@ is not worth doing, are not decided here.
 
 ## Options considered
 
-### Option A: The session names the spec, the gate verifies it and binds it to the PR (chosen)
+### Option A: The caller names the spec, the gate verifies it and binds it to the PR (chosen)
 
 This is what ADR-0012 rejected as Option D. Its objection had two halves:
 
@@ -102,8 +102,7 @@ This is what ADR-0012 rejected as Option D. Its objection had two halves:
 | Dimension | Assessment |
 |---|---|
 | Where the spec comes from | The launch |
-| Searched for | Nothing |
-| Tested against | HEAD: a spec folder by ADR-0012's mark, with a `spec.md` that is not empty |
+| Tested against | HEAD: a folder in a `specs` folder, with a `spec.md` that is not empty |
 | Can change during the PR | The folder: no. Its `spec.md`: only by the user's `unlock`, shown the diff |
 | Record kept | The `spec` value and the blob id of its `spec.md`, in the PR's ledger, the store ADR-0002 allows |
 | A change with no spec | `spec: null` at launch |
@@ -120,13 +119,13 @@ and never finds it, and that the location comment goes.
 - A wrong value on the first round is bound for the life of the PR. No command fixes it.
 - Any edit to `spec.md` after the first round, a typo fix included, holds the PR until the user unlocks it.
 - A session can edit `spec.md` and ask for the unlock. The user reading the diff is the only check on that.
-- The verification proves that the folder is a spec folder. It does not prove that it is this change's
-  spec. The gate trusts the session for that.
-- A session can pass `spec: null` for a change that had a spec folder. Nothing in review checks that.
+- The verification proves that the folder holds a `spec.md`. It does not prove that it is this change's
+  spec. The gate trusts the caller for that.
+- A caller can pass `spec: null` for a change that had a spec folder. Nothing in review checks that.
 
 ## Consequences
 
-- Easier: review needs nothing from the issue to know its spec. Every round of a PR, and its assessment, reads the same spec text, so a session cannot move the target between rounds.
+- Easier: review needs nothing from the issue to know its spec. Every round of a PR, and its assessment, reads the same spec text, so a caller cannot move the target between rounds.
 - Harder: every caller of review-round passes `spec`. The skills, scripts and tests built on the location
   comment change together.
 - **How we would know this was wrong:** PRs bound to the wrong spec with no way out; rounds launched
