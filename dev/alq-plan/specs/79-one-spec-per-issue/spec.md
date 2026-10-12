@@ -83,9 +83,13 @@ code and not run.
   `016` scopes #35, `017` #36, `018` #17 and `019` #63; 005 names `feat/43-…`, 006 `feat/49-…` and 008 `docs/9-…`;
   004 names no issue, and 007 and 009 to 015 have no Feature Branch line (read). #35 and #36 are closed (run:
   `gh issue view`). `dev/alq-plan/specs/` and `dev/alq-build/specs/` do not exist (read).
-- Files outside each folder that cite it, by `specs/<nnn>-` or `spec <nnn>`: 004 6, 008 3, 009 1, 011 1, 012 1,
-  014 1, 016 7, 017 3, 019 15; 007, 010 and 015 none (run: `grep -rlE`).
-- `README.md:27` says each plugin's feature specs are in `specs/<nnn>-<feature>/` (read).
+- Files outside each folder that cite it, by `specs/<nnn>-` or `spec <nnn>`: 004 6, 008 1, 009 1, 011 1, 012 1,
+  014 1, 016 5, 017 1, 019 10; 007, 010 and 015 none (run: `git grep -lE` at `74251bf`, each folder's own files
+  left out).
+- `README.md:27` says each plugin's feature specs are in `specs/<nnn>-<feature>/`. The constitutions of alq-plan,
+  alq-review and alq-build copy it in their Platform Constraints, naming `README.md` as its owner, and their
+  Delivery Workflow names worktrees `.claude/worktrees/<n>`. No other file has `specs/<nnn>-<feature>` (run:
+  `git grep`).
 - The repo's default branch is `main`; its issue types are Task, Bug and Feature (run: `gh repo view`, `gh api
   graphql` `issueTypes`).
 - Run: `python3 -m unittest` passes in `dev/alq-plan/tests` (117 tests) and `dev/alq-build/tests` (18 tests).
@@ -221,6 +225,9 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
    `spec 019`, **Then** nothing is found outside git history and this spec.
 3. **Given** the same, **When** `README.md` is read, **Then** it states that a plugin's feature specs are in
    `specs/<issue>-<short-name>/`, one per issue.
+4. **Given** the same and the constitutions' PR merged, **When** each of the three constitutions is read, **Then**
+   its Platform Constraints name `specs/<issue>-<short-name>/` and its Delivery Workflow names worktrees
+   `.claude/worktrees/<branch>`.
 
 ---
 
@@ -307,6 +314,10 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
   `spec 019`, MUST name the new folder.
 - **FR-020**: `README.md` MUST state the rule, `specs/<issue>-<short-name>/`, one per issue, in place of
   `specs/<nnn>-<feature>/`.
+- **FR-022**: The constitutions of alq-plan, alq-review and alq-build MUST name `specs/<issue>-<short-name>/` in
+  their Platform Constraints and `.claude/worktrees/<branch>` in their Delivery Workflow, with a PATCH version bump
+  each, in a PR of their own that lands after FR-020's, as their Governance has a constitution amended after the
+  file it names as owner (constitution VI).
 
 **Tests**
 
@@ -337,7 +348,7 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
 - **SC-005**: Every completed new scope ends with a pushed `<issue>-spec` branch, a draft PR starting
   `Part of #<issue>`, and a launched internal review round.
 - **SC-006**: After Story 4, 0 folders under `dev/*/specs/` are named by a Spec Kit number, and 0 citations of an old
-  name remain outside git history and this spec.
+  name, and 0 statements of the `specs/<nnn>-` form, remain outside git history and this spec.
 - **SC-007**: CI is green.
 
 ## Assumptions

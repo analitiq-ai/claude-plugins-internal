@@ -9,7 +9,7 @@ tags: [premise, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0005", "0008"]
+relatesTo: ["0002", "0005"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/scripts/premise_report.py"
