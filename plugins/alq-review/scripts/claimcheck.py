@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from policy import Decision
 
 CATEGORIES = tuple(f"K{i}" for i in range(1, 10))
-# K1, what the repo's own code, contracts, validator or CI does (spec FR-005); K9, what a test checks (engineering#57).
+# K1, what the repo's own code, contracts, validator or CI does; K9, what a test checks (engineering#57).
 JUDGED = ("K1", "K9")
 VERDICTS = ("CORRECT", "WRONG", "UNSURE")
 KINDS = ("CODE", "PROSE", "MIXED")
@@ -82,7 +82,7 @@ def parse_check_ref(ref) -> tuple[str, str] | None:
 
 def paragraph(lines: list[str], hunk: dict) -> tuple[int, int]:
     """The 1-based line range of the text a hunk sits in: its new lines, or the line before what it removed, widened
-    to the blank lines around them. A removal is judged by the paragraph it leaves behind (spec US1-5)."""
+    to the blank lines around them. A removal is judged by the paragraph it leaves behind."""
     first = max(1, min(hunk["new_start"], len(lines)))
     last = max(first, min(hunk["new_start"] + max(hunk["new_count"], 1) - 1, len(lines)))
     while first > 1 and lines[first - 2].strip():
@@ -208,7 +208,7 @@ def not_judged(check: dict) -> dict[str, int]:
 
 def settle(check: dict) -> dict:
     """Set the check's status from what it holds. A check whose verdicts are all UNSURE is complete: its claims
-    are notes (FR-015)."""
+    are notes."""
     hunk_ids = {h["id"] for h in check["hunks"]}
     if not hunk_ids <= set(check["labels"]):
         check["status"] = "reading"

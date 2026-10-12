@@ -1,4 +1,4 @@
-"""The claim check's agents read and search; none runs commands or writes files (spec 005 FR-012). Prose that
+"""The claim check's agents read and search; none runs commands or writes files. Prose that
 tells an agent to do what the gate now does for it is checked here too."""
 import re
 import unittest

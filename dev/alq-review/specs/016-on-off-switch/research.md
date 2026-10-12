@@ -57,7 +57,7 @@ Read for this: `plugins/alq-review/scripts/{gate,hookio,claimgate,shimgate,polic
   reviewers already running must go on, or the count is wrong for up to `INFLIGHT_TTL` after the plugin is on
   again. Confinement binds the plugin's own agents, not the session's work (FR-015). A run cut off by the
   switch is left as it is: each check already restarts a run that died (`policy.launch_round`'s dead run, the
-  claim check's relaunch, 006 R13).
+  claim check's relaunch, the shim check's relaunch of a stopped check).
 - **Existing tools**: the workflows' own `REFUSED: the gate hook did not supply this check` answer, which an
   un-injected launch returns today: it does not say why or what to do next, and an agent following the org's
   rule files would stop on it, so the gate answers the launch itself. The dead-run paths: reused unchanged.

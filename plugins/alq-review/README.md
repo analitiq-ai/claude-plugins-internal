@@ -102,9 +102,17 @@ that is under review.
    staged hunk. A bug belongs to its branch, not to a `HEAD`: its line ranges are carried from commit to commit
    by the same diff that follows a claim's words, bugs that one staged change reaches become one at the higher
    count, a bug whose lines are all deleted or whose file left both HEAD and the disk ends, and an override lasts until a commit changes the bug's code. The
-   deep sweep comes at a count of 3 and the hold at 4. A refusal lists, per site, the lines the staged change
-   alters in its file. The full rules are in this repo's
-   `dev/alq-review/specs/006-shim-check-gate/`, amended by `dev/alq-review/specs/011-shim-no-site-left/`.
+   deep sweep comes at a count of 3: two of the usual sweeps and one that searches from the callers, their lists
+   merged, and the next check of that bug is judged against the merged lists with no new sweep. The hold comes at 4.
+   A refusal lists, per site, the lines the staged change alters in its file. The author may contest a listed site;
+   a judge rules it `shares` (it stays), `not_shared` (it is dropped) or `deferred` to an open issue of the repo,
+   which keeps it dropped only while that issue is open. A change Jev does not call a fix passes unswept. A check is
+   kept against its staged tree: one that reached a verdict, `complete` or `patch`, is not run again at the same
+   `HEAD` unless a bug the change reaches is due a deep sweep, and one at the same `HEAD` that stopped after its
+   sweeps recorded their lists is judged again without new sweeps. `gate.log` records each check of code with its
+   verdict, or that it failed, Jev's answers, how many listed sites the rulings left and what it cost (agents,
+   seconds, Jev's price); for a `patch` or deep check it also records each site the check lists that an earlier
+   check of the same bug left out.
    A commit whose code is all in test files skips this check (`dev/alq-review/specs/012-tests-only-tree/`).
 
 ## How an agent uses it

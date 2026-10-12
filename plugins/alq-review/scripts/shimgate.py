@@ -1,4 +1,4 @@
-"""The shim check's hook handlers (spec 006): the commit decision. The rules are shimcheck's and the mapping of lines
+"""The shim check's hook handlers: the commit decision. The rules are shimcheck's and the mapping of lines
 from one version of a file to the next is lineage's; this module reads git and the ledger for them and records what
 they decide. A bug belongs to its branch: it is read by branch (the bugs still tracked) or by id (an override), never
 by HEAD. HEAD gives the text a bug's lines are carried to; a check's record stands only at the HEAD it was made on."""
@@ -228,7 +228,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         current = earlier if earlier is not None and earlier["head"] == head else None
         return _contest(payload, call, current, chains, args["contests"], logged)
     # Below, the check stored for this tree counts only if it was made at this HEAD: one left ruling resumes its
-    # contest, and a complete one is refused as already checked unless a bug of the change is due a deep sweep.
+    # contest, and one with a verdict is refused as already checked unless a bug of the change is due a deep sweep.
     if earlier is not None and earlier["head"] == head and earlier["status"] == "ruling":
         return _allowed(payload, call, earlier, "contest", logged)
     if earlier is not None and earlier["head"] == head and earlier["status"] == "complete" and not deep_due:
@@ -241,7 +241,7 @@ def on_launch(payload: dict, call: dict) -> dict | None:
         check = earlier
         check["started"] = time.time()
     else:
-        # Jev's `kind` reads only the files with a code hunk (FR-005); everything else reads every file with a staged
+        # Jev's `kind` reads only the files with a code hunk; everything else reads every file with a staged
         # hunk, so the lists are judged against the diff they were swept from.
         diff, code_diff = (_diff_of(root, base, tree, hunks), _diff_of(root, base, tree, code)) if code else ("", "")
         check = _new_check(where, tree, head, shimcheck.survivor(chains) if chains else None, code, diff, code_diff)

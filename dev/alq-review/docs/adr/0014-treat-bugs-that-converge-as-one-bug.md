@@ -14,7 +14,7 @@ affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{shimcheck,shimgate,ledger}.py"
   - type: path
-    pattern: "dev/alq-review/specs/006-shim-check-gate/**"
+    pattern: "dev/alq-review/specs/018-lineage-count/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"

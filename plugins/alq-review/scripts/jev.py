@@ -1,4 +1,4 @@
-"""Asks Jev through OpenRouter (spec 006 R6). A failed call or a malformed reply raises JevError with the reason."""
+"""Asks Jev through OpenRouter. A failed call or a malformed reply raises JevError with the reason."""
 from __future__ import annotations
 
 import http.client
@@ -13,11 +13,11 @@ from pathlib import Path
 
 ENDPOINT = "https://openrouter.ai/api/v1/systemone"
 MODEL = "typesafe/jev-1.13"
-TIMEOUT = 30  # nearly 50 times the slowest measured call (R6), so a slow network is not read as a failure
+TIMEOUT = 30  # nearly 50 times the slowest measured call, so a slow network is not read as a failure
 KIND = {"kind": {"type": "choice", "instructions": "Does this change correct a defect in existing behaviour?",
                  "criteria": {"fix": "the change corrects a defect in existing behaviour",
                               "not_fix": "it adds, restructures or removes behaviour without correcting a defect"}}}
-# The questions of the design's replay (jev_fix.py); test_jev compares them when that script is present.
+# The questions of the replay script jev_fix.py; test_jev compares them when that script is present.
 FIX = {
     "level": {"type": "choice", "instructions": "Where does the fix act relative to the defect's cause?",
               "criteria": {"cause": "it changes the mechanism that produces the wrong value, so the wrong value is never produced",
@@ -90,8 +90,8 @@ def _answers(reply, questions: dict) -> tuple[dict[str, str], float]:
     return chosen, cost
 
 
-# Jev labelled a real fix `not_fix` in 1 of 5 asks (research, replay T047), and a change labelled so is not
-# swept. One `fix` in this many asks makes it a fix.
+# With one ask per check, Jev labelled 619ff3b6, a real fix in dev/alq-review/tests/fixtures/shim-replay, `not_fix`
+# in 1 of 5 asks, and a change labelled so is not swept. One `fix` in this many asks makes it a fix.
 KIND_ASKS = 3
 
 

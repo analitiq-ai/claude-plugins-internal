@@ -1,4 +1,4 @@
-"""The `HEAD` snapshot a sweeper reads, beside the worktrees of the main checkout (spec 006 R3)."""
+"""The `HEAD` snapshot a sweeper reads, beside the worktrees of the main checkout."""
 import os
 from pathlib import Path
 

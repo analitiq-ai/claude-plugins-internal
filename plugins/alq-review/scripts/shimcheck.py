@@ -1,4 +1,4 @@
-"""The shim check's rules (spec 006). No I/O: git, the ledger and Jev reach these functions as arguments."""
+"""The shim check's rules. No I/O: git, the ledger and Jev reach these functions as arguments."""
 from __future__ import annotations
 
 import re
@@ -247,7 +247,7 @@ def _merged(chains: list[dict]) -> list[dict]:
 
 def settled_chains(chains: list[dict], check: dict) -> list[dict]:
     """The bugs `check` changes, those it merged away included; an overridden bug the check reaches alone is left as
-    the user set it (FR-017), one merged with another is not (an override is not carried). A tree is counted at most
+    the user set it, one merged with another is not (an override is not carried). A tree is counted at most
     once per bug, so a re-run check counts nothing twice."""
     matched = matching_chains(chains, check["hunks"])
     if check["verdict"] == "complete":
@@ -311,7 +311,7 @@ def carried(bugs: list[dict], olds: dict[str, str], news: dict[str, str], gone: 
 
 
 def _patch_report(check: dict, chain: dict | None, hunks: list[dict], root: str) -> str:
-    """`hunks` are the staged hunks whatever their label: a prose edit reaching a site touches it (FR-007)."""
+    """`hunks` are the staged hunks whatever their label: a prose edit reaching a site touches it."""
     sites = check["same_operation"]
     marks = altered(sites, hunks)
     listed = "".join(f"- {sid} {s['file']}:{s['line']} {s['function']} — {s['does']} ({lines_text(marks[sid])})\n"

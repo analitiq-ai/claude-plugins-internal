@@ -7,7 +7,7 @@
 - **Rationale**: `swept` is the one place that decides what the gate sweeps, and it has four callers (commit
   refusal, launch, chain matching, override seeding); a check anywhere else would leave some of them
   disagreeing. Dropping test hunks from mixed trees would change the diff Jev's `level`/`coverage` answers
-  were calibrated on (spec 006 R6 replay) and the chain ranges, which the issue does not ask for.
+  were calibrated on (the replay of the evidence fixes) and the chain ranges, which the issue does not ask for.
 - **Existing tools**: the "nothing to sweep" path (`commit_decision` `if not code`, `on_launch` `if not code`,
   mode `none`) that all-prose trees already take: fit, reused unchanged; no new mode.
 

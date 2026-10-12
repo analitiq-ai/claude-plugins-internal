@@ -14,7 +14,7 @@ affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{shell,worktree,claimcheck,claimgate,shimcheck,shimgate}.py"
   - type: path
-    pattern: "dev/alq-review/specs/{004-spec-folder-checks,005-claim-check-gate,006-shim-check-gate}/**"
+    pattern: "dev/alq-review/specs/004-spec-folder-checks/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"

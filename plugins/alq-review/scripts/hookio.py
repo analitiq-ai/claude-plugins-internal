@@ -27,12 +27,12 @@ def mode() -> str:
 
 
 def claim_checks_mode() -> str:
-    """The claim check's own setting (spec 005 FR-019), so it can be rolled back alone."""
+    """The claim check's own setting, so it can be rolled back alone."""
     return _setting("claim_checks", "ALQ_REVIEW_CLAIM_CHECKS")
 
 
 def shim_checks_mode() -> str:
-    """The shim check's own setting (spec 006 R1), so it can be rolled back alone."""
+    """The shim check's own setting, so it can be rolled back alone."""
     return _setting("shim_checks", "ALQ_REVIEW_SHIM_CHECKS")
 
 

@@ -14,7 +14,7 @@ affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{jev,shimcheck,shimgate}.py"
   - type: path
-    pattern: "dev/alq-review/specs/{006-shim-check-gate,011-shim-no-site-left,012-tests-only-tree}/**"
+    pattern: "dev/alq-review/specs/{011-shim-no-site-left,012-tests-only-tree}/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"
