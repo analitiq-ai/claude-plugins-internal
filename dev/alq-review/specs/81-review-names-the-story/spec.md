@@ -14,13 +14,9 @@ ADR-0019.
 
 ## Terms
 
-- **Story value**: a string that is exactly `<folder>/spec.md § User Story <N>`, with nothing before or after it.
-  Every character outside `<folder>` and `<N>` is the literal shown: `§` is U+00A7, the only non-ASCII character of
-  the value, and each space is one U+0020, so there is one between `spec.md` and `§`, `§` and `User`, `User` and
-  `Story`, and `Story` and `<N>`. `<N>` is `[1-9][0-9]*` in ASCII digits. `<folder>` is a spec folder's path from the
-  repo root, in printable ASCII with no space, that passes today's shape checks. So two story values name the same
-  folder and story exactly when they are the same string. `args.spec` and the binding are each one whole string,
-  checked as it is.
+- **Story value**: a string both stages of Table A accept. Two story values name the same folder and story
+  exactly when they are the same string. `args.spec`, the Implements line's value and the binding are each one
+  whole string, nothing stripped, checked by the same function.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
 - **PR body**: the PR's `body` field as GitHub holds it, read as JSON, nothing stripped. An empty body has been
@@ -28,7 +24,73 @@ ADR-0019.
 - **Line**: the body is cut into lines at `\n` and at `\r\n` only, neither part of a line; the last line ends at
   the end of the body. A bare `\r` is a character inside a line.
 - **Implements line**: the body's first line that starts `Implements:`. The rest of the line MUST be one U+0020
-  followed by a story value, nothing else; that story value is the line's value.
+  followed by a story value, nothing else; that story value is the line's value (Table B).
+
+## The story value and the refusals
+
+These tables are the rules. Scenarios 2, 3 and 6 to 8, the Implements-line edge case and FR-001, FR-002 and FR-005
+point at them. A clause added to one of them later adds its row in the same edit.
+
+**Table A — the story value.** Stage 1, the form: the whole string MUST match `<folder>/spec.md § User Story <N>`
+exactly, where `<folder>` is one or more characters of any kind and `<N>` is `[1-9][0-9]*` in ASCII digits. Every
+other character is the literal shown: each space is one U+0020 and `§` is U+00A7. The end of the string is its
+end, so a trailing `\n` is a character. A stage-1 failure is refused naming the form. Stage 2, the shape: today's
+shape checks run unchanged on the folder stage 1 took out; a failure gets today's shape message. One row per
+element, each refused unless marked:
+
+| Value (`F` is `dev/x/specs/7-demo`) | Stage | Outcome |
+|---|---|---|
+| `F/spec.md § User Story 2` | — | accepted |
+| `F` (a bare folder) | 1 | form |
+| `F/plan.md § User Story 2` | 1 | form |
+| `F/spec.md § US2` | 1 | form |
+| `F/spec.md $ User Story 2` (`§` replaced) | 1 | form |
+| `F/spec.md  § User Story 2` (space doubled) | 1 | form |
+| `F/spec.md §User Story 2` (space missing) | 1 | form |
+| `F/spec.md § User<tab>Story 2` (a tab for a space) | 1 | form |
+| `F/spec.md § User Story<U+00A0>2` (an NBSP for a space) | 1 | form |
+| `F/spec.md § user story 2` | 1 | form |
+| `F/spec.md § User Story 0`, `… 02`, `… ٢`, `… 2a` | 1 | form |
+| a space before the value; a space after it; a `\n` after it | 1 | form |
+| `/abs/specs/7/spec.md § User Story 2` (absolute) | 2 | shape |
+| `dev/x/specs/../specs/7/spec.md § User Story 2` (a `..` segment) | 2 | shape |
+| `dev/x/7-demo/spec.md § User Story 2` (not in `specs`) | 2 | shape |
+| `dev/x//specs/7-demo/spec.md § User Story 2` (not the one spelling) | 2 | shape |
+
+**Table B — the Implements line.** Each value row of Table A, written after `Implements: `, gives that row's
+outcome through the same function. Each refused row below quotes the line and names the form.
+
+| Body | Outcome |
+|---|---|
+| the line ends `\n` | counts |
+| the line ends `\r\n` | counts |
+| the line is the body's last, with no line end after it | counts |
+| the line is the body's first | counts |
+| two lines start `Implements:`: the first counts, the second, further down, does not | first counts |
+| the only line that starts `Implements:` is further down in the body | counts |
+| ` Implements: <value>` or `See Implements: <value>` (text before it) | not an Implements line |
+| an empty body | no Implements line |
+| `Implements:<value>` (no space), `Implements:  <value>` (two), a tab, an NBSP | refused |
+| `Implements: <value> ` or a tab after the value, as the body's last line too | refused |
+| a bare `\r` inside the line | refused |
+
+**Table C — the refusals.** The binding is checked first (scenario 5). Each way out is a step the next launch
+accepts under that binding. Under `spec: null` the form of an Implements line is never checked: any line that
+starts `Implements:` is refused as present.
+
+| Launch | Binding | Body | Outcome | Ways out |
+|---|---|---|---|---|
+| a value | bound to another value | any | refused, naming the bound value | launch with the bound value |
+| story `S` | none, or `S` | no Implements line, empty body included | refused | add `Implements: S` |
+| story `S` | none, or `S` | a line that breaks Table B | refused, quoting it | make the line `Implements: S` |
+| story `S` | none | a line naming story `T` | refused, quoting both | launch with `T`, or make the line `Implements: S` |
+| story `S` | `S` | a line naming story `T` | refused, quoting both | make the line `Implements: S` |
+| story `S` | none, or `S` | `Implements: S` | opens; binds `S` when unbound | — |
+| `null` | none, or `null` | no Implements line | opens; binds `null` when unbound | — |
+| `null` | none | a line naming story `T` | refused, quoting it | launch with `T`, or remove the line |
+| `null` | none | a line that breaks Table B | refused, quoting it | remove the line |
+| `null` | `null` | any line that starts `Implements:` | refused, quoting it | remove the line |
+| any | any | `gh` does not return the body | could not run (FR-006) | as scenario 12 |
 
 ## Today
 
@@ -64,27 +126,21 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 1. **Given** `spec: 'dev/x/specs/7-demo/spec.md § User Story 2'`, a `spec.md` with `### User Story 2 - Reset
    (Priority: P2)` at the reviewed commit, and a PR body whose first `Implements:` line is the same value, **When**
    the round launches, **Then** it opens, and the PR is bound to the whole value and the `spec.md` blob id.
-2. **Given** a value that is not a story value or `null`, one per element of the grammar: a bare folder,
-   `<folder>/plan.md § User Story 2`, `§ US2`, two spaces before `§`, two after it, `User  Story 2`,
-   `user story 2`, `User Story 02`, `User Story 0`, `User Story ٢` (a non-ASCII digit), `User Story 2a`, a space
-   before the value, a space after it, **When** the round launches, **Then** it is refused, and the message names
-   the form.
-3. **Given** a folder that fails today's shape checks, **When** the round launches, **Then** it is refused as
-   today (`shape`).
+2. **Given** each stage-1 row of Table A, **When** the round launches with it, **Then** it is refused, and the
+   message names the form.
+3. **Given** each stage-2 row of Table A, **When** the round launches with it, **Then** it is refused with today's
+   shape message (`shape`).
 4. **Given** a `spec.md` with no story heading for `<N>` at the reviewed commit, **When** the round launches,
    **Then** it is refused, and the message names the heading it looked for. `### User Story 12` is no heading for
    `1`. `### User Story 1: Sign in` is one for `1`.
 5. **Given** a PR bound to one value, **When** a later launch gives another (another story of the same spec, or
    `null`), **Then** it is refused as today, naming the bound value.
-6. **Given** a PR body whose Implements line names another folder or story than the value, **When** the round
-   launches, **Then** it is refused, and the message quotes both. For a PR not yet bound it names two ways out:
-   launch with the line's value, or make the line `Implements: <value>`. For a bound PR it names only the second,
-   since a launch with another value is refused (scenario 5).
+6. **Given** each row of Table C whose launch is a story, **When** the round launches, **Then** the outcome and
+   the ways out are the row's.
 7. **Given** a non-null value and a PR body with no Implements line, the empty body included, **When** the round
-   launches, **Then** it is refused, and the message names the line to add.
-8. **Given** `spec: null` and a PR body with an Implements line, **When** the round launches, **Then** it is
-   refused. For a PR not yet bound it names two ways out: launch with the line's value, or remove the line. For a
-   PR bound to `null` it names only removing the line.
+   launches, **Then** it is refused, and the message names the line to add (Table C).
+8. **Given** each row of Table C whose launch is `null`, **When** the round launches, **Then** the outcome and the
+   ways out are the row's.
 9. **Given** `spec: null` and a PR body with no `Implements:` line, **When** the round launches, **Then** it opens,
    and the reviewers are told the change needs no spec, as today.
 10. **Given** a bound story value, **When** the internal reviewers are briefed, **Then** each is told to read the
@@ -106,19 +162,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Edge Cases
 
-- The PR body and the Implements line, one case per clause of Terms. Each refused case quotes the line and names
-  the form.
-  - Story value: each grammar element of scenario 2, written on an Implements line, is refused through the same
-    function.
-  - Body: an empty body with `spec: null` opens (scenario 9); with a story value it is scenario 7. The Implements
-    line as the body's first line counts; as its last line with no line end after it, counts. A first line
-    ` Implements: <value>` is not an Implements line. A last line `Implements: <value> ` is refused. These two
-    pin "nothing stripped" at the body's edges.
-  - Line: a line ending `\n` and a line ending `\r\n` each count. A bare `\r` inside the line is refused.
-  - Which line: of two lines that start `Implements:`, the first counts and the second, further down, does not;
-    a body whose only such line is further down counts it. A line with text before `Implements:` is not one.
-  - The rest of the line: one U+0020 and a story value counts. No space, two spaces, or a space or tab after the
-    value is refused.
+- The PR body and the Implements line: one case per row of Table B, for a story launch and, where the row is
+  a line, for a `null` launch (Table C).
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
   heading is checked again in it. A heading the change removed refuses the launch.
@@ -130,17 +175,17 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Functional Requirements
 
-- **FR-001**: `args.spec`, the whole string with nothing stripped, MUST be a story value in its one spelling, or
-  `null`. Any other value, another spelling of a story value included, MUST be refused, naming the form.
-- **FR-002**: The folder of a story value MUST pass today's shape checks.
+- **FR-001**: `args.spec` MUST be `null` or a string both stages of Table A accept. A stage-1 failure MUST be
+  refused naming the form.
+- **FR-002**: Stage 2 MUST be today's shape checks, unchanged, run on the folder stage 1 took out, for every input:
+  `args.spec`, the Implements line's value and the binding. A failure gets today's shape message.
 - **FR-003**: `<folder>/spec.md` at the commit a launch checks MUST hold the story heading for `<N>`, matched at a
   word boundary after the number. One pure function decides it, for review-round and assess-round launches alike.
 - **FR-004**: The PR MUST be bound at its first round to the whole value and the `spec.md` blob id. A later launch
   with another value MUST be refused.
-- **FR-005**: At every review-round launch the gate MUST read the PR body. Its first line that starts
-  `Implements:` MUST name the same folder and story as a non-null value, MUST be present for a non-null value, and
-  MUST be absent for `null`. The line's value, as Terms defines it, MUST be parsed by the same function as
-  `args.spec`. One pure function decides the comparison.
+- **FR-005**: At every review-round launch the gate MUST read the PR body and decide by Table C, after the binding
+  check. The line's value MUST be parsed by the same function as `args.spec` (Table B). One pure function decides
+  the comparison and the ways out, given the launch value, the binding and the body.
 - **FR-006**: A PR body `gh` cannot read MUST refuse the launch as a check that could not run (P4).
 - **FR-007**: The refusals of FR-001 to FR-006 MUST follow the plugin's `mode`, as today's `spec` refusals do.
 - **FR-008**: Every refusal MUST name the next legal step (P1).
