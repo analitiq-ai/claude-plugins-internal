@@ -114,6 +114,14 @@ that is under review.
    seconds, Jev's price); for a `patch` or deep check it also records each site the check lists that an earlier
    check of the same bug left out.
    A commit whose code is all in test files skips this check (`dev/alq-review/specs/012-tests-only-tree/`).
+8. **A change is judged against the decisions that govern it.** At an internal round's launch, adrkit's
+   `adr check` is run on the files the round reviews (the same `git diff` range its reviewers read) once per
+   corpus: every `docs/adr` the repo tracks, and the org's at `$ALQ_ORG_ADR_DIR`. Each corpus keeps its own ids,
+   so a repo decision and an org decision never clash. Only accepted decisions govern. When any does, the
+   `decision-reviewer` joins the round with those records and reports where the change contradicts them; its
+   findings are assessed with everyone else's. An unset `ALQ_ORG_ADR_DIR` is named in the round's `notices`. A
+   launch is refused, naming the fix, when a corpus cannot be checked (`ALQ_ORG_ADR_DIR` is not a directory, `adr`
+   is not installed, or it fails) or when a decision record the change edits is invalid.
 
 ## How an agent uses it
 
@@ -225,6 +233,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
+| `scripts/decisions.py` | the accepted decisions that govern a round's change, asked of adrkit per corpus |
 | `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |
@@ -240,6 +249,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `skills/` | `alq-github-pr-review` |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
+| `agents/decision-reviewer.md` | judges a change against the decisions that govern it |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
 
 Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy.
@@ -255,3 +265,6 @@ edits. Installing the plugin copies files and installs no package, so install it
 hooks (`python3 -m pip install diff-match-patch`; on a Debian or Ubuntu system Python without a virtual environment,
 `sudo apt install python3-diff-match-patch`). Without it both checks refuse a launch and a commit as a check that
 could not run, and the refusal names this step. Any other import fails on a machine that lacks it.
+
+A repo that tracks a `docs/adr`, or a machine that sets `ALQ_ORG_ADR_DIR`, needs adrkit's CLI `adr` on `PATH`
+(`npm install -g @adrkit/cli`); without it an internal round's launch is refused and the refusal names this step.

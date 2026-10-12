@@ -177,7 +177,16 @@ def review_base(root: str, target: str) -> str:
 
 
 def changed_files(root: str, base: str) -> list[str]:
-    return _listed(root, *_DIFF, "--name-only", "-z", f"{base}...HEAD")
+    return files_in(root, f"{base}...HEAD")
+
+
+def files_in(root: str, rev_range: str) -> list[str]:
+    """The paths `git diff rev_range` changes, deleted ones included."""
+    return _listed(root, *_DIFF, "--name-only", "-z", rev_range)
+
+
+def tracked(root: str, pathspec: str) -> list[str]:
+    return _listed(root, "ls-files", "-z", "--", pathspec)
 
 
 def _listed(root: str, *args: str) -> list[str]:

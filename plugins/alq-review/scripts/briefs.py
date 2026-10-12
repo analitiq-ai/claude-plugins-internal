@@ -12,6 +12,7 @@ import sys
 
 import assessment
 import claimcheck
+import decisions
 import facts
 import github
 import ledger
@@ -33,9 +34,11 @@ AUDIT_WAVES = [
      "alq-anti-pattern:duplication", "alq-anti-pattern:code-shape", "alq-anti-pattern:boundary-trust"],
     ["alq-anti-pattern:semantic-parity"],
 ]
+# Joins the internal round only when accepted decisions govern the change.
+DECISION_REVIEWER = "alq-review:decision-reviewer"
 NEEDS = {"alq-anti-pattern:semantic-parity": "alq-anti-pattern:duplication"}
 ASSESSOR = "alq-review:assessor"
-REVIEWERS = frozenset(INTERNAL_REVIEWERS + [t for wave in AUDIT_WAVES for t in wave])
+REVIEWERS = frozenset(INTERNAL_REVIEWERS + [DECISION_REVIEWER] + [t for wave in AUDIT_WAVES for t in wave])
 
 
 def short(agent_type: str) -> str:
@@ -69,19 +72,46 @@ def _graded_against(spec: Spec, root: str) -> str:
             "excludes bounds what you may ask for.")
 
 
+def waves(stage: str, governance: decisions.Governance | None) -> list[list[str]]:
+    """The reviewer types of a round, wave by wave; `governance` is None for an audit, which reads no decisions."""
+    if stage == "audit":
+        return AUDIT_WAVES
+    return [INTERNAL_REVIEWERS + ([DECISION_REVIEWER] if governance.decisions else [])]
+
+
+def review_range(decision: policy.Decision, base: str) -> str:
+    """The `git diff` range a review round reads."""
+    return f"{decision.delta_from}..HEAD" if decision.scope == "delta" else f"{base}...HEAD"
+
+
+def _scope(where: worktree.Worktree, decision: policy.Decision, base: str) -> str:
+    scope = (f"Review branch {where.branch} of {where.slug}.\n"
+             f"In {where.root}, run: git diff {review_range(decision, base)}\n")
+    if decision.scope == "delta":
+        return scope + ("That is what changed since the previous review round. The rest of the branch was reviewed "
+                        "then: read it for context, report on the delta.")
+    return scope + "That is the whole change under review."
+
+
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
                    spec: Spec) -> str:
-    if decision.scope == "delta":
-        scope = (f"In {where.root}, run: git diff {decision.delta_from}..HEAD\n"
-                 "That is what changed since the previous review round. The rest of the branch was reviewed then: "
-                 "read it for context, report on the delta.")
-    else:
-        scope = f"In {where.root}, run: git diff {base}...HEAD\nThat is the whole change under review."
-    return (f"Review branch {where.branch} of {where.slug}.\n{scope}\n\n"
+    return (f"{_scope(where, decision, base)}\n\n"
             "Report only what must change before this merges: a defect, a broken contract, a violated project rule. "
             "No style preferences, no praise, no summary. An empty findings list is a normal and expected answer."
             f"{_graded_against(spec, where.root)}{_ruled_on(state)}\n\n"
             f"Answer through StructuredOutput, numbering findings {short(agent_type)}-1, {short(agent_type)}-2, ...")
+
+
+def _decision_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str,
+                     governance: decisions.Governance) -> str:
+    records = "\n".join(f"- {d.corpus} {d.record_id} \"{d.title}\": {d.record}" for d in governance.decisions)
+    return (f"{_scope(where, decision, base)}\n\n"
+            f"These accepted decisions govern files this change touches:\n{records}\n\n"
+            "Read each record. Report every place the change contradicts what a decision settles, quoting the "
+            "decision's words in the finding's title. Report nothing a decision does not settle: other reviewers "
+            f"cover the rest. An empty findings list is a normal and expected answer.{_ruled_on(state)}\n\n"
+            f"Answer through StructuredOutput, numbering findings {short(DECISION_REVIEWER)}-1, "
+            f"{short(DECISION_REVIEWER)}-2, ...")
 
 
 def _audit_prompt(where: worktree.Worktree, base: str, agent_type: str) -> str:
@@ -115,13 +145,17 @@ def _assess_args(rnd: dict, churned_files: bool) -> dict:
                 rnd["ref"], policy.admissible_verdicts(rnd, churned=churned_files))}
 
 
-def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: Spec) -> dict:
-    """Internal reviewers grade the change against `spec`; audits ignore it."""
-    waves = AUDIT_WAVES if rnd["stage"] == "audit" else [INTERNAL_REVIEWERS]
-
+def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: Spec,
+                governance: decisions.Governance | None) -> dict:
+    """Internal reviewers grade the change against `spec`, and the decision reviewer against `governance`; audits
+    ignore both."""
     def reviewer(agent_type: str) -> dict:
-        prompt = (_audit_prompt(where, rnd["base_sha"], agent_type) if rnd["stage"] == "audit"
-                  else _review_prompt(state, where, decision, rnd["base_sha"], agent_type, spec))
+        if rnd["stage"] == "audit":
+            prompt = _audit_prompt(where, rnd["base_sha"], agent_type)
+        elif agent_type == DECISION_REVIEWER:
+            prompt = _decision_prompt(state, where, decision, rnd["base_sha"], governance)
+        else:
+            prompt = _review_prompt(state, where, decision, rnd["base_sha"], agent_type, spec)
         entry = {"type": agent_type, "short": short(agent_type), "prompt": prompt,
                  "schema": assessment.findings_schema(rnd["ref"], short(agent_type))}
         if agent_type in NEEDS:
@@ -130,7 +164,8 @@ def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: poli
 
     return {"worktree": where.root, "stage": rnd["stage"], "round_ref": rnd["ref"],
             "label": f"{rnd['stage']} review round {rnd['n']} ({rnd['scope']})",
-            "waves": [[reviewer(t) for t in wave] for wave in waves],
+            "waves": [[reviewer(t) for t in wave] for wave in waves(rnd["stage"], governance)],
+            "notices": list(governance.notices) if governance else [],
             "assess": _assess_args(rnd, churned(state, rnd, where.root))}
 
 

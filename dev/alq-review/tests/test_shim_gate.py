@@ -10,9 +10,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from unittest import mock
 
-from paths import PLUGIN
+from paths import HARNESS, PLUGIN
 
-from test_claim_gate import HARNESS, INSTALL_COMMAND, ClaimGate
+from test_claim_gate import INSTALL_COMMAND, ClaimGate
 from test_worktree_facts import git
 
 import hookio

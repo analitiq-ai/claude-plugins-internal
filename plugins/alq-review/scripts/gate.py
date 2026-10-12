@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import traceback
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pathlib import Path
 import assessment
 import briefs
 import claimgate
+import decisions
 import facts
 import github
 from hookio import (block, claim_checks_mode, deny, log_error, mode, record, refuse, session_file, session_state,
@@ -378,7 +380,8 @@ def on_bash(payload: dict) -> dict | None:
 
 
 def on_agent(payload: dict) -> dict | None:
-    if payload.get("agent_id") or payload["tool_input"].get("subagent_type") not in briefs.INTERNAL_REVIEWERS:
+    dispatched = payload["tool_input"].get("subagent_type")
+    if payload.get("agent_id") or dispatched not in (*briefs.INTERNAL_REVIEWERS, briefs.DECISION_REVIEWER):
         return None
     return refuse(payload, "dispatch",
                   "Reviewers run together behind a barrier and are assessed as one round; dispatched one by one, the "
@@ -415,6 +418,12 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
     except RuntimeError as exc:
         raise RuntimeError(f"The change under review is measured from {target} as the remote has it, and it could "
                            f"not be read: {exc}") from exc
+
+
+def _governance(where: worktree.Worktree, rev_range: str) -> decisions.Governance:
+    """The decisions that govern what `git diff rev_range` changes. An empty variable is an unset one."""
+    return decisions.governing(where.root, worktree.files_in(where.root, rev_range),
+                               os.environ.get(decisions.ORG_CORPUS_VAR) or None, shutil.which("adr"))
 
 
 @dataclass(frozen=True)
@@ -588,13 +597,23 @@ def on_workflow(payload: dict) -> dict | None:
                 base = _review_base(where, merges_into)
             except RuntimeError as exc:
                 return block(payload, action, str(exc), event)
-            waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
+            governance = None
+            if stage != "audit":
+                try:
+                    governance = _governance(where, briefs.review_range(decision, base))
+                except RuntimeError as exc:
+                    return block(payload, action, str(exc), event)
+                if governance.record_errors:
+                    return block(payload, action, "Decision records this change edits are invalid:\n"
+                                 + "\n".join(governance.record_errors)
+                                 + "\nNext step: fix them, commit, and launch again.", event)
+            waves = briefs.waves(stage, governance)
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
                                     expected=[t for wave in waves for t in wave], escalation=decision.escalation, now=now)
             rnd.update(root=where.root, session=payload["session_id"])
             _admit_spec(state, spec)
-            injected = briefs.review_args(state, rnd, where, decision, briefs.bound_spec(state))
+            injected = briefs.review_args(state, rnd, where, decision, briefs.bound_spec(state), governance)
     record(payload, "launch", "allow", rnd["ref"], event)
     # "allow" doubles as the permission a headless run needs to start a workflow at all.
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",

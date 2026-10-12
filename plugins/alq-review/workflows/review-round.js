@@ -20,13 +20,14 @@ for (const wave of args.waves) {
   }))
   const silent = wave.filter((_, i) => !results[i]).map(reviewer => reviewer.type)
   if (silent.length) {
-    return { status: 'INCOMPLETE', round: args.label, did_not_report: silent, next_step: 'Launch this workflow again with the same args; a partial round is not assessed.' }
+    return { status: 'INCOMPLETE', round: args.label, notices: args.notices, did_not_report: silent, next_step: 'Launch this workflow again with the same args; a partial round is not assessed.' }
   }
   wave.forEach((reviewer, i) => { reports[reviewer.type] = results[i] })
 }
 
 const findings = Object.entries(reports).flatMap(([type, report]) => report.findings.map(f => ({ ...f, reviewer: type })))
 if (!findings.length) {
-  return { status: 'CLEAN', round: args.label, next_step: 'No reviewer found anything that must change. This stage is done.' }
+  return { status: 'CLEAN', round: args.label, notices: args.notices, next_step: 'No reviewer found anything that must change. This stage is done.' }
 }
-return await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess })
+const assessed = await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess })
+return { ...assessed, notices: args.notices }

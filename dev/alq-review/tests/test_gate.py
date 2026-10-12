@@ -13,11 +13,12 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
-from paths import PLUGIN
+from paths import HARNESS, PLUGIN
 
 from test_worktree_facts import Repo, git
 
 import briefs
+import decisions
 import gate
 import helpers
 import hookio
@@ -51,6 +52,8 @@ class Gate(Repo):
                         # The claim and shim checks have their own tests (test_claim_gate.py, test_shim_gate.py); here a
                         # commit is judged by the review alone.
                         ALQ_REVIEW_CLAIM_CHECKS="log", ALQ_REVIEW_SHIM_CHECKS="log")
+        # Whose org decisions a round reads is the developer's setting, never the test's.
+        self.env.pop(decisions.ORG_CORPUS_VAR, None)
 
     def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": self.tmp.name, **extra}
@@ -1811,6 +1814,85 @@ class OpenPrOnGithub(Gate):
         git(self.root, "checkout", "-q", "-b", "feat/3-next", "main")
         self.assertEqual(self.edit("a.py"), {})
         self.assertEqual(self.asked("pr "), 0)
+
+
+@unittest.skipUnless(shutil.which("adr"), "adrkit's CLI `adr` is not on PATH")
+class DecisionReview(Gate):
+    """#88: an internal round gets a decision reviewer when accepted decisions govern the files it reviews."""
+
+    def governed(self):
+        corpus = self.root / "docs" / "adr"
+        corpus.mkdir(parents=True)
+        (corpus / "0001-keep-b-small.md").write_text(
+            '---\nid: "0001"\ntitle: "Keep b small"\nstatus: accepted\ndate: 2026-10-12\ndeciders: ["@lead"]\n'
+            'affects:\n  - type: path\n    pattern: "b.py"\n---\n\n# Keep b small\n')
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", "docs: decision 0001")
+        return corpus / "0001-keep-b-small.md"
+
+    def test_a_governed_change_gets_the_decision_reviewer_with_the_records_it_judges_against(self):
+        path = self.governed()
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
+        [wave] = args["waves"]
+        self.assertEqual([r["type"] for r in wave], briefs.INTERNAL_REVIEWERS + [briefs.DECISION_REVIEWER])
+        self.assertIn(str(path), wave[-1]["prompt"])
+        self.assertTrue(all(str(path) not in r["prompt"] for r in wave[:-1]))
+        self.assertIn(briefs.DECISION_REVIEWER, self.saved()["rounds"][-1]["expected"])
+
+    def test_the_round_is_not_clean_until_the_decision_reviewer_reports(self):
+        self.governed()
+        _, args = self.launch()
+        for reviewer in args["waves"][0][:-1]:
+            self.report(reviewer, [], args["round_ref"])
+        ready = {"command": f"cd {self.root} && gh pr ready"}
+        self.assertEqual(self.decision(self.hook("PreToolUse", "Bash", ready)), "deny")
+        self.report(args["waves"][0][-1], [], args["round_ref"])
+        self.assertEqual(self.hook("PreToolUse", "Bash", ready), {})
+
+    def test_an_ungoverned_change_gets_the_usual_reviewers_and_is_told_the_org_was_not_checked(self):
+        _, args = self.launch()
+        self.assertEqual([[r["type"] for r in wave] for wave in args["waves"]], [briefs.INTERNAL_REVIEWERS])
+        self.assertTrue(any(decisions.ORG_CORPUS_VAR in n for n in args["notices"]))
+
+    def test_an_org_corpus_that_cannot_be_checked_refuses_the_launch_and_names_the_fix(self):
+        self.env[decisions.ORG_CORPUS_VAR] = str(Path(self.tmp.name) / "missing")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("Next step:", self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
+    def test_a_delta_round_is_governed_by_what_changed_since_the_last_round(self):
+        self.governed()
+        _, args = self.launch()
+        self.run_reviewers(args, [])
+        self.commit("c.py", "c\n", "feat: c")
+        _, second = self.launch()
+        self.assertEqual([[r["type"] for r in wave] for wave in second["waves"]], [briefs.INTERNAL_REVIEWERS])
+
+    def test_an_invalid_decision_record_in_the_change_refuses_the_launch(self):
+        self.governed()
+        self.commit("docs/adr/0002-bad.md", '---\nid: "0002"\ntitle: "Bad"\nstatus: accepted\ndate: 2026-10-12\n---\n',
+                    "docs: decision 0002")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("docs/adr/0002-bad.md", self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
+    @unittest.skipUnless(shutil.which("node"), "node runs the workflow script")
+    def test_the_round_result_carries_its_notices(self):
+        _, args = self.launch()
+        answers = {r["type"]: {"round_ref": args["round_ref"], "findings": []} for wave in args["waves"] for r in wave}
+        done = subprocess.run(["node", str(HARNESS), str(SCRIPTS.parent / "workflows" / "review-round.js")],
+                              input=json.dumps({"args": args, "answers": answers}), capture_output=True, text=True,
+                              check=True)
+        result = json.loads(done.stdout)["result"]
+        self.assertEqual(result["status"], "CLEAN")
+        self.assertEqual(result["notices"], args["notices"])
+
+    def test_the_decision_reviewer_is_not_dispatched_alone(self):
+        out = self.hook("PreToolUse", "Agent", {"subagent_type": briefs.DECISION_REVIEWER, "prompt": "review"})
+        self.assertEqual(self.decision(out), "deny")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from unittest import mock
 from helpers import REVIEWERS, T0, assess, finding, under_ascii_file_names
 
 import briefs
+import decisions
 import facts
 import ledger
 import policy
@@ -348,8 +349,8 @@ class RoundFacts(Repo):
         nxt["root"] = str(self.root)
 
         where = worktree.locate(str(self.root / "b.py"))
-        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"), None)
-                      ["assess"]["schema"]["properties"])
+        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"), None,
+                                                          decisions.Governance((), (), ()))["assess"]["schema"]["properties"])
 
     def test_the_churned_round_cannot_be_handed_a_verdict_that_edits_again(self):
         """Through the real assessor args: the schema the model answers in is where this has to bind."""
