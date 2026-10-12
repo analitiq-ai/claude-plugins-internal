@@ -23,8 +23,8 @@ ADR-0019.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
 - **Implements line**: the PR body's first line that starts `Implements:`, wherever it is in the body. A line ends
-  at `\n` or `\r\n`, which is not part of it. Its value is the rest of the line after `Implements:`, without the
-  spaces and tabs around it. A story PR's is `Implements: <story value>`.
+  at `\n` or `\r\n`, which is not part of it, or at the end of the body. Its value is the rest of the line after
+  `Implements: ` (the colon and one ASCII space), nothing stripped. A story PR's is `Implements: <story value>`.
 
 ## Today
 
@@ -100,8 +100,9 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
   body whose only such line is in prose further down: that line counts.
 - An `Implements:` line whose value is not in the story form, `§` with two spaces before it included: refused,
   quoting the line and naming the form.
-- A body with `\r\n` line ends, or an Implements line with no space or several spaces after `Implements:` or
-  spaces after the value: the value is read as defined in Terms, and a story value in its one spelling counts.
+- A body with `\r\n` line ends whose Implements line holds a story value in its one spelling: counts. An
+  Implements line with no space or two spaces after `Implements:`, a space or tab after the value, or a bare `\r`
+  inside the line: refused, quoting the line and naming the form.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
   heading is checked again in it. A heading the change removed refuses the launch.
