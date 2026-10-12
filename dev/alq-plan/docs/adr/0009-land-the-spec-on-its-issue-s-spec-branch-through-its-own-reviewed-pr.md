@@ -62,10 +62,10 @@ Why now: issue #79, part of #80. The spec is `dev/alq-plan/specs/79-one-spec-per
 1. We will have a new scope create branch `<issue>-spec` from the default branch as `origin` has it, in worktree
    `.claude/worktrees/<issue>-spec`, and run there. A branch `<issue>-spec` that exists locally or on `origin`
    refuses the new scope, naming the rescope form.
-2. We will have a completed new scope commit the spec folder, push the branch, open a draft PR into the default branch
-   whose body starts `Part of #<issue>`, and run the review loops with `spec: null`: the skill launches
-   `alq-review:review-round` first, then the GitHub review loop. This supersedes ADR-0005, decision 3, in what a
-   completed run does. It still posts nothing on the issue.
+2. We will have a completed new scope commit the spec folder, a no-spec folder (ADR-0008) included, push the
+   branch, open a draft PR into the default branch whose body starts `Part of #<issue>`, and run the review loops
+   with `spec: null`: the skill launches `alq-review:review-round` first, then the GitHub review loop. This
+   supersedes ADR-0005, decision 3, in what a completed run does. It still posts nothing on the issue.
 3. We will have a rescope work in the worktree it is run from, the spec's or a story's, and commit and push the spec
    edit on that branch, so it lands in that PR. It creates no branch, worktree or PR, and runs no review of its own.
    This replaces ADR-0005's "the branch of the PR bound to that spec folder".

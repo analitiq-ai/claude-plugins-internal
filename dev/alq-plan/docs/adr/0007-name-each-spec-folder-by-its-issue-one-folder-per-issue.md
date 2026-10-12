@@ -9,7 +9,7 @@ tags: [spec-folder, workflow, skills, rescope]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0004", "0005"]
+relatesTo: ["0001", "0004", "0005", "0008"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"
@@ -73,7 +73,7 @@ Why now: issue #79, part of #80, which adopts that workflow in alq-plan, alq-rev
    issue title, and pass the whole folder to the alq-spec workflow as one input, on every run. The workflow checks
    it with one pure function before anything is written. It passes the folder to `specify` as
    `SPECIFY_FEATURE_DIRECTORY`, and after `specify` checks that `.specify/feature.json` names it. Every step takes the
-   folder from that input.
+   folder from that input, the no-spec folder of a `no spec needed` pick (ADR-0008) included.
 4. We will not use Spec Kit's default numbering for the folders alq-plan creates.
 
 This record changes the text of no earlier decision. It ends two trade-offs that earlier records accepted:
