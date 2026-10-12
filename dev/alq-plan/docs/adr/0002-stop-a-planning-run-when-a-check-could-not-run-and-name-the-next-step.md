@@ -9,7 +9,7 @@ tags: [failure-handling, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003", "0006"]
+relatesTo: ["0003", "0006", "0008"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/scripts/*.py"
