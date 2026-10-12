@@ -15,10 +15,14 @@ ADR-0019.
 ## Terms
 
 - **Story value**: `<folder>/spec.md § User Story <N>`, the notation of a PR body's `Implements:` line.
-  `<folder>` is a spec folder's path from the repo root; `<N>` is a story number of its `spec.md`.
+  `<folder>` is a spec folder's path from the repo root; `<N>` is a story number of its `spec.md`. It has one
+  spelling: nothing before or after it, one ASCII space on each side of `§` and between `Story` and `<N>`, and
+  `<N>` with no leading zero. So two story values name the same folder and story exactly when they are the same
+  string.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
-- **PR header**: the first lines of a PR body. A story PR's header has one `Implements: <story value>` line.
+- **Implements line**: the PR body's first line that starts `Implements:`, wherever it is in the body. A story
+  PR's is `Implements: <story value>`.
 
 ## Today
 
@@ -40,7 +44,7 @@ Read at `86a4b06` on 2026-10-12. "Run" means it was run; "read" means read in th
 ### User Story 1 - A story PR is reviewed against its story (Priority: P1)
 
 The caller launches a review round with `spec: '<folder>/spec.md § User Story <N>'`, as the PR's `Implements:`
-line names it. The gate checks the story exists and agrees with the PR header, binds it, and the internal
+line names it. The gate checks the story exists and agrees with the PR's Implements line, binds it, and the internal
 reviewers grade the change against that story alone.
 
 **Why this priority**: it is the request. Without it, one PR per story is graded against every story.
@@ -54,8 +58,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
    (Priority: P2)` at the reviewed commit, and a PR body whose first `Implements:` line is the same value, **When**
    the round launches, **Then** it opens, and the PR is bound to the whole value and the `spec.md` blob id.
 2. **Given** a value that is not `<folder>/spec.md § User Story <N>` or `null` (a bare folder, `§ US2`,
-   `User Story 02`, `User Story 0`), **When** the round launches, **Then** it is refused, and the message names the
-   form.
+   `User Story 02`, `User Story 0`, `<folder>/spec.md  §  User Story 2`, a value with a space before it), **When**
+   the round launches, **Then** it is refused, and the message names the form.
 3. **Given** a folder that fails today's shape checks, **When** the round launches, **Then** it is refused as
    today (`shape`).
 4. **Given** a `spec.md` with no story heading for `<N>` at the reviewed commit, **When** the round launches,
@@ -90,7 +94,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Edge Cases
 
-- The PR body has two `Implements:` lines: the first one counts.
+- The PR body has two lines that start `Implements:`, the second in prose further down: the first one counts. A
+  body whose only such line is in prose further down: that line counts.
 - An `Implements:` line whose value is not in the story form: refused, quoting the line and naming the form.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
@@ -103,7 +108,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Functional Requirements
 
-- **FR-001**: `args.spec` MUST be a story value or `null`. Any other value MUST be refused, naming the form.
+- **FR-001**: `args.spec` MUST be a story value, in its one spelling, or `null`. Any other value, another spelling
+  of a story value included, MUST be refused, naming the form.
 - **FR-002**: The folder of a story value MUST pass today's shape checks.
 - **FR-003**: `<folder>/spec.md` at the commit a launch checks MUST hold the story heading for `<N>`, matched at a
   word boundary after the number. One pure function decides it, for review-round and assess-round launches alike.
@@ -128,7 +134,7 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Key Entities
 
-- **Story value**: folder and story number, parsed from `args.spec` and from the PR header by one function.
+- **Story value**: folder and story number, parsed from `args.spec` and from the Implements line by one function.
 - **Binding**: the PR's ledger fields `spec` (the whole value, or `null`) and `spec_blob`, as today, read only
   through the function that parses `args.spec`, which gives its folder and story. No reader uses the raw string as
   a folder.
@@ -165,7 +171,7 @@ Answer: predicted. Every review round launched under one PR per user story with 
 Source: code: plugins/alq-review/scripts/briefs.py; analitiq-ai/engineering docs/engineering/git-workflow.md
 
 ### change-alters
-Answer: Yes. The reviewers are named one story, and the gate refuses a story that is missing or disagrees with the PR header.
+Answer: Yes. The reviewers are named one story, and the gate refuses a story that is missing or disagrees with the PR's Implements line.
 Source: user: issue #81, "Wanted"
 
 ### owner
