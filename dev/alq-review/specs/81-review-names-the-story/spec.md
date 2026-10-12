@@ -14,12 +14,13 @@ ADR-0019.
 
 ## Terms
 
-- **Story value**: a string that is exactly `<folder>/spec.md § User Story <N>`, ASCII only, with nothing before or
-  after it. Every character outside `<folder>` and `<N>` is the literal shown; each space is one U+0020, so there
-  is one between `spec.md` and `§`, `§` and `User`, `User` and `Story`, and `Story` and `<N>`. `<N>` is
-  `[1-9][0-9]*` in ASCII digits. `<folder>` is a spec folder's path from the repo root that passes today's shape
-  checks. So two story values name the same folder and story exactly when they are the same string. `args.spec`
-  and the binding are each one whole string, checked as it is.
+- **Story value**: a string that is exactly `<folder>/spec.md § User Story <N>`, with nothing before or after it.
+  Every character outside `<folder>` and `<N>` is the literal shown: `§` is U+00A7, the only non-ASCII character of
+  the value, and each space is one U+0020, so there is one between `spec.md` and `§`, `§` and `User`, `User` and
+  `Story`, and `Story` and `<N>`. `<N>` is `[1-9][0-9]*` in ASCII digits. `<folder>` is a spec folder's path from the
+  repo root, in printable ASCII with no space, that passes today's shape checks. So two story values name the same
+  folder and story exactly when they are the same string. `args.spec` and the binding are each one whole string,
+  checked as it is.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
 - **PR body**: the PR's `body` field as GitHub holds it, read as JSON, nothing stripped. An empty body has been
