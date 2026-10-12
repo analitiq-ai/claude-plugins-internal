@@ -9,7 +9,7 @@ tags: [release, holds, user-authority, spec]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0016"]
+relatesTo: ["0004", "0016", "0019"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{gate,policy,specbinding}.py"
