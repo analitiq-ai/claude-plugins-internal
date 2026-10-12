@@ -81,7 +81,8 @@ Nothing else may release the hold, lower it or start it again. A hold with no na
 or with any second way out, fails the gate.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
-`scripts/pre_merge_gate.py`, the org gate's release).
+`scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
+`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 

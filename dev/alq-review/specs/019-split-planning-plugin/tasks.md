@@ -40,7 +40,7 @@ Phases 2 to 7 are PR 1 (behaviour, this branch). Phase 8 is PR 2 (the move). Pha
 - [x] T003 The user reviews and merges #69 (R17 step 2). Merged 2026-10-09 as draft records ADR-0016 to ADR-0018; the drafted ADR-0019 was dropped.
 - [x] T004 In its own PR, create `dev/alq-plan/` and `dev/alq-build/` with `specify init` at Spec Kit 1.0.7 and the extensions `dev/alq-review/.specify/extensions.yml` lists (adrkit, assess, critique, grill) (R16).
 - [x] T005 In the PR of T004, write `dev/alq-plan/.specify/memory/constitution.md`: principles I to VI copied verbatim from `dev/alq-review/.specify/memory/constitution.md`; plugin principles P1 reworded ("every planning rule is decided by a workflow step that runs a script, not by the agent obeying text"), P3, P4, P5 (R16).
-- [x] T006 [P] In the PR of T004, write `dev/alq-build/.specify/memory/constitution.md`: principles I to VI verbatim; plugin principles P4 and P5 (R16).
+- [x] T006 [P] In the PR of T004, write `dev/alq-build/.specify/memory/constitution.md`: principles I to VI verbatim; plugin principles P4 and P5 (R16). #77 removed P5 (R16).
 - [x] T007 In the PR of T004, draft with the adrkit draft skill in `dev/alq-plan/docs/adr/`: one record each deciding again ADR-0008 decision 1, ADR-0009, ADR-0011 and ADR-0012 decision 1 for alq-plan, and the two ADR-0016 leaves to this log: the part of ADR-0008 decision 2 about the skill that shapes an issue, and what planning does with an issue that needs no spec or is not worth doing. Status draft, decided for this plugin, not copied (R16).
 - [x] T008 [P] In the PR of T004, draft with the adrkit draft skill in `dev/alq-build/docs/adr/`: records deciding again ADR-0008 decisions 1 and 2 for alq-build. Status draft (R16).
 
@@ -190,7 +190,7 @@ root-cause verdict. (The move into `alq-build` is Phase 8.)
 
 ## Phase 9: After PR 2
 
-- [X] T053 Amend `dev/alq-review/.specify/memory/constitution.md` in its own PR: P2's source no longer cites the rescope route; P5's source no longer cites `settled_design.py` or README item 6; bump by the constitution's own rule (R17 step 6).
+- [X] T053 Amend `dev/alq-review/.specify/memory/constitution.md` in its own PR: P2's source no longer cites the rescope route; P5's source no longer cites `settled_design.py` or README item 6; bump by the constitution's own rule (R17 step 6). Done in #77, which removed P5 instead, as review no longer grades settled design; alq-plan's constitution holds it.
 - [ ] T054 In the `cto` repo, rename `alq-review:alq-root-cause-check` and `alq-review:alq-issue-tackle` to `alq-build:root-cause-check` and `alq-build:issue-tackle` wherever named (R17 step 7).
 - [ ] T055 Run quickstart.md "End to end" by hand on throwaway issues.
 

@@ -12,13 +12,11 @@ blastRadius: component
 relatesTo: ["0004", "0016"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{gate,policy}.py"
-  - type: path
-    pattern: "plugins/alq-review/skills/alq-spec/SKILL.md"
+    pattern: "plugins/alq-review/scripts/{gate,policy,specbinding}.py"
   - type: path
     pattern: "plugins/alq-review/README.md"
   - type: path
-    pattern: "dev/alq-review/tests/{test_gate,test_policy}.py"
+    pattern: "dev/alq-review/tests/{test_gate,test_policy,test_specbinding}.py"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"
@@ -91,4 +89,4 @@ constitution P2.
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Plan issue #63 against this ADR.
+2. [x] Plan issue #63 against this ADR. Done in spec 019, built in #75 and #72.

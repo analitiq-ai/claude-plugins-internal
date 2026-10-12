@@ -12,11 +12,11 @@ blastRadius: component
 relatesTo: ["0008", "0016", "0017"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{settled_design,gate}.py"
+    pattern: "plugins/alq-review/scripts/gate.py"
   - type: path
     pattern: "plugins/alq-review/{config.json,README.md}"
   - type: path
-    pattern: "dev/alq-review/tests/{test_gate,test_settled_design}.py"
+    pattern: "dev/alq-review/tests/test_gate.py"
   - type: path
     pattern: "dev/alq-review/specs/{004-spec-folder-checks,015-nested-spec-folders}/**"
 provenance:
@@ -132,7 +132,9 @@ where each repo puts its documents, and the rule keeps refusing changes that dec
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Delete the design-document rule, its list and its tests (issue #29), from a failing test that the
+2. [x] Delete the design-document rule, its list and its tests (issue #29), from a failing test that the
    settled-design check does not refuse a README-only branch.
-3. [ ] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no
+   Done in #75, which took the rule, its list and their tests out of alq-review, not from that failing test.
+3. [x] Change how a spec folder is recognised, from a failing test that a `specs/<x>/` folder with no
    `.specify/` beside it is not graded (issue #56).
+   Not needed: review no longer uses decision 1 (ADR-0017).

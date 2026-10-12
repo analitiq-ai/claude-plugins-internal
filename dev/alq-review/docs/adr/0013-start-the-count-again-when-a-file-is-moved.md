@@ -84,4 +84,4 @@ accurate way to detect that a file was moved.
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Carry it into the design of ADR-0001's rule (issue #17).
+2. [x] Carry it into the design of ADR-0001's rule (issue #17). Done in #60.

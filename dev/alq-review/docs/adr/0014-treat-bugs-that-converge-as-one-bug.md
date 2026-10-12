@@ -97,4 +97,4 @@ Rejected: a commit that touches two bugs would wipe both counts.
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Carry it into the design of ADR-0001's rule (issue #17).
+2. [x] Carry it into the design of ADR-0001's rule (issue #17). Done in #60.
