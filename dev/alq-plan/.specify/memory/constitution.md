@@ -66,9 +66,9 @@ code it governs in the same PR).
 
 ### Plugin Principles
 
-Numbered as in the `alq-review` constitution (`dev/alq-review/.specify/memory/constitution.md`),
-so a principle carries one number in every plugin of this repo. There is no P2: planning holds
-nothing, so there is no hold to release.
+Numbered so a principle carries one number in every plugin of this repo: P1, P3 and P4 as in the
+`alq-review` constitution (`dev/alq-review/.specify/memory/constitution.md`); P5 is planning's
+own. There is no P2: planning holds nothing, so there is no hold to release.
 
 ### P1. Code Decides, Not Prose
 
@@ -123,8 +123,8 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 ## Delivery Workflow
 
 Not gates — context so `/speckit-tasks` shapes tasks to fit: issue-numbered branch, worktree at
-`.claude/worktrees/<n>`, draft PR, internal review rounds, then merge on a clean round and green
-CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
+`.claude/worktrees/<n>`, draft PR, then the review loops and the pre-merge checklist. Owned by the
+organisation's `.claude/rules/github-workflow.md` and
 `.claude/rules/pr-review-loop.md`. Decision records go in `dev/alq-plan/docs/adr/`. The adrkit
 `after_plan` hook is optional: it offers to check a plan against them.
 
@@ -143,4 +143,4 @@ CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-09
+**Version**: 1.0.1 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-12

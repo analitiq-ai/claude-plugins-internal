@@ -146,7 +146,7 @@ claims of a hunk.
   rulings than the bound; a count that changes after a commit of unrelated work; or users reporting claims
   that got past the bound by being moved and reworded in one step.
 - Revisit if: `diff-match-patch` can no longer be used, or a tool appears that follows a sentence across
-  versions without a threshold (constitution P5).
+  versions without a threshold.
 
 ## Action items
 

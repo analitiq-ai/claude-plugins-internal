@@ -190,7 +190,7 @@ root-cause verdict. (The move into `alq-build` is Phase 8.)
 
 ## Phase 9: After PR 2
 
-- [ ] T053 Amend `dev/alq-review/.specify/memory/constitution.md` in its own PR: P2's source no longer cites the rescope route; P5's source no longer cites `settled_design.py` or README item 6; bump by the constitution's own rule (R17 step 6).
+- [X] T053 Amend `dev/alq-review/.specify/memory/constitution.md` in its own PR: P2's source no longer cites the rescope route; P5's source no longer cites `settled_design.py` or README item 6; bump by the constitution's own rule (R17 step 6).
 - [ ] T054 In the `cto` repo, rename `alq-review:alq-root-cause-check` and `alq-review:alq-issue-tackle` to `alq-build:root-cause-check` and `alq-build:issue-tackle` wherever named (R17 step 7).
 - [ ] T055 Run quickstart.md "End to end" by hand on throwaway issues.
 
