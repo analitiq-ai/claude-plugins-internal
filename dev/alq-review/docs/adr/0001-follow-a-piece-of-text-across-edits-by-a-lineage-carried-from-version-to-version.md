@@ -14,7 +14,7 @@ affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{claimcheck,claimgate,shimcheck,shimgate,ledger,lineage}.py"
   - type: path
-    pattern: "dev/alq-review/specs/{005-claim-check-gate,006-shim-check-gate}/**"
+    pattern: "dev/alq-review/specs/018-lineage-count/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka" 
@@ -156,5 +156,7 @@ claims of a hunk.
 
 ## Action items
 
-1. [ ] Amend specs 005 and 006 to this rule, in their own PR, before the code.
+1. [x] Amend specs 005 and 006 to this rule, in their own PR, before the code.
+   Not amended: #33, the amendment, was closed unmerged, as the specs were to be deleted; spec 018 states the
+   rule, and #78 deleted them.
 2. [x] Build it in the order of work of issue #17. Done in #60.

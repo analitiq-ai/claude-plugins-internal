@@ -1,4 +1,4 @@
-"""PreToolUse hook on Read, Glob and Grep: the shim sweeper reads only inside a snapshot folder (spec 006 R3), never the
+"""PreToolUse hook on Read, Glob and Grep: the shim sweeper reads only inside a snapshot folder, never the
 checkout whose staged fix it sweeps; its prompt names the snapshot of this check. Every other reader gets no answer
 from this hook.
 

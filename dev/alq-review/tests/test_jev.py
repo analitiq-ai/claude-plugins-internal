@@ -82,7 +82,7 @@ class Jev(unittest.TestCase):
         self.assertEqual((kind, round(cost, 6)), ("not_fix", 0.0024))
         self.assertEqual(len(StandIn.seen), jev.KIND_ASKS)
 
-    @unittest.skipUnless(REPLAY.is_file(), "the replay script holds the questions SC-001 was measured with")
+    @unittest.skipUnless(REPLAY.is_file(), "jev_fix.py holds the questions the evidence fixes were measured with")
     def test_level_and_coverage_are_the_replays_questions_and_its_state(self):
         replayed = {}
         exec(compile(REPLAY.read_text().replace("KEY = ", "KEY = None and "), str(REPLAY), "exec"), replayed)

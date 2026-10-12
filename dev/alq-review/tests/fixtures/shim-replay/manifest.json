@@ -1,6 +1,6 @@
 {
   "source": "analitiq-ai/claude-code-plugins",
-  "evidence": "The design page's 14-commit evidence table, less 8a219ca0, which the table does not list. Diffs and sweeps are the replay's, with the commit header and message removed: the gate never sees the message.",
+  "evidence": "The 14-commit evidence table of the shim check's design (https://claude.ai/artifact/REN6tz6DW1KFhjoDLYv7M8), less 8a219ca0, which the table does not list. Diffs and sweeps are the replay's, with the commit header and message removed: the gate never sees the message.",
   "commits": [
     {
       "sha": "03a73482",
@@ -15,7 +15,7 @@
       "expected": "patch",
       "diff": "commit-053e0ec9.diff",
       "sweep": "sweep-053e0ec9.md",
-      "note": "the design table's complete was obtained with the commit message, which the gate never sees (research R6)"
+      "note": "the evidence table's complete was obtained with the commit message, which the gate never sees"
     },
     {
       "sha": "29ade9e4",

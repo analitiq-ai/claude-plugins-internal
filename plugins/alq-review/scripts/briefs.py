@@ -171,7 +171,7 @@ def brief(state: dict, rnd: dict) -> dict:
 CLAIM_READER, CLAIM_JUDGE, CLAIM_CONTEST_JUDGE = ("alq-review:claim-reader", "alq-review:claim-judge",
                                                   "alq-review:claim-contest-judge")
 READ_BATCH = 16  # hunks per reader, in the order git lists them; a larger commit gets more readers
-# The categories of the plugins-random-commits study (dev/alq-review/specs/005-claim-check-gate), and K9 (engineering#57); the judged ones
+# The claim categories: K1 to K8 from the claim check's study of 28 commits, and K9 (engineering#57); the judged ones
 # are `claimcheck.JUDGED`, each with its own judge prompt in `_JUDGE_PROMPTS`.
 CATEGORY_MEANINGS = {
     "K1": "what our own code, contracts, validator or CI does",
@@ -185,7 +185,7 @@ CATEGORY_MEANINGS = {
     "K9": "what a test checks: a test's name, description or failure message (a comment in a test about the code "
           "it tests is K1)",
 }
-# The judge prompt the study's 30-claim replay ran (spec SC-001), unchanged below its first paragraph, which names
+# The judge prompt the study's 30-claim replay ran, unchanged below its first paragraph, which names
 # the staged checkout instead of a commit. {{file}}, {{line}} and {{claim}} are filled in per claim by the workflow.
 _JUDGE_TAIL = """
 Readers will rely on every word of this claim, so a claim that is mostly
@@ -366,7 +366,7 @@ _SWEEP_TASK = {
             "(the pre-fix code). Judge by behaviour, not by name.\n\n"
             "B. Every caller and consumer of the mechanism the commit touches. Follow the chain until it leaves the "
             "repo."),
-    # R10: the replay's one costly miss was a duplicate filed under callers; starting from the callers reaches the
+    # The replay's one costly miss was a duplicate filed under callers; starting from the callers reaches the
     # operation from the other side.
     True: ("A. Every caller and consumer of the mechanism the commit touches. Follow the chain until it leaves the "
            "repo.\n\n"
@@ -377,7 +377,7 @@ _SWEEP_TASK = {
 
 
 def sweep_prompt(check: dict, diff: str, snapshot_dir: str, *, callers_first: bool = False) -> str:
-    """The design page's sweep task, with the diff inline: the sweeper has no tool that runs git."""
+    """The sweep task, with the diff inline: the sweeper has no tool that runs git."""
     return ("Inputs (read-only; do not modify anything):\n"
             f"- A commit diff, below.\n- The complete source tree before that commit: {snapshot_dir}/\n\n"
             f"COMMIT DIFF\n{diff}\n\n"

@@ -1,4 +1,4 @@
-"""The `HEAD` copy a shim sweeper reads (spec 006 R3)."""
+"""The `HEAD` copy a shim sweeper reads."""
 from __future__ import annotations
 
 import hashlib

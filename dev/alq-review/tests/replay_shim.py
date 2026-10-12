@@ -1,5 +1,5 @@
-"""Replays the shim check's Jev questions over the evidence fixes in tests/fixtures/shim-replay (spec 006 SC-001,
-quickstart §7): `kind`, then `level` and `coverage` over the recorded sweep when it is a fix, composed into a verdict.
+"""Replays the shim check's Jev questions over the evidence fixes in tests/fixtures/shim-replay:
+`kind`, then `level` and `coverage` over the recorded sweep when it is a fix, composed into a verdict.
 Live: it calls OpenRouter with the key jev.py reads. Exits 1 unless every evidence fix gets its expected verdict."""
 import json
 import sys
@@ -20,7 +20,7 @@ def replay(entry: dict) -> dict:
     if kind == "fix":
         answers, more = jev.ask(jev.fix_state(diff, (FIXTURES / entry["sweep"]).read_text()), jev.FIX)
         level, coverage, cost = answers["level"], answers["coverage"], cost + more
-    # The recorded sweeps are prose, never parsed into a `same_operation` list, so SC-001 grades coverage as given.
+    # The recorded sweeps are prose, never parsed into a `same_operation` list, so the replay grades coverage as given.
     return {"kind": kind, "level": level, "coverage": coverage,
             "verdict": shimcheck.verdict(kind, level, coverage, sites_left=True), "cost": cost}
 
@@ -37,7 +37,7 @@ def main() -> int:
         print(f"{entry['sha']}  {entry['kind']:7}  expected {entry['expected']:11}  kind {result['kind']:7}  "
               f"level {result.get('level')}  coverage {result.get('coverage')}  verdict {result['verdict']}  "
               f"{'ok' if ok else 'MISMATCH'}")
-    print(f"SC-001 {'fails on ' + ', '.join(failed) if failed else 'holds'}; Jev cost ${spent:.4f}")
+    print(f"The replay {'fails on ' + ', '.join(failed) if failed else 'holds'}; Jev cost ${spent:.4f}")
     return 1 if failed else 0
 
 

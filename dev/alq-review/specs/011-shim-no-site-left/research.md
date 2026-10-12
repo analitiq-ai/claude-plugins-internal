@@ -12,9 +12,9 @@
   was refused with nothing to fix or contest (gate.log 2026-10-04T08:32:40Z). `level` is unaffected: ruling
   sites out says nothing about where the fix acts, so `symptom` stays a `patch`. Rejected: rewriting
   `coverage` to `none_other` (the ledger and log would misreport Jev's answer), and skipping the `coverage`
-  question for an empty list (a second request shape, while 006 SC-001 rests on replaying the one shape).
+  question for an empty list (a second request shape, while the replay of the evidence fixes rests on the one shape).
 - **Existing tools**: `shimcheck.ruled_out`, which gives the sites ruled out, and `_judge`'s filter that drops
-  them: fit, reused unchanged. The replay `tests/replay_shim.py`: kept on the 006 rule, since its sweeps are recorded
+  them: fit, reused unchanged. The replay `tests/replay_shim.py`: kept on the rule as it was, since its sweeps are recorded
   as prose and never parsed into a `same_operation` list.
 
 ## R2: A refusal with no site left offers no contest

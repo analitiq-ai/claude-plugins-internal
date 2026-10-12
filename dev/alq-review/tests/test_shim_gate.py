@@ -676,7 +676,7 @@ class ShimContest(Staged):
 
 
 class ShimCost(Staged):
-    """A staged tree is paid for once, and what each check cost is logged (US4, FR-012)."""
+    """A staged tree is checked once at each HEAD, save for its bug's deep sweep, and what each check cost is logged."""
 
     def setUp(self):
         super().setUp()

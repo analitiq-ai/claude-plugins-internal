@@ -1,4 +1,4 @@
-"""The shim sweeper reads only its snapshot of `HEAD` (spec 006 R3); every other reader is left alone."""
+"""The shim sweeper reads only its snapshot of `HEAD`; every other reader is left alone."""
 import json
 import os
 import subprocess
