@@ -2,7 +2,7 @@ schema_version: "1.0"
 workflow:
   id: "alq-spec"
   name: "Spec Cycle"
-  version: "1.5.0"
+  version: "1.6.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
 
@@ -208,6 +208,19 @@ steps:
           dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
           python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"
 
+  # adrkit's after_plan hook is optional, and a headless plan step only prints an optional hook. So the decisions
+  # governing the plan, the repo's and the org's, are gathered here and critique judges the plan against them.
+  - id: to-adr-report
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: adr-report
+        type: shell
+        run: |
+          set -eu
+          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
+          python3 "$ALQ_PLAN_ROOT/scripts/adr_report.py" "$dir" ".specify/workflows/runs/{{ context.run_id }}/adr-report.md"
+
   - id: to-mark-critiques
     type: if
     condition: *spec-is-written
@@ -223,6 +236,8 @@ steps:
       - id: critique
         command: speckit.critique.run
         integration: "{{ inputs.integration }}"
+        input:
+          args: "Judge the plan against every decision in .specify/workflows/runs/{{ context.run_id }}/adr-report.md: each place the plan departs from one is a finding that names the decision. A corpus the report says was not checked is a finding too."
 
   - id: to-new-critique
     type: if

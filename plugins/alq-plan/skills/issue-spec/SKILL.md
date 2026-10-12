@@ -39,7 +39,8 @@ Anything else, a folder whose parent is not named `specs` included: tell the use
 `specify workflow`, and prints one JSON report: `run_id`, `status`, `step`; on a failed step also `stderr`
 and `open_markers`; paused at `review-critique` also `critique`. `specify` takes the directory it runs in as its
 project (it must hold `.specify/`; a parent's does not count), so the spec folder lands in its `specs/`. Run every `DRIVE` call from `PROJECT` with
-`run_in_background: true` (headless steps take up to ~10 min each).
+`run_in_background: true` (headless steps take up to ~10 min each). Critique judges the plan against `PROJECT`'s
+`docs/adr` and, when `ALQ_ORG_ADR_DIR` names it, the org's; unset, the critique says the org's were not checked.
 
 1. **Start.** `python3 DRIVE start <SPEC_FILE> <ISSUE>`, plus `<SPEC_DIR>` on a rescope. Note the `run_id`.
    Expect `paused` at `premise`; on a rescope, `paused` at `grill`, and the next step is 4.
