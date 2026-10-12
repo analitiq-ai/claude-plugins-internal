@@ -43,7 +43,7 @@ def short(agent_type: str) -> str:
 
 
 # None is a PR no launch has bound: only a launch whose spec was refused in log mode opens a round and binds nothing.
-Spec = specbinding.Folder | specbinding.NoSpec | None
+Spec = specbinding.Story | specbinding.NoSpec | None
 
 
 def bound_spec(state: dict) -> Spec:
@@ -64,9 +64,11 @@ def _graded_against(spec: Spec, root: str) -> str:
         return ""
     if isinstance(spec, specbinding.NoSpec):
         return "\n\nThe caller says this change needs no spec. Raise no finding about an unmet requirement of a spec."
-    return (f"\n\nThis change implements the spec in {spec.path}/spec.md of {root}. Read it. Every requirement the "
-            "spec states that the change does not meet is a finding: quote the requirement in its title. What the spec "
-            "excludes bounds what you may ask for.")
+    return (f"\n\nThis change implements User Story {spec.number} of the spec in {spec.folder}/spec.md of {root}. "
+            f"Read the section under the heading `### User Story {spec.number}`, and what the spec excludes. Every "
+            "acceptance scenario of that story the change does not meet is a finding: quote the scenario in its title. "
+            "What the spec excludes bounds what you may ask for. The requirements of other stories are not this PR's: "
+            "raise none.")
 
 
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
@@ -153,7 +155,8 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec_folder": spec.path if isinstance(spec, specbinding.Folder) else None,
+        "spec_folder": spec.folder if isinstance(spec, specbinding.Story) else None,
+        "user_story": spec.number if isinstance(spec, specbinding.Story) else None,
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],

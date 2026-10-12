@@ -34,7 +34,7 @@ def review_call(state: dict | None, stage: str) -> str:
     """The review-round call for `stage`. `spec` is the PR's bound value, quoted so the agent cannot pass another;
     with no binding yet, or no state at hand, both forms the agent may choose from."""
     if state is None or "spec" not in state:
-        spec = "'<spec folder>' | null"
+        spec = "'<folder>/spec.md § User Story <N>' | null"
     elif state["spec"] is None:
         spec = "null"
     else:
@@ -96,8 +96,9 @@ def _holds(state: dict) -> list[tuple[str, str]]:
                       rnd["assessment"]["user_decision"]))
     held = _spec_held(state)
     if held is not None:
-        holds.append((f"The spec.md of `{state['spec']}` changed after this PR was bound to it: the bound blob is "
-                      f"{held['bound']} and HEAD's is {held['head']}, and review grades against the bound text.",
+        holds.append((f"The spec.md that `{state['spec']}` names changed after this PR was bound to it: the bound "
+                      f"blob is {held['bound']} and HEAD's is {held['head']}, and review grades against the bound "
+                      "text.",
                       f"does this PR now build to the changed spec? `git diff {held['bound']} {held['head']}` "
                       "shows the change."))
     return holds

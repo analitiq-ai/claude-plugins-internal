@@ -19,14 +19,15 @@ Your prompt carries `--ref '<round_ref>'`. Run:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/briefs.py --ref '<round_ref>'
 ```
 
-It prints the checkout, the diff and history commands, the spec folder the PR is reviewed against
-(`spec_folder`, null when the change needs no spec), the earlier rounds with every ruling made so far,
-the round verdicts admissible for this round, and `facts` computed from git and the ledger. The facts
-are measurements: build on them, do not re-argue them. Copy `brief_token` into your answer; without it
-the answer is rejected.
+It prints the checkout, the diff and history commands, the spec folder and the number of the user story
+the PR is reviewed against (`spec_folder` and `user_story`, both null when the change needs no spec), the
+earlier rounds with every ruling made so far, the round verdicts admissible for this round, and `facts`
+computed from git and the ledger. The facts are measurements: build on them, do not re-argue them. Copy
+`brief_token` into your answer; without it the answer is rejected.
 
-The brief quotes no spec. When `spec_folder` is set, read `<spec_folder>/spec.md` in the checkout
-yourself.
+The brief quotes no spec. When `spec_folder` is set, read the section of `<spec_folder>/spec.md` under
+the heading `### User Story <user_story>`, and what the spec excludes, in the checkout yourself. The PR
+implements that story alone: the requirements of other stories are not its to meet.
 
 ## Rule on each finding
 

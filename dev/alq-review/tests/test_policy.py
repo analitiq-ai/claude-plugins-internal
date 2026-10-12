@@ -7,13 +7,14 @@ import ledger
 import policy
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
-SPEC = "specs/019-demo"
+SPEC = "specs/019-demo/spec.md § User Story 2"
+UNBOUND = "'<folder>/spec.md § User Story <N>' | null"
 BOUND_BLOB, HEAD_BLOB = "d" * 40, "e" * 40
 # Each binding a PR can have, with what the review call's `spec` must read for it: the PR's own value, quoted so
 # the agent cannot pass another, or both forms when nothing is bound yet.
 BINDINGS = (({"spec": SPEC, "spec_blob": BOUND_BLOB}, f"'{SPEC}'"),
             ({"spec": None, "spec_blob": None}, "null"),
-            ({}, "'<spec folder>' | null"))
+            ({}, UNBOUND))
 
 
 def review_call(stage, spec_arg):
@@ -61,7 +62,8 @@ def verdict_locked(verdict="RESHAPE_SPEC"):
 
 
 # What a lock reason must say for each hold, so the user sees every hold one unlock releases.
-SPEC_HOLD_NAMES = (SPEC, BOUND_BLOB, HEAD_BLOB, f"git diff {BOUND_BLOB} {HEAD_BLOB}")
+SPEC_HOLD_NAMES = (f"The spec.md that `{SPEC}` names changed after this PR was bound to it", BOUND_BLOB, HEAD_BLOB,
+                   f"git diff {BOUND_BLOB} {HEAD_BLOB}")
 VERDICT_LOCK_NAMES = ("which root is canonical?",)
 SPENT_AUDITS_NAMES = ("not converging",)
 
@@ -75,7 +77,7 @@ class ReviewCall(unittest.TestCase):
                     state.update(binding)
                     self.assertEqual(policy.review_call(state, stage), review_call(stage, spec_arg))
             with self.subTest(stage=stage, state=None):
-                self.assertEqual(policy.review_call(None, stage), review_call(stage, "'<spec folder>' | null"))
+                self.assertEqual(policy.review_call(None, stage), review_call(stage, UNBOUND))
 
 
 class Mutation(unittest.TestCase):
@@ -120,7 +122,7 @@ class Mutation(unittest.TestCase):
         self.assertFalse(policy.locked(state))
         self.assertTrue(mutation(state).allow)
 
-    def test_a_spec_hold_names_the_folder_both_blobs_the_diff_and_the_unlock(self):
+    def test_a_spec_hold_names_the_bound_story_value_both_blobs_the_diff_and_the_unlock(self):
         reason = mutation(spec_held_state(T0 + timedelta(hours=1))).reason
         for named in (*SPEC_HOLD_NAMES, "`unlock #7`"):
             self.assertIn(named, reason)

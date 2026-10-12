@@ -51,23 +51,35 @@ that is under review.
    round whose base cannot be read is refused. Later rounds review only what changed since the
    previous round, and reviewers are told what has already been ruled on. Re-running a round on an
    unchanged commit is refused.
-   Every review-round launch, audits included, names in `args.spec` the spec its PR is reviewed against: a
-   spec folder's path from the repo root, or `null` for a change that needs no spec. The launch is refused,
-   with the call to make, when `spec` is missing or is neither `null` nor a non-empty string. A folder is
-   refused, naming the step, when its path is absolute, has a `..` segment, is not in a folder named
-   `specs` or is not written the one way git names it (`shape`), or when its `spec.md` is missing or empty at the commit the round reviews, or git
-   cannot read it there (`spec.md`). The gate reads nothing else in the folder. The first round that opens
-   binds the PR to that value and, for a folder, to the blob id of its `spec.md`; the value never changes,
-   and a launch that names another is refused with both. Each internal reviewer is told to read the bound
-   folder's `spec.md`: every requirement it states that the change does not meet is a finding, and what it
-   excludes bounds what may be asked for. The assessor's brief names the same folder. Under `null`, reviewers
-   are told the change needs no spec and to raise no finding about an unmet requirement of one. Audit
-   reviewers are not given the spec. When `spec.md` at the commit of a review-round or assess-round launch is
-   not the bound text, the launch is refused with the `git diff` from the bound blob to that one (git's error
-   in its place when it cannot make the diff), and the PR is held as a `RESHAPE_SPEC`
-   ruling holds it (2); each launch while it is held is refused with the diff again. After the user's
-   `unlock`, the next review-round or assess-round launch that gets through binds `spec.md` as it then is. Any
-   launch whose spec check passes clears the hold, so a later change, a re-scope's included, is held again.
+   Every review-round launch, audits included, names in `args.spec` the user story its PR implements, as
+   `<folder>/spec.md § User Story <N>` (a spec folder's path from the repo root, and a story number of its
+   `spec.md`), the notation of the PR header's `Implements:` line, or `null` for a PR that is not a user story.
+   The launch is refused, with the call to make, when `spec` is missing or is neither `null` nor that form, with
+   single spaces and no leading zero. The folder is refused, naming the step, when its path is absolute, has a
+   `..` segment, is not in a folder named `specs` or is not written the one way git names it (`shape`), or when
+   its `spec.md` is missing or empty at the commit the round reviews, or git cannot read it there (`spec.md`).
+   That `spec.md` must have a line starting `### User Story <N>`, the number ending at a word boundary: a launch
+   whose `spec.md` has none is refused, naming the heading (`heading`). A heading in a fenced code block counts.
+   The gate reads nothing else in the folder. Each review-round launch reads the PR body: its first line
+   starting `Implements:` must name the same folder and story as the value, must be there for a story and must
+   be absent for `null`, or the launch is refused, quoting the line or naming the one to add (`header`). A body
+   `gh` cannot read refuses the launch as a check that could not run (`header`). The first round that opens
+   binds the PR to the whole value and, for a story, to the blob id of its `spec.md`; the value never changes,
+   and a launch that names another is refused with both. A PR bound to a value that is not a story value, as a
+   bare folder bound before stories were named is, is refused at its review-round and assess-round launches and
+   at the `unlock` of a reshape lock on it, naming the next step: close the PR and open a new one. Each internal
+   reviewer is told to read the section under the bound story's heading in its `spec.md`, and what the spec
+   excludes: every acceptance scenario of that story the change does not meet is a finding, what the spec excludes
+   bounds what may be asked for, and the requirements of other stories are not the PR's. The assessor's brief
+   names the folder and the story number (`spec_folder`, `user_story`). Under `null`, reviewers are told the
+   change needs no spec and to raise no finding about an unmet requirement of one. Audit reviewers are not given
+   the spec. An assess-round launch checks the bound `spec.md` and its story heading at its commit, and does not
+   read the PR body. When `spec.md` at the commit of a review-round or assess-round launch is not the bound text,
+   the launch is refused with the `git diff` from the bound blob to that one (git's error in its place when it
+   cannot make the diff), and the PR is held as a `RESHAPE_SPEC` ruling holds it (2); each launch while it is held
+   is refused with the diff again. After the user's `unlock`, the next review-round or assess-round launch that
+   gets through binds `spec.md` as it then is. Any launch whose spec check passes clears the hold, so a later
+   change, a re-scope's included, is held again.
 6. **Claims are checked before they are committed.** Every `git commit` an agent runs, with or without a PR,
    is refused until the `claim-check` workflow has checked that exact staged tree. Readers label each hunk
    code, prose or mixed and quote each claim its text makes, in one of the categories `scripts/briefs.py`
@@ -118,13 +130,13 @@ that is under review.
 ## How an agent uses it
 
 ```
-Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', spec: '<spec folder>'})                  # internal review
-Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', spec: null})                             # internal review, no spec
-Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', stage: 'audit', spec: '<spec folder>'})  # anti-pattern audit
-Workflow(name='alq-review:assess-round', args={worktree: '/abs/checkout'})                                         # after the poller reports findings
-Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout'})                                          # before git commit
+Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', spec: '<folder>/spec.md § User Story <N>'})                  # internal review
+Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', spec: null})                                                 # internal review, no spec
+Workflow(name='alq-review:review-round', args={worktree: '/abs/checkout', stage: 'audit', spec: '<folder>/spec.md § User Story <N>'})  # anti-pattern audit
+Workflow(name='alq-review:assess-round', args={worktree: '/abs/checkout'})                                                             # after the poller reports findings
+Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout'})                                                              # before git commit
 Workflow(name='alq-review:claim-check', args={worktree: '/abs/checkout', contests: [{claim: 'claim-<id>', evidence: 'path:line'}]})
-Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout'})                                           # before git commit
+Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout'})                                                               # before git commit
 Workflow(name='alq-review:shim-check', args={worktree: '/abs/checkout', contests: [{site: '<id>', reason: '<why>'}]})
 ```
 
@@ -139,8 +151,9 @@ The refusals of a launch's `spec` (5) are made that way: in `log` mode the round
 binds nothing, and a changed `spec.md` holds nothing, leaves the binding as it was and does not release a hold
 recorded before.
 A workflow launched without `args.worktree`, a review or assess launch whose round cannot open (no open PR, a
-review base that cannot be read, no round awaiting assessment), an agent's rejected output, a shim sweeper's read
-outside its snapshot and `scripts/pre_merge_gate.py` refuse in either mode.
+review base that cannot be read, no round awaiting assessment, a PR bound to a value that is not a story value),
+an agent's rejected output, a shim sweeper's read outside its snapshot and `scripts/pre_merge_gate.py` refuse in
+either mode.
 
 The claim check (6) has its own `claim_checks` setting, overridden by `ALQ_REVIEW_CLAIM_CHECKS`, and refuses
 only when both settings enforce. `claim_warn_over` (20) is the number of judged claims above which the
@@ -192,9 +205,10 @@ In the state folder:
 - `ledger.db` - one SQLite file, WAL mode, every write inside a `BEGIN IMMEDIATE` transaction so
   concurrent writers take turns on it:
   - `ledgers (repo, pr) -> doc` - one row per PR: its rounds, findings, assessments, epoch and unlocks, and its
-    spec binding: `spec`, the spec folder or `null`; `spec_blob`, the blob id of the bound `spec.md` (`null` with
-    no spec); and `spec_held`, the `bound` and `head` blob ids and the `at` stamp of the hold a changed `spec.md`
-    put on the PR, until a review-round or assess-round launch whose spec check passes
+    spec binding: `spec`, the story value (`<folder>/spec.md § User Story <N>`) or `null`; `spec_blob`, the blob
+    id of the bound `spec.md` (`null` with no spec); and `spec_held`, the `bound` and `head` blob ids and the `at`
+    stamp of the hold a changed `spec.md` put on the PR, until a review-round or assess-round launch whose spec
+    check passes
   - `open_prs (repo, branch, head) -> pr` - a cache of GitHub's answer to "which PR is open on this branch",
     kept per commit so a new commit asks again; "none" is never kept, since opening a PR does not move the branch
   - `claim_checks (repo, tree)`, `claim_reads (repo, patch_id)`, `claim_verdicts (repo, claim_id)`,
@@ -225,7 +239,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
-| `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
+| `scripts/specbinding.py` | the review-round `spec` argument: the story it names, whether its folder has a spec folder's shape, whether `spec.md` has the story's heading, whether the PR header's `Implements:` line agrees, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |
 | `scripts/lineage.py` | where a piece of text is after an edit: the mapping both checks use to carry a claim or a bug across versions |

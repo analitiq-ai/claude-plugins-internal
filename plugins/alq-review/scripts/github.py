@@ -50,6 +50,12 @@ def pr_head(slug: str, pr: int) -> tuple[str, str] | None:
     return tuple(found.split(" ")) if found else None
 
 
+def pr_body(slug: str, pr: int) -> str | None:
+    # Read as JSON, not through --jq: gh's answer is stripped, and the body's first line must stay as written.
+    found = _gh("pr", "view", str(pr), "--repo", slug, "--json", "body")
+    return json.loads(found)["body"] if found else None
+
+
 def pr_target(slug: str, branch: str) -> tuple[int, str] | None:
     """(number, branch it merges into) of `branch`'s open PR; None when it has none."""
     found = _answer("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "number,baseRefName",

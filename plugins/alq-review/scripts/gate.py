@@ -119,11 +119,12 @@ def _reshape_brief(state: dict, ruling: dict) -> str:
     """The RESHAPE_SPEC ruling the user carries to planning by hand: nothing else hands it over."""
     opened = f"It was held by a RESHAPE_SPEC ruling. Open decision: {ruling['user_decision']}"
     spec = briefs.bound_spec(state)
-    if not isinstance(spec, specbinding.Folder):
+    if not isinstance(spec, specbinding.Story):
         return (f"{opened} This PR has no spec. Close it and restart the work on a new PR bound to a spec that settles "
                 "this decision.")
     gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
-    return (f"{opened} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}. Spec folder: {spec.path}.")
+    return (f"{opened} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}. "
+            f"Spec: {specbinding.story_value(spec)}.")
 
 
 SWITCHED_OFF_WORKFLOWS = (*ROUND_WORKFLOWS, claimgate.CHECK, shimgate.CHECK)
@@ -208,9 +209,13 @@ def _unlock(payload: dict, ref: str) -> dict:
 
     def refs(states):
         return ", ".join(f"{s['repo']}#{s['pr']}" for s in states)
-    if len(named) == 1:
-        # Read before the release: once unlocked, no ruling holds the branch.
-        ruling = policy.reshape_spec_ruling(named[0])
+    # Read before the release: once unlocked, no ruling holds the branch.
+    ruling = policy.reshape_spec_ruling(named[0]) if len(named) == 1 else None
+    unbriefed = ruling and specbinding.binding_problem(named[0].get("spec"))
+    if unbriefed:
+        said = (f"{refs(named)} was not unlocked: the ruling that holds it is handed over with its bound spec. "
+                f"{unbriefed}")
+    elif len(named) == 1:
         brief = _reshape_brief(named[0], ruling) if ruling else ""
         with ledger.open_ledger(named[0]["repo"], named[0]["pr"]) as state:
             ledger.unlock(state, f"user prompt: {first_line(payload['prompt'])[:200]}", datetime.now(timezone.utc))
@@ -438,21 +443,28 @@ def _spec_md_blob(root: str, head: str, folder: str) -> str | None:
     return None
 
 
-def _head_spec_md(root: str, head: str, folder: str, restore: str) -> tuple[str | None, str | None]:
-    """(the blob id of `folder`/spec.md at `head`, None), or (None, the refusal) when it is missing, empty or git
-    cannot read it. `restore` is the next step when it is missing or empty."""
+def _head_spec_md(root: str, head: str, story: specbinding.Story, restore: str) -> tuple[str | None, str | None]:
+    """(the blob id of `story`'s spec.md at `head`, None), or (None, the refusal) when it is missing, empty, has no
+    heading for the story or git cannot read it. `restore` is the next step when it is missing, empty or headless."""
+    path = f"{story.folder}/spec.md"
     try:
-        blob = _spec_md_blob(root, head, folder)
+        blob = _spec_md_blob(root, head, story.folder)
+        text = None if blob is None else worktree.git(root, "cat-file", "blob", f"{head}:{path}")
     except RuntimeError as exc:
-        return None, f'Step "spec.md": git could not read {folder}/spec.md at {head}: {exc}'
+        return None, (f'Step "spec.md": git could not read {path} at {head}: {exc}. Next step: make git able to read '
+                      "it there, then launch again.")
     if blob is None:
-        return None, (f'Step "spec.md": {folder}/spec.md is missing or empty at {head}, the commit this round '
+        return None, (f'Step "spec.md": {path} is missing or empty at {head}, the commit this round '
                       f"reviews, and the round is reviewed against it. Next step: {restore}.")
+    unheaded = specbinding.heading_problem(text, story.number)
+    if unheaded:
+        return None, (f'Step "heading": at {head}, the commit this round reviews, {story.folder}/{unheaded}. Next '
+                      f"step: {restore}.")
     return blob, None
 
 
-def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
-    """HEAD's spec.md of the PR's bound folder, `head_blob`, against the text the PR is bound to."""
+def _spec_text(state: dict, story: specbinding.Story, root: str, head: str, head_blob: str) -> SpecStep:
+    """HEAD's spec.md of the PR's bound story, `head_blob`, against the text the PR is bound to."""
     bound, held = state["spec_blob"], state.get("spec_held")
     step = specbinding.text_step(bound, head_blob, None if held is None else held["at"], state["unlocked_at"])
     if step == "same":
@@ -464,55 +476,69 @@ def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
     except RuntimeError as exc:
         # The blob ids already show the text changed; the diff only shows how.
         shown = f"git could not make the diff: {exc}"
-    return SpecStep({}, f"{state['spec']}/spec.md at {head} is not the text this PR was bound to (blob {bound}, now "
+    return SpecStep({}, f"{story.folder}/spec.md at {head} is not the text this PR was bound to (blob {bound}, now "
                         f"{head_blob}):\n{shown}\nA PR is reviewed against the spec it was bound to, so it is held until "
                         "the user releases it. Stop and ask the user whether this PR now builds to the changed spec; they "
                         f"release it by starting their next prompt with `unlock {policy.unlock_ref(state)}`.",
                     holds={"bound": bound, "head": head_blob})
 
 
-def _spec_step(args: dict, state: dict, stage: str, root: str, head: str) -> SpecStep:
-    """A review-round launch's `spec`, checked in this order: present, null or a non-empty string, the folder's
-    shape, the PR's binding, its spec.md at `head` (the commit the round reviews), then the bound text."""
+def _header_problem(slug: str, pr: int, given: specbinding.Story | specbinding.NoSpec) -> str | None:
+    """The refusal when PR `pr`'s header disagrees with `given`, or gh cannot read it; None when it agrees."""
+    body = github.pr_body(slug, pr)
+    if body is None:
+        return (f'Step "header": gh could not read the body of {slug}#{pr}, so whether its '
+                f"`{specbinding.IMPLEMENTS}` line agrees with this launch's spec could not be checked. Next step: check "
+                "`gh auth status`, then launch again.")
+    problem = specbinding.header_problem(body, given)
+    return problem and f'Step "header": {problem}'
+
+
+def _spec_step(args: dict, state: dict, stage: str, root: str, head: str, slug: str, pr: int) -> SpecStep:
+    """A review-round launch's `spec`, checked in this order: present, null or a story value, its folder's shape, the
+    PR's binding, the header of PR `pr` of `slug`, the story's spec.md and heading at `head` (the commit the round
+    reviews), then the bound text."""
     review_call = policy.review_call(state, stage)
     if "spec" not in args:
-        return SpecStep({}, "args.spec is missing: a review round names the spec folder its PR is reviewed against, "
+        return SpecStep({}, "args.spec is missing: a review round names the user story its PR is reviewed against, "
                             f"or null for a change that needs no spec. Next step: {review_call}.")
     try:
         given = specbinding.parse(args["spec"])
     except ValueError as exc:
         return SpecStep({}, f"{exc}. Next step: {review_call}.")
-    value = given.path if isinstance(given, specbinding.Folder) else None
-    if value is not None:
-        problem = specbinding.shape_problem(value)
+    if isinstance(given, specbinding.Story):
+        problem = specbinding.shape_problem(given.folder)
         if problem:
             return SpecStep({}, f'Step "shape": {problem}. Next step: name the spec folder by its path from the repo '
                                 f"root, {review_call}.")
     if "spec" in state:
-        other = specbinding.bind(state["spec"], value)
+        other = specbinding.bind(state["spec"], args["spec"])
         if other:
             return SpecStep({}, other)
-    if value is None:
+    unheaded = _header_problem(slug, pr, given)
+    if unheaded:
+        return SpecStep({}, unheaded)
+    if isinstance(given, specbinding.NoSpec):
         return SpecStep({} if "spec" in state else {"spec": None, "spec_blob": None})
-    head_blob, unread = _head_spec_md(root, head, value, f"commit it, then {review_call}")
+    head_blob, unread = _head_spec_md(root, head, given, f"commit it, then {review_call}")
     if unread:
         return SpecStep({}, unread)
     if "spec" not in state:
-        return SpecStep({"spec": value, "spec_blob": head_blob})
-    return _spec_text(state, root, head, head_blob)
+        return SpecStep({"spec": args["spec"], "spec_blob": head_blob})
+    return _spec_text(state, given, root, head, head_blob)
 
 
 def _assess_spec_step(state: dict, root: str, head: str) -> SpecStep:
-    """An assess-round launch's check of the bound spec.md at `head`; a PR bound to null or to nothing has none."""
-    folder = state.get("spec")
-    if folder is None:
+    """An assess-round launch's check of the bound story's spec.md at `head`; a PR bound to null or to nothing has
+    none."""
+    if state.get("spec") is None:
         return SpecStep({})
+    story = specbinding.parse(state["spec"])
     # A round awaiting assessment lets no agent commit, so only the user can put spec.md back.
-    head_blob, unread = _head_spec_md(root, head, folder,
-                                      "stop and ask the user to restore it with a commit of their own")
+    head_blob, unread = _head_spec_md(root, head, story, "stop and ask the user to restore it with a commit of their own")
     if unread:
         return SpecStep({}, unread)
-    return _spec_text(state, root, head, head_blob)
+    return _spec_text(state, story, root, head, head_blob)
 
 
 def _refuse_spec(payload: dict, action: str, spec: SpecStep, event: Target, state: dict, now: datetime) -> dict | None:
@@ -554,6 +580,10 @@ def on_workflow(payload: dict) -> dict | None:
     event = Target(where.slug, pr, where.branch, where.root)
     head = worktree.head_sha(where.root)
     with ledger.open_checkouts_ledger(where.slug, pr, where.branch, head) as state:
+        # Refused in log mode too: a round's briefs name the bound story, and this binding names none.
+        unbound = specbinding.binding_problem(state.get("spec"))
+        if unbound:
+            return block(payload, action, unbound, event)
         if call["name"] == ASSESS_ROUND:
             decision = policy.launch_assess(state)
             if not decision.allow:
@@ -573,7 +603,7 @@ def on_workflow(payload: dict) -> dict | None:
             rnd.update(root=where.root, session=payload["session_id"])
             injected = briefs.assess_args(state, rnd, where)
         else:
-            spec = _spec_step(args, state, stage, where.root, head)
+            spec = _spec_step(args, state, stage, where.root, head, where.slug, pr)
             if spec.refusal:
                 refused = _refuse_spec(payload, action, spec, event, state, now)
                 if refused:
