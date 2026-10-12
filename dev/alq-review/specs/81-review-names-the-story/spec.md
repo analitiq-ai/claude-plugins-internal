@@ -18,11 +18,13 @@ ADR-0019.
   `<folder>` is a spec folder's path from the repo root; `<N>` is a story number of its `spec.md`. It has one
   spelling: nothing before or after it, one ASCII space on each side of `§` and between `Story` and `<N>`, and
   `<N>` with no leading zero. So two story values name the same folder and story exactly when they are the same
-  string.
+  string. Each input says where its value starts and ends: `args.spec` and the binding are the whole string, the
+  Implements line's value is defined below; the one spelling is checked on that, nothing stripped from it.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
-- **Implements line**: the PR body's first line that starts `Implements:`, wherever it is in the body. A story
-  PR's is `Implements: <story value>`.
+- **Implements line**: the PR body's first line that starts `Implements:`, wherever it is in the body. A line ends
+  at `\n` or `\r\n`, which is not part of it. Its value is the rest of the line after `Implements:`, without the
+  spaces and tabs around it. A story PR's is `Implements: <story value>`.
 
 ## Today
 
@@ -58,8 +60,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
    (Priority: P2)` at the reviewed commit, and a PR body whose first `Implements:` line is the same value, **When**
    the round launches, **Then** it opens, and the PR is bound to the whole value and the `spec.md` blob id.
 2. **Given** a value that is not `<folder>/spec.md § User Story <N>` or `null` (a bare folder, `§ US2`,
-   `User Story 02`, `User Story 0`, `<folder>/spec.md  §  User Story 2`, a value with a space before it), **When**
-   the round launches, **Then** it is refused, and the message names the form.
+   `User Story 02`, `User Story 0`, `<folder>/spec.md  §  User Story 2`, a value with a space before or after
+   it), **When** the round launches, **Then** it is refused, and the message names the form.
 3. **Given** a folder that fails today's shape checks, **When** the round launches, **Then** it is refused as
    today (`shape`).
 4. **Given** a `spec.md` with no story heading for `<N>` at the reviewed commit, **When** the round launches,
@@ -96,7 +98,10 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 - The PR body has two lines that start `Implements:`, the second in prose further down: the first one counts. A
   body whose only such line is in prose further down: that line counts.
-- An `Implements:` line whose value is not in the story form: refused, quoting the line and naming the form.
+- An `Implements:` line whose value is not in the story form, `§` with two spaces before it included: refused,
+  quoting the line and naming the form.
+- A body with `\r\n` line ends, or an Implements line with no space or several spaces after `Implements:` or
+  spaces after the value: the value is read as defined in Terms, and a story value in its one spelling counts.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
   heading is checked again in it. A heading the change removed refuses the launch.
@@ -108,8 +113,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Functional Requirements
 
-- **FR-001**: `args.spec` MUST be a story value, in its one spelling, or `null`. Any other value, another spelling
-  of a story value included, MUST be refused, naming the form.
+- **FR-001**: `args.spec`, the whole string with nothing stripped, MUST be a story value in its one spelling, or
+  `null`. Any other value, another spelling of a story value included, MUST be refused, naming the form.
 - **FR-002**: The folder of a story value MUST pass today's shape checks.
 - **FR-003**: `<folder>/spec.md` at the commit a launch checks MUST hold the story heading for `<N>`, matched at a
   word boundary after the number. One pure function decides it, for review-round and assess-round launches alike.
@@ -117,8 +122,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
   with another value MUST be refused.
 - **FR-005**: At every review-round launch the gate MUST read the PR body. Its first line that starts
   `Implements:` MUST name the same folder and story as a non-null value, MUST be present for a non-null value, and
-  MUST be absent for `null`. The line's value MUST be parsed by the same function as `args.spec`. One pure function
-  decides the comparison.
+  MUST be absent for `null`. The line's value, as Terms defines it, MUST be parsed by the same function as
+  `args.spec`. One pure function decides the comparison.
 - **FR-006**: A PR body `gh` cannot read MUST refuse the launch as a check that could not run (P4).
 - **FR-007**: The refusals of FR-001 to FR-006 MUST follow the plugin's `mode`, as today's `spec` refusals do.
 - **FR-008**: Every refusal MUST name the next legal step (P1).
@@ -134,7 +139,8 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Key Entities
 
-- **Story value**: folder and story number, parsed from `args.spec` and from the Implements line by one function.
+- **Story value**: folder and story number, parsed by one function from the bounded value of each input: the whole
+  of `args.spec`, the Implements line's value (Terms), the whole stored binding.
 - **Binding**: the PR's ledger fields `spec` (the whole value, or `null`) and `spec_blob`, as today, read only
   through the function that parses `args.spec`, which gives its folder and story. No reader uses the raw string as
   a folder.
