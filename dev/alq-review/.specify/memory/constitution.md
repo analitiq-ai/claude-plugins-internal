@@ -80,8 +80,9 @@ approved to release it (the user or another system) and the one action by which 
 Nothing else may release the hold, lower it or start it again. A hold with no named approver,
 or with any second way out, fails the gate.
 
-Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 7, 8; State: `unlock`; Layout:
-`scripts/pre_merge_gate.py`, the org gate's release).
+Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
+`scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
+`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -96,16 +97,7 @@ Gate: when a reader, judge, model or service the plan depends on does not answer
 reported as a failed check or a named `cannot verify` — never as a pass, never as a finding
 against the author, and never as a guess?
 
-Source: `plugins/alq-review/README.md` (What it enforces 2, 7; Mode: the shim check).
-
-### P5. Settled Design, Existing Tools First
-
-Gate: does every mechanism in `plan.md` cite a `research.md` decision carrying Decision,
-Rationale and Existing tools (or `None fit. Looked at: <where>`), so nothing is hand-rolled
-before what already exists was looked at?
-
-Source: `plugins/alq-review/README.md` (What it enforces 6);
-`plugins/alq-review/scripts/settled_design.py`.
+Source: `plugins/alq-review/README.md` (What it enforces 2, 5, 6; Mode: the shim check).
 
 ## Platform Constraints
 
@@ -115,19 +107,19 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   `.claude-plugin/marketplace.json`; `dev/<name>/` holds what the plugin is built with (this
   project, its `specs/<nnn>-<feature>/` and its `tests/`) and is never installed (`README.md`).
 - Tests: CI runs every `tests/` folder under `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
-- The spec-folder, claim and shim checks each have a `log` / `enforce` setting beside the
-  plugin's mode (`plugins/alq-review/README.md`: Mode).
+- The claim and shim checks each have a `log` / `enforce` setting beside the plugin's mode; the
+  review-round `spec` check follows the plugin's mode alone (`plugins/alq-review/README.md`: Mode).
 - Where the plugin keeps its state: `plugins/alq-review/README.md` (State).
 - Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins
-  (`plugins/alq-review/README.md`, last line).
+  (`plugins/alq-review/README.md`, end of Layout).
 - Private repo: Principle II's public-repo limits bind what the plugin writes into public repos,
   not this repo's own files.
 
 ## Delivery Workflow
 
 Not gates — context so `/speckit-tasks` shapes tasks to fit: issue-numbered branch, worktree at
-`.claude/worktrees/<n>`, draft PR, internal review rounds, then merge on a clean round and green
-CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
+`.claude/worktrees/<n>`, draft PR, then the review loops and the pre-merge checklist. Owned by the
+organisation's `.claude/rules/github-workflow.md` and
 `.claude/rules/pr-review-loop.md`. Decision records go in `dev/alq-review/docs/adr/`. The adrkit
 `after_plan` hook is optional: it offers to check a plan against them.
 
@@ -141,9 +133,9 @@ CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
 - Amending a plugin principle: change its source file first, in its own PR (Principle VI),
   then amend this document and bump its version — MAJOR for removing or redefining a principle,
   MINOR for adding a principle or section, PATCH for wording.
-- The repo is private, so the constitution is committed here. Another plugin in the repo has its
-  own Spec Kit project and constitution; nothing here binds it.
+- The repo is private, so the constitution is committed here. Every other plugin in the repo has
+  its own Spec Kit project and constitution; nothing here binds them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-06
+**Version**: 2.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-12

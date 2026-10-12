@@ -9,10 +9,10 @@ tags: [claim-check, shim-check, holds]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0014"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{claimcheck,claimgate,shimcheck,shimgate,ledger}.py"
+    pattern: "plugins/alq-review/scripts/{claimcheck,claimgate,shimcheck,shimgate,ledger,lineage}.py"
   - type: path
     pattern: "dev/alq-review/specs/{005-claim-check-gate,006-shim-check-gate}/**"
 provenance:
@@ -84,6 +84,12 @@ Known gap: we will not follow text that is moved and reworded in one step. The s
 whose second half lands elsewhere in the file: the half in the rewritten range inherits the lineage, and
 the half in a pure insertion starts a new one.
 
+ADR-0014 amends "holds will not be merged" (point 2) for the shim check: two bugs that one staged change
+overlaps are one bug from then on, at the higher count. A bug also keeps its line ranges, against "a hold will
+carry no line ranges": spec 018 (R9) carries them across edits by the mapping of point 2. In the claim check a
+lineage records where its words are by character, not by line, and lineages merge only when one claim
+inherits several, as point 2 says.
+
 Threat model: the rule is to stop an agent stuck in a loop on one claim. It is not a defence against an agent
 that deletes text and adds it back elsewhere on purpose.
 
@@ -146,9 +152,9 @@ claims of a hunk.
   rulings than the bound; a count that changes after a commit of unrelated work; or users reporting claims
   that got past the bound by being moved and reworded in one step.
 - Revisit if: `diff-match-patch` can no longer be used, or a tool appears that follows a sentence across
-  versions without a threshold (constitution P5).
+  versions without a threshold.
 
 ## Action items
 
 1. [ ] Amend specs 005 and 006 to this rule, in their own PR, before the code.
-2. [ ] Build it in the order of work of issue #17.
+2. [x] Build it in the order of work of issue #17. Done in #60.

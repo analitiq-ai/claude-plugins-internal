@@ -78,15 +78,6 @@ against the author, and never as a guess?
 Source: `plugins/alq-build/skills/root-cause-check/SKILL.md` (verdict CANNOT TELL; The rule
 that keeps this honest).
 
-### P5. Settled Design, Existing Tools First
-
-Gate: does every mechanism in `plan.md` cite a `research.md` decision carrying Decision,
-Rationale and Existing tools (or `None fit. Looked at: <where>`), so nothing is hand-rolled
-before what already exists was looked at?
-
-Source: `plugins/alq-plan/scripts/settled_design.py`; `plugins/alq-plan/speckit/` (the
-settled-design step). alq-build's plans are made by alq-plan's planning, which grades this rule.
-
 ## Platform Constraints
 
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
@@ -104,8 +95,8 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 ## Delivery Workflow
 
 Not gates — context so `/speckit-tasks` shapes tasks to fit: issue-numbered branch, worktree at
-`.claude/worktrees/<n>`, draft PR, internal review rounds, then merge on a clean round and green
-CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
+`.claude/worktrees/<n>`, draft PR, then the review loops and the pre-merge checklist. Owned by the
+organisation's `.claude/rules/github-workflow.md` and
 `.claude/rules/pr-review-loop.md`. Decision records go in `dev/alq-build/docs/adr/`. The adrkit
 `after_plan` hook is optional: it offers to check a plan against them.
 
@@ -124,4 +115,4 @@ CI. Owned by the organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-09
+**Version**: 2.0.0 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-12

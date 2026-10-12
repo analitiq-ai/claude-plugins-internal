@@ -12,13 +12,13 @@ blastRadius: component
 relatesTo: ["0011", "0012", "0016"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{gate,hookio,briefs,settled_design}.py"
+    pattern: "plugins/alq-review/scripts/{gate,hookio,briefs}.py"
   - type: path
     pattern: "plugins/alq-review/workflows/review-round.js"
   - type: path
     pattern: "plugins/alq-review/{config.json,README.md}"
   - type: path
-    pattern: "dev/alq-review/tests/{test_gate,test_settled_design}.py"
+    pattern: "dev/alq-review/tests/test_gate.py"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"
@@ -97,4 +97,4 @@ its `design_documents` list, which ADR-0012, decision 3, already says should not
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Plan issue #63 against this ADR.
+2. [x] Plan issue #63 against this ADR. Done in spec 019, built in #75 and #72.

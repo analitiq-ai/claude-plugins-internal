@@ -219,7 +219,9 @@ main at `7179e9e`; ADRs 0016–0018 as merged in #69 (main at `0fb1766`). Nothin
   two more to the new logs, so alq-plan's also decides the part of ADR-0008 decision 2 about the skill that shapes an
   issue, and what planning does with an issue that needs no spec or is not worth doing. Plugin principles, agreed with the user: alq-plan takes P1 reworded (every planning rule is decided by
   a workflow step that runs a script, since planning has no hooks), P3, P4 and P5; alq-build takes P4 and P5. Neither
-  takes P2: neither has a hold.
+  takes P2: neither has a hold. Changed in #77: alq-build drops P5, as alq-review does, since its sources are
+  alq-plan's and a plugin's constitution names only its own plugin's sources (the user's ruling of 2026-10-12 on
+  alq-review's P5).
 - **Rationale**: governing documents ship apart from the code they govern (constitution VI), so they land before the
   code that moves under them.
 - **Existing tools**: `specify init` and the adrkit draft skill, the tools `dev/alq-review` was built with.
@@ -229,7 +231,7 @@ main at `7179e9e`; ADRs 0016–0018 as merged in #69 (main at `0fb1766`). Nothin
 - **Decision**: (1) the `cto` rule file's review-round call gains `spec`; (2) the alq-review decision records (#69,
   merged as ADR-0016 to ADR-0018); (3) the two new Spec Kit projects with their constitutions and records (R16);
   (4) PR 1, behaviour, with the README items it changes; (5) PR 2, the move; (6) the alq-review constitution
-  amendment, whose P2 and P5 sources change in (4) and (5); (7) a `cto`
+  amendment, whose P2 and P5 sources change in (4) and (5) (#77 removed P5); (7) a `cto`
   follow-up renaming `alq-review:alq-root-cause-check` and `alq-issue-tackle` in the skills that name them. The
   spec's order step that put the constitution and README with the records is corrected to this.
   alq-review is disabled for (1) to (4), and the user reviews those PRs by hand with `/pr-review-toolkit:review-pr`

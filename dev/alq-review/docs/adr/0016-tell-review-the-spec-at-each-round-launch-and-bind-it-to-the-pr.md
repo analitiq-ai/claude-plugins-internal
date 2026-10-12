@@ -14,13 +14,11 @@ affects:
   - type: path
     pattern: "plugins/alq-review/workflows/{review-round,assess-round}.js"
   - type: path
-    pattern: "plugins/alq-review/scripts/{gate,briefs,ledger,speclocation,premise_report}.py"
-  - type: path
-    pattern: "plugins/alq-review/skills/{alq-spec,alq-issue-tackle,alq-root-cause-check}/SKILL.md"
+    pattern: "plugins/alq-review/scripts/{gate,briefs,ledger,policy,specbinding}.py"
   - type: path
     pattern: "plugins/alq-review/README.md"
   - type: path
-    pattern: "dev/alq-review/tests/{test_gate,test_ledger,test_speclocation,test_spec_source,test_premise_report}.py"
+    pattern: "dev/alq-review/tests/{test_gate,test_ledger,test_policy,test_spec_source,test_specbinding}.py"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"
@@ -135,4 +133,4 @@ and never finds it, and that the location comment goes.
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Plan issue #63 against this ADR.
+2. [x] Plan issue #63 against this ADR. Done in spec 019, built in #75 and #72.

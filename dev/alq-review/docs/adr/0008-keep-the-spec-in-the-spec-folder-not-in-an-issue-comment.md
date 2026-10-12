@@ -12,8 +12,6 @@ blastRadius: component
 relatesTo: ["0016"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/skills/{alq-shape,alq-issue-tackle,alq-root-cause-check,design-doc}/SKILL.md"
-  - type: path
     pattern: "plugins/alq-review/scripts/{github,briefs,gate}.py"
   - type: path
     pattern: "dev/alq-review/{tests/test_spec_source.py,specs/014-review-spec/**}"
@@ -100,5 +98,7 @@ committed beside the comment it drifts from".
 ## Action items
 
 1. [x] The ratifier ratifies this ADR, or sends it back.
-2. [ ] Settle the open points of issue #25 in its spec.
-3. [ ] Change the three skills, the gate's spec reader and the tests in one change.
+2. [x] Settle the open points of issue #25 in its spec. Done in #58, which closed #25.
+3. [x] Change the three skills, the gate's spec reader and the tests in one change. Done in two: #58 changed
+   `alq-issue-tackle`, `alq-root-cause-check`, the gate's spec reader and the tests; `alq-shape` kept the comment until
+   #61 merged it into `design-doc`.
