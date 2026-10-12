@@ -539,13 +539,48 @@ class SpecArgument(Gate):
                 self.header = body
                 self.assertEqual(self.decision(self.launch(spec=self.STORY)[0]), decision)
 
-    def test_an_implements_line_naming_another_folder_or_story_is_refused_quoting_both(self):
+    def test_on_an_unbound_pr_an_implements_line_naming_another_folder_or_story_is_refused_naming_both_ways_out(self):
         for named in (self.SIBLING, self.OTHER_STORY):
             with self.subTest(named=named):
                 self.header = f"Implements: {named}\n\nWhat it does."
                 out, _ = self.launch(spec=self.STORY)
-                self.assertRefused(out, 'Step "header"', f"`{named}`", f"`{self.STORY}`", "Next step:")
+                self.assertRefused(out, 'Step "header"', f"names `{named}`", f"launch with spec `{named}`",
+                                   f"edit the line to `Implements: {self.STORY}`")
                 self.assertNothingBound()
+
+    def test_on_a_bound_pr_an_implements_line_naming_another_story_is_refused_naming_only_the_line_edit(self):
+        self.clean_round(self.STORY)
+        self.commit("b.py", "fixed\n", "fix: b")
+        self.header = f"Implements: {self.SIBLING}\n\nWhat it does."
+        out, _ = self.launch(spec=self.STORY)
+        self.assertRefused(out, 'Step "header"', f"names `{self.SIBLING}`",
+                           f"Next step: edit the line to `Implements: {self.STORY}`.")
+        self.assertNotIn("launch with spec", self.reason(out))
+
+    def test_on_a_pr_bound_to_null_an_implements_line_is_refused_naming_only_its_removal(self):
+        self.clean_round(None)
+        self.commit("b.py", "fixed\n", "fix: b")
+        self.header = f"Implements: {self.STORY}\n\nWhat it does."
+        out, _ = self.launch(spec=None)
+        self.assertRefused(out, 'Step "header"', "Next step: remove the line from the PR body.")
+        self.assertNotIn("launch with spec", self.reason(out))
+
+    def test_the_pr_body_is_read_with_nothing_stripped_at_its_edges(self):
+        cases = {f" Implements: {self.STORY}\n\nWhat it does.": f"Next step: add the line `Implements: {self.STORY}`",
+                 f"What it does.\nImplements: {self.STORY} ": f"`Implements: {self.STORY} `"}
+        for pr, (body, words) in enumerate(cases.items(), 7):
+            with self.subTest(body=body):
+                self.on_pr(pr)
+                self.header = body
+                out, _ = self.launch(spec=self.STORY)
+                self.assertRefused(out, 'Step "header"', words)
+
+    def test_an_empty_pr_body_has_no_implements_line(self):
+        self.header = ""
+        out, _ = self.launch(spec=self.STORY)
+        self.assertRefused(out, 'Step "header"', f"Next step: add the line `Implements: {self.STORY}`")
+        self.on_pr(8)
+        self.assertEqual(self.decision(self.launch(spec=None)[0]), "allow")
 
     def test_an_implements_line_not_in_the_story_form_is_refused_quoting_it_and_naming_the_form(self):
         for spec in (self.STORY, None):
@@ -562,7 +597,7 @@ class SpecArgument(Gate):
         self.assertRefused(out, 'Step "header"', f"`Implements: {self.STORY}`", "Next step: add the line")
         self.assertNothingBound()
 
-    def test_a_null_launch_on_a_pr_body_with_an_implements_line_is_refused_naming_both_ways_out(self):
+    def test_on_an_unbound_pr_a_null_launch_on_a_pr_body_with_an_implements_line_is_refused_naming_both_ways_out(self):
         self.header = f"Implements: {self.STORY}\n\nWhat it does."
         out, _ = self.launch(spec=None)
         self.assertRefused(out, 'Step "header"', f"launch with spec `{self.STORY}`", "or remove the line")

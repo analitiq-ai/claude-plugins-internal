@@ -55,14 +55,17 @@ that is under review.
    `<folder>/spec.md § User Story <N>` (a spec folder's path from the repo root, and a story number of its
    `spec.md`), the notation of the PR header's `Implements:` line, or `null` for a PR that is not a user story.
    The launch is refused, with the call to make, when `spec` is missing or is neither `null` nor that form, with
-   single spaces and no leading zero. The folder is refused, naming the step, when its path is absolute, has a
-   `..` segment, is not in a folder named `specs` or is not written the one way git names it (`shape`), or when
-   its `spec.md` is missing or empty at the commit the round reviews, or git cannot read it there (`spec.md`).
+   single spaces, no leading zero and an ASCII folder and number. The folder is refused, naming the step, when
+   its path is absolute, has a `..` segment, is not in a folder named `specs` or is not written the one way git
+   names it (`shape`), or when its `spec.md` is missing or empty at the commit the round reviews, or git cannot
+   read it there (`spec.md`).
    That `spec.md` must have a line starting `### User Story <N>`, the number ending at a word boundary: a launch
    whose `spec.md` has none is refused, naming the heading (`heading`). A heading in a fenced code block counts.
-   The gate reads nothing else in the folder. Each review-round launch reads the PR body: its first line
-   starting `Implements:` must name the same folder and story as the value, must be there for a story and must
-   be absent for `null`, or the launch is refused, quoting the line or naming the one to add (`header`). A body
+   The gate reads nothing else in the folder. Each review-round launch reads the PR body, GitHub's `body` field
+   as JSON with nothing stripped, cut into lines at `\n` and `\r\n` only: its first line starting `Implements:`
+   must be `Implements: ` and the value with nothing after it, must name the same folder and story as the value,
+   must be there for a story and must be absent for `null`, or the launch is refused, quoting the line or naming
+   the one to add (`header`). For a PR already bound, the refusal names only the edit to the PR body. A body
    `gh` cannot read refuses the launch as a check that could not run (`header`). The first round that opens
    binds the PR to the whole value and, for a story, to the blob id of its `spec.md`; the value never changes,
    and a launch that names another is refused with both. Each internal reviewer is told to read the section

@@ -12,7 +12,13 @@ from specbinding import NoSpec, Story
 FOLDER, OTHER = "dev/alq-review/specs/019-x", "dev/alq-review/specs/020-y"
 VALUE = f"{FOLDER}/spec.md § User Story 2"
 ANOTHER_STORY, ANOTHER_FOLDER = f"{FOLDER}/spec.md § User Story 3", f"{OTHER}/spec.md § User Story 2"
-FORM = "'<folder>/spec.md § User Story <N>' or null"
+# Spec scenario 2: one value per element of the story value's grammar, none of them a story value.
+NOT_STORY_VALUES = (FOLDER, f"{FOLDER}/plan.md § User Story 2", f"{FOLDER}/spec.md § US2",
+                    f"{FOLDER}/spec.md  § User Story 2", f"{FOLDER}/spec.md §  User Story 2",
+                    f"{FOLDER}/spec.md § User  Story 2", f"{FOLDER}/spec.md § user story 2",
+                    f"{FOLDER}/spec.md § User Story 02", f"{FOLDER}/spec.md § User Story 0",
+                    f"{FOLDER}/spec.md § User Story ٢", f"{FOLDER}/spec.md § User Story 2a", f" {VALUE}", f"{VALUE} ")
+FORM ="'<folder>/spec.md § User Story <N>' or null"
 BOUND_BLOB, HEAD_BLOB = "a" * 40, "b" * 40
 EARLIER, LATER = ledger.stamp(T0), ledger.stamp(T0 + timedelta(minutes=5))
 
@@ -25,6 +31,10 @@ def body(*lines):
     return "\n".join(lines)
 
 
+def header_problem(text, given, bound=False):
+    return specbinding.header_problem(text, given, bound=bound)
+
+
 class Parse(unittest.TestCase):
     def test_a_story_value_gives_its_folder_and_story_number(self):
         self.assertEqual(specbinding.parse(VALUE), Story(FOLDER, 2))
@@ -34,13 +44,11 @@ class Parse(unittest.TestCase):
         self.assertEqual(specbinding.parse(None), NoSpec())
 
     def test_a_value_not_in_the_story_form_is_refused_quoting_it_and_naming_the_form(self):
-        for value in (FOLDER, f"{FOLDER}/spec.md", f"{FOLDER}/spec.md § US2", f"{FOLDER}/spec.md § User Story 02",
-                      f"{FOLDER}/spec.md § User Story 0", f"{FOLDER}/spec.md § User Story -1",
-                      f"{FOLDER}/spec.md § User Story 2a", f"{FOLDER}/spec.md § User Story",
-                      f"{FOLDER}/spec.md  § User Story 2", f"{FOLDER}/spec.md § User  Story 2",
-                      f"{FOLDER}/spec.md User Story 2", f"{FOLDER}/plan.md § User Story 2",
-                      f"{FOLDER}/spec.md § user story 2", "/spec.md § User Story 2", f" {VALUE}", f"{VALUE}\n",
-                      f"{VALUE} ", "dev/a b/specs/7/spec.md § User Story 2", "", "   ", "none"):
+        for value in NOT_STORY_VALUES + (
+                f"{FOLDER}/spec.md", f"{FOLDER}/spec.md § User Story -1", f"{FOLDER}/spec.md § User Story",
+                f"{FOLDER}/spec.md User Story 2", f"{FOLDER}/spec.md § User Story ２", f"{FOLDER}/spec.md § User Story 2٢",
+                f"{FOLDER}/spec.md § User Story 2", "dev/café/specs/7/spec.md § User Story 2",
+                "/spec.md § User Story 2", f"{VALUE}\n", "dev/a b/specs/7/spec.md § User Story 2", "", "   ", "none"):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError) as raised:
                     specbinding.parse(value)
@@ -121,59 +129,99 @@ class HeaderProblem(unittest.TestCase):
     STORY = Story(FOLDER, 2)
 
     def test_a_first_implements_line_that_names_the_story_agrees(self):
-        for text in (body(f"Implements: {VALUE}"), body("Summary", "", f"Implements: {VALUE}", "", "More."),
-                     body(f"Implements:   {VALUE}  "), f"Implements: {VALUE}\r\nMore.\r\n",
-                     body(f"Implements:{VALUE}")):
+        for text in (body(f"Implements: {VALUE}"), body("Summary", "", f"Implements: {VALUE}", "", "More.")):
             with self.subTest(text=text):
-                self.assertIsNone(specbinding.header_problem(text, self.STORY))
+                self.assertIsNone(header_problem(text, self.STORY))
+
+    def test_the_value_ends_at_each_line_end_on_its_own(self):
+        for text in (f"Implements: {VALUE}\nMore.", f"Implements: {VALUE}\r\nMore.", f"Summary\nImplements: {VALUE}"):
+            with self.subTest(text=text):
+                self.assertIsNone(header_problem(text, self.STORY))
+
+    def test_a_line_with_anything_before_implements_is_not_the_implements_line(self):
+        for line in (f" Implements: {VALUE}", f"See Implements: {VALUE}"):
+            with self.subTest(line=line):
+                self.assertIsNone(header_problem(body("Summary", line), NoSpec()))
+
+    def test_a_value_not_read_in_its_one_spelling_is_refused_quoting_the_line_and_naming_the_form(self):
+        lines = (f"Implements:{VALUE}", f"Implements:  {VALUE}", f"Implements: {VALUE} ", f"Implements: {VALUE}\t",
+                 f"Implements: {VALUE}\rMore.", f"Implements: {FOLDER}/spec.md  § User Story 2")
+        for given in (self.STORY, NoSpec()):
+            for line in lines:
+                with self.subTest(given=given, line=line):
+                    text = header_problem(body("Summary", line, "More."), given) or ""
+                    self.assertIn(f"`{line}`", text)
+                    self.assertIn("`Implements: <folder>/spec.md § User Story <N>`", text)
+
+    def test_a_bare_carriage_return_ending_the_body_is_inside_the_line(self):
+        line = f"Implements: {VALUE}\r"
+        text = header_problem(body("Summary", line), self.STORY) or ""
+        self.assertIn(f"`{line}`", text)
+        self.assertIn("`Implements: <folder>/spec.md § User Story <N>`", text)
 
     def test_no_implements_line_on_no_spec_agrees(self):
         for text in ("", body("Summary", "", "Fixes the thing.")):
             with self.subTest(text=text):
-                self.assertIsNone(specbinding.header_problem(text, NoSpec()))
+                self.assertIsNone(header_problem(text, NoSpec()))
 
     def test_only_the_first_implements_line_counts(self):
-        self.assertIsNone(specbinding.header_problem(body(f"Implements: {VALUE}", f"Implements: {ANOTHER_STORY}"),
-                                                     self.STORY))
-        text = specbinding.header_problem(body(f"Implements: {ANOTHER_STORY}", f"Implements: {VALUE}"), self.STORY)
+        self.assertIsNone(header_problem(body(f"Implements: {VALUE}", f"Implements: {ANOTHER_STORY}"), self.STORY))
+        text = header_problem(body(f"Implements: {ANOTHER_STORY}", f"Implements: {VALUE}"), self.STORY)
         self.assertIn(f"`{ANOTHER_STORY}`", text or "")
 
     def test_a_line_whose_value_is_not_a_story_value_is_refused_quoting_the_line_and_naming_the_form(self):
         for given in (self.STORY, NoSpec()):
-            for line in (f"Implements: {FOLDER}", f"Implements: {FOLDER}/spec.md § US2", "Implements:",
-                         "Implements: null"):
+            for line in ("Implements:", "Implements: null", *(f"Implements: {value}" for value in NOT_STORY_VALUES)):
                 with self.subTest(given=given, line=line):
-                    text = specbinding.header_problem(body("Summary", line), given) or ""
+                    text = header_problem(body("Summary", line), given) or ""
                     self.assertIn(f"`{line}`", text)
                     self.assertIn("`Implements: <folder>/spec.md § User Story <N>`", text)
                     self.assertIn("Next step:", text)
 
-    def test_a_line_naming_another_folder_or_story_is_refused_quoting_both(self):
+    def test_on_an_unbound_pr_a_line_naming_another_folder_or_story_is_refused_naming_both_ways_out(self):
         for named in (ANOTHER_STORY, ANOTHER_FOLDER):
             with self.subTest(named=named):
-                text = specbinding.header_problem(body(f"Implements: {named}"), self.STORY) or ""
-                self.assertIn(f"`{named}`", text)
-                self.assertIn(f"`{VALUE}`", text)
-                self.assertIn("Next step:", text)
+                text = header_problem(body(f"Implements: {named}"), self.STORY) or ""
+                self.assertIn(f"names `{named}`", text)
+                self.assertIn(f"launch with spec `{named}`", text)
+                self.assertIn(f"edit the line to `Implements: {VALUE}`", text)
+
+    def test_on_a_bound_pr_a_line_naming_another_story_is_refused_naming_only_the_line_edit(self):
+        text = header_problem(body(f"Implements: {ANOTHER_STORY}"), self.STORY, bound=True) or ""
+        self.assertIn(f"names `{ANOTHER_STORY}`", text)
+        self.assertIn(f"Next step: edit the line to `Implements: {VALUE}`.", text)
+        self.assertNotIn("launch with spec", text)
+
+    def test_on_a_pr_bound_to_null_an_implements_line_is_refused_naming_only_its_removal(self):
+        for line in (f"Implements: {VALUE}", f"Implements: {FOLDER}"):
+            with self.subTest(line=line):
+                text = header_problem(body("Summary", line), NoSpec(), bound=True) or ""
+                self.assertIn(f"`{line}`", text)
+                self.assertIn("Next step: remove the line from the PR body.", text)
+                self.assertNotIn("launch with spec", text)
+
+    def test_the_last_line_of_the_body_is_read_with_nothing_stripped(self):
+        line = f"Implements: {VALUE} "
+        self.assertIn(f"`{line}`", header_problem(body("Summary", line), self.STORY) or "")
 
     def test_a_story_with_no_implements_line_is_refused_naming_the_line_to_add(self):
         for text in ("", body("Summary", "", "Fixes the thing."), body(f"implements: {VALUE}"),
                      body(f" Implements: {VALUE}"), body(f"> Implements: {VALUE}")):
             with self.subTest(text=text):
-                refusal = specbinding.header_problem(text, self.STORY) or ""
+                refusal = header_problem(text, self.STORY) or ""
                 self.assertIn(f"Next step: add the line `Implements: {VALUE}`", refusal)
 
-    def test_an_implements_line_on_no_spec_is_refused_naming_both_ways_out(self):
-        text = specbinding.header_problem(body("Summary", f"Implements: {VALUE}"), NoSpec()) or ""
+    def test_on_an_unbound_pr_an_implements_line_on_no_spec_is_refused_naming_both_ways_out(self):
+        text = header_problem(body("Summary", f"Implements: {VALUE}"), NoSpec()) or ""
         self.assertIn(f"`Implements: {VALUE}`", text)
         self.assertIn(f"launch with spec `{VALUE}`", text)
         self.assertIn("remove the line from the PR body", text)
 
     def test_each_refusal_has_its_own_text(self):
-        texts = {specbinding.header_problem(body(f"Implements: {FOLDER}"), self.STORY),
-                 specbinding.header_problem(body(f"Implements: {ANOTHER_STORY}"), self.STORY),
-                 specbinding.header_problem("", self.STORY),
-                 specbinding.header_problem(body(f"Implements: {VALUE}"), NoSpec())}
+        texts = {header_problem(body(f"Implements: {FOLDER}"), self.STORY),
+                 header_problem(body(f"Implements: {ANOTHER_STORY}"), self.STORY),
+                 header_problem("", self.STORY),
+                 header_problem(body(f"Implements: {VALUE}"), NoSpec())}
         self.assertEqual(len(texts), 4)
 
 

@@ -480,14 +480,15 @@ def _spec_text(state: dict, story: specbinding.Story, root: str, head: str, head
                     holds={"bound": bound, "head": head_blob})
 
 
-def _header_problem(slug: str, pr: int, given: specbinding.Story | specbinding.NoSpec) -> str | None:
-    """The refusal when PR `pr`'s header disagrees with `given`, or gh cannot read it; None when it agrees."""
+def _header_problem(slug: str, pr: int, given: specbinding.Story | specbinding.NoSpec, bound: bool) -> str | None:
+    """The refusal when PR `pr`'s header disagrees with `given`, or gh cannot read it; None when it agrees. `bound`:
+    the PR is already bound to `given`."""
     body = github.pr_body(slug, pr)
     if body is None:
         return (f'Step "header": gh could not read the body of {slug}#{pr}, so whether its '
                 f"`{specbinding.IMPLEMENTS}` line agrees with this launch's spec could not be checked. Next step: check "
                 "`gh auth status`, then launch again.")
-    problem = specbinding.header_problem(body, given)
+    problem = specbinding.header_problem(body, given, bound=bound)
     return problem and f'Step "header": {problem}'
 
 
@@ -512,7 +513,7 @@ def _spec_step(args: dict, state: dict, stage: str, root: str, head: str, slug: 
         other = specbinding.bind(state["spec"], args["spec"])
         if other:
             return SpecStep({}, other)
-    unheaded = _header_problem(slug, pr, given)
+    unheaded = _header_problem(slug, pr, given, "spec" in state)
     if unheaded:
         return SpecStep({}, unheaded)
     if isinstance(given, specbinding.NoSpec):

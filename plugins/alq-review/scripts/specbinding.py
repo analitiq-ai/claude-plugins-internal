@@ -12,8 +12,10 @@ from ledger import released
 
 FORM = "'<folder>/spec.md § User Story <N>' or null"
 # Single spaces only, and no zero-padded or zero story: one story has one spelling, as the binding compares strings.
-_STORY_VALUE = re.compile(r"(?P<folder>\S+)/spec\.md § User Story (?P<number>[1-9][0-9]*)")
+# `[!-~]` and `[0-9]` rather than `\S` and `\d`, which also match non-ASCII characters.
+_STORY_VALUE = re.compile(r"(?P<folder>[!-~]+)/spec\.md § User Story (?P<number>[1-9][0-9]*)")
 IMPLEMENTS = "Implements:"
+_VALUE_START = f"{IMPLEMENTS} "
 IMPLEMENTS_FORM = f"`{IMPLEMENTS} <folder>/spec.md § User Story <N>`"
 
 
@@ -65,27 +67,40 @@ def heading_problem(spec_md: str, number: int) -> str | None:
     return f"spec.md has no line starting `### User Story {number}`, the heading of User Story {number}"
 
 
-def header_problem(body: str, given: Story | NoSpec) -> str | None:
-    """The refusal when the PR body's first `Implements:` line disagrees with `given`; None when it agrees."""
-    line = next((line for line in body.splitlines() if line.startswith(IMPLEMENTS)), None)
+def header_problem(body: str, given: Story | NoSpec, *, bound: bool) -> str | None:
+    """The refusal when the PR body's first `Implements:` line disagrees with `given`; None when it agrees. The line's
+    value is everything after `Implements: ` up to the line end, nothing stripped. A PR already `bound` to `given`
+    refuses a launch with any other spec, so its refusals name only the edit to the body."""
+    *ended, last = body.split("\n")
+    # Only the `\r` of a `\r\n` line end leaves the line: a bare `\r`, the body's last one included, stays inside it.
+    lines = [line.removesuffix("\r") for line in ended] + [last]
+    line = next((line for line in lines if line.startswith(IMPLEMENTS)), None)
     if line is None:
         if isinstance(given, NoSpec):
             return None
         return (f"The PR body has no `{IMPLEMENTS}` line, and this launch gives spec `{story_value(given)}`. Next "
                 f"step: add the line `{IMPLEMENTS} {story_value(given)}` to the PR body, then launch again.")
     try:
-        named = parse(line[len(IMPLEMENTS):].strip())
+        named = parse(line[len(_VALUE_START):]) if line.startswith(_VALUE_START) else None
     except ValueError:
-        fix = (f"make it `{IMPLEMENTS} {story_value(given)}`" if isinstance(given, Story) else
-               "remove the line from the PR body, or write it as a story value and launch with spec that value")
+        named = None
+    remove = "remove the line from the PR body"
+    if named is None:
+        if isinstance(given, Story):
+            fix = f"make it `{IMPLEMENTS} {story_value(given)}`"
+        else:
+            fix = remove if bound else f"{remove}, or write it as a story value and launch with spec that value"
         return f"The PR body's first `{IMPLEMENTS}` line, `{line}`, is not {IMPLEMENTS_FORM}. Next step: {fix}."
     if isinstance(given, NoSpec):
+        fix = remove if bound else f"launch with spec `{story_value(named)}`, or {remove}"
         return (f"The PR body's line `{line}` says this PR implements a story, and this launch gives spec null. Next "
-                f"step: launch with spec `{story_value(named)}`, or remove the line from the PR body.")
+                f"step: {fix}.")
     if named != given:
+        edit = f"edit the line to `{IMPLEMENTS} {story_value(given)}`"
+        fix = edit if bound else (f"launch with spec `{story_value(named)}` if that is the story this PR implements, "
+                                  f"or {edit}")
         return (f"The PR body's first `{IMPLEMENTS}` line names `{story_value(named)}`, and this launch gives spec "
-                f"`{story_value(given)}`. Next step: launch with spec `{story_value(named)}` if that is the story this "
-                f"PR implements, or edit the line to `{IMPLEMENTS} {story_value(given)}`.")
+                f"`{story_value(given)}`. Next step: {fix}.")
     return None
 
 
