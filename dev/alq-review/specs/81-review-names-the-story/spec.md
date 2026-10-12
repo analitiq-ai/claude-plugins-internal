@@ -96,13 +96,16 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Edge Cases
 
-- The PR body has two lines that start `Implements:`, the second in prose further down: the first one counts. A
-  body whose only such line is in prose further down: that line counts.
-- An `Implements:` line whose value is not in the story form, `§` with two spaces before it included: refused,
-  quoting the line and naming the form.
-- A body with `\r\n` line ends whose Implements line holds a story value in its one spelling: counts. An
-  Implements line with no space or two spaces after `Implements:`, a space or tab after the value, or a bare `\r`
-  inside the line: refused, quoting the line and naming the form.
+- The Implements line, one case per clause of its definition in Terms. Each refused case quotes the line and names
+  the form.
+  - Which line: of two lines that start `Implements:`, the first counts, the second in prose further down does
+    not; a body whose only such line is further down counts it. A line with anything before `Implements:` (a
+    space, other text) is not an Implements line.
+  - Where the value starts: exactly one ASCII space after `Implements:` counts; no space or two spaces is refused.
+  - Where the value ends: each counts on its own — a line ending `\n`, a line ending `\r\n`, and the body's last
+    line with no line end after the value.
+  - What lies between: a story value in its one spelling counts. Anything else is refused: a space or tab after
+    the value, a bare `\r` inside the line, `§` with two spaces before it, a value not in the story form.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
   heading is checked again in it. A heading the change removed refuses the launch.
