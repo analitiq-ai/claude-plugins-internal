@@ -421,11 +421,10 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
                            f"not be read: {exc}") from exc
 
 
-def _governance(where: worktree.Worktree, rev_range: str) -> decisions.Governance:
+def _governance(where: worktree.Worktree, rev_range: str, deadline: float) -> decisions.Governance:
     """The decisions that govern what `git diff rev_range` changes. An empty variable is an unset one."""
     return decisions.governing(where.root, worktree.files_in(where.root, rev_range),
-                               os.environ.get(decisions.ORG_CORPUS_VAR) or None, shutil.which("adr"),
-                               time.monotonic() + decisions.BUDGET)
+                               os.environ.get(decisions.ORG_CORPUS_VAR) or None, shutil.which("adr"), deadline)
 
 
 @dataclass(frozen=True)
@@ -542,7 +541,7 @@ def _admit_spec(state: dict, spec: SpecStep) -> None:
         state.pop("spec_held", None)
 
 
-def on_workflow(payload: dict) -> dict | None:
+def on_workflow(payload: dict, deadline: float) -> dict | None:
     call = payload["tool_input"]
     if call.get("name") == claimgate.CHECK:
         return claimgate.on_launch(payload, call)
@@ -602,13 +601,9 @@ def on_workflow(payload: dict) -> dict | None:
             governance = None
             if stage != "audit":
                 try:
-                    governance = _governance(where, briefs.review_range(decision, base))
+                    governance = _governance(where, briefs.review_range(decision, base), deadline)
                 except RuntimeError as exc:
                     return block(payload, action, str(exc), event)
-                if governance.record_errors:
-                    return block(payload, action, "Decision records are invalid:\n"
-                                 + "\n".join(governance.record_errors)
-                                 + "\nNext step: fix them, commit, and launch again.", event)
             waves = briefs.waves(stage, governance)
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
@@ -707,12 +702,17 @@ def after_structured_output(payload: dict) -> None:
     record(payload, "output", "recorded", f"{ref} is {rnd['status']}")
 
 
+# hooks.json's timeout for this script; past it the harness kills the hook and reads no answer.
+HOOK_SECONDS = 60
+# Left after the deadline for the gate to save its ledger and print its answer.
+_ANSWER_SECONDS = 5
 PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_bash, "Agent": on_agent,
        "Skill": on_skill, "Workflow": on_workflow, "StructuredOutput": on_structured_output,
        "WebFetch": claimgate.on_webfetch}
 
 
-def handle(payload: dict) -> dict | None:
+def handle(payload: dict, deadline: float) -> dict | None:
+    """`deadline`, a `time.monotonic()`, is when this hook's work must be done for its answer to be read."""
     switch = switch_state(payload)
     off = switch == "off"
     if not off:
@@ -735,7 +735,7 @@ def handle(payload: dict) -> dict | None:
     if event in ("SubagentStart", "SubagentStop"):
         return track_subagent(payload, datetime.now(timezone.utc))
     if event == "PreToolUse" and payload["tool_name"] in PRE:
-        return PRE[payload["tool_name"]](payload)
+        return dict(PRE, Workflow=partial(on_workflow, deadline=deadline))[payload["tool_name"]](payload)
     if event == "PostToolUse" and payload["tool_name"] == "StructuredOutput":
         return after_structured_output(payload)
     return None
@@ -775,9 +775,10 @@ def _deciding_settings(payload: dict) -> tuple:
 
 
 def main() -> None:
+    deadline = time.monotonic() + HOOK_SECONDS - _ANSWER_SECONDS
     payload = json.load(sys.stdin)
     try:
-        out = handle(payload)
+        out = handle(payload, deadline)
     except Exception as exc:  # a broken gate must never stall a session; it says so instead
         trace = traceback.format_exc()
         print(trace, file=sys.stderr)

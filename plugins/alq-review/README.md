@@ -120,9 +120,12 @@ that is under review.
    so a repo decision and an org decision never clash. Only accepted decisions govern. When any does, the
    `decision-reviewer` joins the round with those records and reports where the change contradicts them; its
    findings are assessed with everyone else's. An unset `ALQ_ORG_ADR_DIR` is named in the round's `notices`. A
-   launch is refused, naming the fix, when a corpus cannot be checked (`ALQ_ORG_ADR_DIR` is not an absolute path to
-   a directory, `adr` is not installed, or it fails, prints a report of another shape or takes over 20 seconds in
-   all) or when `adr lint` finds an invalid record in any corpus checked: `adr check` leaves such a record out.
+   launch is refused, naming the fix, when a corpus cannot be checked: `ALQ_ORG_ADR_DIR` is not an absolute path to
+   a directory, `adr` is not installed, or it fails, prints a report of another shape or is still running 55 seconds
+   after the hook started. It is refused too when adrkit did not evaluate every record that could govern the change,
+   since `adr check` leaves those out: an error finding on a record that is not `draft` or `proposed`, a record file
+   it skipped, an `affects` matcher it does not evaluate, or a decision-marker scan that was capped or could not read
+   a file. Findings on `draft` and `proposed` records, and warnings about anything else, do not refuse.
 
 ## How an agent uses it
 

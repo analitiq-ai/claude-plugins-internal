@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import closing
 from pathlib import Path
@@ -1890,9 +1891,28 @@ class DecisionReview(Gate):
         self.assertEqual(result["status"], "CLEAN")
         self.assertEqual(result["notices"], args["notices"])
 
+    def test_a_launch_whose_hook_time_is_spent_gets_the_named_adr_refusal(self):
+        """The deadline is the hook's, taken when the payload arrives: what gh and git fetch spend comes off it."""
+        self.governed()
+        payload = {"tool_use_id": "t0", "hook_event_name": "PreToolUse", "session_id": "s1", "cwd": self.tmp.name,
+                   "tool_name": "Workflow", "tool_input": {"name": REVIEW, "args": {"worktree": str(self.root),
+                                                                                  "spec": None}}}
+        with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=self.mode), clear=True):
+            out = gate.handle(payload, time.monotonic())
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("adr lint", self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
     def test_the_decision_reviewer_is_not_dispatched_alone(self):
         out = self.hook("PreToolUse", "Agent", {"subagent_type": briefs.DECISION_REVIEWER, "prompt": "review"})
         self.assertEqual(self.decision(out), "deny")
+
+
+class HookDeadline(unittest.TestCase):
+    def test_the_gate_s_deadline_is_the_timeout_hooks_json_gives_it(self):
+        hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]["PreToolUse"]
+        [timeout] = [h["timeout"] for entry in hooks for h in entry["hooks"] if h["command"].endswith("/gate.py")]
+        self.assertEqual(gate.HOOK_SECONDS, timeout)
 
 
 if __name__ == "__main__":
