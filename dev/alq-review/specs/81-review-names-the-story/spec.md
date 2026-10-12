@@ -14,17 +14,20 @@ ADR-0019.
 
 ## Terms
 
-- **Story value**: `<folder>/spec.md § User Story <N>`, the notation of a PR body's `Implements:` line.
-  `<folder>` is a spec folder's path from the repo root; `<N>` is a story number of its `spec.md`. It has one
-  spelling: nothing before or after it, one ASCII space on each side of `§` and between `Story` and `<N>`, and
-  `<N>` with no leading zero. So two story values name the same folder and story exactly when they are the same
-  string. Each input says where its value starts and ends: `args.spec` and the binding are the whole string, the
-  Implements line's value is defined below; the one spelling is checked on that, nothing stripped from it.
+- **Story value**: a string that is exactly `<folder>/spec.md § User Story <N>`, ASCII only, with nothing before or
+  after it. Every character outside `<folder>` and `<N>` is the literal shown; each space is one U+0020, so there
+  is one between `spec.md` and `§`, `§` and `User`, `User` and `Story`, and `Story` and `<N>`. `<N>` is
+  `[1-9][0-9]*` in ASCII digits. `<folder>` is a spec folder's path from the repo root that passes today's shape
+  checks. So two story values name the same folder and story exactly when they are the same string. `args.spec`
+  and the binding are each one whole string, checked as it is.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
-- **Implements line**: the PR body's first line that starts `Implements:`, wherever it is in the body. A line ends
-  at `\n` or `\r\n`, which is not part of it, or at the end of the body. Its value is the rest of the line after
-  `Implements: ` (the colon and one ASCII space), nothing stripped. A story PR's is `Implements: <story value>`.
+- **PR body**: the PR's `body` field as GitHub holds it, read as JSON, nothing stripped. An empty body has been
+  read and has no Implements line. A body `gh` does not return is a check that could not run (FR-006).
+- **Line**: the body is cut into lines at `\n` and at `\r\n` only, neither part of a line; the last line ends at
+  the end of the body. A bare `\r` is a character inside a line.
+- **Implements line**: the body's first line that starts `Implements:`. The rest of the line MUST be one U+0020
+  followed by a story value, nothing else; that story value is the line's value.
 
 ## Today
 
@@ -38,6 +41,7 @@ Read at `86a4b06` on 2026-10-12. "Run" means it was run; "read" means read in th
   story's requirements become findings against the PR.
 - The assessor brief carries `spec_folder` and nothing about a story (`briefs.py`, `brief`) (read).
 - The gate never reads a PR body (`plugins/alq-review/scripts/github.py` reads a PR's head and target) (read).
+  Every `gh` answer there passes through `_answer`, which strips its output (read).
 - A review-round launch is refused when its branch has no open PR (`gate.py`, `_open_pr`) (read).
 - In `log` mode the refusals of a launch's `spec` let the round open (`plugins/alq-review/README.md`, Mode) (read).
 
@@ -59,9 +63,11 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 1. **Given** `spec: 'dev/x/specs/7-demo/spec.md § User Story 2'`, a `spec.md` with `### User Story 2 - Reset
    (Priority: P2)` at the reviewed commit, and a PR body whose first `Implements:` line is the same value, **When**
    the round launches, **Then** it opens, and the PR is bound to the whole value and the `spec.md` blob id.
-2. **Given** a value that is not `<folder>/spec.md § User Story <N>` or `null` (a bare folder, `§ US2`,
-   `User Story 02`, `User Story 0`, `<folder>/spec.md  §  User Story 2`, a value with a space before or after
-   it), **When** the round launches, **Then** it is refused, and the message names the form.
+2. **Given** a value that is not a story value or `null`, one per element of the grammar: a bare folder,
+   `<folder>/plan.md § User Story 2`, `§ US2`, two spaces before `§`, two after it, `User  Story 2`,
+   `user story 2`, `User Story 02`, `User Story 0`, `User Story ٢` (a non-ASCII digit), `User Story 2a`, a space
+   before the value, a space after it, **When** the round launches, **Then** it is refused, and the message names
+   the form.
 3. **Given** a folder that fails today's shape checks, **When** the round launches, **Then** it is refused as
    today (`shape`).
 4. **Given** a `spec.md` with no story heading for `<N>` at the reviewed commit, **When** the round launches,
@@ -69,12 +75,15 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
    `1`. `### User Story 1: Sign in` is one for `1`.
 5. **Given** a PR bound to one value, **When** a later launch gives another (another story of the same spec, or
    `null`), **Then** it is refused as today, naming the bound value.
-6. **Given** a PR body whose first `Implements:` line names another folder or story than the value, **When** the
-   round launches, **Then** it is refused, and the message quotes both.
-7. **Given** a non-null value and a PR body with no `Implements:` line, **When** the round launches, **Then** it is
-   refused, and the message names the line to add.
-8. **Given** `spec: null` and a PR body with an `Implements:` line, **When** the round launches, **Then** it is
-   refused, and the message names both ways out: launch with the line's value, or remove the line.
+6. **Given** a PR body whose Implements line names another folder or story than the value, **When** the round
+   launches, **Then** it is refused, and the message quotes both. For a PR not yet bound it names two ways out:
+   launch with the line's value, or make the line `Implements: <value>`. For a bound PR it names only the second,
+   since a launch with another value is refused (scenario 5).
+7. **Given** a non-null value and a PR body with no Implements line, the empty body included, **When** the round
+   launches, **Then** it is refused, and the message names the line to add.
+8. **Given** `spec: null` and a PR body with an Implements line, **When** the round launches, **Then** it is
+   refused. For a PR not yet bound it names two ways out: launch with the line's value, or remove the line. For a
+   PR bound to `null` it names only removing the line.
 9. **Given** `spec: null` and a PR body with no `Implements:` line, **When** the round launches, **Then** it opens,
    and the reviewers are told the change needs no spec, as today.
 10. **Given** a bound story value, **When** the internal reviewers are briefed, **Then** each is told to read the
@@ -96,16 +105,19 @@ a stand-in `gh` that answers the PR body, and read the refusal or the injected r
 
 ### Edge Cases
 
-- The Implements line, one case per clause of its definition in Terms. Each refused case quotes the line and names
+- The PR body and the Implements line, one case per clause of Terms. Each refused case quotes the line and names
   the form.
-  - Which line: of two lines that start `Implements:`, the first counts, the second in prose further down does
-    not; a body whose only such line is further down counts it. A line with anything before `Implements:` (a
-    space, other text) is not an Implements line.
-  - Where the value starts: exactly one ASCII space after `Implements:` counts; no space or two spaces is refused.
-  - Where the value ends: each counts on its own — a line ending `\n`, a line ending `\r\n`, and the body's last
-    line with no line end after the value.
-  - What lies between: a story value in its one spelling counts. Anything else is refused: a space or tab after
-    the value, a bare `\r` inside the line, `§` with two spaces before it, a value not in the story form.
+  - Story value: each grammar element of scenario 2, written on an Implements line, is refused through the same
+    function.
+  - Body: an empty body with `spec: null` opens (scenario 9); with a story value it is scenario 7. The Implements
+    line as the body's first line counts; as its last line with no line end after it, counts. A first line
+    ` Implements: <value>` is not an Implements line. A last line `Implements: <value> ` is refused. These two
+    pin "nothing stripped" at the body's edges.
+  - Line: a line ending `\n` and a line ending `\r\n` each count. A bare `\r` inside the line is refused.
+  - Which line: of two lines that start `Implements:`, the first counts and the second, further down, does not;
+    a body whose only such line is further down counts it. A line with text before `Implements:` is not one.
+  - The rest of the line: one U+0020 and a story value counts. No space, two spaces, or a space or tab after the
+    value is refused.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
   heading is checked again in it. A heading the change removed refuses the launch.
