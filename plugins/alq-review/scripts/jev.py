@@ -90,8 +90,8 @@ def _answers(reply, questions: dict) -> tuple[dict[str, str], float]:
     return chosen, cost
 
 
-# Asked once per check, Jev labelled 619ff3b6, a real fix in tests/fixtures/shim-replay, `not_fix` in 1 of 5 asks,
-# and a change labelled so is not swept. One `fix` in this many asks makes it a fix.
+# With one ask per check, Jev labelled 619ff3b6, a real fix in dev/alq-review/tests/fixtures/shim-replay, `not_fix`
+# in 1 of 5 asks, and a change labelled so is not swept. One `fix` in this many asks makes it a fix.
 KIND_ASKS = 3
 
 
