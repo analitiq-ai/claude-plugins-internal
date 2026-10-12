@@ -211,11 +211,7 @@ def _unlock(payload: dict, ref: str) -> dict:
         return ", ".join(f"{s['repo']}#{s['pr']}" for s in states)
     # Read before the release: once unlocked, no ruling holds the branch.
     ruling = policy.reshape_spec_ruling(named[0]) if len(named) == 1 else None
-    unbriefed = ruling and specbinding.binding_problem(named[0].get("spec"))
-    if unbriefed:
-        said = (f"{refs(named)} was not unlocked: the ruling that holds it is handed over with its bound spec. "
-                f"{unbriefed}")
-    elif len(named) == 1:
+    if len(named) == 1:
         brief = _reshape_brief(named[0], ruling) if ruling else ""
         with ledger.open_ledger(named[0]["repo"], named[0]["pr"]) as state:
             ledger.unlock(state, f"user prompt: {first_line(payload['prompt'])[:200]}", datetime.now(timezone.utc))
@@ -476,10 +472,11 @@ def _spec_text(state: dict, story: specbinding.Story, root: str, head: str, head
     except RuntimeError as exc:
         # The blob ids already show the text changed; the diff only shows how.
         shown = f"git could not make the diff: {exc}"
-    return SpecStep({}, f"{story.folder}/spec.md at {head} is not the text this PR was bound to (blob {bound}, now "
-                        f"{head_blob}):\n{shown}\nA PR is reviewed against the spec it was bound to, so it is held until "
-                        "the user releases it. Stop and ask the user whether this PR now builds to the changed spec; they "
-                        f"release it by starting their next prompt with `unlock {policy.unlock_ref(state)}`.",
+    return SpecStep({}, f"{story.folder}/spec.md at {head} is not the text this PR's User Story {story.number} was "
+                        f"bound to (blob {bound}, now {head_blob}):\n{shown}\nA PR is reviewed against the spec it was "
+                        "bound to, so it is held until the user releases it. Stop and ask the user whether this PR now "
+                        "builds to the changed spec; they release it by starting their next prompt with "
+                        f"`unlock {policy.unlock_ref(state)}`.",
                     holds={"bound": bound, "head": head_blob})
 
 
@@ -580,10 +577,6 @@ def on_workflow(payload: dict) -> dict | None:
     event = Target(where.slug, pr, where.branch, where.root)
     head = worktree.head_sha(where.root)
     with ledger.open_checkouts_ledger(where.slug, pr, where.branch, head) as state:
-        # Refused in log mode too: a round's briefs name the bound story, and this binding names none.
-        unbound = specbinding.binding_problem(state.get("spec"))
-        if unbound:
-            return block(payload, action, unbound, event)
         if call["name"] == ASSESS_ROUND:
             decision = policy.launch_assess(state)
             if not decision.allow:

@@ -192,25 +192,6 @@ class Bind(unittest.TestCase):
                 self.assertIn("never changes", text)
                 self.assertTrue(text.endswith(f"Next step: launch with spec {shown(recorded)}."), text)
 
-    def test_a_binding_that_is_not_a_story_value_is_refused_whatever_the_launch_gives(self):
-        """A PR bound to a bare folder before stories were named: no launch can match it, so it is closed."""
-        for given in (FOLDER, VALUE, None):
-            with self.subTest(given=given):
-                text = specbinding.bind(FOLDER, given) or ""
-                self.assertIn(f"This PR is bound to spec `{FOLDER}`, which is not a story value", text)
-                self.assertIn("never changes", text)
-                self.assertTrue(text.endswith("Next step: close this PR and open a new one."), text)
-
-
-class BindingProblem(unittest.TestCase):
-    def test_a_story_value_or_null_is_a_binding(self):
-        for recorded in (VALUE, None):
-            with self.subTest(recorded=recorded):
-                self.assertIsNone(specbinding.binding_problem(recorded))
-
-    def test_a_bare_folder_is_refused_as_bind_refuses_it(self):
-        self.assertEqual(specbinding.binding_problem(FOLDER), specbinding.bind(FOLDER, VALUE))
-
 
 class TextStep(unittest.TestCase):
     def test_equal_blobs_are_the_same(self):

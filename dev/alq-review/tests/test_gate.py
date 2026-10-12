@@ -520,62 +520,6 @@ class SpecArgument(Gate):
         self.assertRefused(out, 'Step "shape"', f"write it as {self.FOLDER}")
         self.assertNotIn("never changes", self.reason(out))
 
-    def bind_to_a_bare_folder(self):
-        """A PR bound before launches named a story: to the spec folder alone."""
-        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
-            with ledger.open_ledger("acme/demo", 7) as state:
-                state.update(branch="feat/1-demo", spec=self.FOLDER, spec_blob=self.bound)
-
-    def test_a_pr_bound_to_a_bare_folder_is_refused_in_both_modes_naming_close_and_reopen(self):
-        """No brief can be built from a binding that names no story, so log mode has no round to let open."""
-        self.bind_to_a_bare_folder()
-        for mode in ("enforce", "log"):
-            for given in (self.STORY, self.FOLDER, None):
-                with self.subTest(mode=mode, given=given):
-                    self.mode = mode
-                    out, _ = self.launch(spec=given)
-                    self.assertRefused(out, f"`{self.FOLDER}`", "not a story value", "never changes",
-                                       "Next step: close this PR and open a new one.")
-                    self.assertNotIn("crashed", self.reason(out))
-                    self.assertEqual(self.saved()["rounds"], [])
-
-    def test_an_assess_launch_on_a_pr_bound_to_a_bare_folder_is_refused_in_both_modes_naming_close_and_reopen(self):
-        self.bind_to_a_bare_folder()
-        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
-            with ledger.open_ledger("acme/demo", 7) as state:
-                helpers.add_round(state, head=self.head)
-        for mode in ("enforce", "log"):
-            with self.subTest(mode=mode):
-                self.mode = mode
-                out, _ = self.launch(ASSESS)
-                self.assertRefused(out, f"`{self.FOLDER}`", "not a story value",
-                                   "Next step: close this PR and open a new one.")
-                self.assertNotIn("crashed", self.reason(out))
-
-    def test_the_assessor_brief_of_a_pr_bound_to_a_bare_folder_is_refused_naming_close_and_reopen(self):
-        self.bind_to_a_bare_folder()
-        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
-            with ledger.open_ledger("acme/demo", 7) as state:
-                rnd = helpers.add_round(state, head=self.head)
-                rnd["status"] = "awaiting_assessment"
-                ref = rnd["ref"]
-        done = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", ref], env=self.env,
-                              capture_output=True, text=True)
-        self.assertNotEqual(done.returncode, 0)
-        self.assertNotIn("Traceback", done.stderr)
-        for part in (f"`{self.FOLDER}`", "not a story value", "Next step: close this PR and open a new one."):
-            with self.subTest(part=part):
-                self.assertIn(part, done.stderr)
-
-    def test_an_unlock_of_a_reshape_spec_lock_on_a_pr_bound_to_a_bare_folder_unlocks_nothing_naming_close_and_reopen(self):
-        HeldBranch.lock(self, spec=self.FOLDER)
-        said = self.say("unlock #7")
-        for part in (f"`{self.FOLDER}`", "not a story value", "Next step: close this PR and open a new one."):
-            with self.subTest(part=part):
-                self.assertIn(part, said)
-        self.assertNotIn("The user unlocked", said)
-        self.assertRefused(self.edit(), "`unlock #7`")
-
     # --- the PR header ---------------------------------------------------------------------------------
 
     def test_a_launch_reads_the_pr_body_each_time(self):
@@ -756,6 +700,18 @@ class SpecArgument(Gate):
         self.assertIsInstance(state["spec_held"]["at"], str)
         self.assertEqual(state["spec_blob"], self.bound)
         self.assertEqual(len(state["rounds"]), 1)
+
+    def assertNamesTheStoryOfTheChangedSpecMd(self, out):
+        self.assertRefused(out, f"{self.FOLDER}/spec.md at ", "is not the text this PR's User Story 2 was bound to")
+        self.assertNotIn(f"{self.STORY}/spec.md", self.reason(out))
+
+    def test_a_review_launch_that_finds_spec_md_changed_names_its_path_and_the_bound_story(self):
+        self.assertNamesTheStoryOfTheChangedSpecMd(self.held())
+
+    def test_an_assess_launch_that_finds_spec_md_changed_names_its_path_and_the_bound_story(self):
+        self.awaiting_assessment(self.STORY)
+        self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED}, "docs: change the spec")
+        self.assertNamesTheStoryOfTheChangedSpecMd(self.launch(ASSESS)[0])
 
     def test_the_diff_a_hold_shows_is_the_one_git_makes_whatever_the_users_diff_config(self):
         for key, value in (("color.ui", "always"), ("diff.external", "echo rewritten"), ("diff.context", "0"),

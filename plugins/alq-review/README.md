@@ -65,18 +65,16 @@ that is under review.
    be absent for `null`, or the launch is refused, quoting the line or naming the one to add (`header`). A body
    `gh` cannot read refuses the launch as a check that could not run (`header`). The first round that opens
    binds the PR to the whole value and, for a story, to the blob id of its `spec.md`; the value never changes,
-   and a launch that names another is refused with both. A PR bound to a value that is not a story value, as a
-   bare folder bound before stories were named is, is refused at its review-round and assess-round launches and
-   at the `unlock` of a reshape lock on it, naming the next step: close the PR and open a new one. Each internal
-   reviewer is told to read the section under the bound story's heading in its `spec.md`, and what the spec
-   excludes: every acceptance scenario of that story the change does not meet is a finding, what the spec excludes
-   bounds what may be asked for, and the requirements of other stories are not the PR's. The assessor's brief
+   and a launch that names another is refused with both. Each internal reviewer is told to read the section
+   under the bound story's heading in its `spec.md`, and what the spec excludes: every acceptance scenario of
+   that story the change does not meet is a finding, what the spec excludes bounds what may be asked for, and
+   the requirements of other stories are not the PR's. The assessor's brief
    names the folder and the story number (`spec_folder`, `user_story`). Under `null`, reviewers are told the
    change needs no spec and to raise no finding about an unmet requirement of one. Audit reviewers are not given
    the spec. An assess-round launch checks the bound `spec.md` and its story heading at its commit, and does not
    read the PR body. When `spec.md` at the commit of a review-round or assess-round launch is not the bound text,
-   the launch is refused with the `git diff` from the bound blob to that one (git's error in its place when it
-   cannot make the diff), and the PR is held as a `RESHAPE_SPEC` ruling holds it (2); each launch while it is held
+   the launch is refused, naming `<folder>/spec.md` and `User Story <N>`, with the `git diff` from the bound blob
+   to that one (git's error in its place when it cannot make the diff), and the PR is held as a `RESHAPE_SPEC` ruling holds it (2); each launch while it is held
    is refused with the diff again. After the user's `unlock`, the next review-round or assess-round launch that
    gets through binds `spec.md` as it then is. Any launch whose spec check passes clears the hold, so a later
    change, a re-scope's included, is held again.
@@ -151,9 +149,8 @@ The refusals of a launch's `spec` (5) are made that way: in `log` mode the round
 binds nothing, and a changed `spec.md` holds nothing, leaves the binding as it was and does not release a hold
 recorded before.
 A workflow launched without `args.worktree`, a review or assess launch whose round cannot open (no open PR, a
-review base that cannot be read, no round awaiting assessment, a PR bound to a value that is not a story value),
-an agent's rejected output, a shim sweeper's read outside its snapshot and `scripts/pre_merge_gate.py` refuse in
-either mode.
+review base that cannot be read, no round awaiting assessment), an agent's rejected output, a shim sweeper's
+read outside its snapshot and `scripts/pre_merge_gate.py` refuse in either mode.
 
 The claim check (6) has its own `claim_checks` setting, overridden by `ALQ_REVIEW_CLAIM_CHECKS`, and refuses
 only when both settings enforce. `claim_warn_over` (20) is the number of judged claims above which the

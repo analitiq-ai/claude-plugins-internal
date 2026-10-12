@@ -93,23 +93,8 @@ def _shown(value: str | None) -> str:
     return "null" if value is None else f"`{value}`"
 
 
-def binding_problem(recorded: str | None) -> str | None:
-    """The refusal when the PR's binding `recorded` is neither null nor a story value, as a PR bound to a bare
-    folder before stories were named is; None when it is either."""
-    try:
-        parse(recorded)
-    except ValueError:
-        return (f"This PR is bound to spec {_shown(recorded)}, which is not a story value ({FORM}), and a PR's bound "
-                "spec never changes. Next step: close this PR and open a new one.")
-    return None
-
-
 def bind(recorded: str | None, given: str | None) -> str | None:
-    """The refusal when `given` differs from the PR's binding `recorded`, or no value can match it; None when it
-    matches."""
-    unbindable = binding_problem(recorded)
-    if unbindable:
-        return unbindable
+    """The refusal when `given` differs from the PR's binding `recorded`; None when it matches."""
     if recorded == given:
         return None
     return (f"This PR is bound to spec {_shown(recorded)}, and this launch gives spec {_shown(given)}. A PR's bound "

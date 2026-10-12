@@ -457,9 +457,6 @@ def main() -> None:
         rnd = ledger.find_round(state, ref)
         if rnd["status"] != "awaiting_assessment":
             sys.exit(f"{ref} is {rnd['status']}, not awaiting assessment")
-        unbound = specbinding.binding_problem(state.get("spec"))
-        if unbound:
-            sys.exit(f"The brief for {ref} cannot be built: {unbound}")
         try:
             print(json.dumps(brief(state, rnd), indent=1))
         except RuntimeError as exc:
