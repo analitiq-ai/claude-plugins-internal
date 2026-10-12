@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import sys
+import time
 import traceback
 from dataclasses import dataclass
 from functools import partial
@@ -423,7 +424,8 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
 def _governance(where: worktree.Worktree, rev_range: str) -> decisions.Governance:
     """The decisions that govern what `git diff rev_range` changes. An empty variable is an unset one."""
     return decisions.governing(where.root, worktree.files_in(where.root, rev_range),
-                               os.environ.get(decisions.ORG_CORPUS_VAR) or None, shutil.which("adr"))
+                               os.environ.get(decisions.ORG_CORPUS_VAR) or None, shutil.which("adr"),
+                               time.monotonic() + decisions.BUDGET)
 
 
 @dataclass(frozen=True)
@@ -604,7 +606,7 @@ def on_workflow(payload: dict) -> dict | None:
                 except RuntimeError as exc:
                     return block(payload, action, str(exc), event)
                 if governance.record_errors:
-                    return block(payload, action, "Decision records this change edits are invalid:\n"
+                    return block(payload, action, "Decision records are invalid:\n"
                                  + "\n".join(governance.record_errors)
                                  + "\nNext step: fix them, commit, and launch again.", event)
             waves = briefs.waves(stage, governance)

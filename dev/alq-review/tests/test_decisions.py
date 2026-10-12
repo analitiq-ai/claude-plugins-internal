@@ -5,6 +5,7 @@ These run the real adrkit CLI, so what is graded is adrkit's contract and not a 
 """
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -41,7 +42,7 @@ class Governing(unittest.TestCase):
         git(self.root, "add", "-A")
 
     def governing(self, files=("src/a.py",), org=None, cli=ADR):
-        return decisions.governing(str(self.root), list(files), org, cli)
+        return decisions.governing(str(self.root), list(files), org, cli, time.monotonic() + 60)
 
     def ids(self, governance):
         return [(d.corpus, d.record_id) for d in governance.decisions]
@@ -83,6 +84,13 @@ class Governing(unittest.TestCase):
         [notice] = self.governing().notices
         self.assertIn(decisions.ORG_CORPUS_VAR, notice)
 
+    def test_a_relative_org_corpus_is_refused_since_the_hook_and_adr_run_from_different_directories(self):
+        record(self.root / "docs" / "adr", "0001", "rule")
+        self.track()
+        with self.assertRaises(decisions.Unavailable) as raised:
+            self.governing(org="docs/adr")
+        self.assertIn("absolute", str(raised.exception))
+
     def test_an_org_corpus_that_is_not_there_cannot_be_checked(self):
         with self.assertRaises(decisions.Unavailable) as raised:
             self.governing(org=str(self.org))
@@ -110,6 +118,47 @@ class Governing(unittest.TestCase):
         [error] = found.record_errors
         self.assertIn("docs/adr/0002-bad.md", error)
         self.assertIn("decider", error)
+
+    def test_an_invalid_record_the_change_does_not_touch_is_reported(self):
+        """adr check leaves out a record it cannot load, so a broken record that should govern would govern nothing."""
+        (self.root / "docs" / "adr").mkdir(parents=True)
+        (self.root / "docs" / "adr" / "0001-bad.md").write_text(
+            '---\nid: "0001"\ntitle: "Bad record"\nstatus: accepted\ndate: 2026-10-12\n'
+            'affects:\n  - type: path\n    pattern: "src/**"\n---\n')
+        self.track()
+        [error] = self.governing().record_errors
+        self.assertIn("docs/adr/0001-bad.md", error)
+
+
+class Unreadable(unittest.TestCase):
+    """What a corpus check does when the CLI misbehaves: a stand-in `adr` that hangs or prints the wrong shape."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "repo"
+        record(self.root / "docs" / "adr", "0001", "rule")
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "add", "-A")
+        self.cli = Path(tmp.name) / "adr"
+
+    def stand_in(self, body: str) -> str:
+        self.cli.write_text(f"#!/bin/sh\n{body}\n")
+        self.cli.chmod(0o755)
+        return str(self.cli)
+
+    def test_a_report_of_another_shape_cannot_be_checked(self):
+        cli = self.stand_in("""echo '{"governing": "0001", "findings": []}'""")
+        with self.assertRaises(decisions.Unavailable) as raised:
+            decisions.governing(str(self.root), ["src/a.py"], None, cli, time.monotonic() + 60)
+        self.assertIn("Next step:", str(raised.exception))
+
+    def test_a_cli_that_hangs_is_stopped_at_the_deadline(self):
+        cli = self.stand_in("sleep 30")
+        started = time.monotonic()
+        with self.assertRaises(decisions.Unavailable):
+            decisions.governing(str(self.root), ["src/a.py"], None, cli, started + 0.5)
+        self.assertLess(time.monotonic() - started, 5)
 
 
 if __name__ == "__main__":

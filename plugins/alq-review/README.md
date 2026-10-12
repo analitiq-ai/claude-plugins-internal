@@ -120,8 +120,9 @@ that is under review.
    so a repo decision and an org decision never clash. Only accepted decisions govern. When any does, the
    `decision-reviewer` joins the round with those records and reports where the change contradicts them; its
    findings are assessed with everyone else's. An unset `ALQ_ORG_ADR_DIR` is named in the round's `notices`. A
-   launch is refused, naming the fix, when a corpus cannot be checked (`ALQ_ORG_ADR_DIR` is not a directory, `adr`
-   is not installed, or it fails) or when a decision record the change edits is invalid.
+   launch is refused, naming the fix, when a corpus cannot be checked (`ALQ_ORG_ADR_DIR` is not an absolute path to
+   a directory, `adr` is not installed, or it fails, prints a report of another shape or takes over 20 seconds in
+   all) or when `adr lint` finds an invalid record in any corpus checked: `adr check` leaves such a record out.
 
 ## How an agent uses it
 
@@ -267,4 +268,4 @@ hooks (`python3 -m pip install diff-match-patch`; on a Debian or Ubuntu system P
 could not run, and the refusal names this step. Any other import fails on a machine that lacks it.
 
 A repo that tracks a `docs/adr`, or a machine that sets `ALQ_ORG_ADR_DIR`, needs adrkit's CLI `adr` on `PATH`
-(`npm install -g @adrkit/cli`); without it an internal round's launch is refused and the refusal names this step.
+(`npm install -g @adrkit/cli@0.20.0`); without it an internal round's launch is refused and the refusal names this step.
