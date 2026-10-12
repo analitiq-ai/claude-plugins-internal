@@ -328,7 +328,7 @@ class Carried(unittest.TestCase):
 
 
 class Shapes(unittest.TestCase):
-    """The schemas agents answer through hold the shapes of contracts/shim-check.md."""
+    """The schemas agents answer through: a sweep lists sites in two lists, a ruling rules on one site."""
 
     check = {"ref": "shim:acme/demo#tree:" + "a" * 40, "root": "/w/demo"}
 

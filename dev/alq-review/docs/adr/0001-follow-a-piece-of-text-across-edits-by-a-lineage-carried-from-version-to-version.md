@@ -158,5 +158,5 @@ claims of a hunk.
 
 1. [x] Amend specs 005 and 006 to this rule, in their own PR, before the code.
    Not amended: #33, the amendment, was closed unmerged, as the specs were to be deleted; spec 018 states the
-   rule, and #78 deleted them.
+   rule, and #83 deleted them.
 2. [x] Build it in the order of work of issue #17. Done in #60.
