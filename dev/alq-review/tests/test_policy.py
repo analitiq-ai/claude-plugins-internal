@@ -62,7 +62,7 @@ def verdict_locked(verdict="RESHAPE_SPEC"):
 
 
 # What a lock reason must say for each hold, so the user sees every hold one unlock releases.
-SPEC_HOLD_NAMES = (f"The spec.md that `{SPEC}` names changed after this PR was bound to it", BOUND_BLOB, HEAD_BLOB,
+SPEC_HOLD_NAMES = ("`specs/019-demo/spec.md` changed after this PR was bound to its User Story 2", BOUND_BLOB, HEAD_BLOB,
                    f"git diff {BOUND_BLOB} {HEAD_BLOB}")
 VERDICT_LOCK_NAMES = ("which root is canonical?",)
 SPENT_AUDITS_NAMES = ("not converging",)

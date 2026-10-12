@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import specbinding
 from ledger import COUNTED, counted, current_round, released
 
 CAP = 4          # rounds a stage may take without settling before the anti-pattern audit is mandatory
@@ -96,8 +97,9 @@ def _holds(state: dict) -> list[tuple[str, str]]:
                       rnd["assessment"]["user_decision"]))
     held = _spec_held(state)
     if held is not None:
-        holds.append((f"The spec.md that `{state['spec']}` names changed after this PR was bound to it: the bound "
-                      f"blob is {held['bound']} and HEAD's is {held['head']}, and review grades against the bound "
+        story = specbinding.parse(state["spec"])
+        holds.append((f"`{story.folder}/spec.md` changed after this PR was bound to its User Story {story.number}: "
+                      f"the bound blob is {held['bound']} and HEAD's is {held['head']}, and review grades against the bound "
                       "text.",
                       f"does this PR now build to the changed spec? `git diff {held['bound']} {held['head']}` "
                       "shows the change."))

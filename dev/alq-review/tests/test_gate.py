@@ -552,6 +552,21 @@ class SpecArgument(Gate):
                                    "Next step: close this PR and open a new one.")
                 self.assertNotIn("crashed", self.reason(out))
 
+    def test_the_assessor_brief_of_a_pr_bound_to_a_bare_folder_is_refused_naming_close_and_reopen(self):
+        self.bind_to_a_bare_folder()
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                rnd = helpers.add_round(state, head=self.head)
+                rnd["status"] = "awaiting_assessment"
+                ref = rnd["ref"]
+        done = subprocess.run([sys.executable, str(SCRIPTS / "briefs.py"), "--ref", ref], env=self.env,
+                              capture_output=True, text=True)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("Traceback", done.stderr)
+        for part in (f"`{self.FOLDER}`", "not a story value", "Next step: close this PR and open a new one."):
+            with self.subTest(part=part):
+                self.assertIn(part, done.stderr)
+
     def test_an_unlock_of_a_reshape_spec_lock_on_a_pr_bound_to_a_bare_folder_unlocks_nothing_naming_close_and_reopen(self):
         HeldBranch.lock(self, spec=self.FOLDER)
         said = self.say("unlock #7")
