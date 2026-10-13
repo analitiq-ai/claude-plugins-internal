@@ -9,10 +9,9 @@
 **Input**: Issue #79, "alq-plan: name spec folders by their issue, land the spec on <issue>-spec through its own
 reviewed PR, require a spec for every issue", part of #80.
 
-**Settled with the user**: issue #79, "Decided", as edited on 2026-10-12, and the user's decision of 2026-10-12 to
-keep `no spec needed`, which then writes a folder that says no spec is needed, and the user's decision of 2026-10-13
-that review is optional and started by hand: the skill launches none. It follows `analitiq-ai/engineering`
-`docs/engineering/git-workflow.md` (engineering ADR-0002 one spec per issue, ADR-0003 one PR per user story).
+**Settled with the user**: issue #79, "Decided", as edited on 2026-10-13. It follows `analitiq-ai/engineering`
+`docs/engineering/git-workflow.md`: one spec per issue, at `specs/<issue>-<slug>/` (engineering ADR-0002,
+decisions 1 and 2), landed through its own PR (decision 3), and one PR per user story (ADR-0003).
 Decision record: alq-plan ADR-0008. ADR-0005, decision 3, stands.
 
 ## Clarifications
@@ -26,7 +25,7 @@ Decision record: alq-plan ADR-0008. ADR-0005, decision 3, stands.
 - Q: What does a rescope of a no-spec folder do? → A: It runs the new-scope workflow from the premise (premise → specify → grill → plan → critique → tasks) into that same folder, since a no-spec spec.md has nothing to grill. `specify` writes over the no-spec spec.md; if the premise picks `no spec needed` again, the writer writes it again. One pure function, in the writer's module, tells a no-spec spec.md apart.
 - Q: What about a change with no issue? → A: The skill creates the issue first, in the repo `origin` names, with one of that repo's issue types, then scopes it like any other.
 - Q: What does spec.md name its stories? → A: Spec Kit's headings, `### User Story <N> - <title> (Priority: P<n>)`. Branches (`<issue>-us<N>-…`), PR headers (`Implements: … § User Story <N>`) and review (#81) name them. On a rescope, existing stories keep their numbers and a new story takes the next free one.
-- Q: Where does the spec land? → A: On branch `<issue>-spec`, created from the repo's default branch in worktree `.claude/worktrees/<issue>-spec`. The skill commits, pushes and opens a draft PR whose body starts `Part of #<issue>`. It launches no review: alq-review is optional, and the user runs it by hand with `spec: null`.
+- Q: Where does the spec land? → A: On branch `<issue>-spec`, created from the repo's default branch in worktree `.claude/worktrees/<issue>-spec`. The skill commits, pushes and opens a draft PR whose body starts `Part of #<issue>`. It launches no review: alq-review is optional and, for now, the user starts it by hand with `spec: null`. Its last message names the folder, the branch, the PR and `spec: null` (issue #79, "Decided", as edited on 2026-10-13).
 - Q: And a rescope? → A: It works in the worktree it is run from, a story's or the spec's, and the spec edit lands in that PR.
 - Q: What happens to the folders that exist? → A: Under `dev/alq-review/specs/`, 004, 007, 008, 009, 010, 011, 012, 014, 015, 016 and 017 are deleted with every citation. 019 is renamed `63-split-planning-plugin`. This runs after #68 (retires 018) and #83 (deletes 005 and 006) merge. `README.md` states the rule instead of `specs/<nnn>-<feature>/`.
 
@@ -75,9 +74,9 @@ code and not run.
   SKILL.md §2 step 3). `premise_report.py` refuses a report that says `Reports wrong behaviour: yes` and recommends
   `no spec needed` (read).
 - A change with no issue has no form (read).
-- A completed run is staged, committed and pushed on the checkout's branch, and the skill ends with
-  `Spec folder: <path>` and `Branch: <branch>`. No PR is opened and no review is run (read: SKILL.md §2 step 8;
-  alq-plan ADR-0005, decision 3).
+- A completed run is staged, committed and pushed on the checkout's branch, and no PR is opened: the spec lands
+  with no PR of its own (read: SKILL.md §2 step 8). The skill ends with `Spec folder: <path>` and
+  `Branch: <branch>`, as alq-plan ADR-0005, decision 3, has it (read).
 - Nothing checks the story headings of spec.md, or that a rescope keeps their numbers (read: workflow.yml,
   `plugins/alq-plan/scripts/`).
 - `dev/alq-review/specs/` holds 15 folders, `004` to `019` without `013`. By each `spec.md`'s Feature Branch line,
@@ -177,15 +176,16 @@ that creates the issue and the run that follows.
 
 ### User Story 3 - The spec lands through its own PR (Priority: P1)
 
-A new scope works on branch `<issue>-spec`, in its own worktree from the default branch, and ends with a draft PR.
-Review is optional, and the user starts it by hand. A rescope edits the spec in the PR it is run from. The story
-numbers that branches and PRs name do not move.
+A new scope works on branch `<issue>-spec`, in its own worktree from the default branch, and the spec lands through
+its own PR. A rescope edits the spec in the PR it is run from. The story numbers that branches and PRs name do not
+move.
 
-**Why this priority**: under the engineering workflow the spec is agreed before code is written, and stories are
-named by number from then on.
+**Why this priority**: under the engineering workflow the spec lands through its own PR first (engineering
+ADR-0002, decision 3), and stories are named by number from then on.
 
 **Independent Test**: run a new scope and a rescope with stand-ins for the agent, `git` remote and `gh`; check the
-branch, its base, the worktree path, the PR body, that no review is launched, and the story-number check.
+branch, its base, the worktree path, the PR body, that no review is launched, the last message, and the
+story-number check.
 
 **Acceptance Scenarios**:
 
@@ -194,8 +194,8 @@ branch, its base, the worktree path, the PR body, that no review is launched, an
 2. **Given** branch `79-spec` already exists, locally or on `origin`, **When** a new scope of #79 starts, **Then** it
    is refused before anything is written, and the message names the branch and the rescope form.
 3. **Given** a new scope that completed, **When** the skill ends, **Then** the spec folder is committed and pushed
-   on `79-spec`, a draft PR into the default branch is open whose body starts `Part of #79`, and no review has been
-   launched.
+   on `79-spec`, a draft PR into the default branch is open whose body starts `Part of #79`, no review has been
+   launched, and the last message names the folder, the branch, the PR and `spec: null`.
 4. **Given** a spec.md with a story heading that is not `### User Story <N> - <title> (Priority: P<n>)`, or two
    stories with one number, **When** the run checks it, **Then** it fails, naming the heading.
 5. **Given** a rescope run from a story's worktree, **When** it completes, **Then** the spec edit is committed and
@@ -205,8 +205,8 @@ branch, its base, the worktree path, the PR body, that no review is launched, an
    or a renumbered story, fails the run, naming the numbers.
 7. **Given** a run that fails or is rejected, **Then** nothing is committed, pushed or opened.
 8. **Given** a new scope that ended on `no spec needed`, **When** the skill ends, **Then** the no-spec folder lands as
-   in scenario 3: committed and pushed on `<issue>-spec`, a draft PR whose body starts `Part of #<issue>`, and no
-   review launched.
+   in scenario 3: committed and pushed on `<issue>-spec`, a draft PR whose body starts `Part of #<issue>`, no
+   review launched, and the last message naming the folder, the branch, the PR and `spec: null`.
 
 ---
 
@@ -313,9 +313,10 @@ Delivery Workflow.
   --json defaultBranchRef`), in worktree `.claude/worktrees/<issue>-spec` of the repo, with `--no-track`, and run
   there. A branch `<issue>-spec` that exists locally or on `origin` MUST refuse the new scope, naming the branch and
   the rescope form.
-- **FR-014**: A completed new scope MUST commit the spec folder, a no-spec folder included, push the branch, open a
-  draft PR into the default branch whose body starts `Part of #<issue>`. It MUST launch no review. Its last message
-  MUST give the spec folder, the branch and the PR, and name no command of another plugin (ADR-0005, decision 3).
+- **FR-014**: A completed new scope MUST commit the spec folder, a no-spec folder included, push the branch, and
+  open a draft PR into the default branch whose body starts `Part of #<issue>`. It MUST launch no review. Its last
+  message MUST give the spec folder, the branch, the PR and `spec: null`, for a review the user starts by hand. As
+  ADR-0005, decision 3, has it, the message MUST name no command of another plugin.
 - **FR-015**: A rescope MUST work in the worktree it is run from, and commit and push the spec edit on that
   worktree's branch. It MUST create no branch, worktree or PR.
 - **FR-016**: The workflow MUST check spec.md's story headings with one pure function after every step that writes
@@ -366,8 +367,8 @@ Delivery Workflow.
 - **SC-003**: A run whose `specify` writes any folder but the one given fails: 0 such runs complete.
 - **SC-004**: `no spec needed` leaves exactly one folder whose spec.md is written by the no-spec writer;
   `not worth doing` leaves none.
-- **SC-005**: Every completed new scope ends with a pushed `<issue>-spec` branch, a draft PR starting
-  `Part of #<issue>`, and no review launched.
+- **SC-005**: Every completed new scope lands its spec through its own PR: a pushed `<issue>-spec` branch and a
+  draft PR whose body starts `Part of #<issue>`, in every run of the alq-plan suite.
 - **SC-006**: After Story 4, 0 folders under `dev/*/specs/` are named by a Spec Kit number, and 0 citations of an old
   name remain outside git history and this spec. After Story 5, 0 statements of the `specs/<nnn>-` form remain
   outside git history and this spec.
@@ -379,8 +380,7 @@ Delivery Workflow.
 - `untracked` takes an optional `<dir>`, as `#<issue>` does, so the folder can land in a project under the checkout.
 - The skill asks the user to confirm the title, body and issue type before it creates the issue: it writes to
   GitHub for the user.
-- A rescope runs no review of its own: the spec edit is reviewed in the PR it lands in, whose spec hold (alq-review
-  ADR-0016, decision 6) the user releases.
+- A rescope, like a new scope, launches no review. It opens no PR: the spec edit lands in the PR it is run from.
 - Whether the headless agent of `specify` honours `SPECIFY_FEATURE_DIRECTORY` from its environment, or needs it in
   its arguments, was not run. FR-005's check holds the folder either way.
 - Out of scope: how alq-build finds and uses the folder (#82); review's story contract (#81); rounds before a PR
@@ -389,28 +389,28 @@ Delivery Workflow.
 ## Why this is worth doing
 
 ### harm
-Answer: Nothing ties a spec folder to its issue, an issue can get two folders, a `no spec needed` scope leaves no folder that a later scope could see, and the spec lands with no PR or review. Under the engineering workflow, branches and PR headers name a spec folder and story that planning never guarantees.
-Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml (premise, specify, select-spec), plugins/alq-plan/skills/issue-spec/SKILL.md step 8
+Answer: Nothing ties a spec folder to its issue, an issue can get two folders, a `no spec needed` scope leaves no folder that a later scope could see, and the spec lands with no PR of its own. Under the engineering workflow, branches and PR headers name a spec folder and story that planning never guarantees.
+Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml (premise, specify, select-spec), plugins/alq-plan/skills/issue-spec/SKILL.md §2 step 8
 
 ### reachable
 Answer: observed. A rescope of specs/001-demo for issue 7 runs to grill, no spec needed completes with no folder, and the 15 folders in dev/alq-review/specs/ are numbered by Spec Kit, not by issue.
 Source: reproduction: python3 -m unittest in dev/alq-plan/tests at 74251bf on 2026-10-12; ls dev/alq-review/specs
 
 ### change-alters
-Answer: Yes. The folder is named from the issue and checked before and after specify, a second scope is refused, `no spec needed` leaves a folder that says so, and the spec reaches the default branch only through its own PR.
-Source: user: issue #79, "Decided"
+Answer: Yes. The folder is named from the issue and checked before and after specify, a second scope is refused, `no spec needed` leaves a folder that says so, and the spec lands through its own PR.
+Source: user: issue #79, "Decided", as edited on 2026-10-13
 
 ### owner
-Answer: No. select-spec checks only the path's shape and spec.md; nothing checks the folder against the issue, the story headings, or that a spec was reviewed before code.
-Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml, plugins/alq-plan/skills/issue-spec/SKILL.md
+Answer: No. select-spec checks only the path's shape and spec.md; nothing checks the folder against the issue or the story headings; and the skill's §2 step 8 opens no PR, so the spec lands with no PR of its own.
+Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml, plugins/alq-plan/skills/issue-spec/SKILL.md §2 step 8
 
 ### inherited
-Answer: Yes. alq-plan ADR-0001 and ADR-0005 accept folders without the issue number and more than one folder per issue; ADR-0006 has no spec needed leave no folder; ADR-0005 has a run post nothing on the issue and end naming the folder and branch. ADR-0008 supersedes ADR-0006's no folder; engineering ADR-0002, decisions 1 and 3, set the folder rule and the spec PR, which alq-plan follows. ADR-0005, decision 3, stands: the run still posts nothing on the issue and names no other plugin's command; the PR it opens is engineering ADR-0002's.
+Answer: Yes. alq-plan ADR-0001 and ADR-0005 accept folders without the issue number and more than one folder per issue; ADR-0006 has no spec needed leave no folder; ADR-0005, decision 3, has a run post nothing on the issue and end naming the folder and branch. ADR-0008 supersedes ADR-0006's no folder. Engineering ADR-0002, decisions 1 and 2, set the folder rule, and its decision 3 the spec PR; alq-plan follows them. ADR-0005, decision 3, stands: the run still posts nothing on the issue, and its last message names no other plugin's command.
 Source: code: dev/alq-plan/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md, dev/alq-plan/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md, dev/alq-plan/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md
 
 ### needs-spec
 Answer: It has decisions in it: the folder form, one folder per issue, the no-spec folder, the untracked form, the spec PR and the migration. The user settled them in issue #79.
-Source: user: issue #79, "Decided"
+Source: user: issue #79, "Decided", as edited on 2026-10-13
 
 ## Root cause
 
@@ -421,9 +421,9 @@ Observed: a rescope of `specs/001-demo` for issue 7 runs to grill
 The folder's name is decided by Spec Kit, not by planning. The workflow's `specify` step names no folder, so
 `speckit.specify` falls back to `feature_numbering`: the next free 3-digit number and a short name of its own. The
 wrong decision is made in `plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml`, at `specify`, which passes no
-folder, and at `select-spec`, which takes any `specs/<feature>` for any issue. The skill's step 8 ends the run on a
-pushed branch with no PR, so nothing downstream sees the spec reviewed, and the premise's `no spec needed` leaves no
-folder, so a later scope of that issue cannot see it was judged.
+folder, and at `select-spec`, which takes any `specs/<feature>` for any issue. The skill's §2 step 8 ends the run
+on a pushed branch and opens no PR, so the spec lands with no PR of its own, and the premise's `no spec needed`
+leaves no folder, so a later scope of that issue cannot see it was judged.
 
 - **Other callers**: `drive_workflow.py start`, which passes no folder on a new scope (verified: the Premise tests
   start a new scope with no folder); `/alq-build:issue-tackle`, which builds against any folder with a `spec.md`
