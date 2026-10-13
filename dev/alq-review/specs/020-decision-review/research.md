@@ -45,8 +45,9 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 
 ## R4: Two adrkit calls per corpus, `lint` and `check`, with the checkout as working directory
 
-- **Decision**: per corpus, `adr lint` and `adr check`, all calls of a launch at once under the launch's deadline;
-  the command lines, fields read and exit codes are data-model § Reading adrkit.
+- **Decision**: per corpus, `adr lint` and `adr check` (and the record reader of R5), all calls of a launch at once
+  under the launch's deadline; `check` takes its options, then `--`, then the paths, so a path that begins with `-` is
+  not read as an option (`adr check --dir d --json --help` prints usage). The command lines, fields read and exit codes are data-model § Reading adrkit.
   Four corpora are eight calls, each of which re-reads its corpus, so one after another they would spend the deadline
   eight times over. Exit 1 means an error finding on a changed record, so it is a report.
 - **Rationale**: `check` alone is not enough. Its `findings` carry the corpus's lint findings only for *changed*
@@ -67,18 +68,21 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
   - A governing record's file is found by the `id` in each file's frontmatter, not by the file name. Run on
     2026-10-13 with adr 0.20.0: `docs/adr/0005-x.md` holding `id: "0007"` lints clean and `check` reports governing
     `0007` with no path, so a `<id>-*.md` glob finds nothing and would blame the install.
-  - A record file is read the way adrkit loads it: the same candidate files, the same lenient decoding, the
-    frontmatter block only. Every rule of the plugin's own drifted from adrkit's in review (status read over the
-    whole file, a file found by name, a strict UTF-8 read that adrkit does not do, `0000-template.md` and symlinks
-    taken as candidates), and each drift refused a change adrkit had judged. adrkit's JSON gives no path for a
-    governing record, so the plugin must read the files; copying adrkit's two discovery constants, pinned by `test_adrkit.Drift`,
-    is the one way to read the same ones. Checked on 2026-10-13 in `@adrkit/core`'s `dist/index.js`.
+  - Record files are found and parsed by adrkit's own `@adrkit/core` (`discoverAdrFiles`,
+    `discoverSkippedMarkdownFiles`, `parseAdrFile`), run by a small node script with the core the installed `adr`
+    imports. adrkit's JSON gives no path for a governing record and no status for a record it could not load, so the
+    plugin must read the files; reading them with adrkit's code is the one way to read the same ones the same way.
+    The plugin's own reader drifted from adrkit's six times in review (status read over the whole file, a file found
+    by name, a strict UTF-8 read, `0000-template.md` and symlinks taken as candidates, CRLF, a YAML block-scalar `id`),
+    and each drift refused a change adrkit had judged. Run on 2026-10-13 with adr 0.20.0: the script returned id
+    `0018` for `id: >-` over an indented `0018`, left out a symlink, listed a nested file as skipped, and took 0.2 s
+    on this repo's largest corpus. `node` is present wherever `adr` runs, since `adr` is a node script.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
   leaves `decisions.py` pure (P3).
 - **Existing tools**: `github.py` (one boundary module per outside service): fit, the same pattern. PR #92's
-  `_entries` shape check: followed. PR #92's `_STATUS` regex over the whole file and `_record` glob: replaced, for the
-  two reasons above.
+  `_entries` shape check: followed. PR #92's `_STATUS` regex over the whole file and `_record` glob, and this plan's earlier Python
+  frontmatter reader: replaced by adrkit's loader.
 
 ## R6: `decisions.py` holds the classification as pure functions of the reports
 
@@ -173,9 +177,9 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
   019 did. The tests that run `adr` skip without it locally and must not skip in CI.
 - **Existing tools**: PR #92's README item and CI step: followed, the item rewritten to the spec's terms.
 
-## R13: The notice choice is ADR-0019, in its own PR before the code
+## R13: The notice choice is ADR-0020, in its own PR before the code
 
-- **Decision**: `dev/alq-review/docs/adr/0019-run-the-round-with-a-notice-for-a-matcher-adrkit-cannot-evaluate-here.md`,
+- **Decision**: `dev/alq-review/docs/adr/0020-run-the-round-with-a-notice-for-a-matcher-adrkit-cannot-evaluate-here.md`,
   status `accepted`, affecting `plugins/alq-review/scripts/{adrkit,decisions,gate}.py`, drafted from this plan
   (`/speckit-adrkit-draft`) and merged on branch `88-adr-notice` before the code PR (FR-019, constitution VI). The
   same PR changes the constitution's Platform Constraints line on per-check settings to name `decision_checks` beside
@@ -188,7 +192,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 
 - **Decision**: `tests/test_decisions.py` holds the pure rules with hand-written reports (no CLI), a `Contract`
   class that runs the real `adr` on fixture corpora, and the drift test of R6. `tests/test_adrkit.py` holds the
-  boundary with a stand-in `adr` script, and the frontmatter reader. `tests/test_gate.py` gains `DecisionReview`
+  boundary with a stand-in `adr` script beside a stand-in `@adrkit/core`. `tests/test_gate.py` gains `DecisionReview`
   (launches through the hook, including one test per row of data-model § Refusals, By mode) and `HookDeadline`.
   `tests/test_agents.py` gains the agent's tool list; `test_worktree_facts` gains `files_in`, `tracked` and
   `not_as_head`. contracts § Scenario coverage maps each scenario to its test. Every test that needs `adr` skips
