@@ -14,12 +14,11 @@ An org path that is also a repo corpus is checked once, as the org corpus.
 
 ## Records
 
-- **Governing**: status `accepted`, or a status adrkit cannot read (FR-004). One rule classifies a record and a
-  skipped file alike: `accepted`, not governing (any other status adrkit knows), or unreadable.
-- **Record**: corpus label, id, title, and the record's file as an absolute path. The same id in two corpora is two
+- **Governing**: a record `adr check` lists as governing (FR-004). The plugin reads no record itself.
+- **Record**: corpus label, id and title, as `adr check` gives them. The same id in two corpora is two
   records.
-- **Broken record**: corpus, file, id when adrkit gives one, adrkit's rule and message (FR-008). It is never briefed.
-- **Notice**: for a matcher (corpus, id, matcher, adrkit's reason) or for a skipped file (corpus, file, reason) (FR-012).
+- **Broken record**: a record the change touches that `adr check` fails on (FR-008): corpus, file, id, adrkit's rule and message. It is never briefed.
+- **Notice**: corpus, id, matcher, adrkit's reason (FR-012).
 
 ## Corpus outcome
 
@@ -33,11 +32,10 @@ corpus's outcome; `too big` applies only to the corpora still to be checked.
 | too big | the round's files number more than `max_review_files` (no adrkit call is made) | full round: split the PR; delta round: commit in smaller steps |
 | could not run | `ALQ_ORG_ADR_DIR` is not an absolute path to a readable folder | point it at the org corpus, or unset it |
 | could not run | a repo corpus holds a file not as HEAD has it | commit or remove those files |
-| could not run | adrkit cannot be started, is not the version the plugin is built for, or answers in a shape the plugin cannot read | the install step |
+| could not run | `adr` cannot be started, `adr --version` is not the version the plugin is built for, or answers in a shape the plugin cannot read | the install step |
 | could not run | adrkit fails in any other way | what adrkit's error says |
 | could not run | a call reaches the deadline | the step that spent the time; the reason names each step's seconds |
 | could not run | adrkit's marker scan was capped | split the change |
-| could not run | a changed regular file cannot be read | make it readable |
 
 ## Refusals
 
@@ -61,8 +59,7 @@ states it. A refusal that blocks opens no round and writes nothing to the ledger
 ```json
 {
   "corpora": ["dev/alq-review/docs/adr", "org (/home/me/engineering/docs/adr)"],
-  "governing": [{"corpus": "dev/alq-review/docs/adr", "id": "0018", "title": "Release a RESHAPE_SPEC lock only by unlock",
-                 "file": "/abs/checkout/dev/alq-review/docs/adr/0018-release-a-reshape-spec-lock-only-by-unlock.md"}],
+  "governing": [{"corpus": "dev/alq-review/docs/adr", "id": "0018", "title": "Release a RESHAPE_SPEC lock only by unlock"}],
   "notices": [{"corpus": "org (/home/me/engineering/docs/adr)", "id": "0007", "matcher": "affects.package \"core\"",
                "reason": "<adrkit's message>"}],
   "broken": [],

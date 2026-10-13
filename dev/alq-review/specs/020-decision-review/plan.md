@@ -8,7 +8,7 @@
 
 At an internal round's launch the gate lists the files of the round's own diff range and asks adrkit, per corpus
 (each tracked `docs/adr` and the org corpus at `ALQ_ORG_ADR_DIR`), which governing records cover them. A new boundary
-module `adrkit.py` runs adrkit's own library under the hook's deadline and returns one outcome per corpus; a new pure
+module `adrkit.py` runs `adr check` per corpus under the hook's deadline and returns one outcome per corpus; a new pure
 module `decisions.py` judges adrkit's findings by the spec's rules. When records govern the change,
 `alq-review:decision-reviewer` joins the round's expected reviewers with those records as its brief, and its findings
 reach `assess-round` like any other. The round's result carries a `decisions` block. An internal round of more than
@@ -54,7 +54,7 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shapes are those of adrkit's published `@adrkit/core`; the gate is an adapter, and any other shape is a corpus not checked (R5). No second validator: adrkit alone loads and judges a record. The rule names are a copy of adrkit's, justified in Complexity Tracking and pinned by a test (R6). Pass with that entry. |
+| I. Contract-first | The shape is `adr check --json`'s; the gate is an adapter, and any other shape is a corpus not checked (R5). No second validator: adrkit alone loads and judges a record, and the gate reads no record (R4). The rule names are a copy of adrkit's, justified in Complexity Tracking and pinned by a test (R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model); nothing degrades to "no decisions". One adrkit version; no tolerance for another. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (R14). Pass. |
@@ -97,7 +97,6 @@ Then the code (branch `88-us1-decision-review`):
 plugins/alq-review/
 ├── scripts/
 │   ├── adrkit.py              # new: the adrkit boundary (R5)
-│   ├── adrkit_corpus.mjs      # new: runs adrkit's library for one corpus (R4)
 │   ├── decisions.py           # new: the pure rules (R6)
 │   ├── gate.py                # main takes the deadline; handle/on_workflow carry it; step timings; the file limit;
 │   │                          #      _governance(); the refusals; on_agent covers the decision reviewer; the
@@ -136,7 +135,7 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `decisions.py` re-declares the adrkit rule names it sorts by (constitution I: no re-declared type-name list) | The spec's rules turn on adrkit's rule names, and adrkit exports no list of them | The copy is pinned to the installed adrkit by a test (R6). Records are loaded by adrkit's library (R4), so no parser, status list or discovery rule is copied |
+| `decisions.py` re-declares the adrkit rule names it sorts by (constitution I: no re-declared type-name list) | The spec's rules turn on adrkit's rule names, and adrkit exports no list of them | The copy is pinned to the installed adrkit by a test (R6). The gate reads only `adr check`'s answer (R4), so no parser, status list or discovery rule is copied |
 
 ## Open points
 

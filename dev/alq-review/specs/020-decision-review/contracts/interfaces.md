@@ -13,7 +13,7 @@ edge.
 
 ## adrkit
 
-`@adrkit/cli` at the one version the plugin is built for: the `adr` command and the `@adrkit/core` library it ships
+`@adrkit/cli` at the one version the plugin is built for; the gate calls only `adr check --json` and `adr --version`
 (research R4, R5).
 
 ## Injected review-round arguments
@@ -35,10 +35,10 @@ In <root>, run: git diff <range>
 <full: That is the whole change under review. | delta: That is what changed since the previous review round. ...>
 
 These decisions govern files this change touches. Each is named by its corpus and id:
-- <corpus> <id> "<title>": <file>
+- <corpus> <id> "<title>"
 ...
 
-Read each record in full before the diff. Report every place the change does what a decision rejected, contradicts
+Read each record in full, in its corpus, before the diff. Report every place the change does what a decision rejected, contradicts
 what it chose, or breaks a consequence it commits to: quote the decision's words in the finding's title and name the
 record (corpus and id) in its detail. Report nothing a decision does not settle; other reviewers cover the rest. An
 empty findings list is a normal and expected answer.

@@ -23,26 +23,27 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 - **Rationale**: FR-001, FR-003. `git ls-files` answers "tracked" at any depth in one call. The spec's edge case says
   an org path inside the repo is still the org corpus, which reverses PR #92's choice.
 
-## R4: One adrkit call per corpus, through adrkit's own library
+## R4: One `adr check` per corpus
 
-- **Decision**: per corpus, one node script runs the library calls `adr check` makes, using the `@adrkit/core` that
-  the installed `adr` ships. All corpora run at once, from the checkout.
-- **Rationale**: `adr check`'s JSON drops two facts the spec's rules need: which findings come from lint, and the
-  status of a file adrkit could not load. Earlier drafts rebuilt them in the plugin with its own file reader; that
-  reader drifted from adrkit's six times in review. Reading records with adrkit's own code copies none of its parsing.
+- **Decision**: per corpus, `adr check --dir <corpus> --json -- <files>`. All corpora run at once, from the checkout.
+  The gate reads its `ok`, `governing` and `findings`; it reads no record and calls nothing else of adrkit's.
+- **Rationale**: adrkit already decides what a record is, its status, what governs a change and whether a changed
+  record is broken. Earlier drafts re-derived parts of that (statuses of files adrkit could not load, record files,
+  lint findings outside the change) with a reader or adrkit's library; each was a second copy of adrkit and churned in
+  review.
 
 ## R5: `adrkit.py`, the boundary module
 
-- **Decision**: a new `scripts/adrkit.py` owns every call to adrkit and the disk. It returns one outcome per corpus and
+- **Decision**: a new `scripts/adrkit.py` owns every call to `adr`. It returns one outcome per corpus and
   never raises for one, so one corpus that could not run does not hide what the others answered. The plugin is built
-  for one adrkit version, and the script checks the version of the library it loads; any other version, or an answer
+  for one adrkit version, and the script checks `adr --version`; any other version, or an answer
   the plugin cannot read, is "could not run" with the install step (data-model § Corpus outcome).
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a check that
   could not run, not a pass).
 
 ## R6: `decisions.py` holds the rules as pure functions
 
-- **Decision**: classifying statuses and findings, building the result and the refusal texts are pure functions in
+- **Decision**: sorting adrkit's findings, building the result and the refusal texts are pure functions in
   `decisions.py`. The rule names it reads are a copy of adrkit's, pinned by a test against the installed adrkit.
 - **Rationale**: constitution P3. adrkit exports no list of its rule names, so a pinned copy is the only option.
 
