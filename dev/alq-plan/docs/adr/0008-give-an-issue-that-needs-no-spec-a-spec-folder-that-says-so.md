@@ -33,7 +33,7 @@ externalRefs:
   - type: doc
     id: "engineering ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "Every issue gets one spec; no code is written for an issue without one"
+    label: "Every issue has exactly one spec, at specs/<issue>-<slug>/"
 ---
 
 # ADR-0008: Give an issue that needs no spec a spec folder that says so
@@ -79,8 +79,8 @@ Why now: issue #79, part of #80. The user settled the decisions below on 2026-10
 This record does not supersede ADR-0006, decision 2. That decision is about the issue: a `no spec needed` run still
 posts nothing on it, and still tells the user to pass `spec: null` when the work is reviewed. What changes is
 ADR-0006's consequence that the outcome lives only in the session that picked it: it now lives in the repo.
-ADR-0006, decisions 1 and 3, stand. The `untracked` form writes to GitHub: it creates an issue. It posts nothing on
-an existing one.
+ADR-0006, decisions 1 and 3, stand. The `untracked` form creates an issue. Nothing is posted on an existing issue;
+the PR the folder lands through is ADR-0009's.
 
 ## Options considered
 
@@ -92,7 +92,7 @@ an existing one.
 | Record of `no spec needed` | A folder in the repo, named by its issue, written by one writer |
 | Seen by the one-folder check of ADR-0007 | Yes |
 | A change with no issue | Gets an issue, then is scoped like any other |
-| Writes to GitHub | `not worth doing` closes the issue; `untracked` creates one |
+| Writes to GitHub | `not worth doing` closes the issue; `untracked` creates one; `write the spec` and `no spec needed` push `<issue>-spec` and open a draft PR (ADR-0009) |
 
 ### Option B: Do nothing
 

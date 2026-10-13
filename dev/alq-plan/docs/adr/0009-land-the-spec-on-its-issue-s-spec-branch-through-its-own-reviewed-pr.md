@@ -31,9 +31,13 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/79"
     label: "alq-plan: name spec folders by their issue, land the spec through its own reviewed PR"
   - type: doc
+    id: "engineering ADR-0002"
+    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
+    label: "The spec lands first as its own PR on <issue>-spec; a PR that changes the approach updates the spec"
+  - type: doc
     id: "engineering ADR-0003"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "One PR per user story; the spec lands first on <issue>-spec"
+    label: "One branch and PR per user story; a story's number is frozen once its branch exists"
 ---
 
 # ADR-0009: Land the spec on its issue's spec branch through its own reviewed PR
@@ -45,12 +49,13 @@ ends with the folder and the branch, posts nothing and names no other plugin's c
 checkout is "the issue's worktree", created "per the repo's branch rules if there is none": the skill names no
 branch, base or path. No PR is opened and no review is run, so a spec reaches code with no one having agreed it.
 
-The organisation's git workflow (`analitiq-ai/engineering`, `docs/engineering/git-workflow.md`, ADR-0003) lands the
-spec first, on branch `<issue>-spec` from the default branch, in worktree `.claude/worktrees/<issue>-spec`, through
-its own PR whose body starts `Part of #<issue>`. Each user story of `spec.md` then becomes one branch
-(`<issue>-us<N>-…`) and one PR (`Implements: <folder>/spec.md § User Story <N>`). Story numbers are frozen once a
-story's branch exists, and a story added later takes the next free number. A spec that changes for a story changes
-in that story's PR.
+The organisation's rules (`analitiq-ai/engineering`) land the spec first, as its own PR on branch `<issue>-spec`
+(engineering ADR-0002, decision 3). Its git workflow (`docs/engineering/git-workflow.md`) branches it from the
+default branch, in worktree `.claude/worktrees/<issue>-spec`, with a PR body that starts `Part of #<issue>`. Each
+user story of `spec.md` then becomes one branch (`<issue>-us<N>-…`) and one PR
+(`Implements: <folder>/spec.md § User Story <N>`). Story numbers are frozen once a story's branch exists, and a
+story added later takes the next free number (engineering ADR-0003, decisions 1 and 3). A PR that changes the
+approach updates the spec in that PR (engineering ADR-0002, decision 4).
 
 The `issue-spec` skill's rescope runs in "the issue's worktree on the branch of the PR bound to that spec folder"
 (`plugins/alq-plan/skills/issue-spec/SKILL.md`, step 1). With one PR per story, several PRs are bound to one folder.
@@ -102,7 +107,8 @@ is the gap this record closes.
 ### Option D: A rescope opens a spec PR of its own
 
 The edit would land on `<issue>-spec` again, apart from the story that needed it. Rejected: the organisation's rule
-changes the spec in the PR of the story that needs the change, so the spec matches what was built.
+changes the spec in the PR of the story that needs the change, so the spec matches what was built (engineering
+ADR-0002, decision 4).
 
 ## Trade-offs
 
