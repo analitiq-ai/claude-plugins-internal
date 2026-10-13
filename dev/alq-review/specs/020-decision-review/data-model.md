@@ -47,9 +47,10 @@ At most one blocks a launch; they are taken in this order. `P` is the plugin's m
 | 2 | not checked | a corpus could not run | `D` is `enforce` |
 | 3 | broken | a broken record | `P` and `D` are both `enforce` |
 
-Every refusal says the check failed, names the corpus (or file, or command) and a fix that works there (FR-011): for a
-repo corpus, correct the record in this repo, commit and launch again; for the org corpus, fix the org's records or
-unset `ALQ_ORG_ADR_DIR`, never "commit". A refusal that does not block writes a `would_deny` line to `gate.log`, and
+Every refusal says the check failed and names the corpus (or file, or command) and a fix that works there (FR-011).
+Refusals 1 and 2 give the next step of their cause (§ Corpus outcome). Refusal 3 gives the record's fix: for a repo
+corpus, correct the record in this repo, commit and launch again; for the org corpus, fix the org's records or unset
+`ALQ_ORG_ADR_DIR`, never "commit". No org refusal says "commit". A refusal that does not block writes a `would_deny` line to `gate.log`, and
 the round opens on what was read.
 
 ## Round arguments and result
@@ -70,8 +71,10 @@ the round opens on what was read.
 ```
 
 - `broken` and `not_checked` are non-empty only when their refusal did not block.
-- `corpora: []` with `org_corpus: "unset"` means no corpus was found; `corpora` non-empty with `governing: []` means
-  nothing governs the change (SC-008).
+- `corpora` lists the judged corpora only.
+- Reading it (SC-008): `corpora: []`, `not_checked: []` and `org_corpus: "unset"` means no corpus was found;
+  `governing: []` with `not_checked: []` means nothing governs the change; `governing: []` with `not_checked`
+  non-empty means nothing in the judged corpora governs it.
 
 ## Round record (ledger, existing)
 
