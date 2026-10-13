@@ -81,7 +81,12 @@ the reading and judging rules are written from.
   (`invalid-enum-value`, `field` `status`); a nested draft and a misnamed `accepted` file each got `corpus-file-skipped`
   with their status read; 65 markers in one changed file gave `marker-declarations-capped` with no `path`; a symlink
   and a mode-000 file were both in `unreadablePaths`; an org corpus outside the checkout came back as
-  `../org/docs/adr/0007-org.md`; an `adr` path with no core beside it exited 3.
+  `../org/docs/adr/0007-org.md`; an `adr` path with no core beside it exited 3; `adr --version` printed `0.20.0` and a
+  newline, nothing else; a file whose frontmatter repeats a loaded record's id but which adrkit could not load (no
+  `deciders`) got its `error` on its own path, while the loaded record stayed governing with only its own path;
+  `check` listed an id once per loaded record holding it.
+- The fixture corpus is kept outside any `docs/adr` path, so this repo's own check does not read it, and holds no
+  file past a marker cap: a cap, and an unreadable file git cannot commit, are built by the tests that need them.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
   leaves `decisions.py` pure (P3). The plugin's own file readers drifted from adrkit's six times in review; reading
@@ -92,8 +97,8 @@ the reading and judging rules are written from.
 
 ## R6: `decisions.py` holds the classification as pure functions of the reports
 
-- **Decision**: `decisions.py` holds the pure rules of data-model § Status, § Corpus outcome (the causes `judge`
-  makes), § Judgement, § Governance and the refusal texts of § Refusals. Choices in them:
+- **Decision**: `decisions.py` holds the pure rules of data-model § Reading adrkit (`report`: the fields read and
+  `_path`), § Status, § Corpus outcome (the causes `report` and `judge` make), § Judgement, § Governance and the refusal texts of § Refusals. Choices in them:
   - One status classifier for records and skipped files, over adrkit's own status list from the report, so the same
     text means the same thing in both and no list of statuses is copied.
   - A finding is judged by the pass that made it: record and file validity from `lint`, which covers the whole
@@ -198,7 +203,8 @@ the reading and judging rules are written from.
 
 - **Decision**: `tests/test_decisions.py` holds the pure rules, a `Contract` class that runs the real adrkit on fixture
   corpora, and the drift test of R6. The pure tests' findings are the corpus script's real output on the fixture
-  corpus of R5, kept as `tests/fixtures/adrkit/answer.json` beside the corpus in `tests/fixtures/adrkit/repo/`;
+  corpus of R5, kept as `tests/fixtures/adrkit/answer.json` beside the corpus in `tests/fixtures/adrkit/corpus/`, and
+  turned into reports by `decisions.report`, the one builder `adrkit.outcomes` uses too;
   `test_adrkit_corpus.Fixture` runs the script and asserts its answer equals the file, so a pure test never grades a
   shape adrkit does not give. `tests/test_adrkit.py` holds the boundary with a stand-in `adr` beside a stand-in
   `@adrkit/core`. `tests/test_gate.py` gains `DecisionReview` (launches through the hook, including one test per row

@@ -43,8 +43,8 @@ real `adr` (skipped locally without it, installed in CI), launches through the h
 within one 55 s deadline shared with the 30 s review-base fetch and the `gh` calls (R4, R7). Not measured on this
 repo's corpora; the deadline bounds them, and a deadline refusal names what each step spent
 
-**Constraints**: no path list anywhere (R2); one validator per document (adrkit's), the gate re-declares only the
-status and rule names it must sort by, pinned by a drift test (R6); every refusal names a fix that can succeed for the
+**Constraints**: no path list anywhere (R2); one validator per document (adrkit's), the gate's only copies of adrkit
+are those data-model § Reading adrkit and § Judgement name, each pinned by a test (R6); every refusal names a fix that can succeed for the
 corpus it names (R10); no fallback when `adr` or its answer is missing (R5, R11)
 
 **Scale/Scope**: this repo has three corpora (17 + 6 + 2 records) with overlapping ids; a round reviews at most
@@ -119,7 +119,7 @@ dev/alq-review/tests/
 ├── test_decisions.py          # new: pure cases from the fixture answer, real-adrkit contract cases, rule drift test
 ├── test_adrkit_corpus.py      # new: the corpus script's answer on the fixture is answer.json
 ├── test_adrkit.py             # new: stand-in adr and @adrkit/core: shapes, exit codes, deadline, symlink vs regular file
-├── fixtures/adrkit/           # new: repo/ (one file per case of data-model § Judgement) and answer.json, adrkit's answer on it
+├── fixtures/adrkit/           # new: corpus/ (outside any docs/adr path), src/, changed.txt and answer.json, adrkit's answer on them
 ├── test_gate.py               # DecisionReview, HookDeadline
 ├── test_agents.py             # DecisionReviewer tools
 ├── test_worktree_facts.py     # files_in, tracked; review_args signature

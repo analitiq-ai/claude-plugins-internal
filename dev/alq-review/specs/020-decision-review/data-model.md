@@ -14,6 +14,7 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 | `not_as_head(root, path) -> list[str]` | `worktree` | the paths `git status --porcelain=v1 -z --untracked-files=all --ignored -- <path>` lists | git |
 | `org_corpus(root) -> Corpus \| NotChecked \| None` | `adrkit` | the only builder of the org corpus, from `ALQ_ORG_ADR_DIR` (§ Corpus) | env, disk |
 | `outcomes(root, corpora, files, deadline, spent) -> list[CorpusReport \| NotChecked]` | `adrkit` | one value per corpus, never raising for one (§ Reading adrkit) | `adr`, `node`, `lstat` |
+| `report(corpus, stdout, real_root, is_regular) -> CorpusReport \| NotChecked` | `decisions` | one corpus script answer as a report: the fields-read check and `_path` (§ Reading adrkit) | only through `is_regular`, which `adrkit` gives as an `os.lstat` check |
 | `repo_corpora(root, tracked) -> list[Corpus]` | `decisions` | the repo corpora (§ Corpus) | none |
 | `merge(repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus whose `realpath(dir)` equals the org's is dropped (the one exception to "no I/O") | realpath |
 | `status_class(status, statuses) -> str` | `decisions` | § Status | none |
@@ -36,7 +37,7 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
   `docs/adr` whose tracked files all sit in subfolders is a corpus.
 - Org corpus: `ALQ_ORG_ADR_DIR` unset or empty is `None`. A value that is not an absolute path to a readable folder
   is `NotChecked(org label, "could-not-run", ...)`. Otherwise the `Corpus`.
-- A record is named `<label> <id>` everywhere: brief, notice, refusal, result.
+- A record is named `<label> <id>` in the brief, notices and result; a broken line names its file (§ Judgement).
 - `dir` is absolute from the builder on, so no consumer joins `root` to it; `label` is for display only. The paths
   the corpus script names go through `_path` (§ Reading adrkit).
 
@@ -53,34 +54,42 @@ and prints one JSON object:
 | `statuses` | adrkit's `Status.options`, the statuses it knows |
 | `lint` | `lintCorpus`'s findings: every record and file of the corpus, changed or not |
 | `check` | `checkChanges`'s findings less the ones it copied from `lint` (it re-emits lint's findings on changed records as the same objects, so they are dropped by identity): the matcher, marker and cap findings of this change |
-| `governing` | per `governing` entry: `id`, `title`, and `paths`, the path of every loaded record with that id |
+| `governing` | one entry per id `checkChanges` lists as governing: `id`, `title`, and `paths`, the path of every record `lintCorpus` loaded with that id |
 | `unreadablePaths` | `markerScan.unreadablePaths` |
 
 Every finding that names a corpus file carries `status`: the record's status when adrkit loaded it, otherwise the
 frontmatter `status` `parseAdrFile` reads, `null` when it is absent, not a string, or the file cannot be parsed.
 Marker and cap findings name no corpus file and carry none.
 
-`outcomes` runs `adr --version` once per launch; anything but `adrkit 0.20.0` leaves every corpus not checked (the
-CLI pins its core to its own version). Then, per corpus, `node adrkit_corpus.mjs <realpath of adr> <dir> <files>`,
-with `cwd` = `realpath(root)` and `<dir>` = `realpath(corpus.dir)`, every corpus at once, each in its own thread as
-`subprocess.run(..., capture_output=True, timeout=max(deadline - time.monotonic(), 0))`, so each call's output is
-read while it runs and only a call that has not exited is killed. The script takes no options, so a path that
-begins with `-` is a path. Seconds go into `spent["adr --version"]` and `spent["adrkit <label>"]`. Without `adr` on
-`PATH`, no call is made.
+`decisions.ADRKIT_VERSION` is `"0.20.0"`, what that release's `adr --version` prints (research.md R5's run), and
+`decisions.INSTALL` is `npm install -g @adrkit/cli@<ADRKIT_VERSION>`; no other file restates either. `outcomes` first
+runs `adr --version`; its stdout, stripped, must equal `ADRKIT_VERSION` (the CLI pins its core to its own version).
+Then, per corpus, `node adrkit_corpus.mjs <realpath of adr> <dir> <files>`, with `cwd` = `realpath(root)` and `<dir>` =
+`realpath(corpus.dir)`, every corpus at once, each in its own thread. Every call, `adr --version` included, is
+`subprocess.run(..., capture_output=True, timeout=max(deadline - time.monotonic(), 0))`, so each call's output is read
+while it runs and only a call that has not exited is killed. The script takes no options, so a path that begins with
+`-` is a path. Seconds go into `spent["adr --version"]` and `spent["adrkit <label>"]`. Without `adr` on `PATH`, no call
+is made; when `adr --version` does not pass, no corpus call is made.
 
-Exit 0 is an answer. Exit 3 is "no `@adrkit/core` beside `adr`" (an `adr` that is not the npm-installed command).
-Any other exit is a failure with its stderr.
+Exit 0 is an answer, whose stdout `outcomes` gives to `decisions.report`. Exit 3 is "no `@adrkit/core` beside `adr`"
+(an `adr` that is not the npm-installed command). Any other exit is a failure with its stderr.
 
-Fields read, and nothing else:
+Fields read, and nothing else. `report` checks every row; the first that fails makes the corpus `NotChecked(could-not-run)`
+naming the field:
 
 | Field | Must be |
 |---|---|
-| `statuses` | list of strings |
-| `lint`, `check` | lists of objects: `rule`, `severity`, `message` strings; `path`, `id`, `field`, `pattern` strings when present; `status` a string or `null` when present. Every `lint` finding has `path` and `status`; a `check` finding whose rule begins `affects-` has `path`, `field`, `pattern` and `status` |
-| `governing` | list of objects: `id`, `title` strings; `paths` a non-empty list of strings |
-| `unreadablePaths` | list of strings |
+| stdout | a JSON object |
+| `statuses` | a list of strings |
+| `lint`, `check` | lists of objects, each with `rule`, `severity` and `message` strings |
+| any finding's `path`, `id`, `field`, `pattern` | strings, when present |
+| any finding's `status` | a string or `null`, when present |
+| a `lint` finding | has `path` and `status` |
+| a `check` finding whose rule begins `affects-` | has `path`, `field`, `pattern` and `status` |
+| `governing` | a list of objects: `id`, `title` strings; `paths` a non-empty list of strings |
+| `unreadablePaths` | a list of strings |
 
-A file has one identity: every path the script names goes through `_path(p) = normpath(join(realpath(root), p))`
+A file has one identity: every path the script names goes through `_path(p) = normpath(join(real_root, p))` in `report`,
 before it is looked up, `lstat`ed or briefed. With `cwd` and `<dir>` already real, adrkit's relative paths (an org
 record outside the repo comes back as `../../engineering/docs/adr/0007-x.md`) meet at one string, and the last
 component is not resolved, so `lstat` still sees a symlink.
@@ -92,7 +101,7 @@ component is not resolved, so `lstat` still sees a symlink.
 | `statuses` | tuple of `statuses` |
 | `lint`, `check` | tuples of `Finding(rule, severity, message, path=None, id=None, field=None, pattern=None, status=None)`, `path` through `_path` |
 | `governing` | tuple of `Governing(id, title, paths)`, `paths` through `_path` |
-| `unreadable_regular` | the paths of `unreadablePaths` that `os.lstat` reports as regular files |
+| `unreadable_regular` | the paths of `unreadablePaths` for which `is_regular` holds |
 
 ## Status
 
@@ -119,11 +128,11 @@ located or briefed.
 | `too-big`: the round's files number more than `max_review_files` | gate, for each corpus not already `NotChecked`; no call is made | the count and the limit | full round: split the PR; delta round: commit in smaller steps and launch after each |
 | `could-not-run`: `ALQ_ORG_ADR_DIR` not an absolute path to a readable folder | `adrkit.org_corpus` | the variable and its value | point it at the org's `docs/adr` as an absolute path, or unset it |
 | `could-not-run`: a repo corpus holds a file `not_as_head` lists | gate, before any call | the files | commit or remove them |
-| `could-not-run`: `adr` not on `PATH`, or `adr --version` not `adrkit 0.20.0` | `adrkit.outcomes`, for every corpus | the version found, if any | `npm install -g @adrkit/cli@0.20.0` |
-| `could-not-run`: the corpus script exits 3 | `adrkit.outcomes` | `adr`'s path and the script's stderr | `npm install -g @adrkit/cli@0.20.0`, so the `adr` on `PATH` is the npm-installed command |
-| `could-not-run`: `adr --version` exits other than 0, or the corpus script other than 0 or 3 | `adrkit.outcomes` | the call and its stderr | what stderr says |
-| `could-not-run`: stdout not a JSON object, or a field read of another shape | `adrkit.outcomes` | the call and the field | `npm install -g @adrkit/cli@0.20.0` |
-| `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
+| `could-not-run`: `adr` not on `PATH`, or `adr --version` printing other than `ADRKIT_VERSION` | `adrkit.outcomes`, for every corpus | the version found, if any | `INSTALL` |
+| `could-not-run`: the corpus script exits 3 | `adrkit.outcomes` | `adr`'s path and the script's stderr | `INSTALL`, so the `adr` on `PATH` is the npm-installed command |
+| `could-not-run`: `adr --version` exits other than 0 (for every corpus), or the corpus script other than 0 or 3 | `adrkit.outcomes` | the call and its stderr | what stderr says |
+| `could-not-run`: a field read of another shape | `decisions.report` | the field | `INSTALL` |
+| `could-not-run`: a call not ended by the deadline (`adr --version`: every corpus) | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
 | `could-not-run`: the causes of § Judgement | `decisions.judge` | § Judgement | § Judgement |
 
 ## Judgement
@@ -139,17 +148,21 @@ Otherwise it returns `Judgement(corpus, records, notices, broken)`. Each finding
 
 | From | Finding | Outcome |
 |---|---|---|
-| `lint` | severity `error` (`unique-id` included), governing | broken, subject the id, or the file when adrkit gives no id (FR-008) |
-| `lint` | rule `corpus-file-skipped`, class `accepted` | broken, subject the file (FR-008) |
+| `lint` | severity `error` (`unique-id` included), governing | broken (FR-008) |
+| `lint` | rule `corpus-file-skipped`, class `accepted` | broken (FR-008) |
 | `lint` | rule `corpus-file-skipped`, class `unreadable` | `FileNotice(corpus, file, reason)`, `reason` adrkit's message (FR-012) |
-| `check` | rule `affects-bad-pattern` or `affects-unknown-type`, governing | broken, subject the id (FR-008) |
+| `check` | rule `affects-bad-pattern` or `affects-unknown-type`, governing | broken (FR-008) |
 | `check` | rule `affects-unresolvable` or `affects-repo-not-applicable`, governing | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
 | either | anything else | ignored: every finding on a file that is not governing, lint's record-level `affects-repo-not-applicable` (check's names each matcher), marker findings (FR-004, FR-013) |
 
-- `broken` lines are `Broken(corpus, subject, rule, message)`.
-- `records`: each `governing` entry whose id has no broken line, as `Record(corpus, id, title, file)`, `file` its one
-  path. An id with a broken line is left out with all its files. Two loaded records share an id only with adrkit's
-  `unique-id` error on each, so an id with several `paths` is always broken.
+- A record's identity is its file. A broken line is `Broken(corpus, file, id, rule, message)`: `file` the finding's
+  `path`, which every broken row's finding has (§ Reading adrkit), and `id` adrkit's, or `None`, for display only.
+- `records`: each `governing` entry none of whose `paths` has a broken line, as `Record(corpus, id, title, file)`,
+  `file` its one path. Two loaded records share an id only with adrkit's `unique-id` error on each, so an entry with
+  several `paths` always has a broken line. A file adrkit could not load is in no entry's `paths` even when its
+  frontmatter repeats a loaded record's id: it is broken by its own file, and the loaded record is still briefed.
+- `affects-unknown-type` never reaches `check` in 0.20, whose lint rejects an unknown matcher type before loading the
+  record; the row keeps a later adrkit's answer from being ignored.
 - `RULES` is every rule name this table and the two causes above name: a copy of adrkit's vocabulary, pinned by
   `test_decisions.Drift` to the installed core's JS. The statuses are not copied: they come with each report.
 
@@ -173,7 +186,7 @@ not_checked, org_corpus)`:
 2. Corpora: `decisions.merge(decisions.repo_corpora(root, worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
 3. Over `max_review_files`: every corpus not yet `NotChecked` becomes `NotChecked(too-big)`; refusal 1.
 4. Otherwise: each repo corpus with `not_as_head` output becomes `NotChecked(could-not-run)`; the rest go to
-   `adrkit.outcomes`, and each report to `decisions.judge`.
+   `adrkit.outcomes` (which builds each report with `decisions.report`), and each report to `decisions.judge`.
 5. `governance = decisions.governance(outcomes, org)`; refusal 2, then refusal 3.
 
 ## Refusals
@@ -184,7 +197,7 @@ At most one blocks per launch; they are taken in this order.
 |---|---|---|---|---|
 | 1 | too big | `files` over `max_review_files` | `hookio.refuse` | `refusal_text("too-big", ...)`: "The change is too big to review: <n> files, and max_review_files is <limit>." and the next step |
 | 2 | not checked | a `NotChecked` with cause `could-not-run` | `hookio.block_decision` | "The decision check could not run:" then each `<corpus>: <reason>` |
-| 3 | broken | `broken` non-empty | `hookio.refuse_decision` | "The decision check found a record it cannot judge against:" then each `<corpus> <subject>: <message> (<rule>)`, then each corpus's fix |
+| 3 | broken | `broken` non-empty | `hookio.refuse_decision` | "The decision check found a record it cannot judge against:" then each `<corpus> <file>` (and `<id>` when adrkit gives one) `: <message> (<rule>)`, then each corpus's fix |
 
 A corpus's fix: repo corpus, "correct the record in this repo, commit, then <call>"; org corpus, "fix the org's
 records at <dir> or unset ALQ_ORG_ADR_DIR, then <call>", never containing "commit".
@@ -228,7 +241,7 @@ both do; the cells where two of them differ are each in the table.
 }
 ```
 
-- `broken` is `[{corpus, subject, rule, message}]`; `not_checked` is `[{corpus, cause, reason}]`. Each is non-empty
+- `broken` is `[{corpus, file, id, rule, message}]`; `not_checked` is `[{corpus, cause, reason}]`. Each is non-empty
   only when its refusal did not block.
 - `corpora: []` with `not_checked: []` and `org_corpus: "unset"` is "no corpus was found"; `corpora` non-empty with
   `governing: []` is "nothing in those corpora governs this change".

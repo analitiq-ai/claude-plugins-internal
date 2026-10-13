@@ -13,7 +13,7 @@ crosses the plugin's edge.
 
 ## adrkit
 
-`@adrkit/cli@0.20.0`, the `adr` command, and the `@adrkit/core` it ships, whose exports the corpus script calls: the
+`@adrkit/cli` at `decisions.ADRKIT_VERSION`, the `adr` command, and the `@adrkit/core` it ships, whose exports the corpus script calls: the
 calls, fields read and exit codes are data-model § Reading adrkit. The rule names `decisions.py` reads (`RULES`) are
 pinned to the installed core's JS by `test_decisions.Drift`; `test_adrkit_corpus.Fixture` pins the answer the pure tests
 read to what adrkit gives.
@@ -62,7 +62,7 @@ only by the review-round workflow; `gate.on_agent` refuses a direct dispatch as 
 ## README and version
 
 README: item 8 under "What it enforces"; Layout rows for `scripts/adrkit.py`, `scripts/adrkit_corpus.mjs`, `scripts/decisions.py`,
-`agents/decision-reviewer.md`; Dependencies names `adr` as the npm-installed command (the corpus script loads the `@adrkit/core` it ships), `npm install -g @adrkit/cli@0.20.0` and node ≥ 22; Mode names `decision_checks` and `max_review_files`. `plugin.json`
+`agents/decision-reviewer.md`; Dependencies names `adr` as the npm-installed command (the corpus script loads the `@adrkit/core` it ships), `decisions.INSTALL`'s command and node ≥ 22; Mode names `decision_checks` and `max_review_files`. `plugin.json`
 `version: 0.14.0`.
 
 ## Scenario coverage
@@ -85,14 +85,14 @@ Refusals by mode are the tests of data-model § Refusals, By mode; a row below n
 | 12 org record unloadable: refused, fix the org or unset, never commit | `test_decisions.Refusals.test_an_org_corpus_s_fix_never_says_commit` |
 | 12 org record skipped, outside the checkout: refused naming the file | `test_decisions.Contract.test_a_skipped_org_file_outside_the_checkout_is_named` |
 | 13 org folder missing: refused naming the path | `test_adrkit.OrgCorpus.test_a_folder_that_is_not_there_or_not_absolute_is_not_checked` |
-| 14 marker scan capped | `test_decisions.Judge.test_a_capped_scan_leaves_the_corpus_not_checked` |
+| 14 marker scan capped | `test_decisions.Judge.test_a_capped_scan_leaves_the_corpus_not_checked`; `test_decisions.Contract.test_a_file_with_more_markers_than_adrkit_reads_leaves_the_corpus_not_checked` |
 | 15 changed regular file unreadable | `test_adrkit.Boundary.test_an_unreadable_regular_file_is_listed_and_a_symlink_is_not`; `test_decisions.Judge.test_an_unreadable_changed_file_leaves_the_corpus_not_checked` |
 | 16 call past the deadline, with each step's time | `test_adrkit.Boundary.test_a_call_that_hangs_is_stopped_at_the_deadline`; `test_gate.DecisionReview.test_a_launch_whose_hook_time_is_spent_gets_the_deadline_refusal` |
-| 17 answer in another shape | `test_adrkit.Boundary.test_a_report_of_another_shape_is_not_checked` |
+| 17 answer in another shape | `test_decisions.Report.test_an_answer_of_another_shape_is_not_checked` |
 | 18 `package`/`entity` matcher: notice naming the matcher | `test_decisions.Contract.test_a_package_matcher_is_a_notice` |
 | 20 only such a record, nothing evaluated: no reviewer | `test_decisions.Judge.test_a_record_with_only_notices_is_not_given_to_the_reviewer` |
 | 21 one evaluated matcher and one notice: given, and the notice | `test_decisions.Contract.test_a_record_matched_by_one_matcher_is_given_and_its_other_matcher_is_a_notice` |
-| 22 two records with one id | `test_decisions.Contract.test_two_records_with_one_id_are_broken`; `test_decisions.Contract.test_a_changed_broken_governing_record_is_one_broken_line` |
+| 22 two records with one id | `test_decisions.Judge.test_two_records_with_one_id_are_both_left_out`; `test_decisions.Contract.test_two_records_with_one_id_are_broken`; `test_decisions.Contract.test_a_changed_broken_governing_record_is_one_broken_line` |
 | 23 skipped file judged by its status | `test_decisions.Contract.test_a_skipped_file_is_judged_by_its_status` |
 | 24 `decision_checks: log` with `adr` missing | `test_gate.DecisionReview.test_without_adr_the_check_follows_decision_checks` |
 | 25 the file limit | `test_gate.DecisionReview.test_the_size_refusal_follows_the_plugin_s_mode` |
@@ -110,8 +110,10 @@ Refusals by mode are the tests of data-model § Refusals, By mode; a row below n
 | each finding judged by the pass that made it | `test_decisions.Judge.test_lint_s_record_level_repo_finding_is_ignored`; `test_decisions.Contract.test_a_changed_broken_governing_record_is_one_broken_line` |
 | records loaded by adrkit's own library | `test_decisions.Contract.test_a_record_whose_id_is_a_block_scalar_is_located`; `test_decisions.Judge.test_a_marker_finding_is_ignored_wherever_its_file_sits`; `test_decisions.Contract.test_a_marker_in_a_corpus_readme_leaves_the_corpus_judged` |
 | the pure tests read adrkit's real answer | `test_adrkit_corpus.Fixture.test_the_fixture_answer_is_what_adrkit_gives` |
-| a record adrkit cannot load is broken, whatever the reader could read of it | `test_decisions.Contract.test_a_governing_record_adrkit_cannot_load_is_broken`; `test_decisions.Contract.test_a_skipped_file_with_no_status_is_a_notice` |
-| one identity per file | `test_decisions.Contract.test_a_checkout_reached_through_a_symlink_still_refuses_a_broken_record` |
+| the fixture is not a corpus of this repo | `test_decisions.Corpora.test_no_test_fixture_is_a_corpus_of_this_repo` |
+| the adrkit version the rules read | `test_adrkit.Boundary.test_adr_version_decides_whether_any_corpus_is_read`; `test_decisions.Contract.test_the_installed_adr_is_the_version_the_rules_read` |
+| a record adrkit cannot load is broken, whatever the reader could read of it | `test_decisions.Judge.test_a_broken_governing_record_is_named_by_its_file_and_left_out`; `test_decisions.Judge.test_a_bad_matcher_on_a_governing_record_is_broken`; `test_decisions.Contract.test_a_governing_record_adrkit_cannot_load_is_broken`; `test_decisions.Contract.test_a_skipped_file_with_no_status_is_a_notice` |
+| one identity per file | `test_decisions.Report.test_paths_adrkit_names_are_joined_to_the_real_root`; `test_adrkit.Boundary.test_each_call_runs_from_the_real_root`; `test_decisions.Contract.test_a_checkout_reached_through_a_symlink_still_refuses_a_broken_record`; `test_decisions.Judge.test_an_unloadable_file_repeating_a_loaded_id_leaves_the_loaded_record_briefed`; `test_decisions.Refusals.test_a_broken_line_names_its_file` |
 | the corpus script's own failures | `test_adrkit.Boundary.test_a_core_that_cannot_be_used_gives_the_install_step`; `test_adrkit.Boundary.test_an_exit_other_than_0_or_3_is_not_checked_with_stderr` |
 | FR-002 a changed path that begins with `-` is checked | `test_decisions.Contract.test_a_changed_path_that_begins_with_a_dash_is_checked` |
 | a rename gives both paths to the check | `test_worktree_facts.QuotedNames` (`files_in`) |
