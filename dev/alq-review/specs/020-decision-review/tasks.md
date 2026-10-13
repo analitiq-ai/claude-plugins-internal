@@ -11,8 +11,8 @@ description: "Task list: the internal review round checks the diff against the d
 (constitution IV). Which cases each test covers is decided when it is written, from the spec's scenarios and
 data-model.md; this list does not enumerate them.
 
-**Organization**: one user story (US1), one PR. The ADR and the constitution lines ship first, in their own PR
-(constitution VI, FR-019, FR-021).
+**Organization**: one user story (US1), one PR. The constitution lines ship first, in their own PR
+(constitution VI, FR-021).
 
 Paths are from the repository root. Tests run with `python -m unittest -v` from `dev/alq-review/tests/`.
 
@@ -22,8 +22,7 @@ Paths are from the repository root. Tests run with `python -m unittest -v` from 
 
 Branch `88-adr-notice`, merged before any code task (R13).
 
-- [ ] T001 Write ADR-0020 in `dev/alq-review/docs/adr/` in ADR-0018's form: the user's notice choice (FR-012, FR-019). `adr lint` reports no error on it.
-- [ ] T002 In `dev/alq-review/.specify/memory/constitution.md` Platform Constraints, name `decision_checks` beside the claim and shim settings, and the decision reviewer as this plugin's own agent.
+- [x] T002 In `dev/alq-review/.specify/memory/constitution.md` Platform Constraints, name `decision_checks` beside the claim and shim settings, and the decision reviewer as this plugin's own agent.
 - [ ] T003 Open the PR, run the review loops (`.claude/rules/pr-review-loop.md`), merge.
 
 ---

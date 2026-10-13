@@ -24,7 +24,7 @@ Every other mention is a pointer.
 
 - Q: Which records count? → A: Those `adr check` lists as governing (FR-004).
 - Q: When is the launch refused? → A: When `adr check` fails on a record the change touches, when its marker scan was capped, when a corpus cannot be checked at all, and when the `adr` command is missing (FR-008 to FR-011).
-- Q: When does the round run with a notice? → A: For each matcher `adr check` reports it cannot evaluate in one repo (FR-012). Refusing would block every round over a matcher no round can evaluate; ignoring would hide it. The user's choice, recorded as an ADR (FR-019).
+- Q: When does the round run with a notice? → A: For each matcher `adr check` reports it cannot evaluate in one repo (FR-012). Refusing would block every round over a matcher no round can evaluate; ignoring would hide it. The user's choice.
 - Q: What is ignored? → A: Every other adrkit finding (FR-013).
 - Q: How long may the check take? → A: One deadline per launch (FR-014).
 - Q: Where do the paths come from? → A: The git diff the round reviews (FR-002).
@@ -40,6 +40,7 @@ Every other mention is a pointer.
 ### Session 2026-10-13
 
 - Q: Does a new, uncommitted file change what adrkit reads? → A: The gate's existing uncommitted-changes refusal counts it; no check of the corpus against the commit is added (FR-024).
+- Q: Is the notice choice recorded as an ADR? → A: No. It is this feature's behaviour, recorded here (FR-012); FR-019 is removed.
 
 ## Terms
 
@@ -153,9 +154,9 @@ An agent launches the internal review round of a PR. The gate lists the files th
 
 - **FR-017**: Audit rounds and assess-round launches MUST NOT run the check and MUST NOT get a decision reviewer.
 - **FR-018**: With `decision_checks` at `enforce`: a refusal under FR-008 (a broken record) MUST follow the plugin's mode as the spec refusals do (in `log` mode it is recorded as would-deny and the round opens with the records that were read); a refusal under FR-009 or FR-010 (the check could not run in full) MUST refuse in either mode, as a review base that cannot be read does.
-- **FR-019**: The user's choice on notices (FR-012) MUST be recorded as an ADR in `dev/alq-review/docs/adr`, in its own PR before the code lands.
+- **FR-019**: Removed (Clarifications, 2026-10-13).
 - **FR-020**: The plugin's README MUST state the `adr` command as a dependency with its install step, what the round does with decisions, the `decision_checks` and `max_review_files` settings, in the terms of this spec.
-- **FR-021**: The check MUST have its own setting, `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`), as the claim and shim checks have. At `log`, no decision-check refusal blocks: each is recorded as would-deny in `gate.log`, the round opens with the records that were read, and the result names each corpus not checked and why, and each broken record. Nothing from a corpus not checked is given to the decision reviewer. The constitution's Platform Constraints lines on per-check settings and on where reviewer agents come from change in the same PR as ADR-0020 (FR-019), before the code.
+- **FR-021**: The check MUST have its own setting, `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`), as the claim and shim checks have. At `log`, no decision-check refusal blocks: each is recorded as would-deny in `gate.log`, the round opens with the records that were read, and the result names each corpus not checked and why, and each broken record. Nothing from a corpus not checked is given to the decision reviewer. The constitution's Platform Constraints lines on per-check settings and on where reviewer agents come from change in their own PR, before the code (R13).
 - **FR-022**: An internal round whose files (FR-002) number more than `max_review_files` (`config.json`, shipped 50) MUST be refused before any adrkit call, following the plugin's mode, naming the count and the limit, with the next step: split the PR, or, for a delta round, commit in smaller steps and launch after each.
 - **FR-023**: When a round is assessed, the rulings on the decision reviewer's findings (each finding's id and ruling: FIX, PUSH_BACK or DEFER) MUST be written to `gate.log`, one line per round.
 - **FR-024**: The gate's existing uncommitted-changes refusal MUST also count new files git does not track (files `.gitignore` hides excepted), at every launch, following the plugin's mode as it does today; in `enforce` mode adrkit therefore reads each repo corpus as the commit has it, except a file `.gitignore` hides, which git does not see and adrkit reads if it sits in a corpus: nothing guards that; in `log` mode adrkit reads the folder as it is on disk. Its message MUST name commit, delete or ignore as the fix. No second check of the corpus against the commit is added.
