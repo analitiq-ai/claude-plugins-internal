@@ -1,131 +1,185 @@
 # Data model: the internal review round checks the diff against the decisions that govern it
 
-Nothing here is stored. Every shape lives for one launch, in `decisions.py` as frozen dataclasses, and leaves the gate
-only as the injected `args.decisions` (§ Round arguments and result). This file is the one statement of the check's
-outcomes and refusals; research.md, contracts/interfaces.md and tasks.md refer to it and do not restate it.
+This file is the one statement of the check's contract: every type, function, reader, cause, next step and refusal.
+research.md gives the reasons, contracts/interfaces.md the outside interfaces, tasks.md the order of work; none of
+them restates what is here. Nothing is stored: every shape lives for one launch, as frozen dataclasses in
+`decisions.py`, and leaves the gate only as `args.decisions` (§ Round arguments and result).
+
+## Functions and their owners
+
+| Function | Module | Does | I/O |
+|---|---|---|---|
+| `files_in(root, rev_range) -> list[str]` | `worktree` | the paths `git diff --name-only -z <range>` lists, deleted ones included | git |
+| `tracked(root, pathspec) -> list[str]` | `worktree` | the paths `git ls-files -z -- <pathspec>` lists | git |
+| `not_as_head(root, path) -> list[str]` | `worktree` | the paths `git status --porcelain=v1 -z --untracked-files=all --ignored -- <path>` lists | git |
+| `org_corpus(root) -> Corpus \| NotChecked \| None` | `adrkit` | the only builder of the org corpus, from `ALQ_ORG_ADR_DIR` (§ Corpus) | env, disk |
+| `outcomes(root, corpora, files, deadline, spent) -> list[CorpusReport \| NotChecked]` | `adrkit` | one value per corpus, never raising for one (§ Reading adrkit) | `adr`, disk |
+| `repo_corpora(tracked) -> list[Corpus]` | `decisions` | the repo corpora (§ Corpus) | none |
+| `merge(repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus whose resolved dir equals the org's is dropped (`os.path.realpath`, the one exception to "no I/O") | realpath |
+| `status_class(text) -> str` | `decisions` | § Status | none |
+| `judge(report) -> Judgement \| NotChecked` | `decisions` | § Judgement | none |
+| `governance(outcomes, org) -> Governance` | `decisions` | § Governance | none |
+| `refusal_text(kind, items, call) -> str` | `decisions` | § Refusals | none |
+| `_governance(...)` | `gate` | runs the above in § Order, refuses per § Refusals | via the above |
 
 ## Corpus
+
+`Corpus(label, dir, kind)`:
 
 | Field | Repo corpus | Org corpus |
 |---|---|---|
 | `label` | path from the repo root, e.g. `dev/alq-review/docs/adr` | `org (<value of ALQ_ORG_ADR_DIR>)` |
-| `dir` | the same path, given to `--dir` relative to the checkout | the absolute path, given to `--dir` |
+| `dir` | the same path, relative to the checkout | the absolute path |
 | `kind` | `repo` | `org` |
 
 - Repo corpora: for each tracked path, every prefix of it that ends in the segments `docs/adr`; distinct, sorted. A
-  `docs/adr` whose tracked files all sit in subfolders is still a corpus. No tracked file under it, no corpus.
-- Org corpus: `ALQ_ORG_ADR_DIR`, when set and non-empty; empty counts as unset. When its resolved path equals a repo
-  corpus's, that corpus is checked once, as the org corpus.
+  `docs/adr` whose tracked files all sit in subfolders is a corpus.
+- Org corpus: `ALQ_ORG_ADR_DIR` unset or empty is `None`. A value that is not an absolute path to a readable folder
+  is `NotChecked(org label, "could-not-run", ...)`. Otherwise the `Corpus`.
 - A record is named `<label> <id>` everywhere: brief, notice, refusal, result.
+
+## Frontmatter
+
+One reader, `adrkit._frontmatter(path) -> dict[str, str] | None`: the file as UTF-8; the block from a first line `---`
+to the next line `---`; each line in it with no leading space of the form `key: value`, `value` stripped of a trailing
+` #...` comment and of one pair of matching quotes. `None` when the file cannot be read, is not UTF-8, or has no such
+block. Nothing outside the block is read: a body line `status: accepted` is not a status. It reads `status` and `id`.
 
 ## Status
 
-One classifier, `decisions.status_class(text: str | None)`, serves loaded records and skipped files alike:
+`status_class(text)`, `text` the frontmatter's `status` or `None`, for loaded records and skipped files alike:
 
-| Status text read | Class |
+| Text | Class |
 |---|---|
 | `accepted` | `accepted` |
 | `draft`, `proposed`, `rejected`, `superseded`, `deprecated` | `not governing` |
-| any other value, no `status:` line, a file that cannot be read or is not UTF-8 | `unreadable` |
+| any other value, no `status`, no frontmatter | `unreadable` |
 
-The text is what `adrkit.py` reads from the frontmatter with `^status:\s*["']?([\w-]+)` (multiline): an opening quote
-and anything after the word, a closing quote or a `# comment` included, are not part of it.
+## Reading adrkit
 
-## Finding (adrkit's, as read)
+`outcomes` runs, for each corpus, `adr lint --dir <dir> --json` and `adr check <files> --dir <dir> --json`, with
+`cwd` = the checkout root, every call at once, each in its own thread as `subprocess.run(..., capture_output=True,
+timeout=max(deadline - time.monotonic(), 0))`, so each call's output is read while it runs and only a call that has
+not exited is killed. Each call's seconds go into `spent["adr <verb> <label>"]`. Without `adr` on `PATH`, no call is
+made.
 
-`rule`, `severity`, `message`, `source` (`lint` or `check`), and optionally `path`, `id`, `field`, `pattern`.
+Fields read, and nothing else:
 
-## Corpus report (what `adrkit.py` hands to `decisions.judge`)
+| Report | Field | Must be |
+|---|---|---|
+| both | `findings` | list of objects: `rule`, `severity`, `message` strings; `path`, `id`, `field`, `pattern` strings when present |
+| check | `governing` | list of objects: `recordId`, `title` strings |
+| check | `markerScan.unreadablePaths` | list of strings |
+
+Exit 0 and 1 are reports. Every path adrkit names is relative to its `cwd`, the checkout root (an org record outside
+the repo comes back as `../../engineering/docs/adr/0007-x.md`), and is resolved against it before it is read,
+`lstat`ed or briefed.
+
+`CorpusReport(corpus, findings, governing, statuses, record_files, unreadable_regular)`:
 
 | Field | Content |
 |---|---|
-| `corpus` | the Corpus |
-| `findings` | lint's and check's |
-| `governing` | check's `governing[]` as `(id, title)` |
-| `files` | `id -> tuple of absolute paths` of `<dir>/<id>-*.md`, for each governing id |
-| `statuses` | `path -> status text or None`, for every path a finding names |
-| `unreadable_regular` | the paths of `markerScan.unreadablePaths` that `lstat` reports as regular files |
-
-Every path adrkit names is relative to the directory it ran in, the checkout root (an org record outside the repo
-comes back as `../../engineering/docs/adr/0007-x.md`); `adrkit.py` resolves each against the checkout root before
-reading, `lstat`ing or globbing.
+| `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check` |
+| `governing` | `(id, title)` per `governing` entry |
+| `statuses` | `path -> frontmatter status or None`, for every path a finding names |
+| `record_files` | `id -> tuple of absolute paths`: the top-level `*.md` files of the corpus, less those a `corpus-file-skipped` finding names, whose frontmatter `id` is that id, for each governing id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
+| `unreadable_regular` | the paths of `markerScan.unreadablePaths` that `os.lstat` reports as regular files |
 
 ## Corpus outcome
 
-Each corpus yields exactly one value, never an exception:
+Each corpus yields exactly one value. `NotChecked(corpus, cause, reason)`: `cause` is `too-big` or `could-not-run`;
+`reason` is one sentence ending `Next step: <step>, then <call>`, `<call>` being `policy.review_call(state,
+'internal')`. A corpus that is not checked contributes no record, notice or broken line, and none of its files is
+located or briefed.
 
-- `NotChecked(corpus, reason)`: the corpus could not be checked. `reason` is one sentence ending `Next step: ...`.
-- `Judgement(corpus, records, notices, broken)`: the corpus was checked.
-
-| Cause of `NotChecked` | Made by | `reason` names | Next step |
+| Cause | Made by | `reason` names | Next step |
 |---|---|---|---|
-| the round's files number more than `max_review_files` | gate, for every corpus, before any call | the count and the limit | full round: split the PR; delta round: commit in smaller steps and launch after each |
-| a repo corpus holds a file not as HEAD has it (`git status --porcelain --untracked-files=all --ignored -- <dir>` lists it) | gate, before any call | the files | commit or remove them |
-| `ALQ_ORG_ADR_DIR` not an absolute path to a readable folder | `adrkit.org_corpus` | the variable and its value | point it at the org's `docs/adr` as an absolute path, or unset it |
-| `adr` not on `PATH` | `adrkit.outcomes`, for every corpus | | `npm install -g @adrkit/cli@0.20.0` |
-| a call exits other than 0 or 1 | `adrkit.outcomes` | the call and its stderr | what stderr says |
-| a call's stdout is not a JSON object, or a field read is of another shape | `adrkit.outcomes` | the call and the field | `npm install -g @adrkit/cli@0.20.0` |
-| a call has not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and the seconds each step spent (review-base fetch, `gh` calls, each `adr` call) | the step that spent the time |
-| a governing id that is not broken has no file, or more than one | `decisions.judge` | the id and the files | `npm install -g @adrkit/cli@0.20.0` (adrkit and the gate disagree on record names) |
-| `marker-scan-capped` or `marker-declarations-capped` (a finding with no `path`) | `decisions.judge` | adrkit's message | split the change |
-| a path in `unreadable_regular` | `decisions.judge` | the file | make it readable |
+| `too-big`: the round's files number more than `max_review_files` | gate, for each corpus not already `NotChecked`; no call is made | the count and the limit | full round: split the PR; delta round: commit in smaller steps and launch after each |
+| `could-not-run`: `ALQ_ORG_ADR_DIR` not an absolute path to a readable folder | `adrkit.org_corpus` | the variable and its value | point it at the org's `docs/adr` as an absolute path, or unset it |
+| `could-not-run`: a repo corpus holds a file `not_as_head` lists | gate, before any call | the files | commit or remove them |
+| `could-not-run`: `adr` not on `PATH` | `adrkit.outcomes`, for every corpus | | `npm install -g @adrkit/cli@0.20.0` |
+| `could-not-run`: a call exits other than 0 or 1 | `adrkit.outcomes` | the call and its stderr | what stderr says |
+| `could-not-run`: stdout not a JSON object, or a field read of another shape | `adrkit.outcomes` | the call and the field | `npm install -g @adrkit/cli@0.20.0` |
+| `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each `adr` call, in seconds) | the step that spent the time |
+| `could-not-run`: `marker-scan-capped` or `marker-declarations-capped` | `decisions.judge` | adrkit's message | split the change |
+| `could-not-run`: a path in `unreadable_regular` | `decisions.judge` | the file | make it readable |
+| `could-not-run`: a governing id, not broken, whose `record_files` are none or several | `decisions.judge` | the record and the files | the corpus's fix (§ Refusals) |
 
-Every next step ends with `policy.review_call(state, 'internal')`. A corpus that is not checked contributes no record,
-notice or broken line: what it would have said is unknown.
+## Judgement
 
-## Judgement (per corpus, pure)
-
-A finding's record class is `status_class(statuses[path])`; a governing record is one whose class is `accepted` or
-`unreadable` (an unreadable status must not hide adrkit's `error` on it, FR-004).
+`judge(report)` first makes the corpus `NotChecked` for the three causes it owns. Otherwise it returns
+`Judgement(corpus, records, notices, broken)`. A finding's record class is `status_class(statuses[path])`; a governing
+record is one whose class is `accepted` or `unreadable` (an unreadable status must not hide adrkit's `error`, FR-004).
 
 | Finding | Outcome |
 |---|---|
 | no `path`, rule other than the two caps | ignored |
-| `corpus-file-skipped`, skipped file `accepted` | **broken** (FR-008) |
-| `corpus-file-skipped`, skipped file `unreadable` | **notice** naming the file (FR-012) |
+| `corpus-file-skipped`, skipped file `accepted` | broken, subject the file (FR-008) |
+| `corpus-file-skipped`, skipped file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
 | `corpus-file-skipped`, skipped file `not governing` | ignored |
-| severity `error` (`unique-id` included), `affects-bad-pattern`, `affects-unknown-type`, on a governing record | **broken** (FR-008) |
-| `affects-unresolvable` or `affects-repo-not-applicable`, source `check`, on a governing record | **notice** naming the matcher (FR-012) |
+| severity `error` (`unique-id` included), `affects-bad-pattern`, `affects-unknown-type`, on a governing record | broken, subject the id, or the file when adrkit gives no id (FR-008) |
+| `affects-unresolvable` or `affects-repo-not-applicable` from `check`, on a governing record | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
 | any finding on a `not governing` record | ignored (FR-004) |
 | anything else | ignored (FR-013) |
 
-- `records`: each `governing` entry whose id has no broken line, as `Record(corpus, id, title, file)`, `file` the one
-  path in `files[id]`. An id with a broken line is left out with all its files, so two records sharing an id
+- `broken` lines are `Broken(corpus, subject, rule, message)`.
+- `records`: each `governing` entry whose id has no broken line, as `Record(corpus, id, title, file)`, `file` its one
+  `record_files` path. An id with a broken line is left out with all its files, so two records sharing an id
   (`unique-id`) are both left out.
-- `notices`: `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `field` + ` ` + quoted `pattern` (e.g.
-  `affects.path "src/**"`), `reason` = adrkit's message; and `FileNotice(corpus, file, reason)`.
-- `broken`: `Broken(corpus, subject, rule, message)`, `subject` the id, or the file when adrkit gives no id.
 
-## Governance (per launch)
+## Governance
 
-`decisions.governance(outcomes, org_label) -> Governance`, `org_label` the org corpus's label or `None`:
+`governance(outcomes, org)`, `org` the result of `org_corpus` → `Governance(corpora, records, notices, broken,
+not_checked, org_corpus)`:
 
 | Field | Content |
 |---|---|
 | `corpora` | the labels of the judged corpora, in order |
-| `records` | every judgement's records, in corpus order; the same id from two corpora is two records |
-| `notices` | every judgement's notices |
-| `broken` | every judgement's broken lines |
+| `records`, `notices`, `broken` | every judgement's, in corpus order; the same id from two corpora is two records |
 | `not_checked` | every `NotChecked` |
-| `org_corpus` | the org label, or `unset` |
+| `org_corpus` | the org label, or `unset` when `org` is `None` |
+
+## Order
+
+`gate._governance` for an internal launch, after `launch_round` and the review base, before `open_round`:
+
+1. `files = worktree.files_in(root, briefs.review_range(decision, base))`.
+2. Corpora: `decisions.merge(decisions.repo_corpora(worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
+3. Over `max_review_files`: every corpus not yet `NotChecked` becomes `NotChecked(too-big)`; refusal 1.
+4. Otherwise: each repo corpus with `not_as_head` output becomes `NotChecked(could-not-run)`; the rest go to
+   `adrkit.outcomes`, and each report to `decisions.judge`.
+5. `governance = decisions.governance(outcomes, org)`; refusal 2, then refusal 3.
 
 ## Refusals
 
-The gate refuses at most once per launch, in this order, after every corpus has its outcome:
+At most one blocks per launch; they are taken in this order.
 
-| # | Refusal | When | Made with | Blocks when | Text |
-|---|---|---|---|---|---|
-| 1 | too big | the files number more than `max_review_files` | `hookio.refuse` | the plugin's mode is `enforce` | "The change is too big to review: ..." and its `NotChecked` next step |
-| 2 | not checked | `not_checked` non-empty (any cause but 1) | `hookio.block_decision` | `decision_checks` is `enforce`, in both plugin modes | "The decision check could not run:" then each `<corpus>: <reason>` |
-| 3 | broken | `broken` non-empty | `hookio.refuse_decision` | the plugin's mode and `decision_checks` are both `enforce` | "The decision check found a record it cannot judge against:" then each `<corpus> <subject>: <message> (<rule>)`, then each corpus's fix |
+| # | Refusal | When | Made with | Text |
+|---|---|---|---|---|
+| 1 | too big | `files` over `max_review_files` | `hookio.refuse` | `refusal_text("too-big", ...)`: "The change is too big to review: <n> files, and max_review_files is <limit>." and the next step |
+| 2 | not checked | a `NotChecked` with cause `could-not-run` | `hookio.block_decision` | "The decision check could not run:" then each `<corpus>: <reason>` |
+| 3 | broken | `broken` non-empty | `hookio.refuse_decision` | "The decision check found a record it cannot judge against:" then each `<corpus> <subject>: <message> (<rule>)`, then each corpus's fix |
 
-A corpus's fix (refusal 3): repo corpus, "correct the record in this repo, commit, then <call>"; org corpus, "fix the
-org's records at <path> or unset ALQ_ORG_ADR_DIR, then <call>", never containing "commit".
+A corpus's fix: repo corpus, "correct the record in this repo, commit, then <call>"; org corpus, "fix the org's
+records at <dir> or unset ALQ_ORG_ADR_DIR, then <call>", never containing "commit".
 
-A refusal that blocks opens no round. One that does not is recorded as `would_deny` in `gate.log`, and the launch goes
-on to the next row and then opens the round on `Governance` as it stands: the decision reviewer is briefed with
-`records` only (nothing not checked or broken is located or briefed), and the result names what was not checked and
-what was broken. Refusal 1 that does not block still makes no `adr` call: every corpus is `NotChecked` for it.
+A refusal that blocks opens no round and records nothing new. One that does not block is recorded as `would_deny` in
+`gate.log`; the launch takes the next refusal, then opens the round on `Governance` as it stands.
+
+### By mode
+
+`P` is the plugin's mode, `D` is `decision_checks`. Each row is one gate test whose subTests are the four cells; each
+open cell asserts the state named.
+
+| Refusal | Test (`test_gate.DecisionReview`) | P enforce, D enforce | P enforce, D log | P log, D enforce | P log, D log | State a round opens on |
+|---|---|---|---|---|---|---|
+| 1 too big | `test_the_size_refusal_follows_the_plugin_s_mode` | blocks | blocks | opens | opens | no `adr` call; every corpus in `not_checked` with cause `too-big`; no decision reviewer |
+| 2 not checked (`ALQ_ORG_ADR_DIR=/nowhere`, repo corpus governs) | `test_a_corpus_not_checked_follows_decision_checks` | blocks | opens | blocks | opens | the repo corpus's record briefed; the org corpus in `not_checked` |
+| 2 not checked (a repo corpus not as HEAD) | `test_a_corpus_not_as_head_follows_decision_checks` | blocks | opens | blocks | opens | no `adr` call with that `--dir`; the corpus in `not_checked`; no record from it |
+| 3 broken (a governing `unique-id` pair beside a governed 0001) | `test_a_broken_record_blocks_only_when_both_enforce` | blocks | opens | opens | opens | the pair in `broken`, neither briefed; 0001 briefed |
+
+`hookio.refuse` blocks when `P` enforces, `hookio.block_decision` when `D` enforces, `hookio.refuse_decision` when
+both do; the cells where two of them differ are each in the table.
 
 ## Round arguments and result
 
@@ -146,9 +200,8 @@ what was broken. Refusal 1 that does not block still makes no `adr` call: every 
 }
 ```
 
-- `broken` is `[{corpus, subject, rule, message}]`; `not_checked` is `[{corpus, reason}]`. Each is non-empty only when
-  its refusal did not block.
-- `org_corpus` is `unset` when the variable is unset or empty.
+- `broken` is `[{corpus, subject, rule, message}]`; `not_checked` is `[{corpus, cause, reason}]`. Each is non-empty
+  only when its refusal did not block.
 - `corpora: []` with `not_checked: []` and `org_corpus: "unset"` is "no corpus was found"; `corpora` non-empty with
   `governing: []` is "nothing in those corpora governs this change".
 

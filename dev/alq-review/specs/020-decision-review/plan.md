@@ -6,18 +6,19 @@
 
 ## Summary
 
-At an internal round's launch the gate lists the files of the round's own diff range and asks adrkit, once per
-corpus (`adr lint` and `adr check`, each tracked `docs/adr` and the org corpus at `ALQ_ORG_ADR_DIR`), which governing
-records cover them. A new boundary module `adrkit.py` runs the CLI under the hook's deadline and refuses any answer it
-cannot read; a new pure module `decisions.py` sorts adrkit's findings into refuse, notice and ignore by the spec's
-table. When records govern the change, `alq-review:decision-reviewer` joins the round's expected reviewers with those
-records as its brief, and its findings reach `assess-round` like any other. The round's result carries a `decisions`
-block: corpora checked, records governing, notices, and whether the org corpus was unset. An internal round of more than
-`max_review_files` files (50) is refused before any `adr` call; the check has its own `decision_checks` setting, and
-each assessed round's rulings on the decision reviewer's findings go to `gate.log`. The user's notice choice lands
-first as ADR-0019 in its own PR, with the constitution's line on per-check settings. Decisions are in [research.md](research.md), shapes in
-[data-model.md](data-model.md), the adrkit fields read, the refusal table, the injected arguments and the scenario
-coverage in [contracts/interfaces.md](contracts/interfaces.md).
+At an internal round's launch the gate lists the files of the round's own diff range and asks adrkit, per corpus
+(each tracked `docs/adr` and the org corpus at `ALQ_ORG_ADR_DIR`), which governing records cover them. A new boundary
+module `adrkit.py` runs the CLI under the hook's deadline and returns one outcome per corpus; a new pure module
+`decisions.py` judges adrkit's findings by the spec's table. When records govern the change,
+`alq-review:decision-reviewer` joins the round's expected reviewers with those records as its brief, and its findings
+reach `assess-round` like any other. The round's result carries a `decisions` block. An internal round of more than
+`max_review_files` files (50) is refused before any `adr` call; the check has its own `decision_checks` setting; each
+assessed round's rulings on the decision reviewer's findings go to `gate.log`. The user's notice choice lands first as
+ADR-0019 in its own PR, with the constitution's lines on per-check settings and reviewer agents.
+
+Decisions and their reasons are in [research.md](research.md); every type, reader, cause and refusal of the check is
+in [data-model.md](data-model.md), stated once; the outside interfaces and the scenario-to-test table are in
+[contracts/interfaces.md](contracts/interfaces.md).
 
 ## Technical Context
 
@@ -55,16 +56,16 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields contracts § "Fields read" lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. The five non-governing statuses and seven rule names are a copy of adrkit's vocabulary, justified in Complexity Tracking and pinned by a drift test (R6). Pass with that entry. |
+| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields data-model § Reading adrkit lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. The five non-governing statuses and seven rule names are a copy of adrkit's vocabulary, justified in Complexity Tracking and pinned by a drift test (R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
-| III. Fail loud, no workarounds, no backwards compatibility | A missing `adr`, a bad org path, an unreadable answer, a capped scan or a deadline each refuse with the step named; nothing degrades to "no decisions". The install step pins one version; no tolerance for another shape. Pass. |
+| III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model § Corpus outcome, § Refusals); nothing degrades to "no decisions". The install step pins one version; no tolerance for another shape. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (contracts, Scenario coverage). `decisions.judge` is pure; `adrkit.py` is tested with a stand-in script and with the real CLI. Pass. |
 | V. Smallest complete change | No cache, no planning-time check, no audit check, no ledger field. `changed_files` is generalised, not duplicated. The whole mechanism ships in one PR because a check that cannot refuse would pass silently (spec, one story). Pass. |
 | VI. Governing rule ships apart | ADR-0019 and the constitution's Platform Constraints line naming `decision_checks` are their own PR, merged first (R13). The README changes with the code it describes, as in spec 019. Pass. |
 | P1. Code decides | The check, the reviewer's seat in `expected`, every refusal and the notices are decided in the gate; the agent is told nothing it could skip. Each refusal ends with its next step (R10). Pass. |
 | P2. Only an approved entity releases a hold | No hold, lock or count is added. A refused launch holds nothing: the next launch checks again. The user releases the check by setting `decision_checks` to `log` (R15, ADR-0011). Pass. |
 | P3. Rules are pure | `decisions.judge` and `decisions.governance` are functions of the reports; `adrkit.py` and the gate do the I/O; `review-round.js` only echoes `decisions` (R6, R9). Pass. |
-| P4. A check that could not run is its own outcome | A call that fails, hangs, or answers in another shape, a capped scan, an unreadable changed file: refused in both plugin modes as a failed check (named in `not_checked` when the user sets `decision_checks` to `log`, R15), never a pass or a finding against the author (R5, R7, R10). A matcher adrkit cannot evaluate here is a named notice, not silence (R6). Pass. |
+| P4. A check that could not run is its own outcome | Every way the check can fail is a `could-not-run` cause of its corpus, never a pass or a finding against the author; its refusal and the state a round opens on are data-model § Refusals. A matcher adrkit cannot evaluate here is a named notice, not silence (R6). Pass. |
 
 Re-check after Phase 1: unchanged.
 
