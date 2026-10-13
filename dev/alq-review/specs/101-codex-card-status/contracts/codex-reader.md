@@ -30,22 +30,23 @@ time. Produced by the poller's `CODEX_ITEMS` jq program.
   "status_at": "2026-10-13T12:55:07Z",
   "spoke": true,
   "comments": [{"url": "…", "at": "…", "body": "Codex Review: Didn't find any major issues. …"}],
-  "unknown": null,
+  "unknown": [],
   "errors": []
 }
 ```
 
 | `state` | `commit` | `status_at` | `unknown` | `errors` |
 |---|---|---|---|---|
-| `not_started` | row's or null | row's or null | null | `[]` |
-| `reviewing` | row's | row's (Running since) | `{kind, url, at}` or null | `[]` |
-| `answered` | row's (prefix of `head`) | row's (the answer time) | `{kind, url, at}` or null | `[]` |
-| `superseded` | row's (not a prefix of `head`) | row's | `{kind, url, at}` or null | `[]` |
-| `declined` | null | null | `{kind, url, at}` | `[]` |
-| `unreadable` | null | null | null | one or more reasons |
+| `not_started` | row's or null | row's or null | `[]` | `[]` |
+| `reviewing` | row's | row's (Running since) | list of `{kind, url, at}` | `[]` |
+| `answered` | row's (prefix of `head`) | row's (the answer time) | list of `{kind, url, at}` | `[]` |
+| `superseded` | row's (not a prefix of `head`) | row's | list of `{kind, url, at}` | `[]` |
+| `declined` | null | null | non-empty list of `{kind, url, at}` | `[]` |
+| `unreadable` | null | null | `[]` | one or more reasons |
 
-`unknown` is the earliest item since the trigger matching no form; it makes the state `declined` only when no
-Code Review row has a status time after `since`.
+`unknown` lists every item since the trigger matching no form, oldest first; it makes the state `declined` only
+when no Code Review row has a status time after `since`. `comments` lists every Codex comment since the trigger
+other than the card, and every unknown item whatever its kind, oldest first.
 
 Each error reads `Codex status card <url> cannot be read: <why>; its format changed: report it on the plugin's
 repo and read the PR by hand`, with `<why>` one of the seven FR-007 lists: `no Code Review row`, `<n> Code
@@ -81,8 +82,11 @@ SUCCESS run with another title is not. The WARNING line is `WARNING: Codex's rep
 (`since` for `reviewing`; `Codex: not started` with no row) (FR-014).
 
 Unchanged: the draft rule, the running-checks wait, the mergeability wait, the `codex-review` lag wait and its
-one sweep dispatch (now timed from `status_at`), the 👍-on-trigger note, the exit codes' meanings in `SKILL.md`,
-the inbox drop's shape, and the waiver's outcome (exit 0 under a WAIVED run on the head).
+one sweep dispatch (now timed from `status_at`), the 👍-on-trigger note,
+the inbox drop's shape, and the waiver's outcome (exit 0 under a WAIVED run on the head, for `not_started` and
+`declined`). Exit 4 now also comes with `mergeStateStatus=CLEAN`, for `superseded` and `declined`: the `BLOCKED:`
+line names each cause, and `SKILL.md`'s exit-4 row says so. The declined line and the WARNING are printed once per
+unknown item.
 
 `Codex comments since the trigger (codex-review is not success):` lists `codex.comments` only: never the card
-(FR-006), an unknown comment included.
+(FR-006), every unknown item included.

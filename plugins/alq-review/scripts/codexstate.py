@@ -90,19 +90,20 @@ def state(items: list[dict], since: str, head: str) -> dict:
     trigger = parse_time(since)
     cards = sorted((i for i in items if match(i) == "card"), key=lambda i: i["at"])
     said = sorted((i for i in items if match(i) != "card" and parse_time(i["at"]) > trigger), key=lambda i: i["at"])
-    unknown = next(({"kind": i["kind"], "url": i["url"], "at": i["at"]} for i in said if match(i) is None), None)
+    unknown = [i for i in said if match(i) is None]
     out = {"state": "not_started", "commit": None, "status_at": None, "spoke": bool(said),
-           "comments": [{"url": i["url"], "at": i["at"], "body": i["body"]} for i in said if i["kind"] == "comment"],
-           "unknown": unknown, "errors": []}
+           "comments": [{"url": i["url"], "at": i["at"], "body": i["body"]}
+                        for i in said if i["kind"] == "comment" or i in unknown],
+           "unknown": [{"kind": i["kind"], "url": i["url"], "at": i["at"]} for i in unknown], "errors": []}
 
     if len(cards) > 1:
-        return dict(out, state="unreadable", unknown=None,
+        return dict(out, state="unreadable", unknown=[],
                     errors=[cannot_read(cards[0]["url"], f"{len(cards)} comments carry the marker")])
     row = None
     if cards:
         row, errors = read_card(cards[0]["url"], cards[0]["body"])
         if errors:
-            return dict(out, state="unreadable", unknown=None, errors=errors)
+            return dict(out, state="unreadable", unknown=[], errors=errors)
 
     # A row that reached its status before the trigger belongs to an earlier round.
     if row and row["at"] > trigger:

@@ -91,7 +91,7 @@ class Unreadable(unittest.TestCase):
     def assertUnreadable(self, items, why, url="card"):
         got = codexstate.state(items, SINCE, HEAD)
         self.assertEqual(got["state"], "unreadable")
-        self.assertEqual((got["commit"], got["status_at"], got["unknown"]), (None, None, None))
+        self.assertEqual((got["commit"], got["status_at"], got["unknown"]), (None, None, []))
         self.assertEqual(got["errors"], unreadable(why, url))
 
     def edited(self, new_row):
@@ -166,24 +166,28 @@ class States(unittest.TestCase):
                 got = self.state(*rows, item(USAGE_LIMIT, url="limit"))
                 self.assertEqual(got["state"], "declined")
                 self.assertEqual((got["commit"], got["status_at"]), (None, None))
-                self.assertEqual(got["unknown"], {"kind": "comment", "url": "limit", "at": "2026-10-13T12:05:00Z"})
+                self.assertEqual(got["unknown"], [{"kind": "comment", "url": "limit", "at": "2026-10-13T12:05:00Z"}])
 
     def test_an_unknown_comment_before_the_trigger_is_not_read(self):
         got = self.state(item(USAGE_LIMIT, at="2026-10-13T11:00:00Z"))
-        self.assertEqual((got["state"], got["unknown"]), ("not_started", None))
+        self.assertEqual((got["state"], got["unknown"]), ("not_started", []))
 
-    def test_an_unknown_item_beside_a_row_keeps_the_rows_state_and_names_the_earliest(self):
+    def test_unknown_items_beside_a_row_keep_the_rows_state_and_are_all_named_oldest_first(self):
         later = item(sample("decline-error.md"), at="2026-10-13T12:07:00Z", url="later")
         earlier = item(USAGE_LIMIT, at="2026-10-13T12:03:00Z", url="earlier")
         for row, expected in ((card("Running"), "reviewing"), (card(), "answered"), (card(commit=OTHER), "superseded")):
             with self.subTest(expected=expected):
                 got = self.state(row, later, earlier)
                 self.assertEqual(got["state"], expected)
-                self.assertEqual(got["unknown"], {"kind": "comment", "url": "earlier", "at": "2026-10-13T12:03:00Z"})
+                self.assertEqual(got["unknown"], [{"kind": "comment", "url": "earlier", "at": "2026-10-13T12:03:00Z"},
+                                                  {"kind": "comment", "url": "later", "at": "2026-10-13T12:07:00Z"}])
 
-    def test_an_unknown_review_is_unknown_too(self):
-        got = self.state(item("### A new heading", kind="review", url="r"))
-        self.assertEqual((got["state"], got["unknown"]["kind"]), ("declined", "review"))
+    def test_an_unknown_review_is_unknown_and_listed_among_the_comments(self):
+        reply = item("### A new heading", kind="review", url="r")
+        got = self.state(card(), reply)
+        self.assertEqual(got["unknown"], [{"kind": "review", "url": "r", "at": reply["at"]}])
+        self.assertEqual(got["comments"], [{"url": "r", "at": reply["at"], "body": "### A new heading"}])
+        self.assertEqual(self.state(reply)["state"], "declined")
 
     def test_spoke_counts_any_item_but_the_card_since_the_trigger(self):
         self.assertFalse(self.state(card())["spoke"])

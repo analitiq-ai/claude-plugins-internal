@@ -24,7 +24,7 @@ Items are every comment and review by `chatgpt-codex-connector` on the PR, whate
 | `review` | review | begins `### 💡 Codex Review` |
 
 An item since the trigger matching none is **unknown**: it decides `declined` only when no row answers (order
-3 below) and is carried as `unknown` in every other state. A card is matched at any time. Two sampled declines
+3 below) and is listed in `unknown` in every other state. A card is matched at any time. Two sampled declines
 (`decline-not-connected.md`, `decline-error.md`) match none by design.
 
 ## Code Review row (read from the card, R4)
@@ -46,8 +46,8 @@ than one comment carrying the marker. Other rows are skipped unread.
 | `commit` | 7–40 hex or null | the row's Commit cell, when a row was read |
 | `status_at` | ISO-8601 Z or null | the row's status time; the answer time when `answered` |
 | `spoke` | bool | any non-card item is since the trigger |
-| `comments` | list of `{url, at, body}` | non-card Codex comments since the trigger, oldest first |
-| `unknown` | `{kind, url, at}` or null | the earliest item since the trigger matching no form, in any state |
+| `comments` | list of `{url, at, body}` | non-card Codex comments and every unknown item since the trigger, oldest first |
+| `unknown` | list of `{kind, url, at}` | every item since the trigger matching no form, oldest first, in any state |
 | `errors` | list of strings | the reading failures, when `unreadable` |
 
 ### State transitions

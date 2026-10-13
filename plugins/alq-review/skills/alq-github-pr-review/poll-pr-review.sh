@@ -9,12 +9,14 @@
 # those against the branch rules. The poller waits for that picture to be complete and prints it.
 #
 # SETTLED means every one of:
-#   - Codex answered since the trigger: its status card's Code Review row says
-#     Completed for the head with a status time after the trigger, and that
-#     status time is the answer's. A Running row is waited on. A Completed row
-#     for another commit settles the round with the re-request, never CLEAN. A
-#     Codex comment or review not on scripts/codexstate.py's list settles the
-#     round while no row answers, and is a WARNING beside one;
+#   - Codex is not reviewing. Its status card's Code Review row, read only
+#     when its status time is after the trigger, is waited on while Running.
+#     Completed for the head is Codex's answer, at that status time; Completed
+#     for another commit settles the round with the re-request, never CLEAN.
+#     With no such row the round waits for one, unless Codex posted something
+#     not on scripts/codexstate.py's list: that settles it, never CLEAN, and
+#     beside a row is a WARNING. pr-gate's WAIVED run on the head stands in
+#     for the missing answer in those two cases only;
 #   - no check is running except the gate runs and those passed to
 #     --ignore-check (a gate run is a verdict, not work: its pending state is
 #     waited on only under the next rule);
@@ -199,8 +201,10 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | [$all_contexts[] | select(.ignored and (.passing | not)) | {name, state, url}] as $ignored_not_passing
 | [$contexts[] | select(.gate)] as $gate_runs
 | ($gate_runs | map(select(.name == "codex-review")) | first) as $codex_gate
-# pr-gate waives a round Codex cannot review; that releases the round only where Codex gave no answer.
-| ($codex_gate != null and $codex_gate.state == "SUCCESS" and ($codex_gate.description | startswith("WAIVED:"))) as $waived
+# pr-gate waives a head Codex cannot review: that stands in for an answer only where Codex has none
+# (not_started, declined). A Running row is still waited on and a superseded row still blocks.
+| ($codex_gate != null and $codex_gate.state == "SUCCESS"
+   and (($codex_gate.description // "") | startswith("WAIVED:"))) as $waived
 | [$contexts[] | select(.unfinished) | select(.gate | not)] as $running
 | [$contexts[] | select((.passing or .unfinished) | not) | {name, state, url}] as $failing
 
@@ -218,11 +222,18 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | [ $rabbit_reviews[] | body_findings[] | select(.id as $id | $answers | contains($id) | not) | del(.id) ] as $outside
 | ($inline + $outside | sort_by(.by != $codex, .by, .path, .line)) as $threads
 
+# Why the round is not clean, once nothing is left to triage: the state of Codex, the merge state, or both.
+| [ (if $codex_state.state == "answered" or ($waived and ($codex_state.state | IN("not_started", "declined"))) then empty
+     elif $codex_state.state == "superseded" then "Codex reviewed \($codex_state.commit), not the head \($pr.headRefOid[0:10])"
+     elif $codex_state.state == "declined" then "Codex'"'"'s reply is not one the poller knows"
+     elif $codex_state.state == "reviewing" then "Codex is reviewing \($codex_state.commit)"
+     else "Codex has not answered since \($since)" end),
+    (if $pr.mergeStateStatus == "CLEAN"
+        or ($pr.mergeStateStatus == "UNSTABLE" and ($ignored_not_passing | length) > 0 and all($contexts[]; .passing))
+     then empty else "GitHub reports mergeStateStatus=\($pr.mergeStateStatus)" end) ] as $blocked_by
+
 | { codex: $codex_state, head: $pr.headRefOid, merge: $pr.mergeStateStatus, decision: $pr.reviewDecision,
-    clean: (($pr.mergeStateStatus == "CLEAN"
-             or ($pr.mergeStateStatus == "UNSTABLE" and ($ignored_not_passing | length) > 0 and all($contexts[]; .passing)))
-            and ($codex_state.state == "answered"
-                 or ($waived and ($codex_state.state | IN("not_started", "declined"))))),
+    clean: ($blocked_by | length == 0), blocked_by: $blocked_by,
     since: $since, trigger_found: ($trigger != null), waived: $waived,
     thumbs_on_trigger_only: (($thumbs_on_trigger | length) > 0 and ($thumbs_on_body | length) == 0
                              and ($codex_state.spoke | not)),
@@ -256,9 +267,9 @@ REPORT='
 (if (.gates | length) > 0 then "Gate check runs:", (.gates[] | "  \(.name): \(.state) — \(.description // "")") else empty end),
 (if .codex.state == "superseded" then "Codex reviewed \(.codex.commit), not the head \(.head[0:10]): comment `@codex review`" else empty end),
 (if .codex.state == "declined" and (.waived | not)
- then "Codex'"'"'s reply is not one the poller knows (\(.codex.unknown.url), \(.codex.unknown.at)): Codex declined or changed what it posts; read it."
- elif .codex.state != "declined" and .codex.unknown != null
- then "WARNING: Codex'"'"'s reply is not one the poller knows (\(.codex.unknown.url), \(.codex.unknown.at)); read it."
+ then (.codex.unknown[] | "Codex'"'"'s reply is not one the poller knows (\(.url), \(.at)): Codex declined or changed what it posts; read it.")
+ elif .codex.state != "declined"
+ then (.codex.unknown[] | "WARNING: Codex'"'"'s reply is not one the poller knows (\(.url), \(.at)); read it.")
  else empty end),
 (if .codex_gate_missing then "WARNING: no codex-review check run from the \($gate_app) App on \(.head[0:10])." else empty end),
 (if .thumbs_on_trigger_only then "Codex answered with only a 👍 on the @codex review comment. The gate reads Codex'"'"'s reactions on the PR description only: comment `@codex review` to get a verdict comment." else empty end),
@@ -328,8 +339,7 @@ hand_over() {
 }
 
 settle() {
-  local state=$1 merge findings
-  merge=$(jq -r '.merge' <<<"$state")
+  local state=$1 findings
   findings=$(jq -r '.findings' <<<"$state")
   report "$state"
   if [ "$findings" -gt 0 ]; then
@@ -342,7 +352,7 @@ settle() {
     hand_over "$state" clean
     exit 0
   fi
-  echo "BLOCKED: nothing to triage, but GitHub reports mergeStateStatus=$merge. Act on the gate check runs and notes above."
+  echo "BLOCKED: nothing to triage, but $(jq -r '.blocked_by | join("; ")' <<<"$state"). Act on the gate check runs and notes above."
   exit 4
 }
 

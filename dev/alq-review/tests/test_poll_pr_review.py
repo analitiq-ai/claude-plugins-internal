@@ -666,6 +666,53 @@ class Poller(unittest.TestCase):
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn(self.unknown_line(reply), done.stdout)
 
+    def test_every_unknown_reply_is_named(self):
+        first = comment(101, CODEX, sample("decline-not-connected.md"), at(2))
+        second = comment(102, CODEX, sample("decline-error.md"), at(3))
+        done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, first, second], contexts=[check("pytest"), ATTESTED]))
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        for reply in (first, second):
+            self.assertIn(self.unknown_line(reply) + ": Codex declined or changed what it posts; read it.", done.stdout)
+
+    def test_an_unknown_review_beside_the_answer_is_a_warning_and_a_codex_comment(self):
+        reply = review(9, CODEX, "### A heading Codex has not posted before", at(6))
+        done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, card(at=at(5))], reviews=[reply],
+                                  contexts=[check("pytest"), ATTESTED]))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(f"WARNING: Codex's reply is not one the poller knows ({reply['url']}, {at(6)}); read it.",
+                      done.stdout)
+        self.assertIn("Codex comments since the trigger", done.stdout)
+        self.assertEqual([c["url"] for c in self.drop()["gate_comments"]], [reply["url"]])
+
+    def test_blocked_names_codex_as_the_cause_when_github_reports_clean(self):
+        cases = ((card(commit="a3d2db7", at=at(5)), "Codex reviewed a3d2db7, not the head abc1234567"),
+                 (comment(101, CODEX, USAGE_LIMIT, at(2)), "Codex's reply is not one the poller knows"))
+        for said, cause in cases:
+            with self.subTest(cause=cause):
+                done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, said],
+                                          contexts=[check("pytest"), CODEX_CLEAN, ATTESTED]))
+                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+                self.assertIn(f"BLOCKED: nothing to triage, but {cause}.", done.stdout)
+                self.assertNotIn("mergeStateStatus=CLEAN.", done.stdout)
+
+    def test_a_waived_run_does_not_release_a_superseded_row(self):
+        waived = gate("codex-review", "SUCCESS", "WAIVED: Codex is out of credits; abc1234567 was not reviewed", at(6))
+        done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, card(commit="a3d2db7", at=at(5))],
+                                  contexts=[check("pytest"), waived, ATTESTED]))
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("Codex reviewed a3d2db7, not the head abc1234567: comment `@codex review`", done.stdout)
+
+    def test_a_waived_run_releases_a_silent_codex(self):
+        waived = gate("codex-review", "SUCCESS", "WAIVED: Codex is out of credits; abc1234567 was not reviewed", at(3))
+        done = self.poll(snapshot(merge="CLEAN", contexts=[check("pytest"), waived, ATTESTED]), minutes="0")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_success_run_with_no_title_is_read(self):
+        untitled = gate("codex-review", "SUCCESS", None, at(13))
+        done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, card(at=at(5))],
+                                  contexts=[check("pytest"), untitled, ATTESTED]))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     # -- a card the poller cannot read ------------------------------------------------
 
     def test_an_unreadable_card_ends_the_run_with_its_url(self):
