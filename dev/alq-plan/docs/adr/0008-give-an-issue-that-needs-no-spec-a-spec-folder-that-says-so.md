@@ -9,7 +9,7 @@ tags: [premise, spec-folder, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006", "0009"]
+relatesTo: ["0005", "0006"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"
@@ -59,7 +59,7 @@ Why now: issue #79, part of #80.
 
 We will have a `no spec needed` pick write `specs/<issue>-<slug>/spec.md`, in the folder the run was given, saying
 that no spec is needed and carrying the premise question the pick rests on and the reason. The folder holds nothing
-else, and lands like a spec, through its own PR (ADR-0009).
+else, and lands like a spec, through its own PR (engineering ADR-0002, decision 3).
 
 ADR-0006, decision 2, stands for the issue: nothing is posted on it, and the user is still told to pass `spec: null`
 when the work is reviewed. What changes is where the outcome lives: in the repo, not the session. ADR-0006,
