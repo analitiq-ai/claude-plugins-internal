@@ -160,33 +160,35 @@ the new `spec.md` with no hold.
    spec branch is another PR and is not locked by it.
 2. **Given** a `RESHAPE_SPEC` lock and a default branch whose bound `spec.md` differs from the one at the locked
    round's reviewed commit, **When** the user types `rebase <ref>`, **Then** the hook checks that first, then
-   rebases the story branch on the default branch, pushes it with `git push --force-with-lease` pinned to the
-   branch tip the remote had before the rebase, releases the lock, and the next round grades against the new
-   `spec.md`. Only whether the file differs is checked, not how.
+   rebases a copy of the story branch on the default branch in a worktree of its own, pushes it with `git push
+   --force-with-lease` pinned to the branch tip the remote had before the rebase, and only once the push has landed
+   moves the story branch and its checkout to the pushed commit and releases the lock. The next round grades
+   against the new `spec.md`. Only whether the file differs is checked, not how. Until the push lands, the story
+   branch and its checkout are not touched.
 3. **Given** a `RESHAPE_SPEC` lock and a default branch whose bound `spec.md` is the same as at the locked round's
    reviewed commit, **When** the user types `rebase <ref>`, **Then** nothing is rebased, the lock stays and the reply
    says the spec PR has not reached the default branch.
 4. **Given** `rebase <ref>` whose rebase stops on a conflict, **When** the hook sees it, **Then** the lock stays and
-   a conflict-resolver agent is dispatched without the user. The lock admits only its changes to the conflicted
-   files, never a spec.md, and the rebase's continue or abort. Once the rebase completes and the check of scenario
-   2 still holds, the branch is pushed as in scenario 2 and the lock is released. If the agent cannot resolve them,
-   it aborts the rebase, the lock stays, and the conflicted files are raised to the user. A conflict in a spec.md is
-   no agent's to resolve: the rebase is aborted, the lock stays, and the spec.md is raised to the user.
+   a conflict-resolver agent is dispatched without the user, into the rebase's worktree. The lock admits only its
+   changes to the conflicted files, never a spec.md, and the rebase's continue or abort; the story rule of User
+   Story 1 holds it there as on the story branch. Once the rebase completes and the check of scenario 2 still
+   holds, the rebase is pushed and the lock released as in scenario 2. If the agent cannot resolve them, it aborts
+   the rebase, the lock stays, and the conflicted files are raised to the user. A conflict in a spec.md is no
+   agent's to resolve: the rebase is aborted, the lock stays, and the spec.md is raised to the user. In each of
+   these the story branch is as it was before `rebase <ref>`.
 5. **Given** a story branch already rebased on a default branch whose bound `spec.md` changed, with the rebased branch
    on the remote, **When** the user types `rebase <ref>` again, **Then** the rebase is a no-op and the lock is released:
    the keyword is safe to repeat.
 6. **Given** a `RESHAPE_SPEC` lock, **When** the user types `unlock <ref>`, **Then** the lock is released with no
    rebase and no spec check, and the reply carries the ruling: the user has ruled the spec stands.
 7. **Given** a completed rebase whose `--force-with-lease` push is refused, **When** the hook sees it, **Then** nothing
-   is forced and the lock stays. When the remote story branch still has the tip the lease names, the story branch is put
-   back on the commit it was at before the rebase, and the reply gives git's words and says to type `rebase <ref>`
-   again. When it moved from that tip (even when a later fetch brought the new tip), nothing is put back: the reply
-   gives git's words, the commit the checkout is on, the one it was on before the rebase and the remote branch's tip,
-   and the step that puts the checkout back.
-8. **Given** a push refused on a moved remote branch as in scenario 7, **When** the user puts the checkout back on the
-   commit it was at before the rebase and types `rebase <ref>` again, **Then** nothing is rebased and the reply says to
-   pull the remote's commits first, as in scenario 11; once the checkout holds them, `rebase <ref>` completes the
-   rebase, the push and the release as in scenario 2.
+   is forced, the lock stays, the story branch and its checkout are as they were before `rebase <ref>`, and the reply
+   gives git's words and says to type `rebase <ref>` again. Typed again, it starts over from its first check, so a
+   remote branch that moved is answered as in scenario 11.
+8. **Given** a push that landed and a story checkout that git cannot move to the pushed commit, **When** the hook sees
+   it, **Then** the lock stays, and the reply gives git's words, the pushed commit and the step that moves the
+   checkout to it (`git reset --keep <sha>` in the checkout); `rebase <ref>` typed after it releases the lock without
+   rebasing again.
 9. **Given** a `RESHAPE_SPEC` lock on a story PR whose base is not the default branch (a stacked story PR), **When**
    the user types `rebase <ref>`, **Then** nothing is rebased, the lock stays, and the reply names the next step:
    land the parent PR first.
@@ -200,6 +202,9 @@ the new `spec.md` with no hold.
     over the PR's diff, not a delta from the last round before the rebase, and its facts count only the commits since
     the release: a file edited in three rounds before the rebase is not at a third edit, and the round is compared with
     no round before the release. After a release by `unlock <ref>` the rounds are measured as before.
+13. **Given** a `rebase <ref>` that ended before it released the lock (the hook killed), **When** the user types
+    `rebase <ref>` again, **Then** a push of it that landed is finished as in scenario 2 without rebasing again, and
+    any other state is dropped and the keyword starts over from its first check: the story branch never moved.
 
 ---
 
@@ -272,8 +277,9 @@ two closing lines.
 - A `spec.md` path in a Bash command that only appears in a heredoc body, a comment or a quoted string the command
   never writes to is not refused by the hook; the commit gate (scenario 3 of User Story 1) and User Story 4 stand
   behind it.
-- During a rebase HEAD is detached: the story-branch rule of User Story 1 reads the branch being rebased, so the
-  conflict-resolver agent is held to it.
+- During a rebase in a story checkout HEAD is detached: the story-branch rule of User Story 1 reads the branch being
+  rebased. The rebase of `rebase <ref>` runs in a detached worktree of its own, which the ledger's record names as the
+  story's, so the rule holds the conflict-resolver agent there too.
 - Audit reviewers are still not given the spec; the diff check applies to an audit launch as to any other.
 
 ## Requirements *(mandatory)*
@@ -282,7 +288,8 @@ two closing lines.
 
 - **FR-001**: On a story branch, every `Edit`, `Write` and `NotebookEdit` of a spec.md, every Bash command of a form
   in the writes table that writes one, and every `git commit` whose staged tree changes one MUST be refused with the
-  next step User Story 1 names. The rule MUST read the checkout's branch and nothing from the ledger. The writes of
+  next step User Story 1 names. The rule MUST read the checkout's branch and nothing from the ledger, except in the
+  worktree a `rebase <ref>` rebases in, which its ledger record names as the story's (User Story 3). The writes of
   every other file, and the same writes on any other branch, MUST pass it.
 - **FR-002**: Every review-round and assess-round launch MUST read `spec.md` at the reviewed commit and nothing of
   any earlier version. The ledger MUST record the `spec` value only: no blob id, no text, no hold.
@@ -304,15 +311,16 @@ two closing lines.
   PR) it MUST refuse, keeping the lock, with the next step: land the parent PR first. When the bound `spec.md` is
   missing on the default branch, it MUST refuse, keeping the lock: the binding never changes, so the reply says to close
   this PR and restart the story on the new folder. Then it MUST check that the bound `spec.md` on the default branch
-  differs from the one at the locked round's reviewed commit, and only then rebase the story branch on it, push it with
-  `git push --force-with-lease` pinned to the branch tip the remote had before the rebase, and release the lock. It MUST
-  rebase nothing when the remote story branch has a commit the checkout lacks. Otherwise the lock MUST stay. When the
-  push is refused, the lock MUST stay. A rebase that ends unpushed, and one a `rebase <ref>` finds it began with no
-  rebase in progress, MUST be judged from git as it then is: a push that landed releases the lock; a checkout already on
-  the commit before the rebase stays there, and one whose remote branch still has the pinned tip is put back on that
-  commit, so that `rebase <ref>` typed again starts over from it; any other state keeps the lock and the record of that
-  commit, and the reply names the step that puts the checkout back. Repeating the keyword MUST be safe. A rebase
-  conflict MUST be resolved by a conflict-resolver agent without the user: while the lock stays it admits only that
+  differs from the one at the locked round's reviewed commit, and only then rebase a copy of the story branch on it in a
+  worktree of its own, push the result with `git push --force-with-lease` pinned to the branch tip the remote had before
+  the rebase, and, once the push has landed, move the story branch and its checkout to the pushed commit and release the
+  lock. The story branch and its checkout MUST NOT change before the push lands. It MUST rebase nothing when the remote
+  story branch has a commit the checkout lacks. Otherwise the lock MUST stay. When the push is refused, the lock MUST
+  stay and the story branch is as it was. When the push landed and the checkout cannot be moved to it, the lock MUST
+  stay and the reply MUST name the step that moves it. A `rebase <ref>` that finds an earlier one unfinished MUST finish
+  it when its push landed, and otherwise drop it and start over. Every reply MUST state only what git said and the
+  commits it observed, never an inferred cause. Repeating the keyword MUST be safe. A rebase conflict MUST be resolved
+  by a conflict-resolver agent without the user, in the rebase's worktree: while the lock stays it admits only that
   agent's changes to the conflicted files, never a spec.md, and the rebase's continue or abort; the user is raised only
   when it cannot resolve them, or when a spec.md is in conflict, with the rebase aborted. `unlock <ref>` MUST release a
   `RESHAPE_SPEC` lock with no rebase when the user rules the spec stands, and stays the release of an `ESCALATE` or

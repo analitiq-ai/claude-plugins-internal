@@ -15,7 +15,8 @@ third), under `mode`: in `log` mode recorded as `would_deny`, nothing blocked.
 | commit | `<path>`, the spec.md of spec folder `<folder>`, is staged for this commit, and `<branch>` is a story branch: a story branch never changes a spec.md. Put it back: `git restore --staged --worktree -- <path>`, or for a file HEAD does not hold, `git rm --cached -- <path>` and delete it. Then raise the spec problem to the user: they land the change in a spec-only PR on `<issue>-spec`; once it merges, this branch rebases on it. |
 
 Not refused by this rule: any file but a spec.md; any branch but a story branch; a Bash command with no `write` action
-(`cat`, `grep`, `git diff`, `git show`, `git log`); a path outside any checkout.
+(`cat`, `grep`, `git diff`, `git show`, `git log`); a path outside any checkout. A path in the detached worktree a
+`rebase <ref>` rebases in is on the branch of the ledger whose `rebase` record names that worktree (data-model).
 
 ## The binding (US2)
 
@@ -49,18 +50,20 @@ hook returns None). Replies go back as `additionalContext` and `systemMessage`. 
 | bound to `null` | This PR has no spec, so no spec change can reach it. Close it and restart the work on a new PR bound to a spec that settles the decision. | stays |
 | checkout missing / on another branch / dirty | names the root and what to do (check `<branch>` out there; commit or discard the changes) | stays |
 | a rebase in progress in `<root>` with no `rebase` record (one no `rebase <ref>` started) | A rebase is in progress in `<root>` that no `rebase <ref>` recorded, so nothing was run. Ask the user to run `git rebase --abort` in `<root>`, then type `rebase <ref>` again. | stays |
-| a `rebase` record with no rebase in progress in `<root>` (a hook killed after it recorded one) | `_recover_rebase` (data-model "Recovering a rebase"): the push landed → the pushed reply; HEAD on `<from>`, or put back on it → none of its own, and the keyword starts over from its first check; otherwise → the kept-record reply | released, `rebase` popped / as the run ends, `rebase` popped / stays, `rebase` kept |
+| a `rebase` record with no rebase in progress in its worktree (a hook that ended before the release, or a step that exited non-zero) | data-model "A recorded rebase found again": `origin/<branch>` at the recorded `rebased` → the story checkout moved to it and released: the pushed reply, or the checkout-not-moved reply; otherwise → none of its own: the worktree removed, and the keyword starts over from its first check; the fetch fails → git's words | released, `rebase` popped / as the run ends, `rebase` popped / stays, `rebase` kept |
 | gh (the default branch or the PR's base) or git fetch fails | their words, as `_unknown_pr` gives them | stays |
 | the PR's base is not `<default>` (a stacked story PR) | `rebase` rebases on `<default>`, and this PR's base is `<base>`, a parent story branch the spec PR never reaches. Next step: land the parent PR first, then type `rebase <ref>` again. | stays |
 | `origin/<branch>` is not an ancestor of HEAD | The remote `<branch>` has commits this checkout lacks, so nothing was rebased. Pull them in `<root>`, then type `rebase <ref>` again. | stays |
 | `<spec>/spec.md` is missing at `origin/<default>` (a rescope moved or deleted the folder) | `<spec>/spec.md` is missing on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. | stays |
 | `<spec>/spec.md` at `origin/<default>` equals the one at the locked round's commit | The spec PR has not reached `<default>`: `<spec>/spec.md` there is the one round <n> reviewed. Land the spec change as a spec-only PR on `<issue>-spec`, and type `rebase <ref>` once it merges. | stays |
-| rebase stops with a spec.md among the conflicts | The rebase of `<branch>` on `<default>` stopped on a conflict in `<spec.md>`, which no agent resolves, so it was aborted. Raise it to the user: <files>. | stays; `rebase` popped |
-| rebase stops on other conflicts | The rebase of `<branch>` on `<default>` stopped on conflicts in <files>. Dispatch now, without asking the user: `Agent(subagent_type='alq-review:conflict-resolver', prompt='<root>')`. It resolves them and continues the rebase; the lock stays until the branch is pushed, and only its changes to those files are admitted. | stays; `rebase`, recorded before the rebase, kept |
-| recorded rebase still in progress | the dispatch reply again | stays |
-| push refused, `origin/<branch>` still at the lease | `git push --force-with-lease=<branch>:<sha> origin <branch>` was refused: <git's words>. Nothing was forced, and `<branch>` is back on `<from>`, the commit it was at before the rebase. Type `rebase <ref>` again. | stays; `git reset --keep <from>` run, `rebase` popped |
-| the checkout cannot be put back (`_recover_rebase` case 3, after a refused push, a stop in the finish or a record found with no rebase in progress: `origin/<branch>` is neither HEAD nor the lease, the fetch failed, or `git reset --keep <from>` exited non-zero) | <git's words, or the finish step's reply>. Nothing was forced. `<branch>` in `<root>` is at `<head>`; before the rebase it was at `<from>`, and `origin/<branch>` is at `<origin>`: a state the gate did not make, so it put nothing back and kept the record of this rebase. Next step: ask the user to put the checkout back on `<from>`, then type `rebase <ref>` again. | stays; `rebase` kept |
-| pushed (rebased or already up to date), or found pushed by `_recover_rebase` | The user rebased `<branch>` on `<default>` and released <repo>#<pr>: every hold named before is released, and the next round is a full round that grades against `<spec>/spec.md` as the branch now has it. | released; `rebase` popped; `regraded_from` set |
+| `git worktree add --detach <worktree> HEAD` exits non-zero | `git worktree add` of `<worktree>` exited non-zero: <git's words>. Nothing was rebased. | stays; `rebase` popped |
+| rebase stops with a spec.md among the conflicts | The rebase of `<branch>` on `<default>` stopped on a conflict in `<spec.md>`, which no agent resolves, so it was aborted; `<branch>` was not changed. Raise it to the user: <files>. | stays; the worktree removed, `rebase` popped |
+| rebase stops on other conflicts | The rebase of `<branch>` on `<default>`, in the worktree `<worktree>`, stopped on conflicts in <files>. Dispatch now, without asking the user: `Agent(subagent_type='alq-review:conflict-resolver', prompt='<worktree>')`. It resolves them and continues the rebase there; `<branch>` is not changed until the rebase is pushed, the lock stays until then, and only its changes to those files are admitted. | stays; `rebase`, recorded before the rebase, and the worktree kept |
+| recorded rebase still in progress in its worktree | the dispatch reply again | stays |
+| push refused | `git push --force-with-lease=<branch>:<sha> origin <rebased>:refs/heads/<branch>` was refused: <git's words>. Nothing was forced, and `<branch>` in `<root>` is at `<head>`, as before `rebase <ref>`. Type `rebase <ref>` again. | stays; the worktree removed, `rebase` popped |
+| pushed, and `git reset --keep <rebased>` in `<root>` exits non-zero | `<rebased>` was pushed to `<branch>` on origin, and `git reset --keep <rebased>` in `<root>` exited non-zero: <git's words>. Next step: ask the user to run `git reset --keep <rebased>` in `<root>`, then type `rebase <ref>` again. | stays; `rebase` (with `rebased`) and the worktree kept |
+| a worktree removal (`git worktree remove --force <worktree>`) exits non-zero | `git worktree remove --force <worktree>` exited non-zero: <git's words>. Type `rebase <ref>` again once it is removed. | stays; `rebase` kept |
+| pushed and the checkout moved (rebased or already up to date), also when found again | The user rebased `<branch>` on `<default>` and released <repo>#<pr>: every hold named before is released, and the next round is a full round that grades against `<spec>/spec.md` as the branch now has it. | released; the worktree removed, `rebase` popped; `regraded_from` set |
 
 `unlock <ref>` on a `RESHAPE_SPEC` lock: released with no rebase and no spec check; the reply carries the ruling as today, and
 names `<issue>-spec` as where a rescope runs.
@@ -68,23 +71,24 @@ names `<issue>-spec` as where a rescope runs.
 ### The conflict resolver
 
 `agents/conflict-resolver.md`: name `conflict-resolver`; tools Read, Grep, Glob, Edit, Bash; dispatched only when the gate's
-reply says so. Its prompt is the checkout root. It reads `git status` and `git diff` there, edits each unmerged file so that
-both sides' intent survives, `git add -- <file>`, `git rebase --continue`, and repeats while the rebase stops; it never edits a
-spec.md, never runs `git rebase --skip`, and when it cannot resolve a file it runs `git rebase --abort` and reports the files.
+reply says so. Its prompt is the rebase worktree the reply names. It reads `git status` and `git diff` there, edits each
+unmerged file so that both sides' intent survives, `git add -- <file>`, `git rebase --continue`, and repeats while the rebase
+stops; it never edits a spec.md, never runs `git rebase --skip`, and when it cannot resolve a file it runs `git rebase --abort`
+and reports the files.
 
 | Event | Gate's answer |
 |---|---|
 | `Agent(subagent_type='alq-review:conflict-resolver')` with no recorded rebase in progress | refused: Only the user's `rebase <ref>` starts a rebase; nothing is in progress to resolve. |
-| the same, with a prompt other than the recorded rebase's root | refused: The conflict resolver is dispatched with the root the gate's reply names, `<root>`, and nothing else. |
-| resolver edits an unmerged non-spec.md file | allowed |
+| the same, with a prompt other than the recorded rebase's worktree | refused: The conflict resolver is dispatched with the worktree the gate's reply names, `<worktree>`, and nothing else. |
+| resolver edits an unmerged non-spec.md file of the worktree | allowed |
 | resolver edits any other file, or a spec.md | refused with the lock reason |
 | resolver: `git add -- <unmerged, none a spec.md>`, `git rebase --continue`, `git rebase --abort`, alone | allowed; not watched |
 | resolver: `git add -- <paths>` naming a spec.md | refused with the lock reason |
 | anyone else, or not alone: the same | judged by `mutation`; a move is caught by the watch |
-| PostToolUse of an admitted `--continue`, rebase finished | the finish: spec check, push with the recorded lease, release; `systemMessage` as the pushed reply, or, on a stop at the spec check or the push, `_recover_rebase`'s reply (the pushed reply; the stop's reply with `<branch>` back on `<from>`; or the kept-record reply) |
+| PostToolUse of an admitted `--continue`, rebase finished | the finish in the worktree: spec check, `rebased` saved, push with the recorded lease, the story checkout moved to `<rebased>`, release; `systemMessage` as the pushed reply, or a stop's reply: at the spec check that step's reply, the worktree removed and `rebase` popped; the push-refused reply; the checkout-not-moved reply |
 | PostToolUse of an admitted `--continue`, stopped again on no spec.md | `systemMessage`: The rebase stopped again on <files>; resolve them and continue. |
-| PostToolUse of an admitted `--continue`, stopped again with a spec.md unmerged | the hook runs `git rebase --abort` and pops `rebase`; `systemMessage`: the spec.md-conflict reply above. |
-| PostToolUse of an admitted `--abort` | `rebase` popped; `systemMessage`: The rebase was aborted and the lock stays. Raise the conflicted files to the user: <files>. |
+| PostToolUse of an admitted `--continue`, stopped again with a spec.md unmerged | the hook runs `git rebase --abort`, removes the worktree and pops `rebase`; `systemMessage`: the spec.md-conflict reply above. |
+| PostToolUse of an admitted `--abort` | the worktree removed, `rebase` popped; `systemMessage`: The rebase was aborted, `<branch>` was not changed, and the lock stays. Raise the conflicted files to the user: <files>. |
 
 ## The diff check (US4)
 

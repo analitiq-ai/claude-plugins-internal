@@ -30,13 +30,15 @@ code is wrong.
    `git commit`: refused with the restore command. On `123-spec` the same edit passes.
 2. **US2.** On a draft PR bound to a folder, merge a spec change into its branch and launch review-round: the round opens; the
    ledger (`python3 scripts/ledger.py status --worktree <root>`) shows `spec` and no `spec_blob`.
-3. **US3.** Have a round ruled `RESHAPE_SPEC`. The refusal names `123-spec`, `rebase <ref>` and `unlock <ref>`. Type
-   `rebase #<pr>` before the spec PR merges: the reply says it has not reached the default branch. Merge a spec-only PR, type it
-   again: the branch is rebased and pushed, the lock is released. With a conflicting change on the default branch, the reply
-   dispatches the conflict resolver; the lock holds every other edit; the push and release follow its `--continue`. Push to the
-   remote branch between the hook's fetch and its push: the push is refused, nothing is put back, and the reply names the commit
-   before the rebase; reset the checkout to it and type it again: the reply says to pull; pull, type it again: it completes. The
-   next round launched is a full round.
+3. **US3.** Have a round ruled `RESHAPE_SPEC`. The refusal names `123-spec`, `rebase <ref>` and `unlock <ref>`. Type `rebase
+   #<pr>` before the spec PR merges: the reply says it has not reached the default branch. Merge a spec-only PR, type it again:
+   the branch is rebased in a worktree under the git dir and pushed, the story checkout moves to the pushed commit, the lock is
+   released, and the worktree is gone. With a conflicting change on the default branch, the reply dispatches the conflict
+   resolver into that worktree; the story checkout does not change and the lock holds every other edit; the push, the move and
+   the release follow its `--continue`. Push to the remote branch between the hook's fetch and its push: the push is refused,
+   nothing is forced, and the story checkout is where it was; type it again: the reply says to pull; pull, type it again: it
+   completes. Kill the hook after its push has landed: `rebase #<pr>` again releases without rebasing again. The next round
+   launched is a full round.
 4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both; `gh pr ready`: refused
    the same way. Split them: both pass.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the
