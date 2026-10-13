@@ -61,10 +61,12 @@ def _graded_against(spec: Spec, root: str) -> str:
     if isinstance(spec, specbinding.NoSpec):
         return "\n\nThe caller says this change needs no spec. Raise no finding about an unmet requirement of a spec."
     return (f"\n\nThis change implements User Story {spec.story} of the spec in {spec.path}/spec.md of {root}. Read "
-            f"the section under its heading, `{specbinding.story_heading(spec.story)}`, and what the spec excludes. "
-            "Every acceptance scenario of that story that the change does not meet is a finding: quote the scenario in "
-            "its title. What the spec excludes bounds what you may ask for. Raise nothing about another story of the "
-            "spec.")
+            "the whole spec.md, and grade the change against the acceptance scenarios under the story's heading, "
+            f"`{specbinding.story_heading(spec.story)}`, and every requirement, edge case and success criterion that "
+            "applies to that story. Every acceptance scenario of that story that the change does not meet is a "
+            "finding: quote the scenario in its title. So is every such requirement, edge case and success criterion "
+            "the change does not meet. What the spec excludes bounds what you may ask for. Raise nothing that only "
+            "another story of the spec delivers.")
 
 
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,

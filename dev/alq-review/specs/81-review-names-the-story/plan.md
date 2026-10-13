@@ -12,8 +12,8 @@ Every review-round launch, audits included, takes `spec` (a folder or `null`, ch
 The PR is bound at its first round to `spec`, `story` and the `spec.md` blob, or to `null`. A later launch whose
 `spec` or `story` differs is refused. After the changed-`spec.md` hold, a launch is refused when `spec.md` at the
 commit it checks has no line starting `### User Story <N>` with the number ending at a word boundary. Internal
-reviewers are told to grade the change against that story's section and the spec's exclusions only; the assessor
-brief carries `user_story` beside `spec_folder`. Nothing is read from the PR body or the branch name.
+reviewers are told to read the whole `spec.md` and grade the change against what of it applies to that story; the
+assessor brief carries `user_story` beside `spec_folder`. Nothing is read from the PR body or the branch name.
 
 ## Constitution Check
 
@@ -92,11 +92,14 @@ heading at the commit it checks. Bound to null or unbound: no spec and no headin
 
 ### D6. Briefs
 
-- Internal reviewer, bound to a folder: "This change implements User Story `N` of the spec in `F/spec.md` of
-  `<root>`. Read the section under its heading, `### User Story N`, and what the spec excludes. Every acceptance
-  scenario of that story that the change does not meet is a finding: quote the scenario in its title. What the spec
-  excludes bounds what you may ask for. Raise nothing about another story of the spec." The prompt names no other
-  story (SC-002).
+- Internal reviewer, bound to a folder (the rule decided on issue #81, 2026-10-13): "This change implements User
+  Story `N` of the spec in `F/spec.md` of `<root>`. Read the whole spec.md, and grade the change against the
+  acceptance scenarios under the story's heading, `### User Story N`, and every requirement, edge case and success
+  criterion that applies to that story. Every acceptance scenario of that story that the change does not meet is a
+  finding: quote the scenario in its title. So is every such requirement, edge case and success criterion the change
+  does not meet. What the spec excludes bounds what you may ask for. Raise nothing that only another story of the
+  spec delivers." Which requirements apply to the story is the reviewer's reading: a spec does not tag them. The
+  prompt names no other story's heading (SC-002).
 - Bound to null: unchanged ("The caller says this change needs no spec...").
 - Unbound: unchanged (nothing).
 - Audit reviewers: unchanged, no spec.
@@ -128,10 +131,13 @@ Found with `grep -rn` over `plugins/` and `dev/`; read, not run.
 | `gate._spec_step` | story checks, binding of `story`, heading | `gate.on_workflow` |
 | `gate._assess_spec_step` | heading of the bound story | `gate.on_workflow` |
 | `gate._spec_text` | the launch hold names `User Story N` | `gate._spec_step`, `gate._assess_spec_step` |
-| `gate._story_step` | new | `gate._spec_step`, `gate._assess_spec_step` |
+| `gate._head_spec_md` | reads `F/spec.md` at the round's head once, through `worktree.tree_entry` and `worktree.tree_text`, and returns its blob id and text | `gate._spec_step`, `gate._assess_spec_step` |
+| `gate._spec_md_blob` | deleted, with its own `ls-tree` parse | was: `gate._head_spec_md` |
+| `gate._story_step` | new; checks the text `_head_spec_md` read, reading nothing itself | `gate._spec_step`, `gate._assess_spec_step` |
 | `worktree._run` | an argument holding a NUL byte (an agent-cited path) is a `RuntimeError`, as an `OSError` or a timeout already was, not a `ValueError` | `worktree._output`, `worktree.git`, `worktree.locate`, `worktree.contents`, `worktree.is_ignored`, `worktree.review_base`, `worktree.head_tree` |
-| `worktree.tree_text` | the one reader of a file at a tree-ish, unstripped: `None` only when the tree has no file there (nothing, a directory or a gitlink), `RuntimeError` in git's words for every git failure | `gate._story_step`, `claimgate._reader_of`, `claimgate._carried`, `claimgate._end_gone`, `shimgate._head_text`, `shimgate._located_in_head`, `shimgate._located_in_staged` |
-| `worktree.tree_blob` | `None` only when the tree has no entry there, `RuntimeError` in git's words for every git failure | `claimgate._reuse`, `claimgate.after_output` |
+| `worktree.tree_entry` | `_tree_entry` made public: the one reader of an entry at a path of a tree-ish, `None` when the tree has none there or for a name no tree can hold (an empty, `.` or `..` part, or a NUL byte, never passed to git), `RuntimeError` in git's words for every git failure | `worktree.tree_text`, `worktree.tree_blob`, `gate._head_spec_md` |
+| `worktree.tree_text` | built on `tree_entry`, the one reader of a file at a tree-ish, by `<tree>:<path>`, unstripped: `None` only when the tree has no file there (nothing, a directory or a gitlink), `RuntimeError` in git's words for every git failure | `gate._head_spec_md`, `claimgate._reader_of`, `claimgate._carried`, `claimgate._end_gone`, `shimgate._head_text`, `shimgate._located_in_head`, `shimgate._located_in_staged` |
+| `worktree.tree_blob` | built on `tree_entry`: `None` only when the tree has no entry there, `RuntimeError` in git's words for every git failure | `claimgate._reuse`, `claimgate.after_output` |
 | `worktree.head_tree` | the empty tree only while HEAD is unborn, `RuntimeError` in git's words for every git failure | `claimgate.on_commit`, `claimgate.on_launch`, `shimgate.on_commit`, `shimgate.on_launch`, `shimgate._override_tree` |
 
 ## Next-step sites

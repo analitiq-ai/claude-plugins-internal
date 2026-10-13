@@ -27,8 +27,10 @@ are measurements: build on them, do not re-argue them. Copy `brief_token` into y
 the answer is rejected.
 
 The brief quotes no spec. When `spec_folder` is set, read `<spec_folder>/spec.md` in the checkout
-yourself: the section under `### User Story <user_story>`, which is what the change delivers, and what the
-spec excludes. Another story's requirements are not this change's.
+yourself, the whole file: the change delivers the story under `### User Story <user_story>`, and is graded
+against that story's acceptance scenarios and every requirement, edge case and success criterion that applies
+to it. What the spec excludes bounds what may be asked for, and what only another story delivers is not this
+change's.
 
 ## Rule on each finding
 

@@ -12,13 +12,16 @@
 the spec folder and the story number as two arguments, not one string to parse, and the gate does not read the
 PR body (2026-10-13). This spec states the behaviour wanted, at the level of its scenarios. The outcome in each
 binding state, round kind and mode, and the wording of each refusal and next step, are the plan's and the tests'
-(2026-10-13); this spec is not graded for them. Decision record: ADR-0019.
+(2026-10-13); this spec is not graded for them. Reviewers read the whole `spec.md` and grade the change against
+what applies to the bound story, and spec authors need not tag requirements by story (issue #81, 2026-10-13).
+Decision record: ADR-0019.
 
 ## What we want
 
 Under one PR per user story, a PR delivers one story of its spec. Every review round names that story, the gate
-checks the spec has it and holds the PR to it, and the internal reviewers grade the change against that story
-alone.
+checks the spec has it and holds the PR to it, and the internal reviewers grade the change against that story's
+acceptance scenarios and every requirement, edge case and success criterion of the spec that applies to it,
+raising nothing that only another story delivers.
 
 ## Terms
 
@@ -33,7 +36,8 @@ alone.
 ### User Story 1 - A story PR is reviewed against its story (Priority: P1)
 
 The caller launches a review round with `spec: '<folder>'` and `story: <N>`. The gate checks the story is in the
-spec, binds the PR to it, and the internal reviewers grade the change against that story alone.
+spec and binds the PR to it. The internal reviewers read the whole spec and grade the change against what of it
+applies to that story.
 
 **Why this priority**: it is the request. Without it, one PR per story is graded against every story.
 
@@ -54,9 +58,10 @@ read the refusal or the injected reviewer prompts and brief.
    refused, naming the bound arguments to launch with.
 5. **Given** `spec: null`, **When** the round launches, **Then** it opens, and the reviewers are told the change
    needs no spec.
-6. **Given** a bound story, **When** the internal reviewers are briefed, **Then** each is told to read the section
-   under that story's heading in `<folder>/spec.md` and what the spec excludes, to report every acceptance scenario
-   of that story the change does not meet, and to raise nothing about another story.
+6. **Given** a bound story, **When** the internal reviewers are briefed, **Then** each is told to read the whole
+   `<folder>/spec.md`, to report every acceptance scenario of that story, and every requirement, edge case and
+   success criterion that applies to it, that the change does not meet, to ask for nothing the spec excludes, and to
+   raise nothing that only another story delivers.
 7. **Given** a bound story, **When** the assessor reads its brief, **Then** it carries `spec_folder` and
    `user_story`. Bound to `null`, or not yet bound, both are null.
 8. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** a launch or an edit is held,
@@ -103,8 +108,10 @@ read the refusal or the injected reviewer prompts and brief.
   `null`. A later launch with other arguments MUST be refused.
 - **FR-004**: A changed `spec.md` MUST be held before the heading is checked (scenarios 9 and 10).
 - **FR-005**: A next step that launches a review round MUST carry the arguments scenario 11 names.
-- **FR-006**: Internal reviewers MUST be told to grade the change against the section under the bound story's
-  heading and the spec's exclusions, and to raise nothing about another story.
+- **FR-006**: Internal reviewers MUST be told to read the whole `spec.md` and grade the change against the bound
+  story's acceptance scenarios and every requirement, edge case and success criterion that applies to that story,
+  within what the spec excludes, and to raise nothing that only another story delivers. A spec need not tag its
+  requirements by story.
 - **FR-007**: The assessor brief MUST carry `user_story` beside `spec_folder`.
 - **FR-008**: Tests MUST be written first and seen to fail for the reason expected, covering the scenarios and
   edge cases above.
@@ -120,8 +127,8 @@ read the refusal or the injected reviewer prompts and brief.
 
 - **SC-001**: Every scenario and edge case above has a test in `dev/alq-review/tests` that failed before the code
   and passes after.
-- **SC-002**: A story PR's reviewers are named one story, never the whole spec: the injected prompt names `### User
-  Story <N>` and no other story.
+- **SC-002**: A story PR's reviewers are named one story: the injected prompt names `### User Story <N>` and no
+  other story's heading, and tells the reviewer to read the whole `spec.md`.
 - **SC-003**: CI is green.
 
 ## Assumptions

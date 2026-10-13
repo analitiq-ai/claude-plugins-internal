@@ -65,9 +65,10 @@ that is under review.
    heading inside a fenced code block counts). The gate reads nothing else in the folder. The first round that opens
    binds the PR to the folder, the story and the blob id of its `spec.md`, or to `null`; the binding never changes,
    and a launch that names another `spec` or `story` is refused with both. Each internal reviewer is told to read
-   the section under the bound story's heading in `spec.md` and what the spec excludes: every acceptance scenario
-   of that story the change does not meet is a finding, what the spec excludes bounds what may be asked for, and
-   nothing is raised about another story. The assessor's brief names the same folder and story. Under `null`,
+   the whole `spec.md` and grade the change against the acceptance scenarios under the bound story's heading and
+   every requirement, edge case and success criterion that applies to that story: each one the change does not
+   meet is a finding, what the spec excludes bounds what may be asked for, and nothing that only another story
+   delivers is raised. The assessor's brief names the same folder and story. Under `null`,
    reviewers are told the change needs no spec and to raise no finding about an unmet requirement of one. Audit
    reviewers are not given the spec. When `spec.md` at the commit of a review-round or assess-round launch is
    not the bound text, the launch is refused with the `git diff` from the bound blob to that one (git's error
