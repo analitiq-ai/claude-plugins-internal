@@ -35,7 +35,7 @@ Branch `88-us1-decision-review`.
 - [ ] T004 [P] `config.json`: `decision_checks` and `max_review_files` (R15, R16). `plugin.json`: 0.14.0.
 - [ ] T005 [P] `.github/workflows/tests.yml`: node 22 and the pinned adrkit install (R12).
 - [ ] T006 Red, then green: `worktree.files_in` over a range, replacing `changed_files`; tracked corpora (R2).
-- [ ] T006a Red, then green: `worktree.is_dirty` counts untracked files and `policy.launch_round`'s refusal names commit, delete or ignore (R18, FR-023).
+- [ ] T006a Red, then green: `worktree.is_dirty` counts untracked files and `policy.launch_round`'s refusal names commit, delete or ignore (R18, FR-024).
 - [ ] T007 Red, then green: `hookio` reads `decision_checks` and `max_review_files`, and each refusal helper blocks as data-model § Refusals says (R15).
 - [ ] T008 Red, then green: the gate's deadline, pinned to `hooks/hooks.json`, and the seconds each launch step spends (R7).
 

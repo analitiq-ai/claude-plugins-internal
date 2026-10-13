@@ -123,7 +123,7 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 
 - **Decision**: `worktree.is_dirty` runs `git status --porcelain --untracked-files=normal` instead of
   `--untracked-files=no`, and `policy.launch_round`'s refusal says "uncommitted changes or new files" with commit,
-  delete or ignore as the fix (FR-023). No corpus-specific check.
+  delete or ignore as the fix (FR-024). No corpus-specific check.
 - **Rationale**: adrkit reads the folder on disk, and the gate's one uncommitted-changes check skipped new files, so a
   drafted decision could govern a round it is not part of. One flag on the existing check closes that; a second
   check over decision folders would answer the same question twice. Reviewers already treat untracked files as not
