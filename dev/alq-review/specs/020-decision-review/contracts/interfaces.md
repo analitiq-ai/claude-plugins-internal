@@ -15,7 +15,8 @@ crosses the plugin's edge.
 
 `@adrkit/cli@0.20.0`, the `adr` command: the calls, fields read and exit codes are data-model § Reading adrkit. The
 rule names and statuses `decisions.py` reads (`RULES`, `NOT_GOVERNING`) and the record-file rules `adrkit.py` copies
-(`RECORD_FILE_PATTERN`, `TEMPLATE_FILE_NAME`) are pinned to the installed package's shipped JS by `test_decisions.Drift`.
+(`RECORD_FILE_PATTERN`, `TEMPLATE_FILE_NAME`) are pinned to the installed package's shipped JS, each in its own module's
+test file: `test_decisions.Drift` and `test_adrkit.Drift`.
 
 ## Injected review-round arguments
 
@@ -66,7 +67,7 @@ README: item 8 under "What it enforces"; Layout rows for `scripts/adrkit.py`, `s
 
 ## Scenario coverage
 
-Refusals by mode are the tests of data-model § Refusals, By mode; they are not repeated here.
+Refusals by mode are the tests of data-model § Refusals, By mode; a row below names one only where a scenario is that test.
 
 | Spec scenario or rule | Test |
 |---|---|
@@ -106,10 +107,10 @@ Refusals by mode are the tests of data-model § Refusals, By mode; they are not 
 | edge: `docs/adr` whose files are all in subfolders | `test_decisions.Corpora.test_a_folder_whose_files_are_all_in_subfolders_is_a_corpus` |
 | edge: solo dispatch | `test_gate.DecisionReview.test_the_decision_reviewer_is_not_dispatched_alone` |
 | one status classifier | `test_decisions.Judge.test_one_status_classifier_serves_records_and_skipped_files` |
-| record files read as adrkit loads them | `test_adrkit.Frontmatter.test_a_status_outside_the_frontmatter_is_not_read`; `test_adrkit.Frontmatter.test_a_byte_that_is_not_utf8_leaves_status_and_id_readable`; `test_adrkit.Boundary.test_a_record_file_is_found_by_its_frontmatter_id` |
+| record files read as adrkit loads them | `test_adrkit.Frontmatter.test_a_status_outside_the_frontmatter_is_not_read`; `test_adrkit.Frontmatter.test_a_byte_that_is_not_utf8_leaves_status_and_id_readable`; `test_adrkit.Frontmatter.test_a_crlf_record_reads_status_and_id`; `test_adrkit.Boundary.test_a_record_file_is_found_by_its_frontmatter_id` |
 | a rename gives both paths to the check | `test_worktree_facts.QuotedNames` (`files_in`) |
 | a record's file found by its id, not its name | `test_decisions.Contract.test_a_record_whose_file_name_differs_from_its_id_is_located`; `test_decisions.Judge.test_a_governing_id_without_exactly_one_file_leaves_the_corpus_not_checked` |
 | calls read at once; only a live call is killed | `test_adrkit.Boundary.test_a_call_that_hangs_is_stopped_at_the_deadline` |
 | FR-014 pin | `test_gate.HookDeadline.test_the_gate_s_deadline_is_the_timeout_hooks_json_gives_it` |
-| drift | `test_decisions.Drift.test_every_rule_and_status_this_module_reads_is_one_the_installed_adrkit_ships` |
+| drift | `test_decisions.Drift.test_every_rule_and_status_this_module_reads_is_one_the_installed_adrkit_ships`; `test_adrkit.Drift.test_the_record_file_rules_are_the_installed_adrkit_s` |
 | CI fails without `adr` | every class that runs `adr`: skip locally, `self.fail` when `CI` is set |

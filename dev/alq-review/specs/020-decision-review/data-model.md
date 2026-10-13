@@ -14,8 +14,8 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 | `not_as_head(root, path) -> list[str]` | `worktree` | the paths `git status --porcelain=v1 -z --untracked-files=all --ignored -- <path>` lists | git |
 | `org_corpus(root) -> Corpus \| NotChecked \| None` | `adrkit` | the only builder of the org corpus, from `ALQ_ORG_ADR_DIR` (§ Corpus) | env, disk |
 | `outcomes(root, corpora, files, deadline, spent) -> list[CorpusReport \| NotChecked]` | `adrkit` | one value per corpus, never raising for one (§ Reading adrkit) | `adr`, disk |
-| `repo_corpora(tracked) -> list[Corpus]` | `decisions` | the repo corpora (§ Corpus) | none |
-| `merge(root, repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus with `realpath(join(root, dir))` equal to the org's `realpath(dir)` is dropped (the one exception to "no I/O") | realpath |
+| `repo_corpora(root, tracked) -> list[Corpus]` | `decisions` | the repo corpora (§ Corpus) | none |
+| `merge(repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus whose `realpath(dir)` equals the org's is dropped (the one exception to "no I/O") | realpath |
 | `status_class(text) -> str` | `decisions` | § Status | none |
 | `judge(report) -> Judgement \| NotChecked` | `decisions` | § Judgement | none |
 | `governance(outcomes, org) -> Governance` | `decisions` | § Governance | none |
@@ -29,7 +29,7 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 | Field | Repo corpus | Org corpus |
 |---|---|---|
 | `label` | path from the repo root, e.g. `dev/alq-review/docs/adr` | `org (<value of ALQ_ORG_ADR_DIR>)` |
-| `dir` | the same path, relative to the checkout | the absolute path |
+| `dir` | `join(root, label)`, absolute | the absolute path |
 | `kind` | `repo` | `org` |
 
 - Repo corpora: for each tracked path, every prefix of it that ends in the segments `docs/adr`; distinct, sorted. A
@@ -37,6 +37,8 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 - Org corpus: `ALQ_ORG_ADR_DIR` unset or empty is `None`. A value that is not an absolute path to a readable folder
   is `NotChecked(org label, "could-not-run", ...)`. Otherwise the `Corpus`.
 - A record is named `<label> <id>` everywhere: brief, notice, refusal, result.
+- `dir` is absolute from the builder on, so no consumer joins `root` to it; `label` is for display only. The only paths
+  resolved against `root` are the ones adrkit names (§ Reading adrkit).
 
 ## Reading a record file
 
@@ -48,12 +50,12 @@ The plugin reads an ADR file the way adrkit 0.20 loads it (`@adrkit/core`, `src/
   `^[0-9]{4,}-.+\.md$` and is not `TEMPLATE_FILE_NAME` `0000-template.md`. This is exactly the set adrkit loads, so a
   `corpus-file-skipped` file, a `template.md`, a `0000-template.md` or a symlink is never one.
 - **Frontmatter**, `adrkit._frontmatter(path) -> dict[str, str] | None`: the file decoded as UTF-8 with invalid bytes
-  replaced, as Node's `readFile(..., "utf8")` does; the block from a first line `---` to the next line `---` (a
-  trailing `\r` ignored); each line in it with no leading space of the form `key: value`, `value` stripped of a
+  replaced, as Node's `readFile(..., "utf8")` does; the text split on `\n`, one trailing `\r` dropped from each line, as
+  adrkit's parser does; the block from a first line `---` to the next line `---`; each line in it with no leading space of the form `key: value`, `value` stripped of a
   trailing ` #...` comment and of one pair of matching quotes. `None` when the file cannot be opened or has no such
   block. Nothing outside the block is read: a body line `status: accepted` is not a status. It reads `status` and `id`.
 
-The pattern and the template name are a copy of adrkit's, pinned with `RULES` and `NOT_GOVERNING` by `Drift`.
+The pattern and the template name are a copy of adrkit's, pinned by `test_adrkit.Drift`.
 
 ## Status
 
@@ -154,7 +156,7 @@ not_checked, org_corpus)`:
 `gate._governance` for an internal launch, after `launch_round` and the review base, before `open_round`:
 
 1. `files = worktree.files_in(root, briefs.review_range(decision, base))`.
-2. Corpora: `decisions.merge(root, decisions.repo_corpora(worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
+2. Corpora: `decisions.merge(decisions.repo_corpora(root, worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
 3. Over `max_review_files`: every corpus not yet `NotChecked` becomes `NotChecked(too-big)`; refusal 1.
 4. Otherwise: each repo corpus with `not_as_head` output becomes `NotChecked(could-not-run)`; the rest go to
    `adrkit.outcomes`, and each report to `decisions.judge`.

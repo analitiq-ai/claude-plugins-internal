@@ -71,7 +71,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
     frontmatter block only. Every rule of the plugin's own drifted from adrkit's in review (status read over the
     whole file, a file found by name, a strict UTF-8 read that adrkit does not do, `0000-template.md` and symlinks
     taken as candidates), and each drift refused a change adrkit had judged. adrkit's JSON gives no path for a
-    governing record, so the plugin must read the files; copying adrkit's two discovery constants, pinned by `Drift`,
+    governing record, so the plugin must read the files; copying adrkit's two discovery constants, pinned by `test_adrkit.Drift`,
     is the one way to read the same ones. Checked on 2026-10-13 in `@adrkit/core`'s `dist/index.js`.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
