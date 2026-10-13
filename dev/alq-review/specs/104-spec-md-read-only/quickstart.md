@@ -11,10 +11,10 @@ suites serve a bare origin and stub `gh`.
 ```
 
 Expected: green, with every scenario of [spec.md](spec.md) covered as [research.md](research.md) R13 lists, and
-`spec_blob`, `spec_held`, `text_step` nowhere:
+`spec_blob`, `spec_held`, `text_step` nowhere in the plugin (US2's tests name the first two, to prove nothing reads them):
 
 ```bash
-grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review dev/alq-review/tests ; test $? -eq 1
+grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review ; test $? -eq 1
 ```
 
 ## Red first
@@ -33,7 +33,9 @@ code is wrong.
 3. **US3.** Have a round ruled `RESHAPE_SPEC`. The refusal names `123-spec`, `rebase <ref>` and `unlock <ref>`. Type
    `rebase #<pr>` before the spec PR merges: the reply says it has not reached the default branch. Merge a spec-only PR, type it
    again: the branch is rebased and pushed, the lock is released. With a conflicting change on the default branch, the reply
-   dispatches the conflict resolver; the lock holds every other edit; the push and release follow its `--continue`.
+   dispatches the conflict resolver; the lock holds every other edit; the push and release follow its `--continue`. Push to the
+   remote branch between the hook's fetch and its push: the push is refused and the branch is back on its commit before the
+   rebase; pull, type it again: it completes. The next round launched is a full round.
 4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both; `gh pr ready`: refused
    the same way. Split them: both pass.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the

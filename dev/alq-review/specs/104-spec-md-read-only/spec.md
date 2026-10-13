@@ -11,10 +11,12 @@ PR"
 
 **Settled with the user**: in issue #104, "Decision" 1-5 (2026-10-13), with the decision flow and evidence at
 https://claude.ai/artifact/318JN3nQhSgcXqCuP18CdD, and in Clarifications below. Decision record: an ADR drafted from
-this spec's plan with `speckit-adrkit-draft`, in its own PR, which replaces ADR-0016 decision 6 and the blob-id part
-of decision 4, and changes ADR-0018 for a `RESHAPE_SPEC` lock. The engineering `git-workflow.md` change, spec PR
-first and then the story PR, is its own PR in the engineering repo. This spec states the behaviour wanted, at the
-level of its scenarios; the wording of each refusal and next step is the plan's and the tests'.
+this spec's plan with `speckit-adrkit-draft`, in its own PR, which replaces ADR-0016 decision 6 and the blob-id part of
+decision 4, replaces the `spec.md`-blob part of ADR-0019 decision 3 (open PR #93) and that record's closing line
+"ADR-0016, decision 6, and ADR-0018 stand", and changes ADR-0018 for a `RESHAPE_SPEC` lock. The engineering
+`git-workflow.md` change, spec PR first and then the story PR, is its own PR in the engineering repo. This spec states
+the behaviour wanted, at the level of its scenarios; the wording of each refusal and next step is the plan's and the
+tests'.
 
 ## What we want
 
@@ -170,23 +172,30 @@ the new `spec.md` with no hold.
    2 still holds, the branch is pushed as in scenario 2 and the lock is released. If the agent cannot resolve them,
    it aborts the rebase, the lock stays, and the conflicted files are raised to the user. A conflict in a spec.md is
    no agent's to resolve: the rebase is aborted, the lock stays, and the spec.md is raised to the user.
-5. **Given** a story branch already rebased on a default branch whose bound `spec.md` changed, **When** the user
-   types `rebase <ref>` again, **Then** the rebase is a no-op and the lock is released: the keyword is safe to
-   repeat.
+5. **Given** a story branch already rebased on a default branch whose bound `spec.md` changed, with the rebased branch
+   on the remote, **When** the user types `rebase <ref>` again, **Then** the rebase is a no-op and the lock is released:
+   the keyword is safe to repeat.
 6. **Given** a `RESHAPE_SPEC` lock, **When** the user types `unlock <ref>`, **Then** the lock is released with no
    rebase and no spec check, and the reply carries the ruling: the user has ruled the spec stands.
-7. **Given** a completed rebase whose `--force-with-lease` push is refused (the remote branch moved from the tip
-   the lease names, even when a later fetch brought the new tip), **When** the hook sees it, **Then** the lock stays
-   and the reply names the refused push; nothing is forced.
-8. **Given** a `RESHAPE_SPEC` lock on a story PR whose base is not the default branch (a stacked story PR), **When**
+7. **Given** a completed rebase whose `--force-with-lease` push is refused (the remote branch moved from the tip the
+   lease names, even when a later fetch brought the new tip), **When** the hook sees it, **Then** nothing is forced, the
+   story branch is put back on the commit it was at before the rebase, the lock stays, and the reply gives git's words
+   and says to type `rebase <ref>` again.
+8. **Given** a push refused as in scenario 7, **When** the user types `rebase <ref>` again once the checkout holds every
+   commit of the remote story branch, **Then** the rebase, the push and the release complete as in scenario 2.
+9. **Given** a `RESHAPE_SPEC` lock on a story PR whose base is not the default branch (a stacked story PR), **When**
    the user types `rebase <ref>`, **Then** nothing is rebased, the lock stays, and the reply names the next step:
    land the parent PR first.
-9. **Given** a `RESHAPE_SPEC` lock and a default branch where the bound `spec.md` is missing (a rescope moved or
-   deleted its folder), **When** the user types `rebase <ref>`, **Then** nothing is rebased, the lock stays, and
-   the reply says the binding never changes: close this PR and restart the story on the new folder.
-10. **Given** a `RESHAPE_SPEC` lock and a remote story branch with a commit the checkout lacks, **When** the user
-    types `rebase <ref>`, **Then** nothing is rebased, the lock stays, and the reply says to pull those commits
-    first: the rebase never drops a remote commit.
+10. **Given** a `RESHAPE_SPEC` lock and a default branch where the bound `spec.md` is missing (a rescope moved or
+    deleted its folder), **When** the user types `rebase <ref>`, **Then** nothing is rebased, the lock stays, and the
+    reply says the binding never changes: close this PR and restart the story on the new folder.
+11. **Given** a `RESHAPE_SPEC` lock and a remote story branch with a commit the checkout lacks, **When** the user types
+    `rebase <ref>`, **Then** nothing is rebased, the lock stays, and the reply says to pull those commits first: the
+    rebase never drops a remote commit.
+12. **Given** a lock released by `rebase <ref>`, **When** the next review round launches, **Then** it is a full round
+    over the PR's diff, not a delta from the last round before the rebase, and its facts count only the commits since
+    the release: a file edited in three rounds before the rebase is not at a third edit. After a release by
+    `unlock <ref>` the rounds are measured as before.
 
 ---
 
@@ -292,14 +301,19 @@ two closing lines.
   missing on the default branch, it MUST refuse, keeping the lock: the binding never changes, so the reply says to close
   this PR and restart the story on the new folder. Then it MUST check that the bound `spec.md` on the default branch
   differs from the one at the locked round's reviewed commit, and only then rebase the story branch on it, push it with
-  `git push --force-with-lease` pinned to the branch tip the remote had before the rebase, and release the lock. It
-  MUST rebase nothing when the remote story branch has a commit the checkout lacks. Otherwise, or when the push is
-  refused, the lock MUST stay. Repeating the keyword MUST be safe. A rebase conflict MUST
-  be resolved by a conflict-resolver agent without the user: while the lock stays it admits only that agent's changes to
-  the conflicted files, never a spec.md, and the rebase's continue or abort; the user is raised only when it cannot
-  resolve them, or when a spec.md is in conflict, with the rebase aborted. `unlock <ref>` MUST release a `RESHAPE_SPEC`
-  lock with no rebase when the user rules the spec stands, and stays the release of an `ESCALATE` or spent-audit lock
-  (ADR-0018).
+  `git push --force-with-lease` pinned to the branch tip the remote had before the rebase, and release the lock. It MUST
+  rebase nothing when the remote story branch has a commit the checkout lacks. Otherwise the lock MUST stay. When the
+  push is refused, the lock MUST stay and the story branch MUST be put back on the commit it was at before the rebase,
+  so that `rebase <ref>` typed again starts over from it; a `rebase <ref>` that finds a rebase it began and never
+  pushed, with no rebase in progress, MUST put the branch back the same way and start over. Repeating the keyword MUST
+  be safe. A rebase conflict MUST be resolved by a conflict-resolver agent without the user: while the lock stays it
+  admits only that agent's changes to the conflicted files, never a spec.md, and the rebase's continue or abort; the
+  user is raised only when it cannot resolve them, or when a spec.md is in conflict, with the rebase aborted.
+  `unlock <ref>` MUST release a `RESHAPE_SPEC` lock with no rebase when the user rules the spec stands, and stays the
+  release of an `ESCALATE` or spent-audit lock (ADR-0018).
+- **FR-010**: A release by `rebase <ref>` MUST start the PR's measurement again: the next review round MUST be a full
+  round over the PR's diff, and a round's facts (the edits per file, the lines fixes wrote, the additions) MUST count
+  only the commits since the first round after the release. A release by `unlock <ref>` MUST change neither.
 
 ### Key Entities
 
@@ -318,8 +332,8 @@ two closing lines.
   PR a round opens on or is attested on changes a spec.md and code together (User Story 4): each route in the writes
   table, the commit and the mixed diff are refused in the tests. Commits made by `cherry-pick`, `merge`, `revert`,
   `am`, `pull` or `rebase --continue` are caught by User Story 4 only.
-- **SC-003**: `spec_blob`, `spec_held` and `text_step` appear nowhere in `plugins/alq-review`, its README or its
-  tests.
+- **SC-003**: `spec_blob`, `spec_held` and `text_step` appear nowhere in `plugins/alq-review` or its README. The tests
+  of User Story 2 name `spec_blob` and `spec_held`, to prove nothing reads them.
 - **SC-004**: A `spec.md` change between two rounds of one PR costs no `unlock`: the second round opens in the
   tests with no hold recorded.
 - **SC-005**: CI is green.
@@ -336,10 +350,12 @@ two closing lines.
 - Out of scope: the forms of Bash write beyond the table (the commit gate and the diff check stand behind the
   hook); the engineering repo's `pr-review-loop.md` and `alq-build`'s skills, the callers that adapt; the story
   argument of #81. No `alq-build` skill writes a spec.md (a grep of `plugins/alq-build` finds none).
-- Unchanged: ADR-0016 decisions 1-3 and 5 (the `spec` argument, its shape, `spec.md` present at the reviewed
-  commit, the bound value never changes); ADR-0017 (review reads only `spec.md`); the spent-audit and `ESCALATE` locks
-  and their `unlock`. ADR-0018's "`unlock` is the one release" changes for a `RESHAPE_SPEC` lock only: `unlock <ref>`
-  releases it when the spec stands, `rebase <ref>` after a spec change; the decision record says so.
+- Unchanged: ADR-0016 decisions 1-3 and 5 (the `spec` argument, its shape, `spec.md` present at the reviewed commit, the
+  bound value never changes); ADR-0017 (review reads only `spec.md`); the spent-audit and `ESCALATE` locks and their
+  `unlock`. ADR-0018's "`unlock` is the one release" changes for a `RESHAPE_SPEC` lock only: `unlock <ref>` releases it
+  when the spec stands, `rebase <ref>` after a spec change; the decision record says so. ADR-0019 (open PR #93) stands
+  but for the `spec.md`-blob part of its decision 3 and its closing line "ADR-0016, decision 6, and ADR-0018 stand",
+  which the decision record replaces.
 
 ## Why this is worth doing
 
