@@ -663,6 +663,7 @@ class SpecArgument(Gate):
         self.assertEqual([line for line in ran if old in line], [])
         head = self.saved()["rounds"][-1]["head_sha"]
         self.assertTrue([line for line in ran if head in line and f"{self.FOLDER}/spec.md" in line], ran)
+        self.assertEqual([line for line in ran if "spec.md" in line and head not in line], [], ran)
 
     def test_a_change_after_the_unlocked_one_is_held_again(self):
         self.held()
