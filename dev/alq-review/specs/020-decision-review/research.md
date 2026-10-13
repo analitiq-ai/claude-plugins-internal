@@ -25,10 +25,11 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 
 ## R4: One `adr check` per corpus
 
-- **Decision**: per corpus, `adr check --dir <corpus> --json -- <files>`. All corpora run at once, from the checkout.
-  The gate reads its `ok`, `governing` and `findings`; it reads no record and calls nothing else of adrkit's.
-  `--dir` is relative to the checkout for a corpus inside it: with an absolute `--dir`, adrkit 0.20.0 does not see a
-  changed record, so a broken one passes (run 2026-10-13).
+- **Decision**: per corpus, `adr check --dir <corpus> --json -- <files>`. All corpora run at once, with the realpath
+  of the checkout root as working folder. The gate reads its `ok`, `governing` and `findings`; it reads no record and
+  calls nothing else of adrkit's. A corpus whose realpath is under that root gets `--dir` relative to it; any other
+  gets its realpath. With an absolute `--dir`, adrkit 0.20.0 does not see a changed record, so a broken one passes
+  (run 2026-10-13).
 - **Rationale**: adrkit already decides what a record is, its status, what governs a change and whether a changed
   record is broken. Earlier drafts re-derived parts of that (statuses of files adrkit could not load, record files,
   lint findings outside the change) with a reader or adrkit's library; each was a second copy of adrkit and churned in
@@ -121,7 +122,7 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
   rulings.
 - **Rationale**: the user's choice: the rulings tell whether the reviewer's brief is right.
 
-## R18: The corpus is checked as the commit has it
+## R18: The uncommitted-changes check counts new files
 
 - **Decision**: `worktree.is_dirty` runs `git status --porcelain --untracked-files=normal` instead of
   `--untracked-files=no`, and `policy.launch_round`'s refusal says "uncommitted changes or new files" with commit,
@@ -130,5 +131,5 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 - **Rationale**: adrkit reads the folder on disk, and the gate's one uncommitted-changes check skipped new files, so a
   drafted decision could govern a round it is not part of. One flag on the existing check closes that; a second
   check over decision folders would answer the same question twice. Reviewers already treat untracked files as not
-  evidence (`briefs.py`), so the gate now agrees with them. Cost: any stray untracked file blocks a launch until it is
-  committed, deleted or ignored.
+  evidence (`briefs.py`), so the gate now agrees with them. Cost: in `enforce` mode, any stray untracked file blocks a launch
+  until it is committed, deleted or ignored.

@@ -128,7 +128,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - **FR-002**: The files MUST come from the git diff the round reviews (full or delta); no list of paths is kept in any file or setting. Every path the diff changes MUST be given to the check, deleted files, symlinks and other non-regular files included: adrkit matches them by path and skips only their marker scan.
 - **FR-003**: Each corpus MUST be checked by its own adrkit call with its own folder, so each corpus keeps its own ids.
 - **FR-004**: The records that govern the change MUST be those `adr check` lists as governing; the plugin MUST NOT read a record's status or decide what is a record.
-- **FR-005**: Every record in a brief, a notice or a refusal MUST be named by its corpus and its id.
+- **FR-005**: Every record in a brief, a notice or a refusal MUST be named by its corpus and its id; a file adrkit gives no id for (a changed record it cannot load) is named by its corpus and its file.
 
 **The reviewer**
 

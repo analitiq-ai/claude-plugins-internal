@@ -143,5 +143,4 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 Settled by reading, not by the user: the deadline margin is 5 s (R7); `adr` is required only when a corpus is to be
 checked (R11); an org path that coincides with a repo corpus is checked once as the org corpus, as the spec's edge case
-says, which reverses PR #92's choice (R3). The gate's existing uncommitted-changes check counts new files (R18), so
-the corpus adrkit reads is the commit's.
+says, which reverses PR #92's choice (R3).

@@ -17,7 +17,7 @@ An org path that is also a repo corpus is checked once, as the org corpus.
 - **Governing**: a record `adr check` lists as governing (FR-004). The plugin reads no record itself.
 - **Record**: corpus label, id and title, as `adr check` gives them. The same id in two corpora is two
   records.
-- **Broken record**: a record the change touches that `adr check` fails on (FR-008): corpus, file, id when adrkit gives one, adrkit's rule and message. It is never briefed.
+- **Broken record**: a record the change touches that `adr check` fails on (FR-008): corpus, file, id when adrkit gives one (FR-005), adrkit's rule and message. It is never briefed.
 - **Notice**: corpus, id, matcher, adrkit's reason (FR-012).
 
 ## Corpus outcome
