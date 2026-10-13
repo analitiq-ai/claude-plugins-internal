@@ -331,6 +331,11 @@ def tree_text(root: str, tree: str, path: str) -> str | None:
     return found.stdout if found.returncode == 0 else None
 
 
+def text_at(root: str, commit: str, path: str) -> str:
+    """`path` as commit `commit` records it, unstripped; RuntimeError, in git's words, when git cannot read it."""
+    return _output(root, "cat-file", "blob", f"{commit}:{path}")
+
+
 def tree_blob(root: str, tree: str, path: str) -> str | None:
     found = _run(root, "rev-parse", "--verify", "--quiet", f"{tree}:{path}")
     return found.stdout.strip() if found.returncode == 0 else None

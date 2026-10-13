@@ -20,13 +20,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/briefs.py --ref '<round_ref>'
 ```
 
 It prints the checkout, the diff and history commands, the spec folder the PR is reviewed against
-(`spec_folder`, null when the change needs no spec), the earlier rounds with every ruling made so far,
+(`spec_folder`, null when the change needs no spec) and the number of the user story of it the PR delivers
+(`user_story`, null with `spec_folder`), the earlier rounds with every ruling made so far,
 the round verdicts admissible for this round, and `facts` computed from git and the ledger. The facts
 are measurements: build on them, do not re-argue them. Copy `brief_token` into your answer; without it
 the answer is rejected.
 
 The brief quotes no spec. When `spec_folder` is set, read `<spec_folder>/spec.md` in the checkout
-yourself.
+yourself: the section under `### User Story <user_story>`, which is what the change delivers, and what the
+spec excludes. Another story's requirements are not this change's.
 
 ## Rule on each finding
 

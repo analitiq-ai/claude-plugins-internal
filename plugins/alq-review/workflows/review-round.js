@@ -1,7 +1,7 @@
 export const meta = {
   name: 'review-round',
   description: 'One review round: every reviewer behind a barrier, then one independent assessment of the whole round',
-  whenToUse: "The internal PR review (args.stage 'internal', default) or the anti-pattern audit (args.stage 'audit') of a PR branch. Pass args.worktree = absolute path of the checkout and args.spec = '<spec folder>' | null: the PR's spec folder, or null for a change that needs no spec. Never dispatch the reviewer agents directly.",
+  whenToUse: "The internal PR review (args.stage 'internal', default) or the anti-pattern audit (args.stage 'audit') of a PR branch. Pass args.worktree = absolute path of the checkout and args.spec = '<spec folder>' | null: the PR's spec folder, or null for a change that needs no spec. Beside a folder pass args.story = <N>, the number of the user story the PR delivers, whose heading in spec.md is ### User Story <N>; beside null pass no args.story. Never dispatch the reviewer agents directly.",
   phases: [{ title: 'Review' }, { title: 'Assess' }],
 }
 

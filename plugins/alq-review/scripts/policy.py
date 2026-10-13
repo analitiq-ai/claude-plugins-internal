@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ledger import COUNTED, counted, current_round, released
+import specbinding
 
 CAP = 4          # rounds a stage may take without settling before the anti-pattern audit is mandatory
 MAX_AUDITS = 2   # escalation audits before the work goes back to the user; each unlock grants this many more
@@ -15,8 +16,7 @@ LOCKING = ("RESHAPE_SPEC", "ESCALATE")
 # thing that put it there.
 MOVING = ("PATCH", "CLASS_FIX")
 
-REVIEW_CALL = ("Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: '%s', "
-               "spec: %s})")
+REVIEW_CALL = "Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: '%s', %s})"
 PLUGIN = "alq-review"
 ASSESS_CALL = "Workflow(name='alq-review:assess-round', args={worktree: '<absolute worktree path>'})"
 
@@ -31,15 +31,16 @@ class Decision:
 
 
 def review_call(state: dict | None, stage: str) -> str:
-    """The review-round call for `stage`. `spec` is the PR's bound value, quoted so the agent cannot pass another;
-    with no binding yet, or no state at hand, both forms the agent may choose from."""
-    if state is None or "spec" not in state:
-        spec = "'<spec folder>' | null"
-    elif state["spec"] is None:
-        spec = "null"
+    """The review-round call for `stage`. `spec` and `story` are the PR's bound ones, quoted so the agent cannot pass
+    others; with no binding yet, or no state at hand, both forms the agent may choose from."""
+    binding = None if state is None else specbinding.bound(state)
+    if binding is None:
+        launch = "spec: '<spec folder>', story: <N> | spec: null"
+    elif isinstance(binding, specbinding.NoSpec):
+        launch = "spec: null"
     else:
-        spec = f"'{state['spec']}'"
-    return REVIEW_CALL % (stage, spec)
+        launch = f"spec: '{binding.path}', story: {binding.story}"
+    return REVIEW_CALL % (stage, launch)
 
 
 def _label(rnd: dict) -> str:
@@ -96,8 +97,10 @@ def _holds(state: dict) -> list[tuple[str, str]]:
                       rnd["assessment"]["user_decision"]))
     held = _spec_held(state)
     if held is not None:
-        holds.append((f"The spec.md of `{state['spec']}` changed after this PR was bound to it: the bound blob is "
-                      f"{held['bound']} and HEAD's is {held['head']}, and review grades against the bound text.",
+        binding = specbinding.bound(state)
+        holds.append((f"`{binding.path}/spec.md`, the spec of this PR's User Story {binding.story}, changed after this "
+                      f"PR was bound to it: the bound blob is {held['bound']} and HEAD's is {held['head']}, and review "
+                      "grades against the bound text.",
                       f"does this PR now build to the changed spec? `git diff {held['bound']} {held['head']}` "
                       "shows the change."))
     return holds

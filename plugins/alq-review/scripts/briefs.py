@@ -46,10 +46,6 @@ def short(agent_type: str) -> str:
 Spec = specbinding.Folder | specbinding.NoSpec | None
 
 
-def bound_spec(state: dict) -> Spec:
-    return specbinding.parse(state["spec"]) if "spec" in state else None
-
-
 def _ruled_on(state: dict) -> str:
     rulings = ledger.adjudicated(state)
     if not rulings:
@@ -64,9 +60,11 @@ def _graded_against(spec: Spec, root: str) -> str:
         return ""
     if isinstance(spec, specbinding.NoSpec):
         return "\n\nThe caller says this change needs no spec. Raise no finding about an unmet requirement of a spec."
-    return (f"\n\nThis change implements the spec in {spec.path}/spec.md of {root}. Read it. Every requirement the "
-            "spec states that the change does not meet is a finding: quote the requirement in its title. What the spec "
-            "excludes bounds what you may ask for.")
+    return (f"\n\nThis change implements User Story {spec.story} of the spec in {spec.path}/spec.md of {root}. Read "
+            f"the section under its heading, `{specbinding.story_heading(spec.story)}`, and what the spec excludes. "
+            "Every acceptance scenario of that story that the change does not meet is a finding: quote the scenario in "
+            "its title. What the spec excludes bounds what you may ask for. Raise nothing about another story of the "
+            "spec.")
 
 
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
@@ -145,7 +143,8 @@ def brief_token(rnd: dict) -> str:
 
 
 def brief(state: dict, rnd: dict) -> dict:
-    spec = bound_spec(state)
+    spec = specbinding.bound(state)
+    folder = spec if isinstance(spec, specbinding.Folder) else None
     base = rnd["base_sha"]
     measured = facts.round_facts(state, rnd, rnd["root"])
     return {
@@ -153,7 +152,8 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec_folder": spec.path if isinstance(spec, specbinding.Folder) else None,
+        "spec_folder": folder.path if folder else None,
+        "user_story": folder.story if folder else None,
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],

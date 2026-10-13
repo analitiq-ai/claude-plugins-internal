@@ -1,7 +1,10 @@
-"""The review-round `spec` argument: what it says, whether its folder has the shape of a spec folder, whether it
-matches the PR's binding, and what a changed spec.md does to that binding. Pure: the gate reads git."""
+"""The review-round `spec` and `story` arguments: what they say, whether the folder has the shape of a spec folder,
+whether they match the PR's binding, whether spec.md has the story's heading, and what a changed spec.md does to the
+binding. Pure: the gate reads git."""
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Literal
@@ -11,7 +14,9 @@ from ledger import released
 
 @dataclass(frozen=True)
 class Folder:
+    """A spec folder and the number of its user story a PR delivers."""
     path: str
+    story: int
 
 
 @dataclass(frozen=True)
@@ -19,13 +24,41 @@ class NoSpec:
     pass
 
 
-def parse(value: object) -> Folder | NoSpec:
-    """ValueError when `value` is neither null nor a non-empty string."""
+def parse(value: object) -> str | None:
+    """The spec folder path `value` names, None for null. ValueError when it is neither null nor a non-empty string."""
     if value is None:
-        return NoSpec()
+        return None
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"spec is {value!r}, and it must be a spec folder path or null")
-    return Folder(value.strip())
+    return value.strip()
+
+
+def parse_story(folder: str | None, args: dict) -> int | None:
+    """The launch's story beside `folder`, None beside null. ValueError when `args` has a story beside null, whatever
+    its form, or beside a folder none, or one that is not a JSON integer of 1 or more."""
+    if folder is None:
+        if "story" in args:
+            raise ValueError(f"story is {json.dumps(args['story'])} beside spec null, and no spec has no story: a "
+                             "change that needs no spec launches without args.story")
+        return None
+    story = args.get("story")
+    if story is None:
+        raise ValueError(f"args.story is {'missing' if 'story' not in args else 'null'}, and a spec folder needs a "
+                         f"story: the number of the user story of {folder}/spec.md this PR delivers")
+    # A JSON boolean arrives as a Python bool, which is an int.
+    if isinstance(story, bool) or not isinstance(story, int):
+        raise ValueError(f"story is {json.dumps(story)}, and the story is a JSON integer")
+    if story < 1:
+        raise ValueError(f"story is {story}, and the story is 1 or more")
+    return story
+
+
+def bound(state: dict) -> Folder | NoSpec | None:
+    """What the PR is bound to; None when no launch has bound it. A folder binding always records its story, so one
+    without raises KeyError."""
+    if "spec" not in state:
+        return None
+    return NoSpec() if state["spec"] is None else Folder(state["spec"], state["story"])
 
 
 def shape_problem(folder: str) -> str | None:
@@ -43,16 +76,26 @@ def shape_problem(folder: str) -> str | None:
     return None
 
 
-def _shown(value: str | None) -> str:
-    return "null" if value is None else f"`{value}`"
+def _shown(binding: Folder | NoSpec) -> str:
+    return "spec null" if isinstance(binding, NoSpec) else f"spec `{binding.path}`, story {binding.story}"
 
 
-def bind(recorded: str | None, given: str | None) -> str | None:
-    """The refusal when `given` differs from the PR's binding `recorded`; None when it matches."""
+def bind(recorded: Folder | NoSpec, given: Folder | NoSpec) -> str | None:
+    """Why `given` is refused when it differs from the PR's binding `recorded`; None when it matches."""
     if recorded == given:
         return None
-    return (f"This PR is bound to spec {_shown(recorded)}, and this launch gives spec {_shown(given)}. A PR's bound "
-            f"spec never changes. Next step: launch with spec {_shown(recorded)}.")
+    return (f"This PR is bound to {_shown(recorded)}, and this launch gives {_shown(given)}. A PR's binding never "
+            "changes")
+
+
+def story_heading(story: int) -> str:
+    return f"### User Story {story}"
+
+
+def has_story(text: str, story: int) -> bool:
+    """Whether a line of `text` starts with the story's heading, its number ending at a word boundary. Read as text,
+    not Markdown: a heading inside a fenced code block counts."""
+    return re.search(rf"^{re.escape(story_heading(story))}\b", text, re.M) is not None
 
 
 def text_step(bound_blob: str, head_blob: str, held_at: str | None,
