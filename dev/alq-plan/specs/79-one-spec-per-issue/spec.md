@@ -12,7 +12,7 @@ reviewed PR, require a spec for every issue", part of #80.
 **Settled with the user**: issue #79, "Decided", as edited on 2026-10-13. It follows `analitiq-ai/engineering`
 `docs/engineering/git-workflow.md`: one spec per issue, at `specs/<issue>-<slug>/` (engineering ADR-0002,
 decisions 1 and 2), landed through its own PR (decision 3), and one PR per user story (ADR-0003).
-Decision record: alq-plan ADR-0008. ADR-0005, decision 3, stands.
+alq-plan ADR-0008 records the no-spec folder. ADR-0005, decision 3, stands.
 
 ## Clarifications
 
@@ -25,9 +25,12 @@ Decision record: alq-plan ADR-0008. ADR-0005, decision 3, stands.
 - Q: What does a rescope of a no-spec folder do? → A: It runs the new-scope workflow from the premise (premise → specify → grill → plan → critique → tasks) into that same folder, since a no-spec spec.md has nothing to grill. `specify` writes over the no-spec spec.md; if the premise picks `no spec needed` again, the writer writes it again. One pure function, in the writer's module, tells a no-spec spec.md apart.
 - Q: What about a change with no issue? → A: The skill creates the issue first, in the repo `origin` names, with one of that repo's issue types, then scopes it like any other.
 - Q: What does spec.md name its stories? → A: Spec Kit's headings, `### User Story <N> - <title> (Priority: P<n>)`. Branches (`<issue>-us<N>-…`), PR headers (`Implements: … § User Story <N>`) and review (#81) name them. On a rescope, existing stories keep their numbers and a new story takes the next free one.
-- Q: Where does the spec land? → A: On branch `<issue>-spec`, created from the repo's default branch in worktree `.claude/worktrees/<issue>-spec`. The skill commits, pushes and opens a draft PR whose body starts `Part of #<issue>`. It launches no review: alq-review is optional and, for now, the user starts it by hand with `spec: null`. Its last message names the folder, the branch, the PR and `spec: null` (issue #79, "Decided", as edited on 2026-10-13).
 - Q: And a rescope? → A: It works in the worktree it is run from, a story's or the spec's, and the spec edit lands in that PR.
 - Q: What happens to the folders that exist? → A: Under `dev/alq-review/specs/`, 004, 007, 008, 009, 010, 011, 012, 014, 015, 016 and 017 are deleted with every citation. 019 is renamed `63-split-planning-plugin`. This runs after #68 (retires 018) and #83 (deletes 005 and 006) merge. `README.md` states the rule instead of `specs/<nnn>-<feature>/`.
+
+### Session 2026-10-13
+
+- Q: Where does the spec land? → A: On branch `<issue>-spec`, created from the repo's default branch in worktree `.claude/worktrees/<issue>-spec`. The skill commits, pushes and opens a draft PR whose body starts `Part of #<issue>`. It launches no review: alq-review is optional and, for now, started by hand with `spec: null` (issue #79, "Decided", as edited on 2026-10-13).
 
 ## Terms
 
@@ -390,14 +393,14 @@ Delivery Workflow.
 
 ### harm
 Answer: Nothing ties a spec folder to its issue, an issue can get two folders, a `no spec needed` scope leaves no folder that a later scope could see, and the spec lands with no PR of its own. Under the engineering workflow, branches and PR headers name a spec folder and story that planning never guarantees.
-Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml (premise, specify, select-spec), plugins/alq-plan/skills/issue-spec/SKILL.md §2 step 8
+Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml (premise, specify, select-spec), plugins/alq-plan/skills/issue-spec/SKILL.md §2 step 8, analitiq-ai/engineering docs/adr/0003-one-pr-per-user-story.md decisions 1 and 3
 
 ### reachable
 Answer: observed. A rescope of specs/001-demo for issue 7 runs to grill, no spec needed completes with no folder, and the 15 folders in dev/alq-review/specs/ are numbered by Spec Kit, not by issue.
 Source: reproduction: python3 -m unittest in dev/alq-plan/tests at 74251bf on 2026-10-12; ls dev/alq-review/specs
 
 ### change-alters
-Answer: Yes. The folder is named from the issue and checked before and after specify, a second scope is refused, `no spec needed` leaves a folder that says so, and the spec lands through its own PR.
+Answer: Yes. The folder is named from the issue and checked after specify, a second scope is refused, `no spec needed` leaves a folder that says so, and the spec lands through its own PR.
 Source: user: issue #79, "Decided", as edited on 2026-10-13
 
 ### owner
@@ -405,11 +408,11 @@ Answer: No. select-spec checks only the path's shape and spec.md; nothing checks
 Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml, plugins/alq-plan/skills/issue-spec/SKILL.md §2 step 8
 
 ### inherited
-Answer: Yes. alq-plan ADR-0001 and ADR-0005 accept folders without the issue number and more than one folder per issue; ADR-0006 has no spec needed leave no folder; ADR-0005, decision 3, has a run post nothing on the issue and end naming the folder and branch. ADR-0008 supersedes ADR-0006's no folder. Engineering ADR-0002, decisions 1 and 2, set the folder rule, and its decision 3 the spec PR; alq-plan follows them. ADR-0005, decision 3, stands: the run still posts nothing on the issue, and its last message names no other plugin's command.
-Source: code: dev/alq-plan/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md, dev/alq-plan/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md, dev/alq-plan/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md
+Answer: Yes. alq-plan ADR-0001 accepts a folder name without the issue number, and ADR-0005 more than one folder per issue; ADR-0006 has a no spec needed outcome live only in the session that picked it; ADR-0005, decision 3, has a run post nothing on the issue and end naming the folder and branch. ADR-0008 has it live in the repo instead, in a folder that says no spec is needed. Engineering ADR-0002, decisions 1 and 2, set the folder rule, and its decision 3 the spec PR; alq-plan follows them. This spec keeps ADR-0005, decision 3: the run still posts nothing on the issue, and its last message names no other plugin's command.
+Source: code: dev/alq-plan/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md, dev/alq-plan/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md, dev/alq-plan/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md, dev/alq-plan/docs/adr/0008-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md, analitiq-ai/engineering docs/adr/0002-one-spec-per-issue.md
 
 ### needs-spec
-Answer: It has decisions in it: the folder form, one folder per issue, the no-spec folder, the untracked form, the spec PR and the migration. The user settled them in issue #79.
+Answer: It has decisions in it: the folder form, one folder per issue, the no-spec folder, an issue first for a change with none, the spec PR and the migration. The user settled them in issue #79.
 Source: user: issue #79, "Decided", as edited on 2026-10-13
 
 ## Root cause
