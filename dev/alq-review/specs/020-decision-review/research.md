@@ -98,8 +98,9 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
     marker in the unscanned part would be missed, so no subset of its records is briefed.
 - **Rationale**: constitution P3. adrkit's own `Status` enum is exactly six values; a status outside it fails the
   schema, raises an `error` and keeps the record out of `governing`, so counting it as governing (FR-004) makes that
-  `error` refuse instead of vanish. `affects-unresolvable` and `affects-repo-not-applicable` are read from `check`
-  only: `lint` reports the same per record, and `check` names the matcher. `markerScan.unreadablePaths` holds both
+  `error` refuse instead of vanish. `affects-unresolvable` and `affects-repo-not-applicable` are read from `check`'s own
+  per-matcher findings, which name the matcher; `lint` reports the record as a whole, and `check` re-emits lint's
+  findings on changed records (R4), so those copies are dropped before judging. `markerScan.unreadablePaths` holds both
   symlinks and unreadable regular files (`readWithPreparedRoot` refuses both as `unreadable`), so only `lstat` tells
   them apart (FR-002: a symlink is given to the check and is not a failure). `NOT_GOVERNING` and `RULES`
   are a copy of adrkit's vocabulary that its JSON gives no other way to learn; a drift test pins each to the installed

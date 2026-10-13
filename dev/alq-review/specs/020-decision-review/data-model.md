@@ -60,8 +60,9 @@ Every listed file gets exactly one entry, and no file ends the run:
 - `{path, error}` when `parseAdrFile` throws (no frontmatter, malformed YAML, a file it cannot read), caught per file.
 
 `path` is absolute. Exit 0 is an answer. Exit 3 is "no usable `@adrkit/core` beside `adr`": the core cannot be found
-(an `adr` that is not the npm-installed command), or one of `discoverAdrFiles`, `discoverSkippedMarkdownFiles` and
-`parseAdrFile` is not a function, checked before any file is read. Any other exit is a failure with its stderr. The plugin keeps an `id` or `status` only
+(an `adr` that is not the npm-installed command), its `package.json` (beside the resolved `dist/`, since the package
+exports no version) gives a `version` other than `0.20.0`, or one of `discoverAdrFiles`, `discoverSkippedMarkdownFiles`
+and `parseAdrFile` is not a function; all checked before any file is read, so every rule below reads 0.20's output. Any other exit is a failure with its stderr. The plugin keeps an `id` or `status` only
 when it is a string; any other value reads as `None`.
 
 ## Status
@@ -103,7 +104,7 @@ component is not resolved, so `lstat` still sees a symlink.
 
 | Field | Content |
 |---|---|
-| `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check`, `path` through `_path` |
+| `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check`, `path` through `_path`: lint's findings, then check's less every one equal to a lint finding (`check` re-emits lint's findings on changed records), so each finding comes once, from the pass that made it |
 | `governing` | `(id, title)` per `governing` entry |
 | `statuses` | `_path(path) -> status` for every entry of the record reader's `records` and `skipped`; `None` for an entry with `error` or a `status` that is not a string |
 | `record_files` | `id -> tuple of absolute paths`: for each governing id, the `_path` of each `records` entry whose `id` is that id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
@@ -139,23 +140,23 @@ located or briefed.
 
 Otherwise it returns `Judgement(corpus, records, notices, broken)`.
 
-Each finding takes the first row it matches, top to bottom. Rows key on adrkit's rule name, severity and the record
-class `status_class(statuses[path])`, never on where a path sits; a governing record is one whose class is `accepted`
-or `unreadable` (an unreadable status must not hide adrkit's `error`, FR-004). `RULES` is every rule name the table
-names.
+Each finding takes the first row it matches, top to bottom. A record's class is `status_class(statuses[path])`; a
+governing record is one whose class is `accepted` or `unreadable` (an unreadable status must not hide adrkit's
+`error`, FR-004). `RULES` is every rule name the table names.
 
 | # | Finding | Outcome |
 |---|---|---|
-| 1 | `marker-scan-capped`, `marker-declarations-capped` | `could-not-run`: adrkit's message; next step: split the change |
-| 2 | `dangling-marker`, `stale-marker`, `marker-unresolvable` | ignored wherever its path sits: the marker scan names changed files (FR-013) |
+| 1 | rule `marker-scan-capped` or `marker-declarations-capped` | `could-not-run`: adrkit's message; next step: split the change |
+| 2 | rule `dangling-marker`, `stale-marker` or `marker-unresolvable`, any `path` | ignored: the marker scan names changed files (FR-013) |
 | 3 | no `path` | ignored (FR-013) |
 | 4 | a `path` not in `statuses` | `could-not-run`: the rule and the path; next step: `npm install -g @adrkit/cli@0.20.0` |
-| 5 | `corpus-file-skipped`, skipped file `accepted` | broken, subject the file (FR-008) |
-| 6 | `corpus-file-skipped`, skipped file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
-| 7 | `corpus-file-skipped`, skipped file `not governing` | ignored |
-| 8 | severity `error` (`unique-id` included), `affects-bad-pattern`, `affects-unknown-type`, on a governing record | broken, subject the id, or the file when adrkit gives no id (FR-008) |
-| 9 | `affects-unresolvable` or `affects-repo-not-applicable` from `check`, on a governing record | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
-| 10 | anything else, any finding on a `not governing` record included | ignored (FR-004, FR-013) |
+| 5 | rule `corpus-file-skipped`, its file `accepted` | broken, subject the file (FR-008) |
+| 6 | rule `corpus-file-skipped`, its file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
+| 7 | rule `corpus-file-skipped`, its file `not governing` | ignored |
+| 8 | severity `error` (`unique-id` included), or rule `affects-bad-pattern` or `affects-unknown-type`; its record governing | broken, subject the id, or the file when adrkit gives no id (FR-008) |
+| 9 | rule `affects-unresolvable` or `affects-repo-not-applicable`, source `check`, `pattern` present; its record governing | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
+| 10 | rule `affects-unresolvable` or `affects-repo-not-applicable`, source `check`, no `pattern` | `could-not-run`: a field of another shape; next step: `npm install -g @adrkit/cli@0.20.0` |
+| 11 | anything else, any finding on a `not governing` record included | ignored (FR-004, FR-013) |
 
 - `broken` lines are `Broken(corpus, subject, rule, message)`.
 - `records`: each `governing` entry whose id has no broken line, as `Record(corpus, id, title, file)`, `file` its one
