@@ -61,9 +61,10 @@ findings against the PR, and the folder alone cannot say which story the PR deli
    launch whose `spec` or `story` differs. This extends ADR-0016, decisions 4 and 5. `story` is recorded only for
    a folder, so a binding to `null` keeps its shape. The gate does not handle a binding made before this change to
    a folder with no story: shipping this change requires that no open PR has one.
-4. We will tell internal reviewers to grade the change against that story's section and the spec's exclusions,
-   and to raise nothing about another story. The assessor brief carries the story number beside the folder. This
-   supersedes ADR-0017, decision 2.
+4. We will tell internal reviewers to read the whole `spec.md` and grade the change against that story's acceptance
+   scenarios and every requirement, edge case and success criterion that applies to it, and to raise nothing that
+   only another story delivers. Spec authors tag nothing by story. The assessor brief carries the story number
+   beside the folder. This supersedes ADR-0017, decision 2.
 
 ADR-0016, decision 6, and ADR-0018 stand: a story PR that edits `spec.md` is held until the user unlocks it.
 
@@ -76,7 +77,7 @@ ADR-0016, decision 6, and ADR-0018 stand: a story PR that edits `spec.md` is hel
 | Where the story comes from | The launch's `story` argument |
 | Checked against | The story heading in `spec.md` at the checked commit |
 | Can change during the PR | No: the bound folder and story never change |
-| Reviewers read | One story's section and the spec's exclusions |
+| Reviewers grade against | The story's scenarios and every requirement, edge case and success criterion that applies to it |
 
 ### Option B: One `spec` string, `<folder>/spec.md § User Story <N>`, checked against the PR header
 
@@ -105,6 +106,7 @@ Reviewers keep grading a story PR against every story of its spec.
   one. On 2026-10-13 one is open, #96 (`88-spec`, a spec PR launched with its folder), so the build waits for it
   to merge.
 - The heading check is textual: a heading inside a fenced code block counts.
+- Which requirements apply to the story is the reviewer's judgement: the spec does not tag them.
 - With parallel stories, a spec edit merged from one story holds every other open story PR once it rebases: one
   unlock each. Accepted in #81.
 - Nothing checks that the story a launch names is the one the PR's `Implements:` line names.
