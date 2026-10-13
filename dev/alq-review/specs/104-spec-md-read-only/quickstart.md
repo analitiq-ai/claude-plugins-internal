@@ -34,8 +34,9 @@ code is wrong.
    `rebase #<pr>` before the spec PR merges: the reply says it has not reached the default branch. Merge a spec-only PR, type it
    again: the branch is rebased and pushed, the lock is released. With a conflicting change on the default branch, the reply
    dispatches the conflict resolver; the lock holds every other edit; the push and release follow its `--continue`. Push to the
-   remote branch between the hook's fetch and its push: the push is refused and the branch is back on its commit before the
-   rebase; pull, type it again: it completes. The next round launched is a full round.
+   remote branch between the hook's fetch and its push: the push is refused, nothing is put back, and the reply names the commit
+   before the rebase; reset the checkout to it and type it again: the reply says to pull; pull, type it again: it completes. The
+   next round launched is a full round.
 4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both; `gh pr ready`: refused
    the same way. Split them: both pass.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the

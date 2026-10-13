@@ -16,8 +16,8 @@
 | Field | Set by | Read by | Gone |
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
-| `rebase` = `{onto, from, lease, at}` | `_rebase`, before it runs `git rebase` (`from` the HEAD before it, `lease` the `<sha>` of step 8) | `policy.rebase_admits`, `on_agent`, `after_bash`, `_rebase` | popped on the release; on a refused push or a stop in the finish, after `git reset --keep <from>`; on an abort; and by a `rebase <ref>` that finds it with no rebase in progress, after `git reset --keep <from>` |
-| `regraded_from` | the release by `rebase <ref>` (step 14), `len(rounds)` then: the index of the first round after it | `facts.round_facts` (`first_reviewed`, the original base, every `..HEAD` range), `policy.launch_round` (no `delta_from` from a round before it) | –; absent reads as 0; `unlock <ref>` leaves it; not `epoch`, which an escalation audit advances (R15) |
+| `rebase` = `{onto, from, lease, at}` | `_rebase`, before it runs `git rebase` (`from` the HEAD before it, `lease` the `<sha>` of step 8) | `policy.rebase_admits`, `on_agent`, `after_bash`, `_rebase`, `_recover_rebase` | popped by the release (step 14), by step 12's abort on a spec.md conflict, by an admitted `rebase-abort`, and by `_recover_rebase` once HEAD is `from`; it is the only copy of `from`, so never while HEAD is on rewritten commits |
+| `regraded_from` | the release by `rebase <ref>` (step 14), `len(rounds)` then: the index of the first round after it | `facts.round_facts` (`first_reviewed`, `base`, `earlier` for `count_not_falling`, `seen` for `repeat_unit`, so `burden`) and `policy.launch_round` (`done`), each reading only `rounds[regraded_from:]`; not the round caps or `briefs.brief`'s `earlier_rounds` (R15) | –; absent reads as 0; `unlock <ref>` leaves it; not `epoch`, which an escalation audit advances (R15) |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
 
@@ -63,7 +63,7 @@ The git subprocesses run with `GIT_TERMINAL_PROMPT=0` and `GIT_SSH_COMMAND='ssh 
 | 1 | `ref` names one locked ledger with a `RESHAPE_SPEC` ruling | names none / several / not a `RESHAPE_SPEC` lock |
 | 2 | `state["spec"]` is a folder | no spec: close the PR and restart on a PR bound to a spec |
 | 3 | the locked round's `root` exists and is on `state["branch"]` | the checkout is missing or on another branch |
-| 4 | `rebase` recorded | with `rebasing(root)` set, the dispatch reply again (R10); with none in progress (a hook killed between its rebase and its push), no reply: `git reset --keep <from>` in `root`, `rebase` popped, and the steps start over from step 1 |
+| 4 | `rebase` recorded | with `rebasing(root)` set, the dispatch reply again (R10); with none in progress (a hook killed after it recorded one), `_recover_rebase` |
 | 5 | `rebasing(root)` set and no `rebase` recorded (a rebase no `rebase <ref>` started) | names it: run `git rebase --abort` in `<root>`; nothing else runs |
 | 6 | the checkout is clean | the checkout is dirty |
 | 7 | `github.default_branch` gives `<default>` and `github.pr_target` the PR's base, and the base is `<default>` | gh's words; a stacked story PR: land the parent PR first |
@@ -72,14 +72,28 @@ The git subprocesses run with `GIT_TERMINAL_PROMPT=0` and `GIT_SSH_COMMAND='ssh 
 | 10 | `tree_blob(spec.md)` at `origin/<default>` is not None | the bound spec.md is missing on `<default>`: the binding never changes; close this PR and restart the story on the new folder |
 | 11 | `tree_blob(spec.md)` at `origin/<default>` ≠ at the locked round's `head_sha` | the spec PR has not reached `<default>` |
 | 12 | `rebase` recorded as `{onto, from, lease: <sha>, at}`, then `git rebase origin/<default>` exits 0 | conflict in a spec.md: `git rebase --abort`, `rebase` popped, raise it to the user; other conflict: the record kept, the dispatch reply |
-| 13 | `git push --force-with-lease=<branch>:<sha> origin <branch>` exits 0 | `git reset --keep <from>` in `root`, `rebase` popped; git's words, then type `rebase <ref>` again |
-| 14 | `ledger.unlock`; `regraded_from = len(rounds)`; `rebase` popped; `record("rebase", "released")` | – |
+| 13 | `git push --force-with-lease=<branch>:<sha> origin <branch>` exits 0 | `_recover_rebase`, with git's words |
+| 14 | the release: `ledger.unlock`; `regraded_from = len(rounds)`; `rebase` popped; `record("rebase", "released")` | – |
 
-Steps 10, 11, 13 and 14 are the finish; `after_bash` runs them, with the recorded `lease` as `<sha>` and the recorded
-`from`, after an admitted `rebase-continue` that completed the rebase. Every way out of the finish pops `rebase`, and a
-stop at step 10, 11 or 13 first runs `git reset --keep <from>` in `root`: the next `rebase <ref>` judges step 9 on the
-HEAD before the rebase, never on the rewritten one, of which no tip recorded before the rebase is an ancestor. A
-`rebase-continue` that stops again with a spec.md unmerged is aborted as step 12 says.
+Steps 10, 11, 13 and 14 are the finish; `after_bash` runs them, with the recorded `lease` as `<sha>`, after an admitted
+`rebase-continue` that completed the rebase. Step 14 pops `rebase`; a stop at step 10, 11 or 13 goes to
+`_recover_rebase`. A `rebase-continue` that stops again with a spec.md unmerged is aborted as step 12 says.
+
+## Recovering a rebase (`gate._recover_rebase`)
+
+One routine for every way a recorded rebase ends unreleased with no rebase in progress: step 4, step 13, and the
+finish's stops at steps 10, 11 and 13. `fetch_target` first brings `origin/<branch>`; the routine then reads git as it
+is, never a cause it infers, with `from` and `lease` from the record. The first case that holds decides:
+
+| Case | Git now | Action | Reply |
+|---|---|---|---|
+| 1 | HEAD is not `from`, and `origin/<branch>` is HEAD: the push landed (a hook killed after it) | step 14 | the pushed reply |
+| 2 | HEAD is `from` (nothing rebased yet, or put back by hand), or `origin/<branch>` is `lease` | `git reset --keep <from>` in `root` unless HEAD is `from`; `rebase` popped once HEAD is `from` | from step 4, none: the steps start over from step 1; from step 13, git's words and `rebase <ref>` again; from step 10 or 11, that step's reply and the branch back on `from` |
+| 3 | anything else; the fetch fails; the reset exits non-zero | none: `rebase` and the lock kept | git's words (or step 10's or 11's reply), HEAD, `from`, `origin/<branch>`, and the manual step: put the checkout back on `from`, then type `rebase <ref>` again |
+
+`rebase` is the only copy of `from`, so it is never popped while HEAD is on rewritten commits: the next step 9 is judged
+on the HEAD before the rebase, which holds `lease`, never on the rewritten one, of which no tip recorded before the
+rebase is an ancestor.
 
 ## What the conflict resolver may do (`policy.rebase_admits`)
 
