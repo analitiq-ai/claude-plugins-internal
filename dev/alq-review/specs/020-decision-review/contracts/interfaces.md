@@ -1,28 +1,26 @@
 # Interfaces: the internal review round checks the diff against the decisions that govern it
 
-The check's types, readers, causes and refusals are [data-model.md](../data-model.md); this file holds only what
-crosses the plugin's edge.
+The check's shapes and refusals are [data-model.md](../data-model.md); this file holds only what crosses the plugin's
+edge.
 
 ## Environment and settings
 
 | Name | Read by | Meaning |
 |---|---|---|
-| `ALQ_ORG_ADR_DIR` | `adrkit.org_corpus` | absolute path of the org's decision corpus, whose records apply to every repo; unset or empty means no org corpus |
-| `ALQ_REVIEW_DECISION_CHECKS` | `hookio.decision_checks_mode` | overrides `config.json`'s `decision_checks` (`log` or `enforce`, shipped `enforce`) |
-| `max_review_files` | `hookio.max_review_files` | `config.json`, shipped 50 |
+| `ALQ_ORG_ADR_DIR` | `adrkit.py` | absolute path of the org's decision corpus, whose records apply to every repo; unset or empty means no org corpus |
+| `ALQ_REVIEW_DECISION_CHECKS` | `hookio.py` | overrides `config.json`'s `decision_checks` (`log` or `enforce`, shipped `enforce`) |
+| `max_review_files` | `hookio.py` | `config.json`, shipped 50 |
 
 ## adrkit
 
-`@adrkit/cli` at `decisions.ADRKIT_VERSION`, the `adr` command, and the `@adrkit/core` it ships, whose exports the corpus script calls: the
-calls, fields read and exit codes are data-model § Reading adrkit. The rule names `decisions.py` reads (`RULES`) are
-pinned to the installed core's JS by `test_decisions.Drift`; `test_adrkit_corpus.Fixture` pins the answer the pure tests
-read to what adrkit gives.
+`@adrkit/cli` at the one version the plugin is built for: the `adr` command and the `@adrkit/core` library it ships
+(research R4, R5).
 
 ## Injected review-round arguments
 
 Unchanged: `worktree`, `stage`, `round_ref`, `label`, `waves`, `assess`. New for an internal round:
 
-- `waves[0]` ends with the decision reviewer's entry when `Governance.records` is non-empty:
+- `waves[0]` ends with the decision reviewer's entry when any record governs the change:
   `{type: 'alq-review:decision-reviewer', short: 'decision-reviewer', prompt, schema}`, `schema` =
   `assessment.findings_schema(round_ref, 'decision-reviewer')`.
 - `decisions`: the block in [data-model.md § Round arguments and result](../data-model.md#round-arguments-and-result).
@@ -61,64 +59,6 @@ only by the review-round workflow; `gate.on_agent` refuses a direct dispatch as 
 
 ## README and version
 
-README: item 8 under "What it enforces"; Layout rows for `scripts/adrkit.py`, `scripts/adrkit_corpus.mjs`, `scripts/decisions.py`,
-`agents/decision-reviewer.md`; Dependencies names `adr` as the npm-installed command (the corpus script loads the `@adrkit/core` it ships), `decisions.INSTALL`'s command and node ≥ 22; Mode names `decision_checks` and `max_review_files`. `plugin.json`
-`version: 0.14.0`.
-
-## Scenario coverage
-
-Refusals by mode are the tests of data-model § Refusals, By mode; a row below names one only where a scenario is that test.
-
-| Spec scenario or rule | Test |
-|---|---|
-| 1 governed change gets the reviewer, briefed by corpus and id, in `expected` | `test_gate.DecisionReview.test_a_governed_change_gets_the_decision_reviewer_with_the_records_it_judges_against` |
-| 2 its finding reaches assess-round | `test_gate.DecisionReview.test_the_decision_reviewer_s_finding_is_assessed_with_the_others` |
-| 3 nothing governs: no reviewer, result names corpora checked | `test_gate.DecisionReview.test_an_ungoverned_change_gets_the_usual_reviewers_and_the_result_names_the_corpora` |
-| 4 draft record covering a changed file: no reviewer, no notice | `test_decisions.Judge.test_a_finding_on_a_non_governing_record_is_ignored`; `test_decisions.Contract.test_only_governing_records_whose_matcher_covers_a_changed_file_govern` |
-| 5 delta round asks about the delta | `test_gate.DecisionReview.test_a_delta_round_is_governed_by_what_changed_since_the_last_round` |
-| 6 org record governs, named by org corpus | `test_decisions.Contract.test_an_org_record_is_named_by_the_org_corpus` |
-| 7 same id in two corpora: both carried | `test_decisions.Contract.test_the_same_id_in_the_repo_and_the_org_is_two_records` |
-| 8 `ALQ_ORG_ADR_DIR` unset: round opens, result says so | `test_gate.DecisionReview.test_an_unset_org_corpus_opens_the_round_and_is_named_in_the_result` |
-| 9, 19 repo-qualified matcher, this repo's name too: notice, not given | `test_decisions.Contract.test_a_repo_qualified_matcher_is_a_notice_naming_the_repo` |
-| 10 `adr` missing: refused with the install step | `test_adrkit.Boundary.test_without_adr_every_corpus_is_not_checked_with_the_install_step`; `test_gate.DecisionReview.test_without_adr_the_check_follows_decision_checks` |
-| 11 repo record with a bad matcher: refused, fix in this repo | `test_decisions.Contract.test_a_bad_pattern_on_a_governing_record_is_broken`; `test_decisions.Refusals.test_a_repo_corpus_s_fix_is_to_correct_and_commit` |
-| 12 org record unloadable: refused, fix the org or unset, never commit | `test_decisions.Refusals.test_an_org_corpus_s_fix_never_says_commit` |
-| 12 org record skipped, outside the checkout: refused naming the file | `test_decisions.Contract.test_a_skipped_org_file_outside_the_checkout_is_named` |
-| 13 org folder missing: refused naming the path | `test_adrkit.OrgCorpus.test_a_folder_that_is_not_there_or_not_absolute_is_not_checked` |
-| 14 marker scan capped | `test_decisions.Judge.test_a_capped_scan_leaves_the_corpus_not_checked`; `test_decisions.Contract.test_a_file_with_more_markers_than_adrkit_reads_leaves_the_corpus_not_checked` |
-| 15 changed regular file unreadable | `test_adrkit.Boundary.test_an_unreadable_regular_file_is_listed_and_a_symlink_is_not`; `test_decisions.Judge.test_an_unreadable_changed_file_leaves_the_corpus_not_checked` |
-| 16 call past the deadline, with each step's time | `test_adrkit.Boundary.test_a_call_that_hangs_is_stopped_at_the_deadline`; `test_gate.DecisionReview.test_a_launch_whose_hook_time_is_spent_gets_the_deadline_refusal` |
-| 17 answer in another shape | `test_decisions.Report.test_an_answer_of_another_shape_is_not_checked` |
-| 18 `package`/`entity` matcher: notice naming the matcher | `test_decisions.Contract.test_a_package_matcher_is_a_notice` |
-| 20 only such a record, nothing evaluated: no reviewer | `test_decisions.Judge.test_a_record_with_only_notices_is_not_given_to_the_reviewer` |
-| 21 one evaluated matcher and one notice: given, and the notice | `test_decisions.Contract.test_a_record_matched_by_one_matcher_is_given_and_its_other_matcher_is_a_notice` |
-| 22 two records with one id | `test_decisions.Judge.test_two_records_with_one_id_are_both_left_out`; `test_decisions.Contract.test_two_records_with_one_id_are_broken`; `test_decisions.Contract.test_a_changed_broken_governing_record_is_one_broken_line` |
-| 23 skipped file judged by its status | `test_decisions.Contract.test_a_skipped_file_is_judged_by_its_status` |
-| 24 `decision_checks: log` with `adr` missing | `test_gate.DecisionReview.test_without_adr_the_check_follows_decision_checks` |
-| 25 the file limit | `test_gate.DecisionReview.test_the_size_refusal_follows_the_plugin_s_mode` |
-| 26 assessed round: rulings in `gate.log` | `test_gate.DecisionReview.test_the_decision_reviewer_s_rulings_are_written_to_the_gate_log` |
-| 27 org corpus outside the checkout: brief's file exists | `test_decisions.Contract.test_an_org_record_outside_the_checkout_is_located` |
-| refusal 2 is taken before refusal 3 | `test_gate.DecisionReview.test_a_corpus_not_checked_is_refused_before_a_broken_record` |
-| FR-002 deleted governed file is given to the check | `test_gate.DecisionReview.test_a_deleted_governed_file_still_gets_the_decision_reviewer` |
-| FR-017 audit and assess launches run no check | `test_gate.DecisionReview.test_an_audit_or_assess_launch_runs_no_check` |
-| edge: no corpus and no variable | `test_gate.DecisionReview.test_with_no_corpus_the_round_opens_and_the_result_says_nothing_was_checked` |
-| edge: org path equal to a repo corpus | `test_decisions.Corpora.test_an_org_path_that_is_a_repo_corpus_is_checked_once_as_the_org` |
-| edge: untracked `docs/adr` | `test_decisions.Corpora.test_an_untracked_folder_is_not_a_corpus` |
-| edge: `docs/adr` whose files are all in subfolders | `test_decisions.Corpora.test_a_folder_whose_files_are_all_in_subfolders_is_a_corpus` |
-| edge: solo dispatch | `test_gate.DecisionReview.test_the_decision_reviewer_is_not_dispatched_alone` |
-| one status classifier, over adrkit's own statuses | `test_decisions.Judge.test_one_status_classifier_serves_records_and_skipped_files` |
-| each finding judged by the pass that made it | `test_decisions.Judge.test_lint_s_record_level_repo_finding_is_ignored`; `test_decisions.Contract.test_a_changed_broken_governing_record_is_one_broken_line` |
-| records loaded by adrkit's own library | `test_decisions.Contract.test_a_record_whose_id_is_a_block_scalar_is_located`; `test_decisions.Judge.test_a_marker_finding_is_ignored_wherever_its_file_sits`; `test_decisions.Contract.test_a_marker_in_a_corpus_readme_leaves_the_corpus_judged` |
-| the pure tests read adrkit's real answer | `test_adrkit_corpus.Fixture.test_the_fixture_answer_is_what_adrkit_gives` |
-| the fixture is not a corpus of this repo | `test_decisions.Corpora.test_no_test_fixture_is_a_corpus_of_this_repo` |
-| the adrkit version the rules read, and its copies | `test_adrkit.Boundary.test_a_core_that_cannot_be_used_gives_the_install_step`; `test_decisions.Contract.test_the_real_script_loads_a_core_of_adrkit_version`; `test_decisions.Drift.test_the_readme_gives_the_install_command` |
-| a record adrkit cannot load is broken, whatever the reader could read of it | `test_decisions.Judge.test_a_broken_governing_record_is_named_by_its_file_and_left_out`; `test_decisions.Judge.test_a_bad_matcher_on_a_governing_record_is_broken`; `test_decisions.Contract.test_a_governing_record_adrkit_cannot_load_is_broken`; `test_decisions.Contract.test_a_skipped_file_with_no_status_is_a_notice` |
-| one identity per file | `test_decisions.Report.test_paths_adrkit_names_are_joined_to_the_real_root`; `test_adrkit.Boundary.test_each_call_runs_from_the_real_root`; `test_decisions.Contract.test_a_checkout_reached_through_a_symlink_still_refuses_a_broken_record`; `test_decisions.Judge.test_an_unloadable_file_repeating_a_loaded_id_leaves_the_loaded_record_briefed`; `test_decisions.Refusals.test_a_broken_line_names_its_file` |
-| the corpus script's own failures | `test_adrkit.Boundary.test_a_core_that_cannot_be_used_gives_the_install_step`; `test_adrkit.Boundary.test_an_exit_other_than_0_or_3_is_not_checked_with_stderr` |
-| FR-002 a changed path that begins with `-` is checked | `test_decisions.Contract.test_a_changed_path_that_begins_with_a_dash_is_checked` |
-| a rename gives both paths to the check | `test_worktree_facts.QuotedNames` (`files_in`) |
-| a record's file found by its id, not its name | `test_decisions.Contract.test_a_record_whose_file_name_differs_from_its_id_is_located` |
-| calls read at once; only a live call is killed | `test_adrkit.Boundary.test_a_call_that_hangs_is_stopped_at_the_deadline` |
-| FR-014 pin | `test_gate.HookDeadline.test_the_gate_s_deadline_is_the_timeout_hooks_json_gives_it` |
-| drift | `test_decisions.Drift.test_every_rule_this_module_reads_is_one_the_installed_adrkit_ships` |
-| CI fails without `adr` | every class that runs `adr`: skip locally, `self.fail` when `CI` is set |
+README: item 8 under "What it enforces"; Layout rows for the new scripts and `agents/decision-reviewer.md`;
+Dependencies names `adr` (the npm-installed command), its install step and node ≥ 22; Mode names `decision_checks`
+and `max_review_files`. `plugin.json` `version: 0.14.0`.

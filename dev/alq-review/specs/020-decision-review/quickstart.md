@@ -1,7 +1,7 @@
 # Quickstart: validate the decision check
 
-Prerequisites: Python 3.13, git, node ≥ 22, `pip install diff-match-patch==20241021`,
-the install command `decisions.INSTALL`, as in CI after R12.
+Prerequisites: Python 3.13, git, node ≥ 22, `pip install diff-match-patch==20241021`, and adrkit installed by the
+README's install step.
 
 ## Suite
 
@@ -9,9 +9,7 @@ the install command `decisions.INSTALL`, as in CI after R12.
 cd dev/alq-review/tests && python -m unittest -v
 ```
 
-Expected: green, with no `skipped` line for `test_decisions.Contract`, `test_adrkit` or `test_gate.DecisionReview`
-(each skips only when `adr` is absent). The scenario table in [contracts/interfaces.md](contracts/interfaces.md) names
-the test for each spec scenario.
+Expected: green, with no test skipped for want of `adr`.
 
 ## By hand, in this repo
 
@@ -27,11 +25,11 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
    `org (/abs/path/to/engineering/docs/adr)`; an org record whose matcher covers a changed file is in `governing`.
 4. Set `ALQ_ORG_ADR_DIR=/nowhere` and launch. Expected: refused, naming `/nowhere`, next step to point the variable at
    the org's `docs/adr` or unset it; `python3 scripts/ledger.py status --worktree <abs>` shows no new round.
-5. Hide `adr` (`PATH` without it) and launch. Expected: refused with `decisions.INSTALL`.
+5. Hide `adr` (`PATH` without it) and launch. Expected: refused with the install step.
 6. Commit a record `dev/alq-review/docs/adr/0099-broken.md` with `status: accepted` and `deciders: 7`, launch.
-   Expected: refused, naming `dev/alq-review/docs/adr`, the file `<checkout>/dev/alq-review/docs/adr/0099-broken.md`
-   with `0099`, adrkit's message and `(invalid-type)`, next step to correct the record in this repo and commit. With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the reviewer's
-   brief lists 0018 only.
+   Expected: refused, naming `dev/alq-review/docs/adr`, the file and adrkit's message, next step to correct the record
+   in this repo and commit. With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the
+   reviewer's brief lists 0018 only.
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision
    reviewer; `decisions.not_checked` names each corpus and why; `gate.log` has a `would_deny` line.
