@@ -337,8 +337,8 @@ Delivery Workflow.
 
 - **FR-022**: The constitutions of alq-plan, alq-review and alq-build MUST name `specs/<issue>-<short-name>/` in
   their Platform Constraints and `.claude/worktrees/<branch>` in their Delivery Workflow, with a PATCH version bump
-  each. Their Governance has the file a constitution names as owner change first and the constitution amended
-  after, so Story 5 lands after Story 4.
+  each. Each constitution's Platform Constraints name README.md as the owner of the folder line, so Story 5 lands
+  after Story 4 changes README.md.
 
 **Tests**
 
