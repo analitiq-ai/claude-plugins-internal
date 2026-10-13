@@ -21,7 +21,7 @@ exists there is no diff to match against.
 - Q: Which records count? → A: Only records adrkit treats as governing: status `accepted`, or a status it cannot read. A finding on a `draft`, `proposed`, `rejected`, `superseded` or `deprecated` record never refuses a launch and never adds a notice (FR-004).
 - Q: When is the launch refused? → A: When adrkit could not load a governing record or one of its matchers (an `error` finding, `corpus-file-skipped`, `affects-bad-pattern`, `affects-unknown-type`), when its marker scan was capped (`marker-scan-capped`, `marker-declarations-capped`), when a changed regular file could not be read, when a corpus cannot be checked at all, and when the `adr` command is missing. The refusal names the corpus and a fix that works for it. For the org corpus the fix is to fix the org's records or unset `ALQ_ORG_ADR_DIR`, never to commit (FR-008 to FR-011).
 - Q: When does the round run with a notice? → A: For a governing record whose matcher adrkit cannot evaluate in one repo: a `package` or `entity` matcher (`affects-unresolvable`), or a matcher qualified with a repo (`affects-repo-not-applicable`; adrkit skips every one, this repo's included). Refusing would block every round over a matcher no round can evaluate; ignoring would hide it (FR-012). The user's choice; recorded as an ADR (FR-019).
-- Q: What is ignored? → A: Files over 8 KB beyond their first 8192 bytes (adrkit scans only that much for markers, by design), symlinks and other non-regular files (adrkit does not follow them, by design), deleted files, and every other adrkit finding (FR-013).
+- Q: What is ignored? → A: Markers past a file's first 8192 bytes (adrkit scans only that much, by design); the marker scan of deleted files, symlinks and other non-regular files (adrkit does not follow them, by design), whose paths are still matched; and every other adrkit finding (FR-013).
 - Q: How long may the check take? → A: Every adrkit call ends by one deadline, taken when the gate hook receives its payload: the hook's 60-second timeout less a margin. A call that reaches it is a corpus that could not be checked (FR-014).
 - Q: Where do the paths come from? → A: From the git diff the round reviews. No path list is kept anywhere (FR-002).
 - Q: How do the check's refusals behave in `log` mode? → A: Split as the README already splits refusals: a broken governing record (FR-008) follows the mode, like a spec refusal; a check that could not run (FR-009, FR-010) refuses in either mode, like a review base that cannot be read (FR-018).
@@ -46,7 +46,7 @@ exists there is no diff to match against.
 
 ## Today
 
-Read on 2026-10-12 on `main` at `86a4b06`; nothing here was run.
+Read on 2026-10-12 on `main` at `86a4b06`; nothing here was run unless it says so.
 
 - No step of a review round reads a decision record: `plugins/` has no call to `adr` and no mention of adrkit, and the internal reviewer list (`briefs.INTERNAL_REVIEWERS`) has five `pr-review-toolkit` agents and nothing else.
 - The repo holds three corpora: `dev/alq-review/docs/adr` (17 records, all `accepted`), `dev/alq-plan/docs/adr` (6, all `draft`) and `dev/alq-build/docs/adr` (2, all `draft`). The ids `0001` to `0006` appear in more than one corpus.
@@ -54,13 +54,14 @@ Read on 2026-10-12 on `main` at `86a4b06`; nothing here was run.
 - adrkit's Spec Kit extension offers `adr check` as an optional `after_plan` hook, with one corpus per run (`ADRKIT_DIR`, default `docs/adr`); in a headless run the offer is only printed. It runs at planning time, when there is no diff.
 - The gate hook that opens a round runs with a 60-second timeout (`hooks/hooks.json`); the fetch of the review base inside it may take up to 30 seconds (`worktree.review_base`).
 - The installed adrkit is `@adrkit/cli` 0.20.0. Its `check` output buckets records as `governing`, `activeProposals` and `history`, and reports findings by rule name; its marker scan reads the first 8192 bytes of a file and does not follow symlinks.
+- Run on 2026-10-13 with adrkit 0.20.0 on a scratch corpus: a record with an unknown or missing status gets an `error` from lint and is in no bucket; two records with one id each get a `unique-id` `error`, and both are listed as governing; `notes.md`, a misnamed file and a file in a subfolder each get `corpus-file-skipped`, while `template.md` and `0000-template.md` are left out with no finding; a `package` or `entity` matcher gets `affects-unresolvable` and a repo-qualified one `affects-repo-not-applicable`, each from `check`, naming the matcher; a path matcher starting with `/` gets `affects-bad-pattern` from `check`; a deleted file and a symlink are matched by path, and the marker scan lists the symlink as unreadable.
 - The closed PR #92 built this without a spec; three review rounds surfaced the decisions in Clarifications.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A review round is checked against every decision that governs the change (Priority: P1)
 
-An agent launches the internal review round of a PR. The gate lists the files the round reviews and asks every corpus, the repo's own and the org's at `ALQ_ORG_ADR_DIR`, which governing records cover them. When any does, the round gets a decision reviewer briefed with those records, and its findings reach the assessor with every other reviewer's. An org record and a repo record with the same id are two records, each named by its corpus and id. A check that could not run refuses the launch, naming the corpus and a fix that works for it. A record adrkit cannot evaluate in one repo is named in a notice; the round runs.
+An agent launches the internal review round of a PR. The gate lists the files the round reviews and asks every corpus, the repo's own and the org's at `ALQ_ORG_ADR_DIR`, which governing records cover them. When any does, the round gets a decision reviewer briefed with those records, and its findings reach the assessor with every other reviewer's. An org record and a repo record with the same id are two records, each named by its corpus and id. A check that could not run refuses the launch, naming the corpus and a fix that works for it, unless `decision_checks` is `log`. A record adrkit cannot evaluate in one repo is named in a notice; the round runs.
 
 **Why this priority**: it is the purpose: a decision is no longer overturned in code without a superseding record (premise `harm`). The parts ship together: a check that cannot refuse would pass a change silently whenever it failed (ADR-0009, constitution P4), and the notices come from the same reading of adrkit's findings as the refusals.
 
@@ -84,7 +85,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 14. **Given** adrkit reports its marker scan was capped, **When** the round launches, **Then** it is refused, naming the corpus the call was for and the cap, with the next step to split the change.
 15. **Given** a changed regular file the check cannot read, **When** the round launches, **Then** it is refused, naming the file.
 16. **Given** an adrkit call that has not ended by the deadline, **When** the round launches, **Then** it is refused as a corpus that could not be checked, naming the corpus, the deadline and the time each step of the launch spent (review-base fetch, `gh` calls, each adrkit call).
-17. **Given** adrkit answers in a shape the gate cannot read, **When** the round launches, **Then** it is refused as a check that could not run, naming the corpus and the install step of the adrkit version the plugin is built for. No such answer has been seen from adrkit 0.14 or 0.20; this is the boundary check on its output.
+17. **Given** adrkit answers in a shape the gate cannot read, **When** the round launches, **Then** it is refused as a check that could not run, naming the corpus and the install step of the adrkit version the plugin is built for.
 18. **Given** a governing record whose matcher is `package` or `entity`, **When** the round launches, **Then** the round opens and the result carries a notice naming the record, its corpus and the matcher.
 19. **Given** a governing record whose matcher is qualified with a repo, this one or another, **When** the round launches, **Then** the round opens and the result carries a notice naming the record, its corpus and that repo.
 20. **Given** such a record is the only one and none of its matchers is evaluated, **When** the round launches, **Then** no decision reviewer is added.
@@ -101,7 +102,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 ### Edge Cases
 
 - A changed file over 8 KB: its path is still matched; a marker past its first 8192 bytes is not seen, and nothing is said about it.
-- A changed symlink or other non-regular file: given to the check and matched by path; adrkit does not scan it for markers, and nothing is said about that.
+- A changed symlink or other non-regular file: given to the check and matched by path; adrkit does not scan it for markers and lists it among the files its marker scan could not read. That is not a refusal (FR-009 refuses only for a regular file), and nothing is said about it.
 - A deleted file: given to the check and matched by path, so a record whose matcher covers it governs the change; there is nothing to scan for markers, and nothing is said about that.
 - The PR changes a decision record: findings on it refuse the launch only when adrkit reports an `error` on a governing record; findings on a `draft` or `proposed` record change nothing.
 - A record whose status adrkit cannot read: counted as governing, so the `error` finding adrkit raises on it refuses the launch (FR-008). It is never dropped the way a `draft` is.
@@ -114,7 +115,8 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - An audit round: no decision reviewer and no check; the feature is the internal round's.
 - A broken governing record in `log` mode, or with `decision_checks` at `log`: recorded as a would-deny, and the round opens with the records that were read. A check that could not run in `log` mode: refused, as in `enforce`, unless `decision_checks` is `log` (FR-021).
 - Two records with one id in one corpus: adrkit reports `unique-id` as an `error` on each; on a governing record that is a broken record (FR-008), with FR-011's fix.
-- A stray `.md` file in a corpus (notes, a misnamed file, a file in a subfolder): adrkit skips it. It refuses only when its status is `accepted`; with no status that can be read it is a notice; otherwise it is ignored.
+- A stray `.md` file in a corpus (notes, a misnamed file, a file in a subfolder): adrkit skips it with a `corpus-file-skipped` finding. It refuses only when its status is `accepted`; with no status that can be read it is a notice; otherwise it is ignored.
+- A file adrkit leaves out of a corpus by name with no finding (`README.md`, `index.md`, `CONTRIBUTING.md`, `template.md`, `0000-template.md`): not a record, whatever its status; nothing is said.
 - A change of more than `max_review_files` files: refused before any adrkit call (FR-022).
 - A round that is `INCOMPLETE` because the decision reviewer did not report: launched again with the same arguments, like any partial round.
 - The reviewer finds nothing: an empty findings list, which is a normal answer.
@@ -129,7 +131,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - **FR-002**: The files MUST come from the git diff the round reviews (full or delta); no list of paths is kept in any file or setting. Every path the diff changes MUST be given to the check, deleted files, symlinks and other non-regular files included: adrkit matches them by path and skips only their marker scan.
 - **FR-003**: Each corpus MUST be checked by its own adrkit call with its own folder, so each corpus keeps its own ids.
 - **FR-004**: Only governing records count: status `accepted`, or a status adrkit cannot read. A finding on a `draft`, `proposed`, `rejected`, `superseded` or `deprecated` record MUST NOT refuse a launch or add a notice.
-- **FR-005**: Every record in a brief, a notice or a refusal MUST be named by its corpus and its id.
+- **FR-005**: Every record in a brief, a notice or a refusal MUST be named by its corpus and its id; a file adrkit gives no id for (a skipped file, a record it could not load) by its corpus and its file.
 
 **The reviewer**
 
@@ -141,7 +143,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - **FR-008**: The launch MUST be refused when adrkit could not load a governing record or one of its matchers: an `error` finding (including `unique-id`), `affects-bad-pattern` or `affects-unknown-type` on a governing record, or `corpus-file-skipped` on a file whose status is `accepted`. A skipped file whose status cannot be read is a notice (FR-012); one with any other status is ignored. The refusal MUST name the corpus and the record.
 - **FR-009**: The launch MUST be refused when adrkit reports `marker-scan-capped` or `marker-declarations-capped`, or when a changed regular file could not be read. The refusal MUST name the corpus, or the file, and for a cap the next step to split the change.
 - **FR-010**: The launch MUST be refused when a corpus cannot be checked at all (its folder is missing or unreadable, the call fails, its answer cannot be read, or it reaches the deadline) and when the `adr` command is missing. The refusal MUST name the corpus, or the missing command and its install step.
-- **FR-011**: Every refusal MUST say the check failed, not the work, and name a fix that works for the corpus it names: for a repo corpus, correct the record in this repo, commit and launch again; for the org corpus, fix the org's records or unset `ALQ_ORG_ADR_DIR`. A refusal about the org corpus MUST NOT tell the agent to commit. A record's file, as adrkit names it, MUST be read from the checkout root, where adrkit ran, so an org record outside the repo is found.
+- **FR-011**: Every refusal MUST say the check failed, not the work, and name a fix that works for the corpus it names: for a repo corpus, correct the record in this repo, commit and launch again; for the org corpus, fix the org's records or unset `ALQ_ORG_ADR_DIR`. A refusal about the org corpus MUST NOT tell the agent to commit. Every record file a brief names MUST be a path that exists, an org record outside the checkout included.
 - **FR-012**: A matcher adrkit cannot evaluate in a one-repo check, a `package` or `entity` matcher (`affects-unresolvable`) or any repo-qualified matcher (`affects-repo-not-applicable`), MUST NOT refuse the launch; the round's result MUST carry a notice naming the record, its corpus, the matcher and the reason. The record reaches the reviewer only if another of its matchers, or a marker, makes it govern the change. A skipped file whose status cannot be read (FR-008) is a notice naming the file.
 - **FR-013**: Every other adrkit finding MUST be ignored. A file over 8 KB is checked as adrkit checks it; nothing is said about markers past its first 8192 bytes.
 - **FR-014**: Every adrkit call of a launch MUST end by one deadline, taken when the gate hook receives its payload: the hook's 60-second timeout less a margin. The calls for different corpora MUST run at the same time. A call that reaches the deadline MUST be treated as a corpus that could not be checked (FR-010), and the refusal MUST name the time each step of the launch spent (the review-base fetch, the `gh` calls, each adrkit call), so the next step is the one that can succeed.
@@ -157,7 +159,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - **FR-018**: With `decision_checks` at `enforce`: a refusal under FR-008 (a governing record adrkit could not load) MUST follow the plugin's mode as the spec refusals do (in `log` mode it is recorded as would-deny and the round opens with the records that were read); a refusal under FR-009 or FR-010 (the check could not run in full) MUST refuse in either mode, as a review base that cannot be read does.
 - **FR-019**: The user's choice on notices (FR-012) MUST be recorded as an ADR in `dev/alq-review/docs/adr`, in its own PR before the code lands.
 - **FR-020**: The plugin's README MUST state the `adr` command as a dependency with its install step, what the round does with decisions, the `decision_checks` and `max_review_files` settings, in the terms of this spec.
-- **FR-021**: The check MUST have its own setting, `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`), as the claim and shim checks have. At `log`, no decision-check refusal blocks: each is recorded as would-deny in `gate.log`, the round opens with the records that were read, and the result names each corpus not checked and why, and each governing record that could not be loaded. Nothing not checked or not loaded is given to the decision reviewer. The constitution's Platform Constraints line on per-check settings changes in the same PR as ADR-0020 (FR-019), before the code.
+- **FR-021**: The check MUST have its own setting, `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`), as the claim and shim checks have. At `log`, no decision-check refusal blocks: each is recorded as would-deny in `gate.log`, the round opens with the records that were read, and the result names each corpus not checked and why, and each governing record that could not be loaded. Nothing not checked or not loaded is given to the decision reviewer. The constitution's Platform Constraints lines on per-check settings and on where reviewer agents come from change in the same PR as ADR-0020 (FR-019), before the code.
 - **FR-022**: An internal round whose files (FR-002) number more than `max_review_files` (`config.json`, shipped 50) MUST be refused before any adrkit call, following the plugin's mode, naming the count and the limit, with the next step: split the PR, or, for a delta round, commit in smaller steps and launch after each.
 - **FR-023**: When a round is assessed, the rulings on the decision reviewer's findings (each finding's id and ruling: FIX, PUSH_BACK or DEFER) MUST be written to `gate.log`, one line per round.
 
@@ -165,7 +167,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 
 - **Corpus**: a folder path (repo-relative for a repo corpus, absolute for the org corpus) and the records in it. Identified by its path.
 - **Governing record**: corpus, id, title, status, the record's file, its matchers.
-- **Decision check result**: per launch: the corpora checked, the governing records that cover the change, the notices, whether the org corpus was unset, and the refusal if any. Reported in the round's result; not kept beyond the round.
+- **Decision check result**: per launch: the corpora checked, the governing records that cover the change, the notices, whether the org corpus was unset, and, when their refusal did not block, the records that could not be loaded and the corpora not checked with why. Reported in the round's result; not kept beyond the round.
 - **Notice**: a record (corpus, id), the matcher, and the reason it could not be evaluated here.
 
 ## Success Criteria *(mandatory)*
@@ -188,7 +190,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - The decisions in Clarifications stand; this spec states what they mean and does not reopen them.
 - adrkit's `check` buckets only `accepted` as governing; a record whose status it does not know, or that has none, is in no bucket and gets an `error` from its lint (run on 2026-10-13 with adrkit 0.20.0). Counting an unreadable status as governing (FR-004) is the plugin's rule, so that a record it cannot classify refuses the launch instead of vanishing. The spec names adrkit's finding rules by the names adrkit 0.20 gives them; a later adrkit that renames one is an answer the gate cannot read (FR-010).
 - The decision reviewer is one agent per round, however many records govern the change; the records are its brief. Which agent and what prompt are plan matters.
-- Org records apply to every repo in the organisation; a record for one repo lives in that repo's corpus. The check gives adrkit no repo identity (the `adr check` command has no option for one), so adrkit skips every repo-qualified matcher, this repo's included (run on 2026-10-12: a matcher qualified with the checked repo's own name came back `affects-repo-not-applicable`); such a matcher in any corpus is a notice (FR-012). How a matcher names a repo is adrkit's rule, not the plugin's.
+- Org records apply to every repo in the organisation; a record for one repo lives in that repo's corpus. The check gives adrkit no repo identity (the `adr check` command has no option for one; adrkit's library takes one for a federation of repos, which this check does not use), so adrkit skips every repo-qualified matcher, this repo's included (run on 2026-10-12: a matcher qualified with the checked repo's own name came back `affects-repo-not-applicable`); such a matcher in any corpus is a notice (FR-012). How a matcher names a repo is adrkit's rule, not the plugin's.
 - `ALQ_ORG_ADR_DIR` names a folder on the machine the round launches from; keeping that folder current is the user's, not the plugin's.
 - The deadline's margin is a plan matter; what the spec fixes is that it is one deadline for all calls of the launch, taken when the hook starts, and that the hook's own timeout is 60 seconds.
 - Out of scope: checking decisions at planning time (#89, closed); the audit stage; a check at commit time; marking which record a finding cites in the ledger beyond what every finding records; a cache of corpus reads across launches.
@@ -204,7 +206,7 @@ Answer: predicted. Main has 17 accepted decision records with `affects` paths, a
 Source: code: `grep -l 'status: accepted' dev/*/docs/adr/*.md` (17); `plugins/alq-review/scripts/briefs.py` waves.
 
 ### change-alters
-Answer: Yes. At round launch the gate runs `adr check <files git diff changed> --dir <corpus>` per corpus (each tracked `docs/adr`, and `$ALQ_ORG_ADR_DIR`). ADR-0018 governs `gate.py`, so it comes back in `governing`. The round gets a decision reviewer briefed with that record. Its finding that the diff contradicts ADR-0018 goes through `assess-round` like any other. The #92 prototype ran this end to end with adrkit 0.20 in tests.
+Answer: Yes. At round launch the gate asks adrkit, once per corpus (each tracked `docs/adr`, and `$ALQ_ORG_ADR_DIR`), which governing records cover the files the git diff changed. ADR-0018 governs `gate.py`, so it comes back in `governing`. The round gets a decision reviewer briefed with that record. Its finding that the diff contradicts ADR-0018 goes through `assess-round` like any other. The #92 prototype ran this end to end with adrkit 0.20 in tests.
 Source: code: closed PR #92 (`decisions.py`, `test_decisions.py`, `test_gate.DecisionReview`); reproduction: `adr check` returned the governing record for a matching changed file.
 
 ### owner
