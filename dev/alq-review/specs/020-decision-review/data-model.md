@@ -24,7 +24,9 @@ An org path that is also a repo corpus is checked once, as the org corpus.
 ## Corpus outcome
 
 Each corpus yields exactly one outcome: **judged** (its governing records, notices and broken records), or **not
-checked** (a cause and a reason that ends with the next step). A corpus not checked contributes nothing else.
+checked** (the corpus, a cause, and a reason that ends with the next step). A corpus not checked contributes nothing
+else. A cause known before any adrkit call (an invalid `ALQ_ORG_ADR_DIR`, a repo corpus not as HEAD) is that
+corpus's outcome; `too big` applies only to the corpora still to be checked.
 
 | Cause | When | Next step |
 |---|---|---|
@@ -49,7 +51,8 @@ At most one blocks a launch; they are taken in this order. `P` is the plugin's m
 
 Every refusal says the check failed and names the corpus (or file, or command) and a fix that works there (FR-011).
 Refusals 1 and 2 give the next step of their cause (§ Corpus outcome). Refusal 3 gives the record's fix, worded as FR-011
-states it. A refusal that does not block writes a `would_deny` line to `gate.log`, and the round opens on what was read.
+states it. A refusal that blocks opens no round and writes nothing to the ledger. One that does not block writes a
+`would_deny` line to `gate.log`; the launch takes the next refusal, then opens on what was read.
 
 ## Round arguments and result
 
@@ -68,11 +71,13 @@ states it. A refusal that does not block writes a `would_deny` line to `gate.log
 }
 ```
 
-- `broken` and `not_checked` are non-empty only when their refusal did not block.
+- `not_checked` is `[{corpus, cause, reason}]`; `broken` is `[{corpus, file, id, rule, message}]`. Both are
+  non-empty only when their refusal did not block.
 - `corpora` lists the judged corpora only.
-- Reading it (SC-008): `corpora: []`, `not_checked: []` and `org_corpus: "unset"` means no corpus was found;
-  `governing: []` with `not_checked: []` means nothing governs the change; `governing: []` with `not_checked`
-  non-empty means nothing in the judged corpora governs it.
+- Reading it (SC-008):
+  - `corpora: []`, `not_checked: []` and `org_corpus: "unset"`: no corpus was found.
+  - `governing: []` with `not_checked: []` and `broken: []`: nothing governs the change.
+  - `governing: []` with `not_checked` or `broken` non-empty: nothing among the records that were judged governs it.
 
 ## Round record (ledger, existing)
 

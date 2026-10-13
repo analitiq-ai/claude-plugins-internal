@@ -89,7 +89,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 19. **Given** a governing record whose matcher is qualified with a repo, this one or another, **When** the round launches, **Then** the round opens and the result carries a notice naming the record, its corpus and that repo.
 20. **Given** such a record is the only one and none of its matchers is evaluated, **When** the round launches, **Then** no decision reviewer is added.
 21. **Given** a governing record with one path matcher that matches a changed file and one matcher adrkit cannot evaluate here, **When** the round launches, **Then** the record is given to the decision reviewer and the result also carries a notice for the matcher it could not evaluate.
-22. **Given** two `accepted` records with one id in one corpus, **When** the round launches, **Then** it is refused as a broken record (adrkit's `unique-id`), naming the corpus and both files, and the fix is to correct the records in that corpus.
+22. **Given** two `accepted` records with one id in one corpus, **When** the round launches, **Then** it is refused as a broken record (adrkit's `unique-id`), naming the corpus and both files, with FR-011's fix for that corpus.
 23. **Given** a skipped file in a corpus (misnamed, or in a subfolder) whose status is `accepted`, **When** the round launches, **Then** it is refused, naming the file; **Given** one with no status that can be read, **Then** the round opens and the result carries a notice naming the file; **Given** one with status `draft`, **Then** nothing is said.
 24. **Given** `decision_checks` is `log` and `adr` cannot be found, **When** the round launches, **Then** the round opens without a decision reviewer, `gate.log` has a would-deny line, and the result names each corpus as not checked and why.
 25. **Given** a change of 51 files and `max_review_files` at 50, **When** the round launches, **Then** it is refused before any adrkit call, naming 51 and 50, and the next step is to split the PR (full round) or commit in smaller steps (delta round).
@@ -113,7 +113,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - `ALQ_ORG_ADR_DIR` pointing inside the repo under review: still the org corpus, checked once as the org corpus; a tracked `docs/adr` at that path is not checked twice.
 - An audit round: no decision reviewer and no check; the feature is the internal round's.
 - A broken governing record in `log` mode, or with `decision_checks` at `log`: recorded as a would-deny, and the round opens with the records that were read. A check that could not run in `log` mode: refused, as in `enforce`, unless `decision_checks` is `log` (FR-021).
-- Two records with one id in one corpus: adrkit reports `unique-id` as an `error` on each; on a governing record that is a broken record (FR-008), fixed in the corpus.
+- Two records with one id in one corpus: adrkit reports `unique-id` as an `error` on each; on a governing record that is a broken record (FR-008), with FR-011's fix.
 - A stray `.md` file in a corpus (notes, a misnamed file, a file in a subfolder): adrkit skips it. It refuses only when its status is `accepted`; with no status that can be read it is a notice; otherwise it is ignored.
 - A change of more than `max_review_files` files: refused before any adrkit call (FR-022).
 - A round that is `INCOMPLETE` because the decision reviewer did not report: launched again with the same arguments, like any partial round.

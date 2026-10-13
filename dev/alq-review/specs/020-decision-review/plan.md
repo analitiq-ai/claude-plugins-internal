@@ -59,7 +59,7 @@ is a refusal, not a limit the plugin works around
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model); nothing degrades to "no decisions". One adrkit version; no tolerance for another. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (R14). Pass. |
 | V. Smallest complete change | No cache, no planning-time check, no audit check, no ledger field. `changed_files` is generalised, not duplicated. The whole mechanism ships in one PR because a check that cannot refuse would pass silently (spec, one story). Pass. |
-| VI. Governing rule ships apart | ADR-0020 and the constitution's Platform Constraints line naming `decision_checks` are their own PR, merged first (R13). The README changes with the code it describes, as in spec 019. Pass. |
+| VI. Governing rule ships apart | ADR-0020 and the constitution lines (R13, T002) are their own PR, merged first. The README changes with the code it describes, as in spec 019. Pass. |
 | P1. Code decides | The check, the reviewer's seat in `expected`, every refusal and the notices are decided in the gate; the agent is told nothing it could skip. Each refusal ends with its next step (R10). Pass. |
 | P2. Only an approved entity releases a hold | No hold, lock or count is added. A refused launch holds nothing: the next launch checks again. The user releases the check by setting `decision_checks` to `log` (R15, ADR-0011). Pass. |
 | P3. Rules are pure | The rules in `decisions.py` are functions of adrkit's answers; `adrkit.py` and the gate do the I/O; `review-round.js` only echoes `decisions` (R6, R9). Pass. |
@@ -88,7 +88,7 @@ ADR first, its own PR (branch `88-adr-notice`):
 
 ```text
 dev/alq-review/docs/adr/0020-run-the-round-with-a-notice-for-a-matcher-adrkit-cannot-evaluate-here.md
-dev/alq-review/.specify/memory/constitution.md   # Platform Constraints: decision_checks beside claim and shim
+dev/alq-review/.specify/memory/constitution.md   # R13, T002
 ```
 
 Then the code (branch `88-us1-decision-review`):
@@ -111,7 +111,7 @@ plugins/alq-review/
 ├── .claude-plugin/plugin.json # 0.14.0
 ├── config.json                # "decision_checks": "enforce", "max_review_files": 50
 ├── hooks/hooks.json           # unchanged; its 60 s timeout is pinned by a test
-└── README.md                  # item 8, Layout rows, Dependencies
+└── README.md                  # T016, contracts/interfaces.md § README
 dev/alq-review/tests/
 ├── test_decisions.py          # new: the pure rules, contract tests against the real adrkit, rule-name pin
 ├── test_adrkit.py             # new: the boundary

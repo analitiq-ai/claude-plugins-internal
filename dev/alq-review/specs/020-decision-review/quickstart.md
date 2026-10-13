@@ -18,8 +18,9 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
 1. On a draft PR's worktree whose diff touches `gate.py`, with `ALQ_ORG_ADR_DIR` unset, launch
    `Workflow(name='alq-review:review-round', args={worktree: '<abs>', spec: 'dev/alq-review/specs/020-decision-review'})`.
    Expected: the round opens; the last reviewer of the wave is `alq-review:decision-reviewer` and its prompt lists
-   `dev/alq-review/docs/adr 0018 "Release a RESHAPE_SPEC lock only by unlock"`; the result's `decisions` has
-   `corpora` = the three `dev/*/docs/adr`, `governing` = that record, `org_corpus: "unset"`.
+   the governing records; the result's `decisions` has `corpora` = the three `dev/*/docs/adr`, `governing` including
+   `dev/alq-review/docs/adr 0018` (adr 0.20.0 on 2026-10-13 also returned 0004, 0006, 0008, 0009, 0012, 0016 and
+   0017), `org_corpus: "unset"`.
 2. `gh pr ready` before the decision reviewer reports: refused (the round is collecting).
 3. Set `ALQ_ORG_ADR_DIR=/abs/path/to/engineering/docs/adr` and launch on a new commit. Expected: `corpora` gains
    `org (/abs/path/to/engineering/docs/adr)`; an org record whose matcher covers a changed file is in `governing`.
@@ -29,7 +30,7 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
 6. Commit a record `dev/alq-review/docs/adr/0099-broken.md` with `status: accepted` and `deciders: 7`, launch.
    Expected: refused, naming `dev/alq-review/docs/adr`, the file and adrkit's message, next step "correct the record
    in this repo, commit and launch again". With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the
-   reviewer's brief lists 0018 only.
+   reviewer's brief lists step 1's records and not 0099.
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision
    reviewer; `decisions.not_checked` names each corpus and why; `gate.log` has a `would_deny` line.
