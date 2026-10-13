@@ -35,6 +35,6 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision
    reviewer; `decisions.not_checked` names each corpus and why; `gate.log` has a `would_deny` line.
-9. On a branch changing 51 files, launch. Expected: refused before any `adr` call, naming 51 and 50.
+9. On a branch changing 51 files, launch. Expected: refused before any adrkit call, naming 51 and 50.
 10. After an assessed round with a decision reviewer: `gate.log` has a `decision-review` line with each finding's
     ruling.

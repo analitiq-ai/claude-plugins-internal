@@ -8,11 +8,11 @@
 
 At an internal round's launch the gate lists the files of the round's own diff range and asks adrkit, per corpus
 (each tracked `docs/adr` and the org corpus at `ALQ_ORG_ADR_DIR`), which governing records cover them. A new boundary
-module `adrkit.py` runs the CLI under the hook's deadline and returns one outcome per corpus; a new pure module
-`decisions.py` judges adrkit's findings by the spec's table. When records govern the change,
+module `adrkit.py` runs adrkit's own library, as `adr check` does, under the hook's deadline and returns one outcome
+per corpus; a new pure module `decisions.py` judges adrkit's findings by the spec's table. When records govern the change,
 `alq-review:decision-reviewer` joins the round's expected reviewers with those records as its brief, and its findings
 reach `assess-round` like any other. The round's result carries a `decisions` block. An internal round of more than
-`max_review_files` files (50) is refused before any `adr` call; the check has its own `decision_checks` setting; each
+`max_review_files` files (50) is refused before any adrkit call; the check has its own `decision_checks` setting; each
 assessed round's rulings on the decision reviewer's findings go to `gate.log`. The user's notice choice lands first as
 ADR-0020 in its own PR, with the constitution's lines on per-check settings and reviewer agents.
 
@@ -26,7 +26,7 @@ in [data-model.md](data-model.md), stated once; the outside interfaces and the s
 the workflow is JavaScript
 
 **Primary Dependencies**: git, as today; adrkit's CLI `adr` (`@adrkit/cli` 0.20.0, node ≥ 22) on `PATH` of the
-machine that launches rounds, new, required only when a corpus is to be checked (R11); the record reader runs the
+machine that launches rounds, new, required only when a corpus is to be checked (R11); the corpus script runs the
 `@adrkit/core` that `adr` ships, on the `node` that `adr` runs on (R5)
 
 **Storage**: none new. The round's `expected` list in the PR's ledger doc names the decision reviewer when it joins;
@@ -39,9 +39,9 @@ real `adr` (skipped locally without it, installed in CI), launches through the h
 
 **Project Type**: Claude Code plugin (hook, workflow, agent)
 
-**Performance Goals**: two `adr` calls and one record-reader call per corpus at each internal launch, all started at once, within one 55 s
-deadline shared with the 30 s review-base fetch and the `gh` calls (R4, R7). The record reader took 0.2 s on this repo's largest corpus
-(2026-10-13); the `adr` calls were not measured. The deadline bounds them, and a deadline refusal names what each step spent
+**Performance Goals**: one `adr --version` per internal launch and one adrkit call per corpus, all corpora at once,
+within one 55 s deadline shared with the 30 s review-base fetch and the `gh` calls (R4, R7). Not measured on this
+repo's corpora; the deadline bounds them, and a deadline refusal names what each step spent
 
 **Constraints**: no path list anywhere (R2); one validator per document (adrkit's), the gate re-declares only the
 status and rule names it must sort by, pinned by a drift test (R6); every refusal names a fix that can succeed for the
@@ -57,7 +57,7 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields data-model § Reading adrkit lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. Record files are found and parsed by adrkit's own `@adrkit/core`, never by the plugin (R5). The statuses in `NOT_GOVERNING` and the rule names in `RULES` are a copy of adrkit's, justified in Complexity Tracking and pinned by `test_decisions.Drift` (R6). Pass with that entry. |
+| I. Contract-first | The shapes are those of adrkit's published `@adrkit/core` (`lintCorpus`, `checkChanges`, `Status`); the gate is an adapter that reads the fields data-model § Reading adrkit lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone loads and judges a record, and its own status list comes with each report. The rule names in `RULES` are a copy of adrkit's, justified in Complexity Tracking and pinned by `test_decisions.Drift` (R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model § Corpus outcome, § Refusals); nothing degrades to "no decisions". The install step pins one version; no tolerance for another shape. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (contracts, Scenario coverage). `decisions.judge` is pure; `adrkit.py` is tested with a stand-in script and with the real CLI. Pass. |
@@ -99,8 +99,8 @@ Then the code (branch `88-us1-decision-review`):
 ```text
 plugins/alq-review/
 ├── scripts/
-│   ├── adrkit.py              # new: data-model § Functions and their owners, § Reading a record file, § Reading adrkit
-│   ├── adrkit_records.mjs     # new: the record reader, data-model § Reading a record file
+│   ├── adrkit.py              # new: data-model § Functions and their owners, § Reading adrkit
+│   ├── adrkit_corpus.mjs      # new: the corpus script, data-model § Reading adrkit
 │   ├── decisions.py           # new: data-model's types and its pure functions
 │   ├── gate.py                # main takes the deadline; handle/on_workflow carry it; step timings; the file limit;
 │   │                          #      _governance(); the refusals; on_agent covers the decision reviewer; the
@@ -116,8 +116,10 @@ plugins/alq-review/
 ├── hooks/hooks.json           # unchanged; its 60 s timeout is pinned by a test
 └── README.md                  # item 8, Layout rows, Dependencies
 dev/alq-review/tests/
-├── test_decisions.py          # new: pure cases, real-CLI contract cases, rule and status drift test
+├── test_decisions.py          # new: pure cases from the fixture answer, real-adrkit contract cases, rule drift test
+├── test_adrkit_corpus.py      # new: the corpus script's answer on the fixture is answer.json
 ├── test_adrkit.py             # new: stand-in adr and @adrkit/core: shapes, exit codes, deadline, symlink vs regular file
+├── fixtures/adrkit/           # new: repo/ (one file per case of data-model § Judgement) and answer.json, adrkit's answer on it
 ├── test_gate.py               # DecisionReview, HookDeadline
 ├── test_agents.py             # DecisionReviewer tools
 ├── test_worktree_facts.py     # files_in, tracked; review_args signature
@@ -138,7 +140,7 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `decisions.py` re-declares adrkit's non-governing statuses (`NOT_GOVERNING`) and the rule names it sorts by (`RULES`) (constitution I: no re-declared type-name list) | A `check --json` finding names a record by path and id but not its status; the spec's rule turns on both the status and the rule name | Asking adrkit per record (`explain`) gives no status either and costs a call per finding against a 55 s deadline. The copy is pinned to the installed package by `test_decisions.Drift` (R6, R14). Statuses and record files themselves come from adrkit's own loader (R5), so no parser or discovery rule is copied |
+| `decisions.py` re-declares the rule names it sorts by (`RULES`) (constitution I: no re-declared type-name list) | The spec's table turns on adrkit's rule names, and adrkit exports no list of them | The copy is pinned to the installed core's JS by `test_decisions.Drift` (R6, R14). Statuses come with each report from adrkit's `Status`, and records are loaded by adrkit's library (R5), so no status list, parser or discovery rule is copied |
 
 ## Open points
 
@@ -153,9 +155,9 @@ the corpus adrkit reads is HEAD's. A refusal that does not block opens the round
 - The check at an internal round's launch, between `launch_round` and `open_round`; audits and assessments skip it: R1
 - The files from the reviewers' own diff range, deleted and non-regular files included: R2
 - Every tracked `docs/adr` and the org corpus, each checked once and labelled: R3
-- `adr lint` and `adr check` per corpus, all started at once, with the checkout as working directory: R4
-- The `adrkit.py` boundary: one outcome per corpus, the fields read, the install step: R5
-- The pure classification in `decisions.py`: one status classifier; broken, notice, not checked, ignored: R6
+- One adrkit call per corpus, the library calls `adr check` makes, all at once, with the checkout as working directory: R4
+- The `adrkit.py` boundary and the corpus script: one outcome per corpus, the fields read, the install step: R5
+- The pure classification in `decisions.py`: one status classifier over adrkit's statuses; each finding judged by the pass that made it: R6
 - One absolute deadline per hook run, 55 s after the payload, pinned to `hooks.json`: R7
 - The decision reviewer agent, its brief, its seat in `expected`: R8
 - The `decisions` block in the injected args and the round's result: R9
@@ -165,6 +167,6 @@ the corpus adrkit reads is HEAD's. A refusal that does not block opens the round
 - ADR-0020 for the notice choice, its own PR first: R13
 - The test suites and the scenario coverage: R14
 - `decision_checks`, the check's own setting: R15
-- `max_review_files`, refused before any `adr` call: R16
+- `max_review_files`, refused before any adrkit call: R16
 - The decision reviewer's rulings in `gate.log`: R17
 - The corpus checked as HEAD has it: R18

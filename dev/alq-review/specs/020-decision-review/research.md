@@ -2,7 +2,8 @@
 
 Read on 2026-10-12: adrkit `@adrkit/cli` 0.20.0 as installed (`~/.node22/lib/node_modules/@adrkit/cli`, its `dist/index.js`
 and `@adrkit/core`'s), the closed PR #92's branch `88-us1-adr-review`, and `plugins/alq-review` on `main` at `86a4b06`.
-Nothing here was run unless a section says so; what PR #92's tests showed is quoted as theirs.
+Nothing here was run unless a section says so; what PR #92's tests showed is quoted as theirs. R5 records the run
+the reading and judging rules are written from.
 
 ## R1: One check in the gate, at an internal round's launch, before the round opens
 
@@ -12,7 +13,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
   data-model § Refusals.
 - **Rationale**: the launch is the one moment that has the diff range, the commit and the reviewer list in hand, and a
   refusal there costs one call (ADR-0009). Running after `launch_round` means a launch refused for its own reasons
-  (dirty tree, cap, same commit) spends no `adr` call of the hook's budget. Audits read no spec either (README item 5).
+  (dirty tree, cap, same commit) spends none of the hook's budget on adrkit. Audits read no spec either (README item 5).
 - **Existing tools**: `gate.on_workflow`'s launch sequence (spec step, `launch_round`, `_review_base`, `open_round`):
   fit, the check slots between the last two. `hookio.refuse` and `hookio.block`: fit, wrapped by `refuse_decision` and
   `block_decision` for `decision_checks` (R15). PR #92's placement: the same, followed.
@@ -22,7 +23,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 - **Decision**: the paths are `worktree.files_in` over the range the reviewer prompt prints: `<base>...HEAD` for a
   full round, `<delta_from>..HEAD` for a delta round (data-model § Functions and their owners).
   `worktree.changed_files(root, base)` becomes `files_in(root, rev_range)`; `briefs.review_range(decision, base)` is
-  the one place the range is written, used by the prompts and the check. Every path is passed to `adr check`: deleted
+  the one place the range is written, used by the prompts and the check. Every path is passed to adrkit: deleted
   files, both sides of a rename, symlinks and non-regular files included.
 - **Rationale**: FR-002 forbids a kept list; the diff the reviewers read is the only honest source, and a delta round
   must ask about the delta (scenario 5). `_DIFF` pins `--find-renames`, under which `--name-only` lists only a
@@ -39,72 +40,71 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 - **Rationale**: FR-001 and FR-003. `git ls-files` answers "tracked" directly and at any depth in one call; taking
   every `docs/adr` prefix of a tracked path finds a corpus whose files all sit in subfolders, which adrkit skips but
   scenario 23 must judge. The spec's edge case says an org path inside the repo is still the org corpus. An absolute
-  path is required because `adr` runs with `cwd` = the checkout, so a relative org path would be read against it.
+  path is required because adrkit runs with `cwd` = the checkout, so a relative org path would be read against it.
 - **Existing tools**: `worktree._listed` with `ls-files`: fit. PR #92's `_corpora`: followed, except that it kept an
   org path that coincides with a repo corpus as the repo's; the spec settles it the other way.
 
-## R4: Two adrkit calls per corpus, `lint` and `check`, with the checkout as working directory
+## R4: One adrkit call per corpus, the three library calls `adr check` makes, with the checkout as working directory
 
-- **Decision**: per corpus, `adr lint` and `adr check` (and the record reader of R5), all calls of a launch at once
-  under the launch's deadline; `check` takes its options, then `--`, then the paths, so a path that begins with `-` is
-  not read as an option (`adr check --dir d --json --help` prints usage). The command lines, fields read and exit codes are data-model § Reading adrkit.
-  Four corpora are eight calls, each of which re-reads its corpus, so one after another they would spend the deadline
-  eight times over. Exit 1 means an error finding on a changed record, so it is a report.
-- **Rationale**: `check` alone is not enough. Its `findings` carry the corpus's lint findings only for *changed*
-  records (`checkChanges`: `changedRecordFindings` filters `input.lint.findings` to `changedRecords`), so a broken
-  governing record the PR does not touch, or a `corpus-file-skipped` file, appears only in `lint --json`. `check` is
-  still needed for `governing`, the per-matcher `affects-*` findings and the marker scan. The files are repo-relative,
-  so `cwd` must be the checkout; `--dir` may be absolute (the org corpus) or repo-relative.
+- **Decision**: per corpus, one run of the corpus script, all corpora of a launch at once under the launch's deadline,
+  after one `adr --version`. The command lines, fields read and exit codes are data-model § Reading adrkit.
+- **Rationale**: `adr check`'s whole body is `lintCorpus`, `readSourceMarkersBatch`, `checkChanges` (the CLI's
+  `runCheck`, read in 0.20.0's `dist/index.js`), and its JSON drops two things the spec's rules need: which findings
+  are lint's (it re-emits lint's findings on changed records among its own) and the status of a file it could not
+  load. Through the CLI that took three calls per corpus (`adr lint`, `adr check`, a file reader), a dedup by
+  equality, and a rule for a copied finding with no `pattern`. Making the three calls in one script keeps each
+  finding's source by construction and costs one call per corpus. `lintCorpus` is still needed beside `check`: it is
+  the only pass over records the change does not touch. The files are repo-relative, so `cwd` must be the checkout.
 - **Existing tools**: `subprocess.run` with `timeout`, one thread per call (`concurrent.futures`): fit.
-  `worktree._run`: git only, not reused. PR #92's `_report` (the two calls, exit-code reading): fit, followed.
+  `worktree._run`: git only, not reused. PR #92's two CLI calls: replaced.
 
-## R5: An `adrkit.py` boundary module reads the CLI's answer, and a shape it does not read leaves the corpus not checked
+## R5: An `adrkit.py` boundary module runs adrkit's library, and a shape it does not read leaves the corpus not checked
 
 - **Decision**: a new `scripts/adrkit.py` owns everything that touches adrkit or the disk for the check; its functions,
-  readers and the shapes it returns are data-model § Functions and their owners, § Reading a record file and § Reading adrkit.
-  Three choices in them:
+  the corpus script and the shapes they return are data-model § Functions and their owners and § Reading adrkit.
+  Choices in them:
   - One value per corpus, never an exception, so a corpus that could not be checked does not hide what the others
     answered when `decision_checks` is `log`.
-  - A governing record's file is found by the `id` in each file's frontmatter, not by the file name. Run on
-    2026-10-13 with adr 0.20.0: `docs/adr/0005-x.md` holding `id: "0007"` lints clean and `check` reports governing
-    `0007` with no path, so a `<id>-*.md` glob finds nothing and would blame the install.
-  - Record files are found and parsed by adrkit's own `@adrkit/core` (`discoverAdrFiles`,
-    `discoverSkippedMarkdownFiles`, `parseAdrFile`), run by a small node script with the core the installed `adr`
-    imports. adrkit's JSON gives no path for a governing record and no status for a record it could not load, so the
-    plugin must read the files; reading them with adrkit's code is the one way to read the same ones the same way.
-    The plugin's own reader drifted from adrkit's six times in review (status read over the whole file, a file found
-    by name, a strict UTF-8 read, `0000-template.md` and symlinks taken as candidates, CRLF, a YAML block-scalar `id`),
-    and each drift refused a change adrkit had judged. Run on 2026-10-13 with adr 0.20.0: the script returned id
-    `0018` for `id: >-` over an indented `0018`, left out a symlink, listed a nested file as skipped, and took 0.2 s
-    on this repo's largest corpus. `node` is present wherever `adr` runs, since `adr` is a node script.
-  - The reader is the plugin's own code, so its answer is total (one entry per file, `null` for an absent key, a
-    per-file `error`) and its failures are its own causes; a record adrkit cannot load is still judged by adrkit's
-    `error`, never turned into a corpus not checked. Every call runs from the real checkout path with the real corpus
-    path, and every path is joined to it the same way: from a checkout reached through a symlink, `adr lint` names
-    files relative to the physical `cwd`, so joining them to the logical root missed every record (run on 2026-10-13).
+  - adrkit's library is `@adrkit/core`, a published package whose exports include every function the script calls.
+    It is found beside the installed `adr`, which pins it to its own version (`@adrkit/cli` 0.20.0 depends on
+    `@adrkit/core` `0.20.0` exactly), so `adr --version`, the CLI's public answer, is the version check. The install
+    step stays one command.
+  - A governing record's file is found by its id among the records adrkit loaded, not by the file name: adrkit 0.20
+    loads `0009-x.md` holding `id: "0099"` as 0099, and `governing` gives no path.
+  - Every call runs from the real checkout path with the real corpus path, and every path is joined to it the same
+    way: from a checkout reached through a symlink, adrkit names files relative to the physical `cwd`, so joining
+    them to the logical root missed every record (run on 2026-10-13).
+- **Run on 2026-10-13** with adrkit 0.20.0, the corpus script over a fixture corpus of one file per case (the corpus
+  `test_adrkit_corpus.Fixture` keeps): `check` copied two lint findings (a changed record's `unique-id`, and lint's
+  record-level `affects-repo-not-applicable` with no `pattern`), both dropped by identity; a record with status
+  `weird` or none was absent from `governing`, `activeProposals` and `history`, with an `error` from lint
+  (`invalid-enum-value`, `field` `status`); a nested draft and a misnamed `accepted` file each got `corpus-file-skipped`
+  with their status read; 65 markers in one changed file gave `marker-declarations-capped` with no `path`; a symlink
+  and a mode-000 file were both in `unreadablePaths`; an org corpus outside the checkout came back as
+  `../org/docs/adr/0007-org.md`; an `adr` path with no core beside it exited 3.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
-  leaves `decisions.py` pure (P3).
+  leaves `decisions.py` pure (P3). The plugin's own file readers drifted from adrkit's six times in review; reading
+  with adrkit's code cannot.
 - **Existing tools**: `github.py` (one boundary module per outside service): fit, the same pattern. PR #92's
-  `_entries` shape check: followed. PR #92's `_STATUS` regex over the whole file and `_record` glob, and this plan's earlier Python
-  frontmatter reader: replaced by adrkit's loader.
+  `_entries` shape check: followed. PR #92's `_STATUS` regex and `_record` glob, this plan's earlier frontmatter
+  reader and record reader: replaced by adrkit's library.
 
 ## R6: `decisions.py` holds the classification as pure functions of the reports
 
 - **Decision**: `decisions.py` holds the pure rules of data-model § Status, § Corpus outcome (the causes `judge`
-  makes), § Judgement, § Governance and the refusal texts of § Refusals. Two choices in them:
-  - One status classifier for loaded records and skipped files, so the same text means the same thing in both.
+  makes), § Judgement, § Governance and the refusal texts of § Refusals. Choices in them:
+  - One status classifier for records and skipped files, over adrkit's own status list from the report, so the same
+    text means the same thing in both and no list of statuses is copied.
+  - A finding is judged by the pass that made it: record and file validity from `lint`, which covers the whole
+    corpus; matchers, markers and caps from `check`, which knows the change.
   - A corpus with a capped scan or an unreadable changed file is not checked as a whole: a record matched only by a
     marker in the unscanned part would be missed, so no subset of its records is briefed.
-- **Rationale**: constitution P3. adrkit's own `Status` enum is exactly six values; a status outside it fails the
-  schema, raises an `error` and keeps the record out of `governing`, so counting it as governing (FR-004) makes that
-  `error` refuse instead of vanish. `affects-unresolvable` and `affects-repo-not-applicable` are read from `check`'s own
-  per-matcher findings, which name the matcher; `lint` reports the record as a whole, and `check` re-emits lint's
-  findings on changed records (R4), so those copies are dropped before judging. `markerScan.unreadablePaths` holds both
-  symlinks and unreadable regular files (`readWithPreparedRoot` refuses both as `unreadable`), so only `lstat` tells
-  them apart (FR-002: a symlink is given to the check and is not a failure). `NOT_GOVERNING` and `RULES`
-  are a copy of adrkit's vocabulary that its JSON gives no other way to learn; a drift test pins each to the installed
-  package's shipped JS.
+- **Rationale**: constitution P3. A status outside adrkit's list fails its schema, raises an `error` and keeps the
+  record out of every bucket (R5's run), so counting it as governing (FR-004) makes that `error` refuse instead of
+  vanish. `markerScan.unreadablePaths` holds both symlinks and unreadable regular files, so only `lstat` tells them
+  apart (FR-002: a symlink is given to the check and is not a failure). `RULES` is the one copy of adrkit's
+  vocabulary, which its exports give no other way to learn; a drift test pins it to the installed core's JS.
 - **Existing tools**: `specbinding.py`, `policy.py` (pure rules over data the gate reads): fit, the same shape. PR #92's
   `_may_govern` and `_not_evaluated`: followed, with every non-governing status, per-matcher notices and the
   symlink distinction added.
@@ -113,7 +113,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 
 - **Decision**: `gate.main` takes `time.monotonic()` as its first statement; the deadline is that plus
   `HOOK_SECONDS - ANSWER_MARGIN` = 60 − 5 = 55 s, passed through `handle` to `on_workflow`, which keeps `spent`, the
-  seconds of each step. How the `adr` calls meet the deadline, and what a late call's corpus says, is data-model
+  seconds of each step. How the adrkit calls meet the deadline, and what a late call's corpus says, is data-model
   § Reading adrkit and § Corpus outcome. A test pins `HOOK_SECONDS` to the `timeout` of the `gate.py` PreToolUse
   entry in `hooks/hooks.json`.
 - **Rationale**: the hook is killed at 60 s and its answer is never read; whatever `gh` and the 30 s review-base fetch
@@ -175,12 +175,12 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 ## R12: README, version and CI
 
 - **Decision**: README gains item 8 under "What it enforces" in the spec's terms (which records count, refusals,
-  notices, the result), Layout rows for `adrkit.py`, `decisions.py` and `agents/decision-reviewer.md`, and a
+  notices, the result), Layout rows for `adrkit.py`, `adrkit_corpus.mjs`, `decisions.py` and `agents/decision-reviewer.md`, and a
   Dependencies paragraph naming `adr` and its install step (FR-020). `plugin.json` goes to 0.14.0. `config.json` gains `"decision_checks": "enforce"` (R15) and
   `"max_review_files": 50` (R16). `tests.yml` adds
-  `actions/setup-node@v4` (node 22) and `npm install -g @adrkit/cli@0.20.0` so the suite runs the real CLI.
+  `actions/setup-node@v4` (node 22) and `npm install -g @adrkit/cli@0.20.0` so the suite runs the real adrkit.
 - **Rationale**: the README is the source the constitution's P1/P4 cite; it changes with the code it describes, as spec
-  019 did. The tests that run `adr` skip without it locally and must not skip in CI.
+  019 did. The tests that run adrkit skip without it locally and must not skip in CI.
 - **Existing tools**: PR #92's README item and CI step: followed, the item rewritten to the spec's terms.
 
 ## R13: The notice choice is ADR-0020, in its own PR before the code
@@ -194,18 +194,22 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
   says to record it.
 - **Existing tools**: ADR-0018 (a user's choice recorded for an issue before its plan): fit, the same form.
 
-## R14: Tests, red first, one per scenario
+## R14: Tests, red first, one per scenario, graded against adrkit's real answer
 
-- **Decision**: `tests/test_decisions.py` holds the pure rules with hand-written reports (no CLI), a `Contract`
-  class that runs the real `adr` on fixture corpora, and the drift test of R6. `tests/test_adrkit.py` holds the
-  boundary with a stand-in `adr` script beside a stand-in `@adrkit/core`. `tests/test_gate.py` gains `DecisionReview`
-  (launches through the hook, including one test per row of data-model § Refusals, By mode) and `HookDeadline`.
-  `tests/test_agents.py` gains the agent's tool list; `test_worktree_facts` gains `files_in`, `tracked` and
-  `not_as_head`. contracts § Scenario coverage maps each scenario to its test. Every test that needs `adr` skips
-  without it locally and fails without it when `CI` is set, so CI cannot pass with the contract unchecked.
-- **Rationale**: constitution IV. Pure rules are tested without node; the boundary is tested against the real CLI so
-  the plugin grades adrkit's contract, not a copy. A refusal's mode is tested at every cell where the helper that
-  makes it and another helper would answer differently, so wiring a refusal to the wrong helper fails a test.
+- **Decision**: `tests/test_decisions.py` holds the pure rules, a `Contract` class that runs the real adrkit on fixture
+  corpora, and the drift test of R6. The pure tests' findings are the corpus script's real output on the fixture
+  corpus of R5, kept as `tests/fixtures/adrkit/answer.json` beside the corpus in `tests/fixtures/adrkit/repo/`;
+  `test_adrkit_corpus.Fixture` runs the script and asserts its answer equals the file, so a pure test never grades a
+  shape adrkit does not give. `tests/test_adrkit.py` holds the boundary with a stand-in `adr` beside a stand-in
+  `@adrkit/core`. `tests/test_gate.py` gains `DecisionReview` (launches through the hook, including one test per row
+  of data-model § Refusals, By mode) and `HookDeadline`. `tests/test_agents.py` gains the agent's tool list;
+  `test_worktree_facts` gains `files_in`, `tracked` and `not_as_head`. contracts § Scenario coverage maps each
+  scenario to its test. Every test that needs `adr` skips without it locally and fails without it when `CI` is set,
+  so CI cannot pass with the contract unchecked.
+- **Rationale**: constitution IV. Every earlier draft of the judgement was written from reading adrkit's JS and was
+  wrong in a new place each review round; findings captured from a run are the only shape the rules may assume.
+  A refusal's mode is tested at every cell where the helper that makes it and another helper would answer
+  differently, so wiring a refusal to the wrong helper fails a test.
 - **Existing tools**: `test_gate.Gate` (hook driver, gh stub, `launch`, `run_reviewers`), `test_worktree_facts.Repo`,
   `workflow_harness.mjs` (stand-in agents): fit, reused. PR #92's `test_decisions.py` and `DecisionReview`: followed.
 
@@ -222,7 +226,7 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 
 - **Decision**: `config.json` gains `max_review_files` (50), read through `hookio`. The size refusal is refusal 1 of
   data-model § Refusals: it applies to every internal round, governed or not, follows the plugin's mode, and when it
-  does not block no `adr` call is made.
+  does not block no adrkit call is made.
 - **Rationale**: the user's choice (Clarifications). adrkit's own marker-scan cap (`MARKER_SCAN_FILE_CAP`, 3000) is a
   constant of its code with no option; a smaller limit the plugin owns is met first. The cap cause stays for
   `marker-declarations-capped`, which a change under 50 files can still reach.
