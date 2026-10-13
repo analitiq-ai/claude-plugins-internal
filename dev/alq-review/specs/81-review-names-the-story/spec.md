@@ -81,12 +81,10 @@ read the refusal or the injected reviewer prompts and brief.
 | `F` | absent, or `null` | refused: a spec folder needs a story |
 | `F` | `0`, `-1` | refused: the story is 1 or more |
 | `F` | `"2"`, `2.5`, `true` | refused: the story is a JSON integer |
-| `null` | absent, or `null` | accepted: no spec |
-| `null` | `2` | refused: no spec has no story |
+| `null` | absent | accepted: no spec |
+| `null` | `null`, `2` | refused: no spec has no story |
 | absent | `2` | refused for the missing `spec`, as before this change |
 | a folder `specbinding.shape_problem` refuses | absent | refused for the folder, as before this change |
-
-A refusal for `story` names the form: `spec: '<folder>', story: <N>`, or `spec: null` with no `story`.
 
 ### Edge Cases
 
