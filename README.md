@@ -26,3 +26,9 @@ The repo is private: the clone uses your git credentials for github.com.
 Spec Kit project (`.specify/`, with the plugin's constitution), the `speckit-*` commands, its feature specs in
 `specs/<nnn>-<feature>/` and its tests in `tests/`. Its decision records go in `docs/adr/` there. Start Claude Code in `dev/<name>/` for
 spec work. CI runs every `tests/` folder under `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
+
+## Spec edits during a story
+
+The coding agent never edits the spec it is graded against; a spec change is the user's call and lands in its
+own spec-only PR. Status: proposed, to replace alq-review ADR-0016 decision 6. Decision flow and evidence:
+[Spec edits during a story](https://claude.ai/artifact/318JN3nQhSgcXqCuP18CdD).
