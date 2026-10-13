@@ -7,18 +7,19 @@ import ledger
 import policy
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
-SPEC = "specs/019-demo"
+SPEC, STORY = "specs/019-demo", 2
 BOUND_BLOB, HEAD_BLOB = "d" * 40, "e" * 40
-# Each binding a PR can have, with what the review call's `spec` must read for it: the PR's own value, quoted so
-# the agent cannot pass another, or both forms when nothing is bound yet.
-BINDINGS = (({"spec": SPEC, "spec_blob": BOUND_BLOB}, f"'{SPEC}'"),
-            ({"spec": None, "spec_blob": None}, "null"),
-            ({}, "'<spec folder>' | null"))
+# Each binding a PR can have, with the arguments the review call must carry for it: the PR's own, quoted so the agent
+# cannot pass others, or both forms when nothing is bound yet.
+UNBOUND_ARGS = "spec: '<spec folder>', story: <N> | spec: null"
+BINDINGS = (({"spec": SPEC, "story": STORY, "spec_blob": BOUND_BLOB}, f"spec: '{SPEC}', story: {STORY}"),
+            ({"spec": None, "spec_blob": None}, "spec: null"),
+            ({}, UNBOUND_ARGS))
 
 
-def review_call(stage, spec_arg):
+def review_call(stage, launch_args):
     return ("Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', "
-            f"stage: '{stage}', spec: {spec_arg}}})")
+            f"stage: '{stage}', {launch_args}}})")
 
 
 def mutation(state, inflight=0):
@@ -26,7 +27,7 @@ def mutation(state, inflight=0):
 
 
 def hold_spec(state, held_at):
-    state.update(spec=SPEC, spec_blob=BOUND_BLOB,
+    state.update(spec=SPEC, story=STORY, spec_blob=BOUND_BLOB,
                  spec_held={"bound": BOUND_BLOB, "head": HEAD_BLOB, "at": ledger.stamp(held_at)})
     return state
 
@@ -61,21 +62,21 @@ def verdict_locked(verdict="RESHAPE_SPEC"):
 
 
 # What a lock reason must say for each hold, so the user sees every hold one unlock releases.
-SPEC_HOLD_NAMES = (SPEC, BOUND_BLOB, HEAD_BLOB, f"git diff {BOUND_BLOB} {HEAD_BLOB}")
+SPEC_HOLD_NAMES = (f"{SPEC}/spec.md", f"User Story {STORY}", BOUND_BLOB, HEAD_BLOB, f"git diff {BOUND_BLOB} {HEAD_BLOB}")
 VERDICT_LOCK_NAMES = ("which root is canonical?",)
 SPENT_AUDITS_NAMES = ("not converging",)
 
 
 class ReviewCall(unittest.TestCase):
-    def test_carries_the_prs_spec_or_both_forms_when_there_is_no_state(self):
+    def test_carries_the_prs_spec_and_story_or_both_forms_when_there_is_no_state(self):
         for stage in ("internal", "audit"):
-            for binding, spec_arg in BINDINGS:
+            for binding, launch_args in BINDINGS:
                 with self.subTest(stage=stage, binding=binding):
                     state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
                     state.update(binding)
-                    self.assertEqual(policy.review_call(state, stage), review_call(stage, spec_arg))
+                    self.assertEqual(policy.review_call(state, stage), review_call(stage, launch_args))
             with self.subTest(stage=stage, state=None):
-                self.assertEqual(policy.review_call(None, stage), review_call(stage, "'<spec folder>' | null"))
+                self.assertEqual(policy.review_call(None, stage), review_call(stage, UNBOUND_ARGS))
 
 
 class Mutation(unittest.TestCase):
@@ -91,14 +92,14 @@ class Mutation(unittest.TestCase):
         self.assertFalse(decision.allow)
         self.assertIn("1/2", decision.reason)
 
-    def test_a_dead_round_names_its_relaunch_with_the_prs_spec(self):
-        for binding, spec_arg in BINDINGS:
+    def test_a_dead_round_names_its_relaunch_with_the_prs_spec_and_story(self):
+        for binding, launch_args in BINDINGS:
             with self.subTest(binding=binding):
                 state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
                 state.update(binding)
                 ledger.open_round(state, "internal", head_sha=HEAD_A, base_sha="0" * 40, scope="full",
                                   expected=REVIEWERS, escalation=False, now=T0)
-                self.assertIn(review_call("internal", spec_arg), mutation(state).reason)
+                self.assertIn(review_call("internal", launch_args), mutation(state).reason)
 
     def test_a_changed_spec_holds_the_pr_until_the_user_unlocks(self):
         state = spec_held_state(T0 + timedelta(hours=1))
@@ -120,7 +121,7 @@ class Mutation(unittest.TestCase):
         self.assertFalse(policy.locked(state))
         self.assertTrue(mutation(state).allow)
 
-    def test_a_spec_hold_names_the_folder_both_blobs_the_diff_and_the_unlock(self):
+    def test_a_spec_hold_names_the_spec_md_the_story_both_blobs_the_diff_and_the_unlock(self):
         reason = mutation(spec_held_state(T0 + timedelta(hours=1))).reason
         for named in (*SPEC_HOLD_NAMES, "`unlock #7`"):
             self.assertIn(named, reason)
@@ -277,14 +278,14 @@ class LaunchRound(unittest.TestCase):
             assess(state, "PATCH")
         return state
 
-    def test_fifth_round_is_refused_and_the_audit_is_named_with_the_prs_spec(self):
-        for binding, spec_arg in BINDINGS:
+    def test_fifth_round_is_refused_and_the_audit_is_named_with_the_prs_spec_and_story(self):
+        for binding, launch_args in BINDINGS:
             with self.subTest(binding=binding):
                 state = self.capped_state()
                 state.update(binding)
                 decision = self.launch(state)
                 self.assertFalse(decision.allow)
-                self.assertIn(review_call("audit", spec_arg), decision.reason)
+                self.assertIn(review_call("audit", launch_args), decision.reason)
 
     def test_audit_at_the_cap_is_an_escalation_and_reopens_the_stage(self):
         state = self.capped_state()
@@ -382,14 +383,14 @@ class MarkReady(unittest.TestCase):
         self.assertFalse(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).allow)
         self.assertFalse(policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0, released=False).allow)
 
-    def test_a_refusal_names_the_internal_round_with_the_prs_spec(self):
-        for binding, spec_arg in BINDINGS:
+    def test_a_refusal_names_the_internal_round_with_the_prs_spec_and_story(self):
+        for binding, launch_args in BINDINGS:
             with self.subTest(binding=binding):
                 state = state_with_round(head=HEAD_A)
                 assess(state, "PATCH")
                 state.update(binding)
                 reason = policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).reason
-                self.assertIn(review_call("internal", spec_arg), reason)
+                self.assertIn(review_call("internal", launch_args), reason)
 
     def test_allowed_when_the_round_at_head_came_back_clean(self):
         state = state_with_round(findings_per_reviewer=(0, 0), head=HEAD_A)

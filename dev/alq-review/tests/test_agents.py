@@ -28,11 +28,19 @@ class ShimAgents(unittest.TestCase):
 
 
 class ReviewRoundWorkflow(unittest.TestCase):
-    def test_when_to_use_names_the_spec_argument_and_both_its_forms(self):
+    def test_when_to_use_names_the_spec_and_story_arguments_and_their_forms(self):
         when = re.search(r'^\s*whenToUse: "(.*)",$', REVIEW_ROUND.read_text(), re.M).group(1)
-        for named in ("args.spec", "'<spec folder>'", "null"):
+        for named in ("args.spec", "'<spec folder>'", "null", "args.story", "### User Story <N>"):
             with self.subTest(named=named):
                 self.assertIn(named, when)
+
+
+class Assessor(unittest.TestCase):
+    def test_the_assessor_is_told_its_brief_names_the_story_beside_the_folder(self):
+        said = (AGENTS / "assessor.md").read_text()
+        for named in ("`spec_folder`", "`user_story`", "### User Story <user_story>"):
+            with self.subTest(named=named):
+                self.assertIn(named, said)
 
 
 if __name__ == "__main__":

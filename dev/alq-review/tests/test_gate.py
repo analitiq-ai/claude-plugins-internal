@@ -3,6 +3,7 @@ import ast
 import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -286,18 +287,29 @@ class InternalRound(Gate):
         self.assertEqual(args["waves"][1][0]["needs"], "alq-anti-pattern:duplication")
 
 
+DEMO_STORIES = {1: "Print (Priority: P1)", 2: "Reset (Priority: P2)"}
+
+
+def demo_spec(lines, stories=(1, 2)):
+    """The demo spec.md: what b.py prints, then the headings of `stories`."""
+    return f"# Demo\n\nb.py prints {lines} lines.\n" + "".join(
+        f"\n### User Story {n} - {DEMO_STORIES[n]}\n\nIt does part {n}.\n" for n in stories)
+
+
 class SpecArgument(Gate):
     """A review-round launch names the spec folder its PR is reviewed against, or null. The first launch that opens a
     round binds the PR to that value and to its spec.md as HEAD records it; every later launch is held to both."""
     FOLDER, OTHER = "dev/demo/specs/001-demo", "dev/demo/specs/002-other"
-    SPEC, CHANGED = "# Demo\n\nb.py prints 20 lines.\n", "# Demo\n\nb.py prints 21 lines.\n"
+    STORY = 2
+    SPEC, CHANGED = demo_spec(20), demo_spec(21)
+    OTHER_SPEC = "# Another feature\n\n### User Story 2 - Elsewhere (Priority: P1)\n"
     UNBOUND_CALL = ("Workflow(name='alq-review:review-round', args={worktree: '<absolute worktree path>', stage: '%s', "
-                    "spec: '<spec folder>' | null})")
+                    "spec: '<spec folder>', story: <N> | spec: null})")
     GIT_FAILURE = "fatal: simulated: the object store cannot be read"
 
     def setUp(self):
         super().setUp()
-        self.head = self.commit_files({f"{self.FOLDER}/spec.md": self.SPEC, f"{self.OTHER}/spec.md": "# Another feature\n"})
+        self.head = self.commit_files({f"{self.FOLDER}/spec.md": self.SPEC, f"{self.OTHER}/spec.md": self.OTHER_SPEC})
         self.bound = self.blob(self.FOLDER)
 
     def commit_files(self, files, message="docs: spec"):
@@ -311,6 +323,15 @@ class SpecArgument(Gate):
     def blob(self, folder):
         return git(self.root, "rev-parse", f"HEAD:{folder}/spec.md")
 
+    def args_for(self, spec):
+        """A launch's arguments for `spec`: the story beside a folder, none beside null."""
+        return {"spec": spec} if spec is None else {"spec": spec, "story": self.STORY}
+
+    def launch_with(self, **args):
+        """A review-round launch with exactly `args` beside the worktree."""
+        out = self.hook("PreToolUse", "Workflow", {"name": REVIEW, "args": {"worktree": str(self.root), **args}})
+        return out, out.get("hookSpecificOutput", {}).get("updatedInput", {}).get("args")
+
     def without_spec(self, stage="internal"):
         return self.hook("PreToolUse", "Workflow", {"name": REVIEW, "args": {"worktree": str(self.root), "stage": stage}})
 
@@ -318,7 +339,7 @@ class SpecArgument(Gate):
         self.env["GH_OPEN_PR"] = f"{pr} main"
 
     def clean_round(self, spec):
-        _, args = self.launch(spec=spec)
+        _, args = self.launch(**self.args_for(spec))
         self.run_reviewers(args, [])
         return args
 
@@ -326,16 +347,19 @@ class SpecArgument(Gate):
         """A PR bound to FOLDER whose spec.md HEAD has since changed; the launch that finds it."""
         self.clean_round(self.FOLDER)
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED}, "docs: change the spec")
-        return self.launch(spec=self.FOLDER)[0]
+        return self.launch(**self.args_for(self.FOLDER))[0]
 
     def say(self, prompt):
         return HeldBranch.say(self, prompt)
 
-    def graded(self, folder=None):
-        """What an internal reviewer's prompt says of the spec `folder`, FOLDER by default."""
-        return (f"\n\nThis change implements the spec in {folder or self.FOLDER}/spec.md of {self.root}. Read it. "
-                "Every requirement the spec states that the change does not meet is a "
-                "finding: quote the requirement in its title. What the spec excludes bounds what you may ask for.")
+    def graded(self, folder=None, story=None):
+        """What an internal reviewer's prompt says of story `story` of the spec `folder`, STORY of FOLDER by default."""
+        story = story or self.STORY
+        return (f"\n\nThis change implements User Story {story} of the spec in {folder or self.FOLDER}/spec.md of "
+                f"{self.root}. Read the section under its heading, `### User Story {story}`, and what the spec excludes. "
+                "Every acceptance scenario of that story that the change does not meet is a finding: quote the "
+                "scenario in its title. What the spec excludes bounds what you may ask for. Raise nothing about "
+                "another story of the spec.")
 
     @staticmethod
     def prompts(out):
@@ -375,10 +399,11 @@ class SpecArgument(Gate):
                 self.assertNothingBound()
 
     def test_the_call_given_to_a_bound_pr_names_its_bound_value(self):
-        for pr, value, written in ((7, self.FOLDER, f"spec: '{self.FOLDER}'}})"), (8, None, "spec: null})")):
+        for pr, value, written in ((7, self.FOLDER, f"spec: '{self.FOLDER}', story: {self.STORY}}})"),
+                                   (8, None, "spec: null})")):
             with self.subTest(spec=value):
                 self.on_pr(pr)
-                self.launch(spec=value)
+                self.launch(**self.args_for(value))
                 out = self.without_spec()
                 self.assertRefused(out, written)
                 self.assertNotIn("<spec folder>", self.reason(out))
@@ -405,13 +430,13 @@ class SpecArgument(Gate):
         (self.root / "dev/demo/specs/005-loose/spec.md").write_text(self.SPEC)
         for folder in ("dev/demo/specs/003-plan-only", "dev/demo/specs/004-empty", "dev/demo/specs/005-loose"):
             with self.subTest(folder=folder):
-                out, _ = self.launch(spec=folder)
+                out, _ = self.launch(**self.args_for(folder))
                 self.assertRefused(out, "spec.md", f"{folder}/spec.md")
                 self.assertNothingBound()
 
     def test_git_failing_while_reading_spec_md_is_a_refusal_naming_the_step_and_gits_error(self):
         self.failing_git("spec.md")
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "spec.md", self.GIT_FAILURE)
         self.assertNotIn("crashed", self.reason(out))
         self.assertNothingBound()
@@ -422,7 +447,7 @@ class SpecArgument(Gate):
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED})
         path = self.env["PATH"]
         self.failing_git(self.bound)
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, self.GIT_FAILURE, "`unlock #7`")
         self.assertNotIn("crashed", self.reason(out))
         state = self.saved()
@@ -432,18 +457,18 @@ class SpecArgument(Gate):
         self.assertRefused(self.edit(), "`unlock #7`")
         self.env["PATH"] = path
         self.unlock_since_the_hold()
-        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.FOLDER))[0]), "allow")
         self.assertEqual(self.saved()["spec_blob"], self.blob(self.FOLDER))
 
     def test_a_changed_spec_md_that_is_not_utf8_is_held_with_its_diff_and_binds_once_unlocked(self):
         self.clean_round(self.FOLDER)
-        (self.root / self.FOLDER / "spec.md").write_bytes(b"# Demo\n\ncaf\xe9\n")
+        (self.root / self.FOLDER / "spec.md").write_bytes(b"# Demo\n\ncaf\xe9\n\n### User Story 2 - Reset\n")
         git(self.root, "commit", "-qam", "docs: a Latin-1 spec")
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "+caf\udce9", "`unlock #7`")
         self.assertEqual(self.saved().get("spec_held", {}).get("head"), self.blob(self.FOLDER))
         self.unlock_since_the_hold()
-        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.FOLDER))[0]), "allow")
         self.assertEqual(self.saved()["spec_blob"], self.blob(self.FOLDER))
 
     def test_a_value_other_than_the_bound_one_is_refused_for_the_binding_before_its_spec_md_is_read(self):
@@ -452,8 +477,8 @@ class SpecArgument(Gate):
         for pr, bound in enumerate((self.FOLDER, None), 7):
             with self.subTest(bound=bound):
                 self.on_pr(pr)
-                self.launch(spec=bound)
-                out, _ = self.launch(spec=gone)
+                self.launch(**self.args_for(bound))
+                out, _ = self.launch(**self.args_for(gone))
                 self.assertRefused(out, bound or "null", gone, "never changes")
                 self.assertNotIn('Step "spec.md"', self.reason(out))
 
@@ -461,47 +486,267 @@ class SpecArgument(Gate):
         for pr, (bound, given) in enumerate(((self.FOLDER, self.OTHER), (self.FOLDER, None), (None, self.FOLDER)), 7):
             with self.subTest(bound=bound, given=given):
                 self.on_pr(pr)
-                self.launch(spec=bound)
-                out, _ = self.launch(spec=given)
+                self.launch(**self.args_for(bound))
+                out, _ = self.launch(**self.args_for(given))
                 self.assertRefused(out, bound or "null", given or "null", "never changes")
                 self.assertEqual(self.saved()["spec"], bound)
                 self.assertEqual(len(self.saved()["rounds"]), 1)
 
     def test_a_misspelled_bound_folder_is_refused_for_its_shape_not_the_binding(self):
-        self.launch(spec=self.FOLDER)
-        out, _ = self.launch(spec=f"./{self.FOLDER}")
+        self.launch(**self.args_for(self.FOLDER))
+        out, _ = self.launch(**self.args_for(f"./{self.FOLDER}"))
         self.assertRefused(out, 'Step "shape"', f"write it as {self.FOLDER}")
         self.assertNotIn("never changes", self.reason(out))
+
+    # --- the story (spec 81) -------------------------------------------------------------------------
+
+    UNBOUND = "spec: '<spec folder>', story: <N> | spec: null"
+
+    def test_a_folder_and_a_story_its_spec_md_has_open_the_round_and_bind_all_three(self):
+        """Scenario 1."""
+        out, _ = self.launch_with(spec=self.FOLDER, story=2)
+        self.assertEqual(self.decision(out), "allow")
+        state = self.saved()
+        self.assertEqual((state["spec"], state["story"], state["spec_blob"]), (self.FOLDER, 2, self.bound))
+
+    def test_each_row_of_the_arguments_table_has_its_outcome(self):
+        """Scenario 2: the spec's arguments table, row by row, each on a PR no launch has bound."""
+        rows = (({"spec": self.FOLDER, "story": 2}, None),
+                ({"spec": self.FOLDER}, "a spec folder needs a story"),
+                ({"spec": self.FOLDER, "story": None}, "a spec folder needs a story"),
+                ({"spec": self.FOLDER, "story": 0}, "the story is 1 or more"),
+                ({"spec": self.FOLDER, "story": -1}, "the story is 1 or more"),
+                ({"spec": self.FOLDER, "story": "2"}, "the story is a JSON integer"),
+                ({"spec": self.FOLDER, "story": 2.5}, "the story is a JSON integer"),
+                ({"spec": self.FOLDER, "story": True}, "the story is a JSON integer"),
+                ({"spec": None}, None),
+                ({"spec": None, "story": None}, "no spec has no story"),
+                ({"spec": None, "story": 2}, "no spec has no story"),
+                ({"story": 2}, "args.spec is missing"),
+                ({"spec": "dev/demo/plans/001-demo"}, 'Step "shape"'))
+        for pr, (args, refusal) in enumerate(rows, 40):
+            with self.subTest(args=args):
+                self.on_pr(pr)
+                out, _ = self.launch_with(**args)
+                if refusal is None:
+                    self.assertEqual(self.decision(out), "allow")
+                    continue
+                self.assertRefused(out, refusal, self.UNBOUND_CALL % "internal")
+                self.assertNothingBound()
+
+    def test_beside_null_a_story_is_refused_for_being_there_before_its_form_or_the_binding_is_judged(self):
+        """The null rule wins over the story's form, and the story is checked before the binding."""
+        for story in (None, 2, "2", 0, True, 2.5):
+            with self.subTest(story=story):
+                out, _ = self.launch_with(spec=None, story=story)
+                self.assertRefused(out, "no spec has no story")
+                for other in ("JSON integer", "1 or more", "never changes"):
+                    self.assertNotIn(other, self.reason(out))
+        self.launch_with(spec=self.FOLDER, story=2)
+        out, _ = self.launch_with(spec=None, story="2")
+        self.assertRefused(out, "no spec has no story", f"spec: '{self.FOLDER}', story: 2}})")
+        self.assertNotIn("never changes", self.reason(out))
+
+    def test_a_story_with_no_heading_in_spec_md_is_refused_naming_the_heading_it_looked_for(self):
+        """Scenario 3, on a review round."""
+        out, _ = self.launch_with(spec=self.FOLDER, story=3)
+        self.assertRefused(out, 'Step "story"', f"{self.FOLDER}/spec.md", "`### User Story 3`",
+                           self.UNBOUND_CALL % "internal")
+        self.assertNothingBound()
+
+    def test_the_story_number_ends_at_a_word_boundary(self):
+        """Scenario 3: `### User Story 12` is no heading for 1; `### User Story 1: Sign in` is one."""
+        twelve, colon = "dev/demo/specs/003-twelve", "dev/demo/specs/004-colon"
+        self.commit_files({f"{twelve}/spec.md": "# Twelve\n\n### User Story 12 - Late (Priority: P3)\n",
+                           f"{colon}/spec.md": "# Colon\n\n### User Story 1: Sign in\n"})
+        out, _ = self.launch_with(spec=twelve, story=1)
+        self.assertRefused(out, 'Step "story"', "`### User Story 1`")
+        self.assertNothingBound()
+        self.on_pr(8)
+        self.assertEqual(self.decision(self.launch_with(spec=colon, story=1)[0]), "allow")
+
+    def test_a_heading_inside_a_fenced_code_block_counts(self):
+        """Edge case: the gate does not parse Markdown."""
+        fenced = "dev/demo/specs/003-fenced"
+        self.commit_files({f"{fenced}/spec.md": "# Fenced\n\n```markdown\n### User Story 1 - Quoted\n```\n"})
+        self.assertEqual(self.decision(self.launch_with(spec=fenced, story=1)[0]), "allow")
+        self.assertEqual(self.saved()["story"], 1)
+
+    def test_a_launch_with_arguments_other_than_the_bound_ones_is_refused_naming_the_bound_launch(self):
+        """Scenarios 4 and 11: the refusal names the bound arguments, as the launch to make."""
+        cases = (({"spec": self.FOLDER, "story": 2}, {"spec": self.FOLDER, "story": 1},
+                  f"spec: '{self.FOLDER}', story: 2}})"),
+                 ({"spec": self.FOLDER, "story": 2}, {"spec": self.OTHER, "story": 2},
+                  f"spec: '{self.FOLDER}', story: 2}})"),
+                 ({"spec": self.FOLDER, "story": 2}, {"spec": None}, f"spec: '{self.FOLDER}', story: 2}})"),
+                 ({"spec": None}, {"spec": self.FOLDER, "story": 2}, "spec: null})"))
+        for pr, (bound, given, call) in enumerate(cases, 7):
+            with self.subTest(bound=bound, given=given):
+                self.on_pr(pr)
+                self.assertEqual(self.decision(self.launch_with(**bound)[0]), "allow")
+                out, _ = self.launch_with(**given)
+                self.assertRefused(out, "never changes", call)
+                self.assertNotIn("<spec folder>", self.reason(out))
+                self.assertEqual(self.saved()["spec"], bound["spec"])
+                self.assertEqual(self.saved().get("story"), bound.get("story"))
+                self.assertEqual(len(self.saved()["rounds"]), 1)
+
+    def test_a_bound_folder_launched_with_no_story_is_refused_naming_the_bound_launch(self):
+        """Scenario 11: the story is checked before the binding, and its refusal names the bound launch."""
+        self.launch_with(spec=self.FOLDER, story=2)
+        out, _ = self.launch_with(spec=self.FOLDER)
+        self.assertRefused(out, "a spec folder needs a story", f"spec: '{self.FOLDER}', story: 2}})")
+
+    def test_internal_reviewers_are_named_the_bound_story_and_no_other(self):
+        """Scenario 6 and SC-002: the prompt names `### User Story 2`, its section and the spec's exclusions,
+        and no other story of a spec.md that has two."""
+        _, args = self.launch_with(spec=self.FOLDER, story=2)
+        for reviewer in args["waves"][0]:
+            with self.subTest(reviewer=reviewer["type"]):
+                prompt = reviewer["prompt"]
+                self.assertIn(self.graded(story=2), prompt)
+                self.assertEqual(set(re.findall(r"User Story (\d+)", prompt)), {"2"})
+
+    def test_an_audit_launch_names_spec_and_story_and_is_checked_like_a_review_round(self):
+        """Edge case: the audit's reviewers still get no spec."""
+        for args, refusal in (({"spec": self.FOLDER}, "a spec folder needs a story"),
+                              ({"spec": self.FOLDER, "story": 3}, "`### User Story 3`"),
+                              ({"spec": None, "story": 2}, "no spec has no story")):
+            with self.subTest(args=args):
+                out, _ = self.launch_with(stage="audit", **args)
+                self.assertRefused(out, refusal, self.UNBOUND_CALL % "audit")
+                self.assertNothingBound()
+        out, args = self.launch_with(stage="audit", spec=self.FOLDER, story=2)
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual(self.saved()["story"], 2)
+        for prompt in (r["prompt"] for wave in args["waves"] for r in wave):
+            self.assertNotIn("User Story", prompt)
+
+    def test_the_assessor_brief_of_an_unbound_pr_gives_no_folder_and_no_story(self):
+        """Scenario 7, not yet bound: only a launch refused in log mode opens a round on an unbound PR."""
+        self.mode = "log"
+        out = self.without_spec()
+        args = out["hookSpecificOutput"]["updatedInput"]["args"]
+        first = args["waves"][0][0]
+        self.run_reviewers(args, [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3,
+                                   "severity": "HIGH", "detail": "d"}])
+        self.assertEqual(self.decision(self.launch(ASSESS)[0]), "allow")
+        brief = self.brief(args["round_ref"])
+        self.assertEqual((brief["spec_folder"], brief["user_story"]), (None, None))
+
+    def test_a_held_launch_and_a_held_edit_name_the_spec_md_the_story_and_the_change(self):
+        """Scenario 8."""
+        out = self.held()
+        self.assertHeldWithTheDiff(out)
+        self.assertRefused(out, f"{self.FOLDER}/spec.md", "User Story 2")
+        edit = self.edit()
+        self.assertRefused(edit, f"{self.FOLDER}/spec.md", "User Story 2", f"git diff {self.bound} {self.blob(self.FOLDER)}")
+
+    def without_the_story_heading(self):
+        """A PR bound to story 2 of FOLDER whose spec.md change also removed that story's heading."""
+        self.clean_round(self.FOLDER)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(21, stories=(1,))}, "docs: drop story 2")
+        return self.launch_with(spec=self.FOLDER, story=2)[0]
+
+    def test_a_change_that_removed_the_heading_is_held_for_the_change_not_refused_for_the_heading(self):
+        """Scenario 9: the user sees the change, and which story's spec it is."""
+        out = self.without_the_story_heading()
+        self.assertHeldWithTheDiff(out)
+        # Named before the diff, which also shows the heading it removed.
+        self.assertIn("User Story 2", self.reason(out).splitlines()[0])
+        self.assertIn("-### User Story 2 - Reset (Priority: P2)", self.reason(out))
+        self.assertNotIn('Step "story"', self.reason(out))
+        self.assertIn("spec_held", self.saved())
+
+    def test_after_the_unlock_the_heading_committed_back_opens_the_round_with_no_second_unlock(self):
+        """Scenario 10: a launch refused for the heading in between keeps the hold's release, and binds nothing."""
+        self.without_the_story_heading()
+        self.unlock_since_the_hold()
+        held = self.saved()["spec_held"]
+        out, _ = self.launch_with(spec=self.FOLDER, story=2)
+        self.assertRefused(out, 'Step "story"', "`### User Story 2`", f"spec: '{self.FOLDER}', story: 2}})")
+        self.assertEqual(self.saved()["spec_held"], held)
+        self.assertEqual(self.saved()["spec_blob"], self.bound)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(21)}, "docs: put story 2 back")
+        out, _ = self.launch_with(spec=self.FOLDER, story=2)
+        self.assertEqual(self.decision(out), "allow")
+        state = self.saved()
+        self.assertNotIn("spec_held", state)
+        self.assertEqual((state["spec_blob"], state["story"]), (self.blob(self.FOLDER), 2))
+
+    def test_an_assess_launch_checks_the_bound_storys_heading_after_the_hold(self):
+        """Scenario 3 on an assess round: the bound story's heading, at the commit it checks, after the hold."""
+        args = self.awaiting_assessment(self.FOLDER)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(21, stories=(1,))}, "docs: drop story 2")
+        out, _ = self.launch(ASSESS)
+        self.assertHeldWithTheDiff(out)
+        self.assertNotIn('Step "story"', self.reason(out))
+        self.unlock_since_the_hold()
+        out, _ = self.launch(ASSESS)
+        # A round awaiting assessment lets no agent commit, so the refusal cannot tell the agent to commit the heading.
+        self.assertRefused(out, 'Step "story"', f"{self.FOLDER}/spec.md", "`### User Story 2`", "stop and ask the user")
+        self.assertEqual(ledger.current_round(self.saved())["ref"], args["round_ref"])
+
+    def test_an_assess_launch_of_a_pr_bound_to_null_checks_no_heading(self):
+        self.awaiting_assessment(None)
+        self.assertEqual(self.decision(self.launch(ASSESS)[0]), "allow")
+
+    def test_in_log_mode_a_story_refusal_is_logged_the_round_opens_and_nothing_is_bound(self):
+        self.mode = "log"
+        cases = {"no story": ({"spec": self.FOLDER}, ["a spec folder needs a story"]),
+                 "not an integer": ({"spec": self.FOLDER, "story": "2"}, ["the story is a JSON integer"]),
+                 "no heading": ({"spec": self.FOLDER, "story": 3}, ["`### User Story 3`"]),
+                 "story beside null": ({"spec": None, "story": 2}, ["no spec has no story"])}
+        for pr, (name, (args, words)) in enumerate(cases.items(), 31):
+            with self.subTest(name):
+                self.on_pr(pr)
+                out = self.refused_in_log_mode(lambda: self.launch_with(**args)[0], words + [self.UNBOUND_CALL % "internal"])
+                self.assertNotIn("spec", self.saved())
+                for prompt in self.prompts(out):
+                    self.assertNotIn("User Story", prompt)
+
+    def test_in_log_mode_a_missing_heading_after_an_unlock_keeps_the_binding_and_the_hold(self):
+        self.without_the_story_heading()
+        self.unlock_since_the_hold()
+        held = self.saved()["spec_held"]
+        self.mode = "log"
+        self.refused_in_log_mode(lambda: self.launch_with(spec=self.FOLDER, story=2)[0], ["`### User Story 2`"])
+        state = self.saved()
+        self.assertEqual((state["spec_blob"], state["story"], state["spec_held"]), (self.bound, 2, held))
 
     # --- the binding ---------------------------------------------------------------------------------
 
     def test_a_branch_whose_name_holds_no_issue_number_binds_the_folder_it_is_given(self):
         git(self.root, "checkout", "-q", "-b", "chore/tidy")
         self.on_pr(30)
-        out, args = self.launch(spec=self.FOLDER)
+        out, args = self.launch(**self.args_for(self.FOLDER))
         self.assertEqual(self.decision(out), "allow")
         self.assertEqual((self.saved()["spec"], self.saved()["spec_blob"]), (self.FOLDER, self.bound))
         self.assertIn(self.graded(), args["waves"][0][0]["prompt"])
 
     def test_the_first_launch_that_opens_a_round_binds_the_folder_and_its_spec_md(self):
-        out, _ = self.launch(spec=f"  {self.FOLDER}\n")
+        out, _ = self.launch(spec=f"  {self.FOLDER}\n", story=self.STORY)
         self.assertEqual(self.decision(out), "allow")
-        self.assertEqual((self.saved()["spec"], self.saved()["spec_blob"]), (self.FOLDER, self.bound))
+        self.assertEqual((self.saved()["spec"], self.saved()["story"], self.saved()["spec_blob"]),
+                         (self.FOLDER, self.STORY, self.bound))
 
     def test_a_first_launch_refused_by_another_rule_binds_nothing(self):
         (self.root / "b.py").write_text("uncommitted\n")
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "uncommitted")
         self.assertNothingBound()
         git(self.root, "checkout", "--", "b.py")
-        self.assertEqual(self.decision(self.launch(spec=self.OTHER)[0]), "allow")
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.OTHER))[0]), "allow")
         self.assertEqual(self.saved()["spec"], self.OTHER)
 
     def test_a_launch_reads_nothing_from_the_issue(self):
-        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.FOLDER))[0]), "allow")
         asked = Path(self.env["GH_LOG"]).read_text()
         self.assertNotIn("issue", asked)
         self.assertNotIn("comments", asked)
+        # The caller gives the story; the PR body's `Implements:` line is not read for it (ADR-0019, decision 1).
+        self.assertNotIn("body", asked)
+        self.assertNotIn("pr view", asked)
 
     def logging_git(self):
         """git as the gate runs it, each command's arguments appended to the returned log."""
@@ -516,7 +761,7 @@ class SpecArgument(Gate):
         log = self.logging_git()
         self.clean_round(self.FOLDER)
         self.commit("b.py", "fixed\n", "fix: b")
-        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.FOLDER))[0]), "allow")
         ran = log.read_text().splitlines()
         for rnd in self.saved()["rounds"]:
             self.assertTrue([line for line in ran if rnd["head_sha"] in line and f"{self.FOLDER}/spec.md" in line], ran)
@@ -526,7 +771,7 @@ class SpecArgument(Gate):
     def test_the_same_value_again_opens_the_next_round_graded_against_the_bound_spec(self):
         self.clean_round(self.FOLDER)
         self.commit("b.py", "fixed\n", "fix: b")
-        out, args = self.launch(spec=self.FOLDER)
+        out, args = self.launch(**self.args_for(self.FOLDER))
         self.assertEqual(self.decision(out), "allow")
         self.assertTrue(args["round_ref"].endswith("internal-0.2"))
         for reviewer in args["waves"][0]:
@@ -537,16 +782,16 @@ class SpecArgument(Gate):
         self.clean_round(self.FOLDER)
         git(self.root, "rm", "-q", f"{self.FOLDER}/spec.md")
         git(self.root, "commit", "-q", "-m", "docs: drop the spec")
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "spec.md", f"{self.FOLDER}/spec.md")
         self.assertEqual(len(self.saved()["rounds"]), 1)
 
     def test_two_prs_on_one_issue_are_each_reviewed_against_their_own_folder(self):
-        _, first = self.launch(spec=self.FOLDER)
+        _, first = self.launch(**self.args_for(self.FOLDER))
         git(self.root, "checkout", "-q", "-b", "feat/1-second", "main")
-        self.commit_files({f"{self.OTHER}/spec.md": "# Another feature\n"})
+        self.commit_files({f"{self.OTHER}/spec.md": self.OTHER_SPEC})
         self.on_pr(8)
-        _, second = self.launch(spec=self.OTHER)
+        _, second = self.launch(**self.args_for(self.OTHER))
         self.assertIn(f"{self.FOLDER}/spec.md", first["waves"][0][0]["prompt"])
         self.assertIn(f"{self.OTHER}/spec.md", second["waves"][0][0]["prompt"])
         self.assertNotIn(self.FOLDER, second["waves"][0][0]["prompt"])
@@ -570,6 +815,7 @@ class SpecArgument(Gate):
         self.assertEqual([r["prompt"] for r in args["waves"][0]],
                          [self.expected_prompt(r["short"], no_spec) for r in args["waves"][0]])
         self.assertEqual((self.saved()["spec"], self.saved()["spec_blob"]), (None, None))
+        self.assertNotIn("story", self.saved())
 
     # --- a changed spec.md holds the PR -------------------------------------------------------------
 
@@ -602,8 +848,8 @@ class SpecArgument(Gate):
     def test_a_launch_while_held_is_refused_again_and_keeps_the_first_hold(self):
         self.held()
         first = self.saved()["spec_held"]
-        self.commit_files({f"{self.FOLDER}/spec.md": "# Demo\n\nb.py prints 22 lines.\n"}, "docs: change it again")
-        out, _ = self.launch(spec=self.FOLDER)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(22)}, "docs: change it again")
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "+b.py prints 22 lines.", "`unlock #7`")
         self.assertEqual(self.saved()["spec_held"], first)
 
@@ -617,8 +863,8 @@ class SpecArgument(Gate):
     def test_an_unlock_lets_the_next_launch_open_and_bind_heads_spec_md_whatever_it_is_then(self):
         self.held()
         self.unlock_since_the_hold()
-        self.commit_files({f"{self.FOLDER}/spec.md": "# Demo\n\nb.py prints 22 lines.\n"}, "docs: change it again")
-        out, _ = self.launch(spec=self.FOLDER)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(22)}, "docs: change it again")
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertEqual(self.decision(out), "allow")
         state = self.saved()
         self.assertEqual(state["spec_blob"], self.blob(self.FOLDER))
@@ -627,13 +873,13 @@ class SpecArgument(Gate):
     def test_a_change_after_the_unlocked_one_is_held_again(self):
         self.held()
         self.unlock_since_the_hold()
-        self.run_reviewers(self.launch(spec=self.FOLDER)[1], [])
-        self.commit_files({f"{self.FOLDER}/spec.md": "# Demo\n\nb.py prints 22 lines.\n"})
-        out, _ = self.launch(spec=self.FOLDER)
+        self.run_reviewers(self.launch(**self.args_for(self.FOLDER))[1], [])
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(22)})
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "-b.py prints 21 lines.", "+b.py prints 22 lines.", "`unlock #7`")
 
     def test_a_rescope_after_a_reshape_spec_unlock_needs_its_own_unlock(self):
-        _, args = self.launch(spec=self.FOLDER)
+        _, args = self.launch(**self.args_for(self.FOLDER))
         first = args["waves"][0][0]
         self.run_reviewers(args, [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3,
                                    "severity": "HIGH", "detail": "d"}])
@@ -642,28 +888,28 @@ class SpecArgument(Gate):
                 helpers.assess(state, "RESHAPE_SPEC")
         self.assertIn("The user unlocked acme/demo#7", self.say("unlock #7"))
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED}, "docs: rescope")
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertHeldWithTheDiff(out)
         self.assertIn("spec_held", self.saved())
 
     # --- what reviewers and the assessor are given ----------------------------------------------------
 
     def test_every_internal_reviewer_is_given_the_path_of_spec_md_and_none_of_its_text(self):
-        """The whole prompt is pinned: it quotes nothing of spec.md and names no heading of it."""
-        _, args = self.launch(spec=self.FOLDER)
+        """The whole prompt is pinned: it quotes nothing of spec.md and names no heading of it but the story's."""
+        _, args = self.launch(**self.args_for(self.FOLDER))
         self.assertEqual([[r["type"] for r in wave] for wave in args["waves"]], [briefs.INTERNAL_REVIEWERS])
         self.assertEqual([r["prompt"] for r in args["waves"][0]],
                          [self.expected_prompt(r["short"], self.graded()) for r in args["waves"][0]])
 
     def test_audit_reviewers_are_not_pointed_at_the_spec(self):
-        _, args = self.launch(spec=self.FOLDER, stage="audit")
+        _, args = self.launch(**self.args_for(self.FOLDER), stage="audit")
         prompts = [r["prompt"] for wave in args["waves"] for r in wave]
         self.assertEqual(len(prompts), sum(len(wave) for wave in briefs.AUDIT_WAVES))
         for prompt in prompts:
             self.assertNotIn("This change implements the spec", prompt)
 
     def awaiting_assessment(self, spec):
-        _, args = self.launch(spec=spec)
+        _, args = self.launch(**self.args_for(spec))
         first = args["waves"][0][0]
         self.run_reviewers(args, [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3,
                                    "severity": "HIGH", "detail": "d"}])
@@ -680,7 +926,7 @@ class SpecArgument(Gate):
         out, _ = self.launch(ASSESS)
         self.assertEqual(self.decision(out), "allow")
         brief = self.brief(args["round_ref"])
-        self.assertEqual(brief["spec_folder"], self.FOLDER)
+        self.assertEqual((brief["spec_folder"], brief["user_story"]), (self.FOLDER, self.STORY))
         self.assertNotIn("b.py prints 20 lines.", json.dumps(brief))
 
     def test_a_second_assess_launch_after_spec_md_changed_is_refused_with_the_diff_and_holds_the_pr(self):
@@ -717,8 +963,8 @@ class SpecArgument(Gate):
         with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
             with ledger.open_ledger("acme/demo", 7) as state:
                 helpers.assess(state, "PATCH")
-        self.commit_files({f"{self.FOLDER}/spec.md": "# Demo\n\nb.py prints 22 lines.\n"}, "docs: change it again")
-        out, _ = self.launch(spec=self.FOLDER)
+        self.commit_files({f"{self.FOLDER}/spec.md": demo_spec(22)}, "docs: change it again")
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "-b.py prints 21 lines.", "+b.py prints 22 lines.", "`unlock #7`")
 
     def test_an_assess_launch_after_an_unlock_with_spec_md_back_to_the_bound_text_clears_the_hold(self):
@@ -735,7 +981,7 @@ class SpecArgument(Gate):
             with ledger.open_ledger("acme/demo", 7) as state:
                 helpers.assess(state, "PATCH")
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED}, "docs: change it again")
-        self.assertHeldWithTheDiff(self.launch(spec=self.FOLDER)[0])
+        self.assertHeldWithTheDiff(self.launch(**self.args_for(self.FOLDER))[0])
 
     def test_an_assess_launch_whose_bound_spec_md_is_gone_or_unreadable_is_refused_and_sent_to_the_user(self):
         """A round awaiting assessment lets no agent commit, so the refusal cannot tell the agent to commit it."""
@@ -769,7 +1015,8 @@ class SpecArgument(Gate):
     def test_the_assessor_brief_of_a_pr_bound_to_null_gives_no_spec_folder(self):
         args = self.awaiting_assessment(None)
         self.assertEqual(self.decision(self.launch(ASSESS)[0]), "allow")
-        self.assertIsNone(self.brief(args["round_ref"])["spec_folder"])
+        brief = self.brief(args["round_ref"])
+        self.assertEqual((brief["spec_folder"], brief["user_story"]), (None, None))
 
     # --- log mode ---------------------------------------------------------------------------------------
 
@@ -791,7 +1038,7 @@ class SpecArgument(Gate):
         cases = {"no spec": (self.without_spec, ["missing", self.UNBOUND_CALL % "internal"]),
                  "not a string": (lambda: self.launch(spec=19)[0], [self.UNBOUND_CALL % "internal"]),
                  "shape": (lambda: self.launch(spec="dev/demo/plans/001-demo")[0], ["shape"]),
-                 "spec.md": (lambda: self.launch(spec="dev/demo/specs/009-gone")[0], ["dev/demo/specs/009-gone/spec.md"])}
+                 "spec.md": (lambda: self.launch(**self.args_for("dev/demo/specs/009-gone"))[0], ["dev/demo/specs/009-gone/spec.md"])}
         for pr, (name, (launch, words)) in enumerate(cases.items(), 21):
             with self.subTest(name):
                 self.on_pr(pr)
@@ -814,13 +1061,14 @@ class SpecArgument(Gate):
         self.run_reviewers(args, [])
         self.commit("b.py", "fixed\n", "fix: b")
         self.mode = "enforce"
-        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
-        self.assertEqual((self.saved()["spec"], self.saved()["spec_blob"]), (self.FOLDER, self.bound))
+        self.assertEqual(self.decision(self.launch(**self.args_for(self.FOLDER))[0]), "allow")
+        self.assertEqual((self.saved()["spec"], self.saved()["story"], self.saved()["spec_blob"]),
+                         (self.FOLDER, self.STORY, self.bound))
 
     def test_in_log_mode_a_different_value_is_logged_and_the_binding_stays(self):
         self.mode = "log"
-        self.launch(spec=self.FOLDER)
-        out = self.refused_in_log_mode(lambda: self.launch(spec=self.OTHER)[0], [self.FOLDER, self.OTHER, "never changes"])
+        self.launch(**self.args_for(self.FOLDER))
+        out = self.refused_in_log_mode(lambda: self.launch(**self.args_for(self.OTHER))[0], [self.FOLDER, self.OTHER, "never changes"])
         self.assertEqual(self.saved()["spec"], self.FOLDER)
         for prompt in self.prompts(out):
             self.assertIn(self.graded(), prompt)
@@ -830,7 +1078,7 @@ class SpecArgument(Gate):
         self.clean_round(self.FOLDER)
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED})
         self.mode = "log"
-        self.refused_in_log_mode(lambda: self.launch(spec=self.FOLDER)[0], ["+b.py prints 21 lines.", "`unlock #7`"])
+        self.refused_in_log_mode(lambda: self.launch(**self.args_for(self.FOLDER))[0], ["+b.py prints 21 lines.", "`unlock #7`"])
         state = self.saved()
         self.assertNotIn("spec_held", state)
         self.assertEqual((state["spec"], state["spec_blob"]), (self.FOLDER, self.bound))
@@ -841,7 +1089,7 @@ class SpecArgument(Gate):
         self.commit_files({f"{self.FOLDER}/spec.md": self.CHANGED})
         self.mode = "log"
         self.env["GH_OPEN_PR"] = "7 nosuch"
-        out, _ = self.launch(spec=self.FOLDER)
+        out, _ = self.launch(**self.args_for(self.FOLDER))
         self.assertRefused(out, "nosuch")
         self.assertNotIn("spec_held", self.saved())
 
@@ -850,7 +1098,7 @@ class SpecArgument(Gate):
         self.held()
         first = self.saved()["spec_held"]
         self.mode = "log"
-        self.launch(spec=self.FOLDER)
+        self.launch(**self.args_for(self.FOLDER))
         self.assertEqual(self.saved().get("spec_held"), first)
 
 
@@ -1071,7 +1319,8 @@ class HeldBranch(Gate):
         """PR `pr`, bound to `spec`, locked by `verdict` on a round with `findings` findings."""
         with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
             with ledger.open_ledger(repo, pr) as state:
-                state.update(branch=branch, spec=spec, spec_blob=None if spec is None else "b" * 40)
+                state.update(branch=branch, spec=spec, spec_blob=None if spec is None else "b" * 40,
+                             **({} if spec is None else {"story": SpecArgument.STORY}))
                 helpers.add_round(state, head=self.head, findings_per_reviewer=(findings, 0))
                 ledger.current_round(state).update(root=str(root or self.root), session="s1")
                 helpers.assess(state, verdict)
@@ -1150,7 +1399,8 @@ class HeldBranch(Gate):
             with self.subTest(spec=spec):
                 with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
                     with ledger.open_ledger("acme/demo", pr) as state:
-                        state.update(branch="feat/1-demo", spec=spec, spec_blob=None if spec is None else "b" * 40)
+                        state.update(branch="feat/1-demo", spec=spec, spec_blob=None if spec is None else "b" * 40,
+                                     **({} if spec is None else {"story": SpecArgument.STORY}))
                         test_policy.spend_audits(state, verdict="RESHAPE_SPEC")
                         ledger.current_round(state)["root"] = str(self.root)
                 said = self.say(f"unlock #{pr}")
