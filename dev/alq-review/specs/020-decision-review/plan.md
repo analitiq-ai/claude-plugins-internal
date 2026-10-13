@@ -11,8 +11,8 @@ which governing records cover them (R1–R4). A new boundary module `adrkit.py` 
 deadline (R5, R7); a new pure module `decisions.py` judges adrkit's findings (R6). When records govern the change,
 `alq-review:decision-reviewer` joins the round's expected reviewers with those records as its brief (R8), and its
 findings reach `assess-round` like any other. The round's result carries a `decisions` block (R9). The file limit,
-the check's own setting and the `gate.log` line are R15–R17; the uncommitted-changes check is R18. The notice choice
-lands first as ADR-0021 in its own PR (R13).
+the check's own setting and the `gate.log` line are R15–R17; the uncommitted-changes check is R18. The constitution
+lines land first in their own PR (R13).
 
 Decisions and their reasons are in [research.md](research.md); the check's shapes, causes and refusals in
 [data-model.md](data-model.md); the outside interfaces in [contracts/interfaces.md](contracts/interfaces.md). This
@@ -57,7 +57,7 @@ the plugin works around
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step (data-model); nothing degrades to "no decisions". One adrkit version; no tolerance for another (R5). Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (R14). Pass. |
 | V. Smallest complete change | No cache, no planning-time check, no audit check, no ledger field. `changed_files` is generalised, not duplicated (R2). The whole mechanism ships in one PR (spec Clarifications, one story). Pass. |
-| VI. Governing rule ships apart | ADR-0021 and the constitution lines are their own PR, merged first (R13). The README changes with the code it describes (R12). Pass. |
+| VI. Governing rule ships apart | The constitution lines are their own PR, merged first (R13). The README changes with the code it describes (R12). Pass. |
 | P1. Code decides | The check, the reviewer's seat in `expected`, every refusal and the notices are decided in the gate; the agent is told nothing it could skip. Each refusal ends with its next step (R10). Pass. |
 | P2. Only an approved entity releases a hold | No hold, lock or count is added. A refused launch holds nothing: the next launch checks again. The user releases the check by setting `decision_checks` to `log` (R15). Pass. |
 | P3. Rules are pure | The rules in `decisions.py` are functions of adrkit's answers; `adrkit.py` and the gate do the I/O; `review-round.js` only echoes `decisions` (R6, R9). Pass. |
@@ -82,10 +82,9 @@ specs/020-decision-review/
 
 ### Source Code (repository root)
 
-ADR first, its own PR (branch `88-adr-notice`, R13):
+Constitution first, its own PR (branch `88-adr-notice`, R13):
 
 ```text
-dev/alq-review/docs/adr/0021-run-the-round-with-a-notice-for-a-matcher-adrkit-cannot-evaluate-here.md
 dev/alq-review/.specify/memory/constitution.md
 ```
 

@@ -96,9 +96,9 @@ requirement of the spec is met. What is required is the spec's; the shapes are d
   node and the pinned adrkit.
 - **Rationale**: the README changes with the code it describes, as in spec 019.
 
-## R13: The notice choice is ADR-0021, its own PR first
+## R13: The constitution lines ship first, in their own PR
 
-- **Decision**: ADR-0021 and the constitution lines FR-021 names land in their own PR before the code (FR-019).
+- **Decision**: the constitution lines FR-021 names land in their own PR before the code.
 - **Rationale**: a governing rule ships apart from the code it governs (constitution VI).
 
 ## R14: Tests
