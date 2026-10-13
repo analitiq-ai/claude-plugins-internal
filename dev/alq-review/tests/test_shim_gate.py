@@ -13,6 +13,7 @@ from unittest import mock
 from paths import PLUGIN
 
 from test_claim_gate import HARNESS, INSTALL_COMMAND, ClaimGate
+from test_gate import ThroughProcess
 from test_worktree_facts import git
 
 import hookio
@@ -440,7 +441,7 @@ class ShimAltered(ShimGate):
                       "(alters lines 333 of this file)", self.reason(self.git_commit()))
 
 
-class ShimLibrary(ShimGate):
+class ShimLibrary(ThroughProcess, ShimGate):
     """The shim check's launch, and a commit that stages a change, refuse naming the install when the diff library
     cannot be imported (X1)."""
 

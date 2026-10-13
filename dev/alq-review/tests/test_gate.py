@@ -1,4 +1,5 @@
-"""Drives scripts/gate.py the way Claude Code does: one JSON payload on stdin per hook event."""
+"""Drives the gate the way Claude Code does, one hook payload per event. The payload goes to `gate.handle` in-process;
+`ThroughProcess` puts it on scripts/gate.py's stdin instead, for the tests of that entry."""
 import ast
 import io
 import json
@@ -52,14 +53,18 @@ class Gate(Repo):
                         # commit is judged by the review alone.
                         ALQ_REVIEW_CLAIM_CHECKS="log", ALQ_REVIEW_SHIM_CHECKS="log")
 
-    def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
+    def payload(self, event, tool=None, tool_input=None, **extra):
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": self.tmp.name, **extra}
         if tool:
             payload = {"tool_use_id": "t0", **payload, "tool_name": tool, "tool_input": tool_input or {}}
-        done = subprocess.run([sys.executable, str(GATE)], input=json.dumps(payload), capture_output=True, text=True,
-                              env=dict(self.env, ALQ_REVIEW_MODE=mode or self.mode))
-        self.assertEqual(done.returncode, 0, done.stderr)
-        return json.loads(done.stdout) if done.stdout.strip() else {}
+        return payload
+
+    def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
+        """The gate's answer to one event: `handle`, under the environment gate.py would run in. A crash raises here
+        with its trace; main()'s answer to one is tested through `ThroughProcess`."""
+        # Cleared, not overlaid: a test that drops a key from self.env means the gate not to see it.
+        with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True):
+            return gate.handle(self.payload(event, tool, tool_input, **extra)) or {}
 
     def saved(self, repo="acme/demo"):
         """The ledger of the branch's open PR; an empty one when it has none."""
@@ -121,6 +126,18 @@ class Gate(Repo):
             meanwhile()
         return self.hook("PostToolUse", "Bash", {"command": command}, tool_use_id="t1", session_id=session,
                          tool_response={})
+
+
+class ThroughProcess:
+    """Runs scripts/gate.py as Claude Code does, one process per event, stdin to stdout. Mixed in before `Gate` by the
+    tests of that entry alone: main()'s answer to a crash, and a library the interpreter cannot import."""
+
+    def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
+        payload = self.payload(event, tool, tool_input, **extra)
+        done = subprocess.run([sys.executable, str(GATE)], input=json.dumps(payload), capture_output=True, text=True,
+                              env=dict(self.env, ALQ_REVIEW_MODE=mode or self.mode))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout) if done.stdout.strip() else {}
 
 
 class InternalRound(Gate):
@@ -903,7 +920,7 @@ class ReleaseReady(Gate):
         self.assertEqual(self.ready(), "deny")
 
 
-class BrokenGate(Gate):
+class BrokenGate(ThroughProcess, Gate):
     """A gate that crashes is deciding nothing. On the paths whose job is to refuse, silence reads
     as permission, so the crash must refuse instead."""
 
@@ -1049,6 +1066,14 @@ class BrokenGate(Gate):
         out = self.hook("SubagentStart", agent_type=briefs.INTERNAL_REVIEWERS[0])  # no agent_id: KeyError inside
         self.assertNotEqual(self.decision(out), "deny")
         self.assertIn("failed open", out.get("systemMessage", ""))
+
+    def test_gate_failure_is_loud_and_refuses_what_it_was_deciding(self):
+        """Even with nowhere to write the trace: the refusal is carried by the answer itself."""
+        self.state_dir.parent.mkdir(exist_ok=True)
+        self.state_dir.write_text("not a directory")
+        out = self.edit()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("alq-review", self.reason(out))
 
 
 
@@ -1645,14 +1670,6 @@ class OtherGates(Gate):
         self.assertEqual(self.edit(), {})
         entries = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
         self.assertTrue(any(e["decision"] == "would_deny" and e["action"] == "edit" for e in entries))
-
-    def test_gate_failure_is_loud_and_refuses_what_it_was_deciding(self):
-        """Even with nowhere to write the trace: the refusal is carried by the answer itself."""
-        self.state_dir.parent.mkdir(exist_ok=True)
-        self.state_dir.write_text("not a directory")
-        out = self.edit()
-        self.assertEqual(self.decision(out), "deny")
-        self.assertIn("alq-review", self.reason(out))
 
 
 class GithubRound(Gate):
