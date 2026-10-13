@@ -33,4 +33,3 @@
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
 - The spec names the `adr` command, `ALQ_ORG_ADR_DIR` and adrkit's finding rules by name. They are the contract the feature sits on and the terms the user settled in, not a design choice, so the "no implementation details" items pass with that reading.
-- The mode of the check's refusals (FR-018) is a default taken from the spec refusals, stated in Assumptions; it was not settled with the user.

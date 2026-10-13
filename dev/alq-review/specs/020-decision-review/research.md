@@ -33,10 +33,11 @@ Nothing here was run; what PR #92's tests showed is quoted as theirs.
 
 ## R3: The corpora are every tracked `docs/adr` plus the org corpus, checked once each
 
-- **Decision**: a repo corpus is each distinct parent folder of a tracked path (`git ls-files -z -- '*docs/adr/*'`)
-  whose last two segments are `docs/adr`, at any depth, sorted. A `docs/adr` with no tracked file, untracked or
-  ignored, is not a corpus. The org corpus is `ALQ_ORG_ADR_DIR` when set and non-empty; it must be an absolute path
-  to a folder the gate can read, else the launch is refused naming the path (FR-010, scenario 13). When it resolves to
+- **Decision**: the corpora are listed as data-model § Corpus says, from `git ls-files -z -- '*docs/adr/*'`: every
+  prefix of a tracked path that ends in `docs/adr`, so a corpus whose files all sit in subfolders is still found. A
+  `docs/adr` with no tracked file, untracked or ignored, is not a corpus. The org corpus is `ALQ_ORG_ADR_DIR` when set
+  and non-empty; a value that is not an absolute path to a readable folder makes the org corpus `NotChecked`
+  (scenario 13). When it resolves to
   the same folder as a repo corpus, it is checked once, as the org corpus, with the org's fix text. Each corpus is
   labelled: a repo corpus by its path from the repo root, the org corpus as `org (<absolute path>)`; every record is
   named `<label> <id>`.
@@ -67,62 +68,51 @@ Nothing here was run; what PR #92's tests showed is quoted as theirs.
 ## R5: An `adrkit.py` boundary module reads the CLI's answer and refuses any shape it does not read
 
 - **Decision**: a new `scripts/adrkit.py` owns everything that touches adrkit or the disk for the check: finding
-  `adr` on `PATH`, checking `ALQ_ORG_ADR_DIR`, the two calls per corpus, parsing their JSON, reading the status line
-  of each record a finding names, `lstat` of each path the marker scan could not read, and locating a governing
-  record's file. adrkit names paths relative to the directory it ran in, the checkout root, so an org record outside
-  the repo comes back as `../../engineering/docs/adr/0007-x.md`; every path adrkit names is resolved against the
-  checkout root before it is read, `lstat`ed or put in a brief. A governing record's file is located only after the
-  corpus is judged: two records with one id are adrkit's `unique-id` error, a broken record (R6), refused with the
-  corpus fix before any file is located; no id can have zero files, since adrkit discovers records by the same
-  `<id>-<slug>.md` name the gate globs for. It builds plain data (`decisions.CorpusReport`) and raises `adrkit.Unavailable` with the corpus and the
-  install step (`npm install -g @adrkit/cli@0.20.0`) when the answer is not in the shape it reads: `findings` must be a
-  list of objects with string `rule`, `severity`, `message` and optional string `path`, `id`, `field`, `pattern`;
-  `governing` a list of objects with string `recordId` and `title`; `markerScan.unreadablePaths` a list of strings.
-  Nothing else in the report is read.
+  `adr` on `PATH`, checking `ALQ_ORG_ADR_DIR` (`org_corpus()`), the two calls per corpus, parsing their JSON, reading
+  the status text of each file a finding names, `lstat` of each path the marker scan could not read, and globbing each
+  governing id's files. `outcomes(root, corpora, files, deadline, spent)` returns one value per corpus, a
+  `CorpusReport` or a `NotChecked`, never raising for a corpus (data-model § Corpus report, § Corpus outcome): a
+  corpus that cannot be checked must not hide what the others answered when `decision_checks` is `log`. Every path
+  adrkit names is resolved against the checkout root, where adrkit ran, so an org record outside the repo is found.
+  Fields read and their shapes: contracts § "Fields read"; nothing else in the report is read. The status text is the
+  word after `status:` (`^status:\s*["']?([\w-]+)`, multiline, as PR #92 read it); a file that cannot be read or is
+  not UTF-8 gives `None`.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
-  leaves `decisions.py` pure (P3).
-- **Existing tools**: `github.py` (one boundary module per outside service, RuntimeError in the service's words): fit,
-  the same pattern. PR #92's `_entries` shape check and `_record` glob: fit, moved into the boundary.
+  leaves `decisions.py` pure (P3). Globbing every governing id's files in the boundary lets `judge` decide, purely,
+  that an id with no file or two is not a record to brief.
+- **Existing tools**: `github.py` (one boundary module per outside service, in the service's words): fit, the same
+  pattern. PR #92's `_entries` shape check, `_STATUS` regex and `_record` glob: fit, moved into the boundary.
 
 ## R6: `decisions.py` holds the classification as pure functions of the reports
 
-- **Decision**: `decisions.judge(report: CorpusReport) -> Judgement` applies the spec's table with no I/O:
-  - A record's status is the `status:` scalar of its frontmatter as `adrkit.py` read it; `draft`, `proposed`,
-    `rejected`, `superseded`, `deprecated` are not governing; any other value, a missing line or an unreadable file
-    is governing (FR-004).
-  - A finding with no `path` is about the corpus or the scan: `marker-scan-capped` and `marker-declarations-capped`
-    are *failed* (FR-009); any other is ignored.
-  - `corpus-file-skipped` is judged by the skipped file's status line: `accepted` is *broken* (FR-008), a record
-    adrkit could not read because of its name or place; no readable status is a *notice* (FR-012) naming the file;
-    any other status is ignored. adrkit raises it for any `.md` that is not a record name, at the top of the corpus or
-    in a subfolder, so a stray note must not stop every round.
-  - Severity `error`, `affects-bad-pattern` or `affects-unknown-type` on a governing record's path is *broken* (FR-008).
-  - `affects-unresolvable` or `affects-repo-not-applicable` from `check` on a governing record is a *notice*
-    (FR-012), carrying the matcher (`field`, `pattern`) and adrkit's message; `lint`'s per-record
-    `affects-repo-not-applicable` is ignored, since `check` reports the same per matcher.
-  - A path in `markerScan.unreadablePaths` that `lstat` says is a regular file is *failed* (FR-009); a symlink or other
-    non-regular file is ignored. adrkit reports both as `unreadable` (`readWithPreparedRoot`: a symlink in the path or a
-    non-file both `refuse("unreadable")`), so only `lstat` tells them apart.
-  - Every other finding, and `absentPaths`, `truncatedPaths`, `outOfTreePaths`, is ignored (FR-013).
+- **Decision**: `decisions.py` holds, with no I/O but `os.path.realpath` in `corpora`: `corpora(tracked, root, org)`,
+  `status_class(text)`, `judge(report) -> Judgement | NotChecked` and `governance(outcomes, org_label) -> Governance`.
+  Their tables are data-model § Status, § Corpus outcome (the causes `judge` makes) and § Judgement. Two choices the
+  tables encode:
+  - One status classifier for loaded records and skipped files, so the same text means the same thing in both: a
+    value outside adrkit's six is `unreadable` in both.
+  - A corpus with a capped scan or an unreadable changed file is `NotChecked` as a whole: a governing record matched
+    only by a marker in the unscanned part would be missed, so no subset of its records is briefed.
   - The governing records are `check`'s `governing` entries: adrkit already includes only records that matched by an
     evaluated matcher or a marker (FR-012's last sentence).
-  `decisions.governance(judgements, org)` folds the corpora into one `Governance`: the records, the notices, the
-  failed and broken lists, and whether the org corpus was unset.
 - **Rationale**: constitution P3. adrkit's own `Status` enum is exactly those six values; a status outside it fails the
   schema, raises an `error` finding and keeps the record out of `records`, so counting it as governing (FR-004) makes
-  that `error` refuse instead of vanish. The status list and the seven rule names are a copy of adrkit's vocabulary that
-  `check --json` gives no other way to learn (a finding carries no status); a drift test pins each name to the installed
-  package's shipped JS, as PR #92's did for the rule names.
+  that `error` refuse instead of vanish. `affects-unresolvable` and `affects-repo-not-applicable` are read from `check`
+  only: `lint` reports the same per record, and `check` names the matcher. `markerScan.unreadablePaths` holds both
+  symlinks and unreadable regular files (`readWithPreparedRoot` refuses both as `unreadable`), so only `lstat` tells
+  them apart (FR-002: a symlink is given to the check and is not a failure). The status list and the seven rule names
+  are a copy of adrkit's vocabulary that `check --json` gives no other way to learn; a drift test pins each to the
+  installed package's shipped JS.
 - **Existing tools**: `specbinding.py`, `policy.py` (pure rules over data the gate reads): fit, the same shape. PR #92's
-  `_may_govern` (regex over `status:`) and `_not_evaluated`: followed, with the status list extended to all five
-  non-governing statuses, the per-matcher notices added, and the symlink distinction added.
+  `_may_govern` and `_not_evaluated`: followed, with all five non-governing statuses, per-matcher notices and the
+  symlink distinction added.
 
 ## R7: One deadline per hook run, taken before the payload is read, 5 s under the hook's timeout
 
 - **Decision**: `gate.main` takes `time.monotonic()` as its first statement; the deadline is that plus
   `HOOK_SECONDS - ANSWER_MARGIN` = 60 − 5 = 55 s. `handle(payload, deadline)` passes it to `on_workflow`; each `adr`
-  call's `timeout` is what remains. A call that reaches it is `Unavailable`: the refusal names the corpus, the call, the
+  call's `timeout` is what remains. A call that reaches it leaves its corpus `NotChecked`: the reason names the call, the
   deadline, and the time each step of the launch spent (the review-base fetch, the `gh` calls, each `adr` call), so
   the next step is the one that can succeed: a slow network, or a corpus adrkit reads slowly (FR-010, FR-014). A test pins `HOOK_SECONDS` to the `timeout` of the
   `gate.py` PreToolUse entry in `hooks/hooks.json`.
@@ -164,26 +154,20 @@ Nothing here was run; what PR #92's tests showed is quoted as theirs.
 
 ## R10: Refusal texts: the check failed, the corpus named, a fix that works for that corpus
 
-- **Decision**: after every corpus is checked, the gate refuses once. If any corpus *failed* (FR-009) or could not be
-  checked (FR-010), `hookio.block` with every such corpus and its problem; else if any has *broken* records (FR-008),
-  `hookio.refuse` with each record named `<corpus> <id>` (its path when adrkit gives no id) and adrkit's message. Each
-  refusal opens "The decision check could not run" or "The decision check found a record it cannot judge against", and
-  ends "Next step: ...": for a repo corpus, correct the record in this repo, commit, and launch again; for the org
-  corpus, fix the org's records at `<path>` or unset `ALQ_ORG_ADR_DIR`, then launch again; for a capped scan, adrkit's
-  message and the step to split the change; for an unreadable file, make it readable and launch again; for a
-  deadline, the time each step spent (R7); for a missing `adr` or
-  an unreadable answer, the install step, then launch again; for a bad `ALQ_ORG_ADR_DIR`, point it at the org's
-  `docs/adr` as an absolute path or unset it, then launch again. A refusal about the org corpus never says to commit.
+- **Decision**: the refusals, their order, when each blocks, their texts and each corpus's fix are data-model
+  § Refusals; the next step of each `NotChecked` cause is data-model § Corpus outcome. The gate refuses at most once,
+  after every corpus has its outcome.
 - **Rationale**: FR-011, FR-018, ADR-0009 (say the check failed; name a step that can succeed where the refusal was
-  made). All corpora are checked before refusing because the governing list is needed anyway in `log` mode, and one
-  refusal naming every problem saves a launch per broken corpus.
-- **Existing tools**: `_spec_step`'s refusal wording (`Step "...": ... Next step: ...`): fit, the same shape.
+  made). Every corpus is checked before refusing because a refusal that does not block opens the round on what was
+  read, and one refusal naming every problem saves a launch per corpus.
+- **Existing tools**: `_spec_step`'s refusal wording (`...: ... Next step: ...`): fit, the same shape.
   `policy.review_call(state, stage)`: fit, the call to print for "launch again".
 
 ## R11: `adr` is required only when a call would be made
 
 - **Decision**: when at least one corpus is to be checked (a tracked `docs/adr`, or `ALQ_ORG_ADR_DIR` set) and `adr`
-  is not on `PATH`, the launch is blocked in both plugin modes with the install step, unless `decision_checks` is `log` (R15) (FR-010, scenario 10). With no corpus
+  is not on `PATH`, every corpus is `NotChecked` with the install step (data-model § Corpus outcome; FR-010,
+  scenario 10). With no corpus
   at all, no call is made and the result says `corpora: []`.
 - **Rationale**: a check with nothing to call has not failed (ADR-0009 point 4); a repo without decisions should not
   need node. The spec's edge case for no corpus and an unset variable opens the round.
@@ -232,25 +216,21 @@ Nothing here was run; what PR #92's tests showed is quoted as theirs.
 ## R15: `decision_checks`, the check's own setting
 
 - **Decision**: `hookio.decision_checks_mode()` reads `decision_checks` (`log` or `enforce`), overridden by
-  `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce` in `config.json`. At `enforce` the refusals follow R10 and FR-018.
-  At `log` no decision-check refusal blocks: each is `record`ed as `would_deny` in `gate.log`, the round opens with the
-  records that were read, and `args.decisions.not_checked` lists `{corpus, reason}` for each corpus that could not be
-  checked (the `adr` command missing names every corpus).
+  `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce` in `config.json`. Which refusals it governs, and the round a refusal
+  it releases opens on: data-model § Refusals.
 - **Rationale**: ADR-0011: a check needs its exits on the day it ships, and the claim and shim checks each have one
-  "so it can be rolled back alone". FR-009/FR-010 refuse in either plugin mode, and `alq-review off` refuses round
-  workflows, so without it a machine where adrkit cannot run has no internal round at all.
+  "so it can be rolled back alone". A corpus not checked refuses in either plugin mode, and `alq-review off` refuses
+  round workflows, so without it a machine where adrkit cannot run has no internal round at all.
 - **Existing tools**: `hookio.claim_checks_mode`, `hookio.shim_checks_mode` (`_setting`): fit, one more of the same.
 
 ## R16: `max_review_files`, the size a round may review
 
-- **Decision**: `config.json` gains `max_review_files` (50), read through `hookio` as the other settings are. After
-  `launch_round` and the review base, before any `adr` call, an internal launch whose files (R2) number more than it
-  is refused with `hookio.refuse` (so it follows the plugin's mode), naming the count and the limit; next step: split
-  the PR (full round), or commit in smaller steps and launch after each (delta round). It applies to every internal
-  round, governed or not.
+- **Decision**: `config.json` gains `max_review_files` (50), read through `hookio`. After `launch_round` and the review
+  base, before any `adr` call, the gate counts the round's files (R2); over the limit is refusal 1 of data-model
+  § Refusals. It applies to every internal round, governed or not, and when it does not block no `adr` call is made.
 - **Rationale**: the user's choice (Clarifications). adrkit's own marker-scan cap (`MARKER_SCAN_FILE_CAP`, 3000) is a
-  constant of its code with no option; a smaller limit the plugin owns is met first, so the capped-scan refusal is
-  left for a change of over 3000 files, which this limit already refuses.
+  constant of its code with no option; a smaller limit the plugin owns is met first. The cap refusal stays for
+  `marker-declarations-capped`, which a change under 50 files can still reach.
 - **Existing tools**: `claim_warn_over` (a number in `config.json` the workflow reads): fit, the same file; read by the
   gate instead, since it refuses.
 
@@ -262,3 +242,14 @@ Nothing here was run; what PR #92's tests showed is quoted as theirs.
 - **Rationale**: the user's choice: the rulings are what tell whether the reviewer's brief is right, and `gate.log`
   outlives a PR's ledger doc.
 - **Existing tools**: `hookio.record`: fit. `ledger.adjudicated` (the rulings per finding): fit, the source of the line.
+
+## R18: The corpus is checked as HEAD has it
+
+- **Decision**: before any call, each repo corpus is listed with `git status --porcelain -z --untracked-files=all
+  --ignored -- <dir>`; one that lists a file is `NotChecked`, naming the files, next step: commit or remove them
+  (data-model § Corpus outcome). The org corpus is outside the repo and read as it is.
+- **Rationale**: the spec's edge case (a PR that adds an ADR is checked against the corpus as HEAD has it). adrkit reads
+  the working folder. The gate's own dirty-tree check (`worktree.is_dirty`) skips untracked files and follows the
+  plugin's mode, so it does not make the folder equal HEAD. Checking an exported copy of HEAD's corpus would brief the
+  reviewer with files that are gone when it reads them.
+- **Existing tools**: `worktree._listed`: fit, one more listing.

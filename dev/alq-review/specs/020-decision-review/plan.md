@@ -55,7 +55,7 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads five fields and refuses the rest (R5). No second validator: adrkit alone judges a record. The five non-governing statuses and seven rule names are a copy of adrkit's vocabulary, justified in Complexity Tracking and pinned by a drift test (R6). Pass with that entry. |
+| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields contracts § "Fields read" lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. The five non-governing statuses and seven rule names are a copy of adrkit's vocabulary, justified in Complexity Tracking and pinned by a drift test (R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | A missing `adr`, a bad org path, an unreadable answer, a capped scan or a deadline each refuse with the step named; nothing degrades to "no decisions". The install step pins one version; no tolerance for another shape. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (contracts, Scenario coverage). `decisions.judge` is pure; `adrkit.py` is tested with a stand-in script and with the real CLI. Pass. |
@@ -98,15 +98,15 @@ Then the code (branch `88-us1-decision-review`):
 plugins/alq-review/
 ├── scripts/
 │   ├── adrkit.py              # new: finds adr, checks ALQ_ORG_ADR_DIR, runs lint + check per corpus under the deadline,
-│   │                          #      reads the fields of R5, reads statuses and lstat, locates record files; Unavailable
-│   ├── decisions.py           # new: Corpus, Finding, CorpusReport, Judgement, Governance; corpora(), judge(), governance()
+│   │                          #      reads the fields of R5, statuses, lstat, record files; one outcome per corpus
+│   ├── decisions.py           # new: data-model's shapes; status_class(), corpora(), judge(), governance(), refusal texts
 │   ├── gate.py                # main takes the deadline; handle/on_workflow carry it; step timings; the file limit;
 │   │                          #      _governance(); the refusals; on_agent covers the decision reviewer; the
 │   │                          #      decision-review gate.log line on assessment; HOOK_SECONDS, ANSWER_MARGIN
-│   ├── hookio.py              # decision_checks_mode(); max_review_files()
+│   ├── hookio.py              # decision_checks_mode(); max_review_files(); refuse_decision(); block_decision()
 │   ├── briefs.py              # DECISION_REVIEWER; REVIEWERS includes it; review_range(); _scope(); _decision_prompt();
 │   │                          #      waves(); review_args takes governance and injects args.decisions
-│   └── worktree.py            # files_in(root, rev_range) replaces changed_files; tracked(root, pathspec)
+│   └── worktree.py            # files_in(root, rev_range) replaces changed_files; tracked(root, pathspec); not_as_head(root, path)
 ├── workflows/review-round.js  # returns decisions: args.decisions on every path
 ├── agents/decision-reviewer.md
 ├── .claude-plugin/plugin.json # 0.14.0
@@ -142,8 +142,9 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 Settled by reading, not by the user: the deadline margin is 5 s (R7); `adr` is required only when a corpus is to be
 checked (R11); an org path that coincides with a repo corpus is checked once as the org corpus, as the spec's edge case
-says, which reverses PR #92's choice (R3). The corpus is read from the checkout, which equals HEAD for tracked files
-because a dirty tracked tree is refused before the check; an untracked file inside a corpus is read as adrkit reads it.
+says, which reverses PR #92's choice (R3). A repo corpus holding a file not as HEAD has it is not checked (R18), so
+the corpus adrkit reads is HEAD's. A refusal that does not block opens the round on what was read, as data-model
+§ Refusals states once.
 
 ## Mechanisms
 
@@ -151,12 +152,12 @@ because a dirty tracked tree is refused before the check; an untracked file insi
 - The files from the reviewers' own diff range, deleted and non-regular files included: R2
 - Every tracked `docs/adr` and the org corpus, each checked once and labelled: R3
 - `adr lint` and `adr check` per corpus, all started at once, with the checkout as working directory: R4
-- The `adrkit.py` boundary: the fields read, the install step, `Unavailable`: R5
-- The pure classification in `decisions.py`: governing status, broken, failed, notice, ignored: R6
+- The `adrkit.py` boundary: one outcome per corpus, the fields read, the install step: R5
+- The pure classification in `decisions.py`: one status classifier; broken, notice, not checked, ignored: R6
 - One absolute deadline per hook run, 55 s after the payload, pinned to `hooks.json`: R7
 - The decision reviewer agent, its brief, its seat in `expected`: R8
 - The `decisions` block in the injected args and the round's result: R9
-- The two refusals, their mode and their fix texts: R10
+- The refusals: data-model § Refusals: R10
 - `adr` required only when a call would be made: R11
 - README item 8, Layout, Dependencies, version 0.14.0, CI's node and adrkit install: R12
 - ADR-0019 for the notice choice, its own PR first: R13
@@ -164,3 +165,4 @@ because a dirty tracked tree is refused before the check; an untracked file insi
 - `decision_checks`, the check's own setting: R15
 - `max_review_files`, refused before any `adr` call: R16
 - The decision reviewer's rulings in `gate.log`: R17
+- The corpus checked as HEAD has it: R18
