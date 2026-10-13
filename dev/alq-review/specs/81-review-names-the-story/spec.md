@@ -131,7 +131,8 @@ read the refusal or the injected reviewer prompts and brief.
 - Out of scope: rounds before a PR exists (#70); the branch-name convention; `alq-build:issue-tackle` and the
   engineering repo's `pr-review-loop.md`, the callers that adapt (#82 and the engineering repo).
 - Precondition of shipping: no open PR is bound to a spec folder with no story. The gate does not handle such
-  bindings (constitution III). On 2026-10-12 the only ones are #77, #78 and #83, all merged.
+  bindings (constitution III), so the ledger is checked for one before shipping. On 2026-10-13 one is open, #96,
+  so the build waits for it to merge (ADR-0019, Trade-offs).
 - Unchanged: a story PR that edits `spec.md` is held until the user unlocks it (ADR-0016 decision 6, ADR-0018).
 
 ## Why this is worth doing
