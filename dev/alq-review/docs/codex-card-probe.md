@@ -7,3 +7,5 @@ without merging once the samples are taken.
 
 Triggers driven, in order: draft marked ready; `@codex review`; a push while that review runs;
 `@codex security review`; the PR closed while a review runs.
+
+Second commit, pushed while a review was running.
