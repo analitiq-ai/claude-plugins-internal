@@ -22,8 +22,8 @@ Paths are from the repository root. Tests run with `python -m unittest -v` from 
 
 Branch `88-adr-notice`, merged before any code task (R13).
 
-- [ ] T001 Write ADR-0021 in `dev/alq-review/docs/adr/` in ADR-0018's form: the user's notice choice (FR-012, FR-019). `adr lint` reports no error on it.
-- [ ] T002 In `dev/alq-review/.specify/memory/constitution.md` Platform Constraints, name `decision_checks` beside the claim and shim settings, and the decision reviewer as this plugin's own agent.
+- [x] T001 Write ADR-0021 in `dev/alq-review/docs/adr/` in ADR-0018's form: the user's notice choice (FR-012, FR-019). `adr lint` reports no error on it.
+- [x] T002 In `dev/alq-review/.specify/memory/constitution.md` Platform Constraints, name `decision_checks` beside the claim and shim settings, and the decision reviewer as this plugin's own agent.
 - [ ] T003 Open the PR, run the review loops (`.claude/rules/pr-review-loop.md`), merge.
 
 ---

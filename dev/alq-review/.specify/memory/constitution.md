@@ -138,4 +138,4 @@ organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-12
+**Version**: 2.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-13

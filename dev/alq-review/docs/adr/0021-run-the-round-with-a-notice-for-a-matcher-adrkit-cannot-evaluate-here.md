@@ -9,7 +9,7 @@ tags: [decisions, review-round, adrkit, notices]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0009", "0011"]
+relatesTo: ["0009"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{decisions,adrkit,gate}.py"
@@ -54,8 +54,8 @@ matcher adrkit cannot evaluate is such a check, a finding, or nothing.
 ## Decision
 
 We will run the round and carry a notice in its result for each such matcher, naming the record, its corpus, the
-matcher and adrkit's message. The record reaches the decision reviewer only if adrkit lists it as governing by another
-matcher. Nothing is refused for it.
+matcher and adrkit's message. The record reaches the decision reviewer only if adrkit lists it as governing, by another
+matcher or an `@adr` marker. Nothing is refused for it.
 
 ## Options considered
 
@@ -65,7 +65,7 @@ matcher. Nothing is refused for it.
 |---|---|
 | The round | Runs |
 | The matcher | Named in the result, with adrkit's message |
-| The record | Briefed only when another matcher governs |
+| The record | Briefed only when adrkit lists it as governing by another route |
 | What the author of the record learns | That this matcher is never evaluated in a one-repo check |
 
 ### Option B: Refuse the launch
@@ -82,7 +82,8 @@ trace, which is the harm the feature exists to stop.
 ## Trade-offs
 
 - A notice obliges nobody; a matcher that stays unevaluable is a notice on every round until the record changes.
-- A record whose only matchers are of this kind never reaches the reviewer. Its author has to add a path matcher.
+- A record whose only matchers are of this kind never reaches the reviewer. Its author has to add a path matcher, or
+  a marker in a governed file.
 
 ## Consequences
 
