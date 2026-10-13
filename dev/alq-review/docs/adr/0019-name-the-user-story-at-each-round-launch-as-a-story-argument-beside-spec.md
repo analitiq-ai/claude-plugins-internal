@@ -52,7 +52,8 @@ findings against the PR, and the folder alone cannot say which story the PR deli
 ## Decision
 
 1. We will have every review-round launch name its story in `story`, a JSON integer of 1 or more, beside `spec`.
-   `story` is required when `spec` is a folder and absent when `spec` is `null`. The caller gives both; review
+   `story` is required when `spec` is a folder and absent when `spec` is `null`. A PR that is not a user story (a
+   spec, ADR or retire PR, or a release branch) launches with `spec: null`. The caller gives both; review
    reads neither the branch name nor the PR body. This extends ADR-0016, decision 1. ADR-0016, decision 2 stands.
 2. We will keep ADR-0016's checks of the folder, and refuse a launch whose `spec.md` at the checked commit has no
    line starting `### User Story <N>`, the number ending at a word boundary.
@@ -100,8 +101,9 @@ Reviewers keep grading a story PR against every story of its spec.
 
 - Every caller of review-round passes `story`: `alq-build:issue-tackle` and the engineering repo's
   `pr-review-loop.md`.
-- No open PR may be bound to a folder with no story when this ships; on 2026-10-12 the only such PRs, #77, #78
-  and #83, are merged.
+- No open PR may be bound to a folder with no story when this ships: before shipping, the ledger is checked for
+  one. On 2026-10-13 one is open, #96 (`88-spec`, a spec PR launched with its folder), so the build waits for it
+  to merge.
 - The heading check is textual: a heading inside a fenced code block counts.
 - With parallel stories, a spec edit merged from one story holds every other open story PR once it rebases: one
   unlock each. Accepted in #81.
