@@ -658,5 +658,89 @@ class StagedTree(Repo):
         self.assertTrue(worktree.concluding(str(self.root)))
 
 
+class TreeReads(Repo):
+    """A tree's reader answers None (or the empty tree) only when git says the thing is absent, and raises in git's
+    words whenever git fails: an absent file and a git that cannot read are different answers."""
+    UNKNOWN = "1" * 40
+
+    def setUp(self):
+        super().setUp()
+        (self.root / "pkg").mkdir()
+        self.commit("pkg/b.py", "b\n", "pkg")
+        self.tree = git(self.root, "rev-parse", "HEAD^{tree}")
+
+    def git_dir(self):
+        return Path(git(self.root, "rev-parse", "--absolute-git-dir"))
+
+    def lose_object(self, name):
+        """Deletes the loose object `name` names, as a corrupt repository lacks it."""
+        oid = git(self.root, "rev-parse", name)
+        (self.git_dir() / "objects" / oid[:2] / oid[2:]).unlink()
+
+    def test_a_path_the_tree_does_not_hold_is_none(self):
+        for path in ("missing.py", "pkg/missing.py", "../a.py", "/a.py", "", "pkg/", "./a.py"):
+            with self.subTest(path=path):
+                self.assertIsNone(worktree.tree_text(str(self.root), self.tree, path))
+                self.assertIsNone(worktree.tree_blob(str(self.root), self.tree, path))
+
+    def test_a_directory_or_gitlink_has_no_text_but_has_its_object(self):
+        git(self.root, "update-index", "--add", "--cacheinfo", f"160000,{git(self.root, 'rev-parse', 'HEAD')},vendor/sub")
+        tree = worktree.staged_tree(str(self.root))
+        for path in ("pkg", "vendor/sub"):
+            with self.subTest(path=path):
+                self.assertIsNone(worktree.tree_text(str(self.root), tree, path))
+                self.assertEqual(worktree.tree_blob(str(self.root), tree, path), git(self.root, "rev-parse", f"{tree}:{path}"))
+
+    def test_a_tree_ish_git_cannot_read_raises_in_gits_words(self):
+        blob = git(self.root, "rev-parse", "HEAD:a.py")
+        for tree_ish in (self.UNKNOWN, "no-such-branch", blob):
+            for read in (worktree.tree_text, worktree.tree_blob):
+                with self.subTest(tree_ish=tree_ish, read=read.__name__):
+                    with self.assertRaisesRegex(RuntimeError, "failed in"):
+                        read(str(self.root), tree_ish, "a.py")
+
+    def test_a_tree_read_outside_a_repository_raises(self):
+        for read in (worktree.tree_text, worktree.tree_blob):
+            with self.subTest(read=read.__name__):
+                with self.assertRaisesRegex(RuntimeError, "not a git repository"):
+                    read(self.tmp.name, self.tree, "a.py")
+
+    def test_a_tree_missing_a_subtree_object_raises(self):
+        self.lose_object("HEAD:pkg")
+        for read in (worktree.tree_text, worktree.tree_blob):
+            with self.subTest(read=read.__name__):
+                with self.assertRaisesRegex(RuntimeError, "failed in"):
+                    read(str(self.root), self.tree, "pkg/b.py")
+
+    def test_a_file_whose_blob_object_is_missing_raises(self):
+        self.lose_object("HEAD:pkg/b.py")
+        with self.assertRaisesRegex(RuntimeError, "failed in"):
+            worktree.tree_text(str(self.root), self.tree, "pkg/b.py")
+
+    def test_an_unborn_head_is_the_empty_tree(self):
+        git(self.root, "checkout", "-q", "--orphan", "fresh")
+        self.assertEqual(worktree.head_tree(str(self.root)), worktree.EMPTY_TREE)
+
+    def test_a_head_git_cannot_read_raises(self):
+        branch = self.git_dir() / "refs" / "heads" / "feat" / "1-demo"
+        for name, broken in (("a branch at a missing commit", lambda: branch.write_text(self.UNKNOWN + "\n")),
+                             ("a branch that names no object", lambda: branch.write_text("zzz\n")),
+                             ("a detached HEAD at a missing commit",
+                              lambda: (self.git_dir() / "HEAD").write_text(self.UNKNOWN + "\n"))):
+            with self.subTest(name):
+                tip = git(self.root, "rev-parse", "HEAD")
+                broken()
+                try:
+                    with self.assertRaisesRegex(RuntimeError, "failed in"):
+                        worktree.head_tree(str(self.root))
+                finally:
+                    (self.git_dir() / "HEAD").write_text("ref: refs/heads/feat/1-demo\n")
+                    branch.write_text(tip + "\n")
+
+    def test_head_outside_a_repository_raises(self):
+        with self.assertRaisesRegex(RuntimeError, "not a git repository"):
+            worktree.head_tree(self.tmp.name)
+
+
 if __name__ == "__main__":
     unittest.main()
