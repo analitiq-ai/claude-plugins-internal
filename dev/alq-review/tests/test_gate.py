@@ -541,15 +541,14 @@ class SpecArgument(Gate):
         self.commit("b.py", "fixed\n", "fix: b")
         self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
         ran = log.read_text().splitlines()
-        rounds = self.saved()["rounds"]
-        for rnd in rounds:
-            self.assertTrue([line for line in ran if rnd["head_sha"] in line and f"{self.FOLDER}/spec.md" in line], ran)
-        self.assertEqual([line for line in ran if "spec.md" in line and "HEAD" in line], [])
-        # Each round's head records the bound blob for spec.md, so a `cat-file blob` of that id reads head's spec.md.
-        self.assertEqual({git(self.root, "rev-parse", f"{rnd['head_sha']}:{self.FOLDER}/spec.md") for rnd in rounds},
-                         {self.bound})
-        by_id = [line for line in ran if self.bound in line]
-        self.assertEqual([line for line in by_id if not line.endswith(f" cat-file blob {self.bound}")], [], by_id)
+        heads, path = {rnd["head_sha"] for rnd in self.saved()["rounds"]}, f"{self.FOLDER}/spec.md"
+        for head in heads:
+            self.assertTrue([line for line in ran if head in line and path in line], ran)
+        self.assertEqual([line for line in ran if "spec.md" in line and not any(head in line for head in heads)], [], ran)
+        # spec.md is unchanged, so the bound id is also head's blob: reading it by that id reads head, and nothing else may use it.
+        self.assertEqual({git(self.root, "rev-parse", f"{head}:{path}") for head in heads}, {self.bound})
+        self.assertEqual([line for line in ran if self.bound in line and not line.endswith(f" cat-file blob {self.bound}")],
+                         [], ran)
 
     def test_the_same_value_again_opens_the_next_round_graded_against_the_bound_spec(self):
         self.clean_round(self.FOLDER)
@@ -661,13 +660,13 @@ class SpecArgument(Gate):
         self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
         ran = log.read_text().splitlines()
         head, path = self.saved()["rounds"][-1]["head_sha"], f"{self.FOLDER}/spec.md"
-        # Every spec.md the branch has held other than head's, so none of them is ruled out by name alone.
-        stale = {git(self.root, "rev-parse", f"{c}:{path}")
-                 for c in git(self.root, "rev-list", head, "--", path).split()} - {git(self.root, "rev-parse", f"{head}:{path}")}
-        self.assertIn(old, stale)
-        self.assertEqual([line for line in ran if any(blob in line for blob in stale)], [], ran)
         self.assertTrue([line for line in ran if head in line and path in line], ran)
         self.assertEqual([line for line in ran if "spec.md" in line and head not in line], [], ran)
+        # Any earlier commit's spec.md is stale text under its own id, so every such id is barred, not only the bound one.
+        stale = ({git(self.root, "rev-parse", f"{commit}:{path}") for commit in git(self.root, "rev-list", head, "--", path).split()}
+                 - {git(self.root, "rev-parse", f"{head}:{path}")})
+        self.assertIn(old, stale)
+        self.assertEqual([line for line in ran if any(blob in line for blob in stale)], [], ran)
 
     def test_a_change_after_the_unlocked_one_is_held_again(self):
         self.held()
