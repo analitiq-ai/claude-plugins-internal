@@ -19,13 +19,14 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 
 ## R2: The files are the reviewers' own diff range, deleted files and all
 
-- **Decision**: the paths come from `git diff --name-only -z <range>` where `<range>` is the one the reviewer prompt
-  prints: `<base>...HEAD` for a full round, `<delta_from>..HEAD` for a delta round. `worktree.changed_files(root, base)`
-  becomes `worktree.files_in(root, rev_range)`; `briefs.review_range(decision, base)` is the one place the range is
-  written, used by the prompts and the check. Every path is passed to `adr check`: deleted files, symlinks and
-  non-regular files included.
+- **Decision**: the paths are `worktree.files_in` over the range the reviewer prompt prints: `<base>...HEAD` for a
+  full round, `<delta_from>..HEAD` for a delta round (data-model § Functions and their owners).
+  `worktree.changed_files(root, base)` becomes `files_in(root, rev_range)`; `briefs.review_range(decision, base)` is
+  the one place the range is written, used by the prompts and the check. Every path is passed to `adr check`: deleted
+  files, both sides of a rename, symlinks and non-regular files included.
 - **Rationale**: FR-002 forbids a kept list; the diff the reviewers read is the only honest source, and a delta round
-  must ask about the delta (scenario 5). adrkit matches `affects` patterns against the path strings it is given and
+  must ask about the delta (scenario 5). `_DIFF` pins `--find-renames`, under which `--name-only` lists only a
+  rename's new path (run on 2026-10-13), so `files_in` adds `--no-renames` and the old path still finds its record. adrkit matches `affects` patterns against the path strings it is given and
   scans only regular files it can open for markers, so a deleted path still finds the record whose pattern covers it.
 - **Existing tools**: `worktree.changed_files` (audit packet, `base...HEAD` only): fit when generalised to a range; its one
   caller is `briefs._audit_prompt`. `worktree._listed` (`-z` listings): fit, reused. PR #92's `files_in` and
@@ -59,15 +60,19 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
 ## R5: An `adrkit.py` boundary module reads the CLI's answer, and a shape it does not read leaves the corpus not checked
 
 - **Decision**: a new `scripts/adrkit.py` owns everything that touches adrkit or the disk for the check; its functions,
-  readers and the shapes it returns are data-model § Functions and their owners, § Frontmatter and § Reading adrkit.
+  readers and the shapes it returns are data-model § Functions and their owners, § Reading a record file and § Reading adrkit.
   Three choices in them:
   - One value per corpus, never an exception, so a corpus that could not be checked does not hide what the others
     answered when `decision_checks` is `log`.
   - A governing record's file is found by the `id` in each file's frontmatter, not by the file name. Run on
     2026-10-13 with adr 0.20.0: `docs/adr/0005-x.md` holding `id: "0007"` lints clean and `check` reports governing
     `0007` with no path, so a `<id>-*.md` glob finds nothing and would blame the install.
-  - Status and id are read only from the frontmatter block, so a body line cannot decide a record's status (spec
-    edge case on an unreadable status).
+  - A record file is read the way adrkit loads it: the same candidate files, the same lenient decoding, the
+    frontmatter block only. Every rule of the plugin's own drifted from adrkit's in review (status read over the
+    whole file, a file found by name, a strict UTF-8 read that adrkit does not do, `0000-template.md` and symlinks
+    taken as candidates), and each drift refused a change adrkit had judged. adrkit's JSON gives no path for a
+    governing record, so the plugin must read the files; copying adrkit's two discovery constants, pinned by `Drift`,
+    is the one way to read the same ones. Checked on 2026-10-13 in `@adrkit/core`'s `dist/index.js`.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
   leaves `decisions.py` pure (P3).

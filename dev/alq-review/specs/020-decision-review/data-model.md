@@ -9,13 +9,13 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 
 | Function | Module | Does | I/O |
 |---|---|---|---|
-| `files_in(root, rev_range) -> list[str]` | `worktree` | the paths `git diff --name-only -z <range>` lists, deleted ones included | git |
+| `files_in(root, rev_range) -> list[str]` | `worktree` | the paths `git diff --no-renames --name-only -z <range>` lists (`_DIFF` plus `--no-renames`, so a rename lists its old path too), deleted ones included | git |
 | `tracked(root, pathspec) -> list[str]` | `worktree` | the paths `git ls-files -z -- <pathspec>` lists | git |
 | `not_as_head(root, path) -> list[str]` | `worktree` | the paths `git status --porcelain=v1 -z --untracked-files=all --ignored -- <path>` lists | git |
 | `org_corpus(root) -> Corpus \| NotChecked \| None` | `adrkit` | the only builder of the org corpus, from `ALQ_ORG_ADR_DIR` (§ Corpus) | env, disk |
 | `outcomes(root, corpora, files, deadline, spent) -> list[CorpusReport \| NotChecked]` | `adrkit` | one value per corpus, never raising for one (§ Reading adrkit) | `adr`, disk |
 | `repo_corpora(tracked) -> list[Corpus]` | `decisions` | the repo corpora (§ Corpus) | none |
-| `merge(repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus whose resolved dir equals the org's is dropped (`os.path.realpath`, the one exception to "no I/O") | realpath |
+| `merge(root, repo, org) -> list[Corpus \| NotChecked]` | `decisions` | the corpora to check, the org last; a repo corpus with `realpath(join(root, dir))` equal to the org's `realpath(dir)` is dropped (the one exception to "no I/O") | realpath |
 | `status_class(text) -> str` | `decisions` | § Status | none |
 | `judge(report) -> Judgement \| NotChecked` | `decisions` | § Judgement | none |
 | `governance(outcomes, org) -> Governance` | `decisions` | § Governance | none |
@@ -38,12 +38,22 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
   is `NotChecked(org label, "could-not-run", ...)`. Otherwise the `Corpus`.
 - A record is named `<label> <id>` everywhere: brief, notice, refusal, result.
 
-## Frontmatter
+## Reading a record file
 
-One reader, `adrkit._frontmatter(path) -> dict[str, str] | None`: the file as UTF-8; the block from a first line `---`
-to the next line `---`; each line in it with no leading space of the form `key: value`, `value` stripped of a trailing
-` #...` comment and of one pair of matching quotes. `None` when the file cannot be read, is not UTF-8, or has no such
-block. Nothing outside the block is read: a body line `status: accepted` is not a status. It reads `status` and `id`.
+The plugin reads an ADR file the way adrkit 0.20 loads it (`@adrkit/core`, `src/load/corpus.ts` and
+`src/parse/frontmatter.ts`), through one reader that serves both `statuses` and `record_files`:
+
+- **Record files** of a corpus, `adrkit._record_files(dir)`: the entries of the folder's top level that are regular
+  files, not symlinks (`os.scandir`, `is_file(follow_symlinks=False)`), whose name matches `RECORD_FILE_PATTERN`
+  `^[0-9]{4,}-.+\.md$` and is not `TEMPLATE_FILE_NAME` `0000-template.md`. This is exactly the set adrkit loads, so a
+  `corpus-file-skipped` file, a `template.md`, a `0000-template.md` or a symlink is never one.
+- **Frontmatter**, `adrkit._frontmatter(path) -> dict[str, str] | None`: the file decoded as UTF-8 with invalid bytes
+  replaced, as Node's `readFile(..., "utf8")` does; the block from a first line `---` to the next line `---` (a
+  trailing `\r` ignored); each line in it with no leading space of the form `key: value`, `value` stripped of a
+  trailing ` #...` comment and of one pair of matching quotes. `None` when the file cannot be opened or has no such
+  block. Nothing outside the block is read: a body line `status: accepted` is not a status. It reads `status` and `id`.
+
+The pattern and the template name are a copy of adrkit's, pinned with `RULES` and `NOT_GOVERNING` by `Drift`.
 
 ## Status
 
@@ -81,8 +91,8 @@ the repo comes back as `../../engineering/docs/adr/0007-x.md`), and is resolved 
 |---|---|
 | `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check` |
 | `governing` | `(id, title)` per `governing` entry |
-| `statuses` | `path -> frontmatter status or None`, for every path a finding names |
-| `record_files` | `id -> tuple of absolute paths`: the top-level `*.md` files of the corpus, less those a `corpus-file-skipped` finding names, whose frontmatter `id` is that id, for each governing id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
+| `statuses` | `path -> _frontmatter(path)["status"]`, or `None`, for every path a finding names |
+| `record_files` | `id -> tuple of absolute paths`: for each governing id, the `_record_files(dir)` whose frontmatter `id` is that id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
 | `unreadable_regular` | the paths of `markerScan.unreadablePaths` that `os.lstat` reports as regular files |
 
 ## Corpus outcome
@@ -103,7 +113,7 @@ located or briefed.
 | `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each `adr` call, in seconds) | the step that spent the time |
 | `could-not-run`: `marker-scan-capped` or `marker-declarations-capped` | `decisions.judge` | adrkit's message | split the change |
 | `could-not-run`: a path in `unreadable_regular` | `decisions.judge` | the file | make it readable |
-| `could-not-run`: a governing id, not broken, whose `record_files` are none or several | `decisions.judge` | the record and the files | the corpus's fix (§ Refusals) |
+| `could-not-run`: a governing id, not broken, whose `record_files` are none or several | `decisions.judge` | the record and the files | the corpus's fix (§ Refusals): for the org corpus, never containing "commit" |
 
 ## Judgement
 
@@ -144,7 +154,7 @@ not_checked, org_corpus)`:
 `gate._governance` for an internal launch, after `launch_round` and the review base, before `open_round`:
 
 1. `files = worktree.files_in(root, briefs.review_range(decision, base))`.
-2. Corpora: `decisions.merge(decisions.repo_corpora(worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
+2. Corpora: `decisions.merge(root, decisions.repo_corpora(worktree.tracked(root, "*docs/adr/*")), adrkit.org_corpus(root))`.
 3. Over `max_review_files`: every corpus not yet `NotChecked` becomes `NotChecked(too-big)`; refusal 1.
 4. Otherwise: each repo corpus with `not_as_head` output becomes `NotChecked(could-not-run)`; the rest go to
    `adrkit.outcomes`, and each report to `decisions.judge`.
@@ -163,18 +173,20 @@ At most one blocks per launch; they are taken in this order.
 A corpus's fix: repo corpus, "correct the record in this repo, commit, then <call>"; org corpus, "fix the org's
 records at <dir> or unset ALQ_ORG_ADR_DIR, then <call>", never containing "commit".
 
-A refusal that blocks opens no round and records nothing new. One that does not block is recorded as `would_deny` in
-`gate.log`; the launch takes the next refusal, then opens the round on `Governance` as it stands.
+A refusal that blocks opens no round and writes nothing to the ledger; its helper writes a `deny` line to `gate.log`.
+One that does not block writes a `would_deny` line to `gate.log`; the launch takes the next refusal, then opens the
+round on `Governance` as it stands.
 
 ### By mode
 
 `P` is the plugin's mode, `D` is `decision_checks`. Each row is one gate test whose subTests are the four cells; each
-open cell asserts the state named.
+blocking cell asserts one `deny` line, each open cell one `would_deny` line and the state named.
 
 | Refusal | Test (`test_gate.DecisionReview`) | P enforce, D enforce | P enforce, D log | P log, D enforce | P log, D log | State a round opens on |
 |---|---|---|---|---|---|---|
 | 1 too big | `test_the_size_refusal_follows_the_plugin_s_mode` | blocks | blocks | opens | opens | no `adr` call; every corpus in `not_checked` with cause `too-big`; no decision reviewer |
 | 2 not checked (`ALQ_ORG_ADR_DIR=/nowhere`, repo corpus governs) | `test_a_corpus_not_checked_follows_decision_checks` | blocks | opens | blocks | opens | the repo corpus's record briefed; the org corpus in `not_checked` |
+| 2 not checked (`adr` not on `PATH`, repo corpus governs) | `test_without_adr_the_check_follows_decision_checks` | blocks | opens | blocks | opens | no decision reviewer; every corpus in `not_checked` with the install step |
 | 2 not checked (a repo corpus not as HEAD) | `test_a_corpus_not_as_head_follows_decision_checks` | blocks | opens | blocks | opens | no `adr` call with that `--dir`; the corpus in `not_checked`; no record from it |
 | 3 broken (a governing `unique-id` pair beside a governed 0001) | `test_a_broken_record_blocks_only_when_both_enforce` | blocks | opens | opens | opens | the pair in `broken`, neither briefed; 0001 briefed |
 

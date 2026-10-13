@@ -14,8 +14,8 @@ crosses the plugin's edge.
 ## adrkit
 
 `@adrkit/cli@0.20.0`, the `adr` command: the calls, fields read and exit codes are data-model § Reading adrkit. The
-rule names and statuses `decisions.py` reads (`RULES`, `NOT_GOVERNING`) are pinned to the installed package's shipped
-JS by `test_decisions.Drift`.
+rule names and statuses `decisions.py` reads (`RULES`, `NOT_GOVERNING`) and the record-file rules `adrkit.py` copies
+(`RECORD_FILE_PATTERN`, `TEMPLATE_FILE_NAME`) are pinned to the installed package's shipped JS by `test_decisions.Drift`.
 
 ## Injected review-round arguments
 
@@ -66,7 +66,7 @@ README: item 8 under "What it enforces"; Layout rows for `scripts/adrkit.py`, `s
 
 ## Scenario coverage
 
-Refusals by mode are the four tests of data-model § Refusals, By mode; they are not repeated here.
+Refusals by mode are the tests of data-model § Refusals, By mode; they are not repeated here.
 
 | Spec scenario or rule | Test |
 |---|---|
@@ -79,7 +79,7 @@ Refusals by mode are the four tests of data-model § Refusals, By mode; they are
 | 7 same id in two corpora: both carried | `test_decisions.Contract.test_the_same_id_in_the_repo_and_the_org_is_two_records` |
 | 8 `ALQ_ORG_ADR_DIR` unset: round opens, result says so | `test_gate.DecisionReview.test_an_unset_org_corpus_opens_the_round_and_is_named_in_the_result` |
 | 9, 19 repo-qualified matcher, this repo's name too: notice, not given | `test_decisions.Contract.test_a_repo_qualified_matcher_is_a_notice_naming_the_repo` |
-| 10 `adr` missing: refused with the install step | `test_adrkit.Boundary.test_without_adr_every_corpus_is_not_checked_with_the_install_step` |
+| 10 `adr` missing: refused with the install step | `test_adrkit.Boundary.test_without_adr_every_corpus_is_not_checked_with_the_install_step`; `test_gate.DecisionReview.test_without_adr_the_check_follows_decision_checks` |
 | 11 repo record with a bad matcher: refused, fix in this repo | `test_decisions.Contract.test_a_bad_pattern_on_a_governing_record_is_broken`; `test_decisions.Refusals.test_a_repo_corpus_s_fix_is_to_correct_and_commit` |
 | 12 org record unloadable: refused, fix the org or unset, never commit | `test_decisions.Refusals.test_an_org_corpus_s_fix_never_says_commit` |
 | 12 org record skipped, outside the checkout: refused naming the file | `test_decisions.Contract.test_a_skipped_org_file_outside_the_checkout_is_named` |
@@ -93,7 +93,8 @@ Refusals by mode are the four tests of data-model § Refusals, By mode; they are
 | 21 one evaluated matcher and one notice: given, and the notice | `test_decisions.Contract.test_a_record_matched_by_one_matcher_is_given_and_its_other_matcher_is_a_notice` |
 | 22 two records with one id | `test_decisions.Contract.test_two_records_with_one_id_are_broken` |
 | 23 skipped file judged by its status | `test_decisions.Contract.test_a_skipped_file_is_judged_by_its_status` |
-| 24, 25 `decision_checks: log` and the file limit | data-model § Refusals, By mode |
+| 24 `decision_checks: log` with `adr` missing | `test_gate.DecisionReview.test_without_adr_the_check_follows_decision_checks` |
+| 25 the file limit | `test_gate.DecisionReview.test_the_size_refusal_follows_the_plugin_s_mode` |
 | 26 assessed round: rulings in `gate.log` | `test_gate.DecisionReview.test_the_decision_reviewer_s_rulings_are_written_to_the_gate_log` |
 | 27 org corpus outside the checkout: brief's file exists | `test_decisions.Contract.test_an_org_record_outside_the_checkout_is_located` |
 | refusal 2 is taken before refusal 3 | `test_gate.DecisionReview.test_a_corpus_not_checked_is_refused_before_a_broken_record` |
@@ -105,7 +106,8 @@ Refusals by mode are the four tests of data-model § Refusals, By mode; they are
 | edge: `docs/adr` whose files are all in subfolders | `test_decisions.Corpora.test_a_folder_whose_files_are_all_in_subfolders_is_a_corpus` |
 | edge: solo dispatch | `test_gate.DecisionReview.test_the_decision_reviewer_is_not_dispatched_alone` |
 | one status classifier | `test_decisions.Judge.test_one_status_classifier_serves_records_and_skipped_files` |
-| frontmatter only; not UTF-8 | `test_adrkit.Frontmatter.test_a_status_outside_the_frontmatter_is_not_read`; `test_adrkit.Frontmatter.test_a_file_that_is_not_utf8_has_no_frontmatter` |
+| record files read as adrkit loads them | `test_adrkit.Frontmatter.test_a_status_outside_the_frontmatter_is_not_read`; `test_adrkit.Frontmatter.test_a_byte_that_is_not_utf8_leaves_status_and_id_readable`; `test_adrkit.Boundary.test_a_record_file_is_found_by_its_frontmatter_id` |
+| a rename gives both paths to the check | `test_worktree_facts.QuotedNames` (`files_in`) |
 | a record's file found by its id, not its name | `test_decisions.Contract.test_a_record_whose_file_name_differs_from_its_id_is_located`; `test_decisions.Judge.test_a_governing_id_without_exactly_one_file_leaves_the_corpus_not_checked` |
 | calls read at once; only a live call is killed | `test_adrkit.Boundary.test_a_call_that_hangs_is_stopped_at_the_deadline` |
 | FR-014 pin | `test_gate.HookDeadline.test_the_gate_s_deadline_is_the_timeout_hooks_json_gives_it` |
