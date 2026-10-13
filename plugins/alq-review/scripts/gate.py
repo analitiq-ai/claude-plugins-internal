@@ -10,19 +10,22 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import traceback
 from dataclasses import dataclass
 from functools import partial
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import adrkit
 import assessment
 import briefs
 import claimgate
+import decisions
 import facts
 import github
-from hookio import (block, claim_checks_mode, deny, log_error, mode, record, refuse, session_file, session_state,
-                    set_switch, shim_checks_mode, switch_state)
+from hookio import (block, block_decision, claim_checks_mode, deny, log_error, max_review_files, mode, record, refuse,
+                    refuse_decision, session_file, session_state, set_switch, shim_checks_mode, switch_state)
 import ledger
 import policy
 from pre_merge_gate import PullRequest, first_line, first_words
@@ -35,6 +38,13 @@ REVIEW_ROUND, ASSESS_ROUND = "alq-review:review-round", "alq-review:assess-round
 ROUND_WORKFLOWS = (REVIEW_ROUND, ASSESS_ROUND)
 REVIEW_SKILLS = {"pr-review-toolkit:review-pr": "internal", "alq-anti-pattern:pr-audit": "audit"}  # -> the round they bypass
 INFLIGHT_TTL = timedelta(minutes=45)   # a reviewer that never reported a stop must not block forever
+HOOK_SECONDS = 60   # hooks/hooks.json's timeout for this hook: Claude Code kills it then
+ANSWER_MARGIN = 5   # left after the last adrkit call to write the ledger, gate.log and the answer
+
+
+def deadline(started: float) -> adrkit.Deadline:
+    """When every adrkit call of a hook run that started at `started`, a `time.monotonic()`, must end."""
+    return adrkit.Deadline(started + HOOK_SECONDS - ANSWER_MARGIN, HOOK_SECONDS - ANSWER_MARGIN)
 
 
 @dataclass(frozen=True)
@@ -378,7 +388,8 @@ def on_bash(payload: dict) -> dict | None:
 
 
 def on_agent(payload: dict) -> dict | None:
-    if payload.get("agent_id") or payload["tool_input"].get("subagent_type") not in briefs.INTERNAL_REVIEWERS:
+    if (payload.get("agent_id")
+            or payload["tool_input"].get("subagent_type") not in (*briefs.INTERNAL_REVIEWERS, briefs.DECISION_REVIEWER)):
         return None
     return refuse(payload, "dispatch",
                   "Reviewers run together behind a barrier and are assessed as one round; dispatched one by one, the "
@@ -531,7 +542,31 @@ def _admit_spec(state: dict, spec: SpecStep) -> None:
         state.pop("spec_held", None)
 
 
-def on_workflow(payload: dict) -> dict | None:
+def _governance(payload: dict, action: str, event: Target, where: worktree.Worktree, decision: policy.Decision,
+                base: str, deadline: adrkit.Deadline, spent: dict[str, float]) -> tuple[dict | None, dict | None]:
+    """An internal round's decision check: (its `decisions` block, None), or (None, the refusal that blocks the
+    launch). The refusals are taken in data-model order; one that does not block lets the round open on what was read."""
+    files = worktree.files_in(where.root, briefs.review_range(decision, base))
+    found = adrkit.corpora(where.root)
+    limit = max_review_files()
+    if len(files) > limit:
+        reason = decisions.too_big(len(files), limit, decision.scope)
+        refused = refuse(payload, action, reason, event)
+        if refused:
+            return None, refused
+        checked = [decisions.NotChecked(c, decisions.TOO_BIG, reason) for c in found.corpora]
+    else:
+        checked = adrkit.check(where.root, found.corpora, files, deadline, spent)
+    outcomes = checked + found.not_checked
+    for reason, refusal in ((decisions.not_checked_refusal(outcomes), block_decision),
+                            (decisions.broken_refusal(outcomes), refuse_decision)):
+        refused = reason and refusal(payload, action, reason, event)
+        if refused:
+            return None, refused
+    return decisions.result(outcomes, found.org_corpus), None
+
+
+def on_workflow(payload: dict, deadline: adrkit.Deadline) -> dict | None:
     call = payload["tool_input"]
     if call.get("name") == claimgate.CHECK:
         return claimgate.on_launch(payload, call)
@@ -547,10 +582,12 @@ def on_workflow(payload: dict) -> dict | None:
                     "branch, with a GitHub origin. For review-round, args.stage is 'internal' (default) or 'audit'.")
     now = datetime.now(timezone.utc)
     action = "assess" if call["name"] == ASSESS_ROUND else "launch"
+    started = time.monotonic()
     try:
         pr, merges_into = _open_pr(where)
     except RuntimeError as exc:
         return block(payload, action, str(exc), Target(where.slug, None, where.branch, where.root))
+    spent = {"gh calls": time.monotonic() - started}
     event = Target(where.slug, pr, where.branch, where.root)
     head = worktree.head_sha(where.root)
     with ledger.open_checkouts_ledger(where.slug, pr, where.branch, head) as state:
@@ -584,17 +621,24 @@ def on_workflow(payload: dict) -> dict | None:
                 refused = refuse(payload, action, decision.reason, event)
                 if refused:
                     return refused
+            started = time.monotonic()
             try:
                 base = _review_base(where, merges_into)
             except RuntimeError as exc:
                 return block(payload, action, str(exc), event)
-            waves = briefs.AUDIT_WAVES if stage == "audit" else [briefs.INTERNAL_REVIEWERS]
+            spent["review-base fetch"] = time.monotonic() - started
+            governance = None
+            if stage == "internal":
+                governance, refused = _governance(payload, action, event, where, decision, base, deadline, spent)
+                if refused:
+                    return refused
+            waves = briefs.waves(stage, governance)
             rnd = ledger.open_round(state, stage, head_sha=head,
                                     base_sha=base, scope=decision.scope or "full",
                                     expected=[t for wave in waves for t in wave], escalation=decision.escalation, now=now)
             rnd.update(root=where.root, session=payload["session_id"])
             _admit_spec(state, spec)
-            injected = briefs.review_args(state, rnd, where, decision, briefs.bound_spec(state))
+            injected = briefs.review_args(state, rnd, where, decision, briefs.bound_spec(state), governance)
     record(payload, "launch", "allow", rnd["ref"], event)
     # "allow" doubles as the permission a headless run needs to start a workflow at all.
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
@@ -684,14 +728,22 @@ def after_structured_output(payload: dict) -> None:
         else:
             rnd = ledger.record_report(state, ref, agent_type, payload["tool_input"], now)
     record(payload, "output", "recorded", f"{ref} is {rnd['status']}")
+    if agent_type == briefs.ASSESSOR and briefs.DECISION_REVIEWER in rnd["expected"]:
+        # Read without the transcript, the rulings say whether the decision reviewer's brief is right.
+        raised = {f["id"] for f in rnd["findings"] if f["reviewer"] == briefs.DECISION_REVIEWER}
+        rulings = [{"id": f["id"], "verdict": f["verdict"]} for f in payload["tool_input"]["findings"] if f["id"] in raised]
+        record(payload, "decision-review", "assessed", json.dumps(rulings),
+               Target(state["repo"], state["pr"], state["branch"]))
 
 
 PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_bash, "Agent": on_agent,
-       "Skill": on_skill, "Workflow": on_workflow, "StructuredOutput": on_structured_output,
-       "WebFetch": claimgate.on_webfetch}
+       "Skill": on_skill, "StructuredOutput": on_structured_output, "WebFetch": claimgate.on_webfetch}
+# Every tool the gate decides on: a launch's decision check also runs against the hook's deadline.
+DECIDED = (*PRE, "Workflow")
 
 
-def handle(payload: dict) -> dict | None:
+def handle(payload: dict, deadline: adrkit.Deadline) -> dict | None:
+    """`deadline`: when a round launch's decision check must end."""
     switch = switch_state(payload)
     off = switch == "off"
     if not off:
@@ -713,6 +765,8 @@ def handle(payload: dict) -> dict | None:
         return after_bash(payload)
     if event in ("SubagentStart", "SubagentStop"):
         return track_subagent(payload, datetime.now(timezone.utc))
+    if event == "PreToolUse" and payload["tool_name"] == "Workflow":
+        return on_workflow(payload, deadline)
     if event == "PreToolUse" and payload["tool_name"] in PRE:
         return PRE[payload["tool_name"]](payload)
     if event == "PostToolUse" and payload["tool_name"] == "StructuredOutput":
@@ -726,7 +780,7 @@ def _past_a_crash(payload: dict) -> str | None:
     Everywhere else the gate only records, so a crash there must not stand between a session and
     its work. Here it was deciding, and a decision it never reached must not be read as a yes.
     """
-    if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") not in PRE:
+    if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") not in DECIDED:
         return None
     unbroken = "To work while it is broken, set ALQ_REVIEW_MODE=log."
     try:
@@ -755,8 +809,9 @@ def _deciding_settings(payload: dict) -> tuple:
 
 def main() -> None:
     payload = json.load(sys.stdin)
+    ends = deadline(time.monotonic())
     try:
-        out = handle(payload)
+        out = handle(payload, ends)
     except Exception as exc:  # a broken gate must never stall a session; it says so instead
         trace = traceback.format_exc()
         print(trace, file=sys.stderr)

@@ -9,6 +9,7 @@ from unittest import mock
 from helpers import REVIEWERS, T0, assess, finding, under_ascii_file_names
 
 import briefs
+import decisions
 import facts
 import ledger
 import policy
@@ -30,6 +31,7 @@ class Repo(unittest.TestCase):
         git(self.root, "config", "user.name", "t")
         git(self.root, "remote", "add", "origin", "git@github.com:acme/demo.git")
         (self.root / ".gitignore").write_text("notes/\n")
+        git(self.root, "add", ".gitignore")
         self.commit("a.py", "".join(f"line{i}\n" for i in range(30)), "base")
         git(self.root, "checkout", "-q", "-b", "feat/1-demo")
 
@@ -65,11 +67,48 @@ class Locate(Repo):
         self.assertTrue(worktree.is_ignored(str(self.root), str(self.root / "notes" / "task.md")))
         self.assertFalse(worktree.is_ignored(str(self.root), str(self.root / "a.py")))
 
-    def test_dirty_means_tracked_changes_only(self):
-        (self.root / "untracked.md").write_text("x")
+    def test_dirty_counts_changed_tracked_files_and_new_files_git_does_not_ignore(self):
+        (self.root / "notes").mkdir()
+        (self.root / "notes" / "task.md").write_text("x")
         self.assertFalse(worktree.is_dirty(str(self.root)))
+        (self.root / "untracked.md").write_text("x")
+        self.assertTrue(worktree.is_dirty(str(self.root)))
+        (self.root / "untracked.md").unlink()
         (self.root / "a.py").write_text("changed\n")
         self.assertTrue(worktree.is_dirty(str(self.root)))
+
+
+class FilesIn(Repo):
+    """The paths a diff range touches: what a round reviews and what its decision check is asked about."""
+
+    def test_every_path_the_range_touches_is_named_deleted_renamed_and_symlinked_ones_included(self):
+        self.commit("old.py", "".join(f"o{i}\n" for i in range(30)), "add old")
+        self.commit("gone.py", "g\n", "add gone")
+        base = git(self.root, "rev-parse", "HEAD")
+        git(self.root, "mv", "old.py", "new.py")
+        git(self.root, "rm", "-q", "gone.py")
+        (self.root / "link.py").symlink_to("a.py")
+        git(self.root, "add", "link.py")
+        git(self.root, "commit", "-q", "-m", "move, delete, link")
+        self.assertEqual(sorted(worktree.files_in(str(self.root), f"{base}...HEAD")),
+                         ["gone.py", "link.py", "new.py", "old.py"])
+
+    def test_a_two_dot_range_names_only_what_changed_since_its_start(self):
+        self.commit("first.py", "1\n", "first")
+        since = self.commit("second.py", "2\n", "second")
+        self.commit("third.py", "3\n", "third")
+        self.assertEqual(worktree.files_in(str(self.root), f"{since}..HEAD"), ["third.py"])
+
+
+class DecisionFolders(Repo):
+    def test_every_tracked_docs_adr_folder_at_any_depth_is_one(self):
+        for path in ("docs/adr/0001-a.md", "dev/x/docs/adr/0001-a.md", "dev/x/docs/adr/old/0002-b.md",
+                     "dev/y/docs/notes.md"):
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            self.commit(path, "x\n", f"add {path}")
+        (self.root / "dev/z/docs/adr").mkdir(parents=True)
+        (self.root / "dev/z/docs/adr/0001-a.md").write_text("untracked\n")
+        self.assertEqual(worktree.decision_folders(str(self.root)), ["dev/x/docs/adr", "docs/adr"])
 
 
 class GitBytes(Repo):
@@ -348,8 +387,9 @@ class RoundFacts(Repo):
         nxt["root"] = str(self.root)
 
         where = worktree.locate(str(self.root / "b.py"))
-        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"), None)
-                      ["assess"]["schema"]["properties"])
+        nothing_governs = decisions.result([], "unset")
+        self.assertIn("round_verdict", briefs.review_args(state, nxt, where, policy.Decision(True, scope="full"), None,
+                                                          nothing_governs)["assess"]["schema"]["properties"])
 
     def test_the_churned_round_cannot_be_handed_a_verdict_that_edits_again(self):
         """Through the real assessor args: the schema the model answers in is where this has to bind."""
@@ -400,7 +440,7 @@ class QuotedNames(Repo):
     def test_the_files_a_branch_changed_are_named_with_how_often(self):
         for name in self.NAMES:
             self.commit(name, "one\n", "add")
-        self.assertEqual(sorted(worktree.changed_files(str(self.root), "main")), sorted(self.NAMES))
+        self.assertEqual(sorted(worktree.files_in(str(self.root), "main...HEAD")), sorted(self.NAMES))
         self.assertEqual(worktree.commits_per_file(str(self.root), "main"), dict.fromkeys(self.NAMES, 1))
 
     def test_unstaged_files_are_named(self):
@@ -453,7 +493,7 @@ class DiffConfig(Repo):
         """What the round facts read of the commits after `since`."""
         root = str(self.root)
         return (worktree.added_lines(root, since), worktree.additions(root, since, "HEAD"),
-                sorted(worktree.changed_files(root, since)), worktree.commits_per_file(root, since))
+                sorted(worktree.files_in(root, f"{since}...HEAD")), worktree.commits_per_file(root, since))
 
     def test_staged_hunks(self):
         (self.root / "a.py").write_text("".join(self.lines))
@@ -501,9 +541,10 @@ class DiffConfig(Repo):
         git(self.root, "add", "b.py", "c.py", "d.py", "f.py")
         git(self.root, "commit", "-q", "-m", "move")
         plain = self.read_under_each_setting(lambda: self.branch_facts(base))
-        files = ["b.py", "c.py", "d.py", "f.py"]
-        self.assertEqual(plain, ({"b.py": [(4, 4)], "c.py": [(4, 4)], "d.py": [(1, 30)], "f.py": [(4, 4)]}, 33, files,
-                                 dict.fromkeys(files, 1)))
+        # The files the range touches name both sides of each rename; the commit counts follow the new name.
+        self.assertEqual(plain, ({"b.py": [(4, 4)], "c.py": [(4, 4)], "d.py": [(1, 30)], "f.py": [(4, 4)]}, 33,
+                                 ["a.py", "b.py", "c.py", "d.py", "e.py", "f.py"],
+                                 dict.fromkeys(["b.py", "c.py", "d.py", "f.py"], 1)))
 
     def test_the_files_a_signed_commit_changed_are_named(self):
         """`log.showSignature` writes git's verdict on a signature ahead of the names the commit changed."""

@@ -179,8 +179,9 @@ def launch_round(state: dict, stage: str, *, head_sha: str, dirty: bool, infligh
     if obstacle:
         return Decision(False, obstacle)
     if dirty:
-        return Decision(False, "Tracked files have uncommitted changes. A round is pinned to a commit so the next one can "
-                               "review exactly what changed since. Next step: commit, then launch again.")
+        return Decision(False, "The checkout has uncommitted changes or new files. A round is pinned to a commit so the "
+                               "next one can review exactly what changed since. Next step: commit, delete or ignore "
+                               "them, then launch again.")
     capped = _cap_reached(state)
     if stage == "audit":
         return Decision(True, scope="full", escalation=capped is not None)

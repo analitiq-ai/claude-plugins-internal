@@ -9,15 +9,20 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import closing, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from paths import PLUGIN
+from paths import HARNESS, PLUGIN
 
+from test_adrkit import record
+from test_decisions import needs_adr
 from test_worktree_facts import Repo, git
 
+import adrkit
+import assessment
 import briefs
 import gate
 import helpers
@@ -47,7 +52,9 @@ class Gate(Repo):
                                  '  "issue view"*) [ -n "$GH_ISSUE_STATE" ] && echo "$GH_ISSUE_STATE" || exit 1 ;;\n'
                                  '  *) exit 1 ;;\nesac\n')
         (stub / "gh").chmod(0o755)
-        self.env = dict(os.environ, ALQ_REVIEW_STATE_DIR=str(self.state_dir), PATH=f"{stub}{os.pathsep}{os.environ['PATH']}",
+        # The machine's own org corpus and decision setting are not the test's.
+        inherited = {k: v for k, v in os.environ.items() if k not in ("ALQ_ORG_ADR_DIR", "ALQ_REVIEW_DECISION_CHECKS")}
+        self.env = dict(inherited, ALQ_REVIEW_STATE_DIR=str(self.state_dir), PATH=f"{stub}{os.pathsep}{os.environ['PATH']}",
                         GH_OPEN_PR="7 main", GH_LOG=str(Path(self.tmp.name) / "gh.log"),
                         # The claim and shim checks have their own tests (test_claim_gate.py, test_shim_gate.py); here a
                         # commit is judged by the review alone.
@@ -68,7 +75,7 @@ class Gate(Repo):
         # Cleared, not overlaid: a test that drops a key from self.env means the gate not to see it.
         with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True), \
                 redirect_stdout(io.StringIO()) as stdout:
-            out = gate.handle(payload)
+            out = gate.handle(payload, gate.deadline(time.monotonic()))
         self.assertEqual(stdout.getvalue(), "")
         return json.loads(json.dumps(out)) if out else {}
 
@@ -1834,6 +1841,293 @@ class OpenPrOnGithub(Gate):
         git(self.root, "checkout", "-q", "-b", "feat/3-next", "main")
         self.assertEqual(self.edit("a.py"), {})
         self.assertEqual(self.asked("pr "), 0)
+
+
+class DecisionReview(Gate):
+    """The internal round's decision check (spec 020), launched through the hook as Claude Code launches it."""
+    DECISION = briefs.DECISION_REVIEWER
+
+    def setUp(self):
+        super().setUp()
+        self.deadline_seconds = gate.HOOK_SECONDS - gate.ANSWER_MARGIN
+        record(self.root / "docs/adr", "0001-src.md", "0001", title="Keep src small")
+        record(self.root / "docs/adr", "0002-draft.md", "0002", title="Draft on src", status="draft")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", "records")
+        git(self.root, "push", "-q", "origin", "HEAD:main")
+        self.no_adr_path = f"{Path(self.tmp.name) / 'bin'}{os.pathsep}{Path(shutil.which('git')).parent}"
+
+    def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
+        payload = json.loads(json.dumps(self.payload(event, tool, tool_input, **extra)))
+        with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True), \
+                redirect_stdout(io.StringIO()):
+            out = gate.handle(payload, adrkit.Deadline(time.monotonic() + self.deadline_seconds, self.deadline_seconds))
+        return json.loads(json.dumps(out)) if out else {}
+
+    def change(self, path="src/a.py", text="a\n"):
+        (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+        return self.commit(path, text, f"change {path}")
+
+    def adr_stub(self, script):
+        """An `adr` that is not adrkit, alone on PATH beside git; it leaves a mark when it is called."""
+        self.called = Path(self.tmp.name) / "adr-called"
+        stub = Path(self.tmp.name) / "bin" / "adr"
+        stub.write_text(f"#!/bin/sh\ntouch {self.called}\n{script}")
+        stub.chmod(0o755)
+        self.env["PATH"] = self.no_adr_path
+
+    def gate_log(self):
+        return [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+
+    def reviewers(self, args):
+        return [r["type"] for wave in args["waves"] for r in wave]
+
+    def test_a_governed_change_gets_a_decision_reviewer_the_round_waits_for(self):
+        needs_adr(self)
+        self.change()
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual(args["waves"][0][-1]["type"], self.DECISION)
+        brief = args["waves"][0][-1]
+        self.assertEqual(brief["short"], "decision-reviewer")
+        self.assertIn('- docs/adr 0001 "Keep src small"', brief["prompt"])
+        self.assertNotIn("0002", brief["prompt"])
+        self.assertIn(f"git diff {git(self.root, 'rev-parse', 'origin/main')}...HEAD", brief["prompt"])
+        self.assertEqual(brief["schema"], assessment.findings_schema(args["round_ref"], "decision-reviewer"))
+        self.assertEqual(args["decisions"]["governing"], [{"corpus": "docs/adr", "id": "0001", "title": "Keep src small"}])
+        self.assertIn(self.DECISION, self.saved()["rounds"][-1]["expected"])
+        for reviewer in args["waves"][0][:-1]:
+            self.report(reviewer, [], args["round_ref"])
+        self.assertEqual(self.saved()["rounds"][-1]["status"], "collecting")
+
+    def test_its_findings_are_assessed_and_their_rulings_logged(self):
+        needs_adr(self)
+        self.change()
+        _, args = self.launch()
+        found = [{"id": "decision-reviewer-1", "title": '"Keep src small"', "file": "src/a.py", "line": 1,
+                  "severity": "HIGH", "detail": "docs/adr 0001"}]
+        for reviewer in args["waves"][0]:
+            self.report(reviewer, found if reviewer["type"] == self.DECISION else [], args["round_ref"])
+        self.assertEqual(self.saved()["rounds"][-1]["status"], "awaiting_assessment")
+        body = self.assessment(args["round_ref"], ["decision-reviewer-1"], verdict="CONVERGED_PUSHBACK")
+        body["findings"][0]["verdict"] = "PUSH_BACK"
+        self.assertEqual(self.submit_assessment(body), {})
+        [line] = [e for e in self.gate_log() if e["action"] == "decision-review"]
+        self.assertEqual(json.loads(line["reason"]), [{"id": "decision-reviewer-1", "verdict": "PUSH_BACK"}])
+        self.assertEqual((line["repo"], line["pr"]), ("acme/demo", 7))
+
+    def test_a_change_nothing_governs_gets_no_decision_reviewer_and_says_what_was_checked(self):
+        needs_adr(self)
+        self.change("lib/b.py")
+        _, args = self.launch()
+        self.assertNotIn(self.DECISION, self.reviewers(args))
+        self.assertEqual(args["decisions"], {"corpora": ["docs/adr"], "governing": [], "notices": [], "broken": [],
+                                             "not_checked": [], "org_corpus": "unset"})
+
+    def test_a_delta_round_asks_only_about_what_changed_since_the_last(self):
+        needs_adr(self)
+        self.change()
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        self.change("lib/b.py")
+        _, second = self.launch()
+        self.assertEqual(second["decisions"]["governing"], [])
+        self.assertNotIn(self.DECISION, self.reviewers(second))
+
+    def test_org_and_repo_records_with_one_id_are_both_briefed_under_their_corpora(self):
+        needs_adr(self)
+        org = Path(self.tmp.name) / "engineering/docs/adr"
+        record(org, "0001-org.md", "0001", title="Org rule")
+        self.env["ALQ_ORG_ADR_DIR"] = str(org)
+        self.change()
+        _, args = self.launch()
+        label = f"org ({org})"
+        self.assertEqual(args["decisions"]["governing"], [{"corpus": "docs/adr", "id": "0001", "title": "Keep src small"},
+                                                          {"corpus": label, "id": "0001", "title": "Org rule"}])
+        self.assertIn(f'- {label} 0001 "Org rule"', args["waves"][0][-1]["prompt"])
+        self.assertEqual((args["decisions"]["corpora"], args["decisions"]["org_corpus"]), (["docs/adr", label], label))
+
+    def test_a_matcher_adrkit_cannot_evaluate_here_is_a_notice_and_the_round_opens(self):
+        needs_adr(self)
+        (self.root / "docs/adr/0003-pkg.md").write_text(
+            (self.root / "docs/adr/0001-src.md").read_text().replace('"0001"', '"0003"').replace("Keep src small", "Pkg")
+            .replace('  - type: path\n    pattern: "src/**"', '  - type: package\n    pattern: "core"'))
+        git(self.root, "add", "-A")
+        self.change()
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual([(n["corpus"], n["id"], n["matcher"]) for n in args["decisions"]["notices"]],
+                         [("docs/adr", "0003", 'affects.package "core"')])
+        self.assertNotIn("0003", args["waves"][0][-1]["prompt"])
+
+    def test_without_adr_the_launch_is_refused_with_the_install_step(self):
+        self.change()
+        self.env["PATH"] = self.no_adr_path
+        for mode in ("enforce", "log"):
+            with self.subTest(mode=mode):
+                out, _ = self.launch_in(mode)
+                self.assertEqual(self.decision(out), "deny")
+                self.assertIn("decision check failed", self.reason(out))
+                self.assertIn(adrkit.INSTALL, self.reason(out))
+        self.assertEqual(self.saved()["rounds"], [])
+
+    def launch_in(self, mode):
+        out = self.hook("PreToolUse", "Workflow", {"name": REVIEW, "args": {"worktree": str(self.root), "spec": None}},
+                        mode=mode)
+        return out, out.get("hookSpecificOutput", {}).get("updatedInput", {}).get("args")
+
+    def test_at_log_a_check_that_could_not_run_opens_the_round_and_says_why(self):
+        self.change()
+        self.env.update(PATH=self.no_adr_path, ALQ_REVIEW_DECISION_CHECKS="log")
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.assertNotIn(self.DECISION, self.reviewers(args))
+        [unrun] = args["decisions"]["not_checked"]
+        self.assertEqual((unrun["corpus"], unrun["cause"]), ("docs/adr", "could not run"))
+        self.assertIn(adrkit.INSTALL, unrun["reason"])
+        self.assertIn("would_deny", [e["decision"] for e in self.gate_log() if e["action"] == "launch"])
+
+    def test_a_broken_record_the_change_touches_is_refused_with_its_fix(self):
+        needs_adr(self)
+        record(self.root / "docs/adr", "0001-again.md", "0001", title="Again")
+        git(self.root, "add", "-A")
+        self.change()
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        for named in ("docs/adr docs/adr/0001-again.md (id 0001)", "unique-id",
+                      "correct the record in this repo, commit and launch again"):
+            self.assertIn(named, self.reason(out))
+
+    def test_in_log_mode_a_broken_record_is_recorded_and_the_round_opens_without_it(self):
+        needs_adr(self)
+        record(self.root / "docs/adr", "0001-again.md", "0001", title="Again")
+        git(self.root, "add", "-A")
+        self.change()
+        out, args = self.launch_in("log")
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual([b["file"] for b in args["decisions"]["broken"]], ["docs/adr/0001-again.md"])
+        self.assertEqual(args["decisions"]["governing"], [])
+        self.assertNotIn(self.DECISION, self.reviewers(args))
+        self.assertIn("would_deny", [e["decision"] for e in self.gate_log() if e["action"] == "launch"])
+
+    def test_an_org_setting_that_is_no_readable_folder_is_refused_naming_it(self):
+        self.change()
+        self.env["ALQ_ORG_ADR_DIR"] = "/nowhere/docs/adr"
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("/nowhere/docs/adr", self.reason(out))
+        self.assertIn("point it at the org corpus, or unset it", self.reason(out))
+
+    def test_a_capped_marker_scan_is_refused_with_split_the_change(self):
+        needs_adr(self)
+        self.change(text="".join("// @adr 0001\n" for _ in range(65)))
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("docs/adr", self.reason(out))
+        self.assertIn("split the change", self.reason(out))
+
+    def test_a_call_past_the_deadline_is_refused_with_each_steps_seconds(self):
+        self.change()
+        self.adr_stub(f'[ "$1" = --version ] && echo {adrkit.VERSION} && exit 0\nsleep 5\n')
+        self.deadline_seconds = 1.5
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        for step in ("docs/adr", "deadline", "gh calls", "review-base fetch", "adr --version", "adr check of docs/adr"):
+            self.assertIn(step, self.reason(out))
+
+    def test_a_skipped_file_the_change_does_not_touch_says_nothing(self):
+        needs_adr(self)
+        (self.root / "docs/adr/notes.md").write_text("notes\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", "notes")
+        self.change()
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "allow")
+        self.assertNotIn("notes.md", json.dumps(args["decisions"]))
+
+    def test_more_files_than_the_limit_is_refused_before_any_adrkit_call(self):
+        self.adr_stub("exit 3\n")
+        for i in range(51):
+            (self.root / f"many/f{i}.py").parent.mkdir(exist_ok=True)
+            (self.root / f"many/f{i}.py").write_text("x\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", "many")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        for named in ("51 files", "max_review_files is 50", "split the PR"):
+            self.assertIn(named, self.reason(out))
+        self.assertFalse(self.called.exists())
+        out, args = self.launch_in("log")
+        self.assertEqual(self.decision(out), "allow")
+        self.assertEqual([(n["corpus"], n["cause"]) for n in args["decisions"]["not_checked"]], [("docs/adr", "too big")])
+        self.assertFalse(self.called.exists())
+
+    def test_a_new_uncommitted_file_is_refused_before_any_adrkit_call(self):
+        self.adr_stub("exit 3\n")
+        self.change()
+        (self.root / "docs/adr/0009-draft.md").write_text("being drafted\n")
+        out, _ = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("commit, delete or ignore", self.reason(out))
+        self.assertFalse(self.called.exists())
+
+    def test_audit_rounds_run_no_decision_check(self):
+        self.adr_stub("exit 3\n")
+        self.change()
+        _, args = self.launch(stage="audit")
+        self.assertNotIn("decisions", args)
+        self.assertNotIn(self.DECISION, self.reviewers(args))
+        self.assertFalse(self.called.exists())
+
+    def test_the_decision_reviewer_is_not_dispatched_alone(self):
+        out = self.hook("PreToolUse", "Agent", {"subagent_type": self.DECISION, "prompt": "review"})
+        self.assertEqual(self.decision(out), "deny")
+
+
+class ReviewRoundResult(unittest.TestCase):
+    """review-round.js echoes the gate's `decisions` block in every result, and has none to echo for an audit."""
+    BLOCK = {"corpora": ["docs/adr"], "governing": [], "notices": [], "broken": [], "not_checked": [],
+             "org_corpus": "unset"}
+
+    def run_round(self, answers, decisions=BLOCK):
+        reviewer = {"type": "pr-review-toolkit:code-reviewer", "short": "code-reviewer", "prompt": "p",
+                    "schema": {"properties": {}}}
+        args = {"round_ref": "acme/demo#7:internal-0.1", "label": "l", "waves": [[reviewer]], "assess": {}}
+        if decisions is not None:
+            args["decisions"] = decisions
+        done = subprocess.run(["node", str(HARNESS), str(PLUGIN / "workflows" / "review-round.js")],
+                              input=json.dumps({"args": args, "answers": answers}), capture_output=True, text=True,
+                              check=True)
+        return json.loads(done.stdout)["result"]
+
+    def test_clean_incomplete_and_assessed_results_carry_it(self):
+        found = {"findings": [{"id": "code-reviewer-1"}]}
+        cases = {"CLEAN": {"pr-review-toolkit:code-reviewer": {"findings": []}}, "INCOMPLETE": {},
+                 "ASSESSED": {"pr-review-toolkit:code-reviewer": found, "alq-review:assess-round": {"status": "ASSESSED"}}}
+        for status, answers in cases.items():
+            with self.subTest(status=status):
+                result = self.run_round(answers)
+                self.assertEqual((result["status"], result["decisions"]), (status, self.BLOCK))
+
+    def test_an_audit_result_has_no_decisions_key(self):
+        self.assertNotIn("decisions", self.run_round({"pr-review-toolkit:code-reviewer": {"findings": []}}, None))
+
+
+class HookDeadline(unittest.TestCase):
+    def test_the_deadline_is_measured_from_the_timeout_hooks_json_gives_the_gate(self):
+        hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]["PreToolUse"]
+        timeouts = [h["timeout"] for entry in hooks for h in entry["hooks"] if h["command"].endswith("scripts/gate.py")]
+        self.assertEqual(timeouts, [gate.HOOK_SECONDS])
+
+    def test_main_hands_on_the_deadline_taken_when_the_payload_arrives(self):
+        payload = {"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {}}
+        with mock.patch.object(gate, "handle", return_value=None) as handled, \
+                mock.patch.object(gate.time, "monotonic", return_value=100.0), \
+                mock.patch("sys.stdin", io.StringIO(json.dumps(payload))):
+            gate.main()
+        self.assertEqual(handled.call_args.args, (payload, adrkit.Deadline(100.0 + gate.HOOK_SECONDS - gate.ANSWER_MARGIN,
+                                                                           gate.HOOK_SECONDS - gate.ANSWER_MARGIN)))
+        self.assertEqual((gate.HOOK_SECONDS, gate.ANSWER_MARGIN), (60, 5))
 
 
 if __name__ == "__main__":

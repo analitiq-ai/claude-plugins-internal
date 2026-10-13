@@ -159,7 +159,8 @@ def compare(before: Snapshot, after: Snapshot) -> tuple[list[str], list[str]]:
 
 
 def is_dirty(root: str) -> bool:
-    return bool(git(root, "status", "--porcelain", "--untracked-files=no"))
+    """Changed tracked files, or new files git does not ignore: adrkit reads a decision folder as it is on disk."""
+    return bool(git(root, "status", "--porcelain", "--untracked-files=normal"))
 
 
 def is_ignored(root: str, path: str) -> bool:
@@ -176,8 +177,18 @@ def review_base(root: str, target: str) -> str:
     return git(root, "merge-base", tracking, "HEAD")
 
 
-def changed_files(root: str, base: str) -> list[str]:
-    return _listed(root, *_DIFF, "--name-only", "-z", f"{base}...HEAD")
+def files_in(root: str, rev_range: str) -> list[str]:
+    """Every path `rev_range` touches, both sides of a rename."""
+    return _listed(root, *_DIFF, "--no-renames", "--name-only", "-z", rev_range)
+
+
+def decision_folders(root: str) -> list[str]:
+    """Every `docs/adr` folder, at any depth, that holds a tracked file."""
+    folders = set()
+    for path in _listed(root, "ls-files", "-z"):
+        parts = path.split("/")
+        folders.update("/".join(parts[:i + 2]) for i in range(len(parts) - 2) if parts[i:i + 2] == ["docs", "adr"])
+    return sorted(folders)
 
 
 def _listed(root: str, *args: str) -> list[str]:
