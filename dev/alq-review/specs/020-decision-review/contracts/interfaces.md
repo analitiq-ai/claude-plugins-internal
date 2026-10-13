@@ -7,9 +7,9 @@ edge.
 
 | Name | Read by | Meaning |
 |---|---|---|
-| `ALQ_ORG_ADR_DIR` | `adrkit.py` | absolute path of the org's decision corpus, whose records apply to every repo; unset or empty means no org corpus |
-| `ALQ_REVIEW_DECISION_CHECKS` | `hookio.py` | overrides `config.json`'s `decision_checks` (`log` or `enforce`, shipped `enforce`) |
-| `max_review_files` | `hookio.py` | `config.json`, shipped 50 |
+| `ALQ_ORG_ADR_DIR` | `adrkit.py` | absolute path of the org corpus (spec Terms, *Corpus*); unset or empty means no org corpus |
+| `ALQ_REVIEW_DECISION_CHECKS` | `hookio.py` | overrides `config.json`'s `decision_checks` (spec FR-021) |
+| `max_review_files` | `hookio.py` | `config.json` (spec FR-022) |
 
 ## adrkit
 

@@ -1,7 +1,8 @@
 # Research: the internal review round checks the diff against the decisions that govern it
 
 Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed PR #92, and `plugins/alq-review` on
-`main` at `86a4b06`. Facts marked "run" were run; the rest were read.
+`main` at `86a4b06`. Facts marked "run" were run; the rest were read. This file owns the mechanisms: how each
+requirement of the spec is met. What is required is the spec's; the shapes are data-model.md's.
 
 ## R1: The check runs in the gate, at an internal round's launch
 
@@ -12,16 +13,16 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 
 ## R2: The files are the reviewers' own diff range
 
-- **Decision**: the files are those of the range the reviewer prompt prints (full: `<base>...HEAD`, delta:
-  `<previous round>..HEAD`), deleted files, both sides of a rename, symlinks and non-regular files included.
-  `worktree.changed_files` is generalised to take a range; one function writes the range for the prompts and the check.
+- **Decision**: the files are those of the range the reviewer prompt prints (spec Terms, *Files the round reviews*),
+  both sides of a rename included. `worktree.changed_files` is generalised to take a range; one function writes the
+  range for the prompts and the check.
 - **Rationale**: FR-002 forbids a kept list. adrkit matches paths as text, so a deleted path still finds its record.
 
 ## R3: The corpora
 
-- **Decision**: every tracked `docs/adr` at any depth, plus the org corpus, each checked once (data-model § Corpus).
-- **Rationale**: FR-001, FR-003. `git ls-files` answers "tracked" at any depth in one call. The spec's edge case says
-  an org path inside the repo is still the org corpus, which reverses PR #92's choice.
+- **Decision**: `git ls-files` finds every tracked `docs/adr` at any depth in one call; the org corpus is added; each
+  is checked once, the org path first when it coincides with a repo corpus (spec Edge Cases).
+- **Rationale**: FR-001, FR-003. Checking a coinciding path once as the org corpus reverses PR #92's choice.
 
 ## R4: One `adr check` per corpus
 
@@ -29,7 +30,8 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
   of the checkout root as working folder. The gate reads its `ok`, `governing` and `findings`; it reads no record and
   calls nothing else of adrkit's. A corpus whose realpath is under that root gets `--dir` relative to it; any other
   gets its realpath. With an absolute `--dir`, adrkit 0.20.0 does not see a changed record, so a broken one passes
-  (run 2026-10-13).
+  (run 2026-10-13). A contract test proves adrkit sees a changed record carrying an error in each of: a nested repo
+  corpus, an org corpus inside the checkout, and an org corpus `ALQ_ORG_ADR_DIR` reaches through a symlink.
 - **Rationale**: adrkit already decides what a record is, its status, what governs a change and whether a changed
   record is broken. Earlier drafts re-derived parts of that (statuses of files adrkit could not load, record files,
   lint findings outside the change) with a reader or adrkit's library; each was a second copy of adrkit and churned in
@@ -85,15 +87,14 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 
 ## R12: README, version and CI
 
-- **Decision**: README item 8, Layout rows, the `decision_checks` and `max_review_files` settings, and `adr` under
-  Dependencies with its install step (FR-020). `plugin.json` 0.14.0. CI installs node and the pinned adrkit.
+- **Decision**: the README and `plugin.json` change as contracts/interfaces.md § README says (FR-020). CI installs
+  node and the pinned adrkit.
 - **Rationale**: the README changes with the code it describes, as in spec 019.
 
 ## R13: The notice choice is ADR-0020, its own PR first
 
-- **Decision**: ADR-0020 and the constitution's lines on per-check settings and reviewer agents land in their own PR
-  before the code (FR-019, constitution VI).
-- **Rationale**: a governing rule ships apart from the code it governs.
+- **Decision**: ADR-0020 and the constitution lines FR-021 names land in their own PR before the code (FR-019).
+- **Rationale**: a governing rule ships apart from the code it governs (constitution VI).
 
 ## R14: Tests
 
@@ -106,30 +107,29 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 
 ## R15: `decision_checks`, the check's own setting
 
-- **Decision**: `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`),
-  as the claim and shim checks have.
+- **Decision**: `hookio` reads the setting as FR-021 defines it, beside the claim and shim settings.
 - **Rationale**: ADR-0011: without it, a machine where adrkit cannot run has no internal round at all.
 
 ## R16: `max_review_files`
 
-- **Decision**: `config.json` gains `max_review_files` (50). It is refusal 1 and applies to every internal round.
-- **Rationale**: the user's choice. adrkit's own marker-scan cap (3000 files) is fixed in its code; a smaller limit
+- **Decision**: `config.json` gains `max_review_files`, shipped as FR-022 says. It is refusal 1 and applies to every
+  internal round.
+- **Rationale**: the user's choice. adrkit's own marker-scan cap (spec Today) is fixed in its code; a smaller limit
   the plugin owns is met first.
 
 ## R17: The decision reviewer's rulings in `gate.log`
 
-- **Decision**: when a round with a decision reviewer is assessed, one `gate.log` line lists each of its findings'
-  rulings.
+- **Decision**: the assessment step writes FR-023's line.
 - **Rationale**: the user's choice: the rulings tell whether the reviewer's brief is right.
 
 ## R18: The uncommitted-changes check counts new files
 
 - **Decision**: `worktree.is_dirty` runs `git status --porcelain --untracked-files=normal` instead of
   `--untracked-files=no`, and `policy.launch_round`'s refusal says "uncommitted changes or new files" with commit,
-  delete or ignore as the fix (FR-024). No corpus-specific check. The refusal keeps following the plugin's mode: in
-  `log` mode it records a would-deny and adrkit reads the folder on disk (the user's choice, 2026-10-13).
+  delete or ignore as the fix (FR-024). No corpus-specific check. The refusal keeps following the plugin's mode (the
+  user's choice, 2026-10-13).
 - **Rationale**: adrkit reads the folder on disk, and the gate's one uncommitted-changes check skipped new files, so a
   drafted decision could govern a round it is not part of. One flag on the existing check closes that; a second
   check over decision folders would answer the same question twice. Reviewers already treat untracked files as not
-  evidence (`briefs.py`), so the gate now agrees with them. Cost: in `enforce` mode, any stray untracked file blocks a launch
-  until it is committed, deleted or ignored.
+  evidence (`briefs.py`), so the gate now agrees with them. Cost: in `enforce` mode, any stray untracked file blocks a
+  launch until it is committed, deleted or ignored.

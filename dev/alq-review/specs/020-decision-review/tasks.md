@@ -32,7 +32,7 @@ Branch `88-adr-notice`, merged before any code task (R13).
 
 Branch `88-us1-decision-review`.
 
-- [ ] T004 [P] `config.json`: `decision_checks` and `max_review_files` (R15, R16). `plugin.json`: 0.14.0.
+- [ ] T004 [P] `config.json`: `decision_checks` and `max_review_files` (R15, R16). `plugin.json`: the version in contracts/interfaces.md § README.
 - [ ] T005 [P] `.github/workflows/tests.yml`: node 22 and the pinned adrkit install (R12).
 - [ ] T006 Red, then green: `worktree.files_in` over a range, replacing `changed_files`; tracked corpora (R2).
 - [ ] T006a Red, then green: `worktree.is_dirty` counts untracked files and `policy.launch_round`'s refusal names commit, delete or ignore (R18, FR-024).
@@ -48,7 +48,7 @@ injected arguments, the refusal or the round's result.
 
 - [ ] T009 [US1] Capture `adr check --json`'s answer on a fixture corpus outside any `docs/adr` path; a test re-runs it and compares (R4, R14).
 - [ ] T010 [US1] Red, then green: `scripts/decisions.py`, the pure rules (R6, data-model), tested on the captured answer.
-- [ ] T011 [US1] Red, then green: `scripts/adrkit.py`, one outcome per corpus, every cause of data-model § Corpus outcome (R5); contract tests run the real adrkit, including one where the change touches a record with an `error` (a duplicate id; as a subTest, a record with no frontmatter) in a nested repo corpus, in an org corpus inside the checkout, and in one `ALQ_ORG_ADR_DIR` reaches through a symlink, and the outcome is judged with that file in `broken` (R4).
+- [ ] T011 [US1] Red, then green: `scripts/adrkit.py`, one outcome per corpus, every cause of data-model § Corpus outcome (R5); contract tests run the real adrkit, R4's cases included.
 - [ ] T012 [US1] Red, then green: `briefs.py` adds the decision reviewer and its prompt, and injects `args.decisions` (R8, R9, contracts/interfaces.md).
 - [ ] T013 [P] [US1] Red, then green: `agents/decision-reviewer.md` (R8).
 - [ ] T014 [US1] Red, then green: `gate.py` runs the check at internal launches, refuses per data-model § Refusals in each mode, refuses solo dispatch of the decision reviewer, and writes its rulings to `gate.log` (R1, R10, R17). One test per spec scenario the gate decides.
