@@ -205,7 +205,7 @@ class Outcomes(Checkout):
         self.assertIn(adrkit.INSTALL, outcome.reason)
 
     def test_an_answer_in_a_shape_the_plugin_does_not_read_could_not_run_with_the_install_step(self):
-        answers = {"not json": "echo nope", "no governing": "echo '{\"ok\": true, \"findings\": []}'",
+        answers = {"not json": "echo nope", "no ok": "echo null", "no governing": "echo '{\"ok\": true, \"findings\": []}'",
                    "a notice with no id": "echo '{\"ok\": true, \"governing\": [], \"findings\": [{\"rule\": "
                                           "\"affects-unresolvable\", \"severity\": \"info\", \"message\": \"m\"}]}'",
                    "failed with no error": "echo '{\"ok\": false, \"governing\": [], \"findings\": []}'; exit 1"}
@@ -216,6 +216,11 @@ class Outcomes(Checkout):
                 self.assertIsInstance(outcome, decisions.NotChecked)
                 self.assertIn("docs/adr", outcome.reason)
                 self.assertIn(adrkit.INSTALL, outcome.reason)
+
+    def test_an_answer_that_is_not_json_says_so(self):
+        self.stub(f'[ "$1" = --version ] && echo {adrkit.VERSION} && exit 0\necho nope\n')
+        _, [outcome] = self.check(["src/a.py"])
+        self.assertIn("Expecting value", outcome.reason)
 
     def test_any_other_adrkit_failure_could_not_run_with_adrkits_error(self):
         for code in (1, 2):   # adrkit's top-level catch exits 1, like a failed check, but answers on stderr only
