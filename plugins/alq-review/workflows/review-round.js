@@ -10,6 +10,8 @@ if (!args || !args.waves) {
   return { status: 'REFUSED', reason: 'The alq-review gate hook did not supply this round. Is the plugin enabled?' }
 }
 
+// The gate's decision check result for an internal round; an audit has none, and its result has no such key.
+const decided = args.decisions ? { decisions: args.decisions } : {}
 const reports = {}
 for (const wave of args.waves) {
   const results = await parallel(wave.map(reviewer => () => {
@@ -20,13 +22,14 @@ for (const wave of args.waves) {
   }))
   const silent = wave.filter((_, i) => !results[i]).map(reviewer => reviewer.type)
   if (silent.length) {
-    return { status: 'INCOMPLETE', round: args.label, did_not_report: silent, next_step: 'Launch this workflow again with the same args; a partial round is not assessed.' }
+    return { status: 'INCOMPLETE', round: args.label, did_not_report: silent, next_step: 'Launch this workflow again with the same args; a partial round is not assessed.', ...decided }
   }
   wave.forEach((reviewer, i) => { reports[reviewer.type] = results[i] })
 }
 
 const findings = Object.entries(reports).flatMap(([type, report]) => report.findings.map(f => ({ ...f, reviewer: type })))
 if (!findings.length) {
-  return { status: 'CLEAN', round: args.label, next_step: 'No reviewer found anything that must change. This stage is done.' }
+  return { status: 'CLEAN', round: args.label, next_step: 'No reviewer found anything that must change. This stage is done.', ...decided }
 }
-return await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess })
+const assessed = await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess })
+return { ...assessed, ...decided }

@@ -36,6 +36,19 @@ def shim_checks_mode() -> str:
     return _setting("shim_checks", "ALQ_REVIEW_SHIM_CHECKS")
 
 
+def decision_checks_mode() -> str:
+    """The decision check's own setting, so it can be rolled back alone."""
+    return _setting("decision_checks", "ALQ_REVIEW_DECISION_CHECKS")
+
+
+def max_review_files() -> int:
+    """How many files an internal round may review: past it, no decision check is run."""
+    limit = config.load()["max_review_files"]
+    if type(limit) is not int or limit < 1:
+        raise ValueError(f"alq-review max_review_files must be a whole number above 0, not {limit!r}")
+    return limit
+
+
 def deny(reason: str) -> dict:
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                    "permissionDecisionReason": f"[alq-review] {reason}"}}
@@ -80,6 +93,20 @@ def refuse_claim(payload: dict, action: str, reason: str, target=None) -> dict |
 def refuse_shim(payload: dict, action: str, reason: str, target=None) -> dict | None:
     """A shim check's refusal: it blocks only when both the plugin and the shim checks enforce."""
     return _refuse_under(shim_checks_mode(), payload, action, reason, target)
+
+
+def refuse_decision(payload: dict, action: str, reason: str, target=None) -> dict | None:
+    """A broken decision record's refusal: it blocks only when both the plugin and the decision check enforce."""
+    return _refuse_under(decision_checks_mode(), payload, action, reason, target)
+
+
+def block_decision(payload: dict, action: str, reason: str, target=None) -> dict | None:
+    """A decision check that could not run blocks in either plugin mode, as a review base that cannot be read does;
+    only the decision check's own setting lets the round open without it."""
+    if decision_checks_mode() == "enforce":
+        return block(payload, action, reason, target)
+    record(payload, action, "would_deny", reason, target)
+    return None
 
 
 def _session_id(payload: dict) -> str | None:

@@ -242,7 +242,10 @@ class LaunchRound(unittest.TestCase):
         self.assertEqual(decision.scope, "full")
 
     def test_uncommitted_work_is_refused_because_rounds_are_pinned_to_commits(self):
-        self.assertFalse(self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7), dirty=True).allow)
+        decision = self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7), dirty=True)
+        self.assertFalse(decision.allow)
+        self.assertIn("uncommitted changes or new files", decision.reason)
+        self.assertIn("commit, delete or ignore", decision.reason)
 
     def test_second_round_reviews_only_the_delta_since_the_first(self):
         state = state_with_round(head=HEAD_A)

@@ -11,7 +11,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
-from paths import PLUGIN
+from paths import HARNESS, PLUGIN
 
 from test_gate import Gate, ThroughProcess
 from test_worktree_facts import git
@@ -20,7 +20,6 @@ import claimcheck
 import hookio
 import ledger
 
-HARNESS = Path(__file__).resolve().parent / "workflow_harness.mjs"
 # The command a refusal gives for a missing diff library: the pip form, or the system package where pip is refused.
 INSTALL_COMMAND = re.compile(r"`(?:\S+ -m pip install diff-match-patch|sudo apt install python3-diff-match-patch)`")
 WORKFLOW = PLUGIN / "workflows" / "claim-check.js"
