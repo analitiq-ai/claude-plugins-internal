@@ -115,13 +115,18 @@ def _outcome(corpus: Corpus, done, deadline: Deadline, steps: dict[str, float]) 
     if isinstance(done, OSError):
         return NotChecked(corpus, COULD_NOT_RUN, f"adr check of {corpus.label} could not be started ({done}). Next "
                                                  f"step: {INSTALL}, then launch again.")
-    # Exit 1 is a check that failed on a changed record: an answer like exit 0's.
-    if done.returncode not in (0, 1):
+    # Exit 1 is either a check that failed on a changed record, answered on stdout like exit 0, or adrkit's own
+    # failure, answered on stderr alone: only the answer tells them apart.
+    try:
+        raw = json.loads(done.stdout) if done.returncode in (0, 1) else None
+    except json.JSONDecodeError:
+        raw = None
+    if raw is None and done.returncode != 0:
         return NotChecked(corpus, COULD_NOT_RUN, f"adr check of {corpus.label} exited {done.returncode}: "
                                                  f"{done.stderr.strip()} Next step: fix what adr says, then launch again.")
     try:
-        answer = parse(json.loads(done.stdout))
-    except ValueError as exc:  # json.JSONDecodeError is one
+        answer = parse(raw)
+    except ValueError as exc:
         return NotChecked(corpus, COULD_NOT_RUN, f"adr check of {corpus.label} answered in a shape this plugin does "
                                                  f"not read ({exc}). Next step: {INSTALL}, then launch again.")
     return judge(corpus, answer)

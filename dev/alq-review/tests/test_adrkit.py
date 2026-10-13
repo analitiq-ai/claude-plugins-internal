@@ -218,10 +218,14 @@ class Outcomes(Checkout):
                 self.assertIn(adrkit.INSTALL, outcome.reason)
 
     def test_any_other_adrkit_failure_could_not_run_with_adrkits_error(self):
-        self.stub(f'[ "$1" = --version ] && echo {adrkit.VERSION} && exit 0\necho "Error: it broke" >&2\nexit 2\n')
-        _, [outcome] = self.check(["src/a.py"])
-        self.assertIn("Error: it broke", outcome.reason)
-        self.assertIn("docs/adr", outcome.reason)
+        for code in (1, 2):   # adrkit's top-level catch exits 1, like a failed check, but answers on stderr only
+            with self.subTest(exit=code):
+                self.stub(f'[ "$1" = --version ] && echo {adrkit.VERSION} && exit 0\necho "Error: it broke" >&2\n'
+                          f'exit {code}\n')
+                _, [outcome] = self.check(["src/a.py"])
+                self.assertIn("Error: it broke", outcome.reason)
+                self.assertIn("docs/adr", outcome.reason)
+                self.assertTrue(outcome.reason.endswith("Next step: fix what adr says, then launch again."))
 
     def test_a_call_past_the_deadline_names_each_steps_seconds(self):
         self.stub(f'[ "$1" = --version ] && echo {adrkit.VERSION} && exit 0\nsleep 5\n')
