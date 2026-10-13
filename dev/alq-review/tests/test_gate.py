@@ -660,9 +660,13 @@ class SpecArgument(Gate):
         log = self.logging_git()
         self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
         ran = log.read_text().splitlines()
-        self.assertEqual([line for line in ran if old in line], [])
-        head = self.saved()["rounds"][-1]["head_sha"]
-        self.assertTrue([line for line in ran if head in line and f"{self.FOLDER}/spec.md" in line], ran)
+        head, path = self.saved()["rounds"][-1]["head_sha"], f"{self.FOLDER}/spec.md"
+        # Every spec.md the branch has held other than head's, so none of them is ruled out by name alone.
+        stale = {git(self.root, "rev-parse", f"{c}:{path}")
+                 for c in git(self.root, "rev-list", head, "--", path).split()} - {git(self.root, "rev-parse", f"{head}:{path}")}
+        self.assertIn(old, stale)
+        self.assertEqual([line for line in ran if any(blob in line for blob in stale)], [], ran)
+        self.assertTrue([line for line in ran if head in line and path in line], ran)
         self.assertEqual([line for line in ran if "spec.md" in line and head not in line], [], ran)
 
     def test_a_change_after_the_unlocked_one_is_held_again(self):
