@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import closing
+from contextlib import closing, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -60,11 +60,16 @@ class Gate(Repo):
         return payload
 
     def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
-        """The gate's answer to one event: `handle`, under the environment gate.py would run in. A crash raises here
-        with its trace; main()'s answer to one is tested through `ThroughProcess`."""
+        """The gate's answer to one event: `handle`, under the environment gate.py would run in, the payload and the
+        answer passed through JSON text as stdin and stdout pass them, and nothing else written to stdout. A crash
+        raises here with its trace; main()'s answer to one is tested through `ThroughProcess`."""
+        payload = json.loads(json.dumps(self.payload(event, tool, tool_input, **extra)))
         # Cleared, not overlaid: a test that drops a key from self.env means the gate not to see it.
-        with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True):
-            return gate.handle(self.payload(event, tool, tool_input, **extra)) or {}
+        with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True), \
+                redirect_stdout(io.StringIO()) as stdout:
+            out = gate.handle(payload)
+        self.assertEqual(stdout.getvalue(), "")
+        return json.loads(json.dumps(out)) if out else {}
 
     def saved(self, repo="acme/demo"):
         """The ledger of the branch's open PR; an empty one when it has none."""
