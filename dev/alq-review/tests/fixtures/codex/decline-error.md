@@ -1,0 +1,22 @@
+Codex Review: Something went wrong. Try again later by commenting “@codex review”.
+
+```
+Unknown error
+```
+
+<details> <summary>ℹ️ About Codex in GitHub</summary>
+<br/>
+
+Codex has been enabled to automatically review pull requests in this repo. Reviews are triggered when you
+- Open a pull request for review
+- Mark a draft as ready
+- Comment "@codex review".
+
+If Codex has suggestions, it will comment; otherwise it will react with 👍.
+
+
+
+
+When you [sign up for Codex through ChatGPT](https://openai.com/codex), Codex can also answer questions or update the PR, like "@codex address that feedback".
+            
+</details>
