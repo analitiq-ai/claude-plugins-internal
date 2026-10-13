@@ -1,8 +1,9 @@
 # Data model: the internal review round checks the diff against the decisions that govern it
 
 Nothing is stored. Every shape lives for one launch and leaves the gate only as `args.decisions`. This file owns the
-shapes, the outcome causes and the refusal order; which records count and when a launch is refused are the spec's
-requirements, and how adrkit is called is research R4 and R5.
+shapes, a corpus's identity, the outcome causes and the refusal order; its mode table is derived from the requirements
+it cites per cell. Which records count and when a launch is refused are the spec's; how adrkit is called is research
+R4 and R5.
 
 ## Corpus
 
@@ -11,7 +12,8 @@ requirements, and how adrkit is called is research R4 and R5.
 | Found by | spec FR-001 and Terms, *Corpus* | `ALQ_ORG_ADR_DIR` (contracts/interfaces.md); unset or empty means no org corpus |
 | Label | its path from the repo root, e.g. `dev/alq-review/docs/adr` | `org (<value of ALQ_ORG_ADR_DIR>)` |
 
-An org path that is also a repo corpus: spec Edge Cases.
+A corpus is identified by the realpath of its folder: one realpath is one corpus, labelled as the org corpus when
+`ALQ_ORG_ADR_DIR` reaches it (spec FR-001).
 
 ## Records
 
@@ -43,9 +45,9 @@ At most one blocks a launch; they are taken in this order. `P` is the plugin's m
 
 | # | Refusal | When | Blocks when |
 |---|---|---|---|
-| 1 | too big | the round's files number more than `max_review_files` | `P` is `enforce` |
-| 2 | not checked | a corpus could not run | `D` is `enforce` |
-| 3 | broken | a broken record | `P` and `D` are both `enforce` |
+| 1 | too big | the round's files number more than `max_review_files` | `P` is `enforce` (spec FR-022) |
+| 2 | not checked | a corpus could not run | `D` is `enforce` (spec FR-018, FR-021) |
+| 3 | broken | a broken record | `P` and `D` are both `enforce` (spec FR-018, FR-021) |
 
 Every refusal says the check failed and names the corpus (or file, or command) and a fix that works there (spec
 FR-011). Refusals 1 and 2 give the next step of their cause (§ Corpus outcome). Refusal 3 gives the record's fix,

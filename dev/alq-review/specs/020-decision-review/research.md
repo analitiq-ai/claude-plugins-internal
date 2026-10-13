@@ -20,8 +20,10 @@ requirement of the spec is met. What is required is the spec's; the shapes are d
 
 ## R3: The corpora
 
-- **Decision**: `git ls-files` finds every tracked `docs/adr` at any depth in one call; the org corpus is added; each
-  is checked once, the org path first when it coincides with a repo corpus (spec Edge Cases).
+- **Decision**: `git ls-files` finds every tracked `docs/adr` at any depth in one call; the org corpus is added; the
+  list is reduced by the identity data-model § Corpus states, so a folder both reach is one corpus, the org's
+  (FR-001). A contract test: `ALQ_ORG_ADR_DIR` naming a tracked `docs/adr` through a symlink yields that corpus once
+  in `corpora`, labelled org.
 - **Rationale**: FR-001, FR-003. Checking a coinciding path once as the org corpus reverses PR #92's choice.
 
 ## R4: One `adr check` per corpus
@@ -30,8 +32,11 @@ requirement of the spec is met. What is required is the spec's; the shapes are d
   of the checkout root as working folder. The gate reads its `ok`, `governing` and `findings`; it reads no record and
   calls nothing else of adrkit's. A corpus whose realpath is under that root gets `--dir` relative to it; any other
   gets its realpath. With an absolute `--dir`, adrkit 0.20.0 does not see a changed record, so a broken one passes
-  (run 2026-10-13). A contract test proves adrkit sees a changed record carrying an error in each of: a nested repo
-  corpus, an org corpus inside the checkout, and an org corpus `ALQ_ORG_ADR_DIR` reaches through a symlink.
+  (run 2026-10-13). A contract test runs the real adrkit through `adrkit.py` on a change touching a record carrying
+  an error (a duplicate id; as a subTest, a record with no frontmatter, which adrkit gives no id for), in each
+  placement: a nested repo corpus; an org corpus inside the checkout; an org corpus `ALQ_ORG_ADR_DIR` reaches through
+  a symlink; the checkout root given through a symlink, with an org corpus inside it named by its real path. Each
+  asserts the judged outcome has that file in `broken`, with `id` absent in the no-frontmatter case.
 - **Rationale**: adrkit already decides what a record is, its status, what governs a change and whether a changed
   record is broken. Earlier drafts re-derived parts of that (statuses of files adrkit could not load, record files,
   lint findings outside the change) with a reader or adrkit's library; each was a second copy of adrkit and churned in
