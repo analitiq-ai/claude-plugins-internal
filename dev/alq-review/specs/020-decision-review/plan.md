@@ -57,7 +57,7 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields data-model § Reading adrkit lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. Record files are found and parsed by adrkit's own `@adrkit/core`, never by the plugin (R5). The five non-governing statuses and seven rule names are a copy of adrkit's, justified in Complexity Tracking and pinned by `test_decisions.Drift` (R6). Pass with that entry. |
+| I. Contract-first | The shapes are adrkit's `lint --json` and `check --json`; the gate is an adapter that reads the fields data-model § Reading adrkit lists and treats any other shape as a corpus not checked (R5). No second validator: adrkit alone judges a record. Record files are found and parsed by adrkit's own `@adrkit/core`, never by the plugin (R5). The statuses in `NOT_GOVERNING` and the rule names in `RULES` are a copy of adrkit's, justified in Complexity Tracking and pinned by `test_decisions.Drift` (R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model § Corpus outcome, § Refusals); nothing degrades to "no decisions". The install step pins one version; no tolerance for another shape. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (contracts, Scenario coverage). `decisions.judge` is pure; `adrkit.py` is tested with a stand-in script and with the real CLI. Pass. |
@@ -138,7 +138,7 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `decisions.py` re-declares adrkit's five non-governing statuses and the seven rule names it sorts by (constitution I: no re-declared type-name list) | A `check --json` finding names a record by path and id but not its status; the spec's rule turns on both the status and the rule name | Asking adrkit per record (`explain`) gives no status either and costs a call per finding against a 55 s deadline. The copy is pinned to the installed package by `test_decisions.Drift` (R6, R14). Statuses and record files themselves come from adrkit's own loader (R5), so no parser or discovery rule is copied |
+| `decisions.py` re-declares adrkit's non-governing statuses (`NOT_GOVERNING`) and the rule names it sorts by (`RULES`) (constitution I: no re-declared type-name list) | A `check --json` finding names a record by path and id but not its status; the spec's rule turns on both the status and the rule name | Asking adrkit per record (`explain`) gives no status either and costs a call per finding against a 55 s deadline. The copy is pinned to the installed package by `test_decisions.Drift` (R6, R14). Statuses and record files themselves come from adrkit's own loader (R5), so no parser or discovery rule is copied |
 
 ## Open points
 

@@ -126,30 +126,36 @@ located or briefed.
 | `could-not-run`: the record reader exits 3 | `adrkit.outcomes` | `adr`'s path and the reader's stderr | `npm install -g @adrkit/cli@0.20.0`, so the `adr` on `PATH` is the npm-installed command |
 | `could-not-run`: stdout not a JSON object, or a field read of another shape | `adrkit.outcomes` | the call and the field | `npm install -g @adrkit/cli@0.20.0` |
 | `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
-| `could-not-run`: `marker-scan-capped` or `marker-declarations-capped` | `decisions.judge` | adrkit's message | split the change |
-| `could-not-run`: a path in `unreadable_regular` | `decisions.judge` | the file | make it readable |
-| `could-not-run`: a finding with a `path` and no `field` `marker` names a path not in `statuses` | `decisions.judge` | the finding's rule and path | `npm install -g @adrkit/cli@0.20.0` |
-| `could-not-run`: a governing id, not broken, whose `record_files` are none or several | `decisions.judge` | the record and the files | the corpus's fix (§ Refusals): for the org corpus, never containing "commit" |
+| `could-not-run`: the causes of § Judgement | `decisions.judge` | § Judgement | § Judgement |
 
 ## Judgement
 
-Which adrkit pass names a finding decides what it is about; where its path sits never does. A finding with a `path` and no `field` `marker` names a corpus file, so its `path` must be in `statuses`.
+`judge(report)` returns `NotChecked(corpus, "could-not-run", reason)` for the first of these it meets:
 
-`judge(report)` first makes the corpus `NotChecked` for the four causes it owns. Otherwise it returns
-`Judgement(corpus, records, notices, broken)`. A finding's record class is `status_class(statuses[path])`; a governing
-record is one whose class is `accepted` or `unreadable` (an unreadable status must not hide adrkit's `error`, FR-004).
+1. a path in `unreadable_regular`: `reason` names the file; next step: make it readable.
+2. a finding whose row below is `could-not-run`, the first in table order.
+3. a governing id, not broken, whose `record_files` are none or several: `reason` names the record and the files; next
+   step: the corpus's fix (§ Refusals), for the org corpus never containing "commit".
 
-| Finding | Outcome |
-|---|---|
-| no `path`, rule other than the two caps | ignored |
-| `field` `marker` (`dangling-marker`, `stale-marker`, `marker-unresolvable`: the marker scan names a changed file, wherever it sits) | ignored (FR-013) |
-| `corpus-file-skipped`, skipped file `accepted` | broken, subject the file (FR-008) |
-| `corpus-file-skipped`, skipped file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
-| `corpus-file-skipped`, skipped file `not governing` | ignored |
-| severity `error` (`unique-id` included), `affects-bad-pattern`, `affects-unknown-type`, on a governing record | broken, subject the id, or the file when adrkit gives no id (FR-008) |
-| `affects-unresolvable` or `affects-repo-not-applicable` from `check`, on a governing record | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
-| any finding on a `not governing` record | ignored (FR-004) |
-| anything else | ignored (FR-013) |
+Otherwise it returns `Judgement(corpus, records, notices, broken)`.
+
+Each finding takes the first row it matches, top to bottom. Rows key on adrkit's rule name, severity and the record
+class `status_class(statuses[path])`, never on where a path sits; a governing record is one whose class is `accepted`
+or `unreadable` (an unreadable status must not hide adrkit's `error`, FR-004). `RULES` is every rule name the table
+names.
+
+| # | Finding | Outcome |
+|---|---|---|
+| 1 | `marker-scan-capped`, `marker-declarations-capped` | `could-not-run`: adrkit's message; next step: split the change |
+| 2 | `dangling-marker`, `stale-marker`, `marker-unresolvable` | ignored wherever its path sits: the marker scan names changed files (FR-013) |
+| 3 | no `path` | ignored (FR-013) |
+| 4 | a `path` not in `statuses` | `could-not-run`: the rule and the path; next step: `npm install -g @adrkit/cli@0.20.0` |
+| 5 | `corpus-file-skipped`, skipped file `accepted` | broken, subject the file (FR-008) |
+| 6 | `corpus-file-skipped`, skipped file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
+| 7 | `corpus-file-skipped`, skipped file `not governing` | ignored |
+| 8 | severity `error` (`unique-id` included), `affects-bad-pattern`, `affects-unknown-type`, on a governing record | broken, subject the id, or the file when adrkit gives no id (FR-008) |
+| 9 | `affects-unresolvable` or `affects-repo-not-applicable` from `check`, on a governing record | `MatcherNotice(corpus, id, matcher, reason)`, `matcher` = `` f'{field} "{pattern}"' ``, `reason` adrkit's message (FR-012) |
+| 10 | anything else, any finding on a `not governing` record included | ignored (FR-004, FR-013) |
 
 - `broken` lines are `Broken(corpus, subject, rule, message)`.
 - `records`: each `governing` entry whose id has no broken line, as `Record(corpus, id, title, file)`, `file` its one

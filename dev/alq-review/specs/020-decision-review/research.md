@@ -101,11 +101,11 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
   `error` refuse instead of vanish. `affects-unresolvable` and `affects-repo-not-applicable` are read from `check`
   only: `lint` reports the same per record, and `check` names the matcher. `markerScan.unreadablePaths` holds both
   symlinks and unreadable regular files (`readWithPreparedRoot` refuses both as `unreadable`), so only `lstat` tells
-  them apart (FR-002: a symlink is given to the check and is not a failure). The status list and the seven rule names
+  them apart (FR-002: a symlink is given to the check and is not a failure). `NOT_GOVERNING` and `RULES`
   are a copy of adrkit's vocabulary that its JSON gives no other way to learn; a drift test pins each to the installed
   package's shipped JS.
 - **Existing tools**: `specbinding.py`, `policy.py` (pure rules over data the gate reads): fit, the same shape. PR #92's
-  `_may_govern` and `_not_evaluated`: followed, with all five non-governing statuses, per-matcher notices and the
+  `_may_govern` and `_not_evaluated`: followed, with every non-governing status, per-matcher notices and the
   symlink distinction added.
 
 ## R7: One deadline per hook run, taken before the payload is read, 5 s under the hook's timeout
