@@ -29,7 +29,7 @@ spec work. CI runs every `tests/` folder under `dev/` that is not inside a `fixt
 
 ## Spec edits during a story
 
-The coding agent never edits the spec it is graded against; a spec change is the user's call and lands in its
-own spec-only PR. The record is alq-review
-[ADR-0020](dev/alq-review/docs/adr/0020-make-spec-md-read-only-on-a-story-branch-and-land-a-spec-change-in-its-own-pr.md);
-decision flow and evidence: [Spec edits during a story](https://claude.ai/artifact/318JN3nQhSgcXqCuP18CdD).
+Proposed (alq-review [ADR-0020](dev/alq-review/docs/adr/0020-make-spec-md-read-only-on-a-story-branch-and-land-a-spec-change-in-its-own-pr.md),
+draft; issue #104): the coding agent never edits the spec it is graded against, and a spec change lands in its
+own spec-only PR. Until the change is built, ADR-0016 decision 6 applies. Decision flow and evidence:
+[Spec edits during a story](https://claude.ai/artifact/318JN3nQhSgcXqCuP18CdD).
