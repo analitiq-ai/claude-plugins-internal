@@ -63,7 +63,7 @@ findings against the PR, and the folder alone cannot say which story the PR deli
    a folder with no story: shipping this change requires that no open PR has one.
 4. We will tell internal reviewers to read the whole `spec.md` and grade the change against that story's acceptance
    scenarios and every requirement, edge case and success criterion that applies to it, and to raise nothing that
-   only another story delivers. Spec authors tag nothing by story. The assessor brief carries the story number
+   only another story delivers. Spec authors need not tag requirements by story. The assessor brief carries the story number
    beside the folder. This supersedes ADR-0017, decision 2.
 
 ADR-0016, decision 6, and ADR-0018 stand: a story PR that edits `spec.md` is held until the user unlocks it.
@@ -106,7 +106,7 @@ Reviewers keep grading a story PR against every story of its spec.
   one. On 2026-10-13 one is open, #96 (`88-spec`, a spec PR launched with its folder), so the build waits for it
   to merge.
 - The heading check is textual: a heading inside a fenced code block counts.
-- Which requirements apply to the story is the reviewer's judgement: the spec does not tag them.
+- Which requirements apply to the story is the reviewer's judgement: the spec need not tag them.
 - With parallel stories, a spec edit merged from one story holds every other open story PR once it rebases: one
   unlock each. Accepted in #81.
 - Nothing checks that the story a launch names is the one the PR's `Implements:` line names.
