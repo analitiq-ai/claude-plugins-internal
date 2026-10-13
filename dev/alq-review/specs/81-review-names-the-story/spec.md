@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: Issue #81, "alq-review: the launch names the user story"
+**Input**: Issue #81, "alq-review: the review launch names the user story in two arguments, spec and story"
 
 **Settled with the user**: in issue #81, "Wanted", "Not in scope" and "Unchanged" (2026-10-12). The launch takes
 the spec folder and the story number as two arguments, not one string to parse, and the gate does not read the
@@ -20,19 +20,36 @@ PR body (2026-10-13). Decision record: ADR-0019.
 - **Story heading**: a line of `spec.md` that starts `### User Story <N>`, the number followed by a word
   boundary. Spec Kit writes `### User Story <N> - <title> (Priority: P<n>)`; older specs use `: ` for ` - `.
 
-## The arguments
+## The checks
 
-A refused row names the form: `spec: '<folder>', story: <N>`, or `spec: null` with no `story`. Today's `spec`
-checks run first, unchanged. A rule added later adds its row in the same edit.
+**The arguments.** `F` is a folder that passes today's shape checks.
 
 | `spec` | `story` | Outcome |
 |---|---|---|
-| a folder | `2` | accepted |
-| a folder | absent, or `null` | refused: a spec folder needs a story |
-| a folder | `0`, `-1` | refused: the story is 1 or more |
-| a folder | `"2"`, `2.5`, `true` | refused: the story is a JSON integer |
+| `F` | `2` | accepted |
+| `F` | absent, or `null` | refused: a spec folder needs a story |
+| `F` | `0`, `-1` | refused: the story is 1 or more |
+| `F` | `"2"`, `2.5`, `true` | refused: the story is a JSON integer |
 | `null` | absent, or `null` | accepted: no spec |
 | `null` | `2` | refused: no spec has no story |
+| absent | `2` | refused with today's missing-`spec` message |
+| a folder that fails today's shape checks | absent | refused with today's shape message |
+
+A refusal for `story` names the form: `spec: '<folder>', story: <N>`, or `spec: null` with no `story`.
+
+**The checks, in order.** A launch runs the rows from the top and stops at the first refusal. An audit launch is
+a review-round launch here. Every refusal follows the plugin's `mode`.
+
+| # | Check | Review-round, PR unbound | Review-round, PR bound | Assess-round |
+|---|---|---|---|---|
+| 1 | `spec` given, null or a non-empty string, folder shape | today's refusals and next steps | as unbound | not run: it reads the binding |
+| 2 | `story`, by the arguments table | refused naming the form; next: launch with the form | as unbound | not run |
+| 3 | the arguments against the binding | not run | other arguments: refused naming the binding; next: launch with the bound arguments | not run |
+| 4 | `spec` is `null` | opens and binds `null` | opens | bound to `null`: opens |
+| 5 | `<folder>/spec.md` in the commit and not empty | refused; next: commit it, then relaunch | as unbound | refused; next: stop and ask the user to restore it with a commit of their own |
+| 6 | `spec.md`'s blob against the bound one | not run | same: go on. Changed and not released: held, recording `spec_held`, and the refusal shows the diff; next: the user's `unlock`. Changed and released by `unlock`: go on with the new blob | as bound review-round |
+| 7 | the story heading for `<N>` in that `spec.md` | refused naming the heading; next: launch with a story `spec.md` has, or add the heading and commit it | refused naming the heading; next: put the heading back in `spec.md`, commit it and relaunch, which the user's `unlock` still releases | refused naming the heading; next: stop and ask the user to put it back with a commit of their own |
+| 8 | all passed | opens and binds the folder, the story and the blob | opens; a released blob is bound | opens |
 
 ## Today
 
@@ -68,9 +85,9 @@ read the refusal or the injected reviewer prompts and brief.
    the story number and the `spec.md` blob id.
 2. **Given** each row of the arguments table, **When** the round launches with it, **Then** the outcome is the
    row's, and a refusal names the form.
-3. **Given** a `spec.md` with no story heading for `<N>` at the reviewed commit, **When** the round launches,
-   **Then** it is refused, and the message names the heading it looked for. `### User Story 12` is no heading for
-   `1`. `### User Story 1: Sign in` is one for `1`.
+3. **Given** each row and column of the checks table, **When** the round launches in that state, **Then** the
+   outcome, any `spec_held` it records and the next step are the cell's. `### User Story 12` is no heading for
+   `1`; `### User Story 1: Sign in` is one for `1`.
 4. **Given** a PR bound to a story or to `null`, **When** a later launch gives other arguments (another story of
    the same spec, another folder, or `null`), **Then** it is refused as today, naming the bound arguments as the
    next launch.
@@ -84,19 +101,16 @@ read the refusal or the injected reviewer prompts and brief.
 8. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** the hold refuses an edit,
    **Then** the reason names `<folder>/spec.md`, `User Story <N>`, both blob ids and the `git diff` that shows the
    change.
-9. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** a review-round or assess-round
-   launch finds it changed, **Then** the refusal names `<folder>/spec.md` and `User Story <N>`.
-10. **Given** an assess-round launch, **When** it checks the binding, **Then** it checks `<folder>/spec.md` at its
-    commit, as today, and the story heading in it.
+9. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** a launch is held (checks row
+   6), **Then** the refusal names `<folder>/spec.md` and `User Story <N>`.
 
 ---
 
 ### Edge Cases
 
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
-- `spec.md` changes after binding and the user unlocks it: the next launch binds the new blob, and the story
-  heading is checked again in it. A heading the change removed refuses the launch.
-- An audit launch: names `spec` and `story` and is checked as above. Audit reviewers still get no spec.
+- An audit launch: names `spec` and `story` and is checked as a review-round launch. Audit reviewers still get no
+  spec.
 
 ## Requirements *(mandatory)*
 
@@ -105,7 +119,8 @@ read the refusal or the injected reviewer prompts and brief.
 - **FR-001**: The launch MUST give `spec` and `story` as the arguments table accepts them. `spec` is checked as
   today.
 - **FR-002**: `<folder>/spec.md` at the commit a launch checks MUST hold the story heading for `<N>`, matched at a
-  word boundary after the number. One pure function decides it, for review-round and assess-round launches alike.
+  word boundary after the number, in the order of the checks table. One pure function decides it, for
+  review-round and assess-round launches alike.
 - **FR-003**: The PR MUST be bound at its first round to the folder, the story number and the `spec.md` blob id,
   or to `null`. A later launch with other arguments MUST be refused.
 - **FR-004**: The refusals of FR-001 to FR-003 MUST follow the plugin's `mode`, as today's `spec` refusals do.
@@ -123,8 +138,9 @@ read the refusal or the injected reviewer prompts and brief.
 ### Key Entities
 
 - **Story**: a spec folder and a story number, given as two launch arguments.
-- **Binding**: the PR's ledger fields `spec` (the folder, or `null`), `story` (the number, or `null`) and
-  `spec_blob`. A row whose `spec` is a folder and whose `story` is `null` is not a binding the gate reads.
+- **Binding**: the PR's ledger fields `spec` (the folder, or `null`) and `spec_blob`, as today, and `story`, the
+  number, recorded and read only when `spec` is a folder. A row bound to `null` before this change already has
+  this shape. A row whose `spec` is a folder and that has no `story` is not a binding the gate reads.
 
 ## Success Criteria *(mandatory)*
 
@@ -166,11 +182,11 @@ Answer: No. Nothing in review knows which story a PR delivers.
 Source: code: plugins/alq-review/scripts/specbinding.py
 
 ### inherited
-Answer: Yes. ADR-0016 decision 2 takes a folder path or null, and ADR-0017 decision 2 names no spec headings in the reviewer prompt. ADR-0019 supersedes both.
+Answer: Yes. ADR-0016 decisions 1, 4 and 5 name, bind and compare `spec` alone, and ADR-0017 decision 2 names no spec headings in the reviewer prompt. ADR-0019 supersedes them: the launch also names `story`, the binding records it, a launch whose story differs is refused, and the reviewer prompt names the story's heading. ADR-0016 decision 2 stands.
 Source: code: dev/alq-review/docs/adr/0016-tell-review-the-spec-at-each-round-launch-and-bind-it-to-the-pr.md, dev/alq-review/docs/adr/0017-leave-the-spec-folder-s-contents-to-planning-review-reads-only-spec-md.md
 
 ### needs-spec
-Answer: It changes the launch contract that alq-build and the engineering rules call, and supersedes two ADR decisions.
+Answer: It changes the launch contract that alq-build and the engineering rules call, and supersedes four ADR decisions.
 Source: user: issue #80, "Decided"
 
 ## Root cause
