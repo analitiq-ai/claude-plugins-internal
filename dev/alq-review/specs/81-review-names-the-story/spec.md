@@ -38,17 +38,22 @@ PR body (2026-10-13). Decision record: ADR-0019.
 A refusal for `story` names the form: `spec: '<folder>', story: <N>`, or `spec: null` with no `story`.
 
 **The binding.** A PR is in one of three states: unbound (its ledger row has no `spec`), bound to `null`, or bound
-to a folder `F` and a story `N`, with `spec.md`'s blob id and, while held, `spec_held`. An assess-round reaches an
-unbound PR only in `log` mode, where a refused first launch opens and binds nothing.
+to a folder `F` and a story `N`, with `spec.md`'s blob id. An assess-round reaches an unbound PR only in `log`
+mode, where a refused first launch opens and binds nothing.
 
-**The review call.** Every refusal whose next step is a review-round launch, from the gate or from `policy`, names
-the text of `policy.review_call`, written R below. It renders the arguments from the binding: `spec: 'F', story: N`
-when bound to a folder, `spec: null` when bound to `null`, and `spec: '<spec folder>', story: <N>` | `spec: null`
-when unbound or when no state is at hand.
+**`spec_held`.** Recorded by a row 6 hold that blocks. Released while a later `unlock` stands, and kept after its
+release. Spent only by a launch whose checks all pass. "Held" means an unreleased `spec_held`.
 
-**The ledger.** A refused launch changes nothing in the ledger, except a row 6 hold, which records `spec_held`. A
-launch that opens records what its cell binds and spends any `spec_held`. Every refusal follows the plugin's
-`mode`.
+**The ledger**, for the checks below:
+- `enforce` mode: a refused launch is blocked and changes nothing, except a row 6 hold, which records `spec_held`. A
+  launch whose checks all pass records what its cell binds and spends `spec_held`.
+- `log` mode: a refused launch is logged `would_deny` and opens, and records and spends nothing: no binding, no new
+  `spec_held`, an earlier `spec_held` kept.
+
+**R** is `policy.review_call`'s text after this change. It renders the arguments from the binding:
+`spec: 'F', story: N` when bound to a folder, `spec: null` when bound to `null`, and
+`spec: '<spec folder>', story: <N>` | `spec: null` when unbound or when called with no state. Where R is named is
+the refusal-site table's.
 
 **The checks, in order.** A launch runs the rows from the top and stops at the first refusal. An audit launch is a
 review-round launch here. "—" is a row a launch in that state does not reach.
@@ -64,6 +69,25 @@ review-round launch here. "—" is a row a launch in that state does not reach.
 | 7 | the story heading for `N` in that `spec.md` | refused naming the heading; next: R with a story `spec.md` has, or add the heading, commit it, then R | — | reached with a changed blob only once released: refused naming the heading; next: put the heading back, commit it, then R, which the kept `spec_held` still releases | — | — | as review-round, except next: stop and ask the user to put it back with a commit of their own |
 | 8 | all passed | opens, binding `F`, `N` and the blob | — | opens, binding a released blob | — | — | as review-round |
 
+**The refusal sites.** Every refusal whose next step launches a review round, from
+`grep -n "Next step\|review_call(" plugins/alq-review/scripts/{gate,policy,specbinding}.py`. None changes the
+ledger in either mode except as the checks table says.
+
+| Site | Refuses | Next step today | Next step after |
+|---|---|---|---|
+| `gate.on_agent` | dispatching a reviewer | `review_call(None, 'internal')` | R, called with no state |
+| `gate.on_skill` | dispatching a review skill | `review_call(None, stage)` | R, called with no state |
+| `gate._spec_step`: `spec` missing, not a value, folder shape (checks row 1) | review-round launch | `review_call(state, stage)` | R from the binding |
+| `gate._spec_step`: `story` (checks row 2) | review-round launch | none: new | R from the binding |
+| `specbinding.bind` (checks row 3) | review-round launch | `launch with spec <recorded>` | R from the binding |
+| `gate._head_spec_md` (checks row 5) | review-round launch | `commit it, then` `review_call(state, stage)` | commit it, then R from the binding |
+| `gate._spec_step`: story heading (checks row 7) | review-round launch | none: new | the checks table's row 7 |
+| `policy._obstacle`, a round that did not complete | edit, re-request, marking the PR ready, the internal-review comment | `relaunch it with` `review_call(state, stage)` | relaunch it with R from the binding |
+| `policy._cap_refusal` | review-round launch, re-request | `review_call(state, 'audit')` | R from the binding |
+| `policy.mark_ready`, internal review not clean at the head | marking the PR ready, a non-draft PR create, the internal-review comment | `review_call(state, 'internal')` | R from the binding |
+| `policy.launch_round`, uncommitted changes | review-round launch | `commit, then launch again` | unchanged: the launch repeats the call just made |
+| `gate._open_pr`, `gh` cannot answer, or no open PR | review-round launch | `then launch again` | unchanged: the launch repeats the call just made |
+
 ## Today
 
 Read at `86a4b06` on 2026-10-12. "Run" means it was run; "read" means read in the code and not run.
@@ -77,8 +101,8 @@ Read at `86a4b06` on 2026-10-12. "Run" means it was run; "read" means read in th
 - The assessor brief carries `spec_folder` and nothing about a story (`briefs.py`, `brief`) (read).
 - The gate never reads a PR body (`plugins/alq-review/scripts/github.py` reads a PR's head and target) (read).
 - A review-round launch is refused when its branch has no open PR (`gate.py`, `_open_pr`) (read).
-- Every refusal that names a review-round launch as its next step names `policy.review_call`, which renders `spec`
-  from the binding and has no `story` (`plugins/alq-review/scripts/policy.py`) (read).
+- The refusals whose next step launches a review round, and their next step today, are the refusal-site table's
+  (read). `policy.review_call` renders `spec` and no `story` (`plugins/alq-review/scripts/policy.py`) (read).
 - In `log` mode the refusals of a launch's `spec` let the round open (`plugins/alq-review/README.md`, Mode) (read).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -123,9 +147,9 @@ read the refusal or the injected reviewer prompts and brief.
    change.
 9. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** a launch is held (checks row
    6), **Then** the refusal names `<folder>/spec.md` and `User Story <N>`.
-10. **Given** a PR in each binding state, **When** `policy` refuses a launch (a round that did not complete, the
-    round cap, or an internal review not yet clean at the head), **Then** the next step is R for that state:
-    `spec: 'dev/x/specs/7-demo', story: 2`, `spec: null`, or both forms.
+10. **Given** each row of the refusal-site table and a PR in each binding state, **When** that site refuses,
+    **Then** its next step is the row's "after" column: with R, `spec: 'dev/x/specs/7-demo', story: 2`,
+    `spec: null`, or both forms.
 
 ---
 
@@ -134,6 +158,8 @@ read the refusal or the injected reviewer prompts and brief.
 - A story heading inside a fenced code block of `spec.md`: counted. The gate does not parse Markdown.
 - An audit launch: names `spec` and `story` and is checked as a review-round launch. Audit reviewers still get no
   spec.
+- `log` mode: a launch refused at row 2 or row 7 logs `would_deny` and opens, and the binding is unchanged. A row 6
+  change records no `spec_held` and keeps an earlier one.
 
 ## Requirements *(mandatory)*
 
@@ -147,8 +173,8 @@ read the refusal or the injected reviewer prompts and brief.
 - **FR-003**: The PR MUST be bound at its first round to the folder, the story number and the `spec.md` blob id,
   or to `null`. A later launch with other arguments MUST be refused.
 - **FR-004**: The refusals of FR-001 to FR-003 MUST follow the plugin's `mode`, as today's `spec` refusals do.
-- **FR-005**: Every refusal MUST name the next legal step (P1). A review-round launch named as a next step MUST be
-  `policy.review_call`'s text, rendered from the binding.
+- **FR-005**: Every refusal MUST name the next legal step (P1). The refusal-site table's rows MUST name its
+  "after" next step.
 - **FR-006**: Internal reviewers MUST be told to grade the change against the section under the bound story's
   heading (its acceptance scenarios) and the spec's exclusions, and to raise nothing about another story.
 - **FR-007**: The assessor brief MUST carry `user_story` beside `spec_folder`.
