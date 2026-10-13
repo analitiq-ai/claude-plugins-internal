@@ -42,19 +42,26 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
 
 ## Reading a record file
 
-The plugin never parses an ADR file itself. `scripts/adrkit_records.mjs` loads each corpus with adrkit's own code: the
-`@adrkit/core` the installed `adr` imports, found with `createRequire(realpath(which adr)).resolve("@adrkit/core")`, so
-the plugin and the CLI read every file with one parser. Run as `node adrkit_records.mjs <realpath of adr> <dir>` with
-`cwd` the checkout root, it prints one JSON object:
+The plugin never parses an ADR file itself. `scripts/adrkit_records.mjs`, the record reader, loads each corpus with
+adrkit's own code: the `@adrkit/core` the installed `adr` imports, found with
+`createRequire(realpath(which adr)).resolve("@adrkit/core")`, so the plugin and the CLI read every file with one
+parser. It runs as `node adrkit_records.mjs <realpath of adr> <dir>` (§ Reading adrkit gives `cwd` and `dir`) and
+prints one JSON object:
 
-| Key | One entry per file |
+| Key | One entry per file of |
 |---|---|
 | `records` | `discoverAdrFiles(dir)`: the files adrkit loads as records |
 | `skipped` | `discoverSkippedMarkdownFiles(dir)`: the files `corpus-file-skipped` names |
 
-Each entry is `{path, id, status}` from `parseAdrFile`, `id` and `status` the frontmatter's values as YAML parses them,
-or `{path, error}` when adrkit cannot read or parse the file; `path` is absolute. The plugin keeps an `id` or `status`
-only when it is a string.
+Every listed file gets exactly one entry, and no file ends the run:
+
+- `{path, id, status}` when `parseAdrFile` returns, `id` and `status` the frontmatter's values as YAML parses them,
+  `null` when the key is absent or the frontmatter is not a mapping;
+- `{path, error}` when `parseAdrFile` throws (no frontmatter, malformed YAML, a file it cannot read), caught per file.
+
+`path` is absolute. Exit 0 is an answer; exit 3 is "`@adrkit/core` cannot be found beside `adr`" (an `adr` that is not
+the npm-installed command); any other exit is a failure with its stderr. The plugin keeps an `id` or `status` only
+when it is a string; any other value reads as `None`.
 
 ## Status
 
@@ -69,11 +76,12 @@ only when it is a string.
 ## Reading adrkit
 
 `outcomes` makes three calls per corpus: `adr lint --dir <dir> --json`, `adr check --dir <dir> --json -- <files>` (the
-options, then `--`, then the paths, so a path that begins with `-` is a path) and the record reader. All run with
-`cwd` the checkout root, every call of every corpus at once, each in its own thread as `subprocess.run(...,
-capture_output=True, timeout=max(deadline - time.monotonic(), 0))`, so each call's output is read while it runs and
-only a call that has not exited is killed. Each call's seconds go into `spent["adr lint <label>"]`, `spent["adr check
-<label>"]` and `spent["records <label>"]`. Without `adr` on `PATH`, no call is made.
+options, then `--`, then the paths, so a path that begins with `-` is a path) and the record reader with `<dir>`. Every
+call runs with `cwd` = `realpath(root)` and `<dir>` = `realpath(corpus.dir)`, every call of every corpus at once, each
+in its own thread as `subprocess.run(..., capture_output=True, timeout=max(deadline - time.monotonic(), 0))`, so each
+call's output is read while it runs and only a call that has not exited is killed. Each call's seconds go into
+`spent["adr lint <label>"]`, `spent["adr check <label>"]` and `spent["records <label>"]`. Without `adr` on `PATH`, no
+call is made.
 
 Fields read, and nothing else:
 
@@ -82,20 +90,23 @@ Fields read, and nothing else:
 | lint, check | `findings` | list of objects: `rule`, `severity`, `message` strings; `path`, `id`, `field`, `pattern` strings when present |
 | check | `governing` | list of objects: `recordId`, `title` strings |
 | check | `markerScan.unreadablePaths` | list of strings |
-| record reader | `records`, `skipped` | lists of objects: `path` a string, and either `error` a string or both `id` and `status` present |
+| record reader | `records`, `skipped` | lists of objects: `path` a string, and either `error` a string or both `id` and `status` keys, any JSON value |
 
-`adr` exit 0 and 1 are reports; the record reader answers only on exit 0. Every path adrkit names is relative to its
-`cwd`, the checkout root (an org record outside the repo comes back as `../../engineering/docs/adr/0007-x.md`), and is
-resolved against it before it is looked up in the record reader's answer, `lstat`ed or briefed.
+`adr` exit 0 and 1 are reports; the record reader's exits are § Reading a record file's. A file has one identity:
+every path adrkit or the reader names goes through `_path(p) = normpath(join(realpath(root), p))` before it is looked
+up, `lstat`ed or briefed. With `cwd` and `<dir>` already real, adrkit's relative paths (an org record outside the repo
+comes back as `../../engineering/docs/adr/0007-x.md`) and the reader's absolute ones meet at one string, and the last
+component is not resolved, so `lstat` still sees a symlink.
 
-`CorpusReport(corpus, findings, governing, statuses, record_files, unreadable_regular)`:
+`CorpusReport(corpus, dir, findings, governing, statuses, record_files, unreadable_regular)`:
 
 | Field | Content |
 |---|---|
-| `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check` |
+| `dir` | `realpath(corpus.dir)`, the `<dir>` the calls were given |
+| `findings` | `Finding(rule, severity, message, source, path=None, id=None, field=None, pattern=None)`, `source` `lint` or `check`, `path` through `_path` |
 | `governing` | `(id, title)` per `governing` entry |
-| `statuses` | `path -> status` for every path of the record reader's `records` and `skipped`; `None` for an entry with `error` or a status that is not a string |
-| `record_files` | `id -> tuple of absolute paths`: for each governing id, the `records` paths whose `id` is that id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
+| `statuses` | `_path(path) -> status` for every entry of the record reader's `records` and `skipped`; `None` for an entry with `error` or a `status` that is not a string |
+| `record_files` | `id -> tuple of absolute paths`: for each governing id, the `_path` of each `records` entry whose `id` is that id. adrkit gives a governing record no path, and a record's file name need not carry its id (adrkit 0.20 loads `0005-x.md` with `id: "0007"` as 0007) |
 | `unreadable_regular` | the paths of `markerScan.unreadablePaths` that `os.lstat` reports as regular files |
 
 ## Corpus outcome
@@ -111,23 +122,25 @@ located or briefed.
 | `could-not-run`: `ALQ_ORG_ADR_DIR` not an absolute path to a readable folder | `adrkit.org_corpus` | the variable and its value | point it at the org's `docs/adr` as an absolute path, or unset it |
 | `could-not-run`: a repo corpus holds a file `not_as_head` lists | gate, before any call | the files | commit or remove them |
 | `could-not-run`: `adr` not on `PATH` | `adrkit.outcomes`, for every corpus | | `npm install -g @adrkit/cli@0.20.0` |
-| `could-not-run`: an `adr` call exits other than 0 or 1, or the record reader other than 0 | `adrkit.outcomes` | the call and its stderr | what stderr says |
+| `could-not-run`: an `adr` call exits other than 0 or 1, or the record reader other than 0 or 3 | `adrkit.outcomes` | the call and its stderr | what stderr says |
+| `could-not-run`: the record reader exits 3 | `adrkit.outcomes` | `adr`'s path | `npm install -g @adrkit/cli@0.20.0`, so the `adr` on `PATH` is the npm-installed command |
 | `could-not-run`: stdout not a JSON object, or a field read of another shape | `adrkit.outcomes` | the call and the field | `npm install -g @adrkit/cli@0.20.0` |
 | `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
 | `could-not-run`: `marker-scan-capped` or `marker-declarations-capped` | `decisions.judge` | adrkit's message | split the change |
 | `could-not-run`: a path in `unreadable_regular` | `decisions.judge` | the file | make it readable |
+| `could-not-run`: a finding names a path under the report's `dir` that is not in `statuses` | `decisions.judge` | the finding's rule and path | `npm install -g @adrkit/cli@0.20.0` |
 | `could-not-run`: a governing id, not broken, whose `record_files` are none or several | `decisions.judge` | the record and the files | the corpus's fix (§ Refusals): for the org corpus, never containing "commit" |
 
 ## Judgement
 
-`judge(report)` first makes the corpus `NotChecked` for the three causes it owns. Otherwise it returns
+`judge(report)` first makes the corpus `NotChecked` for the four causes it owns. Otherwise it returns
 `Judgement(corpus, records, notices, broken)`. A finding's record class is `status_class(statuses[path])`; a governing
 record is one whose class is `accepted` or `unreadable` (an unreadable status must not hide adrkit's `error`, FR-004).
 
 | Finding | Outcome |
 |---|---|
 | no `path`, rule other than the two caps | ignored |
-| a `path` not in `statuses` (a source file a marker finding names) | ignored: not on a record |
+| a `path` outside the report's `dir` (a source file a marker finding names) | ignored: not on a record |
 | `corpus-file-skipped`, skipped file `accepted` | broken, subject the file (FR-008) |
 | `corpus-file-skipped`, skipped file `unreadable` | `FileNotice(corpus, file, reason)` (FR-012) |
 | `corpus-file-skipped`, skipped file `not governing` | ignored |

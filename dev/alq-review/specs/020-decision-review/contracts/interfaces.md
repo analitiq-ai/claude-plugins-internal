@@ -62,7 +62,7 @@ only by the review-round workflow; `gate.on_agent` refuses a direct dispatch as 
 ## README and version
 
 README: item 8 under "What it enforces"; Layout rows for `scripts/adrkit.py`, `scripts/adrkit_records.mjs`, `scripts/decisions.py`,
-`agents/decision-reviewer.md`; Dependencies names `adr` and `npm install -g @adrkit/cli@0.20.0`; Mode names `decision_checks` and `max_review_files`. `plugin.json`
+`agents/decision-reviewer.md`; Dependencies names `adr` as the npm-installed command (the record reader loads the `@adrkit/core` it ships), `npm install -g @adrkit/cli@0.20.0` and node ≥ 22; Mode names `decision_checks` and `max_review_files`. `plugin.json`
 `version: 0.14.0`.
 
 ## Scenario coverage
@@ -107,7 +107,10 @@ Refusals by mode are the tests of data-model § Refusals, By mode; a row below n
 | edge: `docs/adr` whose files are all in subfolders | `test_decisions.Corpora.test_a_folder_whose_files_are_all_in_subfolders_is_a_corpus` |
 | edge: solo dispatch | `test_gate.DecisionReview.test_the_decision_reviewer_is_not_dispatched_alone` |
 | one status classifier | `test_decisions.Judge.test_one_status_classifier_serves_records_and_skipped_files` |
-| record files read by adrkit's own loader | `test_decisions.Contract.test_a_record_whose_id_is_a_block_scalar_is_located`; `test_decisions.Judge.test_a_finding_on_a_file_that_is_not_a_record_is_ignored` |
+| record files read by adrkit's own loader | `test_decisions.Contract.test_a_record_whose_id_is_a_block_scalar_is_located`; `test_decisions.Judge.test_a_finding_on_a_file_that_is_not_a_record_is_ignored`; `test_decisions.Judge.test_a_finding_on_a_corpus_file_the_reader_did_not_return_leaves_the_corpus_not_checked` |
+| a record adrkit cannot load is broken, whatever the reader could read of it | `test_decisions.Contract.test_a_governing_record_adrkit_cannot_load_is_broken`; `test_decisions.Contract.test_a_skipped_file_with_no_status_is_a_notice` |
+| one identity per file | `test_decisions.Contract.test_a_checkout_reached_through_a_symlink_still_refuses_a_broken_record` |
+| the record reader's own failures | `test_adrkit.Boundary.test_a_record_reader_exit_1_is_not_checked_while_adr_exit_1_is_a_report`; `test_adrkit.Boundary.test_a_core_that_cannot_be_found_gives_the_install_step` |
 | FR-002 a changed path that begins with `-` is checked | `test_decisions.Contract.test_a_changed_path_that_begins_with_a_dash_is_checked` |
 | a rename gives both paths to the check | `test_worktree_facts.QuotedNames` (`files_in`) |
 | a record's file found by its id, not its name | `test_decisions.Contract.test_a_record_whose_file_name_differs_from_its_id_is_located`; `test_decisions.Judge.test_a_governing_id_without_exactly_one_file_leaves_the_corpus_not_checked` |

@@ -77,6 +77,11 @@ Nothing here was run unless a section says so; what PR #92's tests showed is quo
     and each drift refused a change adrkit had judged. Run on 2026-10-13 with adr 0.20.0: the script returned id
     `0018` for `id: >-` over an indented `0018`, left out a symlink, listed a nested file as skipped, and took 0.2 s
     on this repo's largest corpus. `node` is present wherever `adr` runs, since `adr` is a node script.
+  - The reader is the plugin's own code, so its answer is total (one entry per file, `null` for an absent key, a
+    per-file `error`) and its failures are its own causes; a record adrkit cannot load is still judged by adrkit's
+    `error`, never turned into a corpus not checked. Every call runs from the real checkout path with the real corpus
+    path, and every path is joined to it the same way: from a checkout reached through a symlink, `adr lint` names
+    files relative to the physical `cwd`, so joining them to the logical root missed every record (run on 2026-10-13).
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
   not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
   leaves `decisions.py` pure (P3).
