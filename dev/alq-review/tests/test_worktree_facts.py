@@ -741,6 +741,13 @@ class TreeReads(Repo):
         with self.assertRaisesRegex(RuntimeError, "not a git repository"):
             worktree.head_tree(self.tmp.name)
 
+    def test_a_path_no_process_argument_can_carry_raises(self):
+        """An agent may cite a path holding a NUL byte, which no process argument can carry."""
+        for read in (worktree.tree_text, worktree.tree_blob):
+            with self.subTest(read=read.__name__):
+                with self.assertRaisesRegex(RuntimeError, "could not run"):
+                    read(str(self.root), self.tree, "pkg/b\0.py")
+
 
 if __name__ == "__main__":
     unittest.main()
