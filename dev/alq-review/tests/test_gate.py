@@ -356,10 +356,12 @@ class SpecArgument(Gate):
         """What an internal reviewer's prompt says of story `story` of the spec `folder`, STORY of FOLDER by default."""
         story = story or self.STORY
         return (f"\n\nThis change implements User Story {story} of the spec in {folder or self.FOLDER}/spec.md of "
-                f"{self.root}. Read the section under its heading, `### User Story {story}`, and what the spec excludes. "
-                "Every acceptance scenario of that story that the change does not meet is a finding: quote the "
-                "scenario in its title. What the spec excludes bounds what you may ask for. Raise nothing about "
-                "another story of the spec.")
+                f"{self.root}. Read the whole spec.md, and grade the change against the acceptance scenarios under the "
+                f"story's heading, `### User Story {story}`, and every requirement, edge case and success criterion "
+                "that applies to that story. Every acceptance scenario of that story that the change does not meet is "
+                "a finding: quote the scenario in its title. So is every such requirement, edge case and success "
+                "criterion the change does not meet. What the spec excludes bounds what you may ask for. Raise nothing "
+                "that only another story of the spec delivers.")
 
     @staticmethod
     def prompts(out):
@@ -598,8 +600,8 @@ class SpecArgument(Gate):
         self.assertRefused(out, "a spec folder needs a story", f"spec: '{self.FOLDER}', story: 2}})")
 
     def test_internal_reviewers_are_named_the_bound_story_and_no_other(self):
-        """Scenario 6 and SC-002: the prompt names `### User Story 2`, its section and the spec's exclusions,
-        and no other story of a spec.md that has two."""
+        """Scenario 6 and SC-002: the prompt names `### User Story 2` and no other story of a spec.md that has two,
+        and tells the reviewer to read the whole spec.md and grade what applies to that story."""
         _, args = self.launch_with(spec=self.FOLDER, story=2)
         for reviewer in args["waves"][0]:
             with self.subTest(reviewer=reviewer["type"]):
