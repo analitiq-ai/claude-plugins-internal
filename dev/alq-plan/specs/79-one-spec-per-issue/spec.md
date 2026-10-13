@@ -12,7 +12,7 @@ reviewed PR, require a spec for every issue", part of #80.
 **Settled with the user**: issue #79, "Decided", as edited on 2026-10-12, and the user's decision of 2026-10-12 to
 keep `no spec needed`, which then writes a folder that says no spec is needed. It follows `analitiq-ai/engineering`
 `docs/engineering/git-workflow.md` (engineering ADR-0002 one spec per issue, ADR-0003 one PR per user story).
-Decision records: alq-plan ADR-0007, ADR-0008 and ADR-0009.
+Decision records: alq-plan ADR-0007, ADR-0008 and ADR-0009, in their own PR (#95).
 
 ## Clarifications
 
@@ -225,9 +225,27 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
    `spec 019`, **Then** nothing is found outside git history and this spec.
 3. **Given** the same, **When** `README.md` is read, **Then** it states that a plugin's feature specs are in
    `specs/<issue>-<short-name>/`, one per issue.
-4. **Given** the same and the constitutions' PR merged, **When** each of the three constitutions is read, **Then**
-   its Platform Constraints name `specs/<issue>-<short-name>/` and its Delivery Workflow names worktrees
+
+---
+
+### User Story 5 - The constitutions state the rule (Priority: P3)
+
+The constitutions of alq-plan, alq-review and alq-build state the folder rule and the worktree path that README.md
+and the engineering git workflow state.
+
+**Why this priority**: each constitution names README.md as the owner of its folder line, so it is amended after
+Story 4 changes README.md.
+
+**Independent Test**: search the repo for `specs/<nnn>-`, and read each constitution's Platform Constraints and
+Delivery Workflow.
+
+**Acceptance Scenarios**:
+
+1. **Given** Story 4 and this story merged, **When** each of the three constitutions is read, **Then** its Platform
+   Constraints name `specs/<issue>-<short-name>/` and its Delivery Workflow names worktrees
    `.claude/worktrees/<branch>`.
+2. **Given** the same, **When** the repo is searched for `specs/<nnn>-`, **Then** nothing is found outside git
+   history and this spec.
 
 ---
 
@@ -314,10 +332,13 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
   `spec 019`, MUST name the new folder.
 - **FR-020**: `README.md` MUST state the rule, `specs/<issue>-<short-name>/`, one per issue, in place of
   `specs/<nnn>-<feature>/`.
+
+**The constitutions (Story 5)**
+
 - **FR-022**: The constitutions of alq-plan, alq-review and alq-build MUST name `specs/<issue>-<short-name>/` in
   their Platform Constraints and `.claude/worktrees/<branch>` in their Delivery Workflow, with a PATCH version bump
-  each, in a PR of their own that lands after FR-020's, as their Governance has a constitution amended after the
-  file it names as owner (constitution VI).
+  each. Their Governance has the file a constitution names as owner change first and the constitution amended
+  after, so Story 5 lands after Story 4.
 
 **Tests**
 
@@ -348,7 +369,8 @@ Every spec folder in the repo is named by its issue, or is gone, and nothing cit
 - **SC-005**: Every completed new scope ends with a pushed `<issue>-spec` branch, a draft PR starting
   `Part of #<issue>`, and a launched internal review round.
 - **SC-006**: After Story 4, 0 folders under `dev/*/specs/` are named by a Spec Kit number, and 0 citations of an old
-  name, and 0 statements of the `specs/<nnn>-` form, remain outside git history and this spec.
+  name remain outside git history and this spec. After Story 5, 0 statements of the `specs/<nnn>-` form remain
+  outside git history and this spec.
 - **SC-007**: CI is green.
 
 ## Assumptions
@@ -383,7 +405,7 @@ Answer: No. select-spec checks only the path's shape and spec.md; nothing checks
 Source: code: plugins/alq-plan/speckit/workflows/alq-spec/workflow.yml, plugins/alq-plan/skills/issue-spec/SKILL.md
 
 ### inherited
-Answer: Yes. alq-plan ADR-0001 and ADR-0005 accept folders without the issue number and more than one folder per issue; ADR-0006 has no spec needed leave no folder; ADR-0005 has a run post nothing and open no PR. ADRs 0007 to 0009 end or supersede those.
+Answer: Yes. alq-plan ADR-0001 and ADR-0005 accept folders without the issue number and more than one folder per issue; ADR-0006 has no spec needed leave no folder; ADR-0005 has a run post nothing and open no PR. ADRs 0007 to 0009 (#95) end or supersede those.
 Source: code: dev/alq-plan/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md, dev/alq-plan/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md, dev/alq-plan/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md
 
 ### needs-spec
