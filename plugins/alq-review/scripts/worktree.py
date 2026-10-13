@@ -28,7 +28,7 @@ def _run(root: str, *args: str, timeout: float | None = None, stdin: str | None 
         # Untranslated, because the watch reads git's messages.
         done = subprocess.run(["git", "-C", root, *args], input=None if stdin is None else as_bytes(stdin),
                               capture_output=True, timeout=timeout, env=dict(os.environ, LC_ALL="C"))
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:  # ValueError: an argument holding a NUL byte
         raise RuntimeError(f"git {' '.join(args)} could not run in {root}: {exc}") from exc
     return subprocess.CompletedProcess(done.args, done.returncode, os.fsdecode(done.stdout), os.fsdecode(done.stderr))
 

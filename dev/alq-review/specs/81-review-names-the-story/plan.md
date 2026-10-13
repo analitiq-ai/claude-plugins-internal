@@ -129,6 +129,7 @@ Found with `grep -rn` over `plugins/` and `dev/`; read, not run.
 | `gate._assess_spec_step` | heading of the bound story | `gate.on_workflow` |
 | `gate._spec_text` | the launch hold names `User Story N` | `gate._spec_step`, `gate._assess_spec_step` |
 | `gate._story_step` | new | `gate._spec_step`, `gate._assess_spec_step` |
+| `worktree._run` | an argument holding a NUL byte (an agent-cited path) is a `RuntimeError`, as an `OSError` or a timeout already was, not a `ValueError` | `worktree._output`, `worktree.git`, `worktree.locate`, `worktree.contents`, `worktree.is_ignored`, `worktree.review_base`, `worktree.head_tree` |
 | `worktree.tree_text` | the one reader of a file at a tree-ish, unstripped: `None` only when the tree has no file there (nothing, a directory or a gitlink), `RuntimeError` in git's words for every git failure | `gate._story_step`, `claimgate._reader_of`, `claimgate._carried`, `claimgate._end_gone`, `shimgate._head_text`, `shimgate._located_in_head`, `shimgate._located_in_staged` |
 | `worktree.tree_blob` | `None` only when the tree has no entry there, `RuntimeError` in git's words for every git failure | `claimgate._reuse`, `claimgate.after_output` |
 | `worktree.head_tree` | the empty tree only while HEAD is unborn, `RuntimeError` in git's words for every git failure | `claimgate.on_commit`, `claimgate.on_launch`, `shimgate.on_commit`, `shimgate.on_launch`, `shimgate._override_tree` |
