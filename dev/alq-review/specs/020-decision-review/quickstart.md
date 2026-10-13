@@ -27,8 +27,8 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
    the org's `docs/adr` or unset it; `python3 scripts/ledger.py status --worktree <abs>` shows no new round.
 5. Hide `adr` (`PATH` without it) and launch. Expected: refused with the install step.
 6. Commit a record `dev/alq-review/docs/adr/0099-broken.md` with `status: accepted` and `deciders: 7`, launch.
-   Expected: refused, naming `dev/alq-review/docs/adr`, the file and adrkit's message, next step to correct the record
-   in this repo and commit. With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the
+   Expected: refused, naming `dev/alq-review/docs/adr`, the file and adrkit's message, next step "correct the record
+   in this repo, commit and launch again". With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the
    reviewer's brief lists 0018 only.
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision

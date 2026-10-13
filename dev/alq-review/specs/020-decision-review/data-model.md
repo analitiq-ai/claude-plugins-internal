@@ -48,10 +48,8 @@ At most one blocks a launch; they are taken in this order. `P` is the plugin's m
 | 3 | broken | a broken record | `P` and `D` are both `enforce` |
 
 Every refusal says the check failed and names the corpus (or file, or command) and a fix that works there (FR-011).
-Refusals 1 and 2 give the next step of their cause (§ Corpus outcome). Refusal 3 gives the record's fix: for a repo
-corpus, correct the record in this repo, commit and launch again; for the org corpus, fix the org's records or unset
-`ALQ_ORG_ADR_DIR`, never "commit". No org refusal says "commit". A refusal that does not block writes a `would_deny` line to `gate.log`, and
-the round opens on what was read.
+Refusals 1 and 2 give the next step of their cause (§ Corpus outcome). Refusal 3 gives the record's fix, worded as FR-011
+states it. A refusal that does not block writes a `would_deny` line to `gate.log`, and the round opens on what was read.
 
 ## Round arguments and result
 
