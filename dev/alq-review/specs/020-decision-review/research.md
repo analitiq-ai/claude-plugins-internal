@@ -119,8 +119,13 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
   rulings.
 - **Rationale**: the user's choice: the rulings tell whether the reviewer's brief is right.
 
-## R18: The corpus is checked as HEAD has it
+## R18: The corpus is checked as the commit has it
 
-- **Decision**: a repo corpus holding a file not as HEAD has it (uncommitted, untracked or ignored) is not checked.
-- **Rationale**: the spec's edge case. adrkit reads the working folder, and the gate's dirty-tree check skips
-  untracked files.
+- **Decision**: `worktree.is_dirty` runs `git status --porcelain --untracked-files=normal` instead of
+  `--untracked-files=no`, and `policy.launch_round`'s refusal says "uncommitted changes or new files" with commit,
+  delete or ignore as the fix (FR-023). No corpus-specific check.
+- **Rationale**: adrkit reads the folder on disk, and the gate's one uncommitted-changes check skipped new files, so a
+  drafted decision could govern a round it is not part of. One flag on the existing check closes that; a second
+  check over decision folders would answer the same question twice. Reviewers already treat untracked files as not
+  evidence (`briefs.py`), so the gate now agrees with them. Cost: any stray untracked file blocks a launch until it is
+  committed, deleted or ignored.

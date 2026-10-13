@@ -102,9 +102,10 @@ plugins/alq-review/
 │   │                          #      _governance(); the refusals; on_agent covers the decision reviewer; the
 │   │                          #      decision-review gate.log line on assessment; HOOK_SECONDS, ANSWER_MARGIN
 │   ├── hookio.py              # decision_checks_mode(); max_review_files(); refuse_decision(); block_decision()
+│   ├── policy.py              # launch_round's uncommitted-changes message names new files (R18)
 │   ├── briefs.py              # DECISION_REVIEWER; REVIEWERS includes it; review_range(); _scope(); _decision_prompt();
 │   │                          #      waves(); review_args takes governance and injects args.decisions
-│   └── worktree.py            # files_in(root, rev_range) replaces changed_files; tracked corpora; files not as HEAD
+│   └── worktree.py            # files_in(root, rev_range) replaces changed_files; tracked corpora; is_dirty counts untracked
 ├── workflows/review-round.js  # returns decisions: args.decisions on every path
 ├── agents/decision-reviewer.md
 ├── .claude-plugin/plugin.json # 0.14.0
@@ -124,7 +125,8 @@ dev/alq-review/tests/
 
 **Structure Decision**: the plugin's existing split: one boundary module per outside service (`github.py`,
 `worktree.py`, now `adrkit.py`), pure rules beside them (`policy.py`, `specbinding.py`, now `decisions.py`), the gate
-as the only handler, the workflow as orchestration. Callers of what changes, read in the code: `worktree.changed_files`
+as the only handler, the workflow as orchestration. Callers of what changes, read in the code: `worktree.is_dirty` is called by `gate.on_workflow` (line 582) and
+`test_worktree_facts` (lines 70, 72); `policy.launch_round` by `gate.on_workflow` and `test_policy`; `worktree.changed_files`
 is called by `briefs._audit_prompt` and tests `test_worktree_facts` (lines 403, 456); `briefs.review_args` by
 `gate.on_workflow` and `test_worktree_facts.RoundFacts`; `briefs.REVIEWERS` by `gate.track_subagent`;
 `briefs.INTERNAL_REVIEWERS` by `gate.on_agent`, `gate.on_workflow`, `test_gate`, `test_switch`; `gate.handle` by
@@ -141,5 +143,5 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 Settled by reading, not by the user: the deadline margin is 5 s (R7); `adr` is required only when a corpus is to be
 checked (R11); an org path that coincides with a repo corpus is checked once as the org corpus, as the spec's edge case
-says, which reverses PR #92's choice (R3). A repo corpus holding a file not as HEAD has it is not checked (R18), so
-the corpus adrkit reads is HEAD's.
+says, which reverses PR #92's choice (R3). The gate's existing uncommitted-changes check counts new files (R18), so
+the corpus adrkit reads is the commit's.

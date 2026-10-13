@@ -24,14 +24,13 @@ An org path that is also a repo corpus is checked once, as the org corpus.
 
 Each corpus yields exactly one outcome: **judged** (its governing records, notices and broken records), or **not
 checked** (the corpus, a cause, and a reason that ends with the next step). A corpus not checked contributes nothing
-else. A cause known before any adrkit call (an invalid `ALQ_ORG_ADR_DIR`, a repo corpus not as HEAD) is that
+else. A cause known before any adrkit call (an invalid `ALQ_ORG_ADR_DIR`) is that
 corpus's outcome; `too big` applies only to the corpora still to be checked.
 
 | Cause | When | Next step |
 |---|---|---|
 | too big | the round's files number more than `max_review_files` (no adrkit call is made) | full round: split the PR; delta round: commit in smaller steps |
 | could not run | `ALQ_ORG_ADR_DIR` is not an absolute path to a readable folder | point it at the org corpus, or unset it |
-| could not run | a repo corpus holds a file not as HEAD has it | commit or remove those files |
 | could not run | `adr` cannot be started, `adr --version` is not the version the plugin is built for, or answers in a shape the plugin cannot read | the install step |
 | could not run | adrkit fails in any other way | what adrkit's error says |
 | could not run | a call reaches the deadline | the step that spent the time; the reason names each step's seconds |
