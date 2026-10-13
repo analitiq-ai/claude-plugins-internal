@@ -535,7 +535,7 @@ class SpecArgument(Gate):
         self.env["PATH"] = f"{wrap}{os.pathsep}{self.env['PATH']}"
         return log
 
-    def test_a_launch_reads_spec_md_at_its_rounds_head_and_never_through_the_binding(self):
+    def test_a_launch_reads_spec_md_at_its_rounds_head_and_names_the_bound_id_only_as_heads_blob(self):
         log = self.logging_git()
         self.clean_round(self.FOLDER)
         self.commit("b.py", "fixed\n", "fix: b")
@@ -545,8 +545,7 @@ class SpecArgument(Gate):
         for rnd in rounds:
             self.assertTrue([line for line in ran if rnd["head_sha"] in line and f"{self.FOLDER}/spec.md" in line], ran)
         self.assertEqual([line for line in ran if "spec.md" in line and "HEAD" in line], [])
-        # The bound id may name a blob only where it is the one each round's head records, so reading it is
-        # reading head; it never stands in for head.
+        # Each round's head records the bound blob for spec.md, so a `cat-file blob` of that id reads head's spec.md.
         self.assertEqual({git(self.root, "rev-parse", f"{rnd['head_sha']}:{self.FOLDER}/spec.md") for rnd in rounds},
                          {self.bound})
         by_id = [line for line in ran if self.bound in line]
@@ -652,6 +651,18 @@ class SpecArgument(Gate):
         state = self.saved()
         self.assertEqual(state["spec_blob"], self.blob(self.FOLDER))
         self.assertNotIn("spec_held", state)
+
+    def test_a_launch_after_an_unlock_reads_heads_spec_md_and_never_the_text_it_was_bound_to(self):
+        self.held()
+        old = self.saved()["spec_blob"]
+        self.unlock_since_the_hold()
+        self.commit_files({f"{self.FOLDER}/spec.md": "# Demo\n\nb.py prints 22 lines.\n"}, "docs: change it again")
+        log = self.logging_git()
+        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
+        ran = log.read_text().splitlines()
+        self.assertEqual([line for line in ran if old in line], [])
+        head = self.saved()["rounds"][-1]["head_sha"]
+        self.assertTrue([line for line in ran if head in line and f"{self.FOLDER}/spec.md" in line], ran)
 
     def test_a_change_after_the_unlocked_one_is_held_again(self):
         self.held()
