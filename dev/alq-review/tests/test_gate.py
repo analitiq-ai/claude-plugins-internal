@@ -61,8 +61,9 @@ class Gate(Repo):
 
     def hook(self, event, tool=None, tool_input=None, mode=None, **extra):
         """The gate's answer to one event: `handle`, under the environment gate.py would run in, the payload and the
-        answer passed through JSON text as stdin and stdout pass them, and nothing else written to stdout. A crash
-        raises here with its trace; main()'s answer to one is tested through `ThroughProcess`."""
+        answer passed through JSON text as stdin and stdout pass them, and nothing written to `sys.stdout` from Python
+        meanwhile. A child's own stdout is not watched here; every child the gate runs captures it. A crash raises
+        here with its trace; main()'s answer to one is tested through `ThroughProcess`."""
         payload = json.loads(json.dumps(self.payload(event, tool, tool_input, **extra)))
         # Cleared, not overlaid: a test that drops a key from self.env means the gate not to see it.
         with mock.patch.dict(os.environ, dict(self.env, ALQ_REVIEW_MODE=mode or self.mode), clear=True), \
