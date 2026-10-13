@@ -12,7 +12,7 @@ blastRadius: component
 relatesTo: ["0005", "0016", "0018"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{gate,briefs,ledger,policy,specbinding}.py"
+    pattern: "plugins/alq-review/scripts/{gate,briefs,ledger,policy,shell,specbinding}.py"
   - type: path
     pattern: "plugins/alq-review/hooks/**"
   - type: path
@@ -20,7 +20,7 @@ affects:
   - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"
   - type: path
-    pattern: "dev/alq-review/tests/{test_gate,test_ledger,test_policy,test_specbinding}.py"
+    pattern: "dev/alq-review/tests/{test_gate,test_ledger,test_policy,test_shell,test_specbinding}.py"
 provenance:
   authoredBy: agent-drafted
   agent:
