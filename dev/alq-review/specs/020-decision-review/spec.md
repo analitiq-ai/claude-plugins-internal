@@ -93,7 +93,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 22. **Given** `decision_checks` is `log` and `adr` cannot be found, **When** the round launches, **Then** the round opens without a decision reviewer, `gate.log` has a would-deny line, and the result names each corpus as not checked and why.
 23. **Given** a change of 51 files and `max_review_files` at 50, **When** the round launches, **Then** it is refused before any adrkit call, naming 51 and 50, and the next step is to split the PR (full round) or commit in smaller steps (delta round).
 24. **Given** a round with a decision reviewer is assessed, **When** the assessment is recorded, **Then** `gate.log` has one line with each of the decision reviewer's finding ids and their rulings.
-25. **Given** a new, uncommitted file in the checkout (a decision being drafted, or any other), **When** a round launches, **Then** it is refused by the gate's existing uncommitted-changes refusal, before any adrkit call, and the fix is to commit, delete or ignore the file.
+25. **Given** a new, uncommitted file in the checkout (a decision being drafted, or any other), **When** a round launches, **Then** in `enforce` mode it is refused by the gate's existing uncommitted-changes refusal, before any adrkit call, and the fix is to commit, delete or ignore the file; in `log` mode that refusal is recorded as a would-deny and the round opens.
 
 ---
 
@@ -108,7 +108,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - A repo with no `docs/adr` folder and `ALQ_ORG_ADR_DIR` unset: the round opens with no decision reviewer, and the result says no corpus was checked and that the variable is unset.
 - A `docs/adr` folder in the repo that holds no tracked file: not a corpus.
 - An untracked or ignored `docs/adr` folder: not a corpus.
-- A repo corpus that is itself one of the files the round reviews (the PR adds an ADR): the check runs against the corpus as the commit has it, because the gate already refuses a launch while the checkout differs from the commit, new files included (FR-024). A file `.gitignore` hides is not seen by git and is read by adrkit if it sits in a corpus; nothing guards that.
+- A repo corpus that is itself one of the files the round reviews (the PR adds an ADR): in `enforce` mode the check runs against the corpus as the commit has it, because the gate's uncommitted-changes refusal blocks first, new files included (FR-024). In `log` mode that refusal only records a would-deny, as every refusal does there, and adrkit reads the folder as it is on disk. A file `.gitignore` hides is not seen by git and is read by adrkit if it sits in a corpus; nothing guards that.
 - `ALQ_ORG_ADR_DIR` pointing inside the repo under review: still the org corpus, checked once as the org corpus; a tracked `docs/adr` at that path is not checked twice.
 - An audit round: no decision reviewer and no check; the feature is the internal round's.
 - A broken record in `log` mode, or with `decision_checks` at `log`: recorded as a would-deny, and the round opens with the records that were read. A check that could not run in `log` mode: refused, as in `enforce`, unless `decision_checks` is `log` (FR-021).
@@ -159,7 +159,7 @@ An agent launches the internal review round of a PR. The gate lists the files th
 - **FR-021**: The check MUST have its own setting, `decision_checks` (`log` or `enforce`, overridden by `ALQ_REVIEW_DECISION_CHECKS`, shipped `enforce`), as the claim and shim checks have. At `log`, no decision-check refusal blocks: each is recorded as would-deny in `gate.log`, the round opens with the records that were read, and the result names each corpus not checked and why, and each broken record. Nothing from a corpus not checked is given to the decision reviewer. The constitution's Platform Constraints lines on per-check settings and on where reviewer agents come from change in the same PR as ADR-0020 (FR-019), before the code.
 - **FR-022**: An internal round whose files (FR-002) number more than `max_review_files` (`config.json`, shipped 50) MUST be refused before any adrkit call, following the plugin's mode, naming the count and the limit, with the next step: split the PR, or, for a delta round, commit in smaller steps and launch after each.
 - **FR-023**: When a round is assessed, the rulings on the decision reviewer's findings (each finding's id and ruling: FIX, PUSH_BACK or DEFER) MUST be written to `gate.log`, one line per round.
-- **FR-024**: The gate's existing uncommitted-changes refusal MUST also count new files git does not track (files `.gitignore` hides excepted), at every launch, so adrkit reads each repo corpus as the commit has it. Its message MUST name commit, delete or ignore as the fix. No second check of the corpus against the commit is added.
+- **FR-024**: The gate's existing uncommitted-changes refusal MUST also count new files git does not track (files `.gitignore` hides excepted), at every launch, following the plugin's mode as it does today; in `enforce` mode adrkit therefore reads each repo corpus as the commit has it. Its message MUST name commit, delete or ignore as the fix. No second check of the corpus against the commit is added.
 
 ### Key Entities
 

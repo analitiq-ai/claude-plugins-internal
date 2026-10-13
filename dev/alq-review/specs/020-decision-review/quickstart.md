@@ -29,8 +29,8 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
 5. Hide `adr` (`PATH` without it) and launch. Expected: refused with the install step.
 6. Commit two records `dev/alq-review/docs/adr/0099-a.md` and `0099-b.md`, each `status: accepted` with id `0099`,
    launch. Expected: refused, naming `dev/alq-review/docs/adr`, both files and adrkit's `unique-id` message, next step "correct the record
-   in this repo, commit and launch again". With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the
-   reviewer's brief lists step 1's records and not 0099.
+   in this repo, commit and launch again". With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line,
+   `decisions.broken` names both 0099 files, and no 0099 is in `governing`.
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision
    reviewer; `decisions.not_checked` names each corpus and why; `gate.log` has a `would_deny` line.
