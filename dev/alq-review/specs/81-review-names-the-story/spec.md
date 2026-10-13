@@ -37,19 +37,32 @@ PR body (2026-10-13). Decision record: ADR-0019.
 
 A refusal for `story` names the form: `spec: '<folder>', story: <N>`, or `spec: null` with no `story`.
 
-**The checks, in order.** A launch runs the rows from the top and stops at the first refusal. An audit launch is
-a review-round launch here. Every refusal follows the plugin's `mode`.
+**The binding.** A PR is in one of three states: unbound (its ledger row has no `spec`), bound to `null`, or bound
+to a folder `F` and a story `N`, with `spec.md`'s blob id and, while held, `spec_held`. An assess-round reaches an
+unbound PR only in `log` mode, where a refused first launch opens and binds nothing.
 
-| # | Check | Review-round, PR unbound | Review-round, PR bound | Assess-round |
-|---|---|---|---|---|
-| 1 | `spec` given, null or a non-empty string, folder shape | today's refusals and next steps | as unbound | not run: it reads the binding |
-| 2 | `story`, by the arguments table | refused naming the form; next: launch with the form | as unbound | not run |
-| 3 | the arguments against the binding | not run | other arguments: refused naming the binding; next: launch with the bound arguments | not run |
-| 4 | `spec` is `null` | opens and binds `null` | opens | bound to `null`: opens |
-| 5 | `<folder>/spec.md` in the commit and not empty | refused; next: commit it, then relaunch | as unbound | refused; next: stop and ask the user to restore it with a commit of their own |
-| 6 | `spec.md`'s blob against the bound one | not run | same: go on. Changed and not released: held, recording `spec_held`, and the refusal shows the diff; next: the user's `unlock`. Changed and released by `unlock`: go on with the new blob | as bound review-round |
-| 7 | the story heading for `<N>` in that `spec.md` | refused naming the heading; next: launch with a story `spec.md` has, or add the heading and commit it | refused naming the heading; next: put the heading back in `spec.md`, commit it and relaunch, which the user's `unlock` still releases | refused naming the heading; next: stop and ask the user to put it back with a commit of their own |
-| 8 | all passed | opens and binds the folder, the story and the blob | opens; a released blob is bound | opens |
+**The review call.** Every refusal whose next step is a review-round launch, from the gate or from `policy`, names
+the text of `policy.review_call`, written R below. It renders the arguments from the binding: `spec: 'F', story: N`
+when bound to a folder, `spec: null` when bound to `null`, and `spec: '<spec folder>', story: <N>` | `spec: null`
+when unbound or when no state is at hand.
+
+**The ledger.** A refused launch changes nothing in the ledger, except a row 6 hold, which records `spec_held`. A
+launch that opens records what its cell binds and spends any `spec_held`. Every refusal follows the plugin's
+`mode`.
+
+**The checks, in order.** A launch runs the rows from the top and stops at the first refusal. An audit launch is a
+review-round launch here. "—" is a row a launch in that state does not reach.
+
+| # | Check | Review-round, unbound | Review-round, bound to `null` | Review-round, bound to `F`, `N` | Assess-round, unbound | Assess-round, bound to `null` | Assess-round, bound to `F`, `N` |
+|---|---|---|---|---|---|---|---|
+| 1 | `spec`: given, `null` or a non-empty string, folder shape | today's refusals; next: R | as unbound | as unbound | not run | not run | not run |
+| 2 | `story`, by the arguments table | refused naming the form; next: R | as unbound | as unbound | not run | not run | not run |
+| 3 | the arguments against the binding | not run | other arguments: refused naming the binding; next: R | as bound to `null` | not run | not run | not run |
+| 4 | `spec` is `null` | opens, binding `null` | opens | — | opens, binding nothing | opens | not run |
+| 5 | `<F>/spec.md` in the commit and not empty | refused; next: commit it, then R | — | as unbound | — | — | refused; next: stop and ask the user to restore it with a commit of their own |
+| 6 | `spec.md`'s blob against the bound one | not run | — | same: go on. Changed and not released: held, recording `spec_held`, the refusal showing the diff; next: the user's `unlock`. Changed and released by `unlock`: go on, carrying the new blob | — | — | as review-round |
+| 7 | the story heading for `N` in that `spec.md` | refused naming the heading; next: R with a story `spec.md` has, or add the heading, commit it, then R | — | reached with a changed blob only once released: refused naming the heading; next: put the heading back, commit it, then R, which the kept `spec_held` still releases | — | — | as review-round, except next: stop and ask the user to put it back with a commit of their own |
+| 8 | all passed | opens, binding `F`, `N` and the blob | — | opens, binding a released blob | — | — | as review-round |
 
 ## Today
 
@@ -64,6 +77,8 @@ Read at `86a4b06` on 2026-10-12. "Run" means it was run; "read" means read in th
 - The assessor brief carries `spec_folder` and nothing about a story (`briefs.py`, `brief`) (read).
 - The gate never reads a PR body (`plugins/alq-review/scripts/github.py` reads a PR's head and target) (read).
 - A review-round launch is refused when its branch has no open PR (`gate.py`, `_open_pr`) (read).
+- Every refusal that names a review-round launch as its next step names `policy.review_call`, which renders `spec`
+  from the binding and has no `story` (`plugins/alq-review/scripts/policy.py`) (read).
 - In `log` mode the refusals of a launch's `spec` let the round open (`plugins/alq-review/README.md`, Mode) (read).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -85,9 +100,14 @@ read the refusal or the injected reviewer prompts and brief.
    the story number and the `spec.md` blob id.
 2. **Given** each row of the arguments table, **When** the round launches with it, **Then** the outcome is the
    row's, and a refusal names the form.
-3. **Given** each row and column of the checks table, **When** the round launches in that state, **Then** the
-   outcome, any `spec_held` it records and the next step are the cell's. `### User Story 12` is no heading for
-   `1`; `### User Story 1: Sign in` is one for `1`.
+3. **Given** each cell of the checks table, **When** the round launches in that state, **Then** the outcome, the
+   ledger it leaves and the next step are the cell's. `### User Story 12` is no heading for `1`; `### User Story 1:
+   Sign in` is one for `1`. Two properties hold over the whole table:
+   - **Order**: each refusing cell's test state also fails every later row that can run in it. So a PR held at
+     row 6 whose new `spec.md` has no heading for `N` is held, recording `spec_held`, and not refused for the heading.
+   - **Legality**: for each refusal, the test carries out its next step on the ledger the refusal left and launches
+     again, and that launch gets past the row. So a released PR refused at row 7 opens once the heading is committed
+     back, with no second `unlock`.
 4. **Given** a PR bound to a story or to `null`, **When** a later launch gives other arguments (another story of
    the same spec, another folder, or `null`), **Then** it is refused as today, naming the bound arguments as the
    next launch.
@@ -97,12 +117,15 @@ read the refusal or the injected reviewer prompts and brief.
    under that story's heading in `<folder>/spec.md` and what the spec excludes, to report every acceptance scenario
    of that story the change does not meet, and to raise nothing about another story.
 7. **Given** a bound story, **When** the assessor reads its brief, **Then** it carries `spec_folder` and
-   `user_story`, the story number. With `spec: null` both are null.
+   `user_story`, the story number. Bound to `null`, or unbound, both are null.
 8. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** the hold refuses an edit,
    **Then** the reason names `<folder>/spec.md`, `User Story <N>`, both blob ids and the `git diff` that shows the
    change.
 9. **Given** a PR bound to a story whose `spec.md` changed after binding, **When** a launch is held (checks row
    6), **Then** the refusal names `<folder>/spec.md` and `User Story <N>`.
+10. **Given** a PR in each binding state, **When** `policy` refuses a launch (a round that did not complete, the
+    round cap, or an internal review not yet clean at the head), **Then** the next step is R for that state:
+    `spec: 'dev/x/specs/7-demo', story: 2`, `spec: null`, or both forms.
 
 ---
 
@@ -124,7 +147,8 @@ read the refusal or the injected reviewer prompts and brief.
 - **FR-003**: The PR MUST be bound at its first round to the folder, the story number and the `spec.md` blob id,
   or to `null`. A later launch with other arguments MUST be refused.
 - **FR-004**: The refusals of FR-001 to FR-003 MUST follow the plugin's `mode`, as today's `spec` refusals do.
-- **FR-005**: Every refusal MUST name the next legal step (P1).
+- **FR-005**: Every refusal MUST name the next legal step (P1). A review-round launch named as a next step MUST be
+  `policy.review_call`'s text, rendered from the binding.
 - **FR-006**: Internal reviewers MUST be told to grade the change against the section under the bound story's
   heading (its acceptance scenarios) and the spec's exclusions, and to raise nothing about another story.
 - **FR-007**: The assessor brief MUST carry `user_story` beside `spec_folder`.
@@ -182,11 +206,11 @@ Answer: No. Nothing in review knows which story a PR delivers.
 Source: code: plugins/alq-review/scripts/specbinding.py
 
 ### inherited
-Answer: Yes. ADR-0016 decisions 1, 4 and 5 name, bind and compare `spec` alone, and ADR-0017 decision 2 names no spec headings in the reviewer prompt. ADR-0019 supersedes them: the launch also names `story`, the binding records it, a launch whose story differs is refused, and the reviewer prompt names the story's heading. ADR-0016 decision 2 stands.
+Answer: Yes. ADR-0016 decisions 1, 4 and 5 name, bind and compare `spec` alone, and ADR-0017 decision 2 names no spec headings in the reviewer prompt. ADR-0019 "extends ADR-0016, decision 1" and "extends ADR-0016, decisions 4 and 5": the launch also names `story`, the binding records it, and a launch whose story differs is refused. It "supersedes ADR-0017, decision 2": the reviewer prompt names the story's heading. "ADR-0016, decision 2 stands."
 Source: code: dev/alq-review/docs/adr/0016-tell-review-the-spec-at-each-round-launch-and-bind-it-to-the-pr.md, dev/alq-review/docs/adr/0017-leave-the-spec-folder-s-contents-to-planning-review-reads-only-spec-md.md
 
 ### needs-spec
-Answer: It changes the launch contract that alq-build and the engineering rules call, and supersedes four ADR decisions.
+Answer: It changes the launch contract that alq-build and the engineering rules call, extends three ADR decisions and supersedes one (ADR-0019).
 Source: user: issue #80, "Decided"
 
 ## Root cause
