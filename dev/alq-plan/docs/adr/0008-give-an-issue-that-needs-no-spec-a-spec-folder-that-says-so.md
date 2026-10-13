@@ -9,7 +9,7 @@ tags: [premise, spec-folder, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006", "0007", "0009"]
+relatesTo: ["0005", "0006", "0009"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"

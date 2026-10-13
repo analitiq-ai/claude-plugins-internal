@@ -9,7 +9,7 @@ tags: [spec, pull-request, review-round, skills]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0007", "0008"]
+relatesTo: ["0005", "0008"]
 affects:
   - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"
