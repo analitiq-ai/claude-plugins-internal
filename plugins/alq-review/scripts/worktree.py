@@ -286,8 +286,8 @@ def head_tree(root: str) -> str:
     a branch no commit has made yet). RuntimeError, in git's words, when git cannot read HEAD."""
     if _run(root, "rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
         return git(root, "rev-parse", "--verify", "HEAD^{tree}")
-    # HEAD names no commit: unborn only when it is a branch git can name. A corrupt ref or a checkout outside any
-    # repository fails here.
+    # HEAD resolves to no object id: unborn only when it is a branch git can name. A corrupt ref or a checkout
+    # outside any repository fails here; a ref at a missing object passes the guard and fails at HEAD^{tree}.
     git(root, "symbolic-ref", "HEAD")
     return EMPTY_TREE
 
@@ -330,12 +330,12 @@ def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
     return diff(root, base, tree, "--", *paths)
 
 
-def _tree_entry(root: str, tree: str, path: str) -> tuple[str, str] | None:
+def tree_entry(root: str, tree: str, path: str) -> tuple[str, str] | None:
     """(the type, the object id) of the entry at `path` in tree-ish `tree`; None when the tree has none there.
     RuntimeError, in git's words, when git cannot read the tree."""
-    # A name with an empty, "." or ".." part is in no tree, and git refuses one that leaves the repository rather
-    # than answering that it is absent. Callers pass paths agents cite.
-    if any(part in ("", ".", "..") for part in path.split("/")):
+    # Callers pass paths agents cite. A name with an empty, "." or ".." part is in no tree, and git refuses one that
+    # leaves the repository rather than answering that it is absent; no process argument can carry a NUL byte.
+    if "\0" in path or any(part in ("", ".", "..") for part in path.split("/")):
         return None
     # ls-tree lists nothing for an absent path and fails for every git failure, where `<tree>:<path>` fails for both.
     listing = _output(root, "--literal-pathspecs", "ls-tree", "--full-tree", "-z", tree, "--", path)
@@ -350,7 +350,7 @@ def _tree_entry(root: str, tree: str, path: str) -> tuple[str, str] | None:
 def tree_text(root: str, tree: str, path: str) -> str | None:
     """`path` as tree-ish `tree` records it, unstripped; None when the tree has no file there (nothing, a directory
     or a gitlink). RuntimeError, in git's words, when git cannot read it."""
-    entry = _tree_entry(root, tree, path)
+    entry = tree_entry(root, tree, path)
     if entry is None or entry[0] != "blob":
         return None
     return _output(root, "cat-file", "blob", f"{tree}:{path}")
@@ -359,7 +359,7 @@ def tree_text(root: str, tree: str, path: str) -> str | None:
 def tree_blob(root: str, tree: str, path: str) -> str | None:
     """The object id at `path` in tree-ish `tree`; None when the tree has none there. RuntimeError, in git's words,
     when git cannot read the tree."""
-    entry = _tree_entry(root, tree, path)
+    entry = tree_entry(root, tree, path)
     return None if entry is None else entry[1]
 
 

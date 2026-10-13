@@ -426,29 +426,19 @@ class SpecStep:
     holds: dict | None = None
 
 
-def _spec_md_blob(root: str, head: str, folder: str) -> str | None:
-    """The blob id of `folder`/spec.md at commit `head`; None when it is missing or empty there. RuntimeError, in
-    git's words, when git cannot say."""
+def _head_spec_md(root: str, head: str, folder: str, restore: str) -> tuple[str | None, str | None, str | None]:
+    """(the blob id of `folder`/spec.md at `head`, its text, None), or (None, None, the refusal) when it is missing
+    (no file there), empty or git cannot read it. `restore` is the next step when it is missing or empty."""
     path = f"{folder}/spec.md"
-    for entry in worktree.git(root, "ls-tree", "-l", "-z", head, "--", path).split("\0"):
-        meta, _, name = entry.partition("\t")
-        if name == path:
-            _, kind, blob, size = meta.split()
-            return blob if kind == "blob" and size != "0" else None
-    return None
-
-
-def _head_spec_md(root: str, head: str, folder: str, restore: str) -> tuple[str | None, str | None]:
-    """(the blob id of `folder`/spec.md at `head`, None), or (None, the refusal) when it is missing, empty or git
-    cannot read it. `restore` is the next step when it is missing or empty."""
     try:
-        blob = _spec_md_blob(root, head, folder)
+        entry = worktree.tree_entry(root, head, path)
+        text = None if entry is None else worktree.tree_text(root, head, path)
     except RuntimeError as exc:
-        return None, f'Step "spec.md": git could not read {folder}/spec.md at {head}: {exc}'
-    if blob is None:
-        return None, (f'Step "spec.md": {folder}/spec.md is missing or empty at {head}, the commit this round '
-                      f"reviews, and the round is reviewed against it. Next step: {restore}.")
-    return blob, None
+        return None, None, f'Step "spec.md": git could not read {path} at {head}: {exc}'
+    if entry is None or not text:
+        return None, None, (f'Step "spec.md": {path} is missing or empty at {head}, the commit this round '
+                            f"reviews, and the round is reviewed against it. Next step: {restore}.")
+    return entry[1], text, None
 
 
 def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
@@ -473,18 +463,13 @@ def _spec_text(state: dict, root: str, head: str, head_blob: str) -> SpecStep:
                     holds={"bound": bound, "head": head_blob})
 
 
-def _story_step(step: SpecStep, root: str, head: str, binding: specbinding.Folder, restore: str) -> SpecStep:
-    """`step`, or the refusal when `binding`'s spec.md at `head` has no heading for its story. It comes after the hold,
-    so a change that also removed the heading is shown to the user before anything else is asked. `restore` is the
-    next step when the heading is missing."""
+def _story_step(step: SpecStep, text: str, head: str, binding: specbinding.Folder, restore: str) -> SpecStep:
+    """`step`, or the refusal when `text`, `binding`'s spec.md at `head`, has no heading for its story. It comes after
+    the hold, so a change that also removed the heading is shown to the user before anything else is asked.
+    `restore` is the next step when the heading is missing."""
     if step.refusal:
         return step
     path = f"{binding.path}/spec.md"
-    try:
-        text = worktree.tree_text(root, head, path)
-    except RuntimeError as exc:
-        return SpecStep({}, f'Step "spec.md": git could not read {path} at {head}: {exc}')
-    # No None to answer: both callers refused already unless _head_spec_md found spec.md a blob at this same commit.
     if specbinding.has_story(text, binding.story):
         return step
     return SpecStep({}, f'Step "story": {path} at {head} has no heading for story {binding.story}: no line of it '
@@ -521,14 +506,14 @@ def _spec_step(args: dict, state: dict, stage: str, root: str, head: str) -> Spe
             return SpecStep({}, f"{other}. Next step: {review_call}.")
     if folder is None:
         return SpecStep({} if binding is not None else {"spec": None, "spec_blob": None})
-    head_blob, unread = _head_spec_md(root, head, folder, f"commit it, then {review_call}")
+    head_blob, text, unread = _head_spec_md(root, head, folder, f"commit it, then {review_call}")
     if unread:
         return SpecStep({}, unread)
     if binding is None:
-        return _story_step(SpecStep({"spec": folder, "story": story, "spec_blob": head_blob}), root, head, given,
+        return _story_step(SpecStep({"spec": folder, "story": story, "spec_blob": head_blob}), text, head, given,
                            f"name the story this PR delivers, whose heading {folder}/spec.md must have at the commit "
                            f"reviewed: {review_call}")
-    return _story_step(_spec_text(state, root, head, head_blob), root, head, given,
+    return _story_step(_spec_text(state, root, head, head_blob), text, head, given,
                        f"commit {folder}/spec.md with that heading, then {review_call}")
 
 
@@ -540,10 +525,10 @@ def _assess_spec_step(state: dict, root: str, head: str) -> SpecStep:
         return SpecStep({})
     # A round awaiting assessment lets no agent commit, so only the user can put spec.md back.
     restore = "stop and ask the user to restore it with a commit of their own"
-    head_blob, unread = _head_spec_md(root, head, binding.path, restore)
+    head_blob, text, unread = _head_spec_md(root, head, binding.path, restore)
     if unread:
         return SpecStep({}, unread)
-    return _story_step(_spec_text(state, root, head, head_blob), root, head, binding, restore)
+    return _story_step(_spec_text(state, root, head, head_blob), text, head, binding, restore)
 
 
 def _refuse_spec(payload: dict, action: str, spec: SpecStep, event: Target, state: dict, now: datetime) -> dict | None:
