@@ -282,9 +282,14 @@ EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # `git hash-object -t t
 
 
 def head_tree(root: str) -> str:
-    """The tree a commit made now would be measured against: HEAD's, or the empty tree before the first commit."""
-    found = _run(root, "rev-parse", "--verify", "--quiet", "HEAD^{tree}")
-    return found.stdout.strip() if found.returncode == 0 else EMPTY_TREE
+    """The tree a commit made now would be measured against: HEAD's, or the empty tree while HEAD is unborn (it names
+    a branch no commit has made yet). RuntimeError, in git's words, when git cannot read HEAD."""
+    if _run(root, "rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
+        return git(root, "rev-parse", "--verify", "HEAD^{tree}")
+    # HEAD names no commit: unborn only when it is a branch git can name. A corrupt ref or a checkout outside any
+    # repository fails here.
+    git(root, "symbolic-ref", "HEAD")
+    return EMPTY_TREE
 
 
 def staged_tree(root: str) -> str:
@@ -325,20 +330,37 @@ def tree_diff(root: str, base: str, tree: str, paths: list[str]) -> str:
     return diff(root, base, tree, "--", *paths)
 
 
+def _tree_entry(root: str, tree: str, path: str) -> tuple[str, str] | None:
+    """(the type, the object id) of the entry at `path` in tree-ish `tree`; None when the tree has none there.
+    RuntimeError, in git's words, when git cannot read the tree."""
+    # A name with an empty, "." or ".." part is in no tree, and git refuses one that leaves the repository rather
+    # than answering that it is absent. Callers pass paths agents cite.
+    if any(part in ("", ".", "..") for part in path.split("/")):
+        return None
+    # ls-tree lists nothing for an absent path and fails for every git failure, where `<tree>:<path>` fails for both.
+    listing = _output(root, "--literal-pathspecs", "ls-tree", "--full-tree", "-z", tree, "--", path)
+    for entry in listing.split("\0"):
+        meta, _, name = entry.partition("\t")
+        if name == path:
+            _, kind, oid = meta.split()
+            return kind, oid
+    return None
+
+
 def tree_text(root: str, tree: str, path: str) -> str | None:
-    """`path` as tree `tree` records it; None when the tree has no such file."""
-    found = _run(root, "cat-file", "blob", f"{tree}:{path}")
-    return found.stdout if found.returncode == 0 else None
-
-
-def text_at(root: str, commit: str, path: str) -> str:
-    """`path` as commit `commit` records it, unstripped; RuntimeError, in git's words, when git cannot read it."""
-    return _output(root, "cat-file", "blob", f"{commit}:{path}")
+    """`path` as tree-ish `tree` records it, unstripped; None when the tree has no file there (nothing, a directory
+    or a gitlink). RuntimeError, in git's words, when git cannot read it."""
+    entry = _tree_entry(root, tree, path)
+    if entry is None or entry[0] != "blob":
+        return None
+    return _output(root, "cat-file", "blob", f"{tree}:{path}")
 
 
 def tree_blob(root: str, tree: str, path: str) -> str | None:
-    found = _run(root, "rev-parse", "--verify", "--quiet", f"{tree}:{path}")
-    return found.stdout.strip() if found.returncode == 0 else None
+    """The object id at `path` in tree-ish `tree`; None when the tree has none there. RuntimeError, in git's words,
+    when git cannot read the tree."""
+    entry = _tree_entry(root, tree, path)
+    return None if entry is None else entry[1]
 
 
 def unstaged(root: str) -> list[str]:

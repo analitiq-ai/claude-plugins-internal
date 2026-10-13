@@ -481,9 +481,10 @@ def _story_step(step: SpecStep, root: str, head: str, binding: specbinding.Folde
         return step
     path = f"{binding.path}/spec.md"
     try:
-        text = worktree.text_at(root, head, path)
+        text = worktree.tree_text(root, head, path)
     except RuntimeError as exc:
         return SpecStep({}, f'Step "spec.md": git could not read {path} at {head}: {exc}')
+    # No None to answer: both callers refused already unless _head_spec_md found spec.md a blob at this same commit.
     if specbinding.has_story(text, binding.story):
         return step
     return SpecStep({}, f'Step "story": {path} at {head} has no heading for story {binding.story}: no line of it '
