@@ -225,7 +225,8 @@ with and without a Code Review row after the trigger, and with and without a WAI
 5. **Given** scenario 4 with the Code Review row Running for the head after T, **When** the poller polls,
    **Then** it waits on "Codex is reviewing …": the waiver releases only the absence of an answer.
 6. **Given** scenario 4 with a SUCCESS run whose title does not start `WAIVED:`, **When** the poller polls,
-   **Then** it waits on "Codex has not answered since T".
+   **Then** the run releases nothing (FR-013) and the round settles as scenario 1 does: exit 4, or exit 2 with
+   open findings or failing checks, printing that Codex's reply is not one the poller knows; never 0.
 
 ---
 

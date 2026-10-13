@@ -5,13 +5,10 @@ there for the stated reason.
 
 0. **Fixtures exist before any test is written (R8)**
    ```bash
-   gh api repos/analitiq-ai/claude-plugins-internal/issues/comments/6146942268 --jq .body   # probe PR #103's card
-   gh api repos/analitiq-ai/claude-plugins-internal/issues/comments/6145948906 --jq .body   # PR #100's card
-   ls tests/fixtures/codex-card/
+   ls tests/fixtures/codex/
+   cmp -s specs/101-codex-card-status/samples/verdict-comment.md tests/fixtures/codex/verdict-comment.md && echo same
    ```
-   - Expected: `completed-one-row.md` and `completed-two-rows.md`, each a trimmed copy of a fetched body whose
-     Code Review row carries `**Completed**`, a `datetime="…"` and a 7-hex commit. If a body differs from the
-     spec's Terms, the fixture wins and the Terms are corrected in the same PR.
+   - Expected: the ten names of the spec folder's `samples/`, each byte-identical to its sample (R8).
 
 1. **The reader's states (R5, R4)**
    ```bash
@@ -38,7 +35,7 @@ there for the stated reason.
 
 4. **The reader by hand, with a card in each state (contract)**
    ```bash
-   jq -n --arg body "$(cat tests/fixtures/codex-card/completed-one-row.md)" \
+   jq -n --arg body "$(cat tests/fixtures/codex/card-one-row-completed.md)" \
      '{since: "2026-10-13T11:57:42Z", head: "<the fixture row'"'"'s commit, padded to 40 hex>",
        items: [{kind: "comment", url: "u", at: "2026-10-13T12:50:58Z", body: $body}]}' \
      | python3 ../../plugins/alq-review/scripts/codexstate.py

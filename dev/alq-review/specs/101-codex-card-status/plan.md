@@ -92,7 +92,7 @@ plugins/alq-review/
 dev/alq-review/tests/
 ├── test_codexstate.py                                # new: every state, every unreadable reason, the CLI
 ├── test_poll_pr_review.py                            # card fixtures; the spec's scenarios and edge cases
-└── fixtures/codex-card/{completed-one-row,completed-two-rows}.md   # trimmed copies of the sampled cards
+└── fixtures/codex/*.md   # the ten samples, copied byte for byte (R8)
 ```
 
 **Structure Decision**: the repo's `plugins/<name>/` + `dev/<name>/tests/` layout, as every other module. Callers
