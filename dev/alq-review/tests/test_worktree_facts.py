@@ -659,8 +659,11 @@ class StagedTree(Repo):
 
 
 class TreeReads(Repo):
-    """A tree's reader answers None (or the empty tree) only when git says the thing is absent, and raises in git's
-    words whenever git fails: an absent file and a git that cannot read are different answers."""
+    """worktree.tree_entry is the one reader of an entry at a path of a tree-ish, and tree_text and tree_blob read
+    through it. Each answers None only when the tree has nothing there: an absent path, or a name no tree can hold
+    (an empty, "." or ".." part, or a NUL byte). tree_text also answers None for an entry that is not a file. Every
+    git failure is a RuntimeError in git's words, so an absent file and a git that cannot read are different answers.
+    head_tree is the empty tree only while HEAD is unborn."""
     UNKNOWN = "1" * 40
 
     def setUp(self):
@@ -668,6 +671,10 @@ class TreeReads(Repo):
         (self.root / "pkg").mkdir()
         self.commit("pkg/b.py", "b\n", "pkg")
         self.tree = git(self.root, "rev-parse", "HEAD^{tree}")
+
+    @staticmethod
+    def readers():
+        return worktree.tree_entry, worktree.tree_text, worktree.tree_blob
 
     def git_dir(self):
         return Path(git(self.root, "rev-parse", "--absolute-git-dir"))
@@ -679,35 +686,47 @@ class TreeReads(Repo):
 
     def test_a_path_the_tree_does_not_hold_is_none(self):
         for path in ("missing.py", "pkg/missing.py", "../a.py", "/a.py", "", "pkg/", "./a.py"):
-            with self.subTest(path=path):
-                self.assertIsNone(worktree.tree_text(str(self.root), self.tree, path))
-                self.assertIsNone(worktree.tree_blob(str(self.root), self.tree, path))
+            for read in self.readers():
+                with self.subTest(path=path, read=read.__name__):
+                    self.assertIsNone(read(str(self.root), self.tree, path))
 
     def test_a_directory_or_gitlink_has_no_text_but_has_its_object(self):
         git(self.root, "update-index", "--add", "--cacheinfo", f"160000,{git(self.root, 'rev-parse', 'HEAD')},vendor/sub")
         tree = worktree.staged_tree(str(self.root))
         for path in ("pkg", "vendor/sub"):
             with self.subTest(path=path):
+                oid = git(self.root, "rev-parse", f"{tree}:{path}")
                 self.assertIsNone(worktree.tree_text(str(self.root), tree, path))
-                self.assertEqual(worktree.tree_blob(str(self.root), tree, path), git(self.root, "rev-parse", f"{tree}:{path}"))
+                self.assertEqual(worktree.tree_blob(str(self.root), tree, path), oid)
+                self.assertEqual(worktree.tree_entry(str(self.root), tree, path),
+                                 ("tree" if path == "pkg" else "commit", oid))
+
+    def test_a_non_ascii_name_holding_a_space_is_read_as_written(self):
+        name = "pkg/caf\u00e9 menu.py"
+        self.commit(name, "caf\u00e9\n", "non-ascii")
+        tree = git(self.root, "rev-parse", "HEAD^{tree}")
+        oid = git(self.root, "rev-parse", f"{tree}:{name}")
+        self.assertEqual(worktree.tree_entry(str(self.root), tree, name), ("blob", oid))
+        self.assertEqual(worktree.tree_blob(str(self.root), tree, name), oid)
+        self.assertEqual(worktree.tree_text(str(self.root), tree, name), "caf\u00e9\n")
 
     def test_a_tree_ish_git_cannot_read_raises_in_gits_words(self):
         blob = git(self.root, "rev-parse", "HEAD:a.py")
         for tree_ish in (self.UNKNOWN, "no-such-branch", blob):
-            for read in (worktree.tree_text, worktree.tree_blob):
+            for read in self.readers():
                 with self.subTest(tree_ish=tree_ish, read=read.__name__):
                     with self.assertRaisesRegex(RuntimeError, "failed in"):
                         read(str(self.root), tree_ish, "a.py")
 
     def test_a_tree_read_outside_a_repository_raises(self):
-        for read in (worktree.tree_text, worktree.tree_blob):
+        for read in self.readers():
             with self.subTest(read=read.__name__):
                 with self.assertRaisesRegex(RuntimeError, "not a git repository"):
                     read(self.tmp.name, self.tree, "a.py")
 
     def test_a_tree_missing_a_subtree_object_raises(self):
         self.lose_object("HEAD:pkg")
-        for read in (worktree.tree_text, worktree.tree_blob):
+        for read in self.readers():
             with self.subTest(read=read.__name__):
                 with self.assertRaisesRegex(RuntimeError, "failed in"):
                     read(str(self.root), self.tree, "pkg/b.py")
@@ -741,12 +760,11 @@ class TreeReads(Repo):
         with self.assertRaisesRegex(RuntimeError, "not a git repository"):
             worktree.head_tree(self.tmp.name)
 
-    def test_a_path_no_process_argument_can_carry_raises(self):
-        """An agent may cite a path holding a NUL byte, which no process argument can carry."""
-        for read in (worktree.tree_text, worktree.tree_blob):
+    def test_a_path_holding_a_nul_byte_is_in_no_tree(self):
+        """An agent may cite such a path; git never sees it, since no process argument can carry it."""
+        for read in self.readers():
             with self.subTest(read=read.__name__):
-                with self.assertRaisesRegex(RuntimeError, "could not run"):
-                    read(str(self.root), self.tree, "pkg/b\0.py")
+                self.assertIsNone(read(str(self.root), self.tree, "pkg/b\0.py"))
 
 
 if __name__ == "__main__":
