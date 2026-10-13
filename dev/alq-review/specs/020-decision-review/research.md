@@ -44,8 +44,10 @@ Read on 2026-10-12 and 2026-10-13: `@adrkit/cli` 0.20.0 as installed, the closed
 ## R6: `decisions.py` holds the rules as pure functions
 
 - **Decision**: sorting adrkit's findings, building the result and the refusal texts are pure functions in
-  `decisions.py`. The rule names it reads are a copy of adrkit's, pinned by a test against the installed adrkit.
-- **Rationale**: constitution P3. adrkit exports no list of its rule names, so a pinned copy is the only option.
+  `decisions.py`. The four rule names it reads (`affects-unresolvable`, `affects-repo-not-applicable`,
+  `marker-scan-capped`, `marker-declarations-capped`) are a copy of adrkit's, pinned by the version check (R5).
+- **Rationale**: constitution P3. adrkit exports no list of its rule names. The gate runs only one adrkit version, so
+  a second guard over the names would check the same thing twice.
 
 ## R7: One deadline per hook run
 

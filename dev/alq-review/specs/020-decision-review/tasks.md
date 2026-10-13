@@ -46,7 +46,7 @@ Branch `88-us1-decision-review`.
 injected arguments, the refusal or the round's result.
 
 - [ ] T009 [US1] Capture `adr check --json`'s answer on a fixture corpus outside any `docs/adr` path; a test re-runs it and compares (R4, R14).
-- [ ] T010 [US1] Red, then green: `scripts/decisions.py`, the pure rules (R6, data-model), tested on the captured answer; the rule-name pin against the installed adrkit.
+- [ ] T010 [US1] Red, then green: `scripts/decisions.py`, the pure rules (R6, data-model), tested on the captured answer.
 - [ ] T011 [US1] Red, then green: `scripts/adrkit.py`, one outcome per corpus, every cause of data-model § Corpus outcome (R5); contract tests run the real adrkit.
 - [ ] T012 [US1] Red, then green: `briefs.py` adds the decision reviewer and its prompt, and injects `args.decisions` (R8, R9, contracts/interfaces.md).
 - [ ] T013 [P] [US1] Red, then green: `agents/decision-reviewer.md` (R8).

@@ -41,7 +41,7 @@ within one 55 s deadline shared with the 30 s review-base fetch and the `gh` cal
 repo's corpora; the deadline bounds them, and a deadline refusal names what each step spent
 
 **Constraints**: no path list anywhere (R2); one validator per document (adrkit's); the gate's one copy of adrkit is
-its rule names, pinned by a test (R6); every refusal names a fix that can succeed for the corpus it names (R10); no
+its rule names, pinned by the version check (R5, R6); every refusal names a fix that can succeed for the corpus it names (R10); no
 fallback when `adr` or its answer is missing (R5, R11)
 
 **Scale/Scope**: this repo has three corpora (17 + 6 + 2 records) with overlapping ids; a round reviews at most
@@ -54,7 +54,7 @@ is a refusal, not a limit the plugin works around
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | The shape is `adr check --json`'s; the gate is an adapter, and any other shape is a corpus not checked (R5). No second validator: adrkit alone loads and judges a record, and the gate reads no record (R4). The rule names are a copy of adrkit's, justified in Complexity Tracking and pinned by a test (R6). Pass with that entry. |
+| I. Contract-first | The shape is `adr check --json`'s; the gate is an adapter, and any other shape is a corpus not checked (R5). No second validator: adrkit alone loads and judges a record, and the gate reads no record (R4). The rule names are a copy of adrkit's, justified in Complexity Tracking and pinned by the version check (R5, R6). Pass with that entry. |
 | II. Ownership & trust boundaries | All in this repo. `ALQ_ORG_ADR_DIR` and adrkit's output are validated where they enter (`adrkit.py`). The org's records are read, never written. Nothing public. Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | Every way the check can fail is a cause with its next step, and the result names it whenever its refusal does not block (data-model); nothing degrades to "no decisions". One adrkit version; no tolerance for another. Pass. |
 | IV. Test-first | Each scenario of the spec is a test written to fail first (R14). Pass. |
@@ -112,7 +112,7 @@ plugins/alq-review/
 ├── hooks/hooks.json           # unchanged; its 60 s timeout is pinned by a test
 └── README.md                  # T016, contracts/interfaces.md § README
 dev/alq-review/tests/
-├── test_decisions.py          # new: the pure rules, contract tests against the real adrkit, rule-name pin
+├── test_decisions.py          # new: the pure rules, contract tests against the real adrkit
 ├── test_adrkit.py             # new: the boundary
 ├── fixtures/adrkit/           # new: a fixture corpus (outside any docs/adr path) and adrkit's captured answer on it
 ├── test_gate.py               # DecisionReview, HookDeadline
@@ -135,7 +135,7 @@ and `test_gate` through `workflow_harness.mjs`; `hooks.json`'s timeout by Claude
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `decisions.py` re-declares the adrkit rule names it sorts by (constitution I: no re-declared type-name list) | The spec's rules turn on adrkit's rule names, and adrkit exports no list of them | The copy is pinned to the installed adrkit by a test (R6). The gate reads only `adr check`'s answer (R4), so no parser, status list or discovery rule is copied |
+| `decisions.py` re-declares the adrkit rule names it sorts by (constitution I: no re-declared type-name list) | The spec's rules turn on adrkit's rule names, and adrkit exports no list of them | The copy is pinned by the version check: the gate runs only the adrkit version it was written for (R5, R6). The gate reads only `adr check`'s answer (R4), so no parser, status list or discovery rule is copied |
 
 ## Open points
 
