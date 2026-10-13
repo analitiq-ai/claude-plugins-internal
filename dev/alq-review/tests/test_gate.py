@@ -535,16 +535,22 @@ class SpecArgument(Gate):
         self.env["PATH"] = f"{wrap}{os.pathsep}{self.env['PATH']}"
         return log
 
-    def test_a_launch_reads_spec_md_at_its_rounds_head_and_never_reads_the_bound_text(self):
+    def test_a_launch_reads_spec_md_at_its_rounds_head_and_never_through_the_binding(self):
         log = self.logging_git()
         self.clean_round(self.FOLDER)
         self.commit("b.py", "fixed\n", "fix: b")
         self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "allow")
         ran = log.read_text().splitlines()
-        for rnd in self.saved()["rounds"]:
+        rounds = self.saved()["rounds"]
+        for rnd in rounds:
             self.assertTrue([line for line in ran if rnd["head_sha"] in line and f"{self.FOLDER}/spec.md" in line], ran)
         self.assertEqual([line for line in ran if "spec.md" in line and "HEAD" in line], [])
-        self.assertNotIn(self.bound, "\n".join(ran))
+        # The bound id may name a blob only where it is the one each round's head records, so reading it is
+        # reading head; it never stands in for head.
+        self.assertEqual({git(self.root, "rev-parse", f"{rnd['head_sha']}:{self.FOLDER}/spec.md") for rnd in rounds},
+                         {self.bound})
+        by_id = [line for line in ran if self.bound in line]
+        self.assertEqual([line for line in by_id if not line.endswith(f" cat-file blob {self.bound}")], [], by_id)
 
     def test_the_same_value_again_opens_the_next_round_graded_against_the_bound_spec(self):
         self.clean_round(self.FOLDER)
