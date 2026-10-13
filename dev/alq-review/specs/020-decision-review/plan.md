@@ -25,7 +25,7 @@ in [data-model.md](data-model.md), stated once; the outside interfaces and the s
 **Language/Version**: Python 3 (CI runs 3.13), standard library only, as the rest of `scripts/`; the agent is Markdown;
 the workflow is JavaScript
 
-**Primary Dependencies**: git, as today; adrkit's CLI `adr` (`@adrkit/cli` 0.20.0, node ≥ 22) on `PATH` of the
+**Primary Dependencies**: git, as today; adrkit's CLI `adr` (installed by `decisions.INSTALL`, node ≥ 22) on `PATH` of the
 machine that launches rounds, new, required only when a corpus is to be checked (R11); the corpus script runs the
 `@adrkit/core` that `adr` ships, on the `node` that `adr` runs on (R5)
 
@@ -39,7 +39,7 @@ real `adr` (skipped locally without it, installed in CI), launches through the h
 
 **Project Type**: Claude Code plugin (hook, workflow, agent)
 
-**Performance Goals**: one `adr --version` per internal launch and one adrkit call per corpus, all corpora at once,
+**Performance Goals**: one adrkit call per corpus, all corpora at once,
 within one 55 s deadline shared with the 30 s review-base fetch and the `gh` calls (R4, R7). Not measured on this
 repo's corpora; the deadline bounds them, and a deadline refusal names what each step spent
 
@@ -124,7 +124,7 @@ dev/alq-review/tests/
 ├── test_agents.py             # DecisionReviewer tools
 ├── test_worktree_facts.py     # files_in, tracked; review_args signature
 └── paths.py                   # HARNESS
-.github/workflows/tests.yml    # setup-node 22; npm install -g @adrkit/cli@0.20.0
+.github/workflows/tests.yml    # setup-node 22; decisions.INSTALL (a copy data-model § Reading adrkit lists)
 ```
 
 **Structure Decision**: the plugin's existing split: one boundary module per outside service (`github.py`,

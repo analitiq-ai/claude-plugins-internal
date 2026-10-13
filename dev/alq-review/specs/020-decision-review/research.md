@@ -47,7 +47,7 @@ the reading and judging rules are written from.
 ## R4: One adrkit call per corpus, the three library calls `adr check` makes, with the checkout as working directory
 
 - **Decision**: per corpus, one run of the corpus script, all corpora of a launch at once under the launch's deadline,
-  after one `adr --version`. The command lines, fields read and exit codes are data-model § Reading adrkit.
+  The command lines, fields read and exit codes are data-model § Reading adrkit.
 - **Rationale**: `adr check`'s whole body is `lintCorpus`, `readSourceMarkersBatch`, `checkChanges` (the CLI's
   `runCheck`, read in 0.20.0's `dist/index.js`), and its JSON drops two things the spec's rules need: which findings
   are lint's (it re-emits lint's findings on changed records among its own) and the status of a file it could not
@@ -66,9 +66,9 @@ the reading and judging rules are written from.
   - One value per corpus, never an exception, so a corpus that could not be checked does not hide what the others
     answered when `decision_checks` is `log`.
   - adrkit's library is `@adrkit/core`, a published package whose exports include every function the script calls.
-    It is found beside the installed `adr`, which pins it to its own version (`@adrkit/cli` 0.20.0 depends on
-    `@adrkit/core` `0.20.0` exactly), so `adr --version`, the CLI's public answer, is the version check. The install
-    step stays one command.
+    It is found beside the installed `adr`, and its version is read from its own `package.json` by the script that
+    loads it. `adr --version` checked the CLI, not the library: a wrapper `adr` beside a core of another version passes
+    it and runs that core (found in review). The install step stays one command.
   - A governing record's file is found by its id among the records adrkit loaded, not by the file name: adrkit 0.20
     loads `0009-x.md` holding `id: "0099"` as 0099, and `governing` gives no path.
   - Every call runs from the real checkout path with the real corpus path, and every path is joined to it the same
@@ -84,11 +84,12 @@ the reading and judging rules are written from.
   `../org/docs/adr/0007-org.md`; an `adr` path with no core beside it exited 3; `adr --version` printed `0.20.0` and a
   newline, nothing else; a file whose frontmatter repeats a loaded record's id but which adrkit could not load (no
   `deciders`) got its `error` on its own path, while the loaded record stayed governing with only its own path;
-  `check` listed an id once per loaded record holding it.
+  `check` listed an id once per loaded record holding it; the script exited 3 for a core whose `package.json`
+  declared 0.21.0, for no core, and for a core without `lintCorpus`; `deciders: 7` gave `invalid-type`, an `error`.
 - The fixture corpus is kept outside any `docs/adr` path, so this repo's own check does not read it, and holds no
   file past a marker cap: a cap, and an unreadable file git cannot commit, are built by the tests that need them.
 - **Rationale**: constitution II (validate where input enters) and P4 (an answer the gate cannot read is a failed check,
-  not a pass). Pinning the install step to 0.20.0 names a fix that works (ADR-0009). Keeping the I/O in one module
+  not a pass). Pinning the install step to `ADRKIT_VERSION` names a fix that works (ADR-0009). Keeping the I/O in one module
   leaves `decisions.py` pure (P3). The plugin's own file readers drifted from adrkit's six times in review; reading
   with adrkit's code cannot.
 - **Existing tools**: `github.py` (one boundary module per outside service): fit, the same pattern. PR #92's
@@ -183,7 +184,7 @@ the reading and judging rules are written from.
   notices, the result), Layout rows for `adrkit.py`, `adrkit_corpus.mjs`, `decisions.py` and `agents/decision-reviewer.md`, and a
   Dependencies paragraph naming `adr` and its install step (FR-020). `plugin.json` goes to 0.14.0. `config.json` gains `"decision_checks": "enforce"` (R15) and
   `"max_review_files": 50` (R16). `tests.yml` adds
-  `actions/setup-node@v4` (node 22) and `npm install -g @adrkit/cli@0.20.0` so the suite runs the real adrkit.
+  `actions/setup-node@v4` (node 22) and `decisions.INSTALL`'s command so the suite runs the real adrkit.
 - **Rationale**: the README is the source the constitution's P1/P4 cite; it changes with the code it describes, as spec
   019 did. The tests that run adrkit skip without it locally and must not skip in CI.
 - **Existing tools**: PR #92's README item and CI step: followed, the item rewritten to the spec's terms.

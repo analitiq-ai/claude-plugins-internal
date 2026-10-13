@@ -37,7 +37,8 @@ them restates what is here. Nothing is stored: every shape lives for one launch,
   `docs/adr` whose tracked files all sit in subfolders is a corpus.
 - Org corpus: `ALQ_ORG_ADR_DIR` unset or empty is `None`. A value that is not an absolute path to a readable folder
   is `NotChecked(org label, "could-not-run", ...)`. Otherwise the `Corpus`.
-- A record is named `<label> <id>` in the brief, notices and result; a broken line names its file (§ Judgement).
+- A record is named `<label> <id>` in the brief, matcher notices and `governing`. A file notice and a broken line name
+  the file, as `_path` gives it (§ Reading adrkit, § Judgement).
 - `dir` is absolute from the builder on, so no consumer joins `root` to it; `label` is for display only. The paths
   the corpus script names go through `_path` (§ Reading adrkit).
 
@@ -61,18 +62,27 @@ Every finding that names a corpus file carries `status`: the record's status whe
 frontmatter `status` `parseAdrFile` reads, `null` when it is absent, not a string, or the file cannot be parsed.
 Marker and cap findings name no corpus file and carry none.
 
-`decisions.ADRKIT_VERSION` is `"0.20.0"`, what that release's `adr --version` prints (research.md R5's run), and
-`decisions.INSTALL` is `npm install -g @adrkit/cli@<ADRKIT_VERSION>`; no other file restates either. `outcomes` first
-runs `adr --version`; its stdout, stripped, must equal `ADRKIT_VERSION` (the CLI pins its core to its own version).
-Then, per corpus, `node adrkit_corpus.mjs <realpath of adr> <dir> <files>`, with `cwd` = `realpath(root)` and `<dir>` =
-`realpath(corpus.dir)`, every corpus at once, each in its own thread. Every call, `adr --version` included, is
+`decisions.ADRKIT_VERSION` is `"0.20.0"`, the release of `@adrkit/core` the rules below were written from (research.md
+R5's run), and `decisions.INSTALL` is `npm install -g @adrkit/cli@<ADRKIT_VERSION>`. Their copies, each pinned:
+
+| Copy | Pinned by |
+|---|---|
+| `.github/workflows/tests.yml`'s install step (T006) | `test_decisions.Contract.test_the_real_script_loads_a_core_of_adrkit_version`, which fails under `CI` when the installed core is another version |
+| the README's Dependencies command (T026) | `test_decisions.Drift.test_the_readme_gives_the_install_command` |
+
+`outcomes` runs, per corpus, `node adrkit_corpus.mjs <realpath of adr> <ADRKIT_VERSION> <dir> <files>`, with `cwd` =
+`realpath(root)` and `<dir>` = `realpath(corpus.dir)`, every corpus at once, each in its own thread as
 `subprocess.run(..., capture_output=True, timeout=max(deadline - time.monotonic(), 0))`, so each call's output is read
 while it runs and only a call that has not exited is killed. The script takes no options, so a path that begins with
-`-` is a path. Seconds go into `spent["adr --version"]` and `spent["adrkit <label>"]`. Without `adr` on `PATH`, no call
-is made; when `adr --version` does not pass, no corpus call is made.
+`-` is a path. Seconds go into `spent["adrkit <label>"]`. Without `adr` on `PATH`, no call is made.
 
-Exit 0 is an answer, whose stdout `outcomes` gives to `decisions.report`. Exit 3 is "no `@adrkit/core` beside `adr`"
-(an `adr` that is not the npm-installed command). Any other exit is a failure with its stderr.
+Before calling the core, the script checks the core it resolved: the `version` of the `package.json` named
+`@adrkit/core` that holds the resolved entry (the core exports no version, and its `exports` hides `package.json`) must
+equal `<ADRKIT_VERSION>`, and `lintCorpus`, `readSourceMarkersBatch`, `checkChanges` and `parseAdrFile` must be
+functions. So the version checked is the one that runs, whatever `adr` is.
+
+Exit 0 is an answer, whose stdout `outcomes` gives to `decisions.report`. Exit 3 is "no usable `@adrkit/core` beside
+`adr`": none found, another version, or a missing export. Any other exit is a failure with its stderr.
 
 Fields read, and nothing else. `report` checks every row; the first that fails makes the corpus `NotChecked(could-not-run)`
 naming the field:
@@ -128,11 +138,11 @@ located or briefed.
 | `too-big`: the round's files number more than `max_review_files` | gate, for each corpus not already `NotChecked`; no call is made | the count and the limit | full round: split the PR; delta round: commit in smaller steps and launch after each |
 | `could-not-run`: `ALQ_ORG_ADR_DIR` not an absolute path to a readable folder | `adrkit.org_corpus` | the variable and its value | point it at the org's `docs/adr` as an absolute path, or unset it |
 | `could-not-run`: a repo corpus holds a file `not_as_head` lists | gate, before any call | the files | commit or remove them |
-| `could-not-run`: `adr` not on `PATH`, or `adr --version` printing other than `ADRKIT_VERSION` | `adrkit.outcomes`, for every corpus | the version found, if any | `INSTALL` |
-| `could-not-run`: the corpus script exits 3 | `adrkit.outcomes` | `adr`'s path and the script's stderr | `INSTALL`, so the `adr` on `PATH` is the npm-installed command |
-| `could-not-run`: `adr --version` exits other than 0 (for every corpus), or the corpus script other than 0 or 3 | `adrkit.outcomes` | the call and its stderr | what stderr says |
+| `could-not-run`: `adr` not on `PATH` | `adrkit.outcomes`, for every corpus | `adr` | `INSTALL` |
+| `could-not-run`: the corpus script exits 3 | `adrkit.outcomes` | `adr`'s path and the script's stderr (the version found, or what is missing) | `INSTALL`, so the `adr` on `PATH` is the npm-installed command |
+| `could-not-run`: the corpus script exits other than 0 or 3 | `adrkit.outcomes` | the call and its stderr | what stderr says |
 | `could-not-run`: a field read of another shape | `decisions.report` | the field | `INSTALL` |
-| `could-not-run`: a call not ended by the deadline (`adr --version`: every corpus) | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
+| `could-not-run`: a call not ended by the deadline | `adrkit.outcomes` | the call, the deadline in seconds, and `spent` (review-base fetch, `gh`, each call, in seconds) | the step that spent the time |
 | `could-not-run`: the causes of § Judgement | `decisions.judge` | § Judgement | § Judgement |
 
 ## Judgement
@@ -233,16 +243,17 @@ both do; the cells where two of them differ are each in the table.
                  "file": "/abs/checkout/dev/alq-review/docs/adr/0018-release-a-reshape-spec-lock-only-by-unlock.md"}],
   "notices": [{"corpus": "org (/home/me/engineering/docs/adr)", "id": "0007", "matcher": "affects.package \"core\"",
                "reason": "<adrkit's message>"},
-              {"corpus": "dev/alq-review/docs/adr", "file": "dev/alq-review/docs/adr/notes.md",
+              {"corpus": "dev/alq-review/docs/adr", "file": "/abs/checkout/dev/alq-review/docs/adr/notes.md",
                "reason": "<adrkit's message>; its status cannot be read"}],
-  "broken": [],
+  "broken": [{"corpus": "dev/alq-review/docs/adr", "file": "/abs/checkout/dev/alq-review/docs/adr/0099-broken.md",
+              "id": "0099", "rule": "invalid-type", "message": "<adrkit's message>"}],
   "not_checked": [],
   "org_corpus": "org (/home/me/engineering/docs/adr)"
 }
 ```
 
-- `broken` is `[{corpus, file, id, rule, message}]`; `not_checked` is `[{corpus, cause, reason}]`. Each is non-empty
-  only when its refusal did not block.
+- `not_checked` is `[{corpus, cause, reason}]`. `broken` and `not_checked` are non-empty only when their refusal did
+  not block, as in this example's log mode.
 - `corpora: []` with `not_checked: []` and `org_corpus: "unset"` is "no corpus was found"; `corpora` non-empty with
   `governing: []` is "nothing in those corpora governs this change".
 

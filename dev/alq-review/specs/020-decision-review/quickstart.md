@@ -1,7 +1,7 @@
 # Quickstart: validate the decision check
 
 Prerequisites: Python 3.13, git, node ≥ 22, `pip install diff-match-patch==20241021`,
-the install command `decisions.INSTALL` (then `adr --version` prints `decisions.ADRKIT_VERSION`), as in CI after R12.
+the install command `decisions.INSTALL`, as in CI after R12.
 
 ## Suite
 
@@ -29,8 +29,8 @@ ADR-0018 governs `plugins/alq-review/scripts/gate.py`, so a branch that changes 
    the org's `docs/adr` or unset it; `python3 scripts/ledger.py status --worktree <abs>` shows no new round.
 5. Hide `adr` (`PATH` without it) and launch. Expected: refused with `decisions.INSTALL`.
 6. Commit a record `dev/alq-review/docs/adr/0099-broken.md` with `status: accepted` and `deciders: 7`, launch.
-   Expected: refused, naming `dev/alq-review/docs/adr 0099` and adrkit's message, next step to correct it in this repo
-   and commit. With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the reviewer's
+   Expected: refused, naming `dev/alq-review/docs/adr`, the file `<checkout>/dev/alq-review/docs/adr/0099-broken.md`
+   with `0099`, adrkit's message and `(invalid-type)`, next step to correct the record in this repo and commit. With `ALQ_REVIEW_MODE=log`: the round opens, `gate.log` has a `would_deny` line, and the reviewer's
    brief lists 0018 only.
 7. Launch an audit round (`stage: 'audit'`). Expected: no decision reviewer, no `decisions` key in the result.
 8. With `adr` hidden and `ALQ_REVIEW_DECISION_CHECKS=log`, launch. Expected: the round opens without a decision
