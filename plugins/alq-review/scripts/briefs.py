@@ -52,6 +52,12 @@ def bound_spec(state: dict) -> Spec:
     return specbinding.parse(state["spec"]) if "spec" in state else None
 
 
+def spec_folder(state: dict) -> str | None:
+    """The spec folder the PR is bound to; None for a PR bound to no spec or not bound yet."""
+    spec = bound_spec(state)
+    return spec.path if isinstance(spec, specbinding.Folder) else None
+
+
 def _ruled_on(state: dict) -> str:
     rulings = ledger.adjudicated(state)
     if not rulings:
@@ -169,7 +175,7 @@ def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: poli
     injected = {"worktree": where.root, "stage": rnd["stage"], "round_ref": rnd["ref"],
                 "label": f"{rnd['stage']} review round {rnd['n']} ({rnd['scope']})",
                 "waves": [[reviewer(t) for t in wave] for wave in waves(rnd["stage"], decisions)],
-                "assess": _assess_args(rnd, churned(state, rnd, where.root))}
+                "assess": _assess_args(rnd, churned(state, rnd, where.root)), "spec_folder": spec_folder(state)}
     if decisions is not None:
         injected["decisions"] = decisions
     return injected
@@ -177,7 +183,7 @@ def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: poli
 
 def assess_args(state: dict, rnd: dict, where: worktree.Worktree) -> dict:
     return {"worktree": where.root, "round_ref": rnd["ref"], "findings": rnd["findings"],
-            "assess": _assess_args(rnd, churned(state, rnd, where.root))}
+            "assess": _assess_args(rnd, churned(state, rnd, where.root)), "spec_folder": spec_folder(state)}
 
 
 def brief_token(rnd: dict) -> str:
@@ -186,7 +192,6 @@ def brief_token(rnd: dict) -> str:
 
 
 def brief(state: dict, rnd: dict) -> dict:
-    spec = bound_spec(state)
     base = rnd["base_sha"]
     measured = facts.round_facts(state, rnd, rnd["root"])
     return {
@@ -194,7 +199,7 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec_folder": spec.path if isinstance(spec, specbinding.Folder) else None,
+        "spec_folder": spec_folder(state),
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],

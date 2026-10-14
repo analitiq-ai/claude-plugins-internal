@@ -1,1 +1,1 @@
-{"mode": "enforce", "claim_checks": "enforce", "shim_checks": "enforce", "claim_warn_over": 20, "decision_checks": "enforce", "max_review_files": 50}
+{"mode": "enforce", "claim_checks": "enforce", "shim_checks": "enforce", "claim_warn_over": 20, "decision_checks": "enforce", "max_review_files": 50, "escalate_to": "Analitiq-Bot-Wonka"}

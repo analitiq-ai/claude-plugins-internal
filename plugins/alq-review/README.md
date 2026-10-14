@@ -21,7 +21,11 @@ that is under review.
    the agent can make one. An unlock that releases a `RESHAPE_SPEC` lock replies with the ruling, since nothing
    else hands it on: the open decision, its rationale, the `spec_gap` findings and the PR's spec folder. On a PR
    bound to `spec: null` it says instead to close the PR and restart the work on a new PR bound to a spec that
-   settles the decision. While a branch is held, every Bash command of the session that launched its round is checked
+   settles the decision. On a PR bound to a spec folder, the ruling also tells the spec's issue, the number the
+   folder's name starts with (`<issue>-<name>`): the gate posts one comment naming the PR and round with that
+   ruling, then makes one edit adding the `reshape_spec` label and the `escalate_to` assignee. Each call is tried
+   once; one that fails is named, with GitHub's error, in the lock's refusal and in the unlock's reply, to be done
+   by hand. The gate never creates the label, and never removes it or the assignee. While a branch is held, every Bash command of the session that launched its round is checked
    against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
    change there, as they stood before the command. A file written or a commit made by any route is caught
    and the agent told to put it back, even if the command then leaves the branch; checking another branch
@@ -167,6 +171,9 @@ when both settings enforce; at `log`, each is a `would_deny` and the round opens
 `max_review_files` (50) is the most files an internal round may review; past it the launch is refused before any
 adrkit call, following the plugin's mode.
 
+`escalate_to` names the GitHub account a `RESHAPE_SPEC` ruling assigns the spec's issue to. It has no default: a
+missing or blank one fails that edit, and the lock names the failure.
+
 The shim check (7) has its own `shim_checks` setting, overridden by `ALQ_REVIEW_SHIM_CHECKS`; when either it or the
 plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is reached through OpenRouter with the
 key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
@@ -246,6 +253,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
+| `scripts/reshape.py` | a `RESHAPE_SPEC` ruling's summary, the notice it owes the spec's issue, and what is said when that notice failed - pure |
 | `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/codexstate.py` | Codex's state for a review round, read from its status card and its known comment forms - a pure function the poller calls |

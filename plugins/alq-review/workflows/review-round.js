@@ -31,5 +31,5 @@ const findings = Object.entries(reports).flatMap(([type, report]) => report.find
 if (!findings.length) {
   return { status: 'CLEAN', round: args.label, next_step: 'No reviewer found anything that must change. This stage is done.', ...decided }
 }
-const assessed = await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess })
+const assessed = await workflow('alq-review:assess-round', { round_ref: args.round_ref, label: args.label, findings, assess: args.assess, spec_folder: args.spec_folder })
 return { ...assessed, ...decided }
