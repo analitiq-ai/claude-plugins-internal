@@ -36,7 +36,8 @@ alq-plan ADR-0008 records the no-spec folder. ADR-0005, decision 3, stands.
 
 - **Spec folder**: `specs/<feature>/` beside a committed `.specify/` (ADR-0004).
 - **Issue folder**: a spec folder whose last part is `<issue>-<short-name>`.
-- **Short name**: lowercase kebab-case, one or more words of `[a-z0-9]` joined by single hyphens.
+- **Short name**: lowercase kebab-case, one or more words of `[a-z0-9]` joined by single hyphens. A new scope picks
+  1 to 4 of them from the issue title (FR-002).
 - **Folder input**: the one workflow input that names the run's spec folder, on every run.
 - **Spec branch**: `<issue>-spec`, the branch a new scope lands its spec on.
 - **Story heading**: a line `### User Story <N> - <title> (Priority: P<n>)` of spec.md.
@@ -114,7 +115,7 @@ below.
 **Acceptance Scenarios**:
 
 1. **Given** `#79` and an issue titled "Name spec folders by their issue", **When** the run starts, **Then** the
-   folder input is `specs/79-<short-name>`, the short name is 2 to 4 words from the title, and it is picked once
+   folder input is `specs/79-<short-name>`, the short name is 1 to 4 words from the title, and it is picked once
    for the run.
 2. **Given** that folder, **When** the workflow reaches `specify`, **Then** `specify` is given it as
    `SPECIFY_FEATURE_DIRECTORY`.
@@ -258,6 +259,7 @@ Delivery Workflow.
 - `specs/079-x` for #79: refused. The number is the issue's number as GitHub writes it, with no padding.
 - `specs/79-x` for #7: refused. The prefix checked is `7-`, with its hyphen.
 - A short name with capitals, underscores, spaces, or nothing after the hyphen: refused by the folder check.
+- An issue title with one usable word, such as "Cleanup": the short name is that word, `specs/<issue>-cleanup`.
 - A project folder before `specs` (`dev/alq-plan/specs/79-x`): the workflow, which runs in the project, is given
   `specs/79-x`.
 - A second Spec Kit project in the same repo holds `specs/<issue>-*`: the workflow sees only its own project's
@@ -277,7 +279,7 @@ Delivery Workflow.
 **The folder (Story 1)**
 
 - **FR-001**: Every spec folder alq-plan creates MUST be `specs/<issue>-<short-name>` under the run's project.
-- **FR-002**: `/alq-plan:issue-spec` MUST pick `<short-name>` once, at the start of a new scope, as 2 to 4 words of
+- **FR-002**: `/alq-plan:issue-spec` MUST pick `<short-name>` once, at the start of a new scope, as 1 to 4 words of
   the issue title, and pass the whole folder to the workflow. On a rescope the folder is the one the user names.
 - **FR-003**: The workflow MUST take the folder as one input on every run, new scope and rescope. Which kind of run
   it is MUST NOT be read from whether a folder was given. The folder MUST reach shell steps through the environment,
