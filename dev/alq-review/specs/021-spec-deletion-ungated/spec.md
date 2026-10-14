@@ -15,11 +15,11 @@ Superseded by the Clarifications: the `cleanup` label decides, not the diff.
 ### Session 2026-10-14
 
 - Q: Where is the spec-deletion-only check decided: the org pr-gate (and this repo adopts it) or alq-review alone? → A: alq-review alone. Only alq-review logic changes; the org pr-gate is left alone. A PR that only deletes files under `specs/` gets none of alq-review's gating: no internal review, no Codex request or wait, no DeepSource grade check, nothing else alq-review applies.
-- Q: What identifies a PR that gets no alq-review gating, and who may mark it? → A: The PR label `cleanup` alone, whatever the diff. Only the user adds it: the hook refuses an agent's command that adds the label unless the user's prompt grants it, as `override-merge` does.
+- Q: What identifies a PR that gets no alq-review gating, and who may mark it? → A: The PR label `cleanup` alone, whatever the diff. Only the user adds it, on GitHub.
 - Q: Does the exemption survive pushes made after the label was added? → A: Yes. The label exempts the PR whatever is pushed to it later; only removing the label brings the gate back.
 - Q: Does this feature change `/alq-post-merge` (citation removal, step 7)? → A: No. The work is alq-review only.
 - Q: Does the label also skip alq-review's commit-time checks (claim-check, shim-check)? → A: Yes. Commits on a branch whose PR carries `cleanup` skip both.
-- Q: (critique) Can the user let the agent add the label, by a grant in their prompt? → A: No. The agent never adds `cleanup`: the hook refuses every agent command that adds it, and the user adds it on GitHub. Labelling an issue that is not a PR is not refused.
+- Q: Does this feature refuse an agent's command that adds the label? → A: No. The user adds a separate hook later that refuses a fixed set of `gh` forms; this feature refuses no label command.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -49,29 +49,7 @@ with no internal round recorded on the branch and no attestation comment.
 
 ---
 
-### User Story 2 - Only the user puts the cleanup label on a PR (Priority: P1)
-
-An agent cannot exempt its own PR. A command by which the agent would add the `cleanup` label to a PR is
-refused; the refusal says only the user adds it, on GitHub.
-
-**Why this priority**: The agent and the user both act on GitHub as Analitiq-bot, so GitHub cannot tell who
-added a label. Without this story the label is a switch any agent can flip to skip every review.
-
-**Independent Test**: Run `gh pr edit <n> --add-label cleanup` as the agent: refused. Run
-`gh issue edit <m> --add-label cleanup` on an issue that is not a PR: allowed.
-
-**Acceptance Scenarios**:
-
-1. **When** the agent runs `gh pr edit <n> --add-label cleanup`, `gh pr create --label cleanup`,
-   `gh issue edit <n> --add-label cleanup` on a PR, or a `gh api` call that adds the label to a PR, **Then** the
-   hook refuses it and says only the user adds the label, on GitHub.
-2. **Given** an issue `<m>` that is not a PR, **When** the agent adds `cleanup` to it, **Then** it is allowed.
-3. **Given** the hook cannot tell whether `<n>` is a PR (GitHub gives no answer), **When** the agent adds
-   `cleanup` to it, **Then** it is refused, naming why.
-
----
-
-### User Story 3 - The poller and the skill apply no review gating to a cleanup PR (Priority: P2)
+### User Story 2 - The poller and the skill apply no review gating to a cleanup PR (Priority: P2)
 
 After opening or readying a cleanup PR, the agent follows the GitHub review skill. The skill and the poller
 recognise it as needing no review: no `@codex review` is posted, no Codex answer is waited on, the DeepSource
@@ -98,9 +76,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 - The label is read from GitHub at each check (ready, merge, poll). When it cannot be read, the PR is treated
   as unlabelled and gated, and the refusal says the label could not be read rather than that a review is
   missing.
-- The user adds the label on GitHub directly: the hook sees no command and refuses nothing; the PR is a
-  cleanup PR.
-- Removing the `cleanup` label is never refused: it only brings the gate back.
+- The user adds the label on GitHub: the PR is a cleanup PR.
+- Removing the `cleanup` label brings the gate back.
 - A commit on a branch with no open PR, or whose open PR has no `cleanup` label, is checked by claim-check and
   shim-check as today.
 - A push after the label was added leaves the PR a cleanup PR: the exemption is bound to the PR, not to a
@@ -129,10 +106,9 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   `@codex review`, or treat an unresolved review thread as blocking; no alq-review gate applies.
 - **FR-009**: The GitHub review skill MUST state that a cleanup PR needs no `@codex review`, no DeepSource
   grade check (`deepsource-pr-gate.sh`) and no thread triage, and that the `cleanup` label is what marks one.
-- **FR-010**: The hook MUST refuse every agent command that adds the `cleanup` label to a PR (`gh pr edit
-  --add-label`, `gh pr create --label`, `gh issue edit --add-label`, a `gh api` call to the labels endpoint), in
-  every mode; the refusal says only the user adds the label, on GitHub. Adding it to an issue that is not a PR is
-  not refused; when GitHub cannot say which it is, the command is refused, naming why.
+- **FR-010**: This feature refuses no command that adds or removes a label. Refusing an agent's label add is
+  left to a separate hook the user adds later; until then a label an agent adds exempts the PR as one the user
+  adds does.
 - **FR-011**: Only the `cleanup` label and the version-only release exempt a PR from review; no other path
   (agent-posted comment, check run from another app) releases the hold.
 - **FR-012**: A `git commit` on a branch that has an open PR carrying the `cleanup` label MUST NOT be held by
@@ -156,7 +132,6 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   gate runs, and zero claim-check or shim-check runs on its commits.
 - **SC-003**: Every PR without the label is gated as before: in the test suite, every existing ready/merge
   refusal case still refuses.
-- **SC-004**: Every label-adding command form in FR-010 is refused, in the test suite.
 
 ## Assumptions
 

@@ -8,8 +8,8 @@
 
 A PR carrying the `cleanup` label is decided by one pure function, `github.is_cleanup` (R1). `policy.mark_ready` and
 `pre_merge_gate.unmet` allow it without a round or an attestation, after the holds they already check (R2, R3, R10);
-`gate.on_bash` skips the claim and shim commit checks for its branch (R4). Only the user adds the label, on GitHub:
-`pre_merge_gate` refuses every gh form by which an agent adds it to a PR, in every mode, with no grant (R5, R6). The poller ends a cleanup PR with exit `5` and hands nothing to the gate
+`gate.on_bash` skips the claim and shim commit checks for its branch (R4). Only the user adds the label, on GitHub;
+no command that adds it is refused here (R5, R6). The poller ends a cleanup PR with exit `5` and hands nothing to the gate
 (R7). A new ADR naming the cleanup PR beside the version-only release lands first, in its own PR (R9).
 
 Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-model.md). Edges:
@@ -32,7 +32,7 @@ Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-
 **Performance Goals**: one `gh` call per `git commit` (R4) and one per ready, merge or poller run; each under
 `github._answer`'s 20 s, inside the hooks' 60 s / 45 s
 
-**Constraints**: one decider (FR-002); the label check refuses in every mode (R6); the label lifts no hold (R10); the
+**Constraints**: one decider (FR-002); the label lifts no hold (R10); the
 org pr-gate is untouched (FR-005)
 
 **Scale/Scope**: one label; nothing in `/alq-post-merge` (R12)
@@ -45,12 +45,12 @@ org pr-gate is untouched (FR-005)
 |---|---|
 | I. Contract-first | No new shape: GitHub's label list, read through `gh`. Pass. |
 | II. Ownership & trust boundaries | All in this repo's plugin; the org pr-gate is not touched (FR-005). Labels enter through `gh` and are validated where read (R1, R3). Pass. |
-| III. Fail loud, no workarounds | An unread label gates the PR and the refusal says why (R2, R3); a label form the hook cannot read is refused, not guessed (R6). The open limit (non-gh routes) is stated, not papered over (R6). Pass. |
+| III. Fail loud, no workarounds | An unread label gates the PR and the refusal says why (R2, R3); an agent's label add is not refused, and that is stated (R6). Pass. |
 | IV. Test-first | Every scenario a failing test first (R11). Pass. |
 | V. Smallest complete change | One decider, one reader, one CLI entry the poller needs; no diff reading, no new module. Pass. |
 | VI. Governing rule ships apart | The ADR amending ADR-0003's list is its own PR, merged first (R9). The README and skill describe the code and ship with it. Pass. |
-| P1. Code decides | Ready, merge, commit, label-add and the poller's outcome are decided in code; the skill routes by exit code (R7). Every refusal names its next step (R6, R8). Pass. |
-| P2. Only an approved entity releases a hold | The review hold on a PR is released by the user, by one action: adding the label on GitHub; every agent command that adds it is refused (R5, R6). Locks and rounds in flight keep their own releases (R10). The label-add check refuses in log mode too, so log mode is not a second way out (R6). Pass. |
+| P1. Code decides | Ready, merge, commit and the poller's outcome are decided in code; the skill routes by exit code (R7). Every refusal names its next step (R6, R8). Pass. |
+| P2. Only an approved entity releases a hold | The review hold on a PR is released by the user adding the label on GitHub. Nothing refuses an agent's label add until the user's separate hook lands (R6); until then the label is a second way out, stated here and in ADR-0021. Locks and rounds in flight keep their own releases (R10). Open until that hook lands. |
 | P3. Rules are pure | `is_cleanup` and `policy.mark_ready` are pure; `gate.py`, `pre_merge_gate.py` and the poller only read and answer. Pass. |
 | P4. A check that could not run is its own outcome | An unread label is `unread(why)`: gated, never a pass, and named in the refusal and the poller's warning (data-model). Pass. |
 
@@ -124,7 +124,7 @@ None.
 - Merge and ready in the pre-merge gate allowed for a cleanup PR: R3
 - Commit checks skipped on a cleanup PR's branch: R4
 - No grant; only the user adds the label: R5
-- The label-add refusal and its forms: R6
+- No label-add refusal here: R6
 - The poller's cleanup outcome (exit 5, no hand-over): R7
 - The refusal sentences and the skill's Cleanup PRs section: R8
 - The ADR naming the cleanup PR: R9

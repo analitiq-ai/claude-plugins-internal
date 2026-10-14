@@ -4,10 +4,6 @@ What changes at the plugin's edges. Internal function shapes are in [../data-mod
 
 ## Hook refusals (PreToolUse/Bash, `pre_merge_gate.py`, every mode)
 
-- label add to a PR (`gh pr create --label cleanup` included): names the PR, or the PR to be created, and says
-  only the user adds the `cleanup` label, on GitHub; ends "Tell them and stop."
-- label add where GitHub cannot say whether N is a PR: names why.
-- graphql label mutation: add labels with `gh pr edit --add-label` so the hook can read which.
 - `gh pr ready` / `gh pr merge` refusals (also `gate.py`'s ready refusal) end with the cleanup sentence (research R8),
   and start with the unread-label sentence when the label could not be read.
 
