@@ -19,7 +19,10 @@ in this session, and passes the user's verdicts on resume. Never reimplement a w
   worktree (create it per the repo's branch rules if there is none). `PROJECT` is `<dir>`, relative to
   `CHECKOUT`, or `CHECKOUT` without one. Write the issue to `SPEC_FILE`:
   `repo=$(git remote get-url origin) && gh issue view <ISSUE> --repo "$repo" --json url,title,body --jq '"\(.url)\n# \(.title)\n\n\(.body)"' > <SPEC_FILE>`.
-  No `SPEC_DIR`: the workflow's `specify` step creates a new spec folder in `PROJECT/specs/`.
+  `SPEC_DIR` is `specs/<ISSUE>-<short name>`, picked once, here, and never changed for the run: the workflow's
+  `specify` step writes the spec there, in `PROJECT`. `<short name>` is 1 to 4 words of the issue title, lowercased,
+  each a run of `[a-z0-9]`, joined by single hyphens: the words that name the change. A title with no such word: stop
+  before writing anything, and tell the user to retitle the issue.
 - **`rescope <spec folder> #<issue>`** - re-scope that spec folder in place; both are required. `ISSUE` is as
   above. `CHECKOUT` is the issue's worktree on the branch of the PR bound to that spec folder: a rescope never creates one.
   With no such worktree, stop and ask the user where it is. The folder is relative to `CHECKOUT`: for
@@ -41,7 +44,8 @@ and `open_markers`; paused at `review-critique` also `critique`. `specify` takes
 project (it must hold `.specify/`; a parent's does not count), so the spec folder lands in its `specs/`. Run every `DRIVE` call from `PROJECT` with
 `run_in_background: true` (headless steps take up to ~10 min each).
 
-1. **Start.** `python3 DRIVE start <SPEC_FILE> <ISSUE>`, plus `<SPEC_DIR>` on a rescope. Note the `run_id`.
+1. **Start.** `python3 DRIVE start <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a new scope,
+   `python3 DRIVE rescope <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a rescope. Note the `run_id`.
    Expect `paused` at `premise`; on a rescope, `paused` at `grill`, and the next step is 4.
 2. **Premise.** Write the output of `python3 PREMISE form` to
    `.specify/workflows/runs/<run_id>/premise-report.md` in `PROJECT`. Answer each of its questions in this

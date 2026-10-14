@@ -21,11 +21,18 @@ inputs:
     type: string
     required: true
     prompt: "GitHub issue number"
-  # Non-empty re-scopes an existing spec folder. The folder itself comes from $SPEC_DIR, never from
-  # this input: template text is spliced into shell source before the shell can validate it.
+  # The run's one spec folder, on every run. Shell steps read it from $SPECIFY_FEATURE_DIRECTORY, never from this
+  # input: template text is spliced into shell source before the shell can validate it.
   spec_dir:
     type: string
-    default: ""
+    required: true
+    prompt: "Spec folder, specs/<issue>-<short-name>"
+  # Never read from whether a folder was given: every run is given one.
+  kind:
+    type: string
+    required: true
+    enum: ["new", "rescope"]
+    prompt: "new or rescope"
   integration:
     type: string
     default: "claude"
@@ -42,11 +49,16 @@ inputs:
     default: ""
 
 steps:
+  # The kind is one of its enum by now, never text the user typed.
+  - id: check-folder
+    type: shell
+    run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" check "$SPECIFY_FEATURE_DIRECTORY" "$ISSUE" "{{ inputs.kind }}"
+
   # Whether the issue is worth a spec is asked before one is written. The questions are answered in the session,
   # which a headless command step cannot do. A re-scope amends a spec that was already judged worth writing.
   - id: new-spec
     type: if
-    condition: "{{ not inputs.spec_dir }}"
+    condition: "{{ inputs.kind == 'new' }}"
     then:
       # The verdict is the outcome itself, so no pick reads as approving or rejecting another.
       - id: premise
@@ -84,30 +96,28 @@ steps:
   # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
   - id: scope
     type: if
-    condition: &spec-is-written "{{ inputs.spec_dir or steps.premise.output.choice == 'write the spec' }}"
+    condition: &spec-is-written "{{ inputs.kind == 'rescope' or steps.premise.output.choice == 'write the spec' }}"
     then:
       - id: scope-kind
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ inputs.kind == 'rescope' }}"
         then:
+          # check-folder has graded the folder, so it goes into the JSON as it is.
           - id: select-spec
             type: shell
             run: |
-              set -eu
-              dir="$SPEC_DIR"
-              case "$dir" in
-                specs/*/*|*..*|*[!A-Za-z0-9._/-]*|specs/) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
-                specs/*) ;;
-                *) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
-              esac
-              test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
-              printf '{\n  "feature_directory": "%s"\n}\n' "$dir" > .specify/feature.json
+              printf '{\n  "feature_directory": "%s"\n}\n' "$SPECIFY_FEATURE_DIRECTORY" > .specify/feature.json
         else:
+          # The folder is in the prompt as well as the environment: the agent reads its prompt, Spec Kit's scripts
+          # read the environment.
           - id: specify
             command: speckit.specify
             integration: "{{ inputs.integration }}"
             input:
-              args: "{{ inputs.spec }}\n\nPremise report: .specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+              args: "{{ inputs.spec }}\n\nSPECIFY_FEATURE_DIRECTORY: {{ inputs.spec_dir }}\n\nPremise report: .specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          - id: check-specify-folder
+            type: shell
+            run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" recorded "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: new-spec-root-cause
     type: if
@@ -164,7 +174,7 @@ steps:
     then:
       - id: root-cause-regrade
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ inputs.kind == 'rescope' }}"
         then:
           - id: root-cause-of-rescope
             type: shell

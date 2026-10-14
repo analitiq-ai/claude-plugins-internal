@@ -305,17 +305,8 @@ class Specify(unittest.TestCase):
                 self.project.env.update(env)
                 report = self.resume(f"premise_verdict={WRITE}")
                 self.assertEqual((report["status"], report["step"]), ("failed", "check-specify-folder"), report)
-                for said in (recorded, f"`{NEW}`", "Next step:"):
+                for said in (recorded, f"`{NEW}`", "Next step:", "start the scope again"):
                     self.assertIn(said, report["stderr"])
-
-    def test_resuming_after_specify_recorded_another_folder_runs_specify_again(self):
-        """The failure's next step: resuming the run gives `specify` its folder again."""
-        self.project.env["CLAUDE_WRITES_TO"] = "specs/001-demo"
-        self.resume(f"premise_verdict={WRITE}")
-        self.project.env["CLAUDE_WRITES_TO"] = NEW
-        report = self.resume()
-        self.assertEqual((report["status"], report["step"]), ("paused", "grill"), report)
-        self.assertEqual([env for env, _ in self.project.specify_given()], [NEW, NEW])
 
 
 class Resume(unittest.TestCase):

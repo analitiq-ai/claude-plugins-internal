@@ -67,11 +67,6 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertIn("A title with no such word: stop before writing anything, and tell the user to retitle the "
                       "issue.", self.new_scope())
 
-    def test_a_folder_that_specify_did_not_record_is_resumed_after_its_next_step(self):
-        stops = squashed(ISSUE_SPEC).split("## Stops", 1)[1]
-        self.assertIn("`step: check-specify-folder`, with a `stderr` line that names a Next step: do as it says.",
-                      stops)
-
     def test_a_completed_run_ends_with_the_spec_folder_and_branch_lines(self):
         text = squashed(ISSUE_SPEC)
         self.assertIn("End with two lines and nothing after them: `Spec folder: <path>`", text)
