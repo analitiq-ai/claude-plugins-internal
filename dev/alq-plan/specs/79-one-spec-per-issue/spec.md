@@ -32,6 +32,11 @@ alq-plan ADR-0008 records the no-spec folder. ADR-0005, decision 3, stands.
 
 - Q: Where does the spec land? → A: On branch `<issue>-spec`, created from the repo's default branch in worktree `.claude/worktrees/<issue>-spec`. The skill commits, pushes and opens a draft PR whose body starts `Part of #<issue>`. It launches no review: alq-review is optional and, for now, started by hand with `spec: null` (issue #79, "Decided", as edited on 2026-10-13).
 
+### Session 2026-10-14
+
+- Q: What does a rescope leave? → A: FR-015's end state; the agent on the branch that gets the edits pulls them
+  (#129). This replaces the 2026-10-12 answer to "And a rescope?".
+
 ## Terms
 
 - **Spec folder**: `specs/<feature>/` beside a committed `.specify/` (ADR-0004).
@@ -181,8 +186,8 @@ that creates the issue and the run that follows.
 ### User Story 3 - The spec lands through its own PR (Priority: P1)
 
 A new scope works on branch `<issue>-spec`, in its own worktree from the default branch, and the spec lands through
-its own PR. A rescope edits the spec in the PR it is run from. The story numbers that branches and PRs name do not
-move; FR-016 says how much of that the run checks.
+its own PR. A rescope's end state is FR-015's. The story numbers that branches and PRs name do not move; FR-016
+says how much of that the run checks.
 
 **Why this priority**: under the engineering workflow the spec lands through its own PR first (engineering
 ADR-0002, decision 3), and stories are named by number from then on.
@@ -202,12 +207,12 @@ story-number check.
    launched, and the last message names the folder, the branch, the PR and `spec: null`.
 4. **Given** a spec.md with a story heading that is not `### User Story <N> - <title> (Priority: P<n>)`, or two
    stories with one number, **When** the run checks it, **Then** it fails, naming the heading.
-5. **Given** a rescope run from a story's worktree, **When** it completes, **Then** the spec edit is committed and
-   pushed on that worktree's branch, and no other branch or PR is created.
+5. **Given** a rescope run from a story's worktree, **When** it completes, **Then** the end state and last message are
+   FR-015's.
 6. **Given** a rescope of a spec with stories 1 to 3, **When** the rescoped spec.md drops story 2 and adds story 4,
    **Then** the run goes on. Given stories numbered 1 and 3, a rescope that adds a story numbered 2 fails the run,
    naming the numbers.
-7. **Given** a run that fails or is rejected, **Then** nothing is committed, pushed or opened.
+7. **Given** a run that fails or is rejected, **Then** the end state is FR-017's.
 8. **Given** a new scope that ended on `no spec needed`, **When** the skill ends, **Then** the no-spec folder lands as
    in scenario 3: committed and pushed on `<issue>-spec`, a draft PR whose body starts `Part of #<issue>`, no
    review launched, and the last message naming the folder, the branch, the PR and `spec: null`.
@@ -323,16 +328,22 @@ Delivery Workflow.
   open a draft PR into the default branch whose body starts `Part of #<issue>`. It MUST launch no review. Its last
   message MUST give the spec folder, the branch, the PR and `spec: null`, for a review the user starts by hand. As
   ADR-0005, decision 3, has it, the message MUST name no command of another plugin.
-- **FR-015**: A rescope MUST work in the worktree it is run from, and commit and push the spec edit on that
-  worktree's branch. It MUST create no branch, worktree or PR.
+- **FR-015**: A completed rescope MUST leave no change to a tracked file outside the spec folder of the worktree
+  it is run from, and MUST commit, push and open nothing. Run state under `.specify/` is not landed. Its last
+  message MUST name the spec folder, say its edits are uncommitted, and say they are to be pushed to the branch of
+  the work that stopped for the spec change. This replaces alq-review spec 104's FR-006 and User Story 5 (the
+  rescope lands on `<issue>-spec` through a spec-only PR), and depends on #130, the gate taking the spec edit on
+  that branch.
 - **FR-016**: The workflow MUST check spec.md's story headings with one pure function after every step that writes
   spec.md: each is `### User Story <N> - <title> (Priority: P<n>)`, and no number is used twice. On a rescope it
-  MUST also check, against spec.md as the run found it, that every number not there before is greater than every
-  number that was. Numbers that were there may be dropped, and a dropped number is not used again. The check
-  compares numbers only, so it does not catch a number dropped and used again in the same run, a story moved to
-  another number, or, in a later run, a dropped number used again that is greater than every number spec.md still
-  has.
-- **FR-017**: A run that fails or is rejected MUST commit, push and open nothing.
+  MUST also check, against spec.md as the run found it in the worktree, uncommitted edits included, that every
+  number not there before is greater than every number that was. Numbers that were there may be dropped, and a
+  dropped number is not used again. The check compares numbers only, so it does not catch a number dropped and
+  used again in the same run, a story moved to another number, or, in a later run, a dropped number used again that
+  is greater than every number spec.md still has, or a number a failed run left in the worktree, which the next
+  rescope takes as already there.
+- **FR-017**: A run that fails or is rejected MUST commit, push and open nothing. On a rescope its last message MUST
+  name the failure and say the spec folder's edits in the worktree are not to be landed.
 
 **Existing folders (Story 4)**
 
@@ -389,11 +400,11 @@ Delivery Workflow.
 - `untracked` takes an optional `<dir>`, as `#<issue>` does, so the folder can land in a project under the checkout.
 - The skill asks the user to confirm the title, body and issue type before it creates the issue: it writes to
   GitHub for the user.
-- A rescope, like a new scope, launches no review. It opens no PR: the spec edit lands in the PR it is run from.
+- A rescope, like a new scope, launches no review. What it leaves, and who lands it, is FR-015's.
 - Whether the headless agent of `specify` honours `SPECIFY_FEATURE_DIRECTORY` from its environment, or needs it in
   its arguments, was not run. FR-005's check holds the folder either way.
 - Out of scope: how alq-build finds and uses the folder (#82); review's story contract (#81); rounds before a PR
-  exists (#70).
+  exists (#70); how an agent stops for a spec change and resumes (#129).
 
 ## Why this is worth doing
 
