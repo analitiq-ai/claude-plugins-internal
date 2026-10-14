@@ -330,7 +330,8 @@ Delivery Workflow.
   MUST also check, against spec.md as the run found it, that every number not there before is greater than every
   number that was. Numbers that were there may be dropped, and a dropped number is not used again. The check
   compares numbers only, so it does not catch a number dropped and used again in the same run, a story moved to
-  another number, or a dropped highest number used again in a later run.
+  another number, or, in a later run, a dropped number used again that is greater than every number spec.md still
+  has.
 - **FR-017**: A run that fails or is rejected MUST commit, push and open nothing.
 
 **Existing folders (Story 4)**
