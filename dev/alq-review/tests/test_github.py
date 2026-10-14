@@ -116,6 +116,8 @@ class BranchLabels(StubGh):
         answer = [{"number": 7, "labels": labels("cleanup")}, {"number": 9, "labels": []}]
         with self.answering(json.dumps(answer)):
             self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), ["cleanup"])
+        with self.answering(json.dumps(answer[::-1])):
+            self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), [])
 
     def test_no_answer_or_another_shape_is_a_runtime_error(self):
         for out, code in (("", 1), ("{}", 0), ('[{"number": 7}]', 0), ("7 main", 0)):
