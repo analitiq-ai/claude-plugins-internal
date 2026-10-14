@@ -50,8 +50,8 @@ the failing read named: `<onto>` or the locked round's `head_sha`.
 | `onto spec.md` | `<spec>/spec.md` is missing or empty on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. |
 | `changed` | The spec PR has not reached `<default>`: `<spec>/spec.md` there is the one round <n> reviewed. Next step: land the spec change as a spec-only PR on `<issue>-spec` and type `rebase <ref>` once it merges, or type `unlock <ref>` if the spec stands. |
 | `release` | The user released `<ref>` for the spec change on `<default>` at `<onto>`: every hold named before is released. Next step, without asking the user: in `<root>`, rebase `<branch>` onto `origin/<default>`; if it stops on conflicts, dispatch `Agent(subagent_type='alq-review:conflict-resolver', prompt='<root>')`, and if it reports the rebase aborted, raise its report to the user and stop; push with `git push --force-with-lease`; then launch the next round, a full round that grades against `<spec>/spec.md` as the branch then has it. |
-| `contains`, exit 1 | `rebase <ref>` released this branch for the spec on `origin/<default>` at `<onto>`, and HEAD does not contain that commit, so a round would grade the old code against the new spec. Next step: rebase onto `origin/<default>` first, push with `git push --force-with-lease`, then launch again. |
-| `contains`, any other exit | git's words, as `_review_base`'s refusal gives them |
+| `contains` False | `rebase <ref>` released this branch for the spec on `origin/<default>` at `<onto>`, and HEAD does not contain that commit, so a round would grade the old code against the new spec. Next step: rebase onto `origin/<default>` first, push with `git push --force-with-lease`, then launch again. |
+| `contains` RuntimeError, at either fact of data-model "The review-round launch" | git's words, as `_review_base`'s refusal gives them |
 
 `unlock <ref>` on a `RESHAPE_SPEC` lock: the reply carries the ruling as today, and names `<issue>-spec` as where a
 rescope runs.

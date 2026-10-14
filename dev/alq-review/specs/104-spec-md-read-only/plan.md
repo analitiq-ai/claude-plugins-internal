@@ -32,7 +32,7 @@ reply is a failing test before its code (R10)
 **Project Type**: Claude Code plugin hooks, one agent, one skill's prose
 
 **Performance Goals**: an edit of a spec.md costs no git call beyond today's `locate`; a review-round launch one diff of the
-changed paths, and after a release by `rebase` one ancestry check. `rebase <ref>` runs its gh calls, one fetch and two reads
+changed paths, and up to two ancestry checks (the last round's head, and `rebased_onto` when set). `rebase <ref>` runs its gh calls, one fetch and two reads
 inside the prompt hook, under its default timeout
 
 **Constraints**: the edit rule reads the branch and never GitHub, nor the ledger (R3); every refusal names the next step; the
@@ -82,8 +82,8 @@ specs/104-spec-md-read-only/
 plugins/alq-review/
 ├── scripts/
 │   ├── specbinding.py       # + spec_folder, spec_md_folder, story_issue, story_edit_refusal, mixed_diff_refusal; - text_step
-│   ├── gate.py              # on_edit: edit rule; on_workflow: no hold, diff check, launch check `contains`; _rebase
-│   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: unrebased_onto, done via counted(regraded_only=True)
+│   ├── gate.py              # on_edit: edit rule; on_workflow: no hold, diff check, two `contains` facts, regraded_from on regrade; _rebase
+│   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: onto_contained, last_head_contained, Decision.regrade; done via counted(regraded_only=True)
 │   ├── ledger.py            # + regraded_rounds; counted(..., regraded_only=False) (R12)
 │   ├── facts.py             # round_facts: earlier, seen, first_reviewed, base from the regraded rounds (R12)
 │   ├── worktree.py          # + name_status, fetch_target, contains
@@ -135,7 +135,5 @@ gate and the edit tools as the early refusal, with its own reply for a folder's 
 - The rescope on `<issue>-spec`, never a merged one: R9
 - The tests of each story, and the hold's deleted: R10
 - The README: R11
-- FR-010's measurement after a release by `rebase`, one `ledger.py` slice: R12
-- FR-011's full round after any rebase: `gate.on_workflow` asks `worktree.contains(root, <last counted head>)` (data-model
-  "New interfaces") and passes the answer to `policy.launch_round`, which gives
-  `scope="full"` and no `delta_from` on False; the round facts are untouched: R12
+- FR-010's regrade at a launch whose last head is no ancestor of HEAD, data-model "The review-round launch", one
+  `ledger.py` slice: R12

@@ -23,7 +23,8 @@ spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they
   after a spec change; PR #105's hand-written ADR-0020 is closed. (2) The engineering `git-workflow.md` change, in that repo:
   the spec changes through its own spec-only PR, never in a story PR. (3) Code, one PR per user story on `104-us<N>-<slug>`: US1
   (the edit rule) off the default branch; US2 (the hold deleted) stacked on US1; US3 (`rebase`, the conflict resolver) stacked
-  on US2; US4 (the diff check) and US5 (the rescope, in `alq-plan`) off the default branch. The README changes with the code of
+  on US2; US4 (the diff check) off the default branch once US1 has merged, since it reads Phase 2's terms that ship in US1;
+  US5 (the rescope, in `alq-plan`) off the default branch. The README changes with the code of
   each story. The plugin's version moves once, in the last alq-review story to merge, and that bump turns on US1 and US4;
   alq-plan's US5 release ships no later than it.
 - **Rationale**: constitution VI puts the governing record apart from the code. The spec's priorities order the stories, and US2
@@ -54,7 +55,8 @@ spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they
 - **Decision**: `gate.on_edit` judges the story rule right after `worktree.locate(path)` and before `target(where)`: the path
   relative to `where.root`, `where.branch`, through `specbinding.story_edit_refusal`; a text refuses with
   `hookio.refuse(payload, "spec-edit", text, Target(where.slug, None, where.branch, where.root))`. Nothing of the ledger or
-  GitHub is read first. A detached HEAD (`where.branch` None), a rebase in progress included, is no story branch.
+  GitHub is read first. `locate` gives no checkout for a detached HEAD, a rebase in progress included, and `on_edit`
+  returns before the rule, so `story_edit_refusal` takes a `str` branch.
 - **Rationale**: FR-001 reads the branch and nothing from the ledger; scenario 4 has no PR and no ledger, and `target()` may
   ask GitHub. `hookio.refuse` is under `mode`, which FR-005 asks for. The path is resolved by `locate` against its own
   checkout, so an absolute path into another worktree is judged by that worktree's branch (edge case).
@@ -178,18 +180,24 @@ spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they
 - **Rationale**: FR-007; the README is the plugin's description and changes with its code (019 R17).
 - **Existing tools**: the README's sections, edited in place.
 
-## R12: After a release by `rebase`, the story is measured afresh
+## R12: After any rebase, the story is measured afresh
 
-- **Decision**: FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
+- **Decision**: a review-round launch whose last counted round's head is not an ancestor of HEAD regrades: data-model "The
+  review-round launch" reads `last_head_contained`, `launch_round` answers `regrade`, and the gate sets `regraded_from` to the
+  index of the round it opens. FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
   `state["rounds"][state.get("regraded_from", 0):]`, and `counted(state, stage, *, regraded_only=False)`, which filters that
   slice instead of every round when the keyword is set. `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call
-  `counted(..., regraded_only=True)`; `round_facts`' `seen`, `first_reviewed` and `base` read `regraded_rounds`. So the first
-  round after a release is full, with no `delta_from`, and the churn facts are measured from it. Unsliced: `policy._capped` (the
-  round caps), `ledger._append_round`'s numbering, and `briefs.brief`'s `earlier_rounds`.
-- **Rationale**: the rebase rewrites every commit of the story branch, so a head recorded before it is no ancestor of the
-  rewritten HEAD: a delta round would brief the whole rebase as a delta, and a file edited in three commits before it would
-  read as at a third edit. A round before the release graded another `spec.md` and another history. One slice, so no two
-  readers disagree on where the release starts. The cap spans the release because a rebase settles no round; the numbering
-  spans it because a round's ref must stay unique in its epoch. `unlock <ref>` rewrites nothing, so it changes neither field.
-- **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round` and `facts.round_facts`, edited; the briefs,
-  unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round cap and changes the round refs.
+  `counted(..., regraded_only=True)`; `round_facts`' `seen`, `first_reviewed` and `base` read `regraded_rounds`. Unsliced:
+  `policy._capped` (the round caps), `ledger._append_round`'s numbering, and `briefs.brief`'s `earlier_rounds`.
+- **Rationale**: a rebase rewrites the story's commits, so a head recorded before it is no ancestor of the rewritten HEAD: a
+  delta round would brief the rebase as a delta, and the facts' two-dot ranges from the first reviewed head
+  (`facts.py`, `worktree.py`) would count every upstream commit as the story's edit. Git says whether a rewrite happened, so
+  every route regrades alike: the rebase after `rebase <ref>`, the one the US1 and US4 replies send the agent to, and a
+  stacked child rebased after its parent lands (the user, Clarifications 2026-10-14). A rebase resets the facts, and they climb
+  again when the findings are not fixed. One slice, so no two readers disagree on where it starts. The cap spans it because a
+  rebase settles no round; the numbering spans it because a round's ref must stay unique in its epoch.
+- **Rejected**: the restart tied to `rebase <ref>` alone, with the facts kept across any other rebase: they then counted
+  upstream commits as the story's own (review round internal-3.7). Measuring only the story's own commits: new measurement code.
+- **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round` and `facts.round_facts`, edited;
+  `worktree.contains` (R6); the briefs, unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round
+  cap and changes the round refs.

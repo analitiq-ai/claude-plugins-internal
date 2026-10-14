@@ -6,24 +6,25 @@
 |---|---|---|
 | Spec folder | `spec_folder(path)` → the `<…>/specs/<name>` folder `path` lies under, by `shape_problem` | `dev/x/specs/123-login/tasks.md` → `dev/x/specs/123-login`; `b.py`, `docs/spec.md` → None |
 | A spec.md | `spec_md_folder(path)` → `spec_folder(path)` when `path` is `<folder>/spec.md` | `dev/x/specs/123-login/spec.md` → `dev/x/specs/123-login`; `dev/x/specs/123-login/plan.md` → None |
-| Story branch | `story_issue(branch)` → the issue when `branch` matches `^(\d+)-us\d+-` | `123-us2-reset` → `123`; `123-spec`, `123-retire-spec`, `123-adr-hold`, `main`, `feat/1-demo`, None (detached HEAD) → None |
+| Story branch | `story_issue(branch)` → the issue when `branch` matches `^(\d+)-us\d+-` | `123-us2-reset` → `123`; `123-spec`, `123-retire-spec`, `123-adr-hold`, `main`, `feat/1-demo` → None |
 | Spec branch | `<issue>-spec`, written into every next step from `story_issue` | `123-spec` |
 
 `path` is repo-relative, as git names it. The gate resolves an edit's path against its checkout (`worktree.locate`)
-before asking; a detached HEAD, a rebase in progress included, has no branch and is no story branch.
+before asking; `locate` gives no checkout for a detached HEAD, a rebase in progress included, so the rule is never asked
+there and every `branch` it reads is a `str`.
 
 ## Ledger doc, per PR (`ledgers (repo, pr) -> doc`)
 
 | Field | Set by | Read by | Gone |
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
-| `regraded_from` | the release by `rebase <ref>`: the index of the first round after it | `ledger.regraded_rounds` only (research R12) | –; absent reads as 0 |
+| `regraded_from` | a review-round launch whose decision has `regrade` (launch table below): the index of the round it opens, replacing an earlier one | `ledger.regraded_rounds` only (research R12) | –; absent reads as 0 |
 | `rebased_onto` | the release by `rebase <ref>`: `{"branch": <default>, "sha": <onto>}` | the review-round launch, through `policy.launch_round` (launch check below) | – |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
 
-A release by `rebase <ref>` sets `regraded_from` and `rebased_onto`, replacing any earlier pair. `unlock <ref>` and a
-refused `rebase <ref>` change neither (FR-010).
+A release by `rebase <ref>` sets `rebased_onto`, replacing an earlier one; `unlock <ref>` and a refused `rebase <ref>`
+leave it. Neither keyword writes `regraded_from` (FR-010).
 
 | State of a PR | Review-round launch with value v | Assess-round launch |
 |---|---|---|
@@ -51,18 +52,34 @@ check), keeps the lock and records nothing:
 | `head spec.md` | `<spec>/spec.md` at the locked round's `head_sha` is read | git's words |
 | `changed` | the two differ | the spec PR has not reached `<default>`: land it first, or `unlock <ref>` if the spec stands |
 
-The release, in one save: `ledger.unlock`, the release `unlock <ref>` makes; `regraded_from` and `rebased_onto`; a
-`rebase released` record. The reply names every hold released and the session's next step: rebase, the conflict
+The release, in one save: `ledger.unlock`, the release `unlock <ref>` makes; `rebased_onto`; a `rebase released`
+record. The reply names every hold released and the session's next step: rebase, the conflict
 resolver on conflicts, push, launch.
 
-The launch after it, at a review-round launch of any stage, after the lock and dirty checks:
+The conflict-resolver agent runs under the hooks as any agent does: no gate code dispatches, admits or watches it.
 
-| Check | Passes when | Fails |
+## The review-round launch (`gate.on_workflow`, `policy.launch_round`)
+
+Before `launch_round`, `on_workflow` reads two facts, each with `worktree.contains` in its own `try`; a RuntimeError is
+refused in git's words, as `_review_base`'s failure is, and no round opens:
+
+| Fact | Read when | Value |
 |---|---|---|
-| `contains` | `rebased_onto` is unset, or HEAD contains `rebased_onto["sha"]` | not contained: refused, naming `<default>` and `<onto>`; git fails: refused as `_review_base`'s failure is |
+| `onto_contained` | `rebased_onto` is set | `contains(root, rebased_onto["sha"])`; else None |
+| `last_head_contained` | stage `internal` and `counted(state, "internal", regraded_only=True)` is not empty | `contains(root, <its last round's head_sha>)`; else None |
 
-Once HEAD contains it the round opens, a full round (research R12). The conflict-resolver agent runs under the hooks as
-any agent does: no gate code dispatches, admits or watches it.
+`launch_round` decides as today (lock, dirty, caps, nothing committed), then:
+
+| Input | Decision |
+|---|---|
+| `onto_contained` False | refused: contracts `contains` row False, `<default>` and `<onto>` from `rebased_onto`, `<ref>` from `unlock_ref(state)` |
+| `last_head_contained` False | allowed, `scope="full"`, no `delta_from`, `regrade=True` |
+| `last_head_contained` True | allowed, `scope="delta"`, `delta_from` the last round's head, as today |
+| both None | allowed as today (a first round is full) |
+
+On `regrade` the gate sets `regraded_from` to the index of the round it opens, in the save that opens it. After the
+rebase that follows `rebase <ref>` HEAD contains `<onto>` and no longer the last head, so that round is full and
+regraded too (research R12).
 
 ## The diff check (`specbinding.mixed_diff_refusal`)
 
@@ -83,9 +100,10 @@ Each reply named is its contracts row.
 | Name | Interface | Outcomes |
 |---|---|---|
 | `specbinding.spec_folder`, `spec_md_folder`, `story_issue` | pure, the table at the top | the folder or the issue; None |
-| `specbinding.story_edit_refusal` | `(branch: str \| None, path: str) -> str \| None`, pure | the text of contracts "The edit rule" when `branch` is a story branch and `path` a spec.md; None otherwise |
+| `specbinding.story_edit_refusal` | `(branch: str, path: str) -> str \| None`, pure | the text of contracts "The edit rule" when `branch` is a story branch and `path` a spec.md; None otherwise |
 | `specbinding.mixed_diff_refusal` | `(changes: list[tuple[str, str]], branch: str) -> str \| None`, pure | `mixed` or `folders` text; None when it passes |
 | `github.default_branch` | `(slug: str) -> str` | the default branch's name; gh fails: RuntimeError in gh's words |
 | `worktree.fetch_target` | `(root: str, target: str) -> str`, factored out of `review_base`, which calls it | `origin/<target>` updated, its sha returned; git fails: RuntimeError in git's words |
-| `worktree.contains` | `(root: str, sha: str) -> bool` | HEAD contains `sha`: True; it does not, or the checkout does not know `sha`: False; git fails otherwise: RuntimeError in git's words |
+| `worktree.contains` | `(root: str, sha: str) -> bool`: `git rev-parse --verify --quiet <sha>^{commit}`, then `git merge-base --is-ancestor <sha> HEAD` | the first exits 1 (the checkout does not know `sha`): False; the second exits 0: True, 1: False; any other exit of either: RuntimeError in git's words |
+| `policy.launch_round` | `(state, stage, *, head_sha, dirty, inflight, onto_contained: bool \| None, last_head_contained: bool \| None) -> Decision`; `Decision` gains `regrade: bool = False` | the launch table above |
 | `worktree.name_status` | `(root: str, base: str) -> list[tuple[str, str]]` | each path changed from the merge base of `base` and HEAD, once, as `(status, path)`, a rename as its `D` and its `A`; git fails: RuntimeError in git's words |

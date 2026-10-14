@@ -47,7 +47,7 @@ branch on it before the next round.
 
 - Q: Who runs the rebase after `rebase <ref>`? → A: The session, not the gate. The gate checks that the bound spec.md changed on the default branch, releases the lock and records the default branch's commit; the session rebases, dispatches the conflict-resolver agent on conflicts and pushes; the next round is refused until the branch contains that commit. This replaces the hook-run rebase in answers 5 and 6 and the hook push in answer 9.
 - Q: Where is a spec.md write refused? → A: In two places: the review-round launch refuses a PR whose diff changes a spec.md and code (User Story 4), the gate that keeps the graded spec from changing beside code; and on a story branch `Edit`, `Write` and `NotebookEdit` of a spec.md are refused by path (User Story 1). Bash writes, the commit and a rebase in progress are not judged by User Story 1; the launch catches what they carry. A spec folder's move gets its own diff-check reply, naming both folders and the two-PR route. This narrows issue #104 Decision 1, which named Bash.
-- Q: How is the first round after a rebase that skipped `rebase <ref>` reviewed? → A: In full: a review-round launch whose last counted round's head is not an ancestor of HEAD reviews the PR's whole diff, whatever rebased the branch. Only a release by `rebase <ref>` restarts the round facts (FR-010), so the agent cannot reset its own measurement by rebasing.
+- Q: How is the first round after a rebase reviewed and measured? → A: By git, not by the keyword: a review-round launch whose last counted round's head is not an ancestor of HEAD, whatever rewrote the branch, is a full round and restarts the round facts from it (FR-010). The agent can reset its measurement by rebasing; the facts climb again if the findings are not fixed. This replaces a restart tied to `rebase <ref>` alone, which left a rebase without it measured across upstream commits.
 
 ## Terms
 
@@ -164,11 +164,11 @@ the next round before and after the story branch is rebased.
    spec check and nothing recorded, and the reply carries the ruling: the user has ruled the spec stands.
 7. **Given** a lock released by `rebase <ref>` and a story branch that does not yet contain the recorded commit,
    **When** a review round launches, **Then** it is refused, saying to rebase onto the default branch first.
-8. **Given** a lock released by `rebase <ref>` and a story branch that contains the recorded commit, **When** the
-   next review round launches, **Then** it is a full round over the PR's diff, not a delta from the last round
-   before the release, and its facts are measured as FR-010 says: a file edited in three rounds before the rebase is
-   not at a third edit, and the round is compared with no round before the release. After a release by `unlock <ref>`
-   the rounds are measured as before.
+8. **Given** a story branch whose last round's head is no longer an ancestor of HEAD, after the rebase that follows
+   `rebase <ref>` or any other rebase (the next step of User Story 1 and User Story 4 scenario 1), **When** the next
+   review round launches, **Then** it is a full round over the PR's diff, not a delta from that head, and its facts
+   restart as FR-010 says: a file edited in three rounds before the rebase is not at a third edit, and the round is
+   compared with no round before it. After `unlock <ref>`, which rewrites nothing, the rounds are measured as before.
 9. **Given** the session's rebase stopped on conflicts, **When** it dispatches the conflict-resolver agent, **Then**
    the agent resolves them in that checkout and continues the rebase; it never edits a spec.md. A conflict in a
    spec.md, or a conflict the agent cannot resolve, makes it abort the rebase and report it, and the session raises
@@ -204,9 +204,6 @@ rounds on each.
 5. **Given** a PR on a branch named otherwise than a story branch, **When** its diff mixes a spec.md and code,
    **Then** the launch is refused all the same: the diff check reads the diff, not the name.
 6. **Given** `log` mode, **When** the check refuses, **Then** it is recorded as `would_deny` and the launch opens.
-7. **Given** a story branch rebased on the default branch after its last round, without `rebase <ref>` (the next step
-   of scenario 1), **When** the next review round launches, **Then** it is a full round over the PR's diff, not a
-   delta from the last round's head, and its facts are measured as before (FR-011).
 
 ---
 
@@ -288,13 +285,11 @@ two closing lines.
   rebase and report when a spec.md is in conflict or it cannot resolve a conflict; the session raises that to the user.
   `unlock <ref>` MUST release a `RESHAPE_SPEC` lock when the user rules the spec stands, and stays the release of an
   `ESCALATE` or spent-audit lock (ADR-0018).
-- **FR-010**: A release by `rebase <ref>` MUST start the PR's measurement again: the next review round MUST be a full
-  round over the PR's diff, and a round's facts (the edits per file, the lines fixes wrote, the additions) MUST count
-  only the commits since the first round after the release, and compare the round only with the rounds since then. A
-  release by `unlock <ref>` MUST change neither.
-- **FR-011**: A review-round launch whose last counted round's head is not an ancestor of HEAD, or is a commit the
-  checkout does not know, MUST be a full round over the PR's diff, whatever rewrote the branch. It MUST NOT restart
-  the round facts; only FR-010's release does.
+- **FR-010**: A review-round launch whose last counted round's head is not an ancestor of HEAD, or is a commit the
+  checkout does not know, MUST start the PR's measurement again, whatever rewrote the branch: the round MUST be a full
+  round over the PR's diff, and its facts and every later round's (the edits per file, the lines fixes wrote, the
+  additions) MUST count only the commits since it, and compare a round only with the rounds since it. The round caps
+  and the round numbering span it. Neither keyword sets it.
 
 ### Key Entities
 
