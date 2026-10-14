@@ -3,10 +3,11 @@
 one heading's.
 
 Each story heading is Spec Kit's `### User Story <N> - <title> (Priority: P<n>)`, and no number is two headings'. On
-a rescope, against spec.md as the run found it, every number not there before is greater than every number that was:
-a number may be dropped, and is then not used again. The check compares numbers only, so it cannot tell a story
-moved to another number, or a number dropped and used again in one run. The form of spec.md as found is not graded:
-a spec scoped before this check may have no story headings.
+a rescope, against spec.md as the run found it, every number not there before is greater than every number that was,
+and a number that was there may be dropped. The check compares numbers only, so it does not catch a number dropped
+and used again in the same run, a story moved to another number, or, in a later run, a dropped number used again
+that is greater than every number spec.md still has. The form of spec.md as found is not graded: a spec scoped
+before this check may have no story headings.
 
 Usage: story_headings.py check <spec folder> [<spec.md as the run found it>]. Prints one problem per line and exits 1
 when there are any, 2 when the check cannot run. A new scope names no spec.md as found.
