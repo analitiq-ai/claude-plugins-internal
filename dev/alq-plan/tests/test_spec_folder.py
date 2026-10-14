@@ -3,9 +3,14 @@ recorded after it ran.
 
 Both checks are pure: they are handed what the project's `specs/` and `.specify/feature.json` hold, and read nothing.
 """
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
-import paths  # noqa: F401  # importing it puts the plugin's scripts on sys.path
+from paths import SCRIPTS
 
 import spec_folder
 
@@ -55,12 +60,19 @@ class Check(unittest.TestCase):
                     self.assert_one_problem(problems(folder, "7", "new", {"7-demo": holds_spec}),
                                             "`rescope specs/7-demo #7`")
 
-    def test_folders_are_named_from_the_checkout_the_project_is_in(self):
-        """A rescope's folder is read from the checkout, so a refusal names it from there."""
-        self.assert_one_problem(problems("specs/7-x", "7", "new", {"7-demo": True}, "dev/x/"),
-                                "`rescope dev/x/specs/7-demo #7`")
-        self.assert_one_problem(problems("specs/7-demo", "7", "rescope", {"7-demo": True, "7-other": True}, "dev/x/"),
-                                "`dev/x/specs/7-other`")
+    def test_every_refusal_names_its_folders_from_the_checkout_the_project_is_in(self):
+        """A rescope's folder is read from the checkout, so a refusal names every folder from there."""
+        cases = {
+            "form": (("specs/7_x", "7", "new", {}), ["`dev/x/specs/7_x`"]),
+            "not this issue": (("specs/8-x", "7", "new", {}), ["`dev/x/specs/8-x`"]),
+            "rescope form": (("specs/7-x", "7", "new", {"7-demo": True}), ["`rescope dev/x/specs/7-demo #7`"]),
+            "no spec.md": (("specs/7-demo", "7", "rescope", {"7-demo": False}), ["`dev/x/specs/7-demo`"]),
+            "besides and other folders": (("specs/7-demo", "7", "rescope", {"7-demo": True, "7-other": True}),
+                                          ["besides `dev/x/specs/7-demo`", "`dev/x/specs/7-other`"]),
+        }
+        for refusal, (args, said) in cases.items():
+            with self.subTest(refusal):
+                self.assert_one_problem(problems(*args, project="dev/x/"), *said)
 
     def test_folders_of_other_issues_do_not_refuse_a_new_scope(self):
         existing = {"70-x": True, "17-y": True, "8-z": True, "007-old": True, "7": True}
@@ -91,6 +103,18 @@ class Check(unittest.TestCase):
     def test_a_kind_other_than_new_or_rescope_cannot_be_checked(self):
         with self.assertRaises(ValueError):
             problems("specs/7-demo", "7", "", {})
+
+
+class Cli(unittest.TestCase):
+    def test_a_check_outside_a_git_checkout_cannot_run_and_says_why(self):
+        """The project's folder in the checkout comes from git, so git's own reason is what the step shows."""
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        with tempfile.TemporaryDirectory() as outside:
+            done = subprocess.run([sys.executable, str(SCRIPTS / "spec_folder.py"), "check", "specs/7-x", "7", "new"],
+                                  cwd=outside, env={**env, "GIT_CEILING_DIRECTORIES": str(Path(outside).parent)},
+                                  capture_output=True, text=True)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("not a git repository", done.stderr)
 
 
 class Recorded(unittest.TestCase):
