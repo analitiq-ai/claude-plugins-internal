@@ -6,7 +6,8 @@ What changes at the plugin's edges. Internal function shapes are in [../data-mod
 
 - `gh pr ready` / `gh pr merge` refusals (also `gate.py`'s ready refusal) end with the cleanup sentence (research R8).
   When the label could not be read, the refusal is the unread-label refusal alone (FR-007).
-- A comment carrying the attestation marker on a cleanup PR is refused as on any PR without a clean round (FR-011).
+- A comment carrying the attestation marker is refused without a clean internal round at the head (or the release),
+  labelled or not; its refusal names that round only, with no cleanup sentence (FR-011).
 
 ## `scripts/github.py` command line
 
