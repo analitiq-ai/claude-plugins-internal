@@ -112,6 +112,14 @@ def reason(text: str) -> str:
     return said
 
 
+def rested_on(text: str) -> str:
+    """The question a stop pick rests on."""
+    said = _field(_lines(text), RESTS_ON, "the premise report")
+    if said not in QUESTIONS:
+        raise ValueError(f"the premise report's `{RESTS_ON}:` is `{said}`, not one of {', '.join(QUESTIONS)}")
+    return said
+
+
 def reports_wrong_behaviour(text: str) -> bool:
     said = _field(_lines(text), WRONG, "the premise report")
     if said not in ("yes", "no"):
