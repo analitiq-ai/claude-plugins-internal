@@ -1760,6 +1760,29 @@ class StoryBranchSpecEdit(Gate):
         git(self.root, "checkout", "-q", "--detach")
         self.assertEqual(self.write("Edit", self.root / self.SPEC_MD), {})
 
+    def test_a_spec_md_link_to_a_file_outside_the_checkout_is_not_refused(self):
+        outside = Path(self.tmp.name) / "shared.md"
+        outside.write_text("# shared\n")
+        link = self.root / "dev/x/specs/124-other/spec.md"
+        link.parent.mkdir(parents=True)
+        link.symlink_to(outside)
+        for branch in (self.STORY, "main"):
+            with self.subTest(branch=branch):
+                git(self.root, "checkout", "-q", branch)
+                self.assertEqual(self.write("Edit", link), {})
+
+    def test_a_link_to_the_spec_md_is_refused_as_the_spec_md(self):
+        link = self.root / "notes.md"
+        link.symlink_to(self.root / self.SPEC_MD)
+        self.assertEqual(self.reason(self.write("Edit", link)), self.refusal())
+
+    def test_log_mode_still_records_what_the_round_lock_would_refuse(self):
+        self.launch()
+        self.assertEqual(self.hook("PreToolUse", "Edit", {"file_path": str(self.root / self.SPEC_MD)}, mode="log"), {})
+        logged = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        self.assertLessEqual({("spec-edit", "would_deny"), ("edit", "would_deny")},
+                             {(e["action"], e["decision"]) for e in logged})
+
 
 class GithubRound(Gate):
     def drop(self, urls):

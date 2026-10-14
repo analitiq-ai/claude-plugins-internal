@@ -344,10 +344,14 @@ def on_edit(payload: dict) -> dict | None:
     if where is None:
         return None
     # Judged on the branch and the path alone, before `target` can ask GitHub: a story branch with no PR yet is held to it.
-    relative = Path(path).resolve().relative_to(Path(where.root).resolve()).as_posix()
-    spec_edit = specbinding.story_edit_refusal(where.branch, relative)
+    # The written file is the link's target, and one outside the checkout is no spec.md of it.
+    written, root = Path(path).resolve(), Path(where.root).resolve()
+    spec_edit = written.is_relative_to(root) and specbinding.story_edit_refusal(where.branch,
+                                                                                 written.relative_to(root).as_posix())
     if spec_edit:
-        return refuse(payload, "spec-edit", spec_edit, Target(where.slug, None, where.branch, where.root))
+        refused = refuse(payload, "spec-edit", spec_edit, Target(where.slug, None, where.branch, where.root))
+        if refused:
+            return refused
     try:
         event = target(where)
     except RuntimeError as exc:
