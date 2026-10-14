@@ -12,7 +12,7 @@ trigger time and the head, and returns Codex's state for the round: `not_started
 `superseded`, `declined` or `unreadable`. It reads the status card's Code Review row (status, status time,
 commit) and matches every other item against one list of Codex's known forms. The poller's jq analysis consumes
 that state: it waits on `not_started` and `reviewing`, takes the row's status time as the answer time for the gate
-lag, refuses CLEAN on `superseded` and `declined` and prints the re-request or the unknown item, releases
+lag, refuses CLEAN on `superseded` and `declined` and prints the re-request or each unknown item, releases
 `not_started` and `declined` when the org gate has waived Codex for the head (FR-013), prints an unknown item
 beside a row that answers as a WARNING (FR-010) and one `Codex: …` line per report (FR-014), and exits 1 on
 `unreadable`. Decisions are in [research.md](research.md), shapes in [data-model.md](data-model.md), the reader's
@@ -58,7 +58,7 @@ and their meanings are unchanged; no backwards compatibility for Codex's earlier
 | IV. Test-first | Every state and reading failure has a reader unit test, every scenario a poller test, each run red first (R9). The reader is a pure function; the poller's jq is exercised through the fake `gh`. Pass. |
 | V. Smallest complete change | One module, one list, the existing waits and report extended. The class of defect, "a Codex item counted by author and time alone", is closed for comments and reviews together (R3); reactions are not items and the gate reads them, so they stay as the spec says (FR-005). `$codex_said_at`, `$codex_answered_at` and `responded` are removed, not left beside the reader's output. Pass. |
 | VI. Governing rule ships apart | No rule file, lint or schema check changes. `SKILL.md` and the README describe the poller and change with it (R10). Pass. |
-| P1. Code decides | The reader and the poller decide; every settled-not-clean line names the next step (`comment @codex review`; read the unknown item). Pass. |
+| P1. Code decides | The reader and the poller decide; every settled-not-clean line names the next step (`comment @codex review`; read each unknown item). Pass. |
 | P2. Only an approved entity releases a hold | No hold, lock or count is added or changed: the poller waits and settles, it holds nothing in the ledger. Not applicable. |
 | P3. Rules are pure | `codexstate.state(items, since, head)` is pure; `main` is stdin/stdout; the poller's shell does the fetching and printing. Pass. |
 | P4. A check that could not run is its own outcome | An unreadable card is an error naming the comment (exit 1); an unknown item is `declined`, never an answer; a reader crash is `ERROR`, never FINDINGS (R1). Pass. |

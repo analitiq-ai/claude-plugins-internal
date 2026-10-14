@@ -151,7 +151,10 @@ state = os.environ["FAKE_GH_DIR"]
 args = sys.argv[1:]
 with open(os.path.join(state, "calls.log"), "a") as log:
     log.write(" ".join(args) + "\n")
-if args[:2] == ["api", "graphql"]:
+if args[:2] == ["api", "graphql"] and os.environ.get("FAKE_GH_GRAPHQL_EXIT"):
+    sys.stderr.write("gh: request failed\n")
+    sys.exit(int(os.environ["FAKE_GH_GRAPHQL_EXIT"]))
+elif args[:2] == ["api", "graphql"]:
     snaps = json.load(open(os.path.join(state, "snapshots.json")))
     counter = os.path.join(state, "served")
     served = int(open(counter).read()) if os.path.exists(counter) else 0
@@ -694,6 +697,35 @@ class Poller(unittest.TestCase):
                 self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
                 self.assertIn(f"BLOCKED: nothing to triage, but {cause}.", done.stdout)
                 self.assertNotIn("mergeStateStatus=CLEAN.", done.stdout)
+
+    def test_a_gh_failure_exits_1_even_when_gh_exits_with_a_code_the_poller_gives_a_meaning(self):
+        # gh exits 4 when it needs authentication; 2, 3 and 4 are the poller's findings, timeout and blocked exits.
+        for code in ("2", "3", "4"):
+            with self.subTest(gh_exit=code):
+                done = self.poll(snapshot(), env_extra={"FAKE_GH_GRAPHQL_EXIT": code})
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("ERROR: could not read acme/demo#7", done.stderr)
+
+    def test_blocked_names_the_merge_state_after_the_codex_cause(self):
+        cases = ((card(at=at(5)), "GitHub reports mergeStateStatus=BLOCKED"),
+                 (card(commit="a3d2db7", at=at(5)),
+                  "Codex reviewed a3d2db7, not the head abc1234567; GitHub reports mergeStateStatus=BLOCKED"),
+                 (comment(101, CODEX, sample("decline-not-connected.md"), at(6)),
+                  "Codex's reply is not one the poller knows; GitHub reports mergeStateStatus=BLOCKED"))
+        for said, causes in cases:
+            with self.subTest(causes=causes):
+                done = self.poll(snapshot(comments=[TRIGGER, said], contexts=[check("pytest"), CODEX_CLEAN, ATTESTED]))
+                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+                self.assertIn(f"BLOCKED: nothing to triage, but {causes}. Act on", done.stdout)
+
+    def test_every_unknown_reply_beside_a_row_is_a_warning(self):
+        first = comment(101, CODEX, sample("decline-not-connected.md"), at(6))
+        second = comment(102, CODEX, sample("decline-error.md"), at(7))
+        done = self.poll(snapshot(merge="CLEAN", comments=[TRIGGER, card(at=at(5)), first, second],
+                                  contexts=[check("pytest"), CODEX_CLEAN, ATTESTED]))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        for reply in (first, second):
+            self.assertIn("WARNING: " + self.unknown_line(reply) + "; read it.", done.stdout)
 
     def test_a_waived_run_does_not_release_a_superseded_row(self):
         waived = gate("codex-review", "SUCCESS", "WAIVED: Codex is out of credits; abc1234567 was not reviewed", at(6))

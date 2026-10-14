@@ -54,7 +54,7 @@ was run. Codex's bodies are in the spec folder's `samples/`, byte for byte (R8).
   - `security`: begins `### 🛡️ Codex Security Review`;
   - `review`: a PR review whose body begins `### 💡 Codex Review`.
   A card is matched whatever its creation time. Every other item counts only if `at > since`. An item since the
-  trigger that matches no form is unknown, and the earliest such item is the one the state names. Nothing else
+  trigger that matches no form is unknown, and every such item is reported (R5). Nothing else
   is matched: the `**Reviewed commit:**` line, the flourish and the review's state are description, not test.
   The old review opener `Here are some automated review suggestions`, which the tests still use, is not on the
   list and leaves the tests (R8); no compatibility branch is kept for it. Leading whitespace is stripped
@@ -95,9 +95,7 @@ was run. Codex's bodies are in the spec folder's `samples/`, byte for byte (R8).
      `superseded` when Completed and it is not.
   3. `declined`: no such row, and an item since the trigger that is on no form (R3).
   4. `not_started`: no such row and no unknown item.
-  Every state carries `commit` and `status_at` (the row's, or null), `unknown` (the earliest item since the
-  trigger on no form, or null, whatever the state), `spoke` (whether any non-card item is since the trigger)
-  and `comments` (the non-card comments since the trigger, oldest first, each `{url, at, body}`).
+  What each state carries is the output table of [contracts/codex-reader.md](contracts/codex-reader.md).
 - **Rationale**: the critique session's precedence decision (spec Key Entities, FR-010): the row is Codex's own
   account of the review, so an unknown item beside it is a warning, not a verdict; it decides the round only
   when nothing answers. Unreadable comes first because an unreadable card ends the run (exit 1) and no state
@@ -120,17 +118,14 @@ was run. Codex's bodies are in the spec folder's `samples/`, byte for byte (R8).
   - `clean`: requires `$codex.state == "answered"`, or `waived` with `not_started` or `declined`, in addition to
     today's merge-state rule; `superseded` can never print CLEAN or hand `clean` to the gate, and `declined`
     cannot without the waiver.
-  - `REPORT`: one line after the header in every report, `Codex: <state> <commit> at <status_at>` (`since` for
-    `reviewing`; `Codex: not started` with no row) (FR-014). `superseded` prints `Codex reviewed <commit>, not
-    the head <head[0:10]>: comment \`@codex review\``. `declined` prints `Codex's reply is not one the poller
-    knows (<url>, <at>): Codex declined or changed what it posts; read it.` unless `waived`. Any other state
-    with `unknown` set prints `WARNING: Codex's reply is not one the poller knows (<url>, <at>); read it.`
-  - `settle()` is unchanged: findings first (exit 2, `hand_over findings`), then `clean` (exit 0), else BLOCKED
-    (exit 4) with the note above. So a superseded or declined round with open findings or failing checks exits
-    2 and hands them to the gate, and with none exits 4; FR-004 and FR-010 say exactly this.
+  - `REPORT` and the exit per state: the table "The poller, per state" in
+    [contracts/codex-reader.md](contracts/codex-reader.md) (FR-004, FR-010, FR-014).
+  - `settle()` keeps its order: findings first (exit 2, `hand_over findings`), then `clean` (exit 0), else
+    BLOCKED (exit 4). Exit 4 can now come with GitHub reporting CLEAN, so `ANALYZE` lists each cause in
+    `blocked_by` and the BLOCKED line prints them joined by `; `.
   - The first-poll "Watching … since" line and the `--ignore-check` announcement are unchanged.
 - **Rationale**: FR-001 to FR-004, FR-007, FR-010, FR-013, FR-014. Reusing `settle`'s order keeps one meaning
-  for exit 2 and exit 4 and changes no line of the SKILL's exit table. The waiver is read from the gate run the
+  for exit 2; the SKILL's exit-4 row widens from "GitHub does not report CLEAN" to the causes `blocked_by` names. The waiver is read from the gate run the
   poller already prints, so no new field is fetched.
 - **Existing tools**: `WAITING_ON`, `REPORT`, `settle`, `errors` as they stand; each gains a branch, none a new
   path. `hand_to_gate` is untouched: `test_poller_contract.py` evals it by `sed` range and the drop's shape is
