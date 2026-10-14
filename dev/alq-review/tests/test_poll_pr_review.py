@@ -164,6 +164,11 @@ elif args[:2] == ["api", "repos/%s/dispatches" % os.environ["FAKE_GH_REPO"]]:
     if os.environ.get("FAKE_GH_DISPATCH_FAILS"):
         sys.stderr.write("HTTP 403: Resource not accessible by integration\n")
         sys.exit(1)
+elif args[:2] == ["pr", "view"] and args[-2:] == ["--json", "labels"]:
+    if os.environ.get("FAKE_GH_LABELS_FAIL"):
+        sys.stderr.write("HTTP 502: Bad Gateway\n")
+        sys.exit(1)
+    print(json.dumps({"labels": [{"name": n} for n in os.environ.get("FAKE_GH_LABELS", "").split(",") if n]}))
 elif args[:2] == ["pr", "view"] and "headRefName,headRefOid" in args:
     print(json.dumps({"headRefName": "feat/1-demo", "headRefOid": os.environ["FAKE_GH_HEAD"]}))
 else:
@@ -172,7 +177,9 @@ else:
 '''
 
 
-class Poller(unittest.TestCase):
+class PollerRun(unittest.TestCase):
+    """The poller run against the fake gh; holds no test of its own."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(subprocess.run, ["rm", "-rf", str(self.tmp)])
@@ -203,6 +210,8 @@ class Poller(unittest.TestCase):
         path = self.state / "inbox" / "acme__demo__7.json"
         return json.loads(path.read_text()) if path.exists() else None
 
+
+class Poller(PollerRun):
     # -- waiting ---------------------------------------------------------------
 
     def test_a_finding_before_codex_answers_does_not_end_the_wait(self):
@@ -807,6 +816,78 @@ exec {sys.executable} "$@"
         done = self.poll(snapshot(overflow="reviewThreads"))
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("reviewThreads", done.stderr)
+
+
+
+class CleanupPoll(PollerRun):
+    """A PR labelled `cleanup` waits on no reviewer: only its checks, the gate's runs aside, settle it (ADR-0021)."""
+    ANNOUNCED = f"Cleanup PR: {REPO}#{PR} carries the cleanup label; no Codex, no internal review, no triage."
+    DONE = "CLEANUP: no check is failing but those ignored; merge once the PR is ready."
+
+    def poll(self, *snapshots, env_extra=None, **kw):
+        return super().poll(*snapshots, env_extra={"FAKE_GH_LABELS": "bug,cleanup", **(env_extra or {})}, **kw)
+
+    def assert_cleanup(self, done):
+        self.assertEqual(done.returncode, 5, done.stdout + done.stderr)
+        self.assertIn(self.ANNOUNCED, done.stdout)
+        self.assertIn(self.DONE, done.stdout)
+        self.assertNotIn("@codex review", done.stdout)
+        self.assertIsNone(self.drop())
+
+    def test_green_checks_end_it_with_no_codex(self):
+        self.assert_cleanup(self.poll(snapshot(merge="BLOCKED", contexts=[check("pytest")])))
+        self.assertEqual(self.polls, 1)
+
+    def test_no_thread_and_no_gate_run_blocks_it(self):
+        threads = [thread(1, CODEX, CODEX_THREAD_BODY), thread(2, "deepsource-io", DEEPSOURCE_THREAD_BODY),
+                   thread(3, "a-human", "Why this?")]
+        done = self.poll(snapshot(threads=threads, contexts=[check("pytest"), WAITING]))
+        self.assert_cleanup(done)
+        self.assertNotIn("Unresolved findings", done.stdout)
+
+    def test_a_failing_check_blocks_it_and_is_named(self):
+        done = self.poll(snapshot(contexts=[check("pytest", conclusion="FAILURE"), WAITING]))
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("pytest [FAILURE]", done.stdout)
+        self.assertNotIn("@codex review", done.stdout)
+        self.assertIsNone(self.drop())
+
+    def test_a_failing_gate_run_does_not_block_it(self):
+        failed = gate("codex-review", "FAILURE", "Codex found major issues in abc1234567", at(0))
+        self.assert_cleanup(self.poll(snapshot(contexts=[check("pytest"), failed])))
+
+    def test_an_ignored_failing_check_does_not(self):
+        done = self.poll(snapshot(contexts=[check("flaky", conclusion="FAILURE")]), args=("--ignore-check", "flaky"))
+        self.assert_cleanup(done)
+
+    def test_a_check_still_running_at_the_deadline_times_out(self):
+        done = self.poll(snapshot(contexts=[check("pytest", "IN_PROGRESS", None)]), minutes="0")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("1 check(s) running: pytest", done.stdout)
+
+    def test_a_draft_is_polled_until_its_checks_settle(self):
+        done = self.poll(snapshot(merge="DRAFT", contexts=[check("pytest", "IN_PROGRESS", None)]),
+                         snapshot(merge="DRAFT", contexts=[check("pytest")]))
+        self.assert_cleanup(done)
+        self.assertEqual(self.polls, 2)
+
+    def test_unknown_mergeability_is_waited_on(self):
+        done = self.poll(snapshot(merge="UNKNOWN", contexts=[check("pytest")]), snapshot(contexts=[check("pytest")]))
+        self.assert_cleanup(done)
+        self.assertEqual(self.polls, 2)
+
+    def test_a_label_that_cannot_be_read_is_warned_of_and_polled_as_unlabelled(self):
+        done = self.poll(snapshot(merge="DRAFT"), env_extra={"FAKE_GH_LABELS_FAIL": "1"})
+        self.assertIn(f"WARNING: the cleanup label of {REPO}#{PR} could not be read (", done.stderr)
+        self.assertIn("HTTP 502: Bad Gateway", done.stderr)
+        self.assertIn("polling it as unlabelled.", done.stderr)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertNotIn(self.ANNOUNCED, done.stdout)
+
+    def test_an_unlabelled_pr_is_polled_as_before(self):
+        done = self.poll(snapshot(merge="DRAFT"), env_extra={"FAKE_GH_LABELS": "bug"})
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertNotIn(self.ANNOUNCED, done.stdout)
 
 
 if __name__ == "__main__":

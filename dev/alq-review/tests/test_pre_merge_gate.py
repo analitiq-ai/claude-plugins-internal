@@ -14,6 +14,7 @@ from pathlib import Path
 import helpers  # noqa: F401  (puts scripts/ on the path)
 from paths import PLUGIN
 
+import github
 import pre_merge_gate
 import shell
 
@@ -94,12 +95,15 @@ class Hook(unittest.TestCase):
         self.stderr = subprocess.PIPE  # where the hook's stderr goes
         self.github_has()
 
-    def github_has(self, number=12, *, url=None, attested=False, draft=False, runs=()):
-        """The PR `gh pr view` finds and the gate's check runs on its head: unattested and unreleased unless asked."""
+    def github_has(self, number=12, *, url=None, attested=False, draft=False, runs=(), labels=()):
+        """The PR `gh pr view` finds and the gate's check runs on its head in acme/demo: unattested, unreleased and
+        unlabelled unless asked. `labels` None leaves the field out."""
         attestation = f"{shell.ATTESTATION_MARKER}\nInternal review clean.\nReviewed commit: `{HEAD}`"
         view = {"number": number, "headRefOid": HEAD, "isDraft": draft,
                 "url": url or f"https://github.com/acme/demo/pull/{number}",
                 "comments": [{"body": attestation}] if attested else []}
+        if labels is not None:
+            view["labels"] = [{"name": name} for name in labels]
         (self.bin / "view.json").write_text(json.dumps(view))
         runs_json = self.bin / "runs.json"
         runs_json.write_text(json.dumps({"total_count": len(runs), "check_runs": list(runs)}))
@@ -614,6 +618,53 @@ class VersionOnlyRelease(Hook):
                                                 "tool_input": {"command": "gh pr merge 12 --merge"}}))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
+
+
+class CleanupPr(Hook):
+    """A PR labelled `cleanup` is merged and readied with no attestation (ADR-0021)."""
+
+    def test_the_pr_is_read_with_its_labels(self):
+        self.github_has(labels=["cleanup"])
+        self.gh(f'case "$*" in "pr view"*--json*labels*) exec cat {self.bin}/view.json ;; *) exit 1 ;; esac')
+        self.assertIsNone(self.merge(PLAIN))
+
+    def test_a_cleanup_pr_merges_and_leaves_draft_without_an_attestation(self):
+        for labels in (["cleanup"], ["bug", "Cleanup"]):
+            with self.subTest(labels=labels):
+                self.github_has(labels=labels, draft=True)
+                self.assertIsNone(self.merge(PLAIN))
+                self.assertIsNone(self.merge("gh pr ready 12"))
+
+    def test_the_label_does_not_license_an_admin_merge(self):
+        self.github_has(labels=["cleanup"])
+        self.assertEqual(self.merge(ADMIN), "deny")
+        self.assertNotIn(github.CLEANUP_EXEMPTION, self.refusal(ADMIN))
+
+    def test_an_unlabelled_pr_is_refused_as_before_and_told_the_users_way_past(self):
+        self.github_has(labels=["bug"], draft=True)
+        for command in (PLAIN, "gh pr ready 12"):
+            with self.subTest(command=command):
+                said = self.refusal(command)
+                self.assertTrue(said.startswith(f"No internal-review attestation for {HEAD[:10]}"), said)
+                self.assertTrue(said.endswith(github.CLEANUP_EXEMPTION), said)
+
+    def test_labels_that_cannot_be_read_are_no_label_and_the_refusal_says_so_first(self):
+        for labels in (None, "cleanup", [{"id": "L1"}]):
+            with self.subTest(labels=labels):
+                self.github_has()
+                view = json.loads((self.bin / "view.json").read_text())
+                if labels is None:
+                    view.pop("labels")
+                else:
+                    view["labels"] = labels
+                (self.bin / "view.json").write_text(json.dumps(view))
+                said = self.refusal(PLAIN)
+                self.assertTrue(said.startswith("The `cleanup` label could not be read ("), said)
+                self.assertIn("No internal-review attestation", said)
+
+    def test_a_release_still_merges_without_the_label(self):
+        self.github_has(runs=[gate_run()])
+        self.assertIsNone(self.merge(PLAIN))
 
 
 class NameReader(unittest.TestCase):

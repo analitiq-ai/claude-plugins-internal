@@ -41,12 +41,25 @@ Exit codes drive the next step:
 | `0`  | **Clean** — GitHub reports `mergeStateStatus=CLEAN` and nothing is left to triage | Run `deepsource-pr-gate.sh`; if it passes, proceed to merge/next step. |
 | `2`  | **Findings** — failing checks and/or unresolved findings printed | Go to *Triaging* below. |
 | `4`  | **Blocked** — nothing to triage, but GitHub does not report CLEAN, or Codex reviewed an earlier commit, or Codex replied with something the poller does not know; the `BLOCKED:` line names which | Act on the gate check runs and notes printed: re-request when `codex-review` says to, attest the internal review (see *Attesting the internal review*), approve, update the branch, leave draft. |
+| `5`  | **Cleanup** — a cleanup PR whose checks settled with none failing; see *Cleanup PRs* | Mark it ready if it is a draft, then merge. If GitHub refuses the merge, tell the user why. |
 | `3`  | **Timeout** — not settled in time; the report says what it was still waiting on | Re-run the poller, or act on what it names. |
 | `1`  | **Error** — a usage error, or the poller could not read the PR (`gh` failed, a Codex status card it cannot read, …); stderr says why | Act on what stderr names; for a format change, report it on the plugin's repo and read the PR by hand. |
 
 Exit `2` fires on *any* unresolved finding or failing check, including ones left before this review round — a stale finding still blocks the PR.
 
 Requires the `gh` CLI authenticated for the target repo (`gh auth status`).
+
+# Cleanup PRs
+
+A PR that carries the `cleanup` label is a cleanup PR: alq-review asks for no review of it. Only the user adds the label, on GitHub. If a PR seems to need no review, tell the user and stop.
+
+For a cleanup PR:
+- Post no `@codex review`, and wait for no Codex answer.
+- Run no `deepsource-pr-gate.sh`.
+- Do no triage: an unresolved thread, from any reviewer, does not block it.
+- `gh pr ready` needs no internal round, and `gh pr merge` no attestation; `--admin` still needs `override-merge`.
+
+The poller says `Cleanup PR:` when it starts and settles once no check is running and GitHub has computed mergeability, a draft included; the gate's own runs (`codex-review`, `internal-review`) neither hold nor block it. Exit `5` means merge once the PR is ready. Exit `4` on a cleanup PR names the checks that are failing: fix them and push. If the label cannot be read, the poller prints a `WARNING:` and polls the PR as unlabelled.
 
 # Attesting the internal review
 

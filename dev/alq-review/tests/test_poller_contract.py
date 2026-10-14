@@ -1,6 +1,7 @@
 """The poller writes the drop, the ledger reads it: this pins the two ends of that file to each other."""
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -58,6 +59,28 @@ class PollerDrop(unittest.TestCase):
         state = ledger.new_state("acme/demo", "feat/1-demo")
         self.assertIsNone(ledger.ingest_poll(state, self.hand_to_gate("clean"), now=T0))
         self.assertEqual(state["github_clean_sha"], "abc123")
+
+
+
+class ExitCodes(unittest.TestCase):
+    """The skill tells the agent what each of the poller's exit codes means; neither may name one the other lacks."""
+    SKILL = POLLER.parent / "SKILL.md"
+
+    def test_the_skill_explains_every_exit_the_poller_names(self):
+        named = re.search(r"^# Exit codes: (.*)$", POLLER.read_text(), re.M).group(1)
+        poller = dict(re.findall(r"(\d) (\S+)", named))
+        table = self.SKILL.read_text().split("Exit codes drive the next step:", 1)[1].split("\n\n", 2)[1]
+        skill = dict(re.findall(r"^\| `(\d)` +\| \*\*(\w+)\*\*", table, re.M))
+        self.assertEqual(poller.keys(), skill.keys())
+        self.assertEqual({code: word.lower() for code, word in poller.items() if code != "1"},
+                         {code: word.lower() for code, word in skill.items() if code != "1"})
+        self.assertEqual(poller.get("5"), "CLEANUP")
+
+    def test_the_skill_says_what_a_cleanup_pr_skips(self):
+        section = self.SKILL.read_text().split("# Cleanup PRs", 1)[1].split("\n# ", 1)[0]
+        for said in ("`cleanup` label", "Only the user adds the label", "Post no `@codex review`", "Run no `deepsource-pr-gate.sh`",
+                     "Do no triage"):
+            self.assertIn(said, section)
 
 
 if __name__ == "__main__":

@@ -7,12 +7,16 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 
 # How the org pr-gate (analitiq-ai/.github pr-gate.js) marks a version-only release: the title of its
 # `internal-review` check run. Only a run the App posted is its word: an agent's token could post the same text.
 GATE_APP = "analitiq-pr-gate"
 RELEASE_CHECK = "internal-review"
 RELEASE_PREFIX = "version-only release:"
+# The label that exempts a PR from alq-review's review gates (ADR-0021).
+CLEANUP_LABEL = "cleanup"
+CLEANUP_EXEMPTION = "To exempt this PR from review, the user adds the `cleanup` label to it on GitHub; an agent does not."
 
 
 def _answer(*args: str) -> str:
@@ -79,3 +83,65 @@ def released(slug: str, commit: str) -> str | None:
     found = _gh("api", "--paginate", f"repos/{slug}/commits/{commit}/check-runs?check_name={RELEASE_CHECK}",
                 "--jq", ".check_runs[]")
     return version_only_release([json.loads(line) for line in found.splitlines()]) if found else None
+
+
+def is_cleanup(labels: list[str]) -> bool:
+    """Whether a PR with these labels is a cleanup PR. GitHub matches label names without case, so this does too."""
+    return any(name.casefold() == CLEANUP_LABEL for name in labels)
+
+
+def unread_cleanup(why: str) -> str:
+    return f"The `cleanup` label could not be read ({why}), so the PR is gated as unlabelled."
+
+
+def label_names(labels) -> list[str]:
+    """The names in a `labels` field of gh's JSON; RuntimeError when it is not a list of named labels."""
+    if not isinstance(labels, list) or not all(isinstance(label, dict) and isinstance(label.get("name"), str)
+                                               for label in labels):
+        raise RuntimeError(f"gh gave labels that are not a list of named labels: {labels!r:.200}")
+    return [label["name"] for label in labels]
+
+
+def _json(text: str):
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"gh gave an answer that is not JSON: {text!r:.200}") from exc
+
+
+def pr_labels(slug: str, pr: int) -> list[str]:
+    """The label names of one PR; RuntimeError when gh cannot say them."""
+    found = _json(_answer("pr", "view", str(pr), "--repo", slug, "--json", "labels"))
+    if not isinstance(found, dict):
+        raise RuntimeError(f"gh gave a PR that is not an object: {found!r:.200}")
+    return label_names(found.get("labels"))
+
+
+def branch_labels(slug: str, branch: str) -> list[list[str]]:
+    """The label names of each open PR of `branch`, none when it has none; RuntimeError when gh cannot say them."""
+    found = _json(_answer("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "number,labels"))
+    if not isinstance(found, list) or not all(isinstance(pr, dict) for pr in found):
+        raise RuntimeError(f"gh gave open PRs that are not a list of objects: {found!r:.200}")
+    return [label_names(pr.get("labels")) for pr in found]
+
+
+USAGE = "usage: github.py cleanup <owner/repo> <pr-number>"
+
+
+def main(argv: list[str]) -> int:
+    """`cleanup <owner/repo> <pr>` prints `cleanup` or `gated`: the poller's one way to ask, so it decides as the
+    hooks do."""
+    if len(argv) != 3 or argv[0] != "cleanup" or not (argv[2].isascii() and argv[2].isdigit()):
+        print(USAGE, file=sys.stderr)
+        return 2
+    try:
+        labels = pr_labels(argv[1], int(argv[2]))
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print("cleanup" if is_cleanup(labels) else "gated")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

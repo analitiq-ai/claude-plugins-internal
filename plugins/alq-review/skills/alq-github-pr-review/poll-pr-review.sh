@@ -41,13 +41,20 @@
 # The trigger is the given comment id, else the newest `@codex review` comment,
 # else the PR's creation (a new non-draft PR reviews itself with no comment).
 #
+# A PR labelled `cleanup` (ADR-0021) waits on no reviewer: it settles
+# once no check is running (the gate runs and ignored checks aside) and GitHub
+# has computed mergeability, a draft included. Its report names failing checks
+# only; no thread is a finding, and nothing is handed to the alq-review gate.
+# scripts/github.py decides whether the PR is one, as the hooks do; when it
+# cannot read the label, the PR is polled as unlabelled, with a WARNING.
+#
 # --ignore-check leaves one check out of the failing/running buckets for this
 # invocation only — for a check red for reasons outside the PR and outside the
 # branch's required set. GitHub then reports UNSTABLE, which counts as clean
 # when every check not passing is ignored. Ignored checks that are not passing
 # are listed in every report, so the exemption is never silent.
 #
-# Exit codes: 0 CLEAN · 2 FINDINGS · 3 TIMEOUT · 4 BLOCKED · 1 usage/error
+# Exit codes: 0 CLEAN · 2 FINDINGS · 3 TIMEOUT · 4 BLOCKED · 5 CLEANUP · 1 usage/error
 set -euo pipefail
 
 CODEX="chatgpt-codex-connector"
@@ -60,6 +67,7 @@ GATE_APP="analitiq-pr-gate"
 # schedule is not relied on: GitHub runs it hours apart.
 GATE_SWEEP_MINUTES=20
 READER="$(dirname "${BASH_SOURCE[0]}")/../../scripts/codexstate.py"
+LABELS="$(dirname "${BASH_SOURCE[0]}")/../../scripts/github.py"
 IGNORE_CHECKS=""
 MINUTES=15
 INTERVAL=60
@@ -206,7 +214,7 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | ($codex_gate != null and $codex_gate.state == "SUCCESS"
    and (($codex_gate.description // "") | startswith("WAIVED:"))) as $waived
 | [$contexts[] | select(.unfinished) | select(.gate | not)] as $running
-| [$contexts[] | select((.passing or .unfinished) | not) | {name, state, url}] as $failing
+| [$contexts[] | select((.passing or .unfinished) | not) | {name, state, url, gate}] as $failing
 
 | [ $pr.reviewThreads.nodes[]
     | select(.isResolved | not)
@@ -259,6 +267,19 @@ if .merge == "DRAFT" then empty else
   (if .merge == "UNKNOWN" then "GitHub is still computing mergeability" else empty end)
 end'
 
+# A cleanup PR waits only for its checks and for GitHub.
+CLEANUP_WAITING_ON='
+(if (.running | length) > 0 then "\(.running | length) check(s) running: \(.running | map(.name) | join(", "))" else empty end),
+(if .merge == "UNKNOWN" then "GitHub is still computing mergeability" else empty end)'
+
+CLEANUP_REPORT='
+([.failing[] | select(.gate | not)]) as $failing |
+"== \($repo)#\($pr) @ \(.head[0:10]): mergeStateStatus=\(.merge)",
+(if ($failing | length) > 0 then "Failing CI checks:",
+   ($failing[] | "  - \(.name) [\(.state)]" + (if .url != "" then "\n    \(.url)" else "" end)) else empty end),
+(if (.ignored | length) > 0 then "Ignored by explicit instruction, not passing:",
+   (.ignored[] | "  - \(.name) [\(.state)]") else empty end)'
+
 REPORT='
 "== \($repo)#\($pr) @ \(.head[0:10]): mergeStateStatus=\(.merge), reviewDecision=\(.decision // "none")",
 "Codex: \(.codex.state | gsub("_"; " "))"
@@ -303,7 +324,11 @@ snapshot() {
 }
 
 report() {
-  jq -r --arg repo "$repo" --arg pr "$pr" --arg gate_app "$GATE_APP" "$REPORT" <<<"$1"
+  if [ "$cleanup" = true ]; then
+    jq -r --arg repo "$repo" --arg pr "$pr" "$CLEANUP_REPORT" <<<"$1"
+  else
+    jq -r --arg repo "$repo" --arg pr "$pr" --arg gate_app "$GATE_APP" "$REPORT" <<<"$1"
+  fi
 }
 
 # Hand the outcome to the alq-review gate: one inbox file per PR, naming its branch and head.
@@ -338,6 +363,19 @@ hand_over() {
     "$(jq -c '[.gate_comments[] | {url, gist, approves}]' <<<"$1")"
 }
 
+settle_cleanup() {
+  local state=$1
+  report "$state"
+  local failing
+  failing=$(jq -r '[.failing[] | select(.gate | not) | .name] | join(", ")' <<<"$state")
+  if [ -n "$failing" ]; then
+    echo "BLOCKED: $failing failing on a cleanup PR."
+    exit 4
+  fi
+  echo "CLEANUP: no check is failing but those ignored; merge once the PR is ready."
+  exit 5
+}
+
 settle() {
   local state=$1 findings
   findings=$(jq -r '.findings' <<<"$state")
@@ -356,6 +394,19 @@ settle() {
   exit 4
 }
 
+cleanup=false
+if verdict=$(python3 "$LABELS" cleanup "$repo" "$pr" 2>&1); then
+  [ "$verdict" = cleanup ] && cleanup=true
+else
+  echo "WARNING: the cleanup label of $repo#$pr could not be read ($verdict); polling it as unlabelled." >&2
+fi
+if [ "$cleanup" = true ]; then
+  echo "Cleanup PR: $repo#$pr carries the cleanup label; no Codex, no internal review, no triage."
+  waiting_on=$CLEANUP_WAITING_ON
+else
+  waiting_on=$WAITING_ON
+fi
+
 deadline=$(( $(date +%s) + MINUTES * 60 ))
 poll=0
 dispatched=false
@@ -368,7 +419,7 @@ while :; do
     exit 1
   fi
   if [ "$poll" -eq 1 ]; then
-    if [ "$(jq -r '.trigger_found' <<<"$state")" = false ]; then
+    if [ "$cleanup" = false ] && [ "$(jq -r '.trigger_found' <<<"$state")" = false ]; then
       echo "No '$TRIGGER_TEXT' comment on $repo#$pr; assuming the auto-triggered review at PR creation."
     fi
     echo "Watching $repo#$pr since $(jq -r '.since' <<<"$state"); polling every ${INTERVAL}s for up to ${MINUTES} min."
@@ -376,11 +427,12 @@ while :; do
       echo "Ignoring CI check(s) by explicit instruction: $(jq -r 'join(", ")' <<<"$ignore_json")"
     fi
   fi
-  waiting=$(jq -r "$WAITING_ON" <<<"$state")
+  waiting=$(jq -r "$waiting_on" <<<"$state")
   if [ -z "$waiting" ]; then
+    if [ "$cleanup" = true ]; then settle_cleanup "$state"; fi
     settle "$state"
   fi
-  if [ "$dispatched" = false ] && [ "$(jq -r '.gate_lags' <<<"$state")" = true ]; then
+  if [ "$cleanup" = false ] && [ "$dispatched" = false ] && [ "$(jq -r '.gate_lags' <<<"$state")" = true ]; then
     dispatch_sweep
     dispatched=true
   fi

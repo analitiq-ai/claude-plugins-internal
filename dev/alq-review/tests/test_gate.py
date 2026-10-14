@@ -25,6 +25,7 @@ import adrkit
 import assessment
 import briefs
 import gate
+import github
 import helpers
 import hookio
 import ledger
@@ -931,6 +932,80 @@ class ReleaseReady(Gate):
     def test_an_ordinary_clean_internal_review_is_not_a_release(self):
         self.github_runs(self.gate_run(title="Internal review clean on 0123456789"))
         self.assertEqual(self.ready(), "deny")
+
+
+class CleanupLabel(Gate):
+    """A PR labelled `cleanup` needs no review: it is readied with no round, and its branch's commits
+    skip the claim and shim checks (ADR-0021)."""
+
+    def setUp(self):
+        super().setUp()
+        # gh answers a branch's open PRs with their labels, one PR's labels, and the branch's open PR as before.
+        (Path(self.tmp.name) / "bin" / "gh").write_text(
+            '#!/bin/sh\necho "$*" >> "$GH_LOG"\ncase "$*" in\n'
+            '  "pr list"*number,labels*) [ -n "$GH_BRANCH_PRS" ] && echo "$GH_BRANCH_PRS" || exit 1 ;;\n'
+            '  "pr list"*) echo "$GH_OPEN_PR" ;;\n'
+            '  "pr view"*labels*) [ -n "$GH_PR_LABELS" ] && echo "$GH_PR_LABELS" || exit 1 ;;\n'
+            '  *) exit 1 ;;\nesac\n')
+        self.env.update(GH_BRANCH_PRS="", GH_PR_LABELS="")
+
+    def labelled(self, *names):
+        labels = [{"name": name} for name in names]
+        self.env.update(GH_BRANCH_PRS=json.dumps([{"number": 7, "labels": labels}]),
+                        GH_PR_LABELS=json.dumps({"labels": labels}))
+
+    def ready(self):
+        return self.hook("PreToolUse", "Bash", {"command": f"cd {self.root} && gh pr ready"})
+
+    def checks_run(self):
+        with mock.patch.object(gate.claimgate, "on_commit", return_value=None) as claims, \
+                mock.patch.object(gate.shimgate, "on_commit", return_value=None) as shims:
+            self.hook("PreToolUse", "Bash", {"command": "git commit -qam x"}, cwd=str(self.root))
+        return claims.called, shims.called
+
+    def test_a_cleanup_pr_is_readied_with_no_round(self):
+        self.labelled("cleanup")
+        self.assertEqual(self.ready(), {})
+
+    def test_a_cleanup_pr_the_ledger_names_is_read_by_its_number(self):
+        _, args = self.launch()
+        found = [helpers.finding(f"{args['waves'][0][0]['short']}-1", file="b.py", line=3)]
+        self.run_reviewers(args, found)
+        self.submit_assessment(self.assessment(args["round_ref"], [found[0]["id"]]))
+        self.labelled("bug", "Cleanup")
+        self.assertEqual(self.ready(), {})
+        self.assertIn("pr view 7 --repo acme/demo --json labels", Path(self.env["GH_LOG"]).read_text())
+
+    def test_an_unlabelled_pr_is_refused_as_before_and_told_the_users_way_past(self):
+        for labels in ((), ("bug",)):
+            with self.subTest(labels=labels):
+                self.labelled(*labels)
+                out = self.ready()
+                self.assertEqual(self.decision(out), "deny")
+                self.assertIn("The internal review has not come back clean", self.reason(out))
+                self.assertTrue(self.reason(out).endswith(github.CLEANUP_EXEMPTION), self.reason(out))
+
+    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_says_why_first(self):
+        out = self.ready()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIn("The `cleanup` label could not be read (", self.reason(out))
+        self.assertLess(self.reason(out).index("could not be read"),
+                        self.reason(out).index("The internal review has not come back clean"))
+
+    def test_a_cleanup_prs_commits_skip_the_claim_and_shim_checks(self):
+        self.labelled("cleanup")
+        self.assertEqual(self.checks_run(), (False, False))
+
+    def test_other_commits_are_checked_as_before(self):
+        for labels in ((), ("bug",)):
+            with self.subTest(labels=labels):
+                self.labelled(*labels)
+                self.assertEqual(self.checks_run(), (True, True))
+        self.env.update(GH_BRANCH_PRS="[]")
+        self.assertEqual(self.checks_run(), (True, True))
+
+    def test_a_commit_whose_labels_could_not_be_read_is_checked_as_before(self):
+        self.assertEqual(self.checks_run(), (True, True))
 
 
 class BrokenGate(ThroughProcess, Gate):

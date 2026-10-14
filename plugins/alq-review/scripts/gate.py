@@ -110,6 +110,18 @@ def _unknown_pr(payload: dict, action: str, where: worktree.Worktree, exc: Runti
                   "then retry.", Target(where.slug, None, where.branch, where.root))
 
 
+def cleanup_of(repo: str, pr: int | None, branch: str | None) -> policy.Cleanup:
+    """Whether the PR carries the `cleanup` label: the PR named, else every open PR of the branch, of which there must
+    be one. A label GitHub cannot say is no label, and the fact says why."""
+    try:
+        if pr is not None:
+            return policy.Cleanup(labelled=github.is_cleanup(github.pr_labels(repo, pr)))
+        found = github.branch_labels(repo, branch)
+    except RuntimeError as exc:
+        return policy.Cleanup(unread=str(exc))
+    return policy.Cleanup(labelled=bool(found) and all(map(github.is_cleanup, found)))
+
+
 def decide(payload: dict, target: Target, rule, **facts_for_rule) -> policy.Decision:
     """Judging reads the ledger and never writes it; a PR with no ledger is judged on an empty one."""
     state = ledger.new_state(target.repo, None) if target.pr is None else ledger.read(target.repo, target.pr)
@@ -357,12 +369,13 @@ def on_bash(payload: dict) -> dict | None:
     for action in shell.classify(command, payload.get("cwd") or os.getcwd()):
         if action.kind == "unlock":
             return refuse(payload, "unlock", "Only the user unlocks a branch. Tell them why it is locked and stop.")
-        # A commit is claim-checked whether or not a PR is open.
-        refused = action.kind == "commit" and (claimgate.on_commit(payload, action)
-                                               or shimgate.on_commit(payload, action))
+        where = worktree.locate(action.cwd)
+        # A commit is claim-checked whether or not a PR is open, unless its PR carries `cleanup` (ADR-0021).
+        refused = (action.kind == "commit" and where is not None
+                   and not cleanup_of(where.slug, None, where.branch).labelled
+                   and (claimgate.on_commit(payload, action) or shimgate.on_commit(payload, action)))
         if refused:
             return refused
-        where = worktree.locate(action.cwd)
         try:
             event = target(where, action.repo, action.pr)
         except RuntimeError as exc:
@@ -375,7 +388,8 @@ def on_bash(payload: dict) -> dict | None:
         if action.kind == "ready":
             commit = worktree.head_sha(event.root) if event.root else (github.pr_head(event.repo, action.pr) or ("", ""))[1]
             decision = decide(payload, event, policy.mark_ready, head_sha=commit,
-                              released=bool(commit) and github.released(event.repo, commit) is not None)
+                              released=bool(commit) and github.released(event.repo, commit) is not None,
+                              cleanup=cleanup_of(event.repo, event.pr, event.branch))
         elif action.kind == "rerequest":
             decision = decide(payload, event, policy.rerequest)
         else:

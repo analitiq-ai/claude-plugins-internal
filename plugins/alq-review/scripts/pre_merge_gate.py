@@ -31,6 +31,9 @@ OLD -> NEW") needs no attestation: it only moves its package's own version up.
 alq-review's github.py reads that verdict; this hook imports it from the same
 checkout rather than keeping a copy that drifts when the gate changes.
 
+A PR labelled `cleanup` needs no attestation either (ADR-0021); `--admin` still needs
+`override-merge`.
+
 The user can overrule the reviewers. Analitiq-Bot is an org admin, and the user and
 every agent session act as it, so GitHub cannot tell the user's override from an
 agent's: the permission is taken from the user's own words instead. A prompt that
@@ -226,7 +229,7 @@ def fetch(pr_ref: str | None, repo: str | None) -> tuple[dict | None, str]:
         args.append(pr_ref)
     if repo:
         args += ["-R", repo]
-    args += ["--json", "number,headRefOid,isDraft,url,comments"]
+    args += ["--json", "number,headRefOid,isDraft,url,comments,labels"]
     try:
         done = subprocess.run(args, capture_output=True, text=True, timeout=30)
     except subprocess.TimeoutExpired:
@@ -355,7 +358,18 @@ def released(named: PullRequest | None, head: str) -> bool:
     return named is not None and github.released(named.repo, head) is not None
 
 
+def cleanup(pr: dict) -> tuple[bool, str]:
+    """Does the PR carry the `cleanup` label? Labels that cannot be read are none; the second part then says so."""
+    # Imported here for the reason released() imports github here.
+    import github
+    try:
+        return github.is_cleanup(github.label_names(pr.get("labels"))), ""
+    except RuntimeError as exc:
+        return False, github.unread_cleanup(str(exc))
+
+
 def how_to_attest(number: int, head: str, verb: str) -> str:
+    from github import CLEANUP_EXEMPTION
     from shell import ATTESTATION_MARKER
     return (
         f"No internal-review attestation for {head[:10]} on PR #{number}, so `gh pr {verb}` "
@@ -367,7 +381,8 @@ def how_to_attest(number: int, head: str, verb: str) -> str:
         "  Internal review clean.\n"
         f"  Reviewed commit: `{head}`'\n\n"
         "An attestation naming an older commit does not count: every push voids it, "
-        "the same way it voids the Codex verdict."
+        "the same way it voids the Codex verdict. "
+        f"{CLEANUP_EXEMPTION}"
     )
 
 
@@ -392,9 +407,10 @@ def unmet(verb: str, args: list[str], pr: dict, named: PullRequest | None) -> st
     head = (pr.get("headRefOid") or "").lower()
     if not head:
         return f"`gh pr view` returned no head commit for PR {pr.get('number')}."
-    if attested(pr.get("comments") or [], head) or released(named, head):
+    labelled, unread = cleanup(pr)
+    if labelled or attested(pr.get("comments") or [], head) or released(named, head):
         return None
-    return how_to_attest(pr.get("number"), head, verb)
+    return f"{unread} {how_to_attest(pr.get('number'), head, verb)}".lstrip()
 
 
 def switched_off(payload: dict) -> bool:

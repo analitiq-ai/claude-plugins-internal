@@ -3,10 +3,12 @@ from datetime import timedelta
 
 from helpers import REVIEWERS, T0, add_round, assess, state_with_round
 
+import github
 import ledger
 import policy
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
+UNLABELLED, LABELLED = policy.Cleanup(), policy.Cleanup(labelled=True)
 SPEC = "specs/019-demo"
 BOUND_BLOB, HEAD_BLOB = "d" * 40, "e" * 40
 # Each binding a PR can have, with what the review call's `spec` must read for it: the PR's own value, quoted so
@@ -382,8 +384,8 @@ class MarkReady(unittest.TestCase):
     def test_refused_without_a_clean_internal_round_at_head(self):
         state = state_with_round(head=HEAD_A)
         assess(state, "PATCH")
-        self.assertFalse(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).allow)
-        self.assertFalse(policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0, released=False).allow)
+        self.assertFalse(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False, cleanup=UNLABELLED).allow)
+        self.assertFalse(policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0, released=False, cleanup=UNLABELLED).allow)
 
     def test_a_refusal_names_the_internal_round_with_the_prs_spec(self):
         for binding, spec_arg in BINDINGS:
@@ -391,25 +393,49 @@ class MarkReady(unittest.TestCase):
                 state = state_with_round(head=HEAD_A)
                 assess(state, "PATCH")
                 state.update(binding)
-                reason = policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).reason
+                reason = policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False, cleanup=UNLABELLED).reason
                 self.assertIn(review_call("internal", spec_arg), reason)
 
     def test_allowed_when_the_round_at_head_came_back_clean(self):
         state = state_with_round(findings_per_reviewer=(0, 0), head=HEAD_A)
-        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).allow)
-        self.assertFalse(policy.mark_ready(state, head_sha=HEAD_B, inflight=0, released=False).allow)
+        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False, cleanup=UNLABELLED).allow)
+        self.assertFalse(policy.mark_ready(state, head_sha=HEAD_B, inflight=0, released=False, cleanup=UNLABELLED).allow)
 
     def test_a_version_only_release_needs_no_round(self):
         fresh = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
-        self.assertTrue(policy.mark_ready(fresh, head_sha=HEAD_A, inflight=0, released=True).allow)
+        self.assertTrue(policy.mark_ready(fresh, head_sha=HEAD_A, inflight=0, released=True, cleanup=UNLABELLED).allow)
 
     def test_a_version_only_release_still_waits_for_a_round_in_flight(self):
-        self.assertFalse(policy.mark_ready(state_with_round(head=HEAD_A), head_sha=HEAD_A, inflight=0, released=True).allow)
+        self.assertFalse(policy.mark_ready(state_with_round(head=HEAD_A), head_sha=HEAD_A, inflight=0, released=True, cleanup=UNLABELLED).allow)
+
+    def test_a_cleanup_pr_needs_no_round(self):
+        fresh = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.assertTrue(policy.mark_ready(fresh, head_sha=HEAD_A, inflight=0, released=False, cleanup=LABELLED).allow)
+        state = state_with_round(head=HEAD_A)
+        assess(state, "PATCH")
+        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False, cleanup=LABELLED).allow)
+
+    def test_a_cleanup_pr_still_waits_for_a_round_in_flight(self):
+        """The label waives a review; it releases no hold (ADR-0018)."""
+        decision = policy.mark_ready(state_with_round(head=HEAD_A), head_sha=HEAD_A, inflight=0, released=False,
+                                     cleanup=LABELLED)
+        self.assertFalse(decision.allow)
+
+    def test_a_refusal_names_the_users_way_past_it(self):
+        reason = policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0,
+                                   released=False, cleanup=UNLABELLED).reason
+        self.assertTrue(reason.endswith(github.CLEANUP_EXEMPTION), reason)
+
+    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_says_so_first(self):
+        decision = policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0,
+                                     released=False, cleanup=policy.Cleanup(unread="gh pr view failed: HTTP 502"))
+        self.assertFalse(decision.allow)
+        self.assertTrue(decision.reason.startswith(github.unread_cleanup("gh pr view failed: HTTP 502")), decision.reason)
 
     def test_allowed_when_every_finding_was_pushed_back(self):
         state = state_with_round(head=HEAD_A)
         assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
-        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False).allow)
+        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False, cleanup=UNLABELLED).allow)
 
 
 class Admissible(unittest.TestCase):

@@ -40,6 +40,7 @@ that is under review.
    (no findings, or every finding pushed back) at the current commit: `gh pr ready`, `gh pr create`
    without `--draft`, and any comment carrying the `internal-review` attestation marker the org pr-gate
    reads. A comment is judged by what it posts, body files included, however `gh` posts or edits it.
+   A cleanup PR (9) needs no round.
 4. **The cap.** A stage gets 4 rounds without settling (a round settles when it is clean or ruled
    `CONVERGED_PUSHBACK`, and the count starts again after it). The fifth is refused and the audit is required;
    its assessment may not be `PATCH`. The second such audit that rules something must change locks the
@@ -90,6 +91,7 @@ that is under review.
    has its file and the disk has none either (a file only unstaged keeps its count). At 3 `WRONG` rulings the agent must stop
    and ask the user, who lets the words stand by typing `unlock claim-<id>`; one more `WRONG` ruling holds it again.
    What the repo's own commit hook changes during the commit is cosmetic and is not checked again.
+   A commit on a branch whose open PR is a cleanup PR (9) skips this check and the next.
 7. **A fix reaches every site of its bug before it is committed.** A `git commit` that stages code is also refused
    until the `shim-check` workflow has checked that staged tree, or the user has overridden its bug; each refusal
    names the next step. Jev answers whether the change fixes a defect. For a fix, sweepers list the sites doing the
@@ -129,6 +131,12 @@ that is under review.
    corpus and a fix that works there. The round's result carries a `decisions` block: the corpora checked, the
    records that govern, the notices, the broken records and corpora not checked when their refusal did not block,
    and the org corpus or `unset`. Audit rounds run no decision check.
+9. **A PR labelled `cleanup` needs no review here** (ADR-0021). `gh pr ready` needs no clean round and
+   `gh pr merge` no attestation, `--admin` still needing `override-merge`; its branch's commits skip the claim and
+   shim checks (6, 7); the poller asks for no Codex review and treats no thread as blocking. The label is read from
+   GitHub at each check, whatever the diff and whatever was pushed after it; a label that cannot be read is no label,
+   and a ready or merge refusal says so first. It releases no round in flight and no lock. The user adds it, on
+   GitHub; an agent does not. The hook refuses no label command: see *Requirements*.
 
 ## How an agent uses it
 
@@ -260,7 +268,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/decisions.py` | the decision check's rules - pure functions of adrkit's answers |
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
-| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
+| `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, the org gate's version-only release, or the `cleanup` label; an admin merge needs the user's `override-merge owner/repo#N` |
 | `skills/` | `alq-github-pr-review` |
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
@@ -271,6 +279,11 @@ Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an in
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
 
 Depends on the `pr-review-toolkit` and `alq-anti-pattern` plugins for the reviewer agents.
+
+## Requirements
+
+- A rule must be created that forbids the agent from applying the `cleanup` label. This plugin does not refuse it
+  (9), so until that rule exists an agent can exempt its own PR from review.
 
 ## Dependencies
 
