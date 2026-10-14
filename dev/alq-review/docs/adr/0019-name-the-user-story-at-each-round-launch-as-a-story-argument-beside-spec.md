@@ -9,7 +9,7 @@ tags: [spec, review-round, user-story, binding]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0016", "0017", "0018"]
+relatesTo: ["0016", "0017", "0018", "0020"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{specbinding,gate,briefs,policy}.py"
@@ -57,7 +57,7 @@ findings against the PR, and the folder alone cannot say which story the PR deli
    reads neither the branch name nor the PR body. This extends ADR-0016, decision 1. ADR-0016, decision 2 stands.
 2. We will keep ADR-0016's checks of the folder, and refuse a launch whose `spec.md` at the checked commit has no
    line starting `### User Story <N>`, the number ending at a word boundary.
-3. We will bind the PR at its first round to the folder, the story and the `spec.md` blob, and refuse a later
+3. We will bind the PR at its first round to the folder and the story, and refuse a later
    launch whose `spec` or `story` differs. This extends ADR-0016, decisions 4 and 5. `story` is recorded only for
    a folder, so a binding to `null` keeps its shape. The gate does not handle a binding made before this change to
    a folder with no story: shipping this change requires that no open PR has one.
@@ -66,7 +66,7 @@ findings against the PR, and the folder alone cannot say which story the PR deli
    only another story delivers. Spec authors need not tag requirements by story. The assessor brief carries the story number
    beside the folder. This supersedes ADR-0017, decision 2.
 
-ADR-0016, decision 6, and ADR-0018 stand: a story PR that edits `spec.md` is held until the user unlocks it.
+ADR-0020 decides what happens to a story PR that changes `spec.md`: its review-round launch is refused.
 
 ## Options considered
 
