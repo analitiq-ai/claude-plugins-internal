@@ -170,8 +170,8 @@ stand": the decision record replaces both (R1).
   the same fact: at a review-round launch of any stage, after `_review_base` and before `ledger.open_round`,
   `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which with `--find-renames` strips the score from
   `R<score>` and yields the destination path), refused through `hookio.refuse(payload, "launch", ...)` with `then` "launch
-  again"; at the attestation, the steps and rule of data-model "The attestation's diff check": the order of `pr_head`,
-  `released`, `mark_ready` and `pr_files`, and the branch it passes; each lookup's outcomes and refusals are its rows in
+  again"; at the attestation, the steps and rule of data-model "The attestation's diff check": which reads it makes, when,
+  and the branch it passes; each lookup's outcomes and refusals are its rows in
   "New interfaces" (P4). Assess-round launches run no diff check.
 - **Rationale**: FR-004: one function decides for both sites. The launch has a checkout and a base; a `gh pr ready` may run from
   anywhere, and GitHub lists the PR's files with their status, so the attestation site needs no checkout. A deleted spec.md

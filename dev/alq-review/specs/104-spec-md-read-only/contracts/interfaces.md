@@ -70,17 +70,16 @@ reports the files, for the session to raise to the user.
 
 ## The diff check (US4)
 
-Sites: a review-round launch of any stage, after the review base is read; the attestation (`ready`), after `mark_ready`
-allows. Both through `hookio.refuse` under `mode`.
-
-At the attestation, the order of its lookups, which row answers which lookup's outcome, and where `<repo>`, `<pr>` and
-the branch come from: data-model "The attestation's diff check" and "New interfaces".
+Sites: a review-round launch of any stage, and the attestation (`ready`). Both through `hookio.refuse` under `mode`.
+Where each site reads its diff: data-model "The mixed-diff rule". At the attestation, what it reads and when, which row
+answers which failed read, and where `<repo>`, `<pr>`, `<sha>` and the branch come from: data-model "The attestation's
+diff check" and "New interfaces".
 
 | Row | Text |
 |---|---|
 | `mixed` | This PR's diff changes `<spec.md>` and `<other path>`, which is outside `<folder>`: a PR changes the spec or the code, never both. Next step: land the spec change as a spec-only PR on `<issue>-spec`, rebase this branch on it, then <launch again / mark it ready again>. |
-| `head fails` | GitHub could not read the head of PR <repo>#<pr> (<gh's words>), so alq-review cannot tell which commit it would attest, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
-| `release fails` | GitHub could not read <repo>'s release check for this head (<gh's words>), so alq-review cannot tell whether it is a version-only release, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
+| `head fails` | GitHub could not read the head of PR <repo>#<pr> (<gh's words>), so alq-review cannot tell which commit it would attest, and refuses the ready. Next step: check that PR <repo>#<pr> exists, and `gh auth status`, then mark it ready again. |
+| `release fails` | GitHub could not read <repo>'s release check for <sha> (<gh's words>), and the internal review has not come back clean at <sha>, so alq-review cannot tell whether it is a version-only release, and refuses the ready. Next step: run the internal review; or, for a version-only release, check that <sha> is pushed and `gh auth status`, then mark it ready again. |
 | `files fail` | GitHub could not list the files of PR <repo>#<pr> (<gh's words>), so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
 | `file cap` | PR <repo>#<pr>'s file list reaches 3000 files, GitHub's cap, so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: split the PR into PRs of fewer files, then mark each ready again. |
 
