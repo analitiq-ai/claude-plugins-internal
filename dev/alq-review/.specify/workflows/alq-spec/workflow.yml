@@ -2,7 +2,7 @@ schema_version: "1.0"
 workflow:
   id: "alq-spec"
   name: "Spec Cycle"
-  version: "1.5.0"
+  version: "1.6.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
 
@@ -90,8 +90,8 @@ steps:
               [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
               gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
 
-  # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
-  # top-level and skips itself on a stop pick, instead of all of them sharing one block.
+  # A resume re-runs the step the run stopped in, nested or not, then goes on from there: no step before it runs
+  # again, the ones in the same block included.
 
   # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
   - id: scope
@@ -102,7 +102,8 @@ steps:
         type: if
         condition: "{{ inputs.kind == 'rescope' }}"
         then:
-          # check-folder has graded the folder, so it goes into the JSON as it is.
+          # No step here reads it back: grill runs in the session, without the run's environment, and finds the
+          # folder through feature.json. check-folder has graded the folder, so it goes into the JSON as it is.
           - id: select-spec
             type: shell
             run: |
@@ -127,14 +128,12 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
       - id: premise-answers
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$SPECIFY_FEATURE_DIRECTORY"
 
   # grill interviews the author, which a headless command step cannot do.
   - id: to-grill
@@ -156,12 +155,11 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+          test -f "$SPECIFY_FEATURE_DIRECTORY/spec.md" || { echo "no spec.md in $SPECIFY_FEATURE_DIRECTORY" >&2; exit 1; }
           found=0
-          grep -n "NEEDS CLARIFICATION" "$dir/spec.md" || found=$?
+          grep -n "NEEDS CLARIFICATION" "$SPECIFY_FEATURE_DIRECTORY/spec.md" || found=$?
           case $found in
-            0) echo "Open clarification markers remain in $dir/spec.md" >&2; exit 1 ;;
+            0) echo "Open clarification markers remain in $SPECIFY_FEATURE_DIRECTORY/spec.md" >&2; exit 1 ;;
             1) ;;
             *) exit "$found" ;;
           esac
@@ -180,21 +178,18 @@ steps:
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY"
         else:
           - id: root-cause-after-grill
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
           - id: premise-answers-after-grill
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-plan
     type: if
@@ -215,8 +210,7 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-mark-critiques
     type: if
@@ -224,7 +218,7 @@ steps:
     then:
       - id: mark-critiques
         type: shell
-        run: python3 .specify/workflows/alq-spec/critique_report.py mark
+        run: python3 .specify/workflows/alq-spec/critique_report.py mark "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-critique
     type: if
@@ -241,7 +235,7 @@ steps:
       - id: new-critique
         type: shell
         output_format: json
-        run: python3 .specify/workflows/alq-spec/critique_report.py find
+        run: python3 .specify/workflows/alq-spec/critique_report.py find "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-review-critique
     type: if

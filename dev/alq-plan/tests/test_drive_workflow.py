@@ -370,11 +370,15 @@ class Install(unittest.TestCase):
         self.assertTrue(same_files(SPECKIT / "presets" / "settled-design", self.preset))
         self.assertTrue(same_files(SPECKIT / "workflows" / "alq-spec", self.workflow))
 
+    def test_only_the_rescope_step_that_writes_feature_json_names_it(self):
+        """No step reads its folder from feature.json; a rescope writes it for Spec Kit's own commands."""
+        self.assertEqual([s["id"] for s in workflow_steps() if "feature.json" in s.get("run", "")], ["select-spec"])
+
     def test_the_workflow_runs_the_plugins_scripts_under_the_plan_root_the_driver_sets(self):
         """The steps run in the project, which has no copy of the plugin's scripts; the driver says where they are."""
         self.assertEqual([s["id"] for s in workflow_steps() if "ALQ_REVIEW_ROOT" in s.get("run", "")], [])
         [step] = [s for s in workflow_steps() if s["id"] == "settled-design"]
-        self.assertIn('python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"', step["run"])
+        self.assertIn('python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$SPECIFY_FEATURE_DIRECTORY"', step["run"])
         with mock.patch.object(drive_workflow.subprocess, "run") as run, mock.patch.dict(os.environ, clear=True):
             drive_workflow._specify(["resume", "r1"], {})
         env = run.call_args.kwargs["env"]
@@ -383,6 +387,27 @@ class Install(unittest.TestCase):
 
 
 class AfterGrill(unittest.TestCase):
+    def test_the_steps_after_grill_grade_the_runs_folder_whatever_feature_json_names(self):
+        """The folder input is the one source of the folder: feature.json is written for Spec Kit's own commands."""
+        self.project = Project("# Demo\n\n[NEEDS CLARIFICATION: which store?]\n")
+        self.addCleanup(self.project.close)
+        self.project.add_folder("specs/8-other", TRACED)
+        _, started = self.project.drive("rescope", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        (self.project.root / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": "specs/8-other"}))
+        proc, report = self.project.drive("resume", started["run_id"], "grill_verdict=approve")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("failed", "no-open-markers"), report)
+        self.assertIn(SPEC_DIR, report["stderr"])
+
+    def test_a_resume_after_grill_cleared_the_markers_runs_on(self):
+        """The skill's way back from open markers: grill again in the session, then a plain resume."""
+        report = self.approved("# Demo\n\n[NEEDS CLARIFICATION: which store?]\n")
+        self.assertTrue(report["open_markers"], report)
+        (self.project.root / SPEC_DIR / "spec.md").write_text(UNANSWERED)
+        proc, report = self.project.drive("resume", report["run_id"])
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("failed", "settled-design"), report)
+
     def approved(self, spec_text):
         self.project = Project(spec_text)
         self.addCleanup(self.project.close)

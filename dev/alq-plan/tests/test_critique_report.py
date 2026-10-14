@@ -18,12 +18,15 @@ class CritiqueReport(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
         (self.root / ".specify").mkdir()
-        (self.root / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": FEATURE}))
+        # The folder is the one the script is given: what feature.json names is never read for it.
+        (self.root / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": "specs/8-other"}))
+        (self.root / "specs" / "8-other" / "critiques").mkdir(parents=True)
         self.critiques = self.root / FEATURE / "critiques"
         self.critiques.mkdir(parents=True)
 
     def run_script(self, action):
-        return subprocess.run([sys.executable, str(SCRIPT), action], cwd=self.root, capture_output=True, text=True)
+        return subprocess.run([sys.executable, str(SCRIPT), action, FEATURE], cwd=self.root, capture_output=True,
+                              text=True)
 
     def test_an_earlier_runs_report_is_not_shown_when_this_run_wrote_none(self):
         (self.critiques / "critique-20990101-000000.md").write_text("old")
