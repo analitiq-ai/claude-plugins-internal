@@ -6,13 +6,14 @@ rescope needs the issue's one folder, holding a spec.md. `recorded` grades the f
 `.specify/feature.json` against the one the run gave it: Spec Kit names a folder itself when it does not take the
 one it is given.
 
-Usage: spec_folder.py check <folder> <issue> new|rescope | recorded <folder>. Run in the project. Prints one problem
-per line and exits 1 when there are any, 2 when the check cannot run.
+Usage: spec_folder.py check <folder> <issue> new|rescope | recorded <folder>. Run in the project, in a git checkout.
+Prints one problem per line and exits 1 when there are any, 2 when the check cannot run.
 """
 from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,8 +24,10 @@ _ISSUE = re.compile(r"[1-9][0-9]*")
 FEATURE_JSON = Path(".specify/feature.json")
 
 
-def problems(folder: str, issue: str, kind: str, existing: dict[str, bool]) -> list[str]:
-    """`existing` maps each folder name in the project's `specs/` to whether it holds a spec.md."""
+def problems(folder: str, issue: str, kind: str, existing: dict[str, bool], project: str) -> list[str]:
+    """`existing` maps each folder name in the project's `specs/` to whether it holds a spec.md. `project` is the
+    project's folder in the checkout, empty or ending in `/`: a rescope's folder is read from the checkout, so a
+    refusal names folders from there."""
     if kind not in ("new", "rescope"):
         raise ValueError(f"the kind of run is new or rescope, got {kind!r}")
     if not _ISSUE.fullmatch(issue):
@@ -41,15 +44,15 @@ def problems(folder: str, issue: str, kind: str, existing: dict[str, bool]) -> l
     issue_folders = sorted(name for name in existing if name.startswith(prefix))
     if kind == "new":
         if issue_folders:
-            forms = ", ".join(f"`rescope specs/{name} #{issue}`" for name in issue_folders)
+            forms = ", ".join(f"`rescope {project}specs/{name} #{issue}`" for name in issue_folders)
             return [f"issue #{issue} already has a spec folder, so it is not scoped again. Next step: {forms}."]
         return []
     if not existing.get(found["name"]):
-        return [f"`{folder}` holds no spec.md, so there is no spec to rescope. Next step: rescope the folder that "
+        return [f"`{project}{folder}` holds no spec.md, so there is no spec to rescope. Next step: rescope the folder that "
                 f"holds issue #{issue}'s spec, or scope the issue with `#{issue}`."]
-    others = [f"`specs/{name}`" for name in issue_folders if name != found["name"]]
+    others = [f"`{project}specs/{name}`" for name in issue_folders if name != found["name"]]
     if others:
-        return [f"issue #{issue} has another spec folder besides `{folder}`: {', '.join(others)}. Next step: keep one "
+        return [f"issue #{issue} has another spec folder besides `{project}{folder}`: {', '.join(others)}. Next step: keep one "
                 "folder for the issue, then rescope it."]
     return []
 
@@ -70,6 +73,11 @@ def _existing() -> dict[str, bool]:
     return {p.name: (p / "spec.md").is_file() for p in specs.iterdir() if p.is_dir()}
 
 
+def _project() -> str:
+    return subprocess.run(["git", "rev-parse", "--show-prefix"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
 def _recorded() -> str | None:
     if not FEATURE_JSON.is_file():
         return None
@@ -83,12 +91,12 @@ def main() -> None:
     args = sys.argv[1:]
     try:
         if len(args) == 4 and args[0] == "check":
-            found = problems(args[1], args[2], args[3], _existing())
+            found = problems(args[1], args[2], args[3], _existing(), _project())
         elif len(args) == 2 and args[0] == "recorded":
             found = recorded_problems(args[1], _recorded())
         else:
             raise ValueError(__doc__)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"The spec folder check could not run: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(2)
     for problem in found:
