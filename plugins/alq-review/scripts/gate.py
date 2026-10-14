@@ -343,6 +343,11 @@ def on_edit(payload: dict) -> dict | None:
     where = worktree.locate(path)
     if where is None:
         return None
+    # Judged on the branch and the path alone, before `target` can ask GitHub: a story branch with no PR yet is held to it.
+    relative = Path(path).resolve().relative_to(Path(where.root).resolve()).as_posix()
+    spec_edit = specbinding.story_edit_refusal(where.branch, relative)
+    if spec_edit:
+        return refuse(payload, "spec-edit", spec_edit, Target(where.slug, None, where.branch, where.root))
     try:
         event = target(where)
     except RuntimeError as exc:

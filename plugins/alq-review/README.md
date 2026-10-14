@@ -133,6 +133,11 @@ that is under review.
    corpus and a fix that works there. The round's result carries a `decisions` block: the corpora checked, the
    records that govern, the notices, the broken records and corpora not checked when their refusal did not block,
    and the org corpus or `unset`. Audit rounds run no decision check.
+9. **A story branch never changes a spec.md.** On a story branch (`<issue>-us<n>-<slug>`), `Edit`, `Write` and
+   `NotebookEdit` of a spec folder's `spec.md` are refused, read from the branch and the path alone, with or without
+   a PR. The next step: stop and raise the spec problem to the user, who lands it in a spec-only PR on
+   `<issue>-spec`; once it merges, the story branch rebases on it. The folder's other files stay editable, so a
+   story PR ticks its tasks.
 
 ## How an agent uses it
 
@@ -154,7 +159,7 @@ Agents do not need to be told any of this: every refusal names the next legal st
 `config.json` holds `{"mode": "log"}` or `{"mode": "enforce"}`; `ALQ_REVIEW_MODE` overrides it.
 It ships `enforce`, as does each check's own setting below.
 In `log` mode a refusal made through `hookio.refuse` does not block; it is written as `would_deny` to `gate.log`.
-The refusals of a launch's `spec` (5) are made that way: in `log` mode the round opens, a refused first launch
+The edit rule (9) is made that way. So are the refusals of a launch's `spec` (5): in `log` mode the round opens, a refused first launch
 binds nothing, and a changed `spec.md` holds nothing, leaves the binding as it was and does not release a hold
 recorded before.
 A workflow launched without `args.worktree`, a review or assess launch whose round cannot open (no open PR, a
@@ -254,7 +259,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
 | `scripts/reshape.py` | a `RESHAPE_SPEC` ruling's summary, the notice it owes the spec's issue, and what is said when that notice failed - pure |
-| `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
+| `scripts/specbinding.py` | what a spec folder, a spec.md and a story branch are; the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding; the edit rule's refusal (9) |
 | `scripts/config.py` | reads `config.json` |
 | `scripts/codexstate.py` | Codex's state for a review round, read from its status card and its known comment forms - a pure function the poller calls |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |

@@ -1690,6 +1690,77 @@ class OtherGates(Gate):
         self.assertTrue(any(e["decision"] == "would_deny" and e["action"] == "edit" for e in entries))
 
 
+class StoryBranchSpecEdit(Gate):
+    """On a story branch the edit tools never change a spec.md: the rule reads the branch and the path, nothing else."""
+    FOLDER = "dev/x/specs/123-login"
+    SPEC_MD = f"{FOLDER}/spec.md"
+    STORY = "123-us2-reset"
+
+    def setUp(self):
+        super().setUp()
+        git(self.root, "checkout", "-q", "-b", self.STORY)
+        SpecArgument.commit_files(self, {f"{self.FOLDER}/{name}": "# x\n"
+                                         for name in ("spec.md", "plan.md", "tasks.md", "research.md")})
+
+    def write(self, tool, path):
+        key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+        return self.hook("PreToolUse", tool, {key: str(path)})
+
+    def refusal(self, branch=STORY):
+        return (f"[alq-review] `{self.SPEC_MD}` is the spec.md of spec folder `{self.FOLDER}`, and `{branch}` is a story branch: a "
+                "story branch never changes a spec.md. Next step: stop and raise the spec problem to the user. They "
+                "land the change in a spec-only PR on `123-spec`; once it merges, this branch rebases on it.")
+
+    def test_each_edit_tool_is_refused_naming_the_file_and_the_spec_branch(self):
+        for tool in ("Edit", "Write", "NotebookEdit"):
+            with self.subTest(tool=tool):
+                out = self.write(tool, self.root / self.SPEC_MD)
+                self.assertEqual(self.decision(out), "deny")
+                self.assertEqual(self.reason(out), self.refusal())
+        logged = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        self.assertEqual({(e["action"], e["decision"], e["branch"]) for e in logged},
+                         {("spec-edit", "deny", self.STORY)})
+
+    def test_no_branch_but_a_story_branch_is_refused(self):
+        for branch in ("123-spec", "123-retire-spec", "123-adr-hold", "main"):
+            with self.subTest(branch=branch):
+                git(self.root, "checkout", "-q", "-B", branch)
+                self.assertEqual(self.write("Edit", self.root / self.SPEC_MD), {})
+
+    def test_the_folders_other_files_stay_editable(self):
+        for name in ("plan.md", "tasks.md", "research.md"):
+            with self.subTest(name=name):
+                self.assertEqual(self.write("Edit", self.root / self.FOLDER / name), {})
+
+    def test_refused_with_no_pr_ledger_or_round_and_without_asking_github(self):
+        self.env["GH_OPEN_PR"] = ""
+        self.assertEqual(self.reason(self.write("Write", self.root / self.SPEC_MD)), self.refusal())
+        self.assertFalse(Path(self.env["GH_LOG"]).exists())
+
+    def test_a_shell_write_or_a_commit_is_left_to_the_launch(self):
+        path = self.root / self.SPEC_MD
+        self.assertEqual(self.hook("PreToolUse", "Bash", {"command": f"echo more >> {path}"}), {})
+        self.assertEqual(self.hook("PreToolUse", "Bash", {"command": f"git -C {self.root} commit -qam spec"}), {})
+
+    def test_log_mode_records_the_refusal_and_blocks_nothing(self):
+        self.assertEqual(self.hook("PreToolUse", "Edit", {"file_path": str(self.root / self.SPEC_MD)}, mode="log"), {})
+        logged = [json.loads(line) for line in (self.state_dir / "gate.log").read_text().splitlines()]
+        self.assertIn(("spec-edit", "would_deny"), [(e["action"], e["decision"]) for e in logged])
+
+    def test_a_path_in_another_worktree_is_judged_by_that_worktrees_branch(self):
+        spec_branch = Path(self.tmp.name) / "spec-checkout"
+        git(self.root, "worktree", "add", "-q", "-b", "123-spec", str(spec_branch))
+        self.assertEqual(self.write("Edit", spec_branch / self.SPEC_MD), {})
+        git(self.root, "checkout", "-q", "-b", "124-spec")
+        story = Path(self.tmp.name) / "story-checkout"
+        git(self.root, "worktree", "add", "-q", "-b", "123-us3-more", str(story))
+        self.assertEqual(self.reason(self.write("Edit", story / self.SPEC_MD)), self.refusal(branch="123-us3-more"))
+
+    def test_a_detached_head_refuses_nothing(self):
+        git(self.root, "checkout", "-q", "--detach")
+        self.assertEqual(self.write("Edit", self.root / self.SPEC_MD), {})
+
+
 class GithubRound(Gate):
     def drop(self, urls):
         inbox = self.state_dir / "inbox"
