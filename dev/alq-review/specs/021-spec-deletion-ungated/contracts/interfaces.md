@@ -18,13 +18,12 @@ stdout `cleanup` or `gated`, exit 0; unread (data-model.md § Cleanup): stderr n
 
 ## `poll-pr-review.sh`
 
-New exit `5` CLEANUP; exit `4` also covers a cleanup PR with a failing check or a merge state GitHub does not
-report mergeable. The lines, exits and the `WARNING:` line are row D5 and § D5 cleanup mode. The usage and the
-other exit codes are unchanged.
+New exits `5` CLEANUP and `6` READY_NEXT; on a cleanup PR, `4` and `3` are the lines of § D5 cleanup mode. Every
+line, exit and the `WARNING:` line are row D5 and § D5 cleanup mode. The usage and today's loop are unchanged.
 
 ## Skill (`alq-github-pr-review/SKILL.md`)
 
-Exit table gains `5`: take the step the `CLEANUP:` line names. A section *Cleanup PRs* (research R8).
+Exit table gains `5` and `6`, each with the next step § D5 cleanup mode gives it. A section *Cleanup PRs* (research R8).
 
 ## README
 

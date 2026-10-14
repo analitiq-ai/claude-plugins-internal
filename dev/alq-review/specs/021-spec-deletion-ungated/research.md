@@ -8,8 +8,7 @@ stated once, in data-model.md § Decisions per consumer (rows D1–D5); the entr
 - **Decision**: data-model.md § Cleanup. `github.is_cleanup(labels: list[str]) -> bool` is the one name test
   (FR-002): true when a label is named `cleanup`, without case, as GitHub matches names. `github.label_names` is
   the one parser of gh's `labels` field. `github.read_cleanup(labels_of)` alone builds `github.Cleanup`.
-  `branch_labels` reads the first open PR gh lists for the branch, as `pr_target` does. `Cleanup.refusal()` is the
-  one unread refusal, and names a next step for each cause (ADR-0009 point 3). The poller calls `python3 scripts/github.py cleanup <repo> <pr>`, whose `main` goes through
+  The readers and the four values of `Cleanup` are data-model.md § Cleanup. The poller calls `python3 scripts/github.py cleanup <repo> <pr>`, whose `main` goes through
   `read_cleanup` (D5).
 - **Source**: code (`version_only_release` / `released`, `pr_target`); which PR a branch's label is read from:
   spec Clarifications.
@@ -23,10 +22,10 @@ stated once, in data-model.md § Decisions per consumer (rows D1–D5); the entr
 
 ## R2: Marking ready and attesting (gate.py → policy)
 
-- **Decision**: rows D1 and D2. `policy.mark_ready` takes one more fact, `cleanup: github.Cleanup | None`.
+- **Decision**: rows D1 and D2. `policy.mark_ready` takes one more fact, `cleanup: github.Cleanup`.
   `gate.cleanup_of(repo, pr, branch)` builds it. A comment carrying the attestation marker is its own action kind,
   `attest`, decided by `policy.attest`, which shares `mark_ready`'s steps 1 and 2 without the label. `gh pr create`
-  without `--draft` reaches `mark_ready` with no PR to read, so its fact is `None`.
+  without `--draft` is kind `ready` too; its branch has no open PR yet, so the reader gives no PR.
 - **Source**: code (`policy.mark_ready`, `_obstacle`, `_settled`, `shell.py`'s marker classification); the
   attestation needing a round: FR-011.
 - **Rationale**: `released` is the pattern, and its test pins that a release still waits for a round in flight.
@@ -72,21 +71,23 @@ stated once, in data-model.md § Decisions per consumer (rows D1–D5); the entr
 
 ## R7: The poller on a cleanup PR
 
-- **Decision**: row D5 and § D5 cleanup mode. The poller runs `github.py cleanup "$repo" "$pr"` once, before its
-  first poll. Cleanup mode keeps today's checks and merge-state terms, drops Codex and threads, gives a draft its
-  own line (US1: the agent readies it once CI is green), and hands nothing to the gate's inbox.
-- **Source**: code (`poll-pr-review.sh`'s `$blocked_by`, `WAITING_ON`, `settle`); FR-008, SC-002.
-- **Rationale**: a hand-over opens a github round in the ledger, which is alq-review gating. A new exit code lets
-  the skill route by code, not by the agent reading a line (P1); `0` already means "run `deepsource-pr-gate.sh`".
-  CI and GitHub's merge state still have to be green (spec Assumptions; P4).
-- **Existing tools**: `READER` already calls a Python script from the poller; `WAITING_ON`, `settle` and `report`
-  take the cleanup branch.
+- **Decision**: row D5 and § D5 cleanup mode: a loop of its own, sharing only the check classification and the
+  merge-state test with today's loop.
+- **Source**: code (`poll-pr-review.sh`: `snapshot`, `ANALYZE`, `WAITING_ON`, `settle`, `report`, `hand_to_gate`,
+  `dispatch_sweep` and the main loop); FR-008, SC-002; US1 (the agent readies the PR once CI is green).
+- **Rationale**: every step of today's loop past the checks reads Codex, reviews or threads: its wait, its error
+  set, its report, its hand-over (which opens a github round in the ledger) and its sweep. A branch inside that
+  loop would have to switch each off; a loop of its own reads none of them. One exit per next step lets the skill
+  route by the code (P1); `0` already means "run `deepsource-pr-gate.sh`". CI and GitHub's merge state still have
+  to be green (spec Assumptions; P4).
+- **Existing tools**: `READER` already calls a Python script from the poller; the check classification and the
+  merge-state test move out of `ANALYZE` into definitions both loops use.
 
 ## R8: What the agent is told
 
 - **Decision**: the missing-review refusals of D1 and D3 (step 4) end with `github.CLEANUP_EXEMPTION`
   (data-model.md § Cleanup). No other refusal carries it. The skill gains a section *Cleanup PRs*: the label marks one; no `@codex review`, no
-  `deepsource-pr-gate.sh`, no triage; exit `5`: take the step the `CLEANUP:` line names.
+  `deepsource-pr-gate.sh`, no triage; exits `5` and `6` as § D5 cleanup mode.
 - **Source**: P1 (a refusal names the next legal step); FR-009, FR-013.
 - **Rationale**: the label clears only the missing review, so only that refusal names it. Without it
   `/alq-post-merge`, which this feature does not change, leaves the agent with no route but the refusal.

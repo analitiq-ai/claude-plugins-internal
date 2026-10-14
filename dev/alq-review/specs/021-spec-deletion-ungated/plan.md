@@ -12,8 +12,8 @@ built only by `github.read_cleanup` from label names that only `github.label_nam
 after the holds they already check, and give an unread label one refusal of its own (R2, R3, R10). An attestation
 comment is its own action kind, which the label does not exempt (R2). `gate.on_bash` skips the claim and shim commit
 checks for its branch (R4). The user adds the label on GitHub; this feature refuses no command that adds it, so until
-the user's separate rule exists an agent can add it too (R5, R6). The poller ends a cleanup PR with exit `5` and hands
-nothing to the gate (R7). ADR-0021 lands first, in its own PR (R9).
+the user's separate rule exists an agent can add it too (R5, R6). The poller runs a cleanup PR through a loop of its own, ending
+it with exit `5` or `6` and handing nothing to the gate (R7). ADR-0021 lands first, in its own PR (R9).
 
 Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-model.md). Edges:
 [contracts/interfaces.md](contracts/interfaces.md). This file owns the code map and the callers of what changes.
@@ -96,8 +96,8 @@ plugins/alq-review/
 │   └── pre_merge_gate.py      # fetch reads labels; unmet allows cleanup, one refusal when unread; refusal
 │                              #      sentences (R3, R8)
 ├── skills/alq-github-pr-review/
-│   ├── poll-pr-review.sh      # cleanup branch, exit 5, no hand-over (R7)
-│   └── SKILL.md               # exit 5; Cleanup PRs (R8)
+│   ├── poll-pr-review.sh      # cleanup loop, exits 5 and 6, no hand-over (R7)
+│   └── SKILL.md               # exits 5 and 6; Cleanup PRs (R8)
 ├── .claude-plugin/plugin.json # MINOR bump
 └── README.md                  # contracts/interfaces.md § README
 dev/alq-review/tests/
@@ -135,7 +135,7 @@ unchanged. `hooks.json` is unchanged: both hooks already see every Bash call.
 - Commit checks skipped on a cleanup PR's branch: R4
 - No grant: R5
 - No label-add refusal here: R6
-- The poller's cleanup outcome (exit 5, no hand-over): R7
+- The poller's cleanup loop (exits 5 and 6, no hand-over): R7
 - The refusal sentences and the skill's Cleanup PRs section: R8
 - The ADR naming the cleanup PR: R9
 - Holds kept on a cleanup PR: R10
