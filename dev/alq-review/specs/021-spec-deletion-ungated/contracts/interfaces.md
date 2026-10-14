@@ -15,7 +15,8 @@ What changes at the plugin's edges. Internal function shapes are in [../data-mod
 python3 scripts/github.py cleanup <owner/repo> <pr-number>
 ```
 
-stdout `cleanup` or `gated`, exit 0; gh gives no answer: stderr names why, exit 1; usage: exit 2.
+stdout `cleanup` or `gated`, exit 0; the label is unread (gh fails, times out or gives no JSON, or the `labels` field
+is malformed): stderr names why, exit 1; usage: exit 2.
 
 ## `poll-pr-review.sh`
 

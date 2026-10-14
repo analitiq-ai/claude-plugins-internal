@@ -11,8 +11,8 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
   already makes. `github.Cleanup` is the one fact, labelled, not labelled or unread with why; it cannot be labelled
   and unread at once. `github.read_cleanup(labels_of)` alone builds it: unread when `labels_of` raises
   `RuntimeError` (any other error propagates), else labelled when `is_cleanup` holds for the PR's labels. The
-  readers raise `RuntimeError` when gh fails, times out or gives no JSON. A branch is merged through one PR (git
-  workflow), so `branch_labels` reads the branch's open PR and raises when gh gives more than one. `Cleanup.refusal()` is the one unread refusal. The poller
+  readers raise `RuntimeError` when gh fails, times out or gives no JSON. `branch_labels` reads the first
+  open PR gh lists for the branch, as `pr_target` does. `Cleanup.refusal()` is the one unread refusal. The poller
   calls `python3 scripts/github.py cleanup <repo> <pr>`, whose `main` goes through `read_cleanup` (R7).
 - **Rationale**: it mirrors the release exemption: a pure `version_only_release(runs)` beside a reader
   `released(slug, commit)`. Every component decides through `read_cleanup`, so none can read the label or render
