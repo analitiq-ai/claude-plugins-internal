@@ -65,6 +65,10 @@ for the two commit checks.
 3. We will not accept a command, a file edit, a setting or an agent's message as a release.
 4. We will give each new user-only action a keyword of its own.
 
+ADR-0019 amends points 1, 3 and 4 for one release: the user exempts a PR from review by adding the
+`cleanup` label on GitHub, with no keyword and no prompt, and the hook refuses every agent command that
+would add it.
+
 ## Options considered
 
 ### Option A: A keyword at the start of the user's prompt (chosen)

@@ -52,12 +52,13 @@ outside it to remove citations of the spec. A rule that reads the diff for delet
 would not have exempted it.
 
 The user and every agent session act on GitHub as the same bot. GitHub cannot tell who added a label,
-or who posted a comment. ADR-0004 takes the user's authority from the user's own prompt for that reason.
+or who posted a comment. For that reason ADR-0004 takes the user's authority only from the user's own
+prompt, and accepts no command as a release. A label is not a prompt, so this record departs from
+ADR-0004 as well as from ADR-0003; point 5 names each departure.
 
 ## Decision
 
-1. We will exempt a PR that carries the label `cleanup` from every alq-review gate. ADR-0003 point 2
-   now names two kinds of PR that need no internal review: a version-only release and a cleanup PR.
+1. We will exempt a PR that carries the label `cleanup` from every alq-review gate.
    - Marking it ready needs no clean internal round. Merging it needs no internal-review attestation.
      `--admin` still needs `override-merge`.
    - A commit on a branch whose open PR carries the label is not held by claim-check or shim-check.
@@ -74,6 +75,20 @@ or who posted a comment. ADR-0004 takes the user's authority from the user's own
    refused as any PR is, and a lock is still released only by `unlock` (ADR-0018).
 4. When the label cannot be read, the PR is gated as unlabelled, and the refusal says the label could
    not be read rather than that a review is missing (ADR-0009).
+5. This record amends two accepted records:
+   - ADR-0003 point 1 says the commit checks do not depend on which reviews are run. A cleanup PR's
+     commits skip them: the user exempts the PR from every gate, and a commit check alone would still
+     hold a #113-shaped PR on its docstring edits.
+   - ADR-0003 point 2 named one kind of PR that needs no internal review. It now names two: a
+     version-only release and a cleanup PR. For a cleanup PR the user switches nothing off.
+   - ADR-0003 point 3 rests that exception on a verdict the org gate's App posts. The cleanup
+     exemption rests on no verdict: it rests on the label, and on the hook refusing the label to agents.
+   - ADR-0004 points 1 and 3 take a release only from a prompt that starts with its keyword, and accept
+     no command as a release. The `cleanup` label is a release the user gives on GitHub, not by a
+     prompt. It is guarded the other way round: no prompt can be faked by an agent, and here the hook
+     refuses every agent command that would give it.
+   - ADR-0004 point 4 gives each new user-only action a keyword. Adding the label has none. A keyword
+     that lets an agent add the label is Option D, which the user rejected.
 
 ## Options considered
 
@@ -117,8 +132,13 @@ also lifts every other check in it.
 
 - The exemption is bound to the PR, not to a head commit. Code pushed after the label was added merges
   with no review of any kind. The attestation, by contrast, is voided by every push.
-- The refusal reads `gh` commands only. A label added by `curl` with the token, by a script, or by a
-  GraphQL query loaded from a file passes it, as the attestation comment's check has the same limit.
+- The refusal reads `gh` commands only. A label added by `curl` with the token, or by a script, passes
+  it. This is the second way out that constitution P2 forbids a hold to have; action item 3 takes it to
+  P2. Like the attestation comment's check, the refusal reads the body files a `gh` command names
+  (`--input`, `-F field=@file`), so a GraphQL mutation loaded from a file is read. A GraphQL mutation
+  names labels by id, so one that sets labels is refused whatever it adds.
+- A cleanup PR's commits skip claim-check and shim-check, so a labelled PR can land code that no
+  alq-review check examined.
 - Every commit in every repo with the plugin on makes one more `gh` call. When GitHub does not answer,
   the commit is checked as today.
 - In a repo whose rulesets require the org gate's checks, a cleanup PR is still held by them. This
@@ -127,7 +147,7 @@ also lifts every other check in it.
 ## Consequences
 
 - Easier: a PR that needs no review goes from draft to merged with no `!` command and no review round.
-  ADR-0003's list grows by a kind the user marks per PR, rather than by a new switch per kind.
+  ADR-0003 point 2's list grows by a kind the user marks per PR, rather than by a new switch per kind.
 - Harder: the label is now a security boundary. A new `gh` form that adds labels needs the refusal
   extended, or it is a way around every gate.
 - **How we would know this was wrong:** a PR labelled `cleanup` merges code that breaks `main`; or a
@@ -140,3 +160,5 @@ also lifts every other check in it.
 
 1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [ ] #114 builds the exemption, the label refusal and the poller's cleanup outcome.
+3. [ ] Amend constitution P2, in its own PR: the `cleanup` label is a release the user gives on GitHub,
+   and the routes the hook cannot see (`curl`, scripts) are a second way out it accepts.
