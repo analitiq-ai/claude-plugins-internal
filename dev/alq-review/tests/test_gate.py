@@ -1921,6 +1921,27 @@ class DecisionReview(Gate):
         self.assertEqual(json.loads(line["reason"]), [{"id": "decision-reviewer-1", "verdict": "PUSH_BACK"}])
         self.assertEqual((line["repo"], line["pr"]), ("acme/demo", 7))
 
+    def test_a_reshape_notice_that_fails_to_record_still_leaves_the_rulings_logged(self):
+        """The notice's GitHub calls and their ledger write come last: nothing they do can lose the log line."""
+        needs_adr(self)
+        folder = "dev/demo/specs/123-login"
+        (self.root / folder).mkdir(parents=True)
+        self.commit(f"{folder}/spec.md", "# Login\n", "docs: spec")
+        self.change()
+        _, args = self.launch(spec=folder)
+        found = [{"id": "decision-reviewer-1", "title": '"Keep src small"', "file": "src/a.py", "line": 1,
+                  "severity": "HIGH", "detail": "docs/adr 0001"}]
+        for reviewer in args["waves"][0]:
+            self.report(reviewer, found if reviewer["type"] == self.DECISION else [], args["round_ref"])
+        body = self.assessment(args["round_ref"], ["decision-reviewer-1"], verdict="RESHAPE_SPEC")
+        body.update(user_decision="which root is canonical?")
+        body["findings"][0]["kind"] = "spec_gap"
+        with mock.patch("ledger.record_notice", side_effect=ledger.LedgerError("simulated")), \
+                self.assertRaises(ledger.LedgerError):
+            self.submit_assessment(body)
+        [line] = [e for e in self.gate_log() if e["action"] == "decision-review"]
+        self.assertEqual(json.loads(line["reason"]), [{"id": "decision-reviewer-1", "verdict": "FIX"}])
+
     def test_a_change_nothing_governs_gets_no_decision_reviewer_and_says_what_was_checked(self):
         needs_adr(self)
         self.change("lib/b.py")

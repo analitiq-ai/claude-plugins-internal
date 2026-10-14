@@ -733,14 +733,15 @@ def after_structured_output(payload: dict) -> None:
         else:
             rnd = ledger.record_report(state, ref, agent_type, payload["tool_input"], now)
     record(payload, "output", "recorded", f"{ref} is {rnd['status']}")
-    if owed is not None and owed["issue"] is not None:
-        _post_notice(ref, state["repo"], owed["issue"], reshape.comment(folder, state["pr"], rnd))
     if agent_type == briefs.ASSESSOR and briefs.DECISION_REVIEWER in rnd["expected"]:
         # Read without the transcript, the rulings say whether the decision reviewer's brief is right.
         raised = {f["id"] for f in rnd["findings"] if f["reviewer"] == briefs.DECISION_REVIEWER}
         rulings = [{"id": f["id"], "verdict": f["verdict"]} for f in payload["tool_input"]["findings"] if f["id"] in raised]
         record(payload, "decision-review", "assessed", json.dumps(rulings),
                Target(state["repo"], state["pr"], state["branch"]))
+    # Last: its gh calls may run out the hook's time, and nothing recorded above should wait on them.
+    if owed is not None and owed["issue"] is not None:
+        _post_notice(ref, state["repo"], owed["issue"], reshape.comment(folder, state["pr"], rnd))
 
 
 def _post_notice(ref: str, slug: str, issue: int, body: str) -> None:
