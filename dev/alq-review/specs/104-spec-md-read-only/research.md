@@ -74,28 +74,28 @@ stand": the decision record replaces both (R1).
 ## R5: The commit backstop
 
 - **Decision**: in `gate.on_bash`, a `commit` action is judged for the story rule before `claimgate.on_commit` and
-  `shimgate.on_commit`: `worktree.to_commit(root, staging)` lists the paths the commit would record (`git diff --cached
-  --name-only --no-renames -z`, plus `git diff --name-only --no-renames -z` when `action.staging`), and the first that
-  `story_write_refusal(branch, path, staged=True)` refuses refuses the commit through `hookio.refuse(payload, "commit", ...)`.
+  `shimgate.on_commit`: `worktree.to_commit(root, action.staging)` (data-model "New interfaces") lists the paths the commit
+  would record, and the first that `story_write_refusal(branch, path, staged=True)` refuses refuses the commit through
+  `hookio.refuse(payload, "commit", ...)`.
   The text names the path and the restore command (`git restore --staged --worktree -- <path>`; for a path not in HEAD,
   `git rm --cached -- <path>` and delete it).
 - **Rationale**: scenario 3 refuses "whatever the claim and shim checks' settings", so the refusal is under the plugin's `mode`
-  alone, not `refuse_claim` or `refuse_shim`, and runs first. `--no-renames` so a spec.md moved away is listed by its own name.
-- **Existing tools**: `worktree._listed` and `_DIFF`'s pinned options, reused with `--no-renames` in place of `--find-renames`;
-  `claimgate.on_commit`'s `worktree.locate(action.cwd)`, the same locate.
+  alone, not `refuse_claim` or `refuse_shim`, and runs first. The row lists a spec.md moved away by its own name, and a
+  `git commit -p` as staging, since it may pick worktree changes.
+- **Existing tools**: `worktree._listed`, `_DIFF` and `shell._stages`, as the row gives them; `claimgate.on_commit`'s
+  `worktree.locate(action.cwd)`, the same locate.
 
 ## R6: The branch under a rebase is the checkout's branch
 
 - **Decision**: `worktree.locate` returns the branch a rebase in progress is rebasing when HEAD is detached: a new
-  `worktree.rebasing(root) -> str | None` reads `head-name` in the directory `git rev-parse --path-format=absolute --git-path
-  rebase-merge` names (`refs/heads/` stripped; None when no rebase is in progress or it names no branch); `locate` uses it where
-  it returned None for `HEAD`. Every reader of `locate` sees the branch under rebase, so the story rule (R3–R5) holds the
-  session and the conflict resolver during the rebase that follows `rebase <ref>` (R9, R10) as on the branch, reading nothing
-  from the ledger (FR-001).
+  `worktree.rebasing(root) -> str | None` (data-model "New interfaces") gives the branch a rebase in progress names, under
+  either rebase backend; `locate` uses it where it returned None for `HEAD`. Every reader of `locate` sees the branch under
+  rebase, so the story rule (R3–R5) holds the session and the conflict resolver during the rebase that follows `rebase <ref>`
+  (R9, R10) as on the branch, reading nothing from the ledger (FR-001).
 - **Rationale**: the spec's edge case: during a rebase the story rule reads the branch being rebased. `_held` compares
   `here.branch` with the ledger's; with None it stops watching a checkout exactly when a rebase runs in it. The path is absolute
-  because git gives `--git-path` relative to the checkout, and the hook process runs elsewhere. Only `rebase-merge`: the
-  session's rebase runs git's default merge backend, which keeps its state there.
+  because git gives `--git-path` relative to the checkout, and the hook process runs elsewhere. Both state directories: a
+  `git rebase --apply`, or `rebase.backend` set to `apply`, keeps its state in `rebase-apply`.
 - **Existing tools**: `worktree.concluding`'s `git rev-parse --path-format=absolute --git-path` read, the same form.
 
 ## R7: The hold goes, and the binding is the `spec` value alone
@@ -163,14 +163,15 @@ stand": the decision record replaces both (R1).
 ## R11: A PR changes the spec or the code, never both
 
 - **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str) -> str | None`, pure: `changes`
-  are `(status, path)` pairs, status git's letter (`A`, `M`, `D`, `R`, `C`, `T`); for each path with status other than `D` whose
-  `spec_md_folder` is set, the first changed path (any status) not under that folder refuses, naming the spec.md, that path, the
-  rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, `<issue>` from `story_issue(branch)`, or "the
-  issue's spec branch" when the branch is not a story branch, rebase this branch on it, then launch again). A renamed spec.md
-  counts at its destination. One site: a review-round launch of any stage, after `_review_base` and before
-  `ledger.open_round`, reads the pairs with `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which
-  with `--find-renames` strips the score from `R<score>` and yields the destination path), refused through
-  `hookio.refuse(payload, "launch", ...)`. Assess-round launches run no diff check.
+  are `(status, path)` pairs, as `worktree.name_status` gives them (data-model "New interfaces"); for each path with status
+  other than `D` whose `spec_md_folder` is set, the first changed path (any status) not under that folder refuses, naming the
+  spec.md, that path, the rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, `<issue>` from
+  `story_issue(branch)`, or "the issue's spec branch" when the branch is not a story branch, rebase this branch on it, then
+  launch again). A rename is a deletion at its source and an addition at its destination, so a spec.md moved between two spec
+  folders is refused, and a code file renamed into a spec folder shows its deletion outside it. One site: a review-round
+  launch of any stage, after `_review_base` and before `ledger.open_round`, reads the pairs with
+  `worktree.name_status(root, base)`, refused through `hookio.refuse(payload, "launch", ...)`. Assess-round launches run no
+  diff check.
 - **Rationale**: FR-004. The launch has a checkout and a base. A deleted spec.md grades nothing (Clarifications). Under `mode`
   (FR-005). An audit launch is a review-round launch (edge case).
 - **Rejected**: a second check at the internal-review attestation (`ready`). `policy.mark_ready`
@@ -178,7 +179,8 @@ stand": the decision record replaces both (R1).
   a settled internal round at `head_sha`, whose launch already ran this check on the same commit. So the check there decides
   nothing new, and it is a second gate over the same diff (one gate per document). Four review rounds of defects came from its
   GitHub reads (`pr_head`, `released`, `pr_files`).
-- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `_review_base`, `hookio.refuse`.
+- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused as the `name_status` row gives; `_review_base`,
+  `hookio.refuse`.
 
 ## R12: The rescope runs on the spec branch
 
@@ -202,7 +204,7 @@ stand": the decision record replaces both (R1).
   data-model "New interfaces" (T032); `Rebase` has a test per row of data-model "`rebase <ref>`", its release
   and its launch row, each with contracts' reply, and FR-009's git writes held to the fetch; the agent file in `test_agents.py`
   against contracts "The conflict resolver"; `worktree.rebasing`, `contains`, `fetch_target`, `to_commit`, `name_status` in
-  `test_worktree_facts.py`, `name_status` with a renamed spec.md giving `R` and the destination path; `ledger.regraded_rounds`
+  `test_worktree_facts.py`, each by its data-model "New interfaces" row; `ledger.regraded_rounds`
   and its callers (R15) in `test_policy.py` and `test_worktree_facts.py`. US2's tests name `spec_blob` and `spec_held`, a stored
   ledger carrying them and holding nothing, so SC-003's grep covers `plugins/alq-review` and not the tests. Deleted with the
   hold: `test_gate.py` `SpecArgument`'s hold tests (today's lines 442–470, 599–672, 709–760, 777–790, 852–877), `held()`,

@@ -10,7 +10,7 @@
 
 `path` is repo-relative, as git names it. The gate resolves an edit's or a command's path against its checkout
 (`worktree.locate`) before asking. During a rebase HEAD is detached, and `locate` reports the branch being rebased
-(`worktree.rebasing`, R6), so the story rule holds there as on the branch.
+(`worktree.rebasing`, New interfaces), so the story rule holds there as on the branch.
 
 ## Ledger doc, per PR (`ledgers (repo, pr) -> doc`)
 
@@ -43,7 +43,7 @@ test per cell.
 
 | kind | fields | Judged by |
 |---|---|---|
-| `commit` | `cwd, staging, alone` | story rule on `worktree.to_commit` (first), then claim and shim gates |
+| `commit` | `cwd, staging, alone` | story rule on `worktree.to_commit` (New interfaces) first, then claim and shim gates |
 | `push`, `rerequest`, `ready` | as today | `policy.mutation` / `rerequest` / `mark_ready` |
 | `unlock` | as today | refused to agents |
 | `write` | `cwd, path` (New interfaces) | story rule, each path against its own checkout |
@@ -120,9 +120,8 @@ watches it, and the story rule holds it on the branch under the rebase.
 
 ## The mixed-diff rule (`specbinding.mixed_diff_refusal`)
 
-Input: `[(status, path)]`, status one of git's `A M D R C T`; `worktree.name_status` strips the score from `R<score>` and
-yields the destination path. For each `(s, p)` with `s != "D"` and `spec_md_folder(p)` set, the first `(_, q)` with `q` not
-under that folder refuses. Readers of the fact:
+Input: `[(status, path)]`, as `worktree.name_status` gives them (New interfaces). For each `(s, p)` with `s != "D"` and
+`spec_md_folder(p)` set, the first `(_, q)` with `q` not under that folder refuses. Readers of the fact:
 
 | Site | Reader | Base |
 |---|---|---|
@@ -130,8 +129,8 @@ under that folder refuses. Readers of the fact:
 
 ## New interfaces
 
-The signatures and outcomes of `shell.Action.path`, `github.default_branch`, `worktree.fetch_target` and
-`worktree.contains`, declared here once. An outcome's reply is its contracts row.
+The signatures and outcomes of `shell.Action.path`, `github.default_branch`, `worktree.fetch_target`,
+`worktree.contains`, `worktree.rebasing`, `worktree.to_commit` and `worktree.name_status`, declared here once. An outcome's reply is its contracts row.
 
 | Name | Signature | Outcome | Reply (contracts) | Tested by |
 |---|---|---|---|---|
@@ -144,3 +143,10 @@ The signatures and outcomes of `shell.Action.path`, `github.default_branch`, `wo
 | `worktree.contains` | `(root: str, sha: str) -> bool`: `git merge-base --is-ancestor <sha> HEAD` | exit 0: True | launch row `contains` passes | T031, T034 |
 | | | exit 1: False | `contains`, exit 1 | T031, T034 |
 | | | any other exit, such as a sha the checkout does not know: RuntimeError in git's words | `contains`, any other exit | T031, T034 |
+| `worktree.rebasing` | `(root: str) -> str \| None`: reads `head-name` in whichever of `git rev-parse --path-format=absolute --git-path rebase-merge` and `git rev-parse --path-format=absolute --git-path rebase-apply` exists, so it holds under either `rebase.backend` | `head-name` is `refs/heads/<branch>`: `<branch>`; `locate` reports it for a detached HEAD | "The story rule", each site | T007 |
+| | | neither exists, or `head-name` names no branch: None; `locate` returns None for a detached HEAD, as today | – | T007 |
+| `worktree.to_commit` | `(root: str, staging: bool) -> list[str]`: `_DIFF --cached --name-only --no-renames -z`, plus `_DIFF --name-only --no-renames -z` when `staging`; `--no-renames` overrides `_DIFF`'s pinned `--find-renames` | the staged paths, each by its own name: a spec.md moved away is listed at its source | "The story rule", commit | T011, T012 |
+| | | `staging` true: also the tracked paths changed in the worktree. `staging` is `Action.staging`, from `shell._stages`, which counts `-a`, `-i`, `-o`, `--all`, `--include`, `--only`, `--pathspec-from-file`, a pathspec and, new, `-p`, `--patch`, `--interactive`: a commit that may pick worktree changes lists them | "The story rule", commit | T010, T011 |
+| | | the new `_stages` words reach `claimgate.on_commit` and `shimgate.on_commit` through the same `staging`, so they answer `git commit -p` as they answer `git commit -a` | `claimcheck.commit_preconditions`'s text, as today | T010 |
+| `worktree.name_status` | `(root: str, base: str) -> list[tuple[str, str]]`: `_DIFF --name-status --no-renames -z <base>...HEAD`; `--no-renames` overrides the pinned `--find-renames`, as in `to_commit` | each changed path once, as `(status, path)`, status one of `A M D T` | the diff check, row `mixed`, when `mixed_diff_refusal` refuses | T046 |
+| | | a rename: `("D", source)` and `("A", destination)`. So a spec.md moved between two spec folders is refused (spec edge case "A spec-only PR that changes two spec folders"), and a code file renamed into a spec folder shows its deletion outside the folder | the diff check, row `mixed` | T045, T046 |
