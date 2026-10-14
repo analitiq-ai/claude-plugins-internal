@@ -67,12 +67,14 @@ def drive(root, env, *args):
 
 
 class Project:
-    """A Spec Kit project with neither the plugin's preset nor its workflow installed; `spec_text` None gives it
-    no spec folder."""
+    """A Spec Kit project with neither the plugin's preset nor its workflow installed, in a git checkout, at `under`
+    in it; `spec_text` None gives it no spec folder."""
 
-    def __init__(self, spec_text=SETTLED):
+    def __init__(self, spec_text=SETTLED, under=""):
         self._tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self._tmp.name) / "project"
+        checkout = Path(self._tmp.name) / "checkout"
+        subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+        self.root = checkout / under
         self.bin = Path(self._tmp.name) / "bin"
         self.bin.mkdir()
         self.prompts = Path(self._tmp.name) / "claude.log"
@@ -207,6 +209,12 @@ class Rescope(unittest.TestCase):
         self.project.add_folder("specs/7-other")
         self.assertIn("specs/7-other", self.refused(ISSUE))
 
+    def test_a_rescope_names_the_issues_other_folder_from_the_checkout(self):
+        self.project = Project(under="dev/demo")
+        self.addCleanup(self.project.close)
+        self.project.add_folder("specs/7-other")
+        self.assertIn("`dev/demo/specs/7-other`", self.refused(ISSUE))
+
     def test_a_rescope_of_a_folder_that_does_not_exist_is_refused(self):
         self.project = Project(spec_text=None)
         self.addCleanup(self.project.close)
@@ -262,6 +270,13 @@ class Scope(unittest.TestCase):
             with self.subTest(folder=folder):
                 self.assert_refused(self.start(folder), f"`rescope {SPEC_DIR} #{ISSUE}`")
                 self.assertEqual(self.project.folders(), ["7-demo"])
+
+    def test_a_refused_new_scope_names_the_rescope_form_from_the_checkout(self):
+        """The skill reads a rescope's folder relative to the checkout, not to the project under it."""
+        self.project = Project(spec_text=SETTLED, under="dev/demo")
+        self.addCleanup(self.project.close)
+        self.project.with_specify()
+        self.assert_refused(self.start(), f"`rescope dev/demo/{SPEC_DIR} #{ISSUE}`")
 
     def test_folders_of_other_issues_do_not_refuse_a_new_scope(self):
         for folder in ("specs/70-x", "specs/17-y", "specs/007-old"):
@@ -442,7 +457,6 @@ class Premise(unittest.TestCase):
         self.project = Project(spec_text=None)
         self.addCleanup(self.project.close)
         # The issue is closed in the repo origin names, whichever repo gh would pick on its own.
-        subprocess.run(["git", "init", "-q", str(self.project.root)], check=True)
         subprocess.run(["git", "-C", str(self.project.root), "remote", "add", "origin", self.ORIGIN], check=True)
         self.project.with_specify()
         proc, self.started = self.project.drive("start", self.project.spec_file(ISSUE_TEXT), ISSUE, NEW)
