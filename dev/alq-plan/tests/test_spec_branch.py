@@ -294,16 +294,6 @@ class Check(unittest.TestCase):
         self.assertEqual(json.loads(done.stdout),
                          {"folder": FOLDER, "branch": "7-us1-demo", "message": f"docs(#{ISSUE}): rescope {FOLDER}"})
 
-    def test_a_rescope_on_origins_default_branch_is_refused_naming_it(self):
-        """The spec edit lands through a PR, so never as a commit pushed to the default branch."""
-        default = self.repo.root / ".claude" / "worktrees" / "trunk"
-        self.repo.git("worktree", "add", "-q", "-b", "trunk", str(default), "origin/trunk")
-        done = self.check("rescope", default)
-        self.assertNotEqual(done.returncode, 0)
-        self.assertIn("trunk", done.stderr)
-        self.assertIn("Next step:", done.stderr)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=default), self.repo.git("rev-parse", "origin/trunk"))
-
     def test_a_run_started_before_runs_took_their_folder_and_kind_is_refused_naming_the_next_step(self):
         write_folder(self.repo.worktree)
         run_id = write_run(self.repo.worktree, "completed", "run-old", inputs={"spec": "# Demo\n", "issue": ISSUE})

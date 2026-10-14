@@ -115,10 +115,6 @@ def check(run_id):
     run = _completed_run(run_id)
     issue, kind = run["issue"], run["kind"]
     branch = _on_spec_branch(issue) if kind == "new" else _current_branch()
-    if kind == "rescope" and branch == _default_branch(_origin()):
-        sys.exit(f"the checkout is on {branch}, origin's default branch: a rescope lands its spec edit through the PR "
-                 "of the branch it runs on, never as a push to the default branch. Next step: rescope from the "
-                 "worktree of the spec's branch or a story's.")
     shown = _from_checkout(run["spec_dir"])
     # The session commits what is staged, so anything else staged would land with the spec.
     others = [path for path in _run("git", "diff", "--cached", "--name-only").splitlines()
