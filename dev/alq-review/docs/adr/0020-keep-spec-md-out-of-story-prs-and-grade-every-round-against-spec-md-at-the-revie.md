@@ -58,8 +58,9 @@ means the spec has to change. Once it changes on another branch and merges, the 
 rebased on it, and nothing checks that the spec actually changed or keeps a round from grading the old code
 against the new spec.
 
-Constitution P2, as ADR-0004 quotes it, asks every hold to name the one entity that releases it and the one
-action by which it does.
+Constitution P2 (3.0.0) asks every hold to name the one entity approved to release it, and that every
+action releasing it be named by a decision record; a way out no record names fails. Before 3.0.0, P2 allowed
+one action only, and ADR-0018 rejected a second release of a `RESHAPE_SPEC` lock on that ground.
 
 ## Decision
 
@@ -82,8 +83,11 @@ action by which it does.
    the gate checks that the bound `spec.md` differs on the default branch from the locked round's commit,
    releases the lock, and records the default branch's commit; the session then rebases, has the
    conflict-resolver agent settle any conflict, and pushes. No review round launches until HEAD contains
-   that commit. Both go through the same release, and nothing else releases the lock. This replaces
-   ADR-0018's "only by `unlock`"; the rest of ADR-0018 stands.
+   that commit. Both go through the same release, and nothing else releases the lock. These two are the
+   release actions P2 asks a record to name for this lock. This replaces ADR-0018's "only by `unlock`";
+   the rest of ADR-0018 stands. ADR-0018's Option B, the rescope prompt as a second release, stays
+   rejected: it released the lock without the user ruling on the spec, where each keyword here is the
+   user's ruling on one outcome.
 6. We will grade a review-round launch as a full round, and measure the round facts afresh from it, when HEAD
    no longer contains a head the facts are measured from, whatever rewrote the branch. The round caps and
    round numbering still span it.
@@ -130,8 +134,8 @@ the spec changes.
 
 ## Trade-offs
 
-- Two keywords release one lock. Each is the user's ruling on a different outcome (the spec stands, or it
-  changed), so P2's one entity holds, but the lock has two named actions.
+- Two keywords release one lock, one per outcome the user can rule (the spec stands, or it changed). The
+  user has to know which to type; the lock's text names both.
 - The rebase, the conflict-resolver dispatch and the push are the session's, named by the reply, not done by
   code. What keeps this safe is the launch refusal until HEAD contains the recorded commit.
 - A spec change costs a separate PR and its own review loop before the story can go on.
