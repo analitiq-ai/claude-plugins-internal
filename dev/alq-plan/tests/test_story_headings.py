@@ -73,8 +73,16 @@ class Rescope(unittest.TestCase):
 
     def test_its_words_claim_only_what_a_number_check_can_tell(self):
         """The check compares numbers, so it cannot tell a story kept, moved or new: its words say numbers only."""
-        self.assertIn("numbers only", story_headings.__doc__)
-        self.assertNotIn("must not move", story_headings.__doc__)
+        doc = " ".join(story_headings.__doc__.split())
+        self.assertIn("numbers only", doc)
+        self.assertNotIn("must not move", doc)
+        self.assertNotIn("is then not used again", doc)
+        # FR-016's three limits, as the spec words them.
+        for limit in ("a number dropped and used again in the same run", "a story moved to another number",
+                      "in a later run, a dropped number used again that is greater than every number spec.md still "
+                      "has"):
+            with self.subTest(limit=limit):
+                self.assertIn(limit, doc)
         # Number 2 twice, and each 2 is a number not there before below 3.
         said = story_headings.problems(spec(1, 2, 2, 3), spec(1, 3))
         self.assertEqual(len(said), 3, said)
