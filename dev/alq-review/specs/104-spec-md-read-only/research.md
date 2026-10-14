@@ -170,14 +170,15 @@ stand": the decision record replaces both (R1).
   the same fact: at a review-round launch of any stage, after `_review_base` and before `ledger.open_round`,
   `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which with `--find-renames` strips the score from
   `R<score>` and yields the destination path), refused through `hookio.refuse(payload, "launch", ...)` with `then` "launch
-  again"; at the attestation, after `policy.mark_ready` allows, the rule of data-model "The attestation's diff check": when
-  it reads `github.pr_files(event.repo, event.pr)`, the branch it passes, and each outcome's refusal (P4). Assess-round launches
-  run no diff check.
+  again"; at the attestation, the steps and rule of data-model "The attestation's diff check": the order of `pr_head`,
+  `released`, `mark_ready` and `pr_files`, and the branch it passes; each lookup's outcomes and refusals are its rows in
+  "New interfaces" (P4). Assess-round launches run no diff check.
 - **Rationale**: FR-004: one function decides for both sites. The launch has a checkout and a base; a `gh pr ready` may run from
   anywhere, and GitHub lists the PR's files with their status, so the attestation site needs no checkout. A deleted spec.md
   grades nothing (Clarifications). Under `mode` (FR-005). An audit launch is a review-round launch (edge case).
 - **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `github._answer`, in the `--paginate`
-  form `released` uses; `_review_base`, `gate.target`, `hookio.refuse`. Reusing the settled round's `base_sha` and `root` at
+  form `released` uses; `github.pr_head` and `github.released`, moved from `_gh` to `_answer` (data-model "New
+  interfaces"); `_review_base`, `gate.target`, `hookio.refuse`. Reusing the settled round's `base_sha` and `root` at
   the attestation: rejected, the root may be gone and `released` PRs have no round.
 
 ## R12: The rescope runs on the spec branch
@@ -198,8 +199,8 @@ stand": the decision record replaces both (R1).
   fixture checks out `123-us2-reset` and commits `dev/x/specs/123-login/spec.md`; the shell reader's write table in
   `test_shell.py`; the pure functions in `test_specbinding.py` (`SpecMdFolder`, `StoryIssue`, `StoryWriteRefusal`, `MixedDiff`,
   replacing `TextStep`); the lock text and the launch refusal in `test_policy.py`; `rebase <ref>` and the diff check in
-  `test_gate.py` (`Rebase(HeldBranch)`, `MixedDiff(SpecArgument)`), the gh stub answering `api repos/*/pulls/*/files` from
-  `GH_PR_FILES` and `repo view --json defaultBranchRef`; `Rebase` has a test per row of data-model "`rebase <ref>`", its release
+  `test_gate.py` (`Rebase(HeldBranch)`, `MixedDiff(SpecArgument)`), the gh stub in `Gate.setUp` answering each GitHub lookup of
+  data-model "New interfaces" (T032); `Rebase` has a test per row of data-model "`rebase <ref>`", its release
   and its launch row, each with contracts' reply, and FR-009's git writes held to the fetch; the agent file in `test_agents.py`
   against contracts "The conflict resolver"; `worktree.rebasing`, `contains`, `fetch_target`, `to_commit`, `name_status` in
   `test_worktree_facts.py`, `name_status` with a renamed spec.md giving `R` and the destination path; `ledger.regraded_rounds`

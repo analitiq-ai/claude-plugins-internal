@@ -131,53 +131,71 @@ under that folder refuses. Readers of the fact:
 
 ### The attestation's diff check
 
-One rule, over the values `on_bash` holds for a `ready` action once `policy.mark_ready` allows. When
-`gate.target(where, action.repo, action.pr)` raises, `_unknown_pr` refuses as today; when it returns None, form (d)
-below, nothing is judged, `mark_ready` included, as today. Otherwise its `Target` is `event`, and the inputs are:
+One rule, over the values `on_bash` holds for a `ready` action. When `gate.target(where, action.repo, action.pr)`
+raises, `_unknown_pr` refuses as today; when it returns None, form (d) below, nothing is judged, `mark_ready` included,
+as today. Otherwise its `Target` is `event`, and `on_bash` runs these steps in order:
+
+1. When `event.root` is None: `github.pr_head(event.repo, action.pr)` gives `(head_branch, commit)`. When it is set:
+   `head_branch` is `event.branch` and `commit` is `worktree.head_sha(event.root)`.
+2. `github.released(event.repo, commit)`: `released` is True for a title, False for None.
+3. `policy.mark_ready` with `head_sha=commit` and `released`.
+4. Once `mark_ready` allows, the rule below.
+
+A lookup that fails (New interfaces) refuses through `hookio.refuse(payload, "ready", text, event)`, its text its own
+contracts row of "The diff check", rendered from `event.repo`, `event.pr` and gh's words, and no later step runs, in
+either mode. `release fails` names no PR, since form (c) has none. No failure becomes `''` or False, and none is answered
+with `mark_ready`'s "not clean" text.
 
 | Input | Value |
 |---|---|
 | `event.pr` | an int or None, as `target` and `pr_of` return it |
-| `released` | the bool `on_bash` passes to `mark_ready` |
-| `head_branch` | `event.branch` when `event.root` is set; otherwise the headRefName of `github.pr_head(event.repo, action.pr)`. `on_bash` keeps both fields of that answer, the headRefOid as `commit` and the headRefName as `head_branch`, instead of taking `[1]`. When `pr_head` fails, `commit` is `''` and `mark_ready` refuses before this rule, so `head_branch` is a str whenever the rule runs |
+| `released` | step 2's bool, the one `on_bash` passes to `mark_ready` |
+| `head_branch` | step 1's str: `pr_head` answered or the attestation refused |
 
 The rule:
 
 1. `released`: no diff check, in any form, because a version-only release changes no spec.md (ADR-0003).
 2. Not `released`, `event.pr` None: unreachable. `decide` reads an empty ledger, which holds no internal round, so
    `mark_ready` refuses with its own text.
-3. Not `released`, `event.pr` set: `github.pr_files(event.repo, event.pr)`, by outcome. Each refusal is
-   `hookio.refuse(payload, "ready", text, event)`, its text the contracts row of "The diff check", rendered from
-   `event.repo`, `event.pr`, `head_branch`, the pairs and gh's words only:
+3. Not `released`, `event.pr` set: `github.pr_files(event.repo, event.pr)`, by its outcomes in New interfaces. The
+   `mixed` text is rendered from `event.repo`, `event.pr`, `head_branch` and the pairs only:
 
 | Outcome | Result | Contracts row |
 |---|---|---|
 | the pairs | `specbinding.mixed_diff_refusal(pairs, head_branch, "mark it ready again")`: a text refuses, None passes | `mixed` |
-| RuntimeError | refused, in gh's words | `gh fails` |
+| RuntimeError | refused, in gh's words | `files fail` |
 | `FileListCapped` | refused; the user splits the PR | `file cap` |
 
 `head_branch` is a str, so the domain of `mixed_diff_refusal`'s `branch` and of `story_issue` stays str.
 
-The forms of `event`, by what `target` returns, and the rules each can reach:
+The forms of `event`, by what `target` returns, and the lookups and rules each can reach:
 
-| Form | When | Rules |
-|---|---|---|
-| (a) `Target(repo, pr, branch, root)` | a checkout of the repo where `pr_of(where)` gives a PR, and the action names that PR or none | 1, 3 |
-| (b) `Target(repo, pr)` | a named PR that `pr_of(where)` does not give, or no checkout of the repo | 1, 3 |
-| (c) `Target(repo, None, branch, root)` | a checkout of the repo where `pr_of(where)` is None, because no ledger names the branch or GitHub reports no open PR, and the action names no PR | 1, 2 |
-| (d) None | no checkout of the repo and no named PR | none |
+| Form | When | Lookups | Rules |
+|---|---|---|---|
+| (a) `Target(repo, pr, branch, root)` | a checkout of the repo where `pr_of(where)` gives a PR, and the action names that PR or none | `released`, `pr_files` | 1, 3 |
+| (b) `Target(repo, pr)` | a named PR, run from no checkout of the repo or from one where `pr_of(where)` does not give it | `pr_head`, `released`, `pr_files` | 1, 3 |
+| (c) `Target(repo, None, branch, root)` | a checkout of the repo where `pr_of(where)` is None, because no ledger names the branch or GitHub reports no open PR, and the action names no PR | `released` | 1, 2 |
+| (d) None | no checkout of the repo and no named PR | none | none |
 
 ## New interfaces
 
-The signatures and outcomes of `shell.Action.path`, `github.pr_files`, `github.default_branch`, `worktree.fetch_target`
-and `worktree.contains`, declared here once. An outcome's reply is its contracts row.
+The signatures and outcomes of `shell.Action.path`, the three GitHub lookups the attestation reads (`github.pr_head`,
+`github.released`, `github.pr_files`), `github.default_branch`, `worktree.fetch_target` and `worktree.contains`,
+declared here once. An outcome's reply is its contracts row. `pr_head` and `released` move from `github._gh` to
+`github._answer`, so each gives its answer or raises RuntimeError in gh's words. Callers of `pr_head`: `gate.on_bash`,
+the ready branch. Callers of `released`: `gate.on_bash`, the ready branch, and `pre_merge_gate.released`.
 
 | Name | Signature | Outcome | Reply (contracts) | Tested by |
 |---|---|---|---|---|
 | `shell.Action.path` | `path: str \| None = None` | kind `write`: one written path, as written; one Action per path of "The written paths of a segment" | "The story rule", edit, Bash write | T010, T012 |
 | | | any other kind: None | – | T010 |
-| `github.pr_files` | `(slug: str, pr: int) -> list[tuple[str, str]]`, through `github._answer`: `gh api --paginate repos/<slug>/pulls/<pr>/files` | the `(status, path)` pairs, GitHub's status as git's letter: `added→A`, `modified`/`changed→M`, `removed→D`, `renamed→R` at the destination path, `copied→C` | "The diff check", `mixed`, or the ready passes | T048 |
-| | | gh fails: RuntimeError in gh's words, from `_answer` | "The diff check", `gh fails` | T048 |
+| `github.pr_head` | `(slug: str, pr: int) -> tuple[str, str]`, through `_answer`: `gh pr view <pr> --repo <slug> --json headRefName,headRefOid` | `(headRefName, headRefOid)`: `head_branch` and `commit` | the attestation goes on to `released` | T048 |
+| | | gh fails, a PR gh cannot find included (`gh pr view` exits non-zero): RuntimeError in gh's words | "The diff check", `head fails` | T048 |
+| `github.released` | `(slug: str, commit: str) -> str \| None`, through `_answer`: `gh api --paginate repos/<slug>/commits/<commit>/check-runs?check_name=<RELEASE_CHECK>` | a title: pr-gate passed `commit` as a version-only release | rule 1 | T048 |
+| | | None: no check run passes it as one | rule 2 or 3 | T048 |
+| | | gh fails: RuntimeError in gh's words. `gate.on_bash` refuses with it; `pre_merge_gate.released` catches it and answers False, keeping "an unreadable answer is no" explicitly: the merge gate fails closed | `gate.on_bash`: "The diff check", `release fails`; `pre_merge_gate`: not released | T048, T063 |
+| `github.pr_files` | `(slug: str, pr: int) -> list[tuple[str, str]]`, through `_answer`: `gh api --paginate repos/<slug>/pulls/<pr>/files` | the `(status, path)` pairs, GitHub's status as git's letter: `added→A`, `modified`/`changed→M`, `removed→D`, `renamed→R` at the destination path, `copied→C` | "The diff check", `mixed`, or the ready passes | T048 |
+| | | gh fails: RuntimeError in gh's words | "The diff check", `files fail` | T048 |
 | | | the list reaches 3000 files, GitHub's cap for that endpoint: raises `github.FileListCapped`, an `Exception` and not a `RuntimeError`, so no `except RuntimeError` reads it as gh failing | "The diff check", `file cap` | T048 |
 | `github.default_branch` | `(slug: str) -> str`, through `_answer`: `gh repo view --json defaultBranchRef` | the default branch's name | `rebase <ref>` row `default` passes | T033 |
 | | | gh fails: RuntimeError in gh's words | `rebase <ref>` row `default` | T033 |

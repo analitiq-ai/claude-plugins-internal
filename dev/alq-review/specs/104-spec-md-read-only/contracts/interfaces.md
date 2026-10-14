@@ -73,13 +73,15 @@ reports the files, for the session to raise to the user.
 Sites: a review-round launch of any stage, after the review base is read; the attestation (`ready`), after `mark_ready`
 allows. Both through `hookio.refuse` under `mode`.
 
-At the attestation, when the check runs, which row answers which `pr_files` outcome, and where `<repo>`, `<pr>` and the
-branch come from: data-model "The attestation's diff check".
+At the attestation, the order of its lookups, which row answers which lookup's outcome, and where `<repo>`, `<pr>` and
+the branch come from: data-model "The attestation's diff check" and "New interfaces".
 
 | Row | Text |
 |---|---|
 | `mixed` | This PR's diff changes `<spec.md>` and `<other path>`, which is outside `<folder>`: a PR changes the spec or the code, never both. Next step: land the spec change as a spec-only PR on `<issue>-spec`, rebase this branch on it, then <launch again / mark it ready again>. |
-| `gh fails` | GitHub could not list the files of PR <repo>#<pr> (<gh's words>), so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
+| `head fails` | GitHub could not read the head of PR <repo>#<pr> (<gh's words>), so alq-review cannot tell which commit it would attest, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
+| `release fails` | GitHub could not read <repo>'s release check for this head (<gh's words>), so alq-review cannot tell whether it is a version-only release, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
+| `files fail` | GitHub could not list the files of PR <repo>#<pr> (<gh's words>), so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
 | `file cap` | PR <repo>#<pr>'s file list reaches 3000 files, GitHub's cap, so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: split the PR into PRs of fewer files, then mark each ready again. |
 
 Passes: a spec-only PR (any `spec`); code with `plan.md`, `tasks.md` or any file of the folder but `spec.md`; a deleted
