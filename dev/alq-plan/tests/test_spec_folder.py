@@ -1,0 +1,101 @@
+"""spec_folder.py: the one check of the run's folder input before anything is written, and of the folder `specify`
+recorded after it ran.
+
+Both checks are pure: they are handed what the project's `specs/` and `.specify/feature.json` hold, and read nothing.
+"""
+import unittest
+
+import paths  # noqa: F401  # importing it puts the plugin's scripts on sys.path
+
+import spec_folder
+
+FORM = "specs/<issue>-<short-name>"
+
+
+class Check(unittest.TestCase):
+    """problems(folder, issue, kind, existing): `existing` maps each folder name in `specs/` to whether it holds a
+    spec.md."""
+
+    def assert_one_problem(self, found, *said):
+        self.assertEqual(len(found), 1, found)
+        for phrase in (*said, "Next step:"):
+            self.assertIn(phrase, found[0])
+
+    def test_a_new_folder_named_by_its_issue_passes(self):
+        for folder, issue in (("specs/79-spec-folder-by-issue", "79"), ("specs/7-a1-b2", "7"), ("specs/7-x", "7")):
+            with self.subTest(folder):
+                self.assertEqual(spec_folder.problems(folder, issue, "new", {}), [])
+
+    def test_a_folder_not_of_the_form_is_refused_naming_the_form(self):
+        for kind in ("new", "rescope"):
+            for folder in ("79-x", "specs/79-", "specs/79", "specs/79-X", "specs/79-a_b", "specs/79-a b",
+                           "specs/79-a--b", "specs/79--a", "specs/79-a-", "specs/79-x/y", "specs/../79-x",
+                           "dev/alq-plan/specs/79-x", "specs/x-79", "specs/", "", "specs/79-x'; touch PWNED; '"):
+                with self.subTest(kind=kind, folder=folder):
+                    self.assert_one_problem(spec_folder.problems(folder, "79", kind, {"79-x": True}), FORM)
+
+    def test_a_folder_numbered_for_another_issue_is_refused_naming_the_prefix_it_needs(self):
+        """The number is the issue's as GitHub writes it: no padding, and the hyphen is part of the prefix."""
+        for kind in ("new", "rescope"):
+            for folder, issue in (("specs/079-x", "79"), ("specs/79-x", "7"), ("specs/7-x", "79")):
+                with self.subTest(kind=kind, folder=folder, issue=issue):
+                    name = folder.removeprefix("specs/")
+                    self.assert_one_problem(spec_folder.problems(folder, issue, kind, {name: True}),
+                                            f"does not start with `{issue}-`")
+
+    def test_a_new_scope_of_an_issue_that_has_a_folder_is_refused_naming_the_rescope_form(self):
+        for folder in ("specs/7-other", "specs/7-demo"):
+            for holds_spec in (True, False):
+                with self.subTest(folder=folder, holds_spec=holds_spec):
+                    self.assert_one_problem(spec_folder.problems(folder, "7", "new", {"7-demo": holds_spec}),
+                                            "`rescope specs/7-demo #7`")
+
+    def test_folders_of_other_issues_do_not_refuse_a_new_scope(self):
+        existing = {"70-x": True, "17-y": True, "8-z": True, "007-old": True, "7": True}
+        self.assertEqual(spec_folder.problems("specs/7-demo", "7", "new", existing), [])
+
+    def test_a_rescope_of_the_issues_own_folder_passes(self):
+        self.assertEqual(spec_folder.problems("specs/7-demo", "7", "rescope", {"7-demo": True, "8-other": True}), [])
+
+    def test_a_rescope_of_a_folder_with_no_spec_md_is_refused(self):
+        for existing in ({}, {"7-demo": False}):
+            with self.subTest(existing=existing):
+                self.assert_one_problem(spec_folder.problems("specs/7-demo", "7", "rescope", existing),
+                                        "specs/7-demo", "spec.md")
+
+    def test_a_rescope_of_another_issues_folder_is_refused_saying_its_name_does_not_start_with_the_issue(self):
+        self.assert_one_problem(spec_folder.problems("specs/7-demo", "8", "rescope", {"7-demo": True}),
+                                "specs/7-demo", "does not start with `8-`")
+
+    def test_a_rescope_while_the_issue_has_a_second_folder_is_refused_naming_it(self):
+        found = spec_folder.problems("specs/7-demo", "7", "rescope", {"7-demo": True, "7-other": False})
+        self.assert_one_problem(found, "specs/7-other")
+
+    def test_an_issue_that_is_not_a_number_as_github_writes_it_is_refused(self):
+        for issue in ("", "07", "x", "#7", "7 "):
+            with self.subTest(issue=issue):
+                self.assert_one_problem(spec_folder.problems("specs/7-demo", issue, "new", {}), "issue")
+
+    def test_a_kind_other_than_new_or_rescope_cannot_be_checked(self):
+        with self.assertRaises(ValueError):
+            spec_folder.problems("specs/7-demo", "7", "", {})
+
+
+class Recorded(unittest.TestCase):
+    """recorded_problems(folder, recorded): `recorded` is the folder `.specify/feature.json` names, None for none."""
+
+    def test_the_folder_the_run_was_given_passes(self):
+        self.assertEqual(spec_folder.recorded_problems("specs/7-new", "specs/7-new"), [])
+
+    def test_another_folder_or_none_is_refused_naming_both_and_the_next_step(self):
+        for recorded, said in (("specs/001-new", "`specs/001-new`"), ("specs/7-new/", "`specs/7-new/`"),
+                               (None, "no folder")):
+            with self.subTest(recorded=recorded):
+                found = spec_folder.recorded_problems("specs/7-new", recorded)
+                self.assertEqual(len(found), 1, found)
+                for phrase in (said, "`specs/7-new`", "Next step:"):
+                    self.assertIn(phrase, found[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

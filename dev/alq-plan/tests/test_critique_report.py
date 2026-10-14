@@ -9,7 +9,7 @@ from pathlib import Path
 from paths import PLUGIN
 
 SCRIPT = PLUGIN / "speckit" / "workflows" / "alq-spec" / "critique_report.py"
-FEATURE = "specs/001-demo"
+FEATURE = "specs/7-demo"
 
 
 class CritiqueReport(unittest.TestCase):

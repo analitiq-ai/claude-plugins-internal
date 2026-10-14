@@ -47,8 +47,30 @@ class IssueSpecSkill(unittest.TestCase):
         said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("Anything else")]
         self.assertTrue([s for s in said if "the two forms" in s and "stop" in s], said)
 
-    def test_starts_the_driver_with_the_spec_file_and_the_issue_then_the_folder_on_a_rescope(self):
-        self.assertIn("`python3 DRIVE start <SPEC_FILE> <ISSUE>`, plus `<SPEC_DIR>` on a rescope.", squashed(ISSUE_SPEC))
+    def test_starts_the_driver_with_the_kind_of_run_the_spec_file_the_issue_and_the_folder(self):
+        """Every run takes its folder; the subcommand, not whether a folder was given, says which kind it is."""
+        self.assertIn("`python3 DRIVE start <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a new scope, "
+                      "`python3 DRIVE rescope <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a rescope.", squashed(ISSUE_SPEC))
+
+    def new_scope(self):
+        found = re.search(r"^- \*\*`#<issue>.*?(?=^- \*\*|^$)", ISSUE_SPEC.read_text(), re.M | re.S).group(0)
+        return re.sub(r"\s+", " ", found)
+
+    def test_a_new_scope_picks_its_folder_once_from_one_to_four_words_of_the_issue_title(self):
+        new_scope = self.new_scope()
+        self.assertIn("`SPEC_DIR` is `specs/<ISSUE>-<short name>`, picked once, here", new_scope)
+        self.assertIn("`<short name>` is 1 to 4 words of the issue title, lowercased, each a run of `[a-z0-9]`, "
+                      "joined by single hyphens", new_scope)
+        self.assertLess(new_scope.index("gh issue view"), new_scope.index("`<short name>` is 1 to 4 words"))
+
+    def test_a_title_with_no_word_stops_before_anything_is_written_saying_to_retitle_the_issue(self):
+        self.assertIn("A title with no such word: stop before writing anything, and tell the user to retitle the "
+                      "issue.", self.new_scope())
+
+    def test_a_folder_that_specify_did_not_record_is_resumed_after_its_next_step(self):
+        stops = squashed(ISSUE_SPEC).split("## Stops", 1)[1]
+        self.assertIn("`step: check-specify-folder`, with a `stderr` line that names a Next step: do as it says.",
+                      stops)
 
     def test_a_completed_run_ends_with_the_spec_folder_and_branch_lines(self):
         text = squashed(ISSUE_SPEC)
