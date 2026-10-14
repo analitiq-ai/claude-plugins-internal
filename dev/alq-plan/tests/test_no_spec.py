@@ -63,8 +63,17 @@ class Folder(unittest.TestCase):
                 self.report.write_text(unreadable)
                 done = self.run_cli("write", str(self.folder), str(self.report))
                 self.assertEqual(done.returncode, 2)
-                self.assertIn("Next step:", done.stderr)
+                self.assertIn("Next step: run `premise_report.py check", done.stderr)
                 self.assertFalse(self.folder.exists())
+
+    def test_a_folder_that_cannot_be_written_names_the_path_and_says_to_clear_it_then_resume(self):
+        """The report is good: what is wrong is the path, and checking the report again would not fix it."""
+        (self.root / "specs").write_text("in the way\n")
+        done = self.run_cli("write", str(self.folder), str(self.report))
+        self.assertEqual(done.returncode, 2)
+        for said in (str(self.root / "specs"), "writable", "resume the run"):
+            self.assertIn(said, done.stderr)
+        self.assertNotIn("premise_report.py check", done.stderr)
 
     def test_a_report_that_is_not_there_writes_nothing(self):
         done = self.run_cli("write", str(self.folder), str(self.root / "gone.md"))

@@ -33,6 +33,7 @@ class Checkout:
         for name, url in (("upstream", "https://github.test/other/demo.git"), ("origin", ORIGIN)):
             subprocess.run(["git", "-C", str(self.root), "remote", "add", name, url], check=True)
         # GH_FAILS fails every call and GH_CREATE_FAILS the create, the way gh does when GitHub refuses one.
+        # GH_DROPS_TYPE creates the issue with no type, as GitHub does for a user without push access.
         gh = bin_dir / "gh"
         gh.write_text(f"#!{sys.executable}\nimport json, os, sys\n"
                       "args = sys.argv[1:]\n"
@@ -48,7 +49,8 @@ class Checkout:
                       "elif os.environ.get('GH_CREATE_FAILS'):\n"
                       "    sys.exit('HTTP 422: Validation Failed')\n"
                       "else:\n"
-                      f"    print(json.dumps({{'number': 81, 'html_url': {URL!r}}}))\n")
+                      "    kind = None if os.environ.get('GH_DROPS_TYPE') else {'name': json.loads(stdin)['type']}\n"
+                      f"    print(json.dumps({{'number': 81, 'html_url': {URL!r}, 'type': kind}}))\n")
         gh.chmod(0o755)
         self.env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
 
@@ -123,6 +125,15 @@ class NewIssue(unittest.TestCase):
         self.assertEqual(done.stdout, "")
         for said in ("HTTP 422", "Next step:"):
             self.assertIn(said, done.stderr)
+
+    def test_an_issue_created_without_its_type_fails_naming_the_issue_and_how_to_set_it(self):
+        self.checkout.env["GH_DROPS_TYPE"] = "1"
+        done = self.create()
+        self.assertNotEqual(done.returncode, 0)
+        self.assertEqual(done.stdout, "")
+        for said in (URL, "type", "push access", "Next step:"):
+            self.assertIn(said, done.stderr)
+        self.assertEqual(len(self.checkout.creates()), 1)
 
     def test_a_repo_github_cannot_show_fails_before_any_issue_is_created(self):
         self.checkout.env["GH_FAILS"] = "1"

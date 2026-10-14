@@ -117,6 +117,11 @@ class Check(unittest.TestCase):
                 self.assert_one_problem(report(pick, rests_on="size", reason="a typo", wrong="no"), pick,
                                         "Rests on:", "size", "needs-spec")
 
+    def test_an_empty_reason_names_where_the_pick_puts_it(self):
+        for pick, goes_to in ((NOT_WORTH_DOING, "the issue's closing comment"), (NO_SPEC, "the folder's spec.md")):
+            with self.subTest(pick):
+                self.assert_one_problem(report(pick, rests_on="needs-spec", wrong="no"), pick, "Reason:", goes_to)
+
     def test_a_stop_pick_needs_only_the_answers_up_to_the_question_it_rests_on(self):
         moot = ("reachable", "change-alters", "owner", "inherited", "needs-spec")
         stopped = report(NOT_WORTH_DOING, rests_on="harm", reason="nothing goes wrong", wrong="no", drop=moot)
