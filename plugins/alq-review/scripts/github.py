@@ -141,13 +141,11 @@ def pr_labels(slug: str, pr: int) -> list[str]:
 
 
 def branch_labels(slug: str, branch: str) -> list[str]:
-    """The label names of the open PR of `branch`, none when it has none; RuntimeError when gh cannot say them, or
-    gives more than one: a branch is merged through one PR."""
+    """The label names of `branch`'s open PR, the first gh lists as in pr_target; none when it has none;
+    RuntimeError when gh cannot say them."""
     found = _json(_answer("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "number,labels"))
     if not isinstance(found, list) or not all(isinstance(pr, dict) for pr in found):
         raise RuntimeError(f"gh gave open PRs that are not a list of objects: {found!r:.200}")
-    if len(found) > 1:
-        raise RuntimeError(f"branch {branch} has {len(found)} open PRs; a branch has one")
     return label_names(found[0].get("labels")) if found else []
 
 

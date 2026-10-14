@@ -112,11 +112,10 @@ class BranchLabels(StubGh):
         with self.answering("[]"):
             self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), [])
 
-    def test_a_branch_with_two_open_prs_is_a_runtime_error_since_a_branch_has_one(self):
+    def test_reads_the_first_open_pr_gh_lists_as_pr_target_does(self):
         answer = [{"number": 7, "labels": labels("cleanup")}, {"number": 9, "labels": []}]
-        with self.answering(json.dumps(answer)), self.assertRaises(RuntimeError) as raised:
-            github.branch_labels("acme/demo", "feat/1-demo")
-        self.assertIn("2 open PRs", str(raised.exception))
+        with self.answering(json.dumps(answer)):
+            self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), ["cleanup"])
 
     def test_no_answer_or_another_shape_is_a_runtime_error(self):
         for out, code in (("", 1), ("{}", 0), ('[{"number": 7}]', 0), ("7 main", 0)):
