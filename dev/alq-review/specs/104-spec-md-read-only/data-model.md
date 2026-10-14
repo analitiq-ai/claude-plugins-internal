@@ -76,9 +76,9 @@ failure is, and no round opens. The first row that holds decides:
 | 4 | stage `internal` and a round cap is reached | the cap refusal, as today |
 | 5 | `contains` is False for a head of `measured_heads(state)` | allowed, `scope="full"`, no `delta_from`, `regrade=True`; an audit's `escalation` as today |
 | 6 | stage `audit` | allowed, `scope="full"`, `escalation` as today |
-| 7 | `counted(state, "internal", regraded_only=True)` is empty | allowed, `scope="full"` |
-| 8 | HEAD is its last round's `head_sha` | refused: nothing was committed, as today |
-| 9 | otherwise | allowed, `scope="delta"`, `delta_from` its last round's `head_sha` |
+| 7 | `done`, `counted(state, "internal", regraded_only=True)`, is empty | allowed, `scope="full"` |
+| 8 | HEAD is `done[-1]["head_sha"]` | refused: nothing was committed, as today |
+| 9 | otherwise | allowed, `scope="delta"`, `delta_from` `done[-1]["head_sha"]` |
 
 On `regrade` the gate sets `regraded_from` to the index of the round `ledger.open_round` returns, after it drops a dead
 `collecting` round, in the save that opens it, replacing an earlier value. A launch refused after `launch_round` allowed

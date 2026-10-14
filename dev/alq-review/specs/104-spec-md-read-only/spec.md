@@ -286,7 +286,7 @@ two closing lines.
   `unlock <ref>` MUST release a `RESHAPE_SPEC` lock when the user rules the spec stands, and stays the release of an
   `ESCALATE` or spent-audit lock (ADR-0018).
 - **FR-010**: A review-round launch of any stage at which HEAD does not contain the head of the first or the last round
-  the facts are measured from (the rounds since the last such launch, or every round before one) MUST start the PR's
+  the facts are measured from (the rounds since the last such launch, or every round when there has been none) MUST start the PR's
   measurement again, whatever rewrote the branch: the round MUST be a full round over the PR's diff, and its facts and every later round's (the edits per file, the lines fixes wrote, the
   additions) MUST count only the commits since it, and compare a round only with the rounds since it. The round caps
   and the round numbering span it. Neither keyword sets it.
