@@ -5,6 +5,7 @@ from helpers import REVIEWERS, T0, add_round, assess, state_with_round
 
 import ledger
 import policy
+import reshape
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
 SPEC = "specs/019-demo"
@@ -166,6 +167,24 @@ class Mutation(unittest.TestCase):
         ledger.unlock(state, "user decided", now=T0 + timedelta(hours=1))
         self.assertTrue(mutation(state).allow)
 
+    def test_a_failed_reshape_notice_is_named_in_the_lock_and_releases_nothing(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        rnd = state["rounds"][-1]
+        rnd["notice"] = {"issue": 123, "comment": {"done": True}, "edit": {"error": "no such label"}}
+        refused = mutation(state)
+        self.assertFalse(refused.allow)
+        self.assertIn(reshape.notice_failures("acme/demo", rnd), refused.reason)
+        ledger.unlock(state, "user decided", now=T0 + timedelta(hours=1))
+        self.assertTrue(mutation(state).allow)
+
+    def test_a_notice_whose_calls_were_done_adds_nothing_to_the_lock(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        unnoticed = mutation(state).reason
+        state["rounds"][-1]["notice"] = {"issue": 123, "comment": {"done": True}, "edit": {"done": True}}
+        self.assertEqual(mutation(state).reason, unnoticed)
+
     def test_a_lock_tells_the_agent_to_ask_the_user_for_the_unlock(self):
         """The agent is the only one who sees the refusal; the user unlocks only if the agent asks."""
         for pr, ref in ((None, "unlock feat/1-demo"), (414, "unlock #414")):
@@ -242,7 +261,10 @@ class LaunchRound(unittest.TestCase):
         self.assertEqual(decision.scope, "full")
 
     def test_uncommitted_work_is_refused_because_rounds_are_pinned_to_commits(self):
-        self.assertFalse(self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7), dirty=True).allow)
+        decision = self.launch(ledger.new_state("acme/demo", "feat/1-demo", pr=7), dirty=True)
+        self.assertFalse(decision.allow)
+        self.assertIn("uncommitted changes or new files", decision.reason)
+        self.assertIn("commit, delete or ignore", decision.reason)
 
     def test_second_round_reviews_only_the_delta_since_the_first(self):
         state = state_with_round(head=HEAD_A)

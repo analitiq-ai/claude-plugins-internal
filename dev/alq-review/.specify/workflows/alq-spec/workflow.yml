@@ -2,7 +2,7 @@ schema_version: "1.0"
 workflow:
   id: "alq-spec"
   name: "Spec Cycle"
-  version: "1.5.0"
+  version: "1.6.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
 
@@ -21,11 +21,18 @@ inputs:
     type: string
     required: true
     prompt: "GitHub issue number"
-  # Non-empty re-scopes an existing spec folder. The folder itself comes from $SPEC_DIR, never from
-  # this input: template text is spliced into shell source before the shell can validate it.
+  # The run's one spec folder, on every run. Shell steps read it from $SPECIFY_FEATURE_DIRECTORY, never from this
+  # input: template text is spliced into shell source before the shell can validate it.
   spec_dir:
     type: string
-    default: ""
+    required: true
+    prompt: "Spec folder, specs/<issue>-<short-name>"
+  # Never read from whether a folder was given: every run is given one.
+  kind:
+    type: string
+    required: true
+    enum: ["new", "rescope"]
+    prompt: "new or rescope"
   integration:
     type: string
     default: "claude"
@@ -42,11 +49,18 @@ inputs:
     default: ""
 
 steps:
+  # The kind is one of its enum by now, never text the user typed. Where the run starts is decided here, once.
+  - id: check-folder
+    type: shell
+    output_format: json
+    run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" check "$SPECIFY_FEATURE_DIRECTORY" "$ISSUE" "{{ inputs.kind }}"
+
   # Whether the issue is worth a spec is asked before one is written. The questions are answered in the session,
-  # which a headless command step cannot do. A re-scope amends a spec that was already judged worth writing.
+  # which a headless command step cannot do. A rescope of a spec amends one already judged worth writing; the issue of
+  # a no-spec folder is judged again.
   - id: new-spec
     type: if
-    condition: "{{ not inputs.spec_dir }}"
+    condition: "{{ steps.check-folder.output.data.starts_at == 'premise' }}"
     then:
       # The verdict is the outcome itself, so no pick reads as approving or rejecting another.
       - id: premise
@@ -78,36 +92,45 @@ steps:
               [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
               gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
 
+      # The folder lets a later scope of the issue see it was judged.
+      - id: no-spec-needed
+        type: if
+        condition: "{{ steps.premise.output.choice == 'no spec needed' }}"
+        then:
+          - id: write-no-spec
+            type: shell
+            run: python3 "$ALQ_PLAN_ROOT/scripts/no_spec.py" write "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+
   # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
   # top-level and skips itself on a stop pick, instead of all of them sharing one block.
 
-  # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
+  # specify writes spec.md from the template, over a no-spec one, so a rescope of a spec skips it and grill amends the
+  # spec in place.
   - id: scope
     type: if
-    condition: &spec-is-written "{{ inputs.spec_dir or steps.premise.output.choice == 'write the spec' }}"
+    condition: &spec-is-written "{{ steps.check-folder.output.data.starts_at == 'grill' or steps.premise.output.choice == 'write the spec' }}"
     then:
       - id: scope-kind
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ steps.check-folder.output.data.starts_at == 'grill' }}"
         then:
+          # No step here reads it back: grill runs in the session, without the run's environment, and finds the
+          # folder through feature.json. check-folder has graded the folder, so it goes into the JSON as it is.
           - id: select-spec
             type: shell
             run: |
-              set -eu
-              dir="$SPEC_DIR"
-              case "$dir" in
-                specs/*/*|*..*|*[!A-Za-z0-9._/-]*|specs/) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
-                specs/*) ;;
-                *) echo "spec_dir must be specs/<feature>, got '$dir'" >&2; exit 1 ;;
-              esac
-              test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
-              printf '{\n  "feature_directory": "%s"\n}\n' "$dir" > .specify/feature.json
+              printf '{\n  "feature_directory": "%s"\n}\n' "$SPECIFY_FEATURE_DIRECTORY" > .specify/feature.json
         else:
+          # The folder is in the prompt as well as the environment: the agent reads its prompt, Spec Kit's scripts
+          # read the environment.
           - id: specify
             command: speckit.specify
             integration: "{{ inputs.integration }}"
             input:
-              args: "{{ inputs.spec }}\n\nPremise report: .specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+              args: "{{ inputs.spec }}\n\nSPECIFY_FEATURE_DIRECTORY: {{ inputs.spec_dir }}\n\nPremise report: .specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          - id: check-specify-folder
+            type: shell
+            run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" recorded "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: new-spec-root-cause
     type: if
@@ -117,14 +140,12 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
       - id: premise-answers
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$SPECIFY_FEATURE_DIRECTORY"
 
   # grill interviews the author, which a headless command step cannot do.
   - id: to-grill
@@ -146,45 +167,42 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          test -f "$dir/spec.md" || { echo "no spec.md in $dir" >&2; exit 1; }
+          test -f "$SPECIFY_FEATURE_DIRECTORY/spec.md" || { echo "no spec.md in $SPECIFY_FEATURE_DIRECTORY" >&2; exit 1; }
           found=0
-          grep -n "NEEDS CLARIFICATION" "$dir/spec.md" || found=$?
+          grep -n "NEEDS CLARIFICATION" "$SPECIFY_FEATURE_DIRECTORY/spec.md" || found=$?
           case $found in
-            0) echo "Open clarification markers remain in $dir/spec.md" >&2; exit 1 ;;
+            0) echo "Open clarification markers remain in $SPECIFY_FEATURE_DIRECTORY/spec.md" >&2; exit 1 ;;
             1) ;;
             *) exit "$found" ;;
           esac
 
   # Grill may rewrite the root cause section, so it is graded again; on a new spec, the premise answers too. A
-  # re-scope has no premise report: its premise answers are not graded, and its root cause is graded without one.
+  # rescope of a spec has no premise report: its premise answers are not graded, and its root cause is graded without
+  # one.
   - id: to-root-cause-regrade
     type: if
     condition: *spec-is-written
     then:
       - id: root-cause-regrade
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ steps.check-folder.output.data.starts_at == 'grill' }}"
         then:
           - id: root-cause-of-rescope
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY"
         else:
           - id: root-cause-after-grill
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+              python3 "$ALQ_PLAN_ROOT/scripts/rootcause.py" check "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
           - id: premise-answers-after-grill
             type: shell
             run: |
               set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$dir"
+              python3 "$ALQ_PLAN_ROOT/scripts/premise_report.py" spec "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-plan
     type: if
@@ -205,8 +223,7 @@ steps:
         type: shell
         run: |
           set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$dir"
+          python3 "$ALQ_PLAN_ROOT/scripts/settled_design.py" "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-mark-critiques
     type: if
@@ -214,7 +231,7 @@ steps:
     then:
       - id: mark-critiques
         type: shell
-        run: python3 .specify/workflows/alq-spec/critique_report.py mark
+        run: python3 .specify/workflows/alq-spec/critique_report.py mark "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-critique
     type: if
@@ -231,7 +248,7 @@ steps:
       - id: new-critique
         type: shell
         output_format: json
-        run: python3 .specify/workflows/alq-spec/critique_report.py find
+        run: python3 .specify/workflows/alq-spec/critique_report.py find "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-review-critique
     type: if

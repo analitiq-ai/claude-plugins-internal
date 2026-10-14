@@ -44,7 +44,7 @@ def tearDownModule():
 def composed_plan() -> str:
     """plan.md as speckit.plan's setup script writes it."""
     root = Path(PROJECT.name)
-    feature = root / "specs" / "001-demo"
+    feature = root / "specs" / "7-demo"
     feature.mkdir(parents=True, exist_ok=True)
     (feature / "spec.md").write_text("# Spec\n")
     (root / ".specify" / "feature.json").write_text(json.dumps({"feature_directory": str(feature)}))

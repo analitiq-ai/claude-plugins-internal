@@ -11,16 +11,15 @@ from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
-from paths import PLUGIN
+from paths import HARNESS, PLUGIN
 
-from test_gate import Gate
+from test_gate import Gate, ThroughProcess
 from test_worktree_facts import git
 
 import claimcheck
 import hookio
 import ledger
 
-HARNESS = Path(__file__).resolve().parent / "workflow_harness.mjs"
 # The command a refusal gives for a missing diff library: the pip form, or the system package where pip is refused.
 INSTALL_COMMAND = re.compile(r"`(?:\S+ -m pip install diff-match-patch|sudo apt install python3-diff-match-patch)`")
 WORKFLOW = PLUGIN / "workflows" / "claim-check.js"
@@ -293,6 +292,19 @@ class ClaimCheckOutputs(ClaimGate):
         self.judge(args, "README.md", FALSE.strip())
         self.assertEqual(self.stored()["status"], "complete")
 
+    def test_an_ill_shaped_output_is_left_to_the_schema_and_logged(self):
+        self.stage("README.md", FALSE)
+        _, args = self.check_launch()
+        # PreToolUse alone: the harness rejects this body on its schema and sends no PostToolUse for it.
+        out = self.hook("PreToolUse", "StructuredOutput", {"check_ref": args["check_ref"], "hunks": []}, agent_id="r1",
+                        agent_type=READER)
+        self.assertNotEqual(self.decision(out), "deny")
+        self.assertEqual([(e["action"], e["decision"]) for e in self.gate_log()][-1], ("claim-output", "ill-shaped"))
+
+
+class ClaimCheckFaults(ThroughProcess, ClaimGate):
+    """A gate that crashes checking an output has passed nothing: the crash refuses the output."""
+
     def test_a_fault_in_the_gate_refuses_the_output_instead_of_passing_it(self):
         self.stage("README.md", FALSE)
         _, args = self.check_launch()
@@ -325,13 +337,6 @@ class ClaimCheckOutputs(ClaimGate):
             with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
                 with ledger.open_claims("acme/demo") as claims:
                     claims.save_check(broken)
-
-    def test_an_ill_shaped_output_is_left_to_the_schema_and_logged(self):
-        self.stage("README.md", FALSE)
-        _, args = self.check_launch()
-        out = self.output(READER, {"check_ref": args["check_ref"], "hunks": []})
-        self.assertNotEqual(self.decision(out), "deny")
-        self.assertEqual([(e["action"], e["decision"]) for e in self.gate_log()][-1], ("claim-output", "ill-shaped"))
 
 
 class ClaimCheckCommitHook(ClaimGate):
@@ -803,7 +808,10 @@ class ClaimReshaping(ClaimGate):
             self.assertIn(part, self.reason(launched))
 
 
-class ClaimLibrary(ClaimGate):
+class ClaimLibraryMissing(ThroughProcess, ClaimGate):
+    """The claim check's launch, and a commit that stages a change, refuse naming the install when the diff library
+    cannot be imported (X1)."""
+
     def setUp(self):
         super().setUp()
         self.blocked = Path(self.tmp.name) / "blocked"
@@ -828,6 +836,8 @@ class ClaimLibrary(ClaimGate):
         self.assertNotEqual(self.decision(self.check_launch()[0]), "deny")
         self.assertIn("would_deny", [e["decision"] for e in self.gate_log() if e["action"] == "claim-launch"])
 
+
+class ClaimLibrary(ClaimGate):
     def test_a_staged_rewrite_past_the_budget_is_not_refused_and_keeps_the_count(self):  # X2
         filler = lambda tag: " ".join(f"{tag}{i}" for i in range(1700))
         self.stage("validator.py", VALIDATOR)

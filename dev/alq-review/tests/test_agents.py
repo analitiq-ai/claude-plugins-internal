@@ -27,6 +27,11 @@ class ShimAgents(unittest.TestCase):
         self.assertEqual(tools("shim-site-judge"), ["Read", "Glob", "Grep"])
 
 
+class DecisionReviewer(unittest.TestCase):
+    def test_it_reads_searches_and_runs_git_to_see_the_diff(self):
+        self.assertEqual(tools("decision-reviewer"), ["Read", "Glob", "Grep", "Bash"])
+
+
 class ReviewRoundWorkflow(unittest.TestCase):
     def test_when_to_use_names_the_spec_argument_and_both_its_forms(self):
         when = re.search(r'^\s*whenToUse: "(.*)",$', REVIEW_ROUND.read_text(), re.M).group(1)

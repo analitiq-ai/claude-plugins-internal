@@ -469,6 +469,28 @@ def record_assessment(state: dict, ref: str, assessment: dict, now: datetime) ->
     return rnd
 
 
+def claim_notice(state: dict, ref: str, notice: dict) -> dict | None:
+    """Sets `notice` on round `ref` and returns it; None when the round already has one, which another delivery of
+    the same ruling claimed."""
+    rnd = find_round(state, ref)
+    if rnd.get("notice") is not None:
+        return None
+    rnd["notice"] = notice
+    return notice
+
+
+def record_notice(state: dict, ref: str, answers: dict) -> None:
+    """Stores GitHub's answer to each call of round `ref`'s notice: {"done": True} or {"error": <gh's words>}."""
+    rnd = find_round(state, ref)
+    notice = rnd.get("notice")
+    if notice is None:
+        raise LedgerError(f"{ref} has no notice to record answers for")
+    answered = [call for call in answers if notice[call] is not None]
+    if answered:
+        raise LedgerError(f"{ref}'s notice already has an answer for {', '.join(answered)}")
+    notice.update(answers)
+
+
 def ingest_poll(state: dict, drop: dict, now: datetime) -> dict | None:
     """Turn one poller result into a GitHub round. Returns the round it opened, if any."""
     state["pr"] = drop["pr"]

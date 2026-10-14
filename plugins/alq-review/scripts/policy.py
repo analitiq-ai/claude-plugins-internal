@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import reshape
 from ledger import COUNTED, counted, current_round, released
 
 CAP = 4          # rounds a stage may take without settling before the anti-pattern audit is mandatory
@@ -92,8 +93,8 @@ def _holds(state: dict) -> list[tuple[str, str]]:
                       f"continue on this approach, change it, or split the branch? The audits: {rulings}."))
     if _verdict_locked(state):
         rnd = current_round(state)
-        holds.append((f"The {_label(rnd)} was assessed {rnd['assessment']['round_verdict']}.",
-                      rnd["assessment"]["user_decision"]))
+        why = f"The {_label(rnd)} was assessed {rnd['assessment']['round_verdict']}. "
+        holds.append(((why + reshape.notice_failures(state["repo"], rnd)).rstrip(), rnd["assessment"]["user_decision"]))
     held = _spec_held(state)
     if held is not None:
         holds.append((f"The spec.md of `{state['spec']}` changed after this PR was bound to it: the bound blob is "
@@ -179,8 +180,9 @@ def launch_round(state: dict, stage: str, *, head_sha: str, dirty: bool, infligh
     if obstacle:
         return Decision(False, obstacle)
     if dirty:
-        return Decision(False, "Tracked files have uncommitted changes. A round is pinned to a commit so the next one can "
-                               "review exactly what changed since. Next step: commit, then launch again.")
+        return Decision(False, "The checkout has uncommitted changes or new files. A round is pinned to a commit so the "
+                               "next one can review exactly what changed since. Next step: commit, delete or ignore "
+                               "them, then launch again.")
     capped = _cap_reached(state)
     if stage == "audit":
         return Decision(True, scope="full", escalation=capped is not None)

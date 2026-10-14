@@ -76,13 +76,14 @@ Source: `plugins/alq-review/README.md` (opening; How an agent uses it).
 ### P2. Only an Approved Entity Releases a Hold
 
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
-approved to release it (the user or another system) and the one action by which it does?
-Nothing else may release the hold, lower it or start it again. A hold with no named approver,
-or with any second way out, fails the gate.
+approved to release it (the user or another system), and is every action that releases it named
+by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
+no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
-`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`.
+`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`;
+which actions release a hold: the decision record in `dev/alq-review/docs/adr/` that decides that hold.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -107,11 +108,11 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   `.claude-plugin/marketplace.json`; `dev/<name>/` holds what the plugin is built with (this
   project, its `specs/<nnn>-<feature>/` and its `tests/`) and is never installed (`README.md`).
 - Tests: CI runs every `tests/` folder under `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
-- The claim and shim checks each have a `log` / `enforce` setting beside the plugin's mode; the
+- The claim, shim and decision checks each have a `log` / `enforce` setting beside the plugin's mode; the
   review-round `spec` check follows the plugin's mode alone (`plugins/alq-review/README.md`: Mode).
 - Where the plugin keeps its state: `plugins/alq-review/README.md` (State).
-- Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins
-  (`plugins/alq-review/README.md`, end of Layout).
+- Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins, except the decision
+  reviewer, which is this plugin's own `agents/decision-reviewer.md` (`plugins/alq-review/README.md`, end of Layout).
 - Private repo: Principle II's public-repo limits bind what the plugin writes into public repos,
   not this repo's own files.
 
@@ -138,4 +139,4 @@ organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-12
+**Version**: 3.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-14

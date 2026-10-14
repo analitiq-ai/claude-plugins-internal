@@ -35,7 +35,9 @@ AUDIT_WAVES = [
 ]
 NEEDS = {"alq-anti-pattern:semantic-parity": "alq-anti-pattern:duplication"}
 ASSESSOR = "alq-review:assessor"
-REVIEWERS = frozenset(INTERNAL_REVIEWERS + [t for wave in AUDIT_WAVES for t in wave])
+# Joins an internal round's wave when a decision record governs the change.
+DECISION_REVIEWER = "alq-review:decision-reviewer"
+REVIEWERS = frozenset(INTERNAL_REVIEWERS + [DECISION_REVIEWER] + [t for wave in AUDIT_WAVES for t in wave])
 
 
 def short(agent_type: str) -> str:
@@ -48,6 +50,12 @@ Spec = specbinding.Folder | specbinding.NoSpec | None
 
 def bound_spec(state: dict) -> Spec:
     return specbinding.parse(state["spec"]) if "spec" in state else None
+
+
+def spec_folder(state: dict) -> str | None:
+    """The spec folder the PR is bound to; None for a PR bound to no spec or not bound yet."""
+    spec = bound_spec(state)
+    return spec.path if isinstance(spec, specbinding.Folder) else None
 
 
 def _ruled_on(state: dict) -> str:
@@ -69,31 +77,55 @@ def _graded_against(spec: Spec, root: str) -> str:
             "excludes bounds what you may ask for.")
 
 
+def review_range(decision: policy.Decision, base: str) -> str:
+    """The diff range a round reviews: the files its decision check asks about are the ones this range touches."""
+    return f"{decision.delta_from}..HEAD" if decision.scope == "delta" else f"{base}...HEAD"
+
+
+def _scope(where: worktree.Worktree, decision: policy.Decision, base: str) -> str:
+    run = f"Review branch {where.branch} of {where.slug}.\nIn {where.root}, run: git diff {review_range(decision, base)}\n"
+    if decision.scope == "delta":
+        return (run + "That is what changed since the previous review round. The rest of the branch was reviewed then: "
+                "read it for context, report on the delta.")
+    return run + "That is the whole change under review."
+
+
+def _numbering(agent_type: str) -> str:
+    return f"Answer through StructuredOutput, numbering findings {short(agent_type)}-1, {short(agent_type)}-2, ..."
+
+
 def _review_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str,
                    spec: Spec) -> str:
-    if decision.scope == "delta":
-        scope = (f"In {where.root}, run: git diff {decision.delta_from}..HEAD\n"
-                 "That is what changed since the previous review round. The rest of the branch was reviewed then: "
-                 "read it for context, report on the delta.")
-    else:
-        scope = f"In {where.root}, run: git diff {base}...HEAD\nThat is the whole change under review."
-    return (f"Review branch {where.branch} of {where.slug}.\n{scope}\n\n"
+    return (f"{_scope(where, decision, base)}\n\n"
             "Report only what must change before this merges: a defect, a broken contract, a violated project rule. "
             "No style preferences, no praise, no summary. An empty findings list is a normal and expected answer."
-            f"{_graded_against(spec, where.root)}{_ruled_on(state)}\n\n"
-            f"Answer through StructuredOutput, numbering findings {short(agent_type)}-1, {short(agent_type)}-2, ...")
+            f"{_graded_against(spec, where.root)}{_ruled_on(state)}\n\n{_numbering(agent_type)}")
 
 
-def _audit_prompt(where: worktree.Worktree, base: str, agent_type: str) -> str:
+def _decision_prompt(state: dict, where: worktree.Worktree, decision: policy.Decision, base: str,
+                     governing: list[dict]) -> str:
+    records = "\n".join(f'- {g["corpus"]} {g["id"]} "{g["title"]}"' for g in governing)
+    return (f"{_scope(where, decision, base)}\n\n"
+            "These decisions govern files this change touches. Each is named by its corpus and id:\n"
+            f"{records}\n\n"
+            "Read each record in full, in its corpus, before the diff. Report every place the change does what a "
+            "decision rejected, contradicts what it chose, or breaks a consequence it commits to: quote the decision's "
+            "words in the finding's title and name the record (corpus and id) in its detail. Report nothing a decision "
+            "does not settle; other reviewers cover the rest. An empty findings list is a normal and expected answer."
+            f"{_ruled_on(state)}\n\n{_numbering(DECISION_REVIEWER)}")
+
+
+def _audit_prompt(where: worktree.Worktree, decision: policy.Decision, base: str, agent_type: str) -> str:
     visibility = github.repo_visibility(where.slug) or "unknown (lookup failed) - treat as public"
-    files = "\n".join(f"  - {f}" for f in worktree.changed_files(where.root, base))
+    reviewed = review_range(decision, base)
+    files = "\n".join(f"  - {f}" for f in worktree.files_in(where.root, reviewed))
     return ("Scope packet\n"
             "mode: delta\n"
             f"repo: {where.slug} at {where.root}\n"
             f"visibility: {visibility}\n"
             "unit: PR delta\n"
             f"files:\n{files}\n"
-            f"regions: changed-hunks - the diff is not pasted; in {where.root} run: git diff {base}...HEAD\n"
+            f"regions: changed-hunks - the diff is not pasted; in {where.root} run: git diff {reviewed}\n"
             "read_beyond: yes\n"
             f"baseline: {base}\n"
             "suppressions: none\n"
@@ -115,28 +147,43 @@ def _assess_args(rnd: dict, churned_files: bool) -> dict:
                 rnd["ref"], policy.admissible_verdicts(rnd, churned=churned_files))}
 
 
-def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: Spec) -> dict:
-    """Internal reviewers grade the change against `spec`; audits ignore it."""
-    waves = AUDIT_WAVES if rnd["stage"] == "audit" else [INTERNAL_REVIEWERS]
+def waves(stage: str, decisions: dict | None) -> list[list[str]]:
+    """Who reviews a round, wave by wave; `decisions` is the internal round's decision check result."""
+    if stage == "audit":
+        return AUDIT_WAVES
+    return [INTERNAL_REVIEWERS + ([DECISION_REVIEWER] if decisions["governing"] else [])]
+
+
+def review_args(state: dict, rnd: dict, where: worktree.Worktree, decision: policy.Decision, spec: Spec,
+                decisions: dict | None) -> dict:
+    """Internal reviewers grade the change against `spec`, and the decision reviewer against the records `decisions`
+    names as governing; audits ignore both, and get `decisions` None."""
 
     def reviewer(agent_type: str) -> dict:
-        prompt = (_audit_prompt(where, rnd["base_sha"], agent_type) if rnd["stage"] == "audit"
-                  else _review_prompt(state, where, decision, rnd["base_sha"], agent_type, spec))
+        if rnd["stage"] == "audit":
+            prompt = _audit_prompt(where, decision, rnd["base_sha"], agent_type)
+        elif agent_type == DECISION_REVIEWER:
+            prompt = _decision_prompt(state, where, decision, rnd["base_sha"], decisions["governing"])
+        else:
+            prompt = _review_prompt(state, where, decision, rnd["base_sha"], agent_type, spec)
         entry = {"type": agent_type, "short": short(agent_type), "prompt": prompt,
                  "schema": assessment.findings_schema(rnd["ref"], short(agent_type))}
         if agent_type in NEEDS:
             entry["needs"] = NEEDS[agent_type]
         return entry
 
-    return {"worktree": where.root, "stage": rnd["stage"], "round_ref": rnd["ref"],
-            "label": f"{rnd['stage']} review round {rnd['n']} ({rnd['scope']})",
-            "waves": [[reviewer(t) for t in wave] for wave in waves],
-            "assess": _assess_args(rnd, churned(state, rnd, where.root))}
+    injected = {"worktree": where.root, "stage": rnd["stage"], "round_ref": rnd["ref"],
+                "label": f"{rnd['stage']} review round {rnd['n']} ({rnd['scope']})",
+                "waves": [[reviewer(t) for t in wave] for wave in waves(rnd["stage"], decisions)],
+                "assess": _assess_args(rnd, churned(state, rnd, where.root)), "spec_folder": spec_folder(state)}
+    if decisions is not None:
+        injected["decisions"] = decisions
+    return injected
 
 
 def assess_args(state: dict, rnd: dict, where: worktree.Worktree) -> dict:
     return {"worktree": where.root, "round_ref": rnd["ref"], "findings": rnd["findings"],
-            "assess": _assess_args(rnd, churned(state, rnd, where.root))}
+            "assess": _assess_args(rnd, churned(state, rnd, where.root)), "spec_folder": spec_folder(state)}
 
 
 def brief_token(rnd: dict) -> str:
@@ -145,7 +192,6 @@ def brief_token(rnd: dict) -> str:
 
 
 def brief(state: dict, rnd: dict) -> dict:
-    spec = bound_spec(state)
     base = rnd["base_sha"]
     measured = facts.round_facts(state, rnd, rnd["root"])
     return {
@@ -153,7 +199,7 @@ def brief(state: dict, rnd: dict) -> dict:
         "checkout": rnd["root"],
         "change_under_review": f"git -C {rnd['root']} diff {base}...HEAD",
         "history": f"git -C {rnd['root']} log --oneline {base}..HEAD",
-        "spec_folder": spec.path if isinstance(spec, specbinding.Folder) else None,
+        "spec_folder": spec_folder(state),
         "facts": measured,
         "admissible_round_verdicts": policy.admissible_verdicts(rnd, churned=bool(measured["files_at_third_edit"])),
         "escalation": rnd["escalation"],

@@ -9,16 +9,21 @@
 # those against the branch rules. The poller waits for that picture to be complete and prints it.
 #
 # SETTLED means every one of:
-#   - Codex answered since the trigger: a comment, a review, or a 👍 on the PR
-#     description or on the `@codex review` comment;
+#   - Codex is not reviewing. Its status card's Code Review row, read only
+#     when its status time is after the trigger, is waited on while Running.
+#     Completed for the head is Codex's answer, at that status time; Completed
+#     for another commit settles the round with the re-request, never CLEAN.
+#     With no such row the round waits for one, unless Codex posted something
+#     not on scripts/codexstate.py's list: that settles it, never CLEAN, and
+#     beside a row is a WARNING. pr-gate's WAIVED run on the head stands in
+#     for the missing answer in those two cases only;
 #   - no check is running except the gate runs and those passed to
 #     --ignore-check (a gate run is a verdict, not work: its pending state is
 #     waited on only under the next rule);
-#   - with nothing to triage, `codex-review` is not older than Codex's answer
-#     on the PR (a comment, a review, or a 👍 on the description), so a verdict
-#     has reached the gate before the round is judged — for GATE_SWEEP_MINUTES
-#     after the answer only: pr-gate does not re-post an unchanged run, so
-#     past that an older run is the verdict;
+#   - with nothing to triage, `codex-review` is not older than the row's status
+#     time, so a verdict has reached the gate before the round is judged — for
+#     GATE_SWEEP_MINUTES after the answer only: pr-gate does not re-post an
+#     unchanged run, so past that an older run is the verdict;
 #   - GitHub has finished computing mergeability.
 # A draft settles at once: Codex does not review drafts.
 #
@@ -54,6 +59,7 @@ GATE_APP="analitiq-pr-gate"
 # triggers nothing, so for those the poller dispatches a sweep. Its 15-min
 # schedule is not relied on: GitHub runs it hours apart.
 GATE_SWEEP_MINUTES=20
+READER="$(dirname "${BASH_SOURCE[0]}")/../../scripts/codexstate.py"
 IGNORE_CHECKS=""
 MINUTES=15
 INTERVAL=60
@@ -120,9 +126,27 @@ query($owner:String!, $name:String!, $pr:Int!) {
   }
 }'
 
+# The round's trigger, read the same way by CODEX_ITEMS and ANALYZE.
+TRIGGER_DEFS='
+def bare: sub("\\[bot\\]$"; "");
+.data.repository.pullRequest as $pr
+| ($pr.comments.nodes) as $comments
+| (if $trigger_id != "" then [$comments[] | select((.databaseId | tostring) == $trigger_id)]
+   else [$comments[] | select(.body | ascii_downcase | gsub("^\\s+|\\s+$"; "") == $trigger_text)] end
+   | last) as $trigger
+| ($trigger.createdAt // $pr.createdAt) as $since
+| '
+
+# What codexstate.py reads: every Codex comment and review, whenever posted, since
+# the card is created before the trigger it answers.
+CODEX_ITEMS='
+{ since: $since, head: $pr.headRefOid,
+  items: ([$comments[] | select((.author.login | bare) == $codex) | {kind: "comment", url, at: .createdAt, body}]
+          + [$pr.reviews.nodes[] | select((.author.login | bare) == $codex and .submittedAt != null)
+             | {kind: "review", url, at: .submittedAt, body}]) }'
+
 # Reduces one snapshot to the facts the loop and the report need.
 ANALYZE='
-def bare: sub("\\[bot\\]$"; "");
 def strip_markup: gsub("(?s)<!--.*?-->"; "") | gsub("!\\[[^\\]]*\\]\\([^)]*\\)"; "") | gsub("</?[A-Za-z][^>]*>"; "");
 def squash: gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "");
 def first_line: split("\n") | map(squash) | map(select(length > 0)) | first // "(no description)";
@@ -151,26 +175,16 @@ def body_findings:
           path: .[2], line: (.[3] | tonumber), outdated: false, url: ($r.url + "-cr-" + .[4]) } ];
 def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0] | tonumber] | add // 0;
 
-.data.repository.pullRequest as $pr
-| ($pr.commits.nodes[0].commit.statusCheckRollup.contexts // {pageInfo: {}, nodes: []}) as $rollup
+($pr.commits.nodes[0].commit.statusCheckRollup.contexts // {pageInfo: {}, nodes: []}) as $rollup
 | [ (["reactions", $pr.reactions], ["comments", $pr.comments], ["reviews", $pr.reviews],
      ["reviewThreads", $pr.reviewThreads], ["status check contexts", $rollup])
       | select(.[1].pageInfo.hasNextPage or .[1].pageInfo.hasPreviousPage) | .[0] ]
   + [ $pr.comments.nodes[] | select(.reactions.pageInfo.hasPreviousPage) | "reactions on \(.url)" ]
   | map("more than 100 \(.) on the PR; the poller reads one page and will not report from part of it") as $overflow
 
-| ($pr.comments.nodes) as $comments
-| (if $trigger_id != "" then [$comments[] | select((.databaseId | tostring) == $trigger_id)]
-   else [$comments[] | select(.body | ascii_downcase | gsub("^\\s+|\\s+$"; "") == $trigger_text)] end
-   | last) as $trigger
-| ($trigger.createdAt // $pr.createdAt) as $since
-
-| [$comments[] | select((.author.login | bare) == $codex and .createdAt > $since)] as $codex_comments
-| [$pr.reviews.nodes[] | select((.author.login | bare) == $codex and .submittedAt != null and .submittedAt > $since)] as $codex_reviews
 | [$pr.reactions.nodes[] | select((.user.login | bare) == $codex and .createdAt > $since)] as $thumbs_on_body
 | [($trigger.reactions.nodes // [])[] | select((.user.login | bare) == $codex)] as $thumbs_on_trigger
-| ([$codex_comments[].createdAt, $codex_reviews[].submittedAt] | max) as $codex_said_at
-| ([$codex_said_at, $thumbs_on_body[].createdAt] | max) as $codex_answered_at
+| (if $codex_state.state == "answered" then $codex_state.status_at else null end) as $codex_answered_at
 
 | [ $rollup.nodes[]
     | if .__typename == "CheckRun" and .checkSuite.app.slug == $gate_app and (.name as $n | $gates | index($n))
@@ -187,6 +201,10 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | [$all_contexts[] | select(.ignored and (.passing | not)) | {name, state, url}] as $ignored_not_passing
 | [$contexts[] | select(.gate)] as $gate_runs
 | ($gate_runs | map(select(.name == "codex-review")) | first) as $codex_gate
+# pr-gate waives a head Codex cannot review: that stands in for an answer only where Codex has none
+# (not_started, declined). A Running row is still waited on and a superseded row still blocks.
+| ($codex_gate != null and $codex_gate.state == "SUCCESS"
+   and (($codex_gate.description // "") | startswith("WAIVED:"))) as $waived
 | [$contexts[] | select(.unfinished) | select(.gate | not)] as $running
 | [$contexts[] | select((.passing or .unfinished) | not) | {name, state, url}] as $failing
 
@@ -204,27 +222,38 @@ def declared_outside: [scan("Outside diff range comments \\(([0-9]+)\\)") | .[0]
 | [ $rabbit_reviews[] | body_findings[] | select(.id as $id | $answers | contains($id) | not) | del(.id) ] as $outside
 | ($inline + $outside | sort_by(.by != $codex, .by, .path, .line)) as $threads
 
-| { head: $pr.headRefOid, merge: $pr.mergeStateStatus, decision: $pr.reviewDecision,
-    clean: ($pr.mergeStateStatus == "CLEAN"
-            or ($pr.mergeStateStatus == "UNSTABLE" and ($ignored_not_passing | length) > 0 and all($contexts[]; .passing))),
-    since: $since, trigger_found: ($trigger != null),
-    responded: (($codex_comments + $codex_reviews + $thumbs_on_body + $thumbs_on_trigger) | length > 0),
-    thumbs_on_trigger_only: ($codex_answered_at == null and ($thumbs_on_trigger | length) > 0),
+# Why the round is not clean, once nothing is left to triage: the state of Codex, the merge state, or both.
+| [ (if $codex_state.state == "answered" or ($waived and ($codex_state.state | IN("not_started", "declined"))) then empty
+     elif $codex_state.state == "superseded" then "Codex reviewed \($codex_state.commit), not the head \($pr.headRefOid[0:10])"
+     elif $codex_state.state == "declined" then "Codex'"'"'s reply is not one the poller knows"
+     elif $codex_state.state == "reviewing" then "Codex is reviewing \($codex_state.commit)"
+     else "Codex has not answered since \($since)" end),
+    (if $pr.mergeStateStatus == "CLEAN"
+        or ($pr.mergeStateStatus == "UNSTABLE" and ($ignored_not_passing | length) > 0 and all($contexts[]; .passing))
+     then empty else "GitHub reports mergeStateStatus=\($pr.mergeStateStatus)" end) ] as $blocked_by
+
+| { codex: $codex_state, head: $pr.headRefOid, merge: $pr.mergeStateStatus, decision: $pr.reviewDecision,
+    clean: ($blocked_by | length == 0), blocked_by: $blocked_by,
+    since: $since, trigger_found: ($trigger != null), waived: $waived,
+    thumbs_on_trigger_only: (($thumbs_on_trigger | length) > 0 and ($thumbs_on_body | length) == 0
+                             and ($codex_state.spoke | not)),
     gate_lags: ($codex_answered_at != null and $codex_gate != null and $codex_gate.state == "PENDING"
                 and $codex_gate.createdAt < $codex_answered_at
                 and (now - ($codex_answered_at | fromdateiso8601)) < $sweep_minutes * 60),
     codex_gate_missing: ([$all_contexts[] | select(.gate and .name == "codex-review")] | length == 0),
     gates: $gate_runs, running: $running, failing: $failing, ignored: $ignored_not_passing, threads: $threads,
-    gate_comments: [ $codex_comments[] | { url, at: .createdAt, gist: (.body | strip_markup | first_line | clip),
-                                          approves: ($codex_gate.state == "SUCCESS") } ],
-    errors: ($overflow + $unparsed
+    gate_comments: [ $codex_state.comments[] | { url, at, gist: (.body | strip_markup | first_line | clip),
+                                                approves: ($codex_gate.state == "SUCCESS") } ],
+    errors: ($overflow + $unparsed + $codex_state.errors
              + (if $trigger_id != "" and $trigger == null then ["comment \($trigger_id) is not among the PR comments"] else [] end)) }
 | .findings = ((.threads | length) + (.failing | length))'
 
 # Why the round is not settled yet, one reason per line; empty once settled.
 WAITING_ON='
 if .merge == "DRAFT" then empty else
-  (if .responded then empty else "Codex has not answered since \(.since)" end),
+  (if .codex.state == "not_started" and (.waived | not) then "Codex has not answered since \(.since)"
+   elif .codex.state == "reviewing" then "Codex is reviewing \(.codex.commit) since \(.codex.status_at)"
+   else empty end),
   (if (.running | length) > 0 then "\(.running | length) check(s) running: \(.running | map(.name) | join(", "))" else empty end),
   (if .findings == 0 and .gate_lags then "codex-review has not caught up with Codex'"'"'s answer" else empty end),
   (if .merge == "UNKNOWN" then "GitHub is still computing mergeability" else empty end)
@@ -232,7 +261,16 @@ end'
 
 REPORT='
 "== \($repo)#\($pr) @ \(.head[0:10]): mergeStateStatus=\(.merge), reviewDecision=\(.decision // "none")",
+"Codex: \(.codex.state | gsub("_"; " "))"
+  + (if .codex.commit == null then ""
+     else " \(.codex.commit) \(if .codex.state == "reviewing" then "since" else "at" end) \(.codex.status_at)" end),
 (if (.gates | length) > 0 then "Gate check runs:", (.gates[] | "  \(.name): \(.state) — \(.description // "")") else empty end),
+(if .codex.state == "superseded" then "Codex reviewed \(.codex.commit), not the head \(.head[0:10]): comment `@codex review`" else empty end),
+(if .codex.state == "declined" and (.waived | not)
+ then (.codex.unknown[] | "Codex'"'"'s reply is not one the poller knows (\(.url), \(.at)): Codex declined or changed what it posts; read it.")
+ elif .codex.state != "declined"
+ then (.codex.unknown[] | "WARNING: Codex'"'"'s reply is not one the poller knows (\(.url), \(.at)); read it.")
+ else empty end),
 (if .codex_gate_missing then "WARNING: no codex-review check run from the \($gate_app) App on \(.head[0:10])." else empty end),
 (if .thumbs_on_trigger_only then "Codex answered with only a 👍 on the @codex review comment. The gate reads Codex'"'"'s reactions on the PR description only: comment `@codex review` to get a verdict comment." else empty end),
 (.gate_comments | map(select(.approves | not)) | if length > 0 then
@@ -248,11 +286,20 @@ REPORT='
             + (if .outdated then " (outdated)" else "" end) + "\n      \(.gist)\n      \(.url)"))
  else empty end)'
 
+# Command substitution does not inherit set -e, so each step returns its own failure.
 snapshot() {
-  gh api graphql -f query="$SNAPSHOT_QUERY" -F owner="$owner" -F name="$name" -F pr="$pr" \
-    | jq --arg codex "$CODEX" --arg trigger_text "$TRIGGER_TEXT" --arg trigger_id "$trigger_id" \
-         --argjson gates "$GATE_CONTEXTS" --arg gate_app "$GATE_APP" --argjson ignore "$ignore_json" \
-         --argjson sweep_minutes "$GATE_SWEEP_MINUTES" "$ANALYZE"
+  local raw items codex_state
+  raw=$(gh api graphql -f query="$SNAPSHOT_QUERY" -F owner="$owner" -F name="$name" -F pr="$pr") || return
+  items=$(jq --arg codex "$CODEX" --arg trigger_text "$TRIGGER_TEXT" --arg trigger_id "$trigger_id" \
+             "$TRIGGER_DEFS$CODEX_ITEMS" <<<"$raw") || return
+  if ! codex_state=$(python3 "$READER" <<<"$items"); then
+    echo "ERROR: the Codex reader failed" >&2
+    return 1
+  fi
+  jq --arg codex "$CODEX" --arg trigger_text "$TRIGGER_TEXT" --arg trigger_id "$trigger_id" \
+     --argjson gates "$GATE_CONTEXTS" --arg gate_app "$GATE_APP" --argjson ignore "$ignore_json" \
+     --argjson sweep_minutes "$GATE_SWEEP_MINUTES" --argjson codex_state "$codex_state" \
+     "$TRIGGER_DEFS$ANALYZE" <<<"$raw"
 }
 
 report() {
@@ -292,8 +339,7 @@ hand_over() {
 }
 
 settle() {
-  local state=$1 merge findings
-  merge=$(jq -r '.merge' <<<"$state")
+  local state=$1 findings
   findings=$(jq -r '.findings' <<<"$state")
   report "$state"
   if [ "$findings" -gt 0 ]; then
@@ -306,7 +352,7 @@ settle() {
     hand_over "$state" clean
     exit 0
   fi
-  echo "BLOCKED: nothing to triage, but GitHub reports mergeStateStatus=$merge. Act on the gate check runs and notes above."
+  echo "BLOCKED: nothing to triage, but $(jq -r '.blocked_by | join("; ")' <<<"$state"). Act on the gate check runs and notes above."
   exit 4
 }
 
@@ -315,7 +361,8 @@ poll=0
 dispatched=false
 while :; do
   poll=$(( poll + 1 ))
-  state=$(snapshot)
+  # gh's and jq's own exit codes overlap the poller's (gh exits 4 when it needs authentication).
+  state=$(snapshot) || { echo "ERROR: could not read $repo#$pr; the lines above say why" >&2; exit 1; }
   if [ "$(jq '.errors | length' <<<"$state")" -gt 0 ]; then
     jq -r '.errors[] | "ERROR: " + .' <<<"$state" >&2
     exit 1

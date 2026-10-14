@@ -38,6 +38,16 @@ def issue_state(slug: str, number: int) -> str | None:
     return _gh("issue", "view", str(number), "--repo", slug, "--json", "state", "--jq", ".state") or None
 
 
+def comment_issue(slug: str, number: int, body: str) -> None:
+    """RuntimeError in gh's words when the comment was not posted."""
+    _answer("issue", "comment", str(number), "--repo", slug, "--body", body)
+
+
+def escalate_issue(slug: str, number: int, label: str, assignee: str) -> None:
+    """Adds `label` and `assignee` in one edit; RuntimeError in gh's words when it was not made."""
+    _answer("issue", "edit", str(number), "--repo", slug, "--add-label", label, "--add-assignee", assignee)
+
+
 def repo_visibility(slug: str) -> str | None:
     private = _gh("api", f"repos/{slug}", "--jq", ".private")
     return {"true": "private", "false": "public"}.get(private or "")

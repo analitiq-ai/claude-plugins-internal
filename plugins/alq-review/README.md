@@ -21,7 +21,11 @@ that is under review.
    the agent can make one. An unlock that releases a `RESHAPE_SPEC` lock replies with the ruling, since nothing
    else hands it on: the open decision, its rationale, the `spec_gap` findings and the PR's spec folder. On a PR
    bound to `spec: null` it says instead to close the PR and restart the work on a new PR bound to a spec that
-   settles the decision. While a branch is held, every Bash command of the session that launched its round is checked
+   settles the decision. On a PR bound to a spec folder, the ruling also tells the spec's issue, the number the
+   folder's name starts with (`<issue>-<name>`): the gate posts one comment naming the PR and round with that
+   ruling, then makes one edit adding the `reshape_spec` label and the `escalate_to` assignee. Each call is tried
+   once; one that fails is named, with GitHub's error, in the lock's refusal and in the unlock's reply, to be done
+   by hand. The gate never creates the label, and never removes it or the assignee. While a branch is held, every Bash command of the session that launched its round is checked
    against the branch's tip and, while its checkout has the branch checked out, every tracked and untracked
    change there, as they stood before the command. A file written or a commit made by any route is caught
    and the agent told to put it back, even if the command then leaves the branch; checking another branch
@@ -114,6 +118,21 @@ that is under review.
    seconds, Jev's price); for a `patch` or deep check it also records each site the check lists that an earlier
    check of the same bug left out.
    A commit whose code is all in test files skips this check (`dev/alq-review/specs/012-tests-only-tree/`).
+8. **An internal round is checked against the decisions that govern its change.** At launch, the gate asks adrkit's
+   `adr check` which accepted decision records (ADRs) govern the files of the round's own diff range: the whole
+   change for a full round, what changed since the last round for a delta. It asks once per corpus, all at once:
+   every tracked `docs/adr` folder of the repo, and the org's at `ALQ_ORG_ADR_DIR` when it is set; a folder reached
+   both ways is checked once, as the org's. When a record governs the change, `alq-review:decision-reviewer` joins
+   the round, briefed with each record by its corpus and id, and the round waits for it like any reviewer; its
+   findings are assessed with the others, and the rulings on them are written to `gate.log` as a `decision-review`
+   line. A matcher adrkit cannot evaluate in one repo (a `package` or `entity` matcher, or one qualified with a repo)
+   is a notice, and the round runs; every other adrkit finding is ignored. The launch is refused when a round reviews
+   more than `max_review_files` files, when a corpus cannot be checked (`adr` missing or not the version below, its
+   answer unreadable, a call past the hook's deadline, a capped marker scan, an `ALQ_ORG_ADR_DIR` that is no
+   absolute readable folder), and when the change touches a record `adr check` fails on; each refusal names the
+   corpus and a fix that works there. The round's result carries a `decisions` block: the corpora checked, the
+   records that govern, the notices, the broken records and corpora not checked when their refusal did not block,
+   and the org corpus or `unset`. Audit rounds run no decision check.
 
 ## How an agent uses it
 
@@ -145,6 +164,15 @@ outside its snapshot and `scripts/pre_merge_gate.py` refuse in either mode.
 The claim check (6) has its own `claim_checks` setting, overridden by `ALQ_REVIEW_CLAIM_CHECKS`, and refuses
 only when both settings enforce. `claim_warn_over` (20) is the number of judged claims above which the
 workflow's result suggests splitting the change.
+
+The decision check (8) has its own `decision_checks` setting, overridden by `ALQ_REVIEW_DECISION_CHECKS`. A
+corpus that could not be checked refuses whenever it enforces, in either plugin mode; a broken record refuses only
+when both settings enforce; at `log`, each is a `would_deny` and the round opens on what was read.
+`max_review_files` (50) is the most files an internal round may review; past it the launch is refused before any
+adrkit call, following the plugin's mode.
+
+`escalate_to` names the GitHub account a `RESHAPE_SPEC` ruling assigns the spec's issue to. It has no default: a
+missing or blank one fails that edit, and the lock names the failure.
 
 The shim check (7) has its own `shim_checks` setting, overridden by `ALQ_REVIEW_SHIM_CHECKS`; when either it or the
 plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is reached through OpenRouter with the
@@ -225,8 +253,10 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/assessment.py` | output schemas and the cross-field validator |
 | `scripts/facts.py` | git/ledger measurements that put the burden of proof on `PATCH` |
 | `scripts/briefs.py` | reviewer list, prompts, audit scope packet, assessor brief |
+| `scripts/reshape.py` | a `RESHAPE_SPEC` ruling's summary, the notice it owes the spec's issue, and what is said when that notice failed - pure |
 | `scripts/specbinding.py` | the review-round `spec` argument: what it says, whether its folder has a spec folder's shape, whether it matches the PR's binding, and what a changed `spec.md` does to that binding |
 | `scripts/config.py` | reads `config.json` |
+| `scripts/codexstate.py` | Codex's state for a review round, read from its status card and its known comment forms - a pure function the poller calls |
 | `scripts/claimcheck.py` | the claim check's rules - pure functions of a check, its lineages and git's answers |
 | `scripts/lineage.py` | where a piece of text is after an edit: the mapping both checks use to carry a claim or a bug across versions |
 | `scripts/claimgate.py` | the claim check's hook handlers |
@@ -234,6 +264,8 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `scripts/shimgate.py` | the shim check's hook handlers |
 | `scripts/jev.py` | the Jev questions the shim check asks |
 | `scripts/snapshot.py`, `scripts/sweeper_read.py` | the `HEAD` copy a sweeper reads, and the hook keeping it there |
+| `scripts/adrkit.py` | the decision check's corpora and every call to `adr` |
+| `scripts/decisions.py` | the decision check's rules - pure functions of adrkit's answers |
 | `scripts/hookio.py` | settings, refusals, `gate.log`, session state and the switch, shared by the handlers |
 | `scripts/gate.py` | hook entrypoint |
 | `scripts/pre_merge_gate.py` | a merge or ready needs the internal-review attestation on the head, or the org gate's version-only release; an admin merge needs the user's `override-merge owner/repo#N` |
@@ -241,6 +273,7 @@ python3 scripts/ledger.py unlock --worktree /abs/checkout --reason "why"    # us
 | `workflows/` | orchestration only; everything else is injected by the hook |
 | `agents/assessor.md` | the assessor |
 | `agents/claim-*.md` | the claim reader, judge and contest judge |
+| `agents/decision-reviewer.md` | the decision reviewer |
 
 Tests: `python3 -m unittest` in this repo's `dev/alq-review/tests/`, which an install does not copy.
 `test_shell.py` reads the org's `.github` repo checked out as `analitiq-org-github` beside this repo.
@@ -255,3 +288,8 @@ edits. Installing the plugin copies files and installs no package, so install it
 hooks (`python3 -m pip install diff-match-patch`; on a Debian or Ubuntu system Python without a virtual environment,
 `sudo apt install python3-diff-match-patch`). Without it both checks refuse a launch and a commit as a check that
 could not run, and the refusal names this step. Any other import fails on a machine that lacks it.
+
+The decision check (8) runs adrkit's command `adr`, version 0.20.0, on the machine that launches rounds: node 22 or
+later, then `npm install -g @adrkit/cli@0.20.0`. It is needed only when the repo has a tracked `docs/adr` or
+`ALQ_ORG_ADR_DIR` is set; without it, or at another version, the launch is refused as a check that could not run,
+and the refusal names this step.

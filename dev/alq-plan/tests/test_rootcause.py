@@ -77,7 +77,7 @@ class Cli(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.folder = Path(tmp.name) / "specs" / "001-demo"
+        self.folder = Path(tmp.name) / "specs" / "7-demo"
         self.folder.mkdir(parents=True)
         self.report = Path(tmp.name) / "premise-report.md"
         self.report.write_text(DEFECT)

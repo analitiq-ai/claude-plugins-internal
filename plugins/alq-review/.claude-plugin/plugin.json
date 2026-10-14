@@ -1,7 +1,7 @@
 {
   "name": "alq-review",
   "description": "Review rounds as a gated process \u2014 every reviewer behind a barrier, one independent assessment per round (patch, class fix, redesign, reshape the spec), and no code change, commit or re-request until that assessment exists; every commit's claims checked against the code first.",
-  "version": "0.13.0",
+  "version": "0.15.0",
   "keywords": [
     "code-review",
     "process-gate",
