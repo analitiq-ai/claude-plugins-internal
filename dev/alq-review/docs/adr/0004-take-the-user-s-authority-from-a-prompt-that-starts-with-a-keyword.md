@@ -65,6 +65,10 @@ for the two commit checks.
 3. We will not accept a command, a file edit, a setting or an agent's message as a release.
 4. We will give each new user-only action a keyword of its own.
 
+ADR-0021 amends points 1, 3 and 4 for one release: adding the `cleanup` label on GitHub, with no
+keyword and no prompt, releases a PR's review holds (ADR-0021 point 3). This plugin refuses no command
+that adds the label (ADR-0021 point 2).
+
 ## Options considered
 
 ### Option A: A keyword at the start of the user's prompt (chosen)
