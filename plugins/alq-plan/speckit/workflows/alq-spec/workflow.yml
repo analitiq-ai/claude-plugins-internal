@@ -55,6 +55,15 @@ steps:
     output_format: json
     run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" check "$SPECIFY_FEATURE_DIRECTORY" "$ISSUE" "{{ inputs.kind }}"
 
+  # A rescope's story numbers are checked against spec.md as the run found it, before grill amends it.
+  - id: to-snapshot-spec
+    type: if
+    condition: "{{ inputs.kind == 'rescope' }}"
+    then:
+      - id: snapshot-spec
+        type: shell
+        run: cp "$SPECIFY_FEATURE_DIRECTORY/spec.md" ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
+
   # Whether the issue is worth a spec is asked before one is written. The questions are answered in the session,
   # which a headless command step cannot do. A rescope of a spec amends one already judged worth writing; the issue of
   # a no-spec folder is judged again.
@@ -132,18 +141,6 @@ steps:
             type: shell
             run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" recorded "$SPECIFY_FEATURE_DIRECTORY"
 
-  # A rescope's story numbers are checked against spec.md as the run found it, before grill amends it.
-  - id: to-snapshot-spec
-    type: if
-    condition: "{{ inputs.spec_dir }}"
-    then:
-      - id: snapshot-spec
-        type: shell
-        run: |
-          set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          cp "$dir/spec.md" ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
-
   # The story headings are checked after every step that writes spec.md: specify, grill and the critique review.
   - id: to-story-headings-after-specify
     type: if
@@ -151,10 +148,7 @@ steps:
     then:
       - id: story-headings-after-specify
         type: shell
-        run: |
-          set -eu
-          dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-          python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$dir"
+        run: python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: new-spec-root-cause
     type: if
@@ -189,21 +183,17 @@ steps:
     then:
       - id: story-headings-after-grill-kind
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ inputs.kind == 'rescope' }}"
         then:
           - id: rescope-story-headings-after-grill
             type: shell
-            run: |
-              set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
+            run: >-
+              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"
+              ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
         else:
           - id: story-headings-after-grill
             type: shell
-            run: |
-              set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$dir"
+            run: python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-no-open-markers
     type: if
@@ -314,21 +304,17 @@ steps:
     then:
       - id: story-headings-after-critique-kind
         type: if
-        condition: "{{ inputs.spec_dir }}"
+        condition: "{{ inputs.kind == 'rescope' }}"
         then:
           - id: rescope-story-headings-after-critique
             type: shell
-            run: |
-              set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$dir" ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
+            run: >-
+              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"
+              ".specify/workflows/runs/{{ context.run_id }}/spec-as-found.md"
         else:
           - id: story-headings-after-critique
             type: shell
-            run: |
-              set -eu
-              dir=$(python3 -c 'import json; print(json.load(open(".specify/feature.json"))["feature_directory"])')
-              python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$dir"
+            run: python3 "$ALQ_PLAN_ROOT/scripts/story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"
 
   - id: to-tasks
     type: if

@@ -773,11 +773,10 @@ if command == "/speckit-critique-run":
         self.assert_failed(report, "rescope-story-headings-after-critique", heading(2, "Story 3"), "above 3")
 
     def test_a_rescope_keeps_spec_md_as_it_found_it_before_any_step_can_write_spec_md(self):
-        """A rescope that runs specify (a no-spec folder's) is graded against the spec it found, not specify's."""
         ids = [s["id"] for s in workflow_steps()]
         [snapshot] = [s for s in workflow_steps() if s["id"] == "snapshot-spec"]
         self.assertIn('"$SPECIFY_FEATURE_DIRECTORY/spec.md"', snapshot["run"])
-        self.assertEqual(ids.index("snapshot-spec"), ids.index("check-folder") + 1)
+        self.assertEqual(ids.index("to-snapshot-spec"), ids.index("check-folder") + 1)
         project, run_id = self.rescope((1, 3))
         self.assertEqual((project.root / f".specify/workflows/runs/{run_id}/spec-as-found.md").read_text(),
                          with_stories(SETTLED, 1, 3))

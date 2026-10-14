@@ -2,13 +2,13 @@
 """The spec branch a new scope runs on, and the checks around the session landing a completed run's spec folder.
 
     spec_branch.py create <issue>                         # branch <issue>-spec from origin's default branch
-    spec_branch.py check new|rescope <run id> <folder>    # before the session commits and pushes the folder
-    spec_branch.py open-pr <run id> <folder>              # a new scope, once pushed: a draft PR into the default branch
-    spec_branch.py discard <issue>                        # a new scope that did not land: its worktree and branch
+    spec_branch.py check <run id>       # before the session commits and pushes the run's spec folder
+    spec_branch.py open-pr <run id>     # a new scope, once pushed: a draft PR into the default branch
+    spec_branch.py discard <issue>      # a new scope that did not land: its worktree and branch
 
 The session runs `git commit` and `git push` itself, never this script, so the commit gate sees every commit.
-`check` and `open-pr` run from the run's project, with the folder relative to it, and refuse a run that has not
-completed: a run that failed or was rejected commits, pushes and opens nothing. Each prints one JSON report.
+`check` and `open-pr` run from the run's project and take the folder and kind the run was started with. They
+refuse a run that has not completed: a run that failed or was rejected commits, pushes and opens nothing. Each prints one JSON report.
 """
 import argparse
 import json
@@ -75,13 +75,14 @@ def create(issue):
     return {"branch": branch, "worktree": str(worktree), "base": f"origin/{base}"}
 
 
-def _completed_run_issue(run_id):
+def _completed_run(run_id):
     require_run(run_id)
+    inputs = run_inputs(run_id)
     status = run_state(run_id)["status"]
     if status != "completed":
         sys.exit(f"run {run_id} is {status}: only a completed run lands its spec, so nothing is to be committed, "
                  "pushed or opened. Next step: resume the run until it completes; a rejected run lands nothing.")
-    return run_inputs(run_id)["issue"]
+    return inputs
 
 
 def _current_branch():
@@ -103,10 +104,11 @@ def _from_checkout(folder):
     return Path(_run("git", "rev-parse", "--show-prefix"), folder).as_posix()
 
 
-def check(kind, run_id, folder):
-    issue = _completed_run_issue(run_id)
+def check(run_id):
+    run = _completed_run(run_id)
+    issue, kind = run["issue"], run["kind"]
     branch = _on_spec_branch(issue) if kind == "new" else _current_branch()
-    shown = _from_checkout(folder)
+    shown = _from_checkout(run["spec_dir"])
     # The session commits what is staged, so anything else staged would land with the spec.
     others = [path for path in _run("git", "diff", "--cached", "--name-only").splitlines()
               if not path.startswith(f"{shown}/")]
@@ -117,10 +119,13 @@ def check(kind, run_id, folder):
     return {"folder": shown, "branch": branch, "message": f"docs(#{issue}): {verb} {shown}"}
 
 
-def open_pr(run_id, folder):
-    issue = _completed_run_issue(run_id)
+def open_pr(run_id):
+    run = _completed_run(run_id)
+    issue = run["issue"]
+    if run["kind"] != "new":
+        sys.exit(f"run {run_id} is a rescope: it lands on the branch it runs on, in that branch's PR, and opens none.")
     branch = _on_spec_branch(issue)
-    shown = _from_checkout(folder)
+    shown = _from_checkout(run["spec_dir"])
     head = _run("git", "rev-parse", "HEAD")
     pushed = _run("git", "ls-remote", "--heads", "origin", branch).split("\t")[0]
     if pushed != head:
@@ -128,7 +133,7 @@ def open_pr(run_id, folder):
                  "Next step: commit the folder and push the branch, then open the PR.")
     origin = _origin()
     pr = _run("gh", "pr", "create", "--repo", origin, "--draft", "--base", _default_branch(origin), "--head", branch,
-              "--title", f"docs(#{issue}): spec {Path(folder).name}",
+              "--title", f"docs(#{issue}): spec {Path(run["spec_dir"]).name}",
               "--body", f"Part of #{issue}\n\nSpec folder: `{shown}`\n")
     return {"folder": shown, "branch": branch, "pr": pr}
 
@@ -158,16 +163,11 @@ def main():
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("create", "discard"):
         sub.add_parser(action).add_argument("issue")
-    c = sub.add_parser("check")
-    c.add_argument("kind", choices=("new", "rescope"))
-    for p in (c, sub.add_parser("open-pr")):
-        p.add_argument("run_id")
-        p.add_argument("folder")
+    for action in ("check", "open-pr"):
+        sub.add_parser(action).add_argument("run_id")
     args = parser.parse_args()
-    if args.action == "check":
-        out = check(args.kind, args.run_id, args.folder)
-    elif args.action == "open-pr":
-        out = open_pr(args.run_id, args.folder)
+    if args.action in ("check", "open-pr"):
+        out = {"check": check, "open-pr": open_pr}[args.action](args.run_id)
     else:
         out = {"create": create, "discard": discard}[args.action](args.issue)
     print(json.dumps(out))

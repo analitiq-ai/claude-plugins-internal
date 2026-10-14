@@ -84,7 +84,11 @@ def run_state(run_id):
 
 
 def run_inputs(run_id):
-    return json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    inputs = json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    if not (inputs.get("spec_dir") and inputs.get("kind")):
+        sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
+                 "which folder it is for. Next step: start the scope again with /alq-plan:issue-spec.")
+    return inputs
 
 
 def _step_env(inputs):
@@ -114,11 +118,7 @@ def start(kind, spec_file, issue, spec_dir):
 
 def resume(run_id, verdict):
     require_run(run_id)
-    inputs = run_inputs(run_id)
-    if not (inputs.get("spec_dir") and inputs.get("kind")):
-        sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
-                 "which folder it is for. Next step: start the scope again with /alq-plan:issue-spec.")
-    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(inputs))
+    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(run_inputs(run_id)))
     state = run_state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
         sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")

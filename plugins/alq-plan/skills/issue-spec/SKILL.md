@@ -16,17 +16,17 @@ in this session, and passes the user's verdicts on resume. Never reimplement a w
 
 `$ARGUMENTS` is one of:
 
-- **`#<issue> [<dir>]`** - scope a new bug or feature. `ISSUE` is the issue number. Before anything else, run
-  `python3 BRANCH create <ISSUE>` from the checkout this session is in. It creates branch `<ISSUE>-spec` from the
-  default branch as origin has it, in worktree `.claude/worktrees/<ISSUE>-spec` of the repo, and prints `branch`,
-  `worktree` and `base` as JSON. It refuses a branch `<ISSUE>-spec` that exists locally or on origin: show the user
-  its message and stop. `CHECKOUT` is its `worktree`. `PROJECT` is `<dir>`, relative to `CHECKOUT`, or `CHECKOUT`
-  without one. Write the issue to `SPEC_FILE`:
+- **`#<issue> [<dir>]`** - scope a new bug or feature. `ISSUE` is the issue number. Write the issue to `SPEC_FILE`,
+  from the checkout this session is in:
   `repo=$(git remote get-url origin) && gh issue view <ISSUE> --repo "$repo" --json url,title,body --jq '"\(.url)\n# \(.title)\n\n\(.body)"' > <SPEC_FILE>`.
   `SPEC_DIR` is `specs/<ISSUE>-<short name>`, picked once, here, and never changed for the run: the workflow's
   `specify` step writes the spec there, in `PROJECT`. `<short name>` is 1 to 4 words of the issue title, lowercased,
   each a run of `[a-z0-9]`, joined by single hyphens: the words that name the change. A title with no such word: stop
-  before writing anything, and tell the user to retitle the issue.
+  before writing anything, and tell the user to retitle the issue. Then, with nothing written yet, run
+  `python3 BRANCH create <ISSUE>` from the same checkout. It creates branch `<ISSUE>-spec` from the default branch as
+  origin has it, in worktree `.claude/worktrees/<ISSUE>-spec` of the repo, and prints `branch`, `worktree` and
+  `base` as JSON. It refuses a branch `<ISSUE>-spec` that exists locally or on origin: show the user its message and
+  stop. `CHECKOUT` is its `worktree`. `PROJECT` is `<dir>`, relative to `CHECKOUT`, or `CHECKOUT` without one.
 - **`rescope <spec folder> #<issue>`** - re-scope that spec folder in place; both are required. `ISSUE` is as
   above. `CHECKOUT` is the worktree this session runs in, a story's or the spec's: the spec edit lands on its branch,
   in the PR it is run from. A rescope creates no branch, worktree or PR. The folder is relative to `CHECKOUT`: for
@@ -82,15 +82,14 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    spec.md/plan.md only the findings the user accepts.
 7. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
    (or `reject`). Expect `completed`.
-8. When the report says `completed`, from `PROJECT`, with `<spec folder>` relative to `PROJECT` (on a new scope,
-   the `feature_directory` of `.specify/feature.json`; on a rescope, `SPEC_DIR`):
-   1. `python3 BRANCH check new <run_id> <spec folder>` on a new scope, `python3 BRANCH check rescope <run_id>
-      <spec folder>` on a rescope. It refuses a run that has not completed, a new scope off its spec branch, and
+8. When the report says `completed`, from `PROJECT`. `BRANCH` takes the folder and the kind of scope from the run
+   itself:
+   1. `python3 BRANCH check <run_id>`. It refuses a run that has not completed, a new scope off its spec branch, and
       anything staged outside the folder, and prints `folder` (relative to `CHECKOUT`), `branch` and `message` as
       JSON. A run that is rejected or fails commits nothing, pushes nothing and opens nothing.
-   2. Run these yourself, in this order, so the commit gate sees the commit: `git add -- <spec folder>`,
+   2. Run these yourself, in this order, so the commit gate sees the commit: `git add -- <SPEC_DIR>`,
       `git commit -m "<message>"` with the check's `message`, and `git push --set-upstream origin HEAD`.
-   3. On a new scope, `python3 BRANCH open-pr <run_id> <spec folder>`. It refuses a branch origin does not have
+   3. On a new scope, `python3 BRANCH open-pr <run_id>`. It refuses a branch origin does not have
       at `HEAD`, opens a draft PR into the default branch whose body starts `Part of #<ISSUE>`, and prints `pr`.
       Launch no review. End with four lines and nothing after them: `Spec folder: <folder>`, `Branch: <branch>`,
       `PR: <pr>` and `Review: spec: null`, the spec a review started by hand takes.
