@@ -20,6 +20,7 @@ Superseded by the Clarifications: the `cleanup` label decides, not the diff.
 - Q: Does this feature change `/alq-post-merge` (citation removal, step 7)? → A: No. The work is alq-review only.
 - Q: Does the label also skip alq-review's commit-time checks (claim-check, shim-check)? → A: Yes. Commits on a branch whose PR carries `cleanup` skip both.
 - Q: Does this feature refuse an agent's command that adds the label? → A: No. The user adds a separate hook later that refuses a fixed set of `gh` forms; this feature refuses no label command.
+- Q: A branch can have open PRs to more than one target. Whose label decides its commits? → A: The PR `pr_target` already resolves for the branch (the first open PR gh lists). No other multi-PR handling.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -80,7 +81,7 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 - Removing the `cleanup` label brings the gate back.
 - A round in flight, a lock or `--admin` without `override-merge` still refuses a cleanup PR (FR-013).
 - A comment carrying the internal-review attestation marker on a cleanup PR is refused as on any PR without a clean round: the org pr-gate takes it for the review (FR-011).
-- A commit on a branch with no open PR, or whose open PR has no `cleanup` label, is checked by claim-check and
+- A commit on a branch with no open PR, or whose open PR (the one `pr_target` resolves) has no `cleanup` label, is checked by claim-check and
   shim-check as today.
 - A push after the label was added leaves the PR a cleanup PR: the exemption is bound to the PR, not to a
   head commit.
@@ -113,7 +114,7 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   adds does.
 - **FR-011**: Only the `cleanup` label and the version-only release exempt a PR from review; no other path
   (agent-posted comment, check run from another app) releases the hold.
-- **FR-012**: A `git commit` on a branch that has an open PR carrying the `cleanup` label MUST NOT be held by
+- **FR-012**: A `git commit` on a branch whose open PR, the one `pr_target` resolves, carries the `cleanup` label MUST NOT be held by
   claim-check or shim-check. When the PR or its label cannot be read, both checks apply as today.
 - **FR-013**: The label releases only the review holds FR-003, FR-004, FR-008 and FR-012 name. A cleanup PR is
   still refused while an internal round is in flight or its branch is locked (a lock is released only by

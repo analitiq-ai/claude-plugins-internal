@@ -1,6 +1,6 @@
 # Research: A PR labelled cleanup gets no alq-review gating
 
-Every decision below was settled by reading the code at `aecf2a3`; none needed the user.
+Every decision below was settled by reading the code at `aecf2a3`, except which PR decides a branch's label (spec Clarifications).
 
 ## R1: One fact, one reader, one decider
 
@@ -49,7 +49,7 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 ## R4: Commit checks (claim-check, shim-check)
 
 - **Decision**: in `gate.on_bash`, a `commit` action reads the checkout's branch's open PR and its labels in one
-  call, `gate.cleanup_of(slug, None, branch)` over `github.branch_labels` (`gh pr list --head <branch> --state open
+  call, `gate.cleanup_of(slug, None, branch)` over `github.branch_labels` (`gh pr list --repo <slug> --head <branch> --state open
   --json number,labels`), before `claimgate.on_commit` / `shimgate.on_commit`. A labelled fact skips both; not
   labelled or unread runs both as today, with no note (FR-012).
 - **Rationale**: Clarification 5. The check sits in the one place both are called (`gate.py:361-362`), so neither
