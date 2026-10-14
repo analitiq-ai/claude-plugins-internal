@@ -11,7 +11,7 @@ Re-reviews are requested by posting a `@codex review` comment **after** all fixe
 
 Codex (`chatgpt-codex-connector[bot]`) answers ~10–15 min later. Its verdict is not yours to read: the org-wide pr-gate reads it and posts the `codex-review` check run, from the `analitiq-pr-gate` App, on the head. Act on that run's state and title as the poller prints them under *Gate check runs*; the title gives the reason for the state.
 
-**A 👍 on the PR description can be Codex's verdict.** When Codex reviews a PR unasked (opened ready for review, or marked ready) and finds nothing, its only answer is a 👍 on the description. The gate counts it when it can tie it to the head, and otherwise says why in the `codex-review` title. A reaction triggers no workflow, so while the poller waits for `codex-review` to catch up with Codex's answer (see *settled* below), it dispatches one gate sweep.
+**A 👍 on the PR description can be Codex's verdict.** When Codex reviews a PR unasked (opened ready for review, or marked ready) and finds nothing, it leaves a 👍 on the description. The gate counts it when it can tie it to the head, and otherwise says why in the `codex-review` title. A reaction triggers no workflow, so while the poller waits for `codex-review` to catch up with Codex's answer (see *settled* below), it dispatches one gate sweep.
 
 **Codex is not the only reviewer.** CodeRabbit, DeepSource and humans leave inline threads too, and an unresolved thread blocks the PR whoever left it. CodeRabbit also puts findings it cannot anchor to the diff ("Outside diff range comments") in its review body only; they have no thread to resolve and still need triage.
 
@@ -32,7 +32,7 @@ Paths below are relative to this skill directory.
 - Defaults: polls every 60s for up to 15 min. Override with `--interval <seconds>` / `--minutes <n>`.
 - `--ignore-check <name>` (repeatable) leaves a check out for this run only — for a check red for reasons outside the PR and outside the branch's required set. It is announced, and every report lists the ignored checks that are not passing. GitHub then reports `UNSTABLE`, which counts as clean when only ignored checks are not passing; an ignored *required* check still leaves the PR `BLOCKED`.
 
-The poller waits until the round has **settled** — Codex answered since the trigger; no check is still running, the gate runs and ignored checks aside; with nothing to triage, an in-progress `codex-review` is not older than Codex's answer (for 20 min after that answer); and GitHub has computed mergeability — then prints one report: `mergeStateStatus`, the gate check runs with their titles verbatim (a `WAIVED:` shows here), every failing check, and every unresolved finding with gist and URL, plus severity for Codex, CodeRabbit and DeepSource. Threads opened by the PR's own author are left out. A draft settles at once, because Codex does not review drafts.
+The poller waits until the round has **settled** — Codex is not reviewing: its status card's Code Review row, dated after the trigger, is waited on while Running, answers when Completed for the head, and settles the round with a re-request when Completed for an earlier commit; with no such row the round waits for one, unless Codex posted a reply not on `scripts/codexstate.py`'s list of what Codex is known to post, which settles it (beside a row such a reply is only a warning); a `WAIVED:` `codex-review` run on the head releases only a round with no such row, never a Running or earlier-commit row; a status card the poller cannot read ends the poll with exit 1; no check is still running, the gate runs and ignored checks aside; with nothing to triage, an in-progress `codex-review` is not older than Codex's answer (for 20 min after that answer); and GitHub has computed mergeability — then prints one report: `mergeStateStatus`, the gate check runs with their titles verbatim (a `WAIVED:` shows here), every failing check, and every unresolved finding with gist and URL, plus severity for Codex, CodeRabbit and DeepSource. Threads opened by the PR's own author are left out. A draft settles at once, because Codex does not review drafts.
 
 Exit codes drive the next step:
 
@@ -40,8 +40,9 @@ Exit codes drive the next step:
 |------|---------|---------|
 | `0`  | **Clean** — GitHub reports `mergeStateStatus=CLEAN` and nothing is left to triage | Run `deepsource-pr-gate.sh`; if it passes, proceed to merge/next step. |
 | `2`  | **Findings** — failing checks and/or unresolved findings printed | Go to *Triaging* below. |
-| `4`  | **Blocked** — nothing to triage, but GitHub does not report CLEAN | Act on the gate check runs and notes printed: re-request when `codex-review` says to, attest the internal review (see *Attesting the internal review*), approve, update the branch, leave draft. |
+| `4`  | **Blocked** — nothing to triage, but GitHub does not report CLEAN, or Codex reviewed an earlier commit, or Codex replied with something the poller does not know; the `BLOCKED:` line names which | Act on the gate check runs and notes printed: re-request when `codex-review` says to, attest the internal review (see *Attesting the internal review*), approve, update the branch, leave draft. |
 | `3`  | **Timeout** — not settled in time; the report says what it was still waiting on | Re-run the poller, or act on what it names. |
+| `1`  | **Error** — a usage error, or the poller could not read the PR (`gh` failed, a Codex status card it cannot read, …); stderr says why | Act on what stderr names; for a format change, report it on the plugin's repo and read the PR by hand. |
 
 Exit `2` fires on *any* unresolved finding or failing check, including ones left before this review round — a stale finding still blocks the PR.
 
