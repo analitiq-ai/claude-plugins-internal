@@ -7,7 +7,8 @@ rescope needs the issue's one folder, holding a spec.md. `recorded` grades the f
 one it is given.
 
 Usage: spec_folder.py check <folder> <issue> new|rescope | recorded <folder>. Run in the project, in a git checkout.
-Prints one problem per line and exits 1 when there are any, 2 when the check cannot run.
+Prints one problem per line and exits 1 when there are any, 2 when the check cannot run. A folder that passes `check`
+prints `{"starts_at": "premise" | "grill"}`, where the run starts, for the workflow's steps to branch on.
 """
 from __future__ import annotations
 
@@ -16,6 +17,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+import no_spec
 
 FORM = "specs/<issue>-<short-name>"
 _FOLDER = re.compile(r"specs/(?P<name>[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*)")
@@ -62,6 +65,12 @@ def problems(folder: str, issue: str, kind: str, existing: dict[str, bool], proj
     return []
 
 
+def starts_at(kind: str, spec: str | None) -> str:
+    """Where a run whose folder passed the check starts; `spec` is the folder's spec.md on a rescope. A no-spec
+    spec.md has nothing to grill, so its rescope is scoped from the premise, as a new scope is."""
+    return "grill" if kind == "rescope" and not no_spec.is_no_spec(spec) else "premise"
+
+
 def recorded_problems(folder: str, recorded: str | None) -> list[str]:
     """`recorded` is the folder `.specify/feature.json` names, None when it names none."""
     if recorded == folder:
@@ -98,6 +107,9 @@ def main() -> None:
     try:
         if len(args) == 4 and args[0] == "check":
             found = problems(args[1], args[2], args[3], _existing(), _project())
+            if not found:
+                spec = Path(args[1], "spec.md").read_text() if args[3] == "rescope" else None
+                print(json.dumps({"starts_at": starts_at(args[3], spec)}))
         elif len(args) == 2 and args[0] == "recorded":
             found = recorded_problems(args[1], _recorded())
         else:

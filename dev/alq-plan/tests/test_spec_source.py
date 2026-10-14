@@ -6,6 +6,7 @@ from pathlib import Path
 from paths import PLUGIN
 
 import premise_report
+import yaml  # Spec Kit's own dependency
 
 ISSUE_SPEC = PLUGIN / "skills" / "issue-spec" / "SKILL.md"
 WORKFLOW = PLUGIN / "speckit" / "workflows" / "alq-spec" / "workflow.yml"
@@ -34,18 +35,43 @@ class CommandSubstitution(unittest.TestCase):
 
 class IssueSpecSkill(unittest.TestCase):
     """What /alq-plan:issue-spec takes, how it starts the driver, and what it ends with."""
-    FORMS = ("#<issue> [<dir>]", "rescope <spec folder> #<issue>")
+    FORMS = ("#<issue> [<dir>]", "rescope <spec folder> #<issue>", 'untracked "<what changes>" [<dir>]')
     ORIGIN = 'repo=$(git remote get-url origin) && gh issue view <ISSUE> --repo "$repo" '
 
-    def test_takes_its_two_forms_and_refuses_anything_else_naming_them(self):
+    def test_takes_its_three_forms_and_refuses_anything_else_naming_them(self):
         text = ISSUE_SPEC.read_text()
         for form in self.FORMS:
             with self.subTest(form=form):
                 self.assertIn(f"- **`{form}`**", text)
-        hint = re.search(r'^argument-hint: "(.*)"$', text, re.M).group(1)
-        self.assertEqual(hint, " | ".join(self.FORMS))
+        front = yaml.safe_load(text.split("---\n")[1])
+        self.assertEqual(front["argument-hint"], " | ".join(self.FORMS))
         said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("Anything else")]
-        self.assertTrue([s for s in said if "the two forms" in s and "stop" in s], said)
+        self.assertTrue([s for s in said if "the three forms" in s and "stop" in s], said)
+
+    def untracked(self):
+        form = re.search(r"^- \*\*`untracked .*?(?=^- \*\*|^$)", ISSUE_SPEC.read_text(), re.M | re.S).group(0)
+        return re.sub(r"\s+", " ", form)
+
+    def test_untracked_refuses_an_empty_change_before_any_issue_is_created(self):
+        self.assertIn("If `<what changes>` is empty or only spaces, tell the user so and stop: no issue is created.",
+                      self.untracked())
+
+    def test_untracked_creates_the_issue_from_a_file_only_once_the_user_confirms_its_title_body_and_type(self):
+        """The skill writes to GitHub for the user."""
+        form = self.untracked()
+        steps = ["`python3 NEW_ISSUE types`", "Ask the user to confirm the title, body and type",
+                 "`# <title>`, a blank line and the body to `ISSUE_FILE`",
+                 "`python3 NEW_ISSUE create <TYPE> <ISSUE_FILE>`"]
+        positions = [form.find(step) for step in steps]
+        self.assertNotIn(-1, positions, list(zip(steps, positions)))
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("create nothing until they do", form)
+
+    def test_untracked_starts_no_run_when_the_create_fails_and_names_the_issue_in_every_later_stop(self):
+        form = self.untracked()
+        self.assertIn("If it exits non-zero, show its message and stop: no run is started.", form)
+        self.assertIn("go on as `#<issue> [<dir>]` with `ISSUE` the new issue", form)
+        self.assertIn("every stop from here on names the issue created, by its `url`", form)
 
     def test_starts_the_driver_with_the_kind_of_run_the_spec_file_the_issue_and_the_folder(self):
         """Every run takes its folder; the subcommand, not whether a folder was given, says which kind it is."""
@@ -88,10 +114,15 @@ class IssueSpecSkill(unittest.TestCase):
                       "command, then append", rescope)
         self.assertLess(rescope.index("`gh issue view`"), rescope.index("`Open decision: …`"))
 
-    def test_no_spec_needed_tells_the_user_to_pass_a_null_spec_at_review(self):
+    def test_no_spec_needed_says_the_folder_was_written_and_tells_the_user_to_pass_a_null_spec_at_review(self):
         """The one value review will take for this PR; nothing else tells the user."""
         said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After `no spec needed`")]
-        self.assertTrue([s for s in said if "tell the user to pass `spec: null` when the work is reviewed" in s], said)
+        self.assertTrue([s for s in said if "the workflow has written `SPEC_DIR` with a spec.md that says no spec is "
+                         "needed" in s and "tell the user to pass `spec: null` when the work is reviewed" in s], said)
+
+    def test_a_rescope_of_a_no_spec_folder_is_expected_to_pause_at_the_premise(self):
+        self.assertIn("on a rescope of a spec, `paused` at `grill`, and the next step is 4; on a rescope of a folder "
+                      "whose spec.md says no spec is needed, `paused` at `premise`.", squashed(ISSUE_SPEC))
 
     def test_every_issue_view_names_the_repo_by_origins_url(self):
         """The same repo the workflow closes a not-worth-doing issue in. origin is read before gh runs: a failed read
@@ -115,6 +146,13 @@ class IssueSpecSkill(unittest.TestCase):
                 self.assertIn(f"`{outcome}`", text)
         self.assertIn("Never ask for approve or reject at this step.", text)
         self.assertIn("Ask the user only what the issue and the code cannot answer.", text)
+
+    def test_a_no_spec_folder_that_cannot_be_written_is_a_stop_that_resumes(self):
+        stops = re.sub(r"\s+", " ", ISSUE_SPEC.read_text().split("## Stops", 1)[1])
+        self.assertIn("- `step: write-no-spec`, with a `stderr` line that names a Next step: show the user the "
+                      "message. When it names a path to clear or make writable, the user does that, not you; resume "
+                      "only once they say it is done. When it names `premise_report.py check`, complete the report as "
+                      "it says.", stops)
 
     def test_says_a_failed_run_leaves_nothing_behind(self):
         text = squashed(ISSUE_SPEC)
