@@ -1,1 +1,19 @@
 version = 1
+
+test_patterns = ["dev/*/tests/**"]
+
+# Vendored Spec Kit and adrkit scripts, overwritten on every upgrade; findings there are unactionable.
+exclude_patterns = ["**/.specify/**"]
+
+# A block's presence enables it; DeepSource rejects a config with no [[analyzers]] block.
+[[analyzers]]
+name = "python"
+
+[analyzers.meta]
+runtime_version = "3.x.x"
+
+[[analyzers]]
+name = "shell"
+
+[[analyzers]]
+name = "secrets"
