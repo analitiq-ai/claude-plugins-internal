@@ -90,8 +90,8 @@ steps:
               [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
               gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
 
-  # A resume re-runs the step the run stopped in, nested or not, then goes on from there: no step before it runs
-  # again, the ones in the same block included.
+  # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
+  # top-level and skips itself on a stop pick, instead of all of them sharing one block.
 
   # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
   - id: scope
