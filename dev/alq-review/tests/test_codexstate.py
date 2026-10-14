@@ -84,7 +84,7 @@ class Card(unittest.TestCase):
 
 
 class Unreadable(unittest.TestCase):
-    """FR-007: each way a card cannot be read is its own reason, and no state is reported from it."""
+    """Each way a card cannot be read is its own reason, and no state is reported from it."""
 
     ROW = next(line for line in sample("card-one-row-completed.md").splitlines() if line.startswith("| 📝"))
 
@@ -128,7 +128,7 @@ class Unreadable(unittest.TestCase):
 
 
 class States(unittest.TestCase):
-    """R5: the order the reader decides in."""
+    """The state the reader returns for a card row and Codex's replies, and the items it lists."""
 
     def state(self, *items):
         return codexstate.state(list(items), SINCE, HEAD)
