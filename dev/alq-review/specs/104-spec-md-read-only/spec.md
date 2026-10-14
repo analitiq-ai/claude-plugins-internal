@@ -155,8 +155,8 @@ the next round before and after the story branch is rebased.
    reviewed commit, **When** the user types `rebase <ref>`, **Then** the lock stays and the reply says the spec PR
    has not reached the default branch: land it first, or type `unlock <ref>` if the spec stands.
 4. **Given** a `RESHAPE_SPEC` lock on a story PR whose base is not the default branch (a stacked story PR), **When**
-   the user types `rebase <ref>`, **Then** the lock stays, and the reply names the next step: land the parent PR
-   first.
+   the user types `rebase <ref>`, **Then** the lock stays, and the reply names the next step: merge the parent PR,
+   retarget this PR to the default branch, then type `rebase <ref>` again.
 5. **Given** a `RESHAPE_SPEC` lock and a default branch where the bound `spec.md` is missing or empty (a rescope
    moved or deleted its folder), **When** the user types `rebase <ref>`, **Then** the lock stays, and the reply says the
    binding never changes: close this PR and restart the story on the new folder.
@@ -272,7 +272,7 @@ two closing lines.
 - **FR-009**: A `RESHAPE_SPEC` lock MUST stay while the rescope runs, and its refusal MUST name the rescope on the spec
   branch and then `rebase <ref>`, or `unlock <ref>` if the spec stands. `rebase <ref>` MUST check against the repo's
   default branch, never the PR's base, and keep the lock, with a reply naming the next step, when: the PR's base is not
-  the default branch (a stacked story PR: land the parent PR first; a branch with no open PR has no base to be stacked
+  the default branch (a stacked story PR: merge the parent PR and retarget this one to the default branch; a branch with no open PR has no base to be stacked
   on and passes); the bound `spec.md` is missing or empty on the default branch (the binding never changes: close this
   PR and restart the story on the new folder); it is the same as at the locked round's reviewed commit (land the spec PR
   first, or `unlock <ref>` if the spec stands); or git or gh cannot answer a check (their words). The gate's one git

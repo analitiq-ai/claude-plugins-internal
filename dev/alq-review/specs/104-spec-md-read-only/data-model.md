@@ -46,7 +46,7 @@ check), keeps the lock and records nothing:
 | `bound` | `state["spec"]` is a folder | no spec: close the PR and restart on a PR bound to a spec |
 | `checkout` | the locked round's checkout exists | the checkout is missing |
 | `default` | GitHub gives the default branch | gh's words |
-| `base` | the branch has no open PR, or its PR's base is the default branch | gh's words; a stacked story PR: land the parent PR first |
+| `base` | the branch has no open PR, or its PR's base is the default branch | gh's words; a stacked story PR: merge the parent PR, retarget this PR to `<default>`, retry |
 | `fetch` | `origin/<default>` is fetched; `<onto>` is its sha | git's words |
 | `onto spec.md` | `<spec>/spec.md` at `<onto>` is read and present | git's words; missing or empty: the binding never changes, close this PR and restart on the new folder |
 | `head spec.md` | `<spec>/spec.md` at the locked round's `head_sha` is read | git's words |
