@@ -12,7 +12,7 @@ blastRadius: component
 relatesTo: ["0003", "0004", "0009", "0018"]
 affects:
   - type: path
-    pattern: "plugins/alq-review/scripts/{github,policy,gate,pre_merge_gate}.py"
+    pattern: "plugins/alq-review/scripts/{github,policy,gate,pre_merge_gate,shell}.py"
   - type: path
     pattern: "plugins/alq-review/skills/alq-github-pr-review/**"
   - type: path

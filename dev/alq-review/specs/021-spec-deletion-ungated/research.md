@@ -9,8 +9,10 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
   `labels` field; it raises `RuntimeError` when the field is not a list of `{name: str}`. `pr_labels(slug, pr)` and
   `branch_labels(slug, branch)` read through it, and `pre_merge_gate` calls it on the `labels` of the `gh pr view` it
   already makes. `github.Cleanup` is the one fact, labelled, not labelled or unread with why; it cannot be labelled
-  and unread at once. `github.read_cleanup(labels_of)` alone builds it: unread when `labels_of` raises, else
-  labelled when there is a PR and each carries the label. `Cleanup.refusal()` is the one unread refusal. The poller
+  and unread at once. `github.read_cleanup(labels_of)` alone builds it: unread when `labels_of` raises
+  `RuntimeError` (any other error propagates), else labelled when `is_cleanup` holds for the PR's labels. The
+  readers raise `RuntimeError` when gh fails, times out or gives no JSON. A branch is merged through one PR (git
+  workflow), so `branch_labels` reads the branch's open PR and raises when gh gives more than one. `Cleanup.refusal()` is the one unread refusal. The poller
   calls `python3 scripts/github.py cleanup <repo> <pr>`, whose `main` goes through `read_cleanup` (R7).
 - **Rationale**: it mirrors the release exemption: a pure `version_only_release(runs)` beside a reader
   `released(slug, commit)`. Every component decides through `read_cleanup`, so none can read the label or render
@@ -25,8 +27,8 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 - **Decision**: `policy.mark_ready` takes one more fact, `cleanup: github.Cleanup`, and allows when it is labelled,
   after `_obstacle` and beside `released`. When the label is unread and no clean round stands at the head, the
   refusal is `Cleanup.refusal()` alone: it names the unread label and says to retry, not that a review is missing
-  (FR-007). `gate.cleanup_of(repo, pr, branch)` reads the PR named, else the branch's open PRs in one
-  `branch_labels` call. A comment carrying the attestation marker is its own action kind, `attest`, decided by
+  (FR-007). `gate.cleanup_of(repo, pr, branch)` reads the PR named, else the branch's open PR through
+  `branch_labels`. A comment carrying the attestation marker is its own action kind, `attest`, decided by
   `policy.attest`: a clean round or a release, never the label, since the org pr-gate takes the attestation for the
   review (FR-011).
 - **Rationale**: `released` is the pattern, and its test pins that a release still waits for a round in flight.
@@ -35,20 +37,21 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 ## R3: Merging and readying (pre_merge_gate)
 
-- **Decision**: `fetch` asks for `labels` too. `unmet` returns None when `is_cleanup` says so, after the `--admin`
-  check and the head check and beside `attested` / `released`. `--admin` still needs `override-merge`. A `labels`
-  field that is missing or not a list of `{name}` is unread: the refusal is `Cleanup.refusal()` alone, as in R2.
+- **Decision**: `fetch` asks for `labels` too; `pre_merge_gate` builds the fact with `read_cleanup` over
+  `label_names` of that field. `unmet` returns None when the fact is labelled, after the `--admin` check and the
+  head check and beside `attested` / `released`. `--admin` still needs `override-merge`. A `labels` field that is
+  missing or not a list of `{name}` is unread: when neither an attestation nor a release lets the PR through, the
+  refusal is `Cleanup.refusal()` alone, as in R2.
 - **Rationale**: FR-003/FR-004. `--admin` steps around GitHub's rules, not alq-review's (`admin_needs_override`);
   the label waives only the internal review.
 - **Existing tools**: `unmet`'s `attested(...) or released(...)` line (`pre_merge_gate.py:395`) takes one more term.
 
 ## R4: Commit checks (claim-check, shim-check)
 
-- **Decision**: in `gate.on_bash`, a `commit` action reads the checkout's branch's open PRs and their labels in one
-  call, `github.branch_labels(slug, branch)` (`gh pr list --head <branch> --state open --json number,labels`),
-  before `claimgate.on_commit` / `shimgate.on_commit`; `is_cleanup` on an open PR's labels true (`LABELLED`) skips
-  both. `NOT_LABELLED` or unread runs both as today,
-  with no note (FR-012).
+- **Decision**: in `gate.on_bash`, a `commit` action reads the checkout's branch's open PR and its labels in one
+  call, `gate.cleanup_of(slug, None, branch)` over `github.branch_labels` (`gh pr list --head <branch> --state open
+  --json number,labels`), before `claimgate.on_commit` / `shimgate.on_commit`. A labelled fact skips both; not
+  labelled or unread runs both as today, with no note (FR-012).
 - **Rationale**: Clarification 5. The check sits in the one place both are called (`gate.py:361-362`), so neither
   module learns about labels.
 - **Existing tools**: `github.pr_target` + `github.pr_labels` was rejected: two sequential gh calls, up to 40 s of
@@ -74,8 +77,8 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
   shortcut, no Codex, no gate lag), and ends with exit `5` CLEANUP when no non-ignored check fails, or exit `4`
   BLOCKED naming the failing checks. It hands nothing to the gate's inbox, reports no thread as a finding and never
   prints `@codex review`. A reader failure prints `WARNING: the cleanup label of <repo>#<pr> could not be read
-  (<why>); polling it as unlabelled.` and polls as today (FR-007). Any non-zero exit of the reader is a failure;
-  on exit 0 it prints only `cleanup` or `gated` (`test_github`).
+  (<why>); polling it as unlabelled.` and polls as today (FR-007). Only exit 0 with exactly `cleanup` or exactly
+  `gated` is a label read; every other exit or output is unread.
 - **Rationale**: FR-008, SC-002. A hand-over opens a github round in the ledger, which is alq-review gating. A new
   exit code lets the skill route by code, not by the agent reading a line (P1); `0` already means "run
   `deepsource-pr-gate.sh`". CI still has to be green (spec Assumptions), so failing checks still block.

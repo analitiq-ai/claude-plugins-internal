@@ -8,11 +8,13 @@ No ledger field and no new state file. Shapes below are what the code passes; Gi
 
 | Value | Meaning | From |
 |---|---|---|
-| `Cleanup(labelled=True)` | the PR carries `cleanup` | there is a PR and `is_cleanup` is true for each |
+| `Cleanup(labelled=True)` | the PR carries `cleanup` | `is_cleanup` true for the PR's labels |
 | `Cleanup()` | it does not, or the branch has no open PR | `is_cleanup` false; no open PR |
-| `Cleanup(unread=why)` | GitHub did not answer; gated as not labelled, and the ready/merge refusal is `refusal()` alone | `RuntimeError` from a reader; a `labels` field `label_names` rejects |
+| `Cleanup(unread=why)` | GitHub did not answer; gated as not labelled, and the ready/merge refusal is `refusal()` alone when nothing else lets the PR through | `RuntimeError` from a reader: gh failed, timed out or gave no JSON, `label_names` rejected the `labels` field, or gh gave a branch more than one open PR |
 
-Built only by `github.read_cleanup(labels_of)`; labelled and unread at once is refused at construction. Names come
+Built only by `github.read_cleanup(labels_of)`, which every consumer calls, the CLI's `main` included; it catches
+`RuntimeError` only, so any other error propagates. Labelled and unread at once is refused at construction.
+A branch is merged through one PR (git workflow), so `branch_labels` reads that one. Names come
 only from `github.label_names`; the name test is `github.is_cleanup` (R1). Never stored: read at each ready, merge,
 commit and poller run (spec Edge Cases).
 
