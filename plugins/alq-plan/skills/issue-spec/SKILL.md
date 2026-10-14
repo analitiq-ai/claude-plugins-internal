@@ -69,10 +69,11 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    of the three by name. Never ask for approve or reject at this step. Write the user's pick in `Pick:`, and
    for either of the two stop picks the question it rests on and the reason, as the form says.
 3. **Resume past premise.** `python3 DRIVE resume <run_id> "premise_verdict=<pick>"`. After `write the spec`,
-   expect `paused` at `grill`. After either stop pick, expect `completed`. After `not worth doing`, the workflow
-   has closed the issue as not planned with the reason: tell the user so and stop. After `no spec needed`, the
-   workflow has written `SPEC_DIR` with a spec.md that says no spec is needed, and nothing was posted: tell the
-   user to pass `spec: null` when the work is reviewed, and stop.
+   expect `paused` at `grill`. After either stop pick, expect `completed`, then run `python3 BRANCH discard <ISSUE>`
+   as **A new scope that does not land** says. After `not worth doing`, the workflow has closed the issue as not
+   planned with the reason: tell the user so and stop. After `no spec needed`, the workflow has written `SPEC_DIR`
+   with a spec.md that says no spec is needed, and nothing was posted: tell the user to pass `spec: null` when the
+   work is reviewed, and stop.
 4. **Grill.** Invoke `/speckit-grill-me` in this session, from `PROJECT`. On a rescope, give grill the open
    decision first: it is the first question. The user answers every question. Do not answer for the user.
 5. **Resume past grill.** Only after grill finished: `python3 DRIVE resume <run_id> grill_verdict=approve`.
@@ -83,24 +84,33 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    (or `reject`). Expect `completed`.
 8. When the report says `completed`, from `PROJECT`, with `<spec folder>` relative to `PROJECT` (on a new scope,
    the `feature_directory` of `.specify/feature.json`; on a rescope, `SPEC_DIR`):
-   - On a new scope, `python3 BRANCH land <run_id> <spec folder>`. It commits the spec folder, pushes the branch,
-     opens a draft PR into the default branch whose body starts `Part of #<ISSUE>`, and prints `folder` (relative
-     to `CHECKOUT`), `branch` and `pr` as JSON. Launch no review. End with four lines and nothing after them:
-     `Spec folder: <folder>`, `Branch: <branch>`, `PR: <pr>` and `Review: spec: null`, the spec a review started
-     by hand takes.
-   - On a rescope, `python3 BRANCH push <run_id> <spec folder>`. It commits the spec folder and pushes the branch
-     it runs on, and prints `folder` and `branch` as JSON. End with two lines and nothing after them:
-     `Spec folder: <folder>` and `Branch: <branch>`.
+   1. `python3 BRANCH check new <run_id> <spec folder>` on a new scope, `python3 BRANCH check rescope <run_id>
+      <spec folder>` on a rescope. It refuses a run that has not completed, a new scope off its spec branch, and
+      anything staged outside the folder, and prints `folder` (relative to `CHECKOUT`), `branch` and `message` as
+      JSON. A run that is rejected or fails commits nothing, pushes nothing and opens nothing.
+   2. Run these yourself, in this order, so the commit gate sees the commit: `git add -- <spec folder>`,
+      `git commit -m "<message>"` with the check's `message`, and `git push --set-upstream origin HEAD`.
+   3. On a new scope, `python3 BRANCH open-pr <run_id> <spec folder>`. It refuses a branch origin does not have
+      at `HEAD`, opens a draft PR into the default branch whose body starts `Part of #<ISSUE>`, and prints `pr`.
+      Launch no review. End with four lines and nothing after them: `Spec folder: <folder>`, `Branch: <branch>`,
+      `PR: <pr>` and `Review: spec: null`, the spec a review started by hand takes.
 
-   Name no other plugin's command. `BRANCH` refuses a run that has not completed. A run that is rejected or fails
-   commits nothing, pushes nothing and opens nothing.
+   On a rescope, end with two lines and nothing after them: `Spec folder: <folder>` and `Branch: <branch>`. Name no
+   other plugin's command.
+
+**A new scope that does not land.** Once `BRANCH create` has made the spec branch, a new scope that stops before
+step 8 lands it runs `python3 BRANCH discard <ISSUE>` from the checkout `BRANCH create` ran in, then stops: after
+either stop pick, a rejected run, a failed run the user does not resume, or any other stop. It removes the spec
+worktree, with what the run left in it, and the local branch, so that a later new scope of the issue is not told
+to rescope a spec that does not exist. It keeps a branch that holds a commit or is on origin: show the user its
+message.
 
 A verdict is the user's decision. Never pass `approve`, or a premise pick, without the user saying so in this session.
 
 ## Stops
 
 `DRIVE` exiting non-zero, or a report other than the one the step expects: show the user the message or the
-report (`stderr` included) and stop. The exceptions, each resumed with `python3 DRIVE resume <run_id>`:
+report (`stderr` included) and stop; on a new scope, first as A new scope that does not land says. The exceptions, each resumed with `python3 DRIVE resume <run_id>`:
 - `step: premise-report`, with `stderr` lines that each name a Next step: complete the report as they say. An
   answer only the user has is the user's to give.
 - `step: root-cause`, `root-cause-after-grill` or `root-cause-of-rescope`, with a `stderr` line that names a
