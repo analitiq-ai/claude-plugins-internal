@@ -997,6 +997,8 @@ class CleanupLabel(Gate):
         out = self.hook("PreToolUse", "Bash",
                         {"command": f"cd {self.root} && gh pr comment --body '{shell.ATTESTATION_MARKER} clean'"})
         self.assertEqual(self.decision(out), "deny")
+        self.assertIn("no clean internal round at", self.reason(out))
+        self.assertNotIn(github.CLEANUP_EXEMPTION, self.reason(out))
 
     def test_a_cleanup_prs_commits_skip_the_claim_and_shim_checks(self):
         self.labelled("cleanup")

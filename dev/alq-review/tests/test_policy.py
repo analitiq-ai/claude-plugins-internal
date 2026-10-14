@@ -441,7 +441,11 @@ class MarkReady(unittest.TestCase):
     def test_an_attestation_needs_a_clean_round_or_a_release_whatever_the_label(self):
         """The org pr-gate takes the attestation as the internal review, so no label stands in for one (FR-011)."""
         fresh = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
-        self.assertFalse(policy.attest(fresh, head_sha=HEAD_A, inflight=0, released=False).allow)
+        refused = policy.attest(fresh, head_sha=HEAD_A, inflight=0, released=False)
+        self.assertFalse(refused.allow)
+        self.assertIn(f"no clean internal round at {HEAD_A[:7]}", refused.reason)
+        self.assertNotIn(github.CLEANUP_EXEMPTION, refused.reason)
+        self.assertNotIn("gh pr ready", refused.reason)
         self.assertTrue(policy.attest(fresh, head_sha=HEAD_A, inflight=0, released=True).allow)
         state = state_with_round(head=HEAD_A)
         assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")

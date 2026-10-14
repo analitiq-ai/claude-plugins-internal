@@ -214,17 +214,25 @@ def rerequest(state: dict, *, inflight: int) -> Decision:
     return Decision(True)
 
 
-def mark_ready(state: dict, *, head_sha: str, inflight: int, released: bool, cleanup: Cleanup) -> Decision:
-    """released: the org pr-gate passed head_sha as a version-only release. Neither it nor a cleanup PR needs a review
-    (ADR-0003, ADR-0021); neither lifts a hold."""
+def _reviewed(state: dict, *, head_sha: str, inflight: int, released: bool) -> Decision | None:
+    """The answer when a hold, the version-only release or a clean internal round at head_sha settles it; None when
+    none does. released: the org pr-gate passed head_sha as a version-only release (ADR-0003); it lifts no hold."""
     obstacle = _obstacle(state, inflight)
     if obstacle:
         return Decision(False, obstacle)
-    if released or cleanup.labelled:
-        return Decision(True)
     internal = [r for r in state["rounds"] if r["stage"] == "internal" and r["status"] in COUNTED]
     last = internal[-1] if internal else None
-    if last is not None and _settled(last) and last["head_sha"] == head_sha:
+    if released or (last is not None and _settled(last) and last["head_sha"] == head_sha):
+        return Decision(True)
+    return None
+
+
+def mark_ready(state: dict, *, head_sha: str, inflight: int, released: bool, cleanup: Cleanup) -> Decision:
+    """A cleanup PR needs no review either (ADR-0021), and lifts no hold."""
+    reviewed = _reviewed(state, head_sha=head_sha, inflight=inflight, released=released)
+    if reviewed is not None:
+        return reviewed
+    if cleanup.labelled:
         return Decision(True)
     if cleanup.unread:
         return Decision(False, cleanup.refusal())
@@ -237,7 +245,12 @@ def mark_ready(state: dict, *, head_sha: str, inflight: int, released: bool, cle
 def attest(state: dict, *, head_sha: str, inflight: int, released: bool) -> Decision:
     """The internal-review attestation: the org pr-gate takes it for a clean review, so the label does not stand in
     for one (FR-011)."""
-    return mark_ready(state, head_sha=head_sha, inflight=inflight, released=released, cleanup=Cleanup())
+    reviewed = _reviewed(state, head_sha=head_sha, inflight=inflight, released=released)
+    if reviewed is not None:
+        return reviewed
+    return Decision(False, f"There is no clean internal round at {head_sha[:7]} to attest: the org pr-gate takes the "
+                           f"attestation for the internal review, and no label stands in for one. Next step: "
+                           f"{review_call(state, 'internal')}.")
 
 
 def admissible_verdicts(rnd: dict, *, churned: bool = False) -> list[str]:
