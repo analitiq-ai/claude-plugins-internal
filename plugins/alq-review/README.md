@@ -40,7 +40,8 @@ that is under review.
    (no findings, or every finding pushed back) at the current commit: `gh pr ready`, `gh pr create`
    without `--draft`, and any comment carrying the `internal-review` attestation marker the org pr-gate
    reads. A comment is judged by what it posts, body files included, however `gh` posts or edits it.
-   A cleanup PR (9) needs no round.
+   A cleanup PR (9) is readied with no round; an attestation on it still needs one, as the org pr-gate takes it
+   for the review.
 4. **The cap.** A stage gets 4 rounds without settling (a round settles when it is clean or ruled
    `CONVERGED_PUSHBACK`, and the count starts again after it). The fifth is refused and the audit is required;
    its assessment may not be `PATCH`. The second such audit that rules something must change locks the
@@ -135,8 +136,8 @@ that is under review.
    `gh pr merge` no attestation, `--admin` still needing `override-merge`; its branch's commits skip the claim and
    shim checks (6, 7); the poller asks for no Codex review and treats no thread as blocking. The label is read from
    GitHub at each check, whatever the diff and whatever was pushed after it; a label that cannot be read is no label,
-   and a ready or merge refusal says so first. It releases no round in flight and no lock. The user adds it, on
-   GitHub; an agent does not. The hook refuses no label command: see *Requirements*.
+   and a ready or merge refusal then names only that. It releases no round in flight and no lock. The user adds it, on
+   GitHub. No hook refuses an agent's label command, so until the rule in *Requirements* exists an agent can add it too.
 
 ## How an agent uses it
 

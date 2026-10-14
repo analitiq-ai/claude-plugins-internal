@@ -648,7 +648,7 @@ class CleanupPr(Hook):
                 self.assertTrue(said.startswith(f"No internal-review attestation for {HEAD[:10]}"), said)
                 self.assertTrue(said.endswith(github.CLEANUP_EXEMPTION), said)
 
-    def test_labels_that_cannot_be_read_are_no_label_and_the_refusal_says_so_first(self):
+    def test_labels_that_cannot_be_read_are_no_label_and_the_refusal_names_only_that(self):
         for labels in (None, "cleanup", [{"id": "L1"}]):
             with self.subTest(labels=labels):
                 self.github_has()
@@ -660,7 +660,7 @@ class CleanupPr(Hook):
                 (self.bin / "view.json").write_text(json.dumps(view))
                 said = self.refusal(PLAIN)
                 self.assertTrue(said.startswith("The `cleanup` label could not be read ("), said)
-                self.assertIn("No internal-review attestation", said)
+                self.assertNotIn("No internal-review attestation", said)
 
     def test_a_release_still_merges_without_the_label(self):
         self.github_has(runs=[gate_run()])

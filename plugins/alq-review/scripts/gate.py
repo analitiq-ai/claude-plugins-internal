@@ -110,16 +110,10 @@ def _unknown_pr(payload: dict, action: str, where: worktree.Worktree, exc: Runti
                   "then retry.", Target(where.slug, None, where.branch, where.root))
 
 
-def cleanup_of(repo: str, pr: int | None, branch: str | None) -> policy.Cleanup:
-    """Whether the PR carries the `cleanup` label: the PR named, else every open PR of the branch, of which there must
-    be one. A label GitHub cannot say is no label, and the fact says why."""
-    try:
-        if pr is not None:
-            return policy.Cleanup(labelled=github.is_cleanup(github.pr_labels(repo, pr)))
-        found = github.branch_labels(repo, branch)
-    except RuntimeError as exc:
-        return policy.Cleanup(unread=str(exc))
-    return policy.Cleanup(labelled=bool(found) and all(map(github.is_cleanup, found)))
+def cleanup_of(repo: str, pr: int | None, branch: str | None) -> github.Cleanup:
+    """The cleanup fact of the PR named, else of the branch's open PRs: at least one, each labelled."""
+    return github.read_cleanup(lambda: [github.pr_labels(repo, pr)] if pr is not None
+                               else github.branch_labels(repo, branch))
 
 
 def decide(payload: dict, target: Target, rule, **facts_for_rule) -> policy.Decision:
@@ -385,11 +379,14 @@ def on_bash(payload: dict) -> dict | None:
             continue
         if event is None:
             continue
-        if action.kind == "ready":
+        if action.kind in ("ready", "attest"):
             commit = worktree.head_sha(event.root) if event.root else (github.pr_head(event.repo, action.pr) or ("", ""))[1]
-            decision = decide(payload, event, policy.mark_ready, head_sha=commit,
-                              released=bool(commit) and github.released(event.repo, commit) is not None,
-                              cleanup=cleanup_of(event.repo, event.pr, event.branch))
+            released = bool(commit) and github.released(event.repo, commit) is not None
+            if action.kind == "ready":
+                decision = decide(payload, event, policy.mark_ready, head_sha=commit, released=released,
+                                  cleanup=cleanup_of(event.repo, event.pr, event.branch))
+            else:
+                decision = decide(payload, event, policy.attest, head_sha=commit, released=released)
         elif action.kind == "rerequest":
             decision = decide(payload, event, policy.rerequest)
         else:

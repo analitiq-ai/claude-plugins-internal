@@ -29,6 +29,28 @@ class IsCleanup(unittest.TestCase):
                 self.assertFalse(github.is_cleanup(labels))
 
 
+class CleanupFact(unittest.TestCase):
+    """The one cleanup fact every hook and the poller decide on."""
+
+    def test_a_pr_whose_label_could_not_be_read_cannot_be_labelled(self):
+        with self.assertRaises(ValueError):
+            github.Cleanup(labelled=True, unread="HTTP 502")
+
+    def test_the_reader_needs_an_open_pr_and_the_label_on_each(self):
+        for found, labelled in (([["cleanup"]], True), ([["bug", "Cleanup"]], True), ([], False),
+                                ([["cleanup"], ["bug"]], False), ([["bug"]], False)):
+            with self.subTest(found=found):
+                self.assertEqual(github.read_cleanup(lambda found=found: found), github.Cleanup(labelled=labelled))
+
+    def test_labels_gh_cannot_say_are_no_label_and_say_why(self):
+        def fails():
+            raise RuntimeError("gh pr view failed: HTTP 502")
+        fact = github.read_cleanup(fails)
+        self.assertEqual(fact, github.Cleanup(unread="gh pr view failed: HTTP 502"))
+        self.assertTrue(fact.refusal().startswith("The `cleanup` label could not be read (gh pr view failed: HTTP 502)"),
+                        fact.refusal())
+
+
 class StubGh(unittest.TestCase):
     """A gh on PATH that logs its arguments, prints GH_OUT and exits GH_EXIT."""
 

@@ -52,13 +52,13 @@ class Classify(unittest.TestCase):
         [action] = shell.classify("cd /repo/.git/wt/x && gh pr ready", "/work")
         self.assertEqual((action.kind, action.pr, action.cwd), ("ready", None, "/repo/.git/wt/x"))
 
-    def test_attesting_the_internal_review_or_opening_a_non_draft_pr_is_marking_ready(self):
+    def test_attesting_the_internal_review_is_its_own_kind_and_a_non_draft_pr_is_marking_ready(self):
         attest = ("gh pr comment 12 --repo acme/demo --body \"$(cat <<'EOF'\n<!-- analitiq-internal-review -->\n"
                   "Internal review clean.\nReviewed commit: `abc123`\nEOF\n)\"")
         [action] = shell.classify(attest, "/work")
-        self.assertEqual((action.kind, action.repo, action.pr), ("ready", "acme/demo", 12))
+        self.assertEqual((action.kind, action.repo, action.pr), ("attest", "acme/demo", 12))
         [action] = shell.classify("gh api repos/acme/demo/issues/12/comments -f body='<!-- analitiq-internal-review -->'", "/work")
-        self.assertEqual((action.kind, action.repo, action.pr), ("ready", "acme/demo", 12))
+        self.assertEqual((action.kind, action.repo, action.pr), ("attest", "acme/demo", 12))
         self.assertEqual(kinds("gh pr create --title t --body b"), [("ready", "/work")])
         for drafted in ("gh pr create --draft --title t", "gh pr create -d --title t"):
             self.assertEqual(kinds(drafted), [], drafted)
@@ -72,10 +72,10 @@ class Classify(unittest.TestCase):
             Path(tmp, "attest.md").write_text(f"{shell.ATTESTATION_MARKER}\nReviewed commit: `abc123`\n")
             Path(tmp, "rerequest.md").write_text("@codex review\n")
             Path(tmp, "payload.json").write_text(json.dumps({"body": shell.ATTESTATION_MARKER}))
-            for command, kind in ((f"gh pr comment 12 --body-file={tmp}/attest.md", "ready"),
+            for command, kind in ((f"gh pr comment 12 --body-file={tmp}/attest.md", "attest"),
                                   ("gh issue comment 12 -F rerequest.md", "rerequest"),
-                                  ("gh api repos/acme/demo/issues/12/comments -F body=@attest.md", "ready"),
-                                  ("gh api repos/acme/demo/issues/12/comments --input payload.json", "ready")):
+                                  ("gh api repos/acme/demo/issues/12/comments -F body=@attest.md", "attest"),
+                                  ("gh api repos/acme/demo/issues/12/comments --input payload.json", "attest")):
                 [action] = shell.classify(command, tmp)
                 self.assertEqual((action.kind, action.pr), (kind, 12), command)
 
@@ -83,7 +83,7 @@ class Classify(unittest.TestCase):
         edit = f"gh api -X PATCH repos/acme/demo/issues/comments/99 -f body='{shell.ATTESTATION_MARKER} Reviewed commit: abc123'"
         mutation = ("gh api graphql -f query='mutation { addComment(input: {subjectId: \"PR_1\", body: \"@codex review\"}) "
                     "{ clientMutationId } }'")
-        self.assertEqual(kinds(edit), [("ready", "/work")])
+        self.assertEqual(kinds(edit), [("attest", "/work")])
         self.assertEqual(kinds(mutation), [("rerequest", "/work")])
 
     def test_reading_comments_that_mention_the_marker_or_trigger_posts_nothing(self):

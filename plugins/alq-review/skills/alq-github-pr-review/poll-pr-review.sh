@@ -372,7 +372,7 @@ settle_cleanup() {
     echo "BLOCKED: $failing failing on a cleanup PR."
     exit 4
   fi
-  echo "CLEANUP: no check is failing but those ignored; merge once the PR is ready."
+  echo "CLEANUP: no check is failing; merge once the PR is ready."
   exit 5
 }
 

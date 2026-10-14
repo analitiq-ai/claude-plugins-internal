@@ -18,7 +18,7 @@ _COMMENTS_API = re.compile(r"repos/([\w.-]+/[\w.-]+)/issues/(\d+)/comments")
 
 @dataclass(frozen=True)
 class Action:
-    kind: str  # commit | push | rerequest | ready (declares the internal review done) | unlock
+    kind: str  # commit | push | rerequest | ready (publishes the PR) | attest (declares the internal review done) | unlock
     cwd: str
     repo: str | None = None
     pr: int | None = None
@@ -139,7 +139,7 @@ def _posts(words: list[str], cwd: str, command: str) -> str | None:
     paths = [Path(cwd, os.path.expanduser(f)) for f in files]
     text = "\n".join([command, *(p.read_text(errors="replace") for p in paths if p.is_file())])
     if ATTESTATION_MARKER in text:
-        return "ready"
+        return "attest"
     return "rerequest" if REVIEW_TRIGGER in text.lower() else None
 
 

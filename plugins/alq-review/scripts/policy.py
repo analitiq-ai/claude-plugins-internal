@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from github import CLEANUP_EXEMPTION, unread_cleanup
+from github import CLEANUP_EXEMPTION, Cleanup
 from ledger import COUNTED, counted, current_round, released
 
 CAP = 4          # rounds a stage may take without settling before the anti-pattern audit is mandatory
@@ -20,13 +20,6 @@ REVIEW_CALL = ("Workflow(name='alq-review:review-round', args={worktree: '<absol
                "spec: %s})")
 PLUGIN = "alq-review"
 ASSESS_CALL = "Workflow(name='alq-review:assess-round', args={worktree: '<absolute worktree path>'})"
-
-
-@dataclass(frozen=True)
-class Cleanup:
-    """Whether a PR carries the `cleanup` label. `unread` says why GitHub could not tell; it is then not labelled."""
-    labelled: bool = False
-    unread: str = ""
 
 
 @dataclass(frozen=True)
@@ -233,11 +226,18 @@ def mark_ready(state: dict, *, head_sha: str, inflight: int, released: bool, cle
     last = internal[-1] if internal else None
     if last is not None and _settled(last) and last["head_sha"] == head_sha:
         return Decision(True)
-    unread = f"{unread_cleanup(cleanup.unread)} " if cleanup.unread else ""
-    return Decision(False, f"{unread}The internal review has not come back clean at {head_sha[:7]}; the GitHub review comes "
+    if cleanup.unread:
+        return Decision(False, cleanup.refusal())
+    return Decision(False, f"The internal review has not come back clean at {head_sha[:7]}; the GitHub review comes "
                            "after it. Until then the PR stays a draft and the internal review is not attested: no gh pr "
                            f"ready, no gh pr create without --draft, no internal-review comment. Next step: "
                            f"{review_call(state, 'internal')}. {CLEANUP_EXEMPTION}")
+
+
+def attest(state: dict, *, head_sha: str, inflight: int, released: bool) -> Decision:
+    """The internal-review attestation: the org pr-gate takes it for a clean review, so the label does not stand in
+    for one (FR-011)."""
+    return mark_ready(state, head_sha=head_sha, inflight=inflight, released=released, cleanup=Cleanup())
 
 
 def admissible_verdicts(rnd: dict, *, churned: bool = False) -> list[str]:

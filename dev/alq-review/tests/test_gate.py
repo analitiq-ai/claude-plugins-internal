@@ -30,6 +30,7 @@ import helpers
 import hookio
 import ledger
 import policy
+import shell
 import test_policy
 
 SCRIPTS = PLUGIN / "scripts"
@@ -985,12 +986,17 @@ class CleanupLabel(Gate):
                 self.assertIn("The internal review has not come back clean", self.reason(out))
                 self.assertTrue(self.reason(out).endswith(github.CLEANUP_EXEMPTION), self.reason(out))
 
-    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_says_why_first(self):
+    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_names_only_that(self):
         out = self.ready()
         self.assertEqual(self.decision(out), "deny")
         self.assertIn("The `cleanup` label could not be read (", self.reason(out))
-        self.assertLess(self.reason(out).index("could not be read"),
-                        self.reason(out).index("The internal review has not come back clean"))
+        self.assertNotIn("The internal review has not come back clean", self.reason(out))
+
+    def test_the_label_does_not_let_an_agent_attest_the_internal_review(self):
+        self.labelled("cleanup")
+        out = self.hook("PreToolUse", "Bash",
+                        {"command": f"cd {self.root} && gh pr comment --body '{shell.ATTESTATION_MARKER} clean'"})
+        self.assertEqual(self.decision(out), "deny")
 
     def test_a_cleanup_prs_commits_skip_the_claim_and_shim_checks(self):
         self.labelled("cleanup")

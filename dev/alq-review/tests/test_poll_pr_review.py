@@ -822,7 +822,7 @@ exec {sys.executable} "$@"
 class CleanupPoll(PollerRun):
     """A PR labelled `cleanup` waits on no reviewer: only its checks, the gate's runs aside, settle it (ADR-0021)."""
     ANNOUNCED = f"Cleanup PR: {REPO}#{PR} carries the cleanup label; no Codex, no internal review, no triage."
-    DONE = "CLEANUP: no check is failing but those ignored; merge once the PR is ready."
+    DONE = "CLEANUP: no check is failing; merge once the PR is ready."
 
     def poll(self, *snapshots, env_extra=None, **kw):
         return super().poll(*snapshots, env_extra={"FAKE_GH_LABELS": "bug,cleanup", **(env_extra or {})}, **kw)

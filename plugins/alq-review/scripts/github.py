@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 
 # How the org pr-gate (analitiq-ai/.github pr-gate.js) marks a version-only release: the title of its
 # `internal-review` check run. Only a run the App posted is its word: an agent's token could post the same text.
@@ -90,8 +92,30 @@ def is_cleanup(labels: list[str]) -> bool:
     return any(name.casefold() == CLEANUP_LABEL for name in labels)
 
 
-def unread_cleanup(why: str) -> str:
-    return f"The `cleanup` label could not be read ({why}), so the PR is gated as unlabelled."
+@dataclass(frozen=True)
+class Cleanup:
+    """Whether a PR carries the `cleanup` label. `unread` says why GitHub could not tell; such a PR is not labelled."""
+    labelled: bool = False
+    unread: str = ""
+
+    def __post_init__(self):
+        if self.labelled and self.unread:
+            raise ValueError("a PR whose label could not be read is not labelled")
+
+    def refusal(self) -> str:
+        """The refusal of a PR whose label could not be read: it is told to retry, not to get a review (FR-007)."""
+        return (f"The `cleanup` label could not be read ({self.unread}), so alq-review gates the PR as unlabelled. "
+                "Retry once GitHub answers.")
+
+
+def read_cleanup(labels_of: Callable[[], list[list[str]]]) -> Cleanup:
+    """`labels_of` gives the label names of each PR in question, or raises RuntimeError. There must be a PR, and each
+    must carry the label."""
+    try:
+        found = labels_of()
+    except RuntimeError as exc:
+        return Cleanup(unread=str(exc))
+    return Cleanup(labelled=bool(found) and all(map(is_cleanup, found)))
 
 
 def label_names(labels) -> list[str]:
@@ -134,12 +158,11 @@ def main(argv: list[str]) -> int:
     if len(argv) != 3 or argv[0] != "cleanup" or not (argv[2].isascii() and argv[2].isdigit()):
         print(USAGE, file=sys.stderr)
         return 2
-    try:
-        labels = pr_labels(argv[1], int(argv[2]))
-    except RuntimeError as exc:
-        print(exc, file=sys.stderr)
+    cleanup = read_cleanup(lambda: [pr_labels(argv[1], int(argv[2]))])
+    if cleanup.unread:
+        print(cleanup.unread, file=sys.stderr)
         return 1
-    print("cleanup" if is_cleanup(labels) else "gated")
+    print("cleanup" if cleanup.labelled else "gated")
     return 0
 
 

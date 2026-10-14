@@ -8,7 +8,7 @@ import ledger
 import policy
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
-UNLABELLED, LABELLED = policy.Cleanup(), policy.Cleanup(labelled=True)
+UNLABELLED, LABELLED = github.Cleanup(), github.Cleanup(labelled=True)
 SPEC = "specs/019-demo"
 BOUND_BLOB, HEAD_BLOB = "d" * 40, "e" * 40
 # Each binding a PR can have, with what the review call's `spec` must read for it: the PR's own value, quoted so
@@ -426,11 +426,26 @@ class MarkReady(unittest.TestCase):
                                    released=False, cleanup=UNLABELLED).reason
         self.assertTrue(reason.endswith(github.CLEANUP_EXEMPTION), reason)
 
-    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_says_so_first(self):
+    def test_a_label_that_could_not_be_read_is_gated_and_the_refusal_names_only_that(self):
+        unread = github.Cleanup(unread="gh pr view failed: HTTP 502")
         decision = policy.mark_ready(ledger.new_state("acme/demo", "feat/1-demo", pr=7), head_sha=HEAD_A, inflight=0,
-                                     released=False, cleanup=policy.Cleanup(unread="gh pr view failed: HTTP 502"))
-        self.assertFalse(decision.allow)
-        self.assertTrue(decision.reason.startswith(github.unread_cleanup("gh pr view failed: HTTP 502")), decision.reason)
+                                     released=False, cleanup=unread)
+        self.assertEqual(decision, policy.Decision(False, unread.refusal()))
+
+    def test_a_clean_round_readies_a_pr_whose_label_could_not_be_read(self):
+        state = state_with_round(head=HEAD_A)
+        assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
+        self.assertTrue(policy.mark_ready(state, head_sha=HEAD_A, inflight=0, released=False,
+                                          cleanup=github.Cleanup(unread="HTTP 502")).allow)
+
+    def test_an_attestation_needs_a_clean_round_or_a_release_whatever_the_label(self):
+        """The org pr-gate takes the attestation as the internal review, so no label stands in for one (FR-011)."""
+        fresh = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.assertFalse(policy.attest(fresh, head_sha=HEAD_A, inflight=0, released=False).allow)
+        self.assertTrue(policy.attest(fresh, head_sha=HEAD_A, inflight=0, released=True).allow)
+        state = state_with_round(head=HEAD_A)
+        assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
+        self.assertTrue(policy.attest(state, head_sha=HEAD_A, inflight=0, released=False).allow)
 
     def test_allowed_when_every_finding_was_pushed_back(self):
         state = state_with_round(head=HEAD_A)

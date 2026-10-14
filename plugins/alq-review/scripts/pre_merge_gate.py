@@ -358,14 +358,11 @@ def released(named: PullRequest | None, head: str) -> bool:
     return named is not None and github.released(named.repo, head) is not None
 
 
-def cleanup(pr: dict) -> tuple[bool, str]:
-    """Does the PR carry the `cleanup` label? Labels that cannot be read are none; the second part then says so."""
+def cleanup(pr: dict):
+    """The cleanup fact of the PR `gh pr view` gave, as a github.Cleanup."""
     # Imported here for the reason released() imports github here.
     import github
-    try:
-        return github.is_cleanup(github.label_names(pr.get("labels"))), ""
-    except RuntimeError as exc:
-        return False, github.unread_cleanup(str(exc))
+    return github.read_cleanup(lambda: [github.label_names(pr.get("labels"))])
 
 
 def how_to_attest(number: int, head: str, verb: str) -> str:
@@ -407,10 +404,10 @@ def unmet(verb: str, args: list[str], pr: dict, named: PullRequest | None) -> st
     head = (pr.get("headRefOid") or "").lower()
     if not head:
         return f"`gh pr view` returned no head commit for PR {pr.get('number')}."
-    labelled, unread = cleanup(pr)
-    if labelled or attested(pr.get("comments") or [], head) or released(named, head):
+    fact = cleanup(pr)
+    if fact.labelled or attested(pr.get("comments") or [], head) or released(named, head):
         return None
-    return f"{unread} {how_to_attest(pr.get('number'), head, verb)}".lstrip()
+    return fact.refusal() if fact.unread else how_to_attest(pr.get("number"), head, verb)
 
 
 def switched_off(payload: dict) -> bool:
