@@ -24,7 +24,7 @@ alq-plan ADR-0008 records the no-spec folder. ADR-0005, decision 3, stands.
 - Q: What does `no spec needed` leave? → A: `specs/<issue>-<short-name>/spec.md`, from the run's folder input, saying no spec is needed and carrying the premise question the pick rests on and the reason, as the premise report records them. One writer script writes every such spec.md and nothing else into the folder. Nothing is posted on the issue, and the user is told to pass `spec: null` when the work is reviewed. A later new scope of that issue is refused, as the issue has a folder.
 - Q: What does a rescope of a no-spec folder do? → A: It runs the new-scope workflow from the premise (premise → specify → grill → plan → critique → tasks) into that same folder, since a no-spec spec.md has nothing to grill. `specify` writes over the no-spec spec.md; if the premise picks `no spec needed` again, the writer writes it again. One pure function, in the writer's module, tells a no-spec spec.md apart.
 - Q: What about a change with no issue? → A: The skill creates the issue first, in the repo `origin` names, with one of that repo's issue types, then scopes it like any other.
-- Q: What does spec.md name its stories? → A: Spec Kit's headings, `### User Story <N> - <title> (Priority: P<n>)`. Branches (`<issue>-us<N>-…`), PR headers (`Implements: … § User Story <N>`) and review (#81) name them. On a rescope, existing stories keep their numbers and a new story takes the next free one.
+- Q: What does spec.md name its stories? → A: Spec Kit's headings, `### User Story <N> - <title> (Priority: P<n>)`. Branches (`<issue>-us<N>-…`), PR headers (`Implements: … § User Story <N>`) and review (#81) name them. On a rescope, existing stories keep their numbers and a new story takes the next free one, a number never used in spec.md.
 - Q: And a rescope? → A: It works in the worktree it is run from, a story's or the spec's, and the spec edit lands in that PR.
 - Q: What happens to the folders that exist? → A: Under `dev/alq-review/specs/`, 004, 007, 008, 009, 010, 011, 012, 014, 015, 016 and 017 are deleted with every citation. 019 is renamed `63-split-planning-plugin`. This runs after #68 (retires 018) and #83 (deletes 005 and 006) merge. `README.md` states the rule instead of `specs/<nnn>-<feature>/`.
 
@@ -182,7 +182,7 @@ that creates the issue and the run that follows.
 
 A new scope works on branch `<issue>-spec`, in its own worktree from the default branch, and the spec lands through
 its own PR. A rescope edits the spec in the PR it is run from. The story numbers that branches and PRs name do not
-move.
+move; FR-016 says how much of that the run checks.
 
 **Why this priority**: under the engineering workflow the spec lands through its own PR first (engineering
 ADR-0002, decision 3), and stories are named by number from then on.
@@ -204,8 +204,8 @@ story-number check.
    stories with one number, **When** the run checks it, **Then** it fails, naming the heading.
 5. **Given** a rescope run from a story's worktree, **When** it completes, **Then** the spec edit is committed and
    pushed on that worktree's branch, and no other branch or PR is created.
-6. **Given** a rescope of a spec whose stories are numbered 1 and 3, **When** the rescoped spec.md adds a story,
-   **Then** the run goes on only if the new story's number is greater than 3. A new story numbered 2 fails the run,
+6. **Given** a rescope of a spec with stories 1 to 3, **When** the rescoped spec.md drops story 2 and adds story 4,
+   **Then** the run goes on. Given stories numbered 1 and 3, a rescope that adds a story numbered 2 fails the run,
    naming the numbers.
 7. **Given** a run that fails or is rejected, **Then** nothing is committed, pushed or opened.
 8. **Given** a new scope that ended on `no spec needed`, **When** the skill ends, **Then** the no-spec folder lands as
@@ -328,8 +328,9 @@ Delivery Workflow.
 - **FR-016**: The workflow MUST check spec.md's story headings with one pure function after every step that writes
   spec.md: each is `### User Story <N> - <title> (Priority: P<n>)`, and no number is used twice. On a rescope it
   MUST also check, against spec.md as the run found it, that every number not there before is greater than every
-  number that was. Numbers that were there may be dropped. Stories are compared by number only, so a number
-  dropped and used again in the same run, or a story moved to another number, is not caught.
+  number that was. Numbers that were there may be dropped, and a dropped number is not used again. The check
+  compares numbers only, so it does not catch a number dropped and used again in the same run, a story moved to
+  another number, or a dropped highest number used again in a later run.
 - **FR-017**: A run that fails or is rejected MUST commit, push and open nothing.
 
 **Existing folders (Story 4)**
