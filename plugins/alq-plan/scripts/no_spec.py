@@ -30,9 +30,7 @@ def is_no_spec(spec: str) -> bool:
     return spec.splitlines()[:1] == [TITLE]
 
 
-def write(folder: Path, report: Path) -> None:
-    # Read before the folder is made: a report that cannot be read leaves no folder behind.
-    spec = text(report.read_text())
+def write(folder: Path, spec: str) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "spec.md").write_text(spec)
 
@@ -41,12 +39,20 @@ def main() -> None:
     if len(sys.argv) != 4 or sys.argv[1] != "write":
         print(__doc__, file=sys.stderr)
         sys.exit(2)
+    folder = Path(sys.argv[2])
     try:
-        write(Path(sys.argv[2]), Path(sys.argv[3]))
+        spec = text(Path(sys.argv[3]).read_text())
     except (OSError, ValueError) as exc:
-        print(f"The no-spec spec.md could not be written: {type(exc).__name__}: {exc}\nNext step: run "
-              f"`premise_report.py check <premise report> '{premise_report.NO_SPEC}'` and do as it says.",
+        print(f"The no-spec spec.md could not be read from the premise report: {type(exc).__name__}: {exc}\nNext "
+              f"step: run `premise_report.py check <premise report> '{premise_report.NO_SPEC}'` and do as it says.",
               file=sys.stderr)
+        sys.exit(2)
+    try:
+        write(folder, spec)
+    except OSError as exc:
+        print(f"The no-spec spec.md could not be written to {exc.filename or folder}: {type(exc).__name__}: "
+              f"{exc.strerror or exc}\nNext step: make that path writable or clear what is in its way, then resume "
+              "the run.", file=sys.stderr)
         sys.exit(2)
 
 

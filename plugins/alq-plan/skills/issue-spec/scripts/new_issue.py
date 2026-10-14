@@ -62,6 +62,11 @@ def create(kind, path):
     created = json.loads(_gh(["api", "--method", "POST", f"repos/{repo}/issues", "--input", "-"],
                              f"GitHub did not create the issue in {repo}",
                              stdin=json.dumps({"title": title, "body": body, "type": kind})))
+    # GitHub creates the issue and drops its type, without an error, for a user without push access.
+    if (created.get("type") or {}).get("name") != kind:
+        sys.exit(f"GitHub created {created['html_url']} but did not set its type to `{kind}`. Next step: set the "
+                 "type on that issue, or have a user with push access to the repo set it, then scope it as "
+                 f"`#{created['number']}`.")
     return {"issue": str(created["number"]), "url": created["html_url"]}
 
 

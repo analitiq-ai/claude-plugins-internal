@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The premise report: what the planning skill answers at the workflow's `premise` pause, before any spec folder
-exists, and what the user picked there.
+"""The premise report: what the planning skill answers at the workflow's `premise` pause, before a spec is
+written, and what the user picked there.
 
 The form below is the one place the questions are worded. A report is graded on its form and on each answer naming
 a source, not on whether the answer is right: the user's pick is the judgement. spec.md has an answer
@@ -35,6 +35,7 @@ WRONG, RECOMMENDATION, PICK, RESTS_ON, REASON = ("Reports wrong behaviour", "Rec
                                                  "Reason")
 SPEC_HEADING = "## Why this is worth doing"
 _STOP_ONLY = "required unless the pick is write the spec"
+_REASON_GOES_TO = {NOT_WORTH_DOING: "the issue's closing comment", NO_SPEC: "the folder's spec.md"}
 
 
 def form() -> str:
@@ -175,8 +176,8 @@ def problems(text: str, pick: str) -> list[str]:
             found.append(f"`{RESTS_ON}:` is `{rests_on}`, and a stop names the question it rests on. Next step: "
                          f"make it one of {', '.join(QUESTIONS)}.")
         if not filled(why):
-            found.append(f"`{REASON}:` is empty, and it is what the issue's comment will say. Next step: give the "
-                         "reason in one line.")
+            found.append(f"`{REASON}:` is empty, and it is what {_REASON_GOES_TO[pick]} will say. Next step: give "
+                         "the reason in one line.")
     for name in _graded(pick, rests_on):
         found += _answer_problems(f"## {name}", name, sections[name])
     if wrong == "yes" and recommended == NO_SPEC:
