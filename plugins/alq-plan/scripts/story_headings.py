@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Checks spec.md's story headings: branches, PR headers and review name a story by its number, so the number must
-be one heading's, and must not move.
+"""Checks spec.md's story headings: branches, PR headers and review name a story by its number, so a number must be
+one heading's.
 
-Each story heading is Spec Kit's `### User Story <N> - <title> (Priority: P<n>)`, and no number is two stories'. On a
-rescope, against spec.md as the run found it, a story that is new is numbered above every number that was there: a
-number may be dropped, and is then not taken again. The form of spec.md as found is not graded: a spec scoped before
-this check may have no story headings.
+Each story heading is Spec Kit's `### User Story <N> - <title> (Priority: P<n>)`, and no number is two headings'. On
+a rescope, against spec.md as the run found it, every number not there before is greater than every number that was:
+a number may be dropped, and is then not used again. The check compares numbers only, so it cannot tell a story
+moved to another number, or a number dropped and used again in one run. The form of spec.md as found is not graded:
+a spec scoped before this check may have no story headings.
 
 Usage: story_headings.py check <spec folder> [<spec.md as the run found it>]. Prints one problem per line and exits 1
 when there are any, 2 when the check cannot run. A new scope names no spec.md as found.
@@ -52,19 +53,18 @@ def problems(spec: str, found: str | None) -> list[str]:
     for number, same in by_number.items():
         if len(same) > 1:
             named = "; ".join(f"line {line}: `{text}`" for line, text in same)
-            out.append(f"{len(same)} stories have number {number}: {named}. Next step: give each new story the "
-                       "next free number, and leave a story that was there its own.")
+            out.append(f"{len(same)} headings have number {number}: {named}. Next step: give each heading a number "
+                       "no other heading has.")
     if found is not None:
         before = {number for _, _, number in _stories(found)[0]}
         if before:
             highest = max(before)
             for line, text, number in stories:
                 if number not in before and number < highest:
-                    out.append(f"line {line}: `{text}` is a new story numbered {number}, but spec.md had stories "
-                               f"{_listed(before)} when the run found it, and a new story is numbered above "
-                               f"{highest}: a story keeps its number, and a dropped number is not taken again. "
-                               f"Next step: number it above {highest}, or give a story that was there back its "
-                               "number.")
+                    out.append(f"line {line}: `{text}` has number {number}, which spec.md did not have when the "
+                               f"run found it: it had {_listed(before)}, and a number not there before is greater "
+                               f"than {highest}, so a dropped number is not used again. Next step: number it above "
+                               f"{highest}.")
     return out
 
 

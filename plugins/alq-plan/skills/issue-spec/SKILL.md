@@ -100,7 +100,8 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
 
 **A new scope that does not land.** Once `BRANCH create` has made the spec branch, a new scope that stops before
 step 8 lands it runs `python3 BRANCH discard <ISSUE>` from the checkout `BRANCH create` ran in, then stops: after
-`not worth doing`, a rejected run, a failed run the user does not resume, or any other stop. It removes the spec
+`not worth doing`, after a rejected run, and after a failed run or any other stop. On a failed run or any other
+stop, first ask the user whether they will resume the run; only when they say no, discard. It removes the spec
 worktree, with what the run left in it, and the local branch, so that a later new scope of the issue is not told
 to rescope a spec that does not exist. It keeps a branch that holds a commit or is on origin: show the user its
 message.
@@ -110,7 +111,8 @@ A verdict is the user's decision. Never pass `approve`, or a premise pick, witho
 ## Stops
 
 `DRIVE` exiting non-zero, or a report other than the one the step expects: show the user the message or the
-report (`stderr` included) and stop; on a new scope, first as A new scope that does not land says. The exceptions, each resumed with `python3 DRIVE resume <run_id>`:
+report (`stderr` included) and stop. On a new scope, first ask the user whether they will resume the run; only when
+they say no, discard, as **A new scope that does not land** says. The exceptions, each resumed with `python3 DRIVE resume <run_id>`:
 - `step: premise-report`, with `stderr` lines that each name a Next step: complete the report as they say. An
   answer only the user has is the user's to give.
 - `step: root-cause`, `root-cause-after-grill` or `root-cause-of-rescope`, with a `stderr` line that names a

@@ -31,6 +31,15 @@ def spec_branch(issue):
     return f"{issue}-spec"
 
 
+def _repo_root():
+    """The repo's main worktree, whichever of its worktrees this runs in."""
+    return Path(_run("git", "rev-parse", "--path-format=absolute", "--git-common-dir")).parent
+
+
+def spec_worktree(issue):
+    return _repo_root() / ".claude" / "worktrees" / spec_branch(issue)
+
+
 def _origin():
     return _run("git", "remote", "get-url", "origin")
 
@@ -49,7 +58,7 @@ def _exists_locally(branch):
 
 
 def _exists_on_origin(branch):
-    remote = subprocess.run(["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
+    remote = subprocess.run(["git", "ls-remote", "--exit-code", "origin", f"refs/heads/{branch}"],
                             capture_output=True, text=True)
     # ls-remote --exit-code exits 2 when origin has no such branch, and otherwise when it could not ask.
     if remote.returncode not in (0, 2):
@@ -68,9 +77,7 @@ def create(issue):
     origin = _origin()
     base = _default_branch(origin)
     _run("git", "fetch", "--quiet", "origin", base)
-    # Under the repo's main worktree, whichever of its worktrees this runs in.
-    root = Path(_run("git", "rev-parse", "--path-format=absolute", "--git-common-dir")).parent
-    worktree = root / ".claude" / "worktrees" / branch
+    worktree = spec_worktree(issue)
     _run("git", "worktree", "add", "--quiet", "--no-track", "-b", branch, str(worktree), f"origin/{base}")
     return {"branch": branch, "worktree": str(worktree), "base": f"origin/{base}"}
 
@@ -108,6 +115,10 @@ def check(run_id):
     run = _completed_run(run_id)
     issue, kind = run["issue"], run["kind"]
     branch = _on_spec_branch(issue) if kind == "new" else _current_branch()
+    if kind == "rescope" and branch == _default_branch(_origin()):
+        sys.exit(f"the checkout is on {branch}, origin's default branch: a rescope lands its spec edit through the PR "
+                 "of the branch it runs on, never as a push to the default branch. Next step: rescope from the "
+                 "worktree of the spec's branch or a story's.")
     shown = _from_checkout(run["spec_dir"])
     # The session commits what is staged, so anything else staged would land with the spec.
     others = [path for path in _run("git", "diff", "--cached", "--name-only").splitlines()
@@ -127,7 +138,7 @@ def open_pr(run_id):
     branch = _on_spec_branch(issue)
     shown = _from_checkout(run["spec_dir"])
     head = _run("git", "rev-parse", "HEAD")
-    pushed = _run("git", "ls-remote", "--heads", "origin", branch).split("\t")[0]
+    pushed = _run("git", "ls-remote", "origin", f"refs/heads/{branch}").split("\t")[0]
     if pushed != head:
         sys.exit(f"origin's {branch} is {pushed or 'missing'}, not HEAD {head}: the PR would not hold the spec. "
                  "Next step: commit the folder and push the branch, then open the PR.")
@@ -139,8 +150,7 @@ def open_pr(run_id):
 
 
 def discard(issue):
-    branch = spec_branch(issue)
-    root = Path(_run("git", "rev-parse", "--path-format=absolute", "--git-common-dir")).parent
+    branch, root = spec_branch(issue), _repo_root()
     if not _exists_locally(branch):
         sys.exit(f"there is no branch {branch} to discard.")
     if _exists_on_origin(branch):
@@ -151,7 +161,7 @@ def discard(issue):
     if beyond:
         sys.exit(f"{branch} holds commits beyond {base}: {'; '.join(beyond.splitlines())}. Next step: land them, or "
                  "ask the user before removing the branch; nothing was removed.")
-    worktree = root / ".claude" / "worktrees" / branch
+    worktree = spec_worktree(issue)
     # A run that stopped leaves its folder and run files uncommitted; they go with the scope that did not land.
     _run("git", "-C", str(root), "worktree", "remove", "--force", str(worktree))
     _run("git", "-C", str(root), "branch", "--delete", "--force", branch)
