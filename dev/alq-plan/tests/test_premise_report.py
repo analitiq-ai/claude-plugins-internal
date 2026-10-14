@@ -134,9 +134,10 @@ class Check(unittest.TestCase):
         text = report(answers={**ANSWERS, "harm": ("", ""), "owner": ("nothing", "a guess")})
         self.assertEqual(len(premise_report.problems(text, WRITE)), 3)
 
-    def test_the_reason_and_whether_it_is_a_defect_are_read_back(self):
+    def test_the_reason_the_question_it_rests_on_and_whether_it_is_a_defect_are_read_back(self):
         text = report(NO_SPEC, rests_on="needs-spec", reason="a typo, fixed by the request", wrong="no")
         self.assertEqual(premise_report.reason(text), "a typo, fixed by the request")
+        self.assertEqual(premise_report.rested_on(text), "needs-spec")
         self.assertFalse(premise_report.reports_wrong_behaviour(text))
         self.assertTrue(premise_report.reports_wrong_behaviour(report()))
 
@@ -157,9 +158,13 @@ class Check(unittest.TestCase):
         self.assertEqual(premise_report.problems(report(answers=logged), WRITE), [])
         self.assertEqual(premise_report.spec_problems(spec_section(logged)), [])
 
-    def test_a_reason_that_is_empty_unfilled_or_on_two_lines_and_a_flag_empty_or_on_two_cannot_be_read_back(self):
+    def test_a_reason_question_or_flag_that_is_empty_unfilled_or_on_two_lines_cannot_be_read_back(self):
         text = report(NO_SPEC, rests_on="needs-spec", reason="a typo", wrong="no")
         for read, label, unreadable in ((premise_report.reason, "Reason", text + "Reason: another\n"),
+                                        (premise_report.rested_on, "Rests on", text + "Rests on: owner\n"),
+                                        (premise_report.rested_on, "Rests on", report()),
+                                        (premise_report.rested_on, "Rests on",
+                                         report(NO_SPEC, rests_on="size", reason="a typo", wrong="no")),
                                         (premise_report.reason, "Reason", report()),
                                         (premise_report.reason, "Reason",
                                          report(NO_SPEC, rests_on="needs-spec", reason="[one line]", wrong="no")),
