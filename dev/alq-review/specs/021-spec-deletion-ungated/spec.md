@@ -117,8 +117,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 - **FR-012**: A `git commit` on a branch whose open PR, the one `pr_target` resolves, carries the `cleanup` label MUST NOT be held by
   claim-check or shim-check. When the PR or its label cannot be read, both checks apply as today.
 - **FR-013**: The label releases only the review holds FR-003, FR-004, FR-008 and FR-012 name. A cleanup PR is
-  still refused while an internal round is in flight or its branch is locked (a lock is released only by
-  `unlock`), and `gh pr merge --admin` on it still needs `override-merge`.
+  still refused while an internal round is in flight or its branch is locked (a lock keeps the releases its
+  own decision record names), and `gh pr merge --admin` on it still needs `override-merge`.
 
 ### Key Entities
 

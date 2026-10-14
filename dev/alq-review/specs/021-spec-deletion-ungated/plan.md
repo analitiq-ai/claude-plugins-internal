@@ -26,7 +26,7 @@ Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-
 
 **Storage**: none new
 
-**Testing**: `python -m unittest -v` in `dev/alq-review/tests/` (R11)
+**Testing**: `python3 -m unittest -v` in `dev/alq-review/tests/` (R11)
 
 **Target Platform**: any machine running Claude Code with alq-review installed
 
@@ -53,7 +53,7 @@ Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-
 | V. Smallest complete change | One decider, one reader, one CLI entry the poller needs; no diff reading, no new module. Pass. |
 | VI. Governing rule ships apart | The ADR amending ADR-0003's list is its own PR, merged first (R9). The README and skill describe the code and ship with it. Pass. |
 | P1. Code decides | Ready, merge, commit and the poller's outcome are decided in code; the skill routes by exit code (R7). Every refusal names its next step (R6, R8). Pass. |
-| P2. Only an approved entity releases a hold | The review hold on a PR is released by the user adding the label on GitHub. Nothing refuses an agent's label add until the user's separate hook lands (R6); until then the label is a second way out, stated here and in ADR-0021. Locks and rounds in flight keep their own releases (R10). Open until that hook lands. |
+| P2. Only an approved entity releases a hold | ADR-0021 names the label as the one release of the review holds, and of no other (R10); locks and rounds in flight keep the releases their own records name (ADR-0018, ADR-0020). The approved entity is the user, but nothing refuses an agent's label add until the user's rule exists (R6). Open until that rule exists; Complexity Tracking. |
 | P3. Rules are pure | `is_cleanup` and `policy.mark_ready` are pure; `gate.py`, `pre_merge_gate.py` and the poller only read and answer. Pass. |
 | P4. A check that could not run is its own outcome | An unread label is `unread(why)`: gated, never a pass, and named in the refusal and the poller's warning (data-model). Pass. |
 
@@ -125,7 +125,7 @@ unchanged. `hooks.json` is unchanged: both hooks already see every Bash call.
 
 | Violation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| P2: until the user's rule forbidding it exists, an agent can add the label and release its own PR's review hold | The user decided this feature refuses no label command (FR-010); a hook reads only the `gh` forms it knows, so no refusal here closes every route | Refusing the `gh` forms here was rejected by the user, who adds that rule apart from this plugin. Closed by ADR-0021 action items 3 and 4 |
+| P2: until the user's rule forbidding it exists, an agent can add the label and release its own PR's review hold, so the user is not yet the one entity that releases it | The user decided this feature refuses no label command (FR-010); a hook reads only the `gh` forms it knows, so no refusal here closes every route | Refusing the `gh` forms here was rejected by the user, who adds that rule apart from this plugin. Closed by ADR-0021 action item 3 |
 
 ## Mechanisms
 

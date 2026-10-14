@@ -9,7 +9,7 @@ tags: [merge-gate, user-authority, holds, labels]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003", "0004", "0009", "0018"]
+relatesTo: ["0003", "0004", "0009", "0018", "0020"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{github,policy,gate,pre_merge_gate,shell}.py"
@@ -71,7 +71,8 @@ ADR-0004 as well as from ADR-0003; point 5 names each departure.
    user creates apart from this plugin (action item 3), and the plugin's README names it as a
    requirement. Until that rule exists, an agent can add the label and exempt its own PR.
 3. We will let the label release every hold point 1 lifts, and no other. A round in flight and a lock
-   still refuse a cleanup PR as any PR, and a lock is still released only by `unlock` (ADR-0018).
+   still refuse a cleanup PR as any PR. The label releases no lock: each lock keeps the releases its own
+   record names (ADR-0018, ADR-0020).
 4. When the label cannot be read, the PR is gated as unlabelled, and the ready or merge refusal says the
    label could not be read rather than that a review is missing (ADR-0009).
 5. This record amends two accepted records:
@@ -139,7 +140,8 @@ also lifts every other check in it.
 - A cleanup PR's commits skip claim-check and shim-check, so a labelled PR can land code that no
   alq-review check examined.
 - Until the user's rule exists, an agent can add the label and skip review of its own PR. Constitution
-  P2 fails a hold with a second way out; action item 4 takes this to P2.
+  P2 (3.0.0) asks that one approved entity release a hold; this record names the label as the release, and
+  the rule of action item 3 makes the user that entity.
 - Every commit in every repo with the plugin on makes one more `gh` call. When GitHub does not answer,
   the commit is checked as today.
 - In a repo whose rulesets require the org gate's checks, a cleanup PR is still held by them. This
@@ -164,6 +166,4 @@ also lifts every other check in it.
 2. [ ] #114 builds the exemption and the poller's cleanup outcome, and names the rule of item 3 as a
    requirement in the plugin's README.
 3. [ ] The user creates the rule that forbids an agent to apply the `cleanup` label.
-4. [ ] Amend constitution P2, in its own PR: the label releases the holds of point 3, and until the rule
-   of item 3 exists it is a second way out.
-5. [ ] Once this record is accepted, add to ADR-0003 and ADR-0004 a note naming the amendments of point 5.
+4. [ ] Once this record is accepted, add to ADR-0003 and ADR-0004 a note naming the amendments of point 5.
