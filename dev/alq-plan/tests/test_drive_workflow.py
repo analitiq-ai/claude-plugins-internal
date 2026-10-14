@@ -17,6 +17,8 @@ from paths import PLUGIN, REPO
 from test_premise_report import report as premise_report_text
 from test_premise_report import spec_section
 from test_rootcause import SPEC as SPEC_WITH
+from test_settled_design import PLAN, RESEARCH
+from test_story_headings import heading
 
 import yaml  # Spec Kit's own dependency
 
@@ -662,6 +664,115 @@ class NoSpecRescope(unittest.TestCase):
         self.assertIn("Reason: the request fixes it", self.spec().splitlines())
         self.assertEqual([p.name for p in (self.project.root / SPEC_DIR).iterdir()], ["spec.md"])
         self.assertEqual((self.project.prompts.read_text(), self.project.gh_calls()), ("", []))
+def with_stories(text, *headings):
+    """`text` with a story under each heading; an int is that story's heading in the form."""
+    stories = "".join(f"{heading(h) if isinstance(h, int) else h}\n\nA maintainer does a thing.\n\n" for h in headings)
+    return f"{text}\n## User Scenarios & Testing\n\n{stories}"
+
+
+class StoryHeadings(unittest.TestCase):
+    """The story headings are checked after every step that writes spec.md: specify, grill and the critique review.
+    A rescope's are checked against spec.md as the run found it."""
+    NEW = "specs/001-new"
+    # Stands in for every agent the workflow dispatches to: `specify` writes $CLAUDE_SPEC as the new spec, `plan`
+    # a plan that passes the settled-design check, `critique-run` a report; the rest write nothing.
+    AGENT = f"""#!{sys.executable}
+import json, os, sys
+from pathlib import Path
+command = sys.argv[2].split()[0]
+if command == "/speckit-specify":
+    Path({NEW!r}).mkdir(parents=True)
+    Path({NEW!r}, "spec.md").write_text(os.environ["CLAUDE_SPEC"])
+    Path(".specify/feature.json").write_text(json.dumps({{"feature_directory": {NEW!r}}}))
+feature = Path(json.loads(Path(".specify/feature.json").read_text())["feature_directory"])
+if command == "/speckit-plan":
+    (feature / "plan.md").write_text({PLAN!r})
+    (feature / "research.md").write_text({RESEARCH!r})
+if command == "/speckit-critique-run":
+    (feature / "critiques").mkdir(exist_ok=True)
+    (feature / "critiques" / "critique-1.md").write_text("# Critique\\n")
+"""
+
+    def project(self, spec_text=None):
+        project = Project(spec_text)
+        self.addCleanup(project.close)
+        project.stand_in("claude", self.AGENT)
+        return project
+
+    def resume(self, project, run_id, verdict=None):
+        proc, report = project.drive("resume", run_id, *([verdict] if verdict else []))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return report
+
+    def new_scope(self, written):
+        """A new scope whose `specify` writes `written`, resumed past premise."""
+        project = self.project()
+        project.env["CLAUDE_SPEC"] = written
+        _, started = project.drive("start", project.spec_file("https://github.test/acme/demo/issues/7\n# Demo\n"),
+                                   ISSUE)
+        (project.root / f".specify/workflows/runs/{started['run_id']}/premise-report.md").write_text(
+            premise_report_text())
+        return project, started["run_id"], self.resume(project, started["run_id"], f"premise_verdict={WRITE}")
+
+    def rescope(self, found):
+        """A rescope of a spec that has `found`'s story headings, started and paused at grill."""
+        project = self.project(with_stories(SETTLED, *found))
+        proc, started = project.drive("start", project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        self.assertEqual((proc.returncode, started["step"]), (0, "grill"), proc.stderr)
+        return project, started["run_id"]
+
+    def grilled(self, project, run_id, folder, spec_text):
+        (project.root / folder / "spec.md").write_text(spec_text)
+        return self.resume(project, run_id, "grill_verdict=approve")
+
+    def critiqued(self, project, run_id, folder, spec_text):
+        (project.root / folder / "spec.md").write_text(spec_text)
+        return self.resume(project, run_id, "critique_verdict=approve")
+
+    def assert_failed(self, report, step, *said):
+        self.assertEqual((report["status"], report["step"]), ("failed", step), report)
+        for phrase in (*said, "Next step:"):
+            self.assertIn(phrase, report["stderr"])
+
+    def test_a_story_heading_specify_wrote_out_of_the_form_stops_the_run_naming_it(self):
+        _, _, report = self.new_scope(with_stories(TRACED, 1, "### User Story 2: Land it"))
+        self.assert_failed(report, "story-headings-after-specify", "### User Story 2: Land it")
+
+    def test_a_new_scope_whose_stories_are_in_the_form_pauses_at_grill(self):
+        _, _, report = self.new_scope(with_stories(TRACED, 1, 2))
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"), report)
+
+    def test_two_stories_with_one_number_left_by_grill_stop_the_run(self):
+        project, run_id, _ = self.new_scope(with_stories(TRACED, 1, 2))
+        report = self.grilled(project, run_id, self.NEW, with_stories(TRACED, 1, heading(1, "Other")))
+        self.assert_failed(report, "story-headings-after-grill", "number 1")
+
+    def test_a_heading_the_critique_review_left_out_of_the_form_stops_the_run_until_it_is_fixed(self):
+        project, run_id, _ = self.new_scope(with_stories(TRACED, 1, 2))
+        paused = self.grilled(project, run_id, self.NEW, with_stories(TRACED, 1, 2))
+        self.assertEqual((paused["status"], paused["step"]), ("paused", "review-critique"), paused)
+        report = self.critiqued(project, run_id, self.NEW, with_stories(TRACED, 1, "### User Story 2 - Land it"))
+        self.assert_failed(report, "story-headings-after-critique", "### User Story 2 - Land it")
+        (project.root / self.NEW / "spec.md").write_text(with_stories(TRACED, 1, 2))
+        self.assertEqual(self.resume(project, run_id)["status"], "completed")
+
+    def test_a_rescope_that_numbers_a_new_story_into_a_number_dropped_before_the_run_stops_at_grill(self):
+        project, run_id = self.rescope((1, 3))
+        report = self.grilled(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 2, 3))
+        self.assert_failed(report, "rescope-story-headings-after-grill", heading(2), "above 3")
+
+    def test_a_rescope_that_drops_a_story_and_numbers_the_new_one_above_every_story_goes_on(self):
+        project, run_id = self.rescope((1, 2, 3))
+        report = self.grilled(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3, 4))
+        self.assertEqual((report["status"], report["step"]), ("paused", "review-critique"), report)
+        report = self.critiqued(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3, 4))
+        self.assertEqual(report["status"], "completed", report)
+
+    def test_a_rescope_whose_critique_review_renumbers_a_story_stops_the_run(self):
+        project, run_id = self.rescope((1, 3))
+        self.grilled(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3))
+        report = self.critiqued(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, heading(2, "Story 3")))
+        self.assert_failed(report, "rescope-story-headings-after-critique", heading(2, "Story 3"), "above 3")
 
 
 class Report(unittest.TestCase):

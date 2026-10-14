@@ -7,6 +7,7 @@ from paths import PLUGIN
 
 import premise_report
 import yaml  # Spec Kit's own dependency
+from test_drive_workflow import workflow_steps
 
 ISSUE_SPEC = PLUGIN / "skills" / "issue-spec" / "SKILL.md"
 WORKFLOW = PLUGIN / "speckit" / "workflows" / "alq-spec" / "workflow.yml"
@@ -93,18 +94,40 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertIn("A title with no such word: stop before writing anything, and tell the user to retitle the "
                       "issue.", self.new_scope())
 
-    def test_a_completed_run_ends_with_the_spec_folder_and_branch_lines(self):
-        text = squashed(ISSUE_SPEC)
-        self.assertIn("End with two lines and nothing after them: `Spec folder: <path>`", text)
-        self.assertIn("`Branch: <branch>`", text)
+    def form(self, start):
+        found = re.search(rf"^- \*\*`{start}.*?(?=^- \*\*|^$)", ISSUE_SPEC.read_text(), re.M | re.S).group(0)
+        return re.sub(r"\s+", " ", found)
 
-    def test_a_rescope_runs_in_the_issues_existing_worktree_and_never_creates_one(self):
-        """A fresh branch would take the re-scoped spec away from the PR it was held for."""
-        rescope = re.search(r"^- \*\*`rescope .*?(?=^- \*\*|^$)", ISSUE_SPEC.read_text(), re.M | re.S).group(0)
-        rescope = re.sub(r"\s+", " ", rescope)
-        self.assertIn("never creates one", rescope)
-        self.assertIn("the PR bound to that spec folder", rescope)
-        self.assertIn("stop and ask the user", rescope)
+    def test_a_new_scope_creates_its_spec_branch_and_worktree_before_anything_else_and_runs_there(self):
+        new = self.form("#<issue>")
+        self.assertIn("Before anything else, run `python3 BRANCH create <ISSUE>`", new)
+        self.assertIn("`CHECKOUT` is its `worktree`", new)
+        self.assertLess(new.index("BRANCH create"), new.index("`gh issue view"))
+        self.assertIn("show the user its message and stop", new)
+
+    def test_a_completed_new_scope_lands_through_its_draft_pr_launches_no_review_and_says_so_last(self):
+        text = squashed(ISSUE_SPEC)
+        self.assertIn("on a new scope, `python3 BRANCH land <run_id> <spec folder>`", text)
+        self.assertIn("Launch no review.", text)
+        self.assertIn("End with four lines and nothing after them: `Spec folder: <folder>`, `Branch: <branch>`, "
+                      "`PR: <pr>` and `Review: spec: null`", text)
+
+    def test_a_rescope_works_in_the_worktree_it_is_run_from_and_creates_nothing(self):
+        """The spec edit lands in the PR the rescope is run from, a story's or the spec's."""
+        self.assertIn("`CHECKOUT` is the worktree this session runs in", self.form("rescope"))
+        self.assertIn("A rescope creates no branch, worktree or PR.", self.form("rescope"))
+        text = squashed(ISSUE_SPEC)
+        self.assertIn("On a rescope, `python3 BRANCH push <run_id> <spec folder>`", text)
+        self.assertIn("End with two lines and nothing after them: `Spec folder: <folder>` and `Branch: <branch>`",
+                      text)
+
+    def test_every_story_heading_check_is_a_stop_the_skill_names(self):
+        stops = ISSUE_SPEC.read_text().partition("## Stops")[2]
+        checks = [s["id"] for s in workflow_steps() if "story_headings.py" in s.get("run", "")]
+        self.assertEqual(len(checks), 5, checks)
+        for step in checks:
+            with self.subTest(step=step):
+                self.assertIn(f"`{step}`", stops)
 
     def test_a_rescope_writes_the_issue_as_first_stated_then_the_open_decision(self):
         """The folder may hold the wrong scope: the issue is read again from GitHub, not taken from the folder."""
@@ -156,7 +179,7 @@ class IssueSpecSkill(unittest.TestCase):
 
     def test_says_a_failed_run_leaves_nothing_behind(self):
         text = squashed(ISSUE_SPEC)
-        self.assertIn("A run that is rejected or fails commits nothing and pushes nothing.", text)
+        self.assertIn("A run that is rejected or fails commits nothing, pushes nothing and opens nothing.", text)
 
     def test_holds_none_of_the_old_home_phrases(self):
         text = squashed(ISSUE_SPEC).lower()
