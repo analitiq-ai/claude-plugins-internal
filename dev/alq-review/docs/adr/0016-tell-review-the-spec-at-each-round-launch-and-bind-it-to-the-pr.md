@@ -9,7 +9,7 @@ tags: [spec, review-round, ledger]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0008", "0009", "0012", "0018"]
+relatesTo: ["0002", "0008", "0009", "0012", "0018", "0020"]
 affects:
   - type: path
     pattern: "plugins/alq-review/workflows/{review-round,assess-round}.js"
