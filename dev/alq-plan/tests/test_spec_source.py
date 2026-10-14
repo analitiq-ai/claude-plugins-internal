@@ -105,21 +105,38 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertLess(new.index("BRANCH create"), new.index("gh issue view"))
         self.assertIn("show the user its message and stop", new)
 
-    def test_a_completed_new_scope_lands_through_its_draft_pr_launches_no_review_and_says_so_last(self):
+    def test_a_completed_run_is_checked_then_committed_and_pushed_by_the_session_then_a_new_scope_opens_its_pr(self):
+        """The session runs git commit and git push itself, so the commit gate sees the commit."""
         text = squashed(ISSUE_SPEC)
-        self.assertIn("On a new scope, `python3 BRANCH land <run_id> <spec folder>`", text)
+        steps = ["`python3 BRANCH check new <run_id> <spec folder>`", "`python3 BRANCH check rescope <run_id> <spec folder>`",
+                 "`git add -- <spec folder>`", '`git commit -m "<message>"`', "`git push --set-upstream origin HEAD`",
+                 "`python3 BRANCH open-pr <run_id> <spec folder>`"]
+        positions = [text.find(step) for step in steps]
+        self.assertNotIn(-1, positions, list(zip(steps, positions)))
+        self.assertEqual(positions, sorted(positions))
         self.assertIn("Launch no review.", text)
         self.assertIn("End with four lines and nothing after them: `Spec folder: <folder>`, `Branch: <branch>`, "
                       "`PR: <pr>` and `Review: spec: null`", text)
+        self.assertIn("On a rescope, end with two lines and nothing after them: `Spec folder: <folder>` and "
+                      "`Branch: <branch>`", text)
 
     def test_a_rescope_works_in_the_worktree_it_is_run_from_and_creates_nothing(self):
         """The spec edit lands in the PR the rescope is run from, a story's or the spec's."""
         self.assertIn("`CHECKOUT` is the worktree this session runs in", self.form("rescope"))
         self.assertIn("A rescope creates no branch, worktree or PR.", self.form("rescope"))
-        text = squashed(ISSUE_SPEC)
-        self.assertIn("On a rescope, `python3 BRANCH push <run_id> <spec folder>`", text)
-        self.assertIn("End with two lines and nothing after them: `Spec folder: <folder>` and `Branch: <branch>`",
-                      text)
+
+    def test_a_new_scope_that_does_not_land_discards_its_spec_branch(self):
+        """A spec branch left behind would refuse the next new scope of the issue and tell it to rescope."""
+        discard = "`python3 BRANCH discard <ISSUE>`"
+        rule = re.search(r"^\*\*A new scope that does not land\.\*\*.*?(?=^$)", ISSUE_SPEC.read_text(), re.M | re.S)
+        self.assertIsNotNone(rule)
+        rule = re.sub(r"\s+", " ", rule.group(0))
+        for said in (discard, "either stop pick", "a rejected run", "a failed run"):
+            with self.subTest(said=said):
+                self.assertIn(said, rule)
+        said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After either stop pick")]
+        self.assertTrue([s for s in said if discard in s], said)
+        self.assertIn("A new scope that does not land", ISSUE_SPEC.read_text().partition("## Stops")[2])
 
     def test_every_story_heading_check_is_a_stop_the_skill_names(self):
         stops = ISSUE_SPEC.read_text().partition("## Stops")[2]

@@ -157,8 +157,68 @@ def write_folder(project: Path, folder=FOLDER):
     (project / folder / "plan.md").write_text("# Plan\n")
 
 
-class Land(unittest.TestCase):
-    """A completed new scope: its folder committed and pushed on the spec branch, and a draft PR part of its issue."""
+class Discard(unittest.TestCase):
+    """A new scope that ends without landing leaves no spec branch behind, so that a new scope can start again."""
+
+    def setUp(self):
+        self.repo = Repo()
+        self.addCleanup(self.repo.close)
+        done = self.repo.run("create", ISSUE)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        # What a run that stopped leaves in the worktree: a folder and the run's own files, none of them committed.
+        write_folder(self.repo.worktree)
+        write_run(self.repo.worktree, "failed")
+
+    def assert_kept(self):
+        self.assertTrue(self.repo.worktree.is_dir())
+        self.assertEqual(self.repo.git("branch", "--list", BRANCH).strip("+* "), BRANCH)
+
+    def test_the_spec_worktree_and_its_local_branch_are_removed(self):
+        done = self.repo.run("discard", ISSUE)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertFalse(self.repo.worktree.exists())
+        self.assertEqual(self.repo.git("branch", "--list", BRANCH), "")
+        self.assertEqual(self.repo.git("worktree", "list", "--porcelain").count("worktree "), 1)
+        self.assertEqual(self.repo.run("create", ISSUE).returncode, 0)
+
+    def test_run_from_another_worktree_it_removes_the_repos_spec_worktree(self):
+        other = self.repo.root / ".claude" / "worktrees" / "other"
+        self.repo.git("worktree", "add", "-q", "-b", "other", str(other))
+        done = self.repo.run("discard", ISSUE, cwd=other)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertFalse(self.repo.worktree.exists())
+
+    def test_a_spec_branch_with_a_commit_beyond_its_base_is_kept_naming_the_commit(self):
+        self.repo.commit(self.repo.worktree, "landed.txt")
+        done = self.repo.run("discard", ISSUE)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn(BRANCH, done.stderr)
+        self.assertIn("landed.txt", done.stderr)
+        self.assertIn("Next step:", done.stderr)
+        self.assert_kept()
+
+    def test_a_spec_branch_on_origin_is_kept_naming_it(self):
+        self.repo.git("push", "-q", "origin", f"{BRANCH}:{BRANCH}", cwd=self.repo.worktree)
+        done = self.repo.run("discard", ISSUE)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn(f"{BRANCH} is on origin", done.stderr)
+        self.assertIn("Next step:", done.stderr)
+        self.assert_kept()
+
+    def test_an_issue_with_no_spec_branch_has_nothing_to_discard(self):
+        done = self.repo.run("discard", "8")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("8-spec", done.stderr)
+
+
+def staged(where):
+    return subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=where, capture_output=True, text=True,
+                          check=True).stdout.split()
+
+
+class Check(unittest.TestCase):
+    """Before the session commits a completed run's folder: the run completed, the branch is the right one, and
+    nothing but the folder is staged. The check commits and pushes nothing itself."""
 
     def setUp(self):
         self.repo = Repo()
@@ -168,21 +228,98 @@ class Land(unittest.TestCase):
         self.created = self.repo.gh_calls()
         self.base = self.repo.git("rev-parse", "HEAD", cwd=self.repo.worktree)
 
-    def land(self, project, status="completed"):
+    def check(self, kind, project, status="completed"):
         write_folder(project)
-        return self.repo.run("land", write_run(project, status, f"run-{status}"), FOLDER, cwd=project)
+        return self.repo.run("check", kind, write_run(project, status, f"run-{kind}-{status}"), FOLDER, cwd=project)
 
-    def committed(self):
-        return self.repo.git("show", "--name-only", "--format=", "HEAD", cwd=self.repo.worktree).splitlines()
+    def assert_changed_nothing(self, where):
+        self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=where), self.base)
+        self.assertEqual(self.repo.remote_branch(BRANCH), "")
+        self.assertEqual(self.repo.gh_calls(), self.created)
 
-    def test_a_completed_new_scope_commits_the_folder_pushes_the_branch_and_opens_a_draft_pr(self):
-        done = self.land(self.repo.worktree)
+    def test_a_completed_new_scope_on_its_spec_branch_passes_and_gives_the_commit_message(self):
+        done = self.check("new", self.repo.worktree)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout),
+                         {"folder": FOLDER, "branch": BRANCH, "message": f"docs(#{ISSUE}): spec {FOLDER}"})
+        self.assert_changed_nothing(self.repo.worktree)
+        self.assertEqual(staged(self.repo.worktree), [])
+
+    def test_a_project_below_the_checkout_names_its_folder_from_the_checkout(self):
+        done = self.check("new", self.repo.worktree / "dev" / "demo")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["folder"], f"dev/demo/{FOLDER}")
+
+    def test_a_run_that_failed_was_rejected_or_has_not_finished_is_refused(self):
+        for kind in ("new", "rescope"):
+            for status in ("failed", "aborted", "paused"):
+                with self.subTest(kind=kind, status=status):
+                    done = self.check(kind, self.repo.worktree, status)
+                    self.assertNotEqual(done.returncode, 0)
+                    self.assertIn(status, done.stderr)
+                    self.assert_changed_nothing(self.repo.worktree)
+
+    def test_a_new_scope_off_its_spec_branch_is_refused_naming_it(self):
+        done = self.check("new", self.repo.root)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn(BRANCH, done.stderr)
+
+    def test_anything_staged_outside_the_folder_is_refused_naming_it(self):
+        (self.repo.worktree / "stray.txt").write_text("stray")
+        self.repo.git("add", "stray.txt", cwd=self.repo.worktree)
+        done = self.check("new", self.repo.worktree)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("stray.txt", done.stderr)
+
+    def test_the_folder_already_staged_passes(self):
+        write_folder(self.repo.worktree)
+        self.repo.git("add", FOLDER, cwd=self.repo.worktree)
+        self.assertEqual(self.check("new", self.repo.worktree).returncode, 0)
+
+    def test_a_completed_rescope_passes_on_whatever_branch_it_runs_on(self):
+        story = self.repo.root / ".claude" / "worktrees" / "7-us1-demo"
+        self.repo.git("worktree", "add", "-q", "-b", "7-us1-demo", str(story), "origin/main")
+        done = self.check("rescope", story)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout),
+                         {"folder": FOLDER, "branch": "7-us1-demo", "message": f"docs(#{ISSUE}): rescope {FOLDER}"})
+
+    def test_the_script_never_commits_or_pushes_so_the_sessions_commit_gate_sees_every_commit(self):
+        self.assertNotRegex(SCRIPT.read_text(), r'"(commit|push)"')
+
+
+class OpenPr(unittest.TestCase):
+    """A completed new scope whose folder the session committed and pushed: a draft PR, part of its issue."""
+
+    def setUp(self):
+        self.repo = Repo()
+        self.addCleanup(self.repo.close)
+        done = self.repo.run("create", ISSUE)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.created = self.repo.gh_calls()
+        self.run_id = write_run(self.repo.worktree, "completed")
+        write_folder(self.repo.worktree)
+
+    def landed(self, pushed=True):
+        """The session's part: the folder committed as the check says, and pushed."""
+        done = self.repo.run("check", "new", self.run_id, FOLDER, cwd=self.repo.worktree)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.repo.git("add", "--", FOLDER, cwd=self.repo.worktree)
+        self.repo.git("commit", "-q", "-m", json.loads(done.stdout)["message"], cwd=self.repo.worktree)
+        if pushed:
+            self.repo.git("push", "-q", "--set-upstream", "origin", "HEAD", cwd=self.repo.worktree)
+
+    def open_pr(self):
+        return self.repo.run("open-pr", self.run_id, FOLDER, cwd=self.repo.worktree)
+
+    def test_a_pushed_new_scope_opens_one_draft_pr_into_the_default_branch_part_of_its_issue(self):
+        self.landed()
+        done = self.open_pr()
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(json.loads(done.stdout), {"folder": FOLDER, "branch": BRANCH, "pr": PR_URL})
-        self.assertEqual(sorted(self.committed()), [f"{FOLDER}/plan.md", f"{FOLDER}/spec.md"])
-        head = self.repo.git("rev-parse", "HEAD", cwd=self.repo.worktree)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD~1", cwd=self.repo.worktree), self.base)
-        self.assertEqual(self.repo.remote_branch(BRANCH), head)
+        self.assertEqual(sorted(self.repo.git("show", "--name-only", "--format=", "HEAD",
+                                              cwd=self.repo.worktree).splitlines()),
+                         [f"{FOLDER}/plan.md", f"{FOLDER}/spec.md"])
         read, create = self.repo.gh_calls()[len(self.created):]
         self.assertEqual(read, ["repo", "view", str(self.repo.origin), *DEFAULT_BRANCH_READ])
         self.assertEqual(create[:2], ["pr", "create"])
@@ -191,81 +328,29 @@ class Land(unittest.TestCase):
         flags = dict(zip(create[2::2], create[3::2]))
         self.assertEqual((flags["--repo"], flags["--base"], flags["--head"]), (str(self.repo.origin), "trunk", BRANCH))
         self.assertEqual(flags["--body"].splitlines()[0], f"Part of #{ISSUE}")
-        self.assertTrue(flags["--title"])
+        self.assertEqual(flags["--title"], f"docs(#{ISSUE}): spec 7-demo")
 
-    def test_a_project_below_the_checkout_names_its_folder_from_the_checkout(self):
-        project = self.repo.worktree / "dev" / "demo"
-        done = self.land(project)
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(json.loads(done.stdout)["folder"], f"dev/demo/{FOLDER}")
-        self.assertEqual(sorted(self.committed()), [f"dev/demo/{FOLDER}/plan.md", f"dev/demo/{FOLDER}/spec.md"])
-
-    def test_a_run_that_failed_was_rejected_or_has_not_finished_commits_pushes_and_opens_nothing(self):
-        for status in ("failed", "aborted", "paused"):
-            with self.subTest(status=status):
-                done = self.land(self.repo.worktree, status)
-                self.assertNotEqual(done.returncode, 0)
-                self.assertIn(status, done.stderr)
-                self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=self.repo.worktree), self.base)
-                self.assertEqual(self.repo.remote_branch(BRANCH), "")
-                self.assertEqual(self.repo.gh_calls(), self.created)
-
-    def test_a_default_branch_github_will_not_name_commits_pushes_and_opens_nothing(self):
-        self.repo.env["GH_FAILS"] = "1"
-        done = self.land(self.repo.worktree)
+    def test_a_branch_origin_does_not_have_at_its_head_opens_nothing(self):
+        self.landed(pushed=False)
+        done = self.open_pr()
         self.assertNotEqual(done.returncode, 0)
-        self.assertIn("HTTP 502", done.stderr)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=self.repo.worktree), self.base)
-        self.assertEqual(self.repo.remote_branch(BRANCH), "")
+        self.assertIn("Next step:", done.stderr)
+        self.assertEqual(self.repo.gh_calls(), self.created)
 
-    def test_landing_off_the_spec_branch_is_refused_naming_it(self):
-        done = self.land(self.repo.root)
-        self.assertNotEqual(done.returncode, 0)
-        self.assertIn(BRANCH, done.stderr)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD"), self.repo.git("rev-parse", "origin/main"))
-        self.assertEqual(self.repo.remote_branch(BRANCH), "")
-
-
-class Push(unittest.TestCase):
-    """A completed rescope: the spec edit committed and pushed on the branch of the worktree it ran in, and nothing
-    created."""
-    STORY = "7-us1-demo"
-
-    def setUp(self):
-        self.repo = Repo()
-        self.addCleanup(self.repo.close)
-        self.checkout = self.repo.root / ".claude" / "worktrees" / self.STORY
-        self.repo.git("worktree", "add", "-q", "-b", self.STORY, str(self.checkout), "origin/main")
-        self.base = self.repo.git("rev-parse", "HEAD", cwd=self.checkout)
-
-    def worktrees(self):
-        return [line for line in self.repo.git("worktree", "list", "--porcelain").splitlines()
-                if line.startswith("worktree ")]
-
-    def push(self, status="completed"):
-        write_folder(self.checkout)
-        return self.repo.run("push", write_run(self.checkout, status), FOLDER, cwd=self.checkout)
-
-    def test_a_completed_rescope_commits_and_pushes_on_its_worktrees_branch_and_creates_nothing(self):
-        branches = self.repo.git("branch", "--list")
-        worktrees = self.worktrees()
-        done = self.push()
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(json.loads(done.stdout), {"folder": FOLDER, "branch": self.STORY})
-        head = self.repo.git("rev-parse", "HEAD", cwd=self.checkout)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD~1", cwd=self.checkout), self.base)
-        self.assertEqual(sorted(self.repo.git("show", "--name-only", "--format=", "HEAD", cwd=self.checkout).splitlines()),
-                         [f"{FOLDER}/plan.md", f"{FOLDER}/spec.md"])
-        self.assertEqual(self.repo.remote_branch(self.STORY), head)
-        self.assertEqual((self.repo.git("branch", "--list"), self.worktrees()), (branches, worktrees))
-        self.assertEqual(self.repo.gh_calls(), [])
-
-    def test_a_rescope_that_failed_or_was_rejected_commits_and_pushes_nothing(self):
-        done = self.push("aborted")
+    def test_a_run_that_has_not_completed_opens_nothing(self):
+        self.landed()
+        run_id = write_run(self.repo.worktree, "aborted", "run-aborted")
+        done = self.repo.run("open-pr", run_id, FOLDER, cwd=self.repo.worktree)
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("aborted", done.stderr)
-        self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=self.checkout), self.base)
-        self.assertEqual(self.repo.remote_branch(self.STORY), "")
+        self.assertEqual(self.repo.gh_calls(), self.created)
+
+    def test_a_pr_github_refuses_fails_loud(self):
+        self.landed()
+        self.repo.env["GH_FAILS"] = "1"
+        done = self.open_pr()
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("HTTP 502", done.stderr)
 
 
 if __name__ == "__main__":
