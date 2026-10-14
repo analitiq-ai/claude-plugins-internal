@@ -66,14 +66,16 @@ class Folder(unittest.TestCase):
                 self.assertIn("Next step: run `premise_report.py check", done.stderr)
                 self.assertFalse(self.folder.exists())
 
-    def test_a_folder_that_cannot_be_written_names_the_path_and_says_to_clear_it_then_resume(self):
-        """The report is good: what is wrong is the path, and checking the report again would not fix it."""
+    def test_a_folder_that_cannot_be_written_names_the_path_and_says_to_clear_it(self):
+        """The report is good: what is wrong is the path, and checking the report again would not fix it. Whether
+        the run resumes is the skill's to say, not the script's."""
         (self.root / "specs").write_text("in the way\n")
         done = self.run_cli("write", str(self.folder), str(self.report))
         self.assertEqual(done.returncode, 2)
-        for said in (str(self.root / "specs"), "writable", "resume the run"):
+        for said in (str(self.root / "specs"), "Next step: make that path writable or clear what is in its way."):
             self.assertIn(said, done.stderr)
-        self.assertNotIn("premise_report.py check", done.stderr)
+        for unsaid in ("premise_report.py check", "resume", "DRIVE"):
+            self.assertNotIn(unsaid, done.stderr)
 
     def test_a_report_that_is_not_there_writes_nothing(self):
         done = self.run_cli("write", str(self.folder), str(self.root / "gone.md"))

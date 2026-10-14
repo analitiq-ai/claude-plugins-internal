@@ -147,6 +147,10 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertIn("Never ask for approve or reject at this step.", text)
         self.assertIn("Ask the user only what the issue and the code cannot answer.", text)
 
+    def test_a_no_spec_folder_that_cannot_be_written_is_a_stop_that_resumes(self):
+        stops = re.sub(r"\s+", " ", ISSUE_SPEC.read_text().split("## Stops", 1)[1])
+        self.assertIn("- `step: write-no-spec`, with a `stderr` line that names a Next step: do as it says.", stops)
+
     def test_says_a_failed_run_leaves_nothing_behind(self):
         text = squashed(ISSUE_SPEC)
         self.assertIn("A run that is rejected or fails commits nothing and pushes nothing.", text)

@@ -535,6 +535,20 @@ class Premise(unittest.TestCase):
         for line in ("Rests on: needs-spec", f"Reason: {self.REASON}"):
             self.assertIn(line, text.splitlines())
 
+    def test_an_unwritable_no_spec_folder_stops_at_its_step_with_a_next_step_and_resumes_once_cleared(self):
+        blocker = self.project.root / "specs"
+        blocker.write_text("in the way\n")
+        report = self.stop(NO_SPEC)
+        self.assertEqual((report["status"], report["step"]), ("failed", "write-no-spec"), report)
+        self.assertIn("Next step:", report["stderr"])
+        for unsaid in ("resume", "DRIVE"):
+            self.assertNotIn(unsaid, report["stderr"])
+        blocker.unlink()
+        proc, report = self.project.drive("resume", self.started["run_id"])
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(report["status"], "completed", report)
+        self.assertTrue(no_spec.is_no_spec((self.project.root / NEW / "spec.md").read_text()))
+
     def test_an_issue_judged_to_need_no_spec_is_not_scoped_again(self):
         self.stop(NO_SPEC)
         proc, report = self.project.drive("start", self.project.spec_file(ISSUE_TEXT), ISSUE, "specs/7-other")
