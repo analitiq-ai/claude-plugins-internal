@@ -74,6 +74,10 @@ class Check(unittest.TestCase):
             with self.subTest(refusal):
                 self.assert_one_problem(problems(*args, project="dev/x/"), *said)
 
+    def test_a_rescope_of_the_issues_one_folder_passes_in_a_project_under_the_checkout(self):
+        self.assertEqual(problems("specs/7-demo", "7", "rescope", {"7-demo": True, "8-other": True},
+                                  project="dev/x/"), [])
+
     def test_folders_of_other_issues_do_not_refuse_a_new_scope(self):
         existing = {"70-x": True, "17-y": True, "8-z": True, "007-old": True, "7": True}
         self.assertEqual(problems("specs/7-demo", "7", "new", existing), [])
