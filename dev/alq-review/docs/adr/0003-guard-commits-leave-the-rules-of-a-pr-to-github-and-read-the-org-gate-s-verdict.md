@@ -69,10 +69,10 @@ Why now: these reasons sit in a docstring and a code comment. No ADR binds the n
 3. We will take a check run as the org gate's verdict only when its App posted it. A run with the right
    name from anyone else counts for nothing. The exception of point 2 rests on such a verdict.
 
-ADR-0019 amends points 1, 2 and 3 for a PR that carries the `cleanup` label: it needs no internal review,
+ADR-0021 amends points 1, 2 and 3 for a PR that carries the `cleanup` label: it needs no internal review,
 its commits skip the commit checks, and its exception rests on the label, not on a verdict of the org
-gate. The hook refuses the `gh` commands that add the label (ADR-0019 point 2); `curl` and scripts are
-not refused.
+gate. The hook refuses only the commands ADR-0021 point 2 names; every other route to the label, `curl`
+and scripts among them, stays open.
 
 ## Options considered
 
