@@ -10,7 +10,7 @@ suites serve a bare origin and stub `gh`.
 (cd dev/alq-plan/tests && python -m unittest -v)
 ```
 
-Expected: green, with every scenario of [spec.md](spec.md) covered as [research.md](research.md) R13 lists, and
+Expected: green, with every scenario of [spec.md](spec.md) covered as [research.md](research.md) R10 lists, and
 `spec_blob`, `spec_held`, `text_step` nowhere in the plugin (US2's tests name the first two, to prove nothing reads them):
 
 ```bash
@@ -26,15 +26,15 @@ its code is wrong.
 ## End to end (manual, after each story merges)
 
 1. **US1.** In a worktree on `123-us1-x` of a repo with `specs/123-y/spec.md`: `Edit` it: refused, naming the file and
-   `123-spec`. `echo x >> specs/123-y/spec.md`: refused. `cat specs/123-y/spec.md`: not refused. Stage a change by hand and
-   `git commit`: refused with the restore command. On `123-spec` the same edit passes.
+   `123-spec`. Edit `specs/123-y/plan.md`: passes. On `123-spec` the spec.md edit passes.
 2. **US2.** On a draft PR bound to a folder, merge a spec change into its branch and launch review-round: the round opens; the
    ledger (`python3 scripts/ledger.py status --worktree <root>`) shows `spec` and no `spec_blob`.
 3. **US3.** Have a round ruled `RESHAPE_SPEC`. The refusal names `123-spec`, `rebase <ref>` and `unlock <ref>`. Type `rebase
    #<pr>` before the spec PR merges: contracts' reply for row `changed`, and the lock stays. Merge a spec-only PR, type it
    again: contracts' `release` reply, the ledger shows `rebased_onto`, and git is as FR-009 leaves it. Launch review-round
-   before rebasing: row `contains` refuses. Rebase (with a conflicting change on the default branch, dispatch the conflict
+   before rebasing: the `contains` check refuses. Rebase (with a conflicting change on the default branch, dispatch the conflict
    resolver as the reply says), push, launch again: a full round.
-4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both. Split them: both pass.
+4. **US4.** Commit a spec.md change (through Bash) and a code change on one branch and launch: reply `mixed`, naming both.
+   Split them: both pass. Move a spec folder in one PR and launch: reply `folders`, naming both folders.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the
    folder, the branch and the user's next steps once.

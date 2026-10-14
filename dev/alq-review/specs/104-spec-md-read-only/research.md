@@ -10,6 +10,10 @@ open PR #93 (`git show origin/81-adr-name-the-user-story:dev/alq-review/docs/adr
 decision 1 stands. Its decision 3 binds the `spec.md` blob and its closing line says "ADR-0016, decision 6, and ADR-0018
 stand": the decision record replaces both (R1).
 
+Scope, as the user narrowed it (spec Clarifications, 2026-10-14): the review-round launch's diff check (US4) is the gate that
+keeps the graded spec from changing beside code; the story rule (US1) refuses only `Edit`, `Write` and `NotebookEdit` of a
+spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they carry is caught at the next launch.
+
 ## R1: Shipping order: records first, then one PR per user story, stacked where a story needs another
 
 - **Decision**: (1) the decision record, drafted from this plan with `speckit-adrkit-draft`, in its own PR on `104-adr-<slug>`,
@@ -18,100 +22,60 @@ stand": the decision record replaces both (R1).
   stand", and changes ADR-0018 so a `RESHAPE_SPEC` lock is released by `unlock <ref>` when the spec stands and by `rebase <ref>`
   after a spec change; PR #105's hand-written ADR-0020 is closed. (2) The engineering `git-workflow.md` change, in that repo:
   the spec changes through its own spec-only PR, never in a story PR. (3) Code, one PR per user story on `104-us<N>-<slug>`: US1
-  (the hook and the commit backstop) off the default branch; US2 (the hold deleted) stacked on US1; US3 (`rebase`, the conflict
-  resolver) stacked on US2; US4 (the diff check) and US5 (the rescope, in `alq-plan`) off the default branch. The README changes
-  with the code of each story. The plugin's version moves once, in the last alq-review story to merge, and that bump turns on
-  US1; alq-plan's US5 release ships no later than it.
+  (the edit rule) off the default branch; US2 (the hold deleted) stacked on US1; US3 (`rebase`, the conflict resolver) stacked
+  on US2; US4 (the diff check) and US5 (the rescope, in `alq-plan`) off the default branch. The README changes with the code of
+  each story. The plugin's version moves once, in the last alq-review story to merge, and that bump turns on US1 and US4;
+  alq-plan's US5 release ships no later than it.
 - **Rationale**: constitution VI puts the governing record apart from the code. The spec's priorities order the stories, and US2
   says it comes after US1; US3's release reads a lock US2 reshapes. The stacking rule is git-workflow.md's. The spec.md of this
   folder never changes on these branches, so the hold that is live until US2 merges does not bite. US5's release goes first
   because the rescope route the lock text names must work the day the rule is live: a rescope in the story worktree is refused
-  at its first write once US1 is on.
+  at its first edit once US1 is on.
 - **Existing tools**: `speckit-adrkit-draft` and `draft.sh`, the tools ADR-0016–0018 were written with. The git-workflow
   stacking rule, as written. The release practice the repo used for 0.12.0 and 0.13.0 (019 R2).
 
-## R2: What a spec.md and a story branch are, defined once
+## R2: What a spec folder, a spec.md and a story branch are, defined once
 
-- **Decision**: `specbinding.py` gains three pure functions and loses `text_step`. `spec_md_folder(path) -> str | None`: the spec
-  folder of a repo-relative `path` named `spec.md` whose folder passes `shape_problem`, else None (`docs/spec.md`,
-  `specs/x/plan.md` give None). `story_issue(branch) -> str | None`: the issue number of a branch named `<digits>-us<digits>-...`,
-  else None. `story_write_refusal(branch, path, staged: bool) -> str | None`: the one refusal text for a write of `path` on
-  `branch`, None when the branch is not a story branch or the path is not a spec.md; it names the file, the branch, the rule,
-  and the next step with `<issue>-spec`, and for a staged change the restore command. The module's docstring becomes: what a
-  spec folder and a spec.md are, the review-round `spec` argument, its binding, and the two rules that keep a spec.md out of a
-  story PR.
+- **Decision**: `specbinding.py` gains four pure functions and loses `text_step`. `spec_folder(path) -> str | None`: the
+  `<…>/specs/<name>` folder a repo-relative `path` lies under, by `shape_problem`, else None. `spec_md_folder(path) -> str | None`:
+  that folder when `path` is `<folder>/spec.md`, else None (`docs/spec.md`, `specs/x/plan.md` give None).
+  `story_issue(branch) -> str | None`: the issue number of a branch named `<digits>-us<digits>-...`, else None.
+  `story_edit_refusal(branch, path) -> str | None`: the refusal text for an edit of `path` on `branch`, None when the branch is
+  not a story branch or the path is not a spec.md. The module's docstring becomes: what a spec folder and a spec.md are, the
+  review-round `spec` argument, its binding, and the two rules that keep a spec.md out of a story PR.
 - **Rationale**: the spec's Terms define a spec.md by `shape_problem`, so the rule reuses it rather than re-declaring what a
-  spec folder is. One text for the three sites (R3–R5) is the spec's "the same words". P3 puts the decision in a pure function.
+  spec folder is; the diff check (R8) needs the folder of any path to tell a folder move from code. P3 puts the decision in a
+  pure function.
 - **Existing tools**: `specbinding.shape_problem`, reused. `worktree.locate`, which gives the branch. A regex of the branch
   name in `gate.py`: rejected, the rule would live in a handler.
 
 ## R3: The rule on `Edit`, `Write` and `NotebookEdit`
 
 - **Decision**: `gate.on_edit` judges the story rule right after `worktree.locate(path)` and before `target(where)`: the path
-  relative to `where.root`, `where.branch`, through `specbinding.story_write_refusal`; a text refuses with `hookio.refuse(payload,
-  "spec-write", text, Target(where.slug, None, where.branch, where.root))`. Nothing of the ledger or GitHub is read first.
-- **Rationale**: FR-001 reads the branch and nothing from the ledger; scenario 6 has no PR and no ledger, and `target()` may ask
-  GitHub. `hookio.refuse` is under `mode`, which FR-005 asks for.
+  relative to `where.root`, `where.branch`, through `specbinding.story_edit_refusal`; a text refuses with
+  `hookio.refuse(payload, "spec-edit", text, Target(where.slug, None, where.branch, where.root))`. Nothing of the ledger or
+  GitHub is read first. A detached HEAD (`where.branch` None), a rebase in progress included, is no story branch.
+- **Rationale**: FR-001 reads the branch and nothing from the ledger; scenario 4 has no PR and no ledger, and `target()` may
+  ask GitHub. `hookio.refuse` is under `mode`, which FR-005 asks for. The path is resolved by `locate` against its own
+  checkout, so an absolute path into another worktree is judged by that worktree's branch (edge case).
+- **Rejected**: Bash writes, the commit and the branch under a rebase (the earlier R4–R6). Each needed a reader of git or shell
+  state whose edge cases review rounds on PR #108 kept finding; the diff check at the launch sees what all of them leave.
 - **Existing tools**: `worktree.locate`, `hookio.refuse`, `Target`, reused.
 
-## R4: Bash writes, read by the one shell reader
-
-- **Decision**: `shell.classify` gains the kind `write`, its Action's field `path` declared in data-model "New
-  interfaces". The paths a segment writes, by the spec's table: a redirection target (`>`, `>>`, `&>`, `n>`,
-  attached or as the next word); `tee`'s non-option words; the last non-option word of `cp`; every non-option word of `mv`, `rm`,
-  `truncate` (after `-s <size>` / `--size=`), and of `sed` or `perl` when `-i`, `-i<suffix>` or `--in-place` is among its options;
-  for `git`: the non-option words of `rm` and `mv`, the words after `--` of `checkout`, and the non-option words of `restore`
-  except the value of `-s` / `--source`. Heredoc bodies are already cut away. `gate.on_bash` resolves each `write` action's
-  path against `action.cwd` (`~` expanded), locates its checkout, and judges it as R3 does; a refusal returns before the
-  other actions.
-- **Rationale**: one reader of a command (ADR-0005, the docstring of `shell.py`); the table is the spec's, and what it misses is
-  caught at the commit (R5) and the launch (R11). A path is judged by its own checkout, so an absolute path into another
-  worktree is judged by that worktree's branch (edge case). A word that is not a path, such as a `sed` script, locates nothing and
-  is not a hit, so the reader need not tell the file from the script.
-- **Existing tools**: `shell._segments`, `_words`, `_git`'s option walk and `_HEREDOC`, reused. `pre_merge_gate.tokenize`:
-  looked at; it is the merge gate's own reader, kept there because that script must answer without the plugin's modules.
-
-## R5: The commit backstop
-
-- **Decision**: in `gate.on_bash`, a `commit` action is judged for the story rule before `claimgate.on_commit` and
-  `shimgate.on_commit`: `worktree.to_commit(root, action.staging)` (data-model "New interfaces") lists the paths the commit
-  would record, and the first that `story_write_refusal(branch, path, staged=True)` refuses refuses the commit through
-  `hookio.refuse(payload, "commit", ...)`.
-  The text names the path and the restore command (`git restore --staged --worktree -- <path>`; for a path not in HEAD,
-  `git rm --cached -- <path>` and delete it).
-- **Rationale**: scenario 3 refuses "whatever the claim and shim checks' settings", so the refusal is under the plugin's `mode`
-  alone, not `refuse_claim` or `refuse_shim`, and runs first. The row lists a spec.md moved away by its own name, and a
-  `git commit -p` as staging, since it may pick worktree changes.
-- **Existing tools**: `worktree._listed`, `_DIFF` and `shell._stages`, as the row gives them; `claimgate.on_commit`'s
-  `worktree.locate(action.cwd)`, the same locate.
-
-## R6: The branch under a rebase is the checkout's branch
-
-- **Decision**: `worktree.locate` returns the branch a rebase in progress is rebasing when HEAD is detached: a new
-  `worktree.rebasing(root) -> str | None` (data-model "New interfaces") gives the branch a rebase in progress names, under
-  either rebase backend; `locate` uses it where it returned None for `HEAD`. Every reader of `locate` sees the branch under
-  rebase, so the story rule (R3–R5) holds the session and the conflict resolver during the rebase that follows `rebase <ref>`
-  (R9, R10) as on the branch, reading nothing from the ledger (FR-001).
-- **Rationale**: the spec's edge case: during a rebase the story rule reads the branch being rebased. `_held` compares
-  `here.branch` with the ledger's; with None it stops watching a checkout exactly when a rebase runs in it. The path is absolute
-  because git gives `--git-path` relative to the checkout, and the hook process runs elsewhere. Both state directories: a
-  `git rebase --apply`, or `rebase.backend` set to `apply`, keeps its state in `rebase-apply`.
-- **Existing tools**: `worktree.concluding`'s `git rev-parse --path-format=absolute --git-path` read, the same form.
-
-## R7: The hold goes, and the binding is the `spec` value alone
+## R4: The hold goes, and the binding is the `spec` value alone
 
 - **Decision**: delete `gate._spec_text`, `SpecStep.holds`, `_refuse_spec` and `_admit_spec`'s hold clearing; `_head_spec_md`
   becomes `_spec_md_present(root, head, folder, restore) -> str | None` (the refusal when `spec.md` is missing, empty or
   unreadable at `head`), through `_spec_md_blob`, which stays whole: the one reader of a spec.md at a commit, whose blob id
-  `rebase <ref>` compares (R9). `_spec_step` binds `{"spec": value}` only; on a bound
-  PR it checks presence and binds nothing. `_assess_spec_step` checks presence only. Delete `specbinding.text_step` and its
-  `released` import; `policy._spec_held` and the hold in `_holds`; the README's hold, `spec_blob` and `spec_held` text; the
-  tests of the hold (R13). Nothing reads `spec_blob` or `spec_held` from a stored ledger; no migration.
+  `rebase <ref>` compares (R6). `_spec_step` binds `{"spec": value}` only; on a bound PR it checks presence and binds nothing.
+  `_assess_spec_step` checks presence only. Delete `specbinding.text_step` and its `released` import; `policy._spec_held` and
+  the hold in `_holds`; the README's hold, `spec_blob` and `spec_held` text; the tests of the hold (R10). Nothing reads
+  `spec_blob` or `spec_held` from a stored ledger; no migration.
 - **Rationale**: decisions 4 and 5 of issue #104: every round grades against `spec.md` at the reviewed commit, and the gate keeps
   no copy. The presence check is ADR-0016 decision 3, which stands.
 - **Existing tools**: `_spec_md_blob`, kept. `ledger.released`, kept for the verdict lock.
 
-## R8: What a `RESHAPE_SPEC` lock says
+## R5: What a `RESHAPE_SPEC` lock says
 
 - **Decision**: in `policy._holds`, the verdict-lock entry for `RESHAPE_SPEC` keeps `user_decision` as the question and
   `_lock_reason` ends, when a `RESHAPE_SPEC` ruling holds the branch, with: the spec is rescoped on `<issue>-spec` (the issue from
@@ -124,131 +88,108 @@ stand": the decision record replaces both (R1).
   names the next legal step).
 - **Existing tools**: `_holds`, `_lock_reason`, `unlock_ref`, `_reshape_brief`, edited in place.
 
-## R9: `rebase <ref>`: the gate checks and releases; the session rebases
+## R6: `rebase <ref>`: the gate checks and releases; the session rebases
 
 - **Decision**: `gate._on_release` reads `rebase <ref>` only when it is the whole prompt, trimmed: the word `rebase`, one ref
   and nothing else; `unlock <ref>` is read as today (ADR-0004: first words). `gate._rebase` is data-model "`rebase <ref>`": its
-  rows in order, its release, and the launch row after it, under FR-009. New: `github.default_branch`,
-  `worktree.fetch_target` and `worktree.contains`, data-model "New interfaces". The spec.md reads are `gate._spec_md_blob`
-  (R7), for the reason data-model gives.
+  checks in order, its release, and the launch check after it, under FR-009. New: `github.default_branch`,
+  `worktree.fetch_target` and `worktree.contains` (data-model "New interfaces"). The spec.md reads are `gate._spec_md_blob`
+  (R4), which tells a missing path from an unknown commit.
 - **Rationale**: the user's decision in Clarifications (2026-10-14), which replaces the hook-run rebase. The default branch,
   never the PR's base: the spec PR merges into the default branch, so a stacked story PR's base never receives it, and its
-  parent lands first. A branch with no open PR has no base that could be a parent story branch, so row `base` has nothing to
-  refuse. A missing spec.md is a moved folder, and the binding never changes (ADR-0016 decision 5). The release comes before the
-  rebase because the rebase and the push are mutations the lock refuses; what keeps a round from grading the old code against
-  the new spec is the launch refusal, and `rebased_onto` is the one fact it needs, the commit whose spec.md the check saw and its branch; a
-  branch rebased onto a later default-branch commit contains it too. The whole-prompt match keeps an ordinary request that
-  starts with `rebase` from running a fetch. One release predicate, `ledger.unlock` and `released`, so `rebase` and `unlock`
-  release the same way and nothing else does; a second stamp would be a second release mechanism. Its one git write is FR-009's
-  fetch, so the keyword is safe to repeat; typed again after a release it names no locked PR.
-- **Rejected**: the hook rebasing itself, first in place, then in a throwaway worktree: every partial failure between the
-  rewrite and the push needed handling inside the gate, and four review rounds kept finding states it got wrong. A gate checks
-  state and the worker changes it, as GitHub's "branch must be up to date" rule does.
+  parent lands first. A missing spec.md is a moved folder, and the binding never changes (ADR-0016 decision 5). The release
+  comes before the rebase because the rebase and the push are mutations the lock refuses; what keeps a round from grading the
+  old code against the new spec is the launch refusal, and `rebased_onto` is the one fact it needs; a branch rebased onto a
+  later default-branch commit contains it too. The whole-prompt match keeps an ordinary request that starts with `rebase` from
+  running a fetch. One release predicate, `ledger.unlock` and `released`, so `rebase` and `unlock` release the same way and
+  nothing else does. Its one git write is FR-009's fetch, so the keyword is safe to repeat.
+- **Rejected**: the hook rebasing itself, in place or in a throwaway worktree: every partial failure between the rewrite and the
+  push needed handling inside the gate, and four review rounds kept finding states it got wrong. A gate checks state and the
+  worker changes it, as GitHub's "branch must be up to date" rule does.
 - **Existing tools**: `_unlock`, `_names`, `policy.locked`, `reshape_spec_ruling`, `ledger.unlock`, `worktree.review_base`'s
-  fetch, `_spec_md_blob`, `github.pr_target`, reused; `github.default_branch` and `worktree.contains`, new. `ledger.py unlock`
-  CLI, unchanged.
+  fetch, `_spec_md_blob`, `github.pr_target`, reused. `ledger.py unlock` CLI, unchanged.
 
-## R10: The conflict-resolver agent ships in the plugin
+## R7: The conflict-resolver agent ships in the plugin
 
 - **Decision**: a new `agents/conflict-resolver.md`, contracts "The conflict resolver", which the session dispatches as the
-  `rebase <ref>` reply says. No gate code dispatches, admits or watches it (data-model "`rebase <ref>`"); the story rule holds
-  it on the branch under the rebase (R6).
-- **Rationale**: the user asked that a conflict be resolved without them (Clarifications). A story commit never changes a
-  spec.md (US1), so a spec.md conflict is no agent's to settle; the user decides it. A hook cannot run an agent, so the reply
-  names the dispatch, a deviation from P1 the plan's Complexity Tracking records; it fails safe, since no round opens until the
-  branch contains `rebased_onto` (data-model, row `contains`).
+  `rebase <ref>` reply says. No gate code dispatches, admits or watches it.
+- **Rationale**: the user asked that a conflict be resolved without them (Clarifications). A spec.md conflict is no agent's to
+  settle; its prompt says so, and if a spec.md change survives the rebase anyway, the next launch refuses it (US4). A hook
+  cannot run an agent, so the reply names the dispatch, a deviation from P1 the plan's Complexity Tracking records; it fails
+  safe, since no round opens until the branch contains `rebased_onto`.
 - **Existing tools**: the plugin's `agents/` and `test_agents.py`'s frontmatter reader, reused; `test_shipped_tree.py` lists the
   agent as `alq-review:conflict-resolver`.
 
-## R11: A PR changes the spec or the code, never both
+## R8: A PR changes the spec or the code, never both
 
-- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str) -> str | None`, pure: `changes`
-  are `(status, path)` pairs, as `worktree.name_status` gives them (data-model "New interfaces"); for each path with status
-  other than `D` whose `spec_md_folder` is set, the first changed path (any status) not under that folder refuses, naming the
-  spec.md, that path, the rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, `<issue>` from
-  `story_issue(branch)`, or "the issue's spec branch" when the branch is not a story branch, rebase this branch on it, then
-  launch again). A rename is a deletion at its source and an addition at its destination, so a spec.md moved between two spec
-  folders is refused, and a code file renamed into a spec folder shows its deletion outside it. One site: a review-round
-  launch of any stage, after `_review_base` and before `ledger.open_round`, reads the pairs with
-  `worktree.name_status(root, base)`, refused through `hookio.refuse(payload, "launch", ...)`. Assess-round launches run no
-  diff check.
-- **Rationale**: FR-004. The launch has a checkout and a base. A deleted spec.md grades nothing (Clarifications). Under `mode`
-  (FR-005). An audit launch is a review-round launch (edge case).
-- **Rejected**: a second check at the internal-review attestation (`ready`). `policy.mark_ready`
-  (`plugins/alq-review/scripts/policy.py:215-229`) allows it only for a version-only release, which changes no spec.md, or for
-  a settled internal round at `head_sha`, whose launch already ran this check on the same commit. So the check there decides
-  nothing new, and it is a second gate over the same diff (one gate per document). Four review rounds of defects came from its
-  GitHub reads (`pr_head`, `released`, `pr_files`).
-- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused as the `name_status` row gives; `_review_base`,
-  `hookio.refuse`.
+- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str) -> str | None`, pure. `changes` are
+  `(status, path)` pairs, a rename split into its deletion and its addition (`worktree.name_status`). For the first path with
+  status other than `D` whose `spec_md_folder` is set, the changed paths (any status) not under that folder decide: none, it
+  passes; one or more in no spec folder, reply `mixed`, naming the spec.md and the first such path; all in other spec folders,
+  reply `folders`, naming the two folders and the two-PR route. One site: a review-round launch of any stage, after
+  `_review_base` and in its `try`, before `ledger.open_round`, refused through `hookio.refuse(payload, "launch", ...)`; a git
+  failure is refused as `_review_base`'s is. Assess-round launches run no diff check.
+- **Rationale**: FR-004 and the spec's Clarifications: this is the gate, and it reads the diff whatever wrote it. A deleted
+  spec.md grades nothing. A folder's move is no spec-and-code mix, so `mixed`'s "land the spec change as a spec-only PR" would
+  send the agent nowhere; `folders` names the route that passes. Under `mode` (FR-005). An audit launch is a review-round
+  launch (edge case).
+- **Rejected**: a second check at the internal-review attestation (`ready`): it is allowed only for a version-only release or a
+  settled internal round at `head_sha`, whose launch already ran this check on the same commit; a second gate over the same diff
+  (one gate per document).
+- **Existing tools**: `worktree.changed_files` and `_DIFF`, the model for `name_status`; `_review_base`, `hookio.refuse`.
 
-## R12: The rescope runs on the spec branch
+## R9: The rescope runs on the spec branch
 
 - **Decision**: `plugins/alq-plan/skills/issue-spec/SKILL.md`, the `rescope` form: `CHECKOUT` is the worktree of `<issue>-spec`,
-  created per the repo's branch rules off the default branch when there is none; before any write the skill reads `git fetch
-  origin` then `git branch -a --merged origin/<default>` and stops, naming it and asking the user to delete it, when a local or
-  remote `<issue>-spec` is already merged. Step 8's commit and push land on that branch; its closing lines name the folder and the
-  branch, and then, once, the user's next steps: open the spec-only PR, approve it, rebase the story branch with `rebase <ref>`,
-  relaunch the review. It names no other plugin's command.
-- **Rationale**: FR-006. With US1, a rescope in the story PR's worktree is refused at its first write. A merged branch reused
+  created per the repo's branch rules off the default branch when there is none; before any write the skill fetches and stops,
+  naming it and asking the user to delete it, when a local or remote `<issue>-spec` is already merged into the default branch.
+  Step 8's commit and push land on that branch; its closing lines name the folder and the branch, and then, once, the user's
+  next steps: open the spec-only PR, approve it, rebase the story branch with `rebase <ref>`, relaunch the review. It names no
+  other plugin's command.
+- **Rationale**: FR-006. With US1, a rescope in the story PR's worktree is refused at its first edit. A merged branch reused
   would carry a merged history into a new PR.
 - **Existing tools**: the skill's two forms and its `DRIVE` steps, unchanged; `git-workflow.md`'s worktree command.
 
-## R13: Tests, red first, in the two suites
+## R10: Tests, red first, in the two suites
 
-- **Decision**: `dev/alq-review/tests`: the story rule's gate tests join `test_gate.py` as a class `StoryBranch(Gate)` whose
-  fixture checks out `123-us2-reset` and commits `dev/x/specs/123-login/spec.md`; the shell reader's write table in
-  `test_shell.py`; the pure functions in `test_specbinding.py` (`SpecMdFolder`, `StoryIssue`, `StoryWriteRefusal`, `MixedDiff`,
-  replacing `TextStep`); the lock text and the launch refusal in `test_policy.py`; `rebase <ref>` and the diff check in
-  `test_gate.py` (`Rebase(HeldBranch)`, `MixedDiff(SpecArgument)`), the gh stub in `Gate.setUp` answering each GitHub lookup of
-  data-model "New interfaces" (T032); `Rebase` has a test per row of data-model "`rebase <ref>`", its release
-  and its launch row, each with contracts' reply, and FR-009's git writes held to the fetch; the agent file in `test_agents.py`
-  against contracts "The conflict resolver"; `worktree.rebasing`, `contains`, `fetch_target`, `to_commit`, `name_status` in
-  `test_worktree_facts.py`, each by its data-model "New interfaces" row; `ledger.regraded_rounds`
-  and its callers (R15) in `test_policy.py` and `test_worktree_facts.py`. US2's tests name `spec_blob` and `spec_held`, a stored
-  ledger carrying them and holding nothing, so SC-003's grep covers `plugins/alq-review` and not the tests. Deleted with the
-  hold: `test_gate.py` `SpecArgument`'s hold tests (today's lines 442–470, 599–672, 709–760, 777–790, 852–877), `held()`,
-  `assertHeldWithTheDiff`, `spec_blob` in `HeldBranch.lock` and three `state.update` calls; `test_policy.py` `hold_spec`,
-  `spec_held_state`, `SPEC_HOLD_NAMES`, four `Mutation` tests and the "spec hold" case of the every-hold test;
-  `test_specbinding.py` `TextStep`; `test_worktree_facts.py:298`. `dev/alq-plan/tests/test_spec_source.py`: the rescope test
-  becomes the spec-branch test. Each test is written, run and seen to fail for the expected reason before its code (constitution
-  IV). Before the hold's tests are deleted in US2, they are run once on main and the result is recorded in the PR, so the spec's
-  "did not converge" is observed (its Root cause ran nothing).
+- **Decision**: `dev/alq-review/tests`: the edit rule's gate tests in `test_gate.py`, a class on a story-branch checkout with a
+  committed spec.md; the pure functions in `test_specbinding.py`, replacing `TextStep`; the lock text and the launch refusal in
+  `test_policy.py`; `rebase <ref>` and the diff check in `test_gate.py`, a test per check of data-model "`rebase <ref>`" and per
+  reply of contracts "The diff check", with the gh stub answering each new GitHub lookup; the agent file in `test_agents.py`
+  against contracts "The conflict resolver"; each new `worktree` function in `test_worktree_facts.py`; the FR-010 slice (R12)
+  in `test_policy.py` and `test_worktree_facts.py`. US2's tests name `spec_blob` and `spec_held`, a stored ledger carrying them
+  and holding nothing, so SC-003's grep covers `plugins/alq-review` and not the tests. The hold's tests are deleted with it
+  (`SpecArgument`'s hold tests, `held()`, `assertHeldWithTheDiff`, `test_policy.py`'s spec-hold fixtures and cases,
+  `TextStep`). `dev/alq-plan/tests/test_spec_source.py`: the rescope test becomes the spec-branch test. Each test is written,
+  run and seen to fail for the expected reason before its code (constitution IV). Before the hold's tests are deleted in US2,
+  they are run once on main and the result is recorded in the PR, so the spec's "did not converge" is observed.
 - **Rationale**: SC-001 and FR-008. The harness drives each hook event in-process (`Gate.hook`), with a bare origin for the
-  fetch (`serve_remote`).
+  fetch (`serve_remote`). Exact git flags and per-case test names are the story PRs' to settle in their tests.
 - **Existing tools**: `Gate`, `HeldBranch.lock`, `SpecArgument.commit_files`, `Repo.serve_remote`, the gh stub, reused.
 
-## R14: What the README says
+## R11: What the README says
 
 - **Decision**: item 2: a `RESHAPE_SPEC` lock's two releases and the rescope route; the changed-spec hold sentence goes. Item 5:
   the binding is the `spec` value; `spec.md` is read at the reviewed commit each round; the hold paragraph is replaced by the
-  diff check. A new item 8: a story branch never changes a spec.md (the three sites, the writes table's forms, the next step).
-  Mode: the story rule and the diff check are made through `hookio.refuse`. What the user types: `rebase`, and the session's
-  next step after it. State: the ledger's `spec`, `regraded_from` and `rebased_onto` records. Layout: `specbinding.py`'s new
-  line, `agents/conflict-resolver.md`. Nothing names `spec_blob`, `spec_held` or `text_step` (SC-003).
+  diff check and its two replies. A new item 8: on a story branch the edit tools never change a spec.md, and the diff check
+  stands behind it for every other route. Mode: the edit rule and the diff check are made through `hookio.refuse`. What the user
+  types: `rebase`, and the session's next step after it. State: the ledger's `spec`, `regraded_from` and `rebased_onto`. Layout:
+  `specbinding.py`'s new line, `agents/conflict-resolver.md`. Nothing names `spec_blob`, `spec_held` or `text_step` (SC-003).
 - **Rationale**: FR-007; the README is the plugin's description and changes with its code (019 R17).
 - **Existing tools**: the README's sections, edited in place.
 
-## R15: After a release by `rebase`, the story is measured afresh
+## R12: After a release by `rebase`, the story is measured afresh
 
 - **Decision**: FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
   `state["rounds"][state.get("regraded_from", 0):]`, and `counted(state, stage, *, regraded_only=False)`, which filters that
-  slice instead of every round when the keyword is set. Its writers are data-model's writer matrix.
-  `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call `counted(..., regraded_only=True)`; `round_facts`'
-  `seen`, `first_reviewed` and `base` read `regraded_rounds`. So the first round after a release has `scope="full"` and no
-  `delta_from`, the brief's delta diff (`briefs._review_prompt`, `git diff <delta_from>..HEAD`) gives way to `git diff
-  <base>...HEAD`, and `added_lines`, `commits_per_file`, both `additions`, `count_not_falling`, `repeat_unit` and so `burden`
-  are measured as FR-010 says. Unsliced, the default: `policy._capped` (the round caps), `ledger._append_round`'s round
-  numbering, and `briefs.brief`'s `earlier_rounds`. Callers of `round_facts`, `gate.on_structured_output`, `briefs.churned` and
-  `briefs.brief`, change nothing.
+  slice instead of every round when the keyword is set. `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call
+  `counted(..., regraded_only=True)`; `round_facts`' `seen`, `first_reviewed` and `base` read `regraded_rounds`. So the first
+  round after a release is full, with no `delta_from`, and the churn facts are measured from it. Unsliced: `policy._capped` (the
+  round caps), `ledger._append_round`'s numbering, and `briefs.brief`'s `earlier_rounds`.
 - **Rationale**: the rebase rewrites every commit of the story branch, so a head recorded before it is no ancestor of the
-  rewritten HEAD: `<old head>..HEAD` holds every rewritten commit of the story and every commit the default branch gained, so a
-  delta round would brief the whole rebase as a delta, and a file the story edited in three commits before it would read as at a
-  third edit. A round before the release graded another `spec.md` and another history, so neither its finding count nor its
-  spots say whether the story converges now. One slice, so no two readers disagree on where the release starts; `counted` keeps
-  its `COUNTED` filter over it, so a dead round after the release is never `done[-1]`. The cap spans the release because a
-  rebase settles no round; the numbering spans it because a round's ref, `<stage>-<epoch>.<n>`, must stay unique in its epoch;
-  earlier rounds are the assessor's context, not a gate. `unlock <ref>` rewrites nothing, so it changes neither field.
-- **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round`'s `done` and `facts.round_facts`, edited; the
-  briefs, unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round cap (`_capped` counts
-  `counted` rounds, which `epoch` filters) and changes the round refs, neither of which a spec change asks for.
+  rewritten HEAD: a delta round would brief the whole rebase as a delta, and a file edited in three commits before it would
+  read as at a third edit. A round before the release graded another `spec.md` and another history. One slice, so no two
+  readers disagree on where the release starts. The cap spans the release because a rebase settles no round; the numbering
+  spans it because a round's ref must stay unique in its epoch. `unlock <ref>` rewrites nothing, so it changes neither field.
+- **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round` and `facts.round_facts`, edited; the briefs,
+  unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round cap and changes the round refs.

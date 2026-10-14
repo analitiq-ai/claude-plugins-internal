@@ -1,274 +1,247 @@
 ---
 
-description: "Task list for spec.md is read-only on a story branch (#104)"
+description: "Task list for #104: spec.md is read-only on a story branch"
 ---
 
 # Tasks: spec.md is read-only on a story branch
 
 **Input**: Design documents from `dev/alq-review/specs/104-spec-md-read-only/`
 
-**Prerequisites**: plan.md, spec.md, research.md (R1–R15), data-model.md, contracts/interfaces.md, quickstart.md
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/interfaces.md, quickstart.md
 
-**Tests**: Required (FR-008, SC-001, constitution IV, R13). Every test task is written, run, and seen to fail for the
-reason named before its code task starts; the failure is quoted in the commit message or PR body.
+**Tests**: Required (FR-008, SC-001, constitution IV, research R10). Every test task is written, run, and seen to fail
+for the reason named before the implementation task after it. A task marked *pin* covers behaviour this feature keeps;
+it passes before and after, and says so.
 
-**Organization**: One PR per user story (R1). US1 off the default branch; US2 stacked on US1; US3 stacked on US2; US4
-and US5 off the default branch. The README changes with each story's code (R14).
+**Organization**: one phase per user story; each story is its own PR on `104-us<N>-<slug>` (research R1).
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: US1–US5, from spec.md
-- Paths are repo-relative to the `claude-plugins-internal` root
-
-## Path Conventions
-
-- Plugin code: `plugins/alq-review/scripts/`, `plugins/alq-review/agents/`, `plugins/alq-review/hooks/hooks.json`,
-  `plugins/alq-review/README.md`; `plugins/alq-plan/skills/issue-spec/SKILL.md`
-- Tests: `dev/alq-review/tests/`, `dev/alq-plan/tests/`; run with `(cd dev/alq-review/tests && python -m unittest -v)`
-  and `(cd dev/alq-plan/tests && python -m unittest -v)`
+- **[P]**: can run in parallel (different files, no dependency on an incomplete task)
+- **[Story]**: US1–US5, spec.md's user stories
+- Paths are repo-root relative. Suites: `(cd dev/alq-review/tests && python -m unittest -v)` and
+  `(cd dev/alq-plan/tests && python -m unittest -v)`
 
 ---
 
-## Phase 1: Setup (governing records, their own PRs — R1, constitution VI)
+## Phase 1: Setup (governing records, their own PRs, before any code — R1, constitution VI)
 
-**Purpose**: The decision record and the workflow rule ship apart from, and before, the code they govern.
-
-- [ ] T001 Draft the decision record with `speckit-adrkit-draft` from `dev/alq-review/specs/104-spec-md-read-only/plan.md` into `dev/alq-review/docs/adr/` on branch `104-adr-<slug>`, with the README's pointer to it in `plugins/alq-review/README.md`: it replaces ADR-0016 decision 6 and the blob-id part of decision 4, replaces the `spec.md`-blob part of ADR-0019 decision 3 (open PR #93) and that record's closing line "ADR-0016, decision 6, and ADR-0018 stand", and changes ADR-0018 so a `RESHAPE_SPEC` lock is released by `unlock <ref>` when the spec stands and by `rebase <ref>` after a spec change; open it as its own PR
-- [ ] T002 Close PR #105 (hand-written ADR-0020) with a comment naming T001's PR, after the user confirms
-- [ ] T003 [P] In the engineering repo, open the `git-workflow.md` PR "The spec changes through its own PR": a spec change lands in a spec-only PR on `<issue>-spec`, never in a story PR; the story branch rebases on it (outward-facing: confirm with the user first)
-- [ ] T004 Run the hold's tests once on main (`dev/alq-review/tests/test_gate.py` `SpecArgument` hold tests and `dev/alq-review/tests/test_policy.py` spec-hold tests named in R13) and save the output for US2's PR body, so "did not converge" is observed, not asserted (R13)
+- [ ] T001 Run both suites on the default branch and record that they are green, as the baseline every story PR is measured against (`dev/alq-review/tests`, `dev/alq-plan/tests`)
+- [ ] T002 Draft the decision record with `speckit-adrkit-draft` from `dev/alq-review/specs/104-spec-md-read-only/plan.md` into `dev/alq-review/docs/adr/` on branch `104-adr-<slug>`, with its pointer in `plugins/alq-review/README.md`; it replaces ADR-0016 decision 6 and the blob-id part of decision 4, replaces the `spec.md`-blob part of ADR-0019 decision 3 (open PR #93) and that record's closing line "ADR-0016, decision 6, and ADR-0018 stand", and changes ADR-0018 so a `RESHAPE_SPEC` lock is released by `unlock <ref>` when the spec stands and by `rebase <ref>` after a spec change. Open it as its own PR; ask the user before closing PR #105 (hand-written ADR-0020)
+- [ ] T003 [P] In the engineering repo, change `docs/engineering/git-workflow.md`: the spec changes through its own spec-only PR on `<issue>-spec`, never in a story PR; spec PR first, then the story PR rebases on it. Its own PR in that repo
 
 ---
 
-## Phase 2: Foundational (shared pure definitions — R2, R6)
+## Phase 2: Foundational (the terms, defined once — R2)
 
-**Purpose**: What a spec.md, a story branch and a branch under rebase are, defined once; every story reads them.
+**Purpose**: the pure term functions US1, US3 and US4 call. Ships in US1's PR (the first story PR cut).
 
-**⚠️ CRITICAL**: US1, US3 and US4 call these. Land them in US1's PR (the first code PR); US4 and US5, off the default branch, rebase on US1 if they need them before it merges.
+- [ ] T004 Write failing tests in `dev/alq-review/tests/test_specbinding.py` for `spec_folder(path) -> str | None`, `spec_md_folder(path) -> str | None` and `story_issue(branch) -> str | None`, with data-model's examples verbatim: `dev/x/specs/123-login/tasks.md` → `dev/x/specs/123-login`; `b.py`, `docs/spec.md` → None; `dev/x/specs/123-login/spec.md` → `dev/x/specs/123-login` for `spec_md_folder`, `dev/x/specs/123-login/plan.md` → None; `story_issue` matches `^(\d+)-us\d+-`: `123-us2-reset` → `123`; `123-spec`, `123-retire-spec`, `123-adr-hold`, `main`, `feat/1-demo`, None → None. Run; expect `AttributeError`
+- [ ] T005 Implement `spec_folder` (by the existing `shape_problem`, not a new regex), `spec_md_folder` and `story_issue` in `plugins/alq-review/scripts/specbinding.py`; rewrite the module docstring per R2 (what a spec folder and a spec.md are, the `spec` argument, its binding, the two rules that keep a spec.md out of a story PR). T004 green
 
-- [ ] T005 [P] Write failing tests `SpecMdFolder` and `StoryIssue` in `dev/alq-review/tests/test_specbinding.py`: `spec_md_folder("dev/x/specs/123-login/spec.md") == "dev/x/specs/123-login"`; `None` for `docs/spec.md` and `dev/x/specs/123-login/plan.md`; `story_issue("123-us2-reset") == "123"`; `None` for `123-spec`, `123-retire-spec`, `123-adr-hold`, `main`, `feat/1-demo` (data-model "A spec.md, a story branch"); run and confirm `AttributeError`
-- [ ] T006 Implement `spec_md_folder(path) -> str | None` (path named `spec.md` whose folder passes `shape_problem`) and `story_issue(branch) -> str | None` (`^(\d+)-us\d+-`) in `plugins/alq-review/scripts/specbinding.py`; update the module docstring per R2; T005 passes
-- [ ] T007 [P] Write a failing test in `dev/alq-review/tests/test_worktree_facts.py` for each outcome of `worktree.rebasing(root)`'s data-model "New interfaces" row, called from a process cwd other than `root`: `None` with no rebase; the branch during a stopped `git rebase` and during a stopped `git rebase --apply`; `None` during a stopped rebase of a detached HEAD; RuntimeError in git's words for a `root` git cannot read as a checkout, and RuntimeError for a `rebase-merge` directory with no `head-name`; `worktree.locate` reporting that branch while HEAD is detached mid-rebase, and letting a RuntimeError of `rebasing` (patched to raise) through, never None (R6, edge case "During a rebase HEAD is detached")
-- [ ] T008 Implement `rebasing(root) -> str | None` in `plugins/alq-review/scripts/worktree.py` as its data-model "New interfaces" row gives (R6), and use it in `locate` where it returned `None` for a detached `HEAD`, uncaught; `locate`'s docstring names the branch under a rebase and that RuntimeError (data-model, consumers and copies); T007 passes; callers of `locate` (`gate._held`, `on_edit`, `on_bash`, `on_workflow`, `claimgate` ×2, `shimgate` ×3, `ledger.main`) still pass the full suite
-
-**Checkpoint**: shared definitions in place, full `dev/alq-review/tests` suite green.
+**Checkpoint**: the terms exist; no caller yet.
 
 ---
 
-## Phase 3: User Story 1 - A story branch cannot change a spec.md (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - A story branch's edit tools cannot change a spec.md (Priority: P1) 🎯 MVP
 
-**Goal**: Every `Edit`/`Write`/`NotebookEdit`, every Bash write of the writes table and every `git commit` that touches a spec.md on a story branch is refused with one text (contracts "The story rule").
+**Goal**: on a story branch, `Edit`, `Write` and `NotebookEdit` of a spec.md are refused by path, before the ledger or GitHub is read.
 
-**Independent Test**: `StoryBranch(Gate)` in `dev/alq-review/tests/test_gate.py`, on a checkout of `123-us2-reset` with `dev/x/specs/123-login/spec.md` committed: each write refused; the same on `123-spec` passes.
+**Independent Test**: in `test_gate.py`'s harness, on a checkout of `123-us2-reset` with a committed `dev/x/specs/123-login/spec.md`, send each edit tool and read the refusal; on `123-spec` the same writes pass this rule.
 
-**Branch/PR**: `104-us1-<slug>` off the default branch.
+**Branch**: `104-us1-<slug>` off the default branch, carrying Phase 2.
 
 ### Tests for User Story 1 ⚠️ (write first, see them fail)
 
-- [ ] T009 [P] [US1] Write failing tests `StoryWriteRefusal` in `dev/alq-review/tests/test_specbinding.py`: `story_write_refusal(branch, path, staged)` returns contracts' edit/Bash text (names `<path>`, `<folder>`, `<branch>`, "a story branch never changes a spec.md", next step with `123-spec`) for `staged=False`; the commit text with `git restore --staged --worktree -- <path>` and `git rm --cached -- <path>` for `staged=True`; `None` for a non-story branch or a non-spec.md path
-- [ ] T010 [P] [US1] Write failing tests in `dev/alq-review/tests/test_shell.py` for the `write` kind, each outcome of `Action.path`'s data-model "New interfaces" row, the paths those of data-model "The written paths of a segment": `echo x > P`, `cat <<EOF >> P` (body cut), `2> P`, `&> P`, `>P` attached; `| tee P`, `tee -a P`; `sed -i ... P`, `sed -i.bak`, `--in-place`, `perl -i`; `cp a P` (last word); `mv a P`, `mv P b`, `rm P`, `truncate -s 0 P`, `truncate --size=0 P`; `git rm P`, `git mv P b`, `git checkout -- P`, `git restore P`, `git restore -s HEAD P` (value of `-s` excluded); and no `write` action for `cat P`, `grep x P`, `git diff P`, `git show HEAD:P`, `git log P`, `sed` without `-i`; plus `staging` true for `git commit -p`, `git commit --patch` and `git commit --interactive` (data-model "New interfaces", `worktree.to_commit`); and, for the consumers whose answer that changes, `git commit -p`, `--patch` and `--interactive` added to `test_a_commit_that_stages_or_shares_its_command_is_refused` in `dev/alq-review/tests/test_claim_gate.py` `ClaimCheckCommit` and to a `ShimCommit` test in `dev/alq-review/tests/test_shim_gate.py` run with `ALQ_REVIEW_CLAIM_CHECKS=log`, so the shim gate's answer is the one graded: each refused naming "`git commit` alone"
-- [ ] T011 [P] [US1] Write a failing test in `dev/alq-review/tests/test_worktree_facts.py` for each outcome of `worktree.to_commit(root, staging)`'s data-model "New interfaces" row: the staged paths, plus the tracked paths changed in the worktree when `staging` is true; a spec.md moved away listed by its own name; RuntimeError in git's words for a `root` git cannot read as a checkout
-- [ ] T012 [US1] Write failing tests class `StoryBranch(Gate)` in `dev/alq-review/tests/test_gate.py` (fixture: branch `123-us2-reset`, `dev/x/specs/123-login/spec.md` committed), one per US1 scenario: (1) `Edit`, `Write`, `NotebookEdit` of the spec.md refused with the edit text; (2) each Bash form of the writes table refused with the same text; (3) `git commit` with a staged spec.md change refused with the commit text, also with `refuse_claim`/`refuse_shim` off and with `-a` staging; (4) on `123-spec`, `123-retire-spec`, `123-adr-hold` and the default branch none refused by this rule; (5) `plan.md`, `tasks.md`, `research.md` writes not refused; (6) refused with no PR, no ledger, no round, and no `gh` call made; (7) `cat`, `grep`, `git diff`, `git show`, `git log` not refused; (8) `log` mode records `would_deny` and does not block; plus edge cases: an absolute path into another worktree judged by that worktree's branch; a spec.md path only in a heredoc body, comment or quoted string not refused; mid-rebase (detached HEAD) on a story branch still refused
+- [ ] T006 [US1] Write failing tests in `dev/alq-review/tests/test_specbinding.py` for `story_edit_refusal(branch: str | None, path: str) -> str | None`: on `123-us2-reset` with `dev/x/specs/123-login/spec.md` it returns contracts "The edit rule" text naming the path, the folder, the branch and `123-spec`; it returns None for branches `123-spec`, `123-retire-spec`, `123-adr-hold`, `main`, None (detached HEAD), and for `plan.md`, `tasks.md`, `research.md` of the folder and `docs/spec.md`. Expect `AttributeError`
+- [ ] T007 [US1] Write failing tests in `dev/alq-review/tests/test_gate.py`, a new class on a story-branch checkout with a committed spec.md (reuse `Gate`, `SpecArgument.commit_files`): scenario 1 (`Edit`, `Write`, `NotebookEdit` each refused, action `spec-edit`, text names the file and `123-spec`); 2 (`123-spec`, `123-retire-spec`, `123-adr-hold`, default branch: not refused by this rule); 3 (`plan.md`, `tasks.md`, `research.md` pass); 4 (no PR, no ledger, no round: still refused, and the gh stub is not called); 5 (a Bash write and a commit of the spec.md are not refused by this rule); 6 (`log` mode: recorded `would_deny`, not blocked); edge cases: an absolute path into another worktree is judged by that worktree's branch; a detached HEAD (a rebase in progress) refuses nothing. Expect the edits to be allowed
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement `story_write_refusal(branch, path, staged: bool) -> str | None` in `plugins/alq-review/scripts/specbinding.py` with the contracts' two texts verbatim; T009 passes
-- [ ] T014 [US1] Add `Action.path` (data-model "New interfaces") to `shell.Action` and the `write` kind to `shell.classify` in `plugins/alq-review/scripts/shell.py`, reusing `_segments`, `_words`, `_git`'s option walk and `_HEREDOC`, exactly the table's forms and no wider (R4); make `_stages` count `-p`, `--patch` and `--interactive` as staging, and its docstring name them (data-model "New interfaces", `worktree.to_commit`); T010 passes, its `test_claim_gate.py` and `test_shim_gate.py` cases included, and existing `test_shell.py`, `test_claim_gate.py` and `test_shim_gate.py` stay green
-- [ ] T015 [US1] Implement `to_commit(root, staging) -> list[str]` in `plugins/alq-review/scripts/worktree.py` with `_listed`, as its data-model "New interfaces" row gives (R5); T011 passes
-- [ ] T016 [US1] In `plugins/alq-review/scripts/gate.py` `on_edit`, judge the story rule right after `worktree.locate(path)` and before `target(where)`: path relative to `where.root`, `where.branch`, `specbinding.story_write_refusal(..., staged=False)`; refuse via `hookio.refuse(payload, "spec-write", text, Target(where.slug, None, where.branch, where.root))` (R3)
-- [ ] T017 [US1] In `plugins/alq-review/scripts/gate.py` `on_bash`, for each `write` action resolve its `path` against `action.cwd` (`~` expanded), `worktree.locate` it, and judge it as T016 does, returning the first refusal before other actions (R4)
-- [ ] T018 [US1] In `plugins/alq-review/scripts/gate.py` `on_bash`, for a `commit` action, before `claimgate.on_commit` and `shimgate.on_commit`, refuse through `hookio.refuse(payload, "commit", ...)` on the first `worktree.to_commit(root, action.staging)` path that `story_write_refusal(branch, path, staged=True)` refuses — under the plugin's `mode` only, not `refuse_claim`/`refuse_shim` (R5); a RuntimeError of `to_commit` is not caught, so `gate.main` refuses it as a crash (data-model `to_commit` row); T012 passes
-- [ ] T019 [US1] Update `plugins/alq-review/README.md`: new item 8 (a story branch never changes a spec.md: the three sites, the writes table's forms, the next step); item 6's list of what a commit may not stage itself (line 80) gains `-p`, `--patch`, `--interactive`; Mode: the story rule is made through `hookio.refuse`; Layout: `specbinding.py`'s new line (R14)
-- [ ] T020 [US1] Run both suites; open the US1 draft PR on `104-us1-<slug>` and run the review loops per `.claude/rules/pr-review-loop.md` with `spec: 'dev/alq-review/specs/104-spec-md-read-only'`
+- [ ] T008 [US1] Implement `story_edit_refusal` in `plugins/alq-review/scripts/specbinding.py` from `story_issue` and `spec_md_folder`, text per contracts "The edit rule". T006 green
+- [ ] T009 [US1] In `plugins/alq-review/scripts/gate.py` `on_edit` (caller: `gate.PRE` for `Edit`, `Write`, `NotebookEdit`), right after `where = worktree.locate(path)` and its None check and before `target(where)`: take `path` relative to `where.root`, call `specbinding.story_edit_refusal(where.branch, rel)`, and on a text return `refuse(payload, "spec-edit", text, Target(where.slug, None, where.branch, where.root))`. Read nothing of the ledger or GitHub first (R3). T007 green
+- [ ] T010 [US1] In `plugins/alq-review/README.md`: new item 8 (on a story branch the edit tools never change a spec.md; the next step is the spec-only PR on `<issue>-spec`), Mode (the edit rule is made through `hookio.refuse`), Layout (`specbinding.py`'s new line) — R11
+- [ ] T011 [US1] Run both suites; all green. Run the PR tripwire `git log --name-only <base>..HEAD | sort | uniq -c | sort -rn`
 
-**Checkpoint**: US1 refusals live and tested; the hold still exists (removed by US2).
+**Checkpoint**: US1 is live; a story branch's edit tools cannot move the spec.
 
 ---
 
-## Phase 4: User Story 2 - Every round grades against spec.md at the reviewed commit; no copy kept (Priority: P2)
+## Phase 4: User Story 2 - Every round grades against spec.md at the reviewed commit, and the gate keeps no copy (Priority: P2)
 
-**Goal**: The binding is the `spec` value alone; `spec.md` is read at the reviewed commit each round; the hold, `spec_blob`, `spec_held` and `text_step` are deleted (R7).
+**Goal**: delete the hold; the binding is the `spec` value alone; `spec.md` is read at the reviewed commit every round.
 
-**Independent Test**: in `test_gate.py`, bind a PR to a folder, commit a change to its `spec.md`, launch the next review round and assessment: both open, the ledger holds `spec` only, no `unlock` asked.
+**Independent Test**: bind a PR to a folder, commit a change to its `spec.md`, launch the next review round and the assessment, and read the ledger and the refusals.
 
-**Branch/PR**: `104-us2-<slug>`, stacked on US1. Include T004's recorded output in the PR body.
+**Branch**: `104-us2-<slug>` stacked on `104-us1-<slug>`.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T021 [P] [US2] Write failing tests in `dev/alq-review/tests/test_gate.py` (`SpecArgument`), one per US2 scenario: (1) a changed `spec.md` at the reviewed commit opens the review round and the assess round, no diff shown, no hold, no `unlock`; (2) the ledger after a round holds `spec` and neither `spec_blob` nor `spec_held`; (3) reviewer and assessor briefs tell them to read `<folder>/spec.md` and quote none of its text; (4) `spec.md` missing or empty at the reviewed commit is refused naming the path; (6) a stored ledger with `spec_blob`/`spec_held` set does not hold the PR (SC-004)
-- [ ] T022 [P] [US2] Write a failing test in `dev/alq-review/tests/test_policy.py` for US2 scenario 5: a lock reason names only a `RESHAPE_SPEC`, `ESCALATE` or spent-audit hold, never a changed `spec.md`, including on a state carrying a stale `spec_held`
+- [ ] T012 [US2] Before deleting anything, run the hold's tests once on the default branch (`test_gate.py`'s `SpecArgument` hold tests, `test_policy.py`'s spec-hold cases, `test_specbinding.py`'s `TextStep`) and record the output for the US2 PR body (R10: the "did not converge" is observed)
+- [ ] T013 [US2] Write failing tests in `dev/alq-review/tests/test_gate.py`: scenario 1 / SC-004 (a PR bound to a folder whose `spec.md` changed since its first round: review-round and assess-round both open, no diff shown, no hold recorded, no `unlock` asked); scenario 2 (after a round opens the ledger holds `spec` and neither `spec_blob` nor `spec_held`); scenario 6 (a stored ledger carrying `spec_blob` and `spec_held`: nothing reads them, and a PR held only by a changed `spec.md` is held no longer). Expect a hold refusal / those keys present
+- [ ] T014 [P] [US2] Write *pin* tests in `dev/alq-review/tests/test_gate.py` if not already covered: scenario 3 (internal reviewers and the assessor are told to read `<folder>/spec.md` in the checkout and quoted none of its text); scenario 4 (`spec.md` missing or empty at the reviewed commit: refused naming the path; assess: "restore it with the user's commit"). These pass before and after
+- [ ] T015 [P] [US2] Write failing tests in `dev/alq-review/tests/test_policy.py`: scenario 5 (a lock reason names a `RESHAPE_SPEC`, `ESCALATE` or spent-audit hold only, never a changed `spec.md`; a state with `spec_held` set and no other hold is not locked)
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] In `plugins/alq-review/scripts/gate.py` delete `_spec_text`, `SpecStep.holds`, `_refuse_spec`, `_admit_spec`'s hold clearing; keep `_spec_md_blob` whole (R7, R9 read its blob id); replace `_head_spec_md` with `_spec_md_present(root, head, folder, restore) -> str | None` through `_spec_md_blob`; `_spec_step` binds `{"spec": value}` only and on a bound PR checks presence only; `_assess_spec_step` checks presence only (R7). Callers to re-check: `on_workflow` (two sites each for `_refuse_spec`/`_admit_spec`)
-- [ ] T024 [US2] In `plugins/alq-review/scripts/specbinding.py` delete `text_step` and its `released` import (R7)
-- [ ] T025 [US2] In `plugins/alq-review/scripts/policy.py` delete `_spec_held` and its entry in `_holds`; drop "Editing the spec or changing files another way does not release it" from `_lock_reason`'s closing sentence (R7, R8); callers `locked`, `_lock_reason`, `_obstacle`, `mutation`, `rerequest`, `mark_ready`, `launch_round` stay green
-- [ ] T026 [US2] Delete the hold's tests per R13: in `dev/alq-review/tests/test_gate.py` `SpecArgument`'s hold tests (main's lines 442–470, 599–672, 709–760, 777–790, 852–877), `held()`, `assertHeldWithTheDiff`, `spec_blob` in `HeldBranch.lock` and the three `state.update` calls; in `dev/alq-review/tests/test_policy.py` `hold_spec`, `spec_held_state`, `SPEC_HOLD_NAMES`, the four `Mutation` hold tests and the "spec hold" case of the every-hold test; in `dev/alq-review/tests/test_specbinding.py` `TextStep`; `dev/alq-review/tests/test_worktree_facts.py:298`
-- [ ] T027 [US2] Update `plugins/alq-review/README.md` item 5 (binding is the `spec` value; `spec.md` read at the reviewed commit each round; hold paragraph removed), item 2 (changed-spec hold sentence removed), State (`spec` only); verify `grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review` finds nothing (SC-003; US2's tests name `spec_blob` and `spec_held` to prove nothing reads them)
-- [ ] T028 [US2] Run both suites; open the US2 draft PR stacked on US1 and run the review loops
+- [ ] T016 [US2] Delete the hold's tests: in `dev/alq-review/tests/test_gate.py` the `SpecArgument` hold tests, `held()`, `assertHeldWithTheDiff`; in `dev/alq-review/tests/test_policy.py` the spec-hold fixtures and cases; in `dev/alq-review/tests/test_specbinding.py` `TextStep`
+- [ ] T017 [US2] In `plugins/alq-review/scripts/gate.py` (callers: `_spec_step` and `_assess_spec_step` by `on_workflow`; `_refuse_spec` and `_admit_spec` by `on_workflow`, two sites each): delete `_spec_text`, `SpecStep.holds`, `_refuse_spec` and `_admit_spec`'s hold clearing; replace `_head_spec_md` with `_spec_md_present(root, head, folder, restore) -> str | None` (the refusal when `spec.md` is missing, empty or unreadable at `head`) through `_spec_md_blob`, kept whole; `_spec_step` binds `{"spec": value}` only and on a bound PR checks presence and binds nothing; `_assess_spec_step` checks presence only. T013 green
+- [ ] T018 [P] [US2] In `plugins/alq-review/scripts/specbinding.py` delete `text_step` and its `released` import
+- [ ] T019 [P] [US2] In `plugins/alq-review/scripts/policy.py` delete `_spec_held` and the hold in `_holds` (callers of `_holds`: `locked`, `_lock_reason`). T015 green
+- [ ] T020 [US2] In `plugins/alq-review/README.md`: item 2 loses the changed-spec hold sentence; item 5 says the binding is the `spec` value and `spec.md` is read at the reviewed commit each round, the hold paragraph removed; State names the ledger's `spec`. No `spec_blob`, `spec_held` or `text_step` anywhere (R11)
+- [ ] T021 [US2] Run both suites green and `grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review ; test $? -eq 1` (SC-003)
 
-**Checkpoint**: US1 + US2: the agent cannot move its target, and a spec change costs no `unlock`.
+**Checkpoint**: no hold; a spec.md change between rounds costs no `unlock`.
 
 ---
 
-## Phase 5: User Story 3 - `rebase <ref>` releases a `RESHAPE_SPEC` lock after a spec change (Priority: P3)
+## Phase 5: User Story 3 - `rebase` releases a `RESHAPE_SPEC` lock after a spec change (Priority: P3)
 
-**Goal**: spec FR-009 and FR-010, by data-model "`rebase <ref>`" and the ledger table (R8–R10, R15).
+**Goal**: the lock names the rescope route; `rebase <ref>` checks the spec changed on the default branch, releases, records `rebased_onto` and `regraded_from`; the session rebases; the next round waits for the commit and is measured afresh (FR-009, FR-010).
 
-**Independent Test**: `Rebase(HeldBranch)` in `test_gate.py`: lock with `RESHAPE_SPEC`, merge (or not) a change to the bound `spec.md` into the served origin's default branch, send `rebase <ref>` and `unlock <ref>` as the prompt, and launch a round before and after the story branch is rebased.
+**Independent Test**: lock a story with a `RESHAPE_SPEC` ruling, merge a change to its bound `spec.md` into the default branch (or not), send `rebase <ref>` and `unlock <ref>` as the prompt, and launch the next round before and after rebasing.
 
-**Branch/PR**: `104-us3-<slug>`, stacked on US2.
+**Branch**: `104-us3-<slug>` stacked on `104-us2-<slug>`.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T029 [P] [US3] Write failing tests in `dev/alq-review/tests/test_policy.py`: the `RESHAPE_SPEC` `_lock_reason` names `123-spec` (or "the issue's spec branch" for a non-story branch), "spec-only PR", `rebase <ref>` and `unlock <ref>` (US3 scenario 1); `policy.launch_round` with `unrebased_onto={"branch": "main", "sha": <sha>}` refused at either stage, after the lock and dirty refusals, with contracts' row `contains` reply naming `origin/main`, `<sha>` and `<ref>` (`#<pr>` for a state with a PR, the branch for one without), and with `unrebased_onto=None` deciding as before (US3 scenario 7); `launch_round` on a state whose `regraded_from` is past every internal round gives `scope="full"` and no `delta_from` (US3 scenario 8); a dead (`collecting`, not counted) round after `regraded_from`, behind a counted one, does not become `done[-1]`; `CAP` unsettled internal rounds, all before `regraded_from`, still refused with the cap refusal (R15)
-- [ ] T030 [P] [US3] Write failing tests in `dev/alq-review/tests/test_agents.py`: `agents/conflict-resolver.md` exists with contracts "The conflict resolver"'s name and tools, and its prose carries each of that section's rules: never edits a spec.md, never `git rebase --skip`, `git rebase --abort` and a report on a spec.md conflict or one it cannot resolve (US3 scenario 9); `test_shipped_tree.py`'s commands include `alq-review:conflict-resolver`
-- [ ] T031 [P] [US3] Write failing tests in `dev/alq-review/tests/test_worktree_facts.py` for each outcome of the data-model "New interfaces" rows of `worktree.contains` and `worktree.fetch_target` (with `review_base` still green after it calls `fetch_target`); `ledger.regraded_rounds` (every round with no `regraded_from`, `rounds[regraded_from:]` with one) and `ledger.counted(..., regraded_only=True)` filtering that slice, the default unsliced; after a release with k counted internal rounds, `ledger._append_round` numbers the next round `internal-<epoch>.<k+1>`, a new ref, and `ledger.named_round` returns that new round; `facts.round_facts` on a ledger with `regraded_from`: `files_at_third_edit`, `fix_additions` and `original_additions` measured as FR-010 says, so a file edited in three commits before a rebase is not at a third edit; the first full round after a release, with more findings than the last round before it, has `count_not_falling` false and `burden` false; a finding at a spot a round before the release flagged is not `repeat_unit` (US3 scenario 8, R15)
-- [ ] T032 [US3] Extend the gh stub in `dev/alq-review/tests/test_gate.py` `Gate.setUp` with a knob for `repo view --json defaultBranchRef` (`GH_DEFAULT_BRANCH`), beside `pr list` (`GH_OPEN_PR`, as today), and a `GH_FAIL` knob naming the lookups that fail. By default each answers: the fixture's default branch, `7 main`. Failing, an exit non-zero with stderr, is opt-in per lookup through `GH_FAIL`, and the stub's comment says so
-- [ ] T033 [US3] Write failing tests class `Rebase(HeldBranch)` in `dev/alq-review/tests/test_gate.py`, using `Repo.serve_remote`, one per row of data-model "`rebase <ref>`" with contracts' reply for it, each failing row keeping the lock: `names` (no locked PR, several); `ruling`; `bound`; `checkout`; `default` failing (gh's words); `base` with `pr list` failing while `repo view` answers (gh's words), with a stacked PR (US3 scenario 4), and with no open PR, which passes the row and releases with a reply naming the branch as `<ref>`; `fetch` failing (git's words); `onto read` and `head read` each failing with git's words (a sha the checkout does not know), distinct from `onto spec.md`, missing or empty on the default branch (scenario 5); `changed` false (scenario 3, naming `unlock <ref>`); the `release` (scenario 2): released through `ledger.unlock`, recorded `rebase`/`released`, contracts' release reply; the story branch, its checkout, the remote branch and `git worktree list` as FR-009 leaves them; typed again, it names no locked PR; (1) a mutation refused under a `RESHAPE_SPEC` lock names the rescope and both keywords, and the spec branch is not locked; (6) `unlock <ref>` releases with no spec check and names `123-spec`; prompts `rebase onto main` and `rebase #<pr> now` get no reply; and, from data-model's writer matrix, one test per cell asserting `regraded_from` and `rebased_onto` as the cell gives them: the `release` with both absent before, and after an earlier `rebase <ref>` release (both replaced); `unlock <ref>` with both absent before, and after an earlier `rebase <ref>` release (both unchanged); each failing row with both absent before, and after an earlier `rebase <ref>` release (both unchanged)
-- [ ] T034 [US3] Write failing tests in `Rebase` for data-model's launch row `contains` (US3 scenarios 7 and 8): a review-round launch, internal and audit, while HEAD lacks `rebased_onto` refused with contracts' exit-1 reply; `rebased_onto` unknown to the checkout refused with git's words, the lock untouched; a launch on a PR whose base is not the recorded `rebased_onto["branch"]` is refused naming the recorded branch, not the PR's base; and, from data-model's writer matrix, one test per cell of the launch after it: the `release` with both absent before: once the test rebases the story branch onto `rebased_onto`, the launch opens a full round (`git diff <base>...HEAD` in its brief, no delta) whose facts are measured as FR-010 says, a file at three edits before the rebase not at a third edit, compared with no round before the release; the `release` after an earlier one and rounds on the rebased branch: the launch refused again until the second rebase, then measured from the second release; `unlock <ref>` with both absent before: the rounds measured as before; `unlock <ref>` after an earlier `rebase <ref>` release and rounds on the rebased branch: the launch opens with no rebase and is still measured from the earlier release, a file at three edits before that rebase not at a third edit; each failing row, either state before: the launch decides as before the prompt
+- [ ] T022 [P] [US3] Write failing tests in `dev/alq-review/tests/test_worktree_facts.py` against a bare origin (`Repo.serve_remote`): `worktree.fetch_target(root, target) -> str` updates `origin/<target>` and returns its sha, git failure raises `RuntimeError` in git's words, and `review_base` still gives today's answer through it; `worktree.contains(root, sha) -> bool` is True when HEAD contains `sha`, False when it does not or the checkout does not know `sha`, `RuntimeError` in git's words otherwise
+- [ ] T023 [P] [US3] Write failing tests in `dev/alq-review/tests/test_policy.py`: R5's lock text when a `RESHAPE_SPEC` ruling holds the branch (rescope on `123-spec`, "the issue's spec branch" for a non-story branch, lands as a spec-only PR while this branch stays locked, then `rebase <ref>`; or `unlock <ref>` if the spec stands); with no `RESHAPE_SPEC` ruling the closing sentence is today's less "Editing the spec or changing files another way does not release it"; `launch_round` refuses when `rebased_onto` is set and HEAD does not contain it (contracts `contains`, exit 1 text naming `<default>` and `<onto>`); after `regraded_from` the next round is `scope="full"` with no `delta_from` (`done` via `counted(..., regraded_only=True)`), and `_capped` still counts every round
+- [ ] T024 [P] [US3] Write failing tests in `dev/alq-review/tests/test_worktree_facts.py` for `facts.round_facts` after a release: `earlier` from `counted(..., regraded_only=True)`, `seen`, `first_reviewed` and `base` from `ledger.regraded_rounds`; a file edited in three rounds before `regraded_from` is not at a third edit; absent `regraded_from` reads as 0 and facts are unchanged
+- [ ] T025 [P] [US3] Write failing tests in `dev/alq-review/tests/test_agents.py` for `plugins/alq-review/agents/conflict-resolver.md` against contracts "The conflict resolver": name `conflict-resolver`; tools Read, Grep, Glob, Edit, Bash; body says it never edits a spec.md, never runs `git rebase --skip`, and on a spec.md among the unmerged files or a file it cannot resolve runs `git rebase --abort` and reports the files; and in `dev/alq-review/tests/test_shipped_tree.py` list `alq-review:conflict-resolver`
+- [ ] T026 [US3] Write failing tests in `dev/alq-review/tests/test_gate.py` for `rebase <ref>`, one per check of data-model "`rebase <ref>`" in order, each failure keeping the lock and recording nothing, with the gh stub answering the default-branch and PR-base lookups: whole-prompt match only (`rebase #12 now` gets no reply and runs no fetch); `names` (none / several: as `unlock`'s replies with `rebase`); `ruling` (an `ESCALATE` or spent-audit lock); `bound` (`spec` null); `checkout` (round's root gone); `default` (gh fails: its words); `base` (stacked PR: "land the parent PR first"; no open PR passes; gh fails); `fetch` (git fails); `onto spec.md` (missing or empty on the default branch: "the binding never changes"; git fails); `head spec.md` (git fails); `changed` (same blob: "The spec PR has not reached `<default>`"). The release: `ledger.unlock` applied, `regraded_from` set to the index of the next round, `rebased_onto` = `{"branch": <default>, "sha": <onto>}`, a `rebase released` record, all in one save; a second release replaces the pair; the reply names every hold released and the session's next step (contracts `release` text, including `Agent(subagent_type='alq-review:conflict-resolver', prompt='<root>')` and `git push --force-with-lease`); the only git write is `origin/<default>` (no local branch, checkout, worktree or remote branch changes); typing it twice is safe. `unlock <ref>` on a `RESHAPE_SPEC` lock releases with no spec check, leaves `regraded_from` and `rebased_onto` unchanged, and its reply names `123-spec`. Launch after release: refused until HEAD contains `<onto>` (scenario 7), git failure refused as `_review_base`'s; once rebased, a full round with facts restarted (scenario 8); after `unlock` rounds are measured as before
 
 ### Implementation for User Story 3
 
-- [ ] T035 [P] [US3] Add `default_branch` to `plugins/alq-review/scripts/github.py` per its data-model "New interfaces" row
-- [ ] T036 [P] [US3] Add `contains` and factor `fetch_target` out of `review_base` in `plugins/alq-review/scripts/worktree.py`, per their data-model "New interfaces" rows; T031's worktree tests pass
-- [ ] T037 [US3] In `plugins/alq-review/scripts/ledger.py` add `regraded_rounds(state)` and the keyword `counted(state, stage, *, regraded_only=False)` (R15); `ledger._append_round`'s numbering keeps the unsliced default. In `plugins/alq-review/scripts/policy.py` add the `RESHAPE_SPEC` closing sentence of `_lock_reason` per R8 using `specbinding.story_issue(state["branch"])`; give `launch_round` the keyword `unrebased_onto: dict | None`, the `rebased_onto` record, refused after the lock and dirty checks with contracts' row `contains` reply; `launch_round`'s `done` is `counted(state, "internal", regraded_only=True)`, `_capped` keeps the default. In `plugins/alq-review/scripts/facts.py` `round_facts`' `earlier` calls `counted(..., regraded_only=True)` and `seen`, `first_reviewed` and `base` read `regraded_rounds(state)`. Callers `gate.on_workflow`, `gate.on_structured_output`, `briefs.churned`, `briefs.brief` (its `earlier_rounds` unsliced) and `briefs._review_prompt` stay green; T029 and T031's ledger and facts tests pass
-- [ ] T038 [P] [US3] Create `plugins/alq-review/agents/conflict-resolver.md` per contracts "The conflict resolver"; T030 passes
-- [ ] T039 [US3] In `plugins/alq-review/scripts/gate.py` `_on_release`, match `rebase <ref>` only as the whole trimmed prompt (R9); implement `_rebase`'s rows per data-model "`rebase <ref>`" in order, `names` through `changed`, each failure replying contracts' text for its row with the lock kept; the spec.md reads through `gate._spec_md_blob`, never `worktree.tree_blob` (data-model "`rebase <ref>`"); git writes only as FR-009 allows
-- [ ] T040 [US3] In `plugins/alq-review/scripts/gate.py` `_rebase`, on every row passing, the `release` of data-model "`rebase <ref>`" in one save, with contracts' release reply; T033 passes but for scenario 6
-- [ ] T041 [US3] In `plugins/alq-review/scripts/gate.py` `on_workflow`, for a review-round launch of any stage, data-model's launch row `contains`: `unrebased_onto=rebased_onto`, the whole record, to `policy.launch_round` on False, `None` otherwise, a `RuntimeError` refused as `_review_base`'s; callers of `launch_round` (`gate.on_workflow` only) and `briefs._review_prompt` stay green; T034 passes
-- [ ] T042 [US3] Update `gate._reshape_brief` (the `unlock` reply) in `plugins/alq-review/scripts/gate.py` to name `<issue>-spec` as where the rescope runs (US3 scenario 6); T033 passes
-- [ ] T043 [US3] Update `plugins/alq-review/README.md`: item 2 (a `RESHAPE_SPEC` lock's two releases and the rescope route), What the user types (`rebase <ref>` and the session's next step after it), State (`regraded_from` and `rebased_onto`), Layout (`agents/conflict-resolver.md`) (R14)
-- [ ] T044 [US3] Run both suites; open the US3 draft PR stacked on US2 and run the review loops
+- [ ] T027 [P] [US3] Add `default_branch(slug: str) -> str` to `plugins/alq-review/scripts/github.py`: the default branch's name; gh fails → `RuntimeError` in gh's words. Only caller: `gate._rebase`
+- [ ] T028 [P] [US3] In `plugins/alq-review/scripts/worktree.py`, factor `fetch_target(root, target) -> str` out of `review_base` (which calls it; its caller `gate._review_base` is unchanged) and add `contains(root, sha) -> bool` per data-model "New interfaces". T022 green
+- [ ] T029 [P] [US3] In `plugins/alq-review/scripts/ledger.py` add `regraded_rounds(state)` = `state["rounds"][state.get("regraded_from", 0):]` and give `counted(state, stage, *, regraded_only=False)` the keyword, filtering that slice when set. Callers of `counted` stay unsliced except where T030/T031 set it: `policy._capped`, `ledger._append_round` and `briefs.brief`'s `earlier_rounds` keep every round (R12)
+- [ ] T030 [US3] In `plugins/alq-review/scripts/facts.py` `round_facts` (callers: `gate.on_structured_output`, `briefs.churned`, `briefs.brief`): `earlier` via `counted(..., regraded_only=True)`; `seen`, `first_reviewed`, `base` from `ledger.regraded_rounds`. T024 green
+- [ ] T031 [US3] In `plugins/alq-review/scripts/policy.py`: `_lock_reason` ends with R5's `RESHAPE_SPEC` text (issue from `specbinding.story_issue(state["branch"])`), and otherwise drops "Editing the spec or changing files another way does not release it"; `launch_round` (caller `gate.on_workflow`; `delta_from` read by `briefs._review_prompt`) takes whether HEAD contains `rebased_onto["sha"]`, refuses with contracts `contains` exit-1 text when it does not, and computes `done` via `counted(..., regraded_only=True)`. T023 green
+- [ ] T032 [US3] In `plugins/alq-review/scripts/gate.py`: `_reshape_brief` (the `unlock` reply) names `<issue>-spec` as where a rescope runs; `_on_release` (caller `on_prompt`) reads `rebase <ref>` only when the trimmed prompt is exactly `rebase` and one ref; new `_rebase(payload, ref)` runs data-model's checks in order through `_names`, `policy.locked`, `reshape_spec_ruling`, `github.pr_target`, `github.default_branch`, `worktree.fetch_target`, `_spec_md_blob` at `<onto>` and at the locked round's `head_sha`, replies per contracts "`rebase <ref>`" with `<sha>` the commit the failing read named, and on pass releases in one save (`ledger.unlock`, `regraded_from`, `rebased_onto`, `rebase released` record)
+- [ ] T033 [US3] In `plugins/alq-review/scripts/gate.py` `on_workflow`, at a review-round launch of any stage after the lock and dirty checks: when `rebased_onto` is set call `worktree.contains(root, rebased_onto["sha"])` and pass the answer to `policy.launch_round`; a `RuntimeError` is refused as `_review_base`'s failure is. T026 green
+- [ ] T034 [US3] Create `plugins/alq-review/agents/conflict-resolver.md` per contracts "The conflict resolver" (frontmatter name `conflict-resolver`, tools Read, Grep, Glob, Edit, Bash; prompt is the checkout; reads `git status`/`git diff`, edits each unmerged file so both sides' intent survives, `git add -- <file>`, `git rebase --continue`, repeats; never edits a spec.md, never `git rebase --skip`; aborts and reports on a spec.md conflict or an unresolvable file). T025 green
+- [ ] T035 [US3] In `plugins/alq-review/README.md`: item 2 names a `RESHAPE_SPEC` lock's two releases and the rescope route; What the user types adds `rebase <ref>` and the session's next step after it; State adds `regraded_from` and `rebased_onto`; Layout adds `agents/conflict-resolver.md` (R11)
+- [ ] T036 [US3] Run both suites green; tripwire as T011
 
-**Checkpoint**: US1–US3: a wrong spec has a full route back (FR-009).
+**Checkpoint**: a story locked for a wrong spec has a way back onto the changed spec.
 
 ---
 
 ## Phase 6: User Story 4 - A PR changes the spec or the code, never both (Priority: P4)
 
-**Goal**: A review-round launch of any stage refuses a diff that adds or modifies a spec.md and changes a file outside its folder; one pure function decides it (R11).
+**Goal**: a review-round launch of any stage refuses a diff that adds or modifies a spec.md and changes a file outside its folder (`mixed`, `folders`); any launch whose last counted head is not an ancestor of HEAD is a full round (FR-004, FR-011).
 
-**Independent Test**: `MixedDiff(SpecArgument)` in `test_gate.py`: branches whose diffs mix and separate spec and code; launch rounds on each.
+**Independent Test**: build branches whose diffs mix and separate spec and code, and launch rounds on each.
 
-**Branch/PR**: `104-us4-<slug>` off the default branch (rebase on US1 for `spec_md_folder`/`story_issue` if US1 has not merged).
+**Branch**: `104-us4-<slug>` off the default branch once US1 (Phase 2's terms) and US3 (`worktree.contains`) have merged.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T045 [P] [US4] Write failing tests `MixedDiff` in `dev/alq-review/tests/test_specbinding.py` for `mixed_diff_refusal(changes, branch)`: `[("M", "dev/x/specs/123-login/spec.md"), ("M", "b.py")]` refused naming both, `123-spec` and "launch again"; spec-only passes; `tasks.md` + code passes; `("D", spec.md)` + code passes; two folders' spec.md refused; a spec.md moved between two folders, `[("D", "dev/x/specs/123-login/spec.md"), ("A", "dev/x/specs/124-other/spec.md")]`, refused; non-story branch uses "the issue's spec branch"
-- [ ] T046 [P] [US4] Write a failing test in `dev/alq-review/tests/test_worktree_facts.py` for each outcome of `worktree.name_status(root, base)`'s data-model "New interfaces" row: `(status, path)` pairs; a spec.md moved between two folders giving `D` at its source and `A` at its destination; RuntimeError in git's words for a `base` the checkout does not know
-- [ ] T048 [US4] Write failing tests class `MixedDiff(SpecArgument)` in `dev/alq-review/tests/test_gate.py`, one per US4 scenario: (1) mixed diff refused at review-round launch for `internal` and `audit`, any `spec`, naming the spec.md, a file outside its folder and "launch again"; (2) spec-only PR with `spec: null` passes and reviewers are told the change needs no spec; (3) `b.py` + `tasks.md` passes; (4) deleted spec.md + code with `spec: null` passes; (5) a non-story branch name refused all the same; (6) `log` mode records `would_deny` and the launch opens; plus: assess-round launch runs no diff check; a launch whose `worktree.name_status` raises (patched) blocked with its words as `_review_base`'s failure is, no round opened; edge cases: a story branch cut off `123-spec` before it merged refused; a spec folder moved, with nothing else in the diff, refused (data-model `name_status` row), while the route that passes does: a PR adding the new folder, then a later PR deleting the old folder and updating its citations
+- [ ] T037 [P] [US4] Write failing tests in `dev/alq-review/tests/test_specbinding.py` for `mixed_diff_refusal(changes: list[tuple[str, str]], branch: str) -> str | None`: `[("M", "dev/x/specs/123-login/spec.md"), ("M", "b.py")]` on `123-us2-reset` → `mixed` text naming the spec.md, `b.py`, `123-spec`; on a non-story branch → "the issue's spec branch"; one folder only → None; `b.py` + `tasks.md` → None; `("D", …/spec.md)` + code → None; a move (`D` old folder's spec.md, `A` new folder's spec.md, both folders' other files) → `folders` naming both folders and the two-PR route; two folders → `folders`; the first non-`D` spec.md decides `F`
+- [ ] T038 [P] [US4] Write failing tests in `dev/alq-review/tests/test_worktree_facts.py` for `worktree.name_status(root, base) -> list[tuple[str, str]]`: each path changed from the merge base of `base` and HEAD, once, as `(status, path)`; a rename as its `D` and its `A`; git failure raises `RuntimeError` in git's words
+- [ ] T039 [P] [US4] Write failing tests in `dev/alq-review/tests/test_policy.py` for FR-011: `launch_round` told the last counted round's head is not an ancestor of HEAD (or unknown) gives `scope="full"` and no `delta_from`, and leaves the round facts' slice untouched
+- [ ] T040 [US4] Write failing tests in `dev/alq-review/tests/test_gate.py`: scenario 1 (`spec.md` + `b.py`, refused for `spec` null and a folder, stage internal and audit, naming both and `123-spec`); 2 (spec-only PR, `spec: null`: passes, reviewers told the change needs no spec); 3 (`b.py` + `tasks.md`: passes); 4 (deleted spec.md + code, `spec: null`: passes); 5 (branch not named as a story branch: refused all the same); 6 (`log` mode: `would_deny`, launch opens); 7 (story branch rebased after its last round without `rebase <ref>`: full round, facts measured as before); edge cases: a story branch cut off `123-spec` before the spec PR merged is refused; a folder move gets `folders`; a git failure in the diff read is refused as `_review_base`'s; an assess-round launch runs no diff check
 
 ### Implementation for User Story 4
 
-- [ ] T049 [P] [US4] Implement `mixed_diff_refusal(changes: list[tuple[str, str]], branch) -> str | None` in `plugins/alq-review/scripts/specbinding.py` with contracts' text verbatim; T045 passes
-- [ ] T050 [P] [US4] Implement `name_status(root, base)` in `plugins/alq-review/scripts/worktree.py` as its data-model "New interfaces" row gives; T046 passes
-- [ ] T052 [US4] In `plugins/alq-review/scripts/gate.py` `on_workflow`, for a review-round launch of any stage, read `changes = worktree.name_status(root, base)` in the `try` that holds `_review_base`, its RuntimeError blocked as `_review_base`'s is (data-model `name_status` row); after that `try` and before `ledger.open_round`, refuse via `hookio.refuse(payload, "launch", ...)` on `specbinding.mixed_diff_refusal(changes, branch)`; not for assess-round; T048 passes
-- [ ] T054 [US4] Update `plugins/alq-review/README.md` item 5 (the diff check, and that a spec folder moves in two PRs: data-model `name_status` row) and Mode (the diff check is made through `hookio.refuse`) (R14)
-- [ ] T055 [US4] Run both suites; open the US4 draft PR and run the review loops
+- [ ] T041 [P] [US4] Add `name_status(root, base) -> list[tuple[str, str]]` to `plugins/alq-review/scripts/worktree.py`, modelled on `changed_files` and `_DIFF`, renames split into `D` + `A`. T038 green
+- [ ] T042 [P] [US4] Add `mixed_diff_refusal` to `plugins/alq-review/scripts/specbinding.py` per data-model "The diff check" and contracts `mixed`/`folders` texts. T037 green
+- [ ] T043 [US4] In `plugins/alq-review/scripts/policy.py` `launch_round` (caller `gate.on_workflow`), take whether the last counted round's head is an ancestor of HEAD; on False give `scope="full"` and no `delta_from`, round facts untouched. T039 green
+- [ ] T044 [US4] In `plugins/alq-review/scripts/gate.py` `on_workflow`, at a review-round launch of any stage, after `_review_base` and inside its `try`, before `ledger.open_round`: `specbinding.mixed_diff_refusal(worktree.name_status(root, base), where.branch)`; a text is refused through `refuse(payload, "launch", text, event)`; and pass `worktree.contains(root, <last counted head>)` to `policy.launch_round` (FR-011). Assess-round launches run no diff check. T040 green
+- [ ] T045 [US4] In `plugins/alq-review/README.md`: item 5 replaces the old hold paragraph's place with the diff check and its two replies; item 8 adds that the diff check stands behind the edit rule for every other route; Mode names the diff check as made through `hookio.refuse` (R11)
+- [ ] T046 [US4] Run both suites green; tripwire as T011
 
-**Checkpoint**: "spec PR first, then the story PR" is decided in code.
+**Checkpoint**: no round opens on a PR that changes a spec.md and code together.
 
 ---
 
 ## Phase 7: User Story 5 - A rescope runs on the spec branch (Priority: P5)
 
-**Goal**: `/alq-plan:issue-spec rescope <folder> #<issue>` works in the `<issue>-spec` worktree, never a merged one, so the rescoped `spec.md` lands as a spec-only PR (R12).
+**Goal**: `/alq-plan:issue-spec rescope <folder> #<issue>` works in the `<issue>-spec` worktree, never the story PR's (FR-006).
 
-**Independent Test**: `dev/alq-plan/tests/test_spec_source.py`: the rescope form's resolved `CHECKOUT` and its two closing lines.
+**Independent Test**: run the skill's entry-point resolution on a rescope and read the checkout it names and the closing lines.
 
-**Branch/PR**: `104-us5-<slug>` off the default branch; must release no later than the alq-review version that turns on US1 (R1).
+**Branch**: `104-us5-<slug>` off the default branch; its alq-plan release ships no later than the alq-review release that turns US1 on (R1).
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T056 [US5] Rewrite the rescope test in `dev/alq-plan/tests/test_spec_source.py` as the spec-branch test, failing first: (1) `CHECKOUT` for `rescope dev/x/specs/123-login #123` is the `123-spec` worktree, created off the default branch when none exists; (2) a local or remote `123-spec` already merged into the default branch stops the skill before any write, naming the branch and asking the user to delete it; (3) commit and push land on `123-spec`, closing lines `Spec folder: <path>` and `Branch: 123-spec`, then once: open the spec-only PR, approve it, type `rebase <ref>` for the story branch, relaunch the review; names no other plugin's command
+- [ ] T047 [US5] In `dev/alq-plan/tests/test_spec_source.py`, replace the rescope test (story PR's worktree) with failing tests: scenario 1 (`rescope dev/x/specs/123-login #123` resolves `CHECKOUT` to the `123-spec` worktree, created off the default branch per the repo's branch rules when there is none); 2 (a local or remote `123-spec` merged into the default branch: the skill fetches and stops before any write, naming it and asking the user to delete it; never reuses it); 3 (commit and push land on `123-spec`; closing lines `Spec folder: <path>` and `Branch: 123-spec`, then once: open the spec-only PR, approve it, type `rebase <ref>` for the story branch, relaunch the review; no other plugin's command named)
 
 ### Implementation for User Story 5
 
-- [ ] T057 [US5] Edit the `rescope` form of `plugins/alq-plan/skills/issue-spec/SKILL.md` per R12: `CHECKOUT` is the `<issue>-spec` worktree (created per the repo's branch rules off the default branch); before any write `git fetch origin` then `git branch -a --merged origin/<default>`, stop naming a merged `<issue>-spec`; step 8's commit and push on that branch; the closing lines of T056; T056 passes
-- [ ] T058 [US5] Run `(cd dev/alq-plan/tests && python -m unittest -v)`; bump alq-plan's version per the repo's release practice; open the US5 draft PR and run the review loops
+- [ ] T048 [US5] Edit the `rescope` form in `plugins/alq-plan/skills/issue-spec/SKILL.md` per R9 and contracts "`/alq-plan:issue-spec rescope`"; the skill's two forms and `DRIVE` steps otherwise unchanged. T047 green
+- [ ] T049 [US5] Bump `plugins/alq-plan/.claude-plugin/plugin.json` and its entry in `.claude-plugin/marketplace.json`; run `dev/alq-plan/tests` green
 
-**Checkpoint**: the rescope route the `RESHAPE_SPEC` lock names works.
+**Checkpoint**: the route the `RESHAPE_SPEC` lock names works.
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 8: Polish & Cross-Cutting
 
-- [ ] T059 In the last alq-review story PR to merge, bump the alq-review plugin version (the bump that turns on US1), after confirming US5's alq-plan release has shipped or ships with it (R1)
-- [ ] T060 [P] Run `grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review ; test $? -eq 1` and both suites from `dev/alq-review/specs/104-spec-md-read-only/quickstart.md` on the final branch (SC-003, SC-005)
-- [ ] T061 [P] Walk quickstart.md's manual end-to-end steps 1–5 after each story merges and record the results in its PR
-- [ ] T062 Close PR #102 as superseded by #104, after the user confirms (spec Assumptions)
+- [ ] T050 In the last alq-review story PR to merge, bump `plugins/alq-review/.claude-plugin/plugin.json` and its entry in `.claude-plugin/marketplace.json` once (R1); this release turns US1 and US4 on
+- [ ] T051 Run quickstart.md end to end against the merged default branch (`dev/alq-review/specs/104-spec-md-read-only/quickstart.md` steps 1–5), the SC-003 grep, and both suites; record the result
+- [ ] T052 Ask the user before closing PR #102 (superseded by this issue, spec Assumptions)
 
 ---
 
 ## Dependencies & Execution Order
 
-### Phase Dependencies
+### Phase dependencies
 
-- **Setup (Phase 1)**: T001 and T003 must merge before any code PR merges (constitution VI). T004 before T026.
-- **Foundational (Phase 2)**: ships inside US1's PR; blocks US1, US3, US4.
-- **US1 (P1)**: after Phase 2.
-- **US2 (P2)**: stacked on US1 (spec: "comes after User Story 1").
-- **US3 (P3)**: stacked on US2 (its release reads the lock US2 reshapes).
-- **US4 (P4)**: needs `spec_md_folder`/`story_issue` (Phase 2); otherwise independent of US1–US3.
-- **US5 (P5)**: independent code; its release ships no later than the alq-review release that turns on US1.
-- **Polish**: after all stories.
+- **Setup (Phase 1)**: T002 and T003 land as their own PRs before the first code PR (constitution VI)
+- **Foundational (Phase 2)**: ships inside US1's PR; blocks US1, US3 (`story_issue` in the lock text) and US4
+- **US1**: off the default branch, after Phase 2
+- **US2**: stacked on US1
+- **US3**: stacked on US2 (its lock text reads the lock US2 reshapes)
+- **US4**: off the default branch after US1 and US3 merge (needs Phase 2's terms and `worktree.contains`). R1 lists US4 "off the default branch"; the dependency on US3's `contains` was not in it, so US4 waits for that merge
+- **US5**: independent of the others (alq-plan only); release no later than the alq-review release (T050)
+- **Polish**: T050 in the last alq-review story PR; T051 after all merge
 
-### Within Each User Story
+### Within each story
 
-- Tests written and seen to fail before their code (quickstart "Red first").
-- Pure functions (`specbinding`, `policy`, `shell`, `worktree`, `github`) before `gate.py` handlers.
-- README with the story's code, in the same PR.
+Tests written and seen to fail → pure functions (`specbinding`, `ledger`, `worktree`, `github`) → `policy`/`facts` → `gate` handlers → README → suites green.
 
-### Parallel Opportunities
+### Parallel opportunities
 
-- T003 parallel with T001.
-- T005 ∥ T007.
-- US1 tests T009 ∥ T010 ∥ T011.
-- US2 tests T021 ∥ T022.
-- US3 tests T029 ∥ T030 ∥ T031; implementation T035 ∥ T036 ∥ T038.
-- US4 tests T045 ∥ T046; implementation T049 ∥ T050.
-- US4 and US5 can proceed in parallel with US1–US3 (separate branches off the default branch).
+- T003 beside T002 (different repos)
+- US5 (Phase 7) beside any alq-review story
+- US2: T014 and T015 (different files); T018 and T019 after T017
+- US3: T022, T023, T024, T025 (tests in four files; T022 and T024 share `test_worktree_facts.py`, so run them as one task when one agent writes them); T027, T028, T029 (three modules)
+- US4: T037, T038, T039 (three test files); T041, T042
 
 ---
-
-## Parallel Example: User Story 1
-
-```bash
-Task: "Write failing StoryWriteRefusal tests in dev/alq-review/tests/test_specbinding.py"
-Task: "Write failing write-kind tests in dev/alq-review/tests/test_shell.py"
-Task: "Write failing to_commit test in dev/alq-review/tests/test_worktree_facts.py"
-```
 
 ## Parallel Example: User Story 3
 
 ```bash
-Task: "Add github.default_branch in plugins/alq-review/scripts/github.py"
-Task: "Add worktree.contains and fetch_target in plugins/alq-review/scripts/worktree.py"
-Task: "Create plugins/alq-review/agents/conflict-resolver.md"
+# Tests first, in separate files:
+Task: "fetch_target/contains tests in dev/alq-review/tests/test_worktree_facts.py"
+Task: "lock text and launch_round tests in dev/alq-review/tests/test_policy.py"
+Task: "conflict-resolver frontmatter tests in dev/alq-review/tests/test_agents.py"
+
+# Then the leaf modules together:
+Task: "github.default_branch in plugins/alq-review/scripts/github.py"
+Task: "worktree.fetch_target and contains in plugins/alq-review/scripts/worktree.py"
+Task: "ledger.regraded_rounds and counted(regraded_only) in plugins/alq-review/scripts/ledger.py"
 ```
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (User Story 1)
+### MVP (User Story 1)
 
-1. Phase 1 records (T001, T003) merged.
-2. Phase 2 + US1 in one PR: the agent can no longer write the spec it is graded against.
-3. **Validate**: `StoryBranch` green; quickstart step 1.
+1. Phase 1 records merged
+2. Phase 2 + Phase 3 in `104-us1-<slug>`: the edit rule
+3. Validate with quickstart step 1; the internal and Codex review loops per `pr-review-loop.md`
 
-### Incremental Delivery
+### Incremental delivery
 
-1. US1 → US2 (hold deleted) → US3 (`rebase` release), stacked.
-2. US4 and US5 in parallel off the default branch.
-3. Version bump in the last alq-review PR to merge (T059); alq-plan's US5 release no later.
-
----
+US1 → US2 (hold deleted) → US3 (`rebase`) → US4 (diff check) → T050 version bump in the last alq-review PR. US5 any time before T050's release. Each story PR runs the full review loop and is merged before the next stacked one is rebased onto the default branch.
 
 ## Notes
 
-- Name each edited function's callers in the message before editing it (coding principles); plan.md's Structure Decision lists them.
-- Third edit to one file in a branch: stop and diagnose (`.claude/rules/pr-review-loop.md`).
-- Outward-facing steps (T002, T003, T062, PR creation) are confirmed with the user first.
+- Name each edited function's callers in the PR before the first edit (the callers are listed in plan.md "Structure Decision")
+- Third edit to one file in a branch: stop and diagnose (pr-review-loop.md)
+- No migration of stored ledgers; no backwards compatibility

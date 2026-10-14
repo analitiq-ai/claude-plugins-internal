@@ -20,8 +20,9 @@ tests'.
 
 ## What we want
 
-The coding agent never changes the spec it is graded against. On a story branch every write to a `spec.md` is
-refused, at the tool, at the commit and at the review launch. A spec that turns out wrong is raised to the user and
+The coding agent never changes the spec it is graded against. A review launch is refused on a PR that changes a
+`spec.md` and code together, whatever wrote the change; on a story branch an edit tool's write to a `spec.md` is
+refused sooner, at the tool. A spec that turns out wrong is raised to the user and
 changed in a PR of its own that changes only the spec folder; the story branch rebases on it. The gate keeps no copy
 of the spec's text: every round grades against `spec.md` as it is in the commit under review, so there is nothing to
 hold and nothing to `unlock` for a spec edit. A `RESHAPE_SPEC` lock stays while the spec is rescoped; the user's
@@ -45,6 +46,8 @@ branch on it before the next round.
 ### Session 2026-10-14
 
 - Q: Who runs the rebase after `rebase <ref>`? → A: The session, not the gate. The gate checks that the bound spec.md changed on the default branch, releases the lock and records the default branch's commit; the session rebases, dispatches the conflict-resolver agent on conflicts and pushes; the next round is refused until the branch contains that commit. This replaces the hook-run rebase in answers 5 and 6 and the hook push in answer 9.
+- Q: Where is a spec.md write refused? → A: In two places: the review-round launch refuses a PR whose diff changes a spec.md and code (User Story 4), the gate that keeps the graded spec from changing beside code; and on a story branch `Edit`, `Write` and `NotebookEdit` of a spec.md are refused by path (User Story 1). Bash writes, the commit and a rebase in progress are not judged by User Story 1; the launch catches what they carry. A spec folder's move gets its own diff-check reply, naming both folders and the two-PR route. This narrows issue #104 Decision 1, which named Bash.
+- Q: How is the first round after a rebase that skipped `rebase <ref>` reviewed? → A: In full: a review-round launch whose last counted round's head is not an ancestor of HEAD reviews the PR's whole diff, whatever rebased the branch. Only a release by `rebase <ref>` restarts the round facts (FR-010), so the agent cannot reset its own measurement by rebasing.
 
 ## Terms
 
@@ -61,14 +64,13 @@ branch on it before the next round.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - A story branch cannot change a spec.md (Priority: P1)
+### User Story 1 - A story branch's edit tools cannot change a spec.md (Priority: P1)
 
-An agent on a story branch tries to write a `spec.md`, by an edit tool, by a shell command or by a commit. Each is
-refused and told the one route a spec change takes: stop, raise it to the user, and land it as a spec-only PR on the
-spec branch.
+An agent on a story branch tries to write a `spec.md` by an edit tool. It is refused and told the one route a spec
+change takes: stop, raise it to the user, and land it as a spec-only PR on the spec branch.
 
-**Why this priority**: it is the rule the evidence asked for. Without it the agent can move the target it is graded
-against, and the hold of ADR-0016 decision 6 only catches that after the fact.
+**Why this priority**: it is the agent's usual route to the file, refused before any work builds on the change.
+User Story 4 is the gate; this rule only catches the common case sooner.
 
 **Independent Test**: drive the gate hook in `dev/alq-review/tests/test_gate.py`'s harness on a checkout whose
 branch is a story branch, send each write, and read the refusal; send the same writes on a spec branch and see them
@@ -80,35 +82,16 @@ pass this rule.
    `NotebookEdit` names that file, **Then** it is refused, naming the file, saying a story branch never changes a
    spec.md, and giving the next step: stop and raise the spec problem to the user, who lands the change in a
    spec-only PR on `123-spec`, after which this branch rebases on it.
-2. **Given** the same checkout, **When** a Bash command of a form in the writes table names that file as what it
-   writes, **Then** it is refused with the same words.
-3. **Given** the same checkout with a change to that file staged by any route, **When** `git commit` runs,
-   **Then** it is refused, naming the file and how to put it back, whatever the claim and shim checks' settings.
-4. **Given** a checkout on `123-spec`, `123-retire-spec`, `123-adr-hold` or the default branch, **When** any of the
-   writes above names that file, **Then** this rule refuses none of them.
-5. **Given** a story branch, **When** a write names `plan.md`, `tasks.md`, `research.md` or any other file of the
+2. **Given** a checkout on `123-spec`, `123-retire-spec`, `123-adr-hold` or the default branch, **When** an edit
+   tool names that file, **Then** this rule refuses none of them.
+3. **Given** a story branch, **When** a write names `plan.md`, `tasks.md`, `research.md` or any other file of the
    spec folder, **Then** this rule refuses none of them: a story PR ticks its tasks.
-6. **Given** a story branch and no PR, no ledger and no round, **When** a write names a spec.md, **Then** it is
-   refused all the same: the rule reads the branch, not the ledger.
-7. **Given** a Bash command that only reads the file (`cat`, `grep`, `git diff`, `git show`, `git log`), **When**
-   it runs on a story branch, **Then** it is not refused.
-8. **Given** `log` mode, **When** a write is refused by this rule, **Then** it is recorded as `would_deny` and not
+4. **Given** a story branch and no PR, no ledger and no round, **When** an edit tool names a spec.md, **Then** it
+   is refused all the same: the rule reads the branch, not the ledger.
+5. **Given** a story branch, **When** a Bash command writes a spec.md or a commit changes one, **Then** this rule
+   refuses neither; User Story 4 refuses the launch of a PR that carries the change beside code.
+6. **Given** `log` mode, **When** a write is refused by this rule, **Then** it is recorded as `would_deny` and not
    blocked, as Mode says of the spec refusals.
-
----
-
-### The writes
-
-`P` is the path of a spec.md, written as given or relative to the command's directory. The hook refuses these
-forms; what it misses, scenario 3 catches at the commit and User Story 4 at the launch.
-
-| Form | Examples |
-|---|---|
-| Shell redirection into `P` | `echo x > P`, `cat <<EOF >> P` |
-| `tee` into `P` | `... \| tee P`, `tee -a P` |
-| In-place edit of `P` | `sed -i ... P`, `perl -i ... P` |
-| `P` as the target of a copy, move, removal or truncation | `cp a P`, `mv a P`, `mv P b`, `rm P`, `truncate -s 0 P` |
-| A git command that rewrites `P` in the checkout or the index | `git rm P`, `git mv P b`, `git checkout -- P`, `git restore P` |
 
 ---
 
@@ -187,10 +170,9 @@ the next round before and after the story branch is rebased.
    not at a third edit, and the round is compared with no round before the release. After a release by `unlock <ref>`
    the rounds are measured as before.
 9. **Given** the session's rebase stopped on conflicts, **When** it dispatches the conflict-resolver agent, **Then**
-   the agent resolves them in that checkout and continues the rebase; it never edits a spec.md, and the story rule
-   of User Story 1 holds it as it holds the session. A conflict in a spec.md cannot come from a story commit (User
-   Story 1); if one arises, or a conflict the agent cannot resolve, it aborts the rebase and reports it, and the
-   session raises it to the user.
+   the agent resolves them in that checkout and continues the rebase; it never edits a spec.md. A conflict in a
+   spec.md, or a conflict the agent cannot resolve, makes it abort the rebase and report it, and the session raises
+   it to the user. A spec.md change the rebase leaves on the branch is refused at the next launch (User Story 4).
 
 ---
 
@@ -199,8 +181,8 @@ the next round before and after the story branch is rebased.
 A review-round launch, an audit included, is refused on a PR whose diff adds or modifies a spec.md and changes any
 file outside that spec folder.
 
-**Why this priority**: it is the check that catches a spec change that reached the branch by a route the hook and
-the commit gate did not see, and it is what makes "spec PR first, then the story PR" a rule code decides.
+**Why this priority**: it is the gate. It refuses a spec change beside code whatever route wrote it (a Bash write,
+a commit, a rebase), and it is what makes "spec PR first, then the story PR" a rule code decides.
 
 **Independent Test**: in the same harness, build branches whose diffs mix and separate spec and code, and launch
 rounds on each.
@@ -222,6 +204,9 @@ rounds on each.
 5. **Given** a PR on a branch named otherwise than a story branch, **When** its diff mixes a spec.md and code,
    **Then** the launch is refused all the same: the diff check reads the diff, not the name.
 6. **Given** `log` mode, **When** the check refuses, **Then** it is recorded as `would_deny` and the launch opens.
+7. **Given** a story branch rebased on the default branch after its last round, without `rebase <ref>` (the next step
+   of scenario 1), **When** the next review round launches, **Then** it is a full round over the PR's diff, not a
+   delta from the last round's head, and its facts are measured as before (FR-011).
 
 ---
 
@@ -253,34 +238,32 @@ two closing lines.
 
 - A story branch created off `<issue>-spec` before the spec PR merged carries the spec in its diff: User Story 4
   refuses its launch until the spec PR merges and the branch rebases on the default branch.
-- A spec-only PR that changes two spec folders is refused by User Story 4: the second folder is outside the first.
-- A move of a spec folder is refused by User Story 4 even in a spec-only PR: a move is a deletion at the source and
-  an addition at the destination, and the old folder is outside the new one (data-model `worktree.name_status` row).
-  It is two PRs: one adds the new folder; a later one deletes the old folder and updates its citations, which passes,
-  since a deleted spec.md is not read as a change to it. Or it is the user's call with the switch (`alq-review off`).
+- A spec-only PR that changes two spec folders, a move of a spec folder included, is refused by User Story 4: a
+  move is a deletion at the source and an addition at the destination, and the old folder is outside the new one.
+  The refusal names both folders and the two-PR route, not the spec-or-code reply: one PR adds the new folder; a
+  later one deletes the old folder and updates its citations, which passes, since a deleted spec.md is not read as a
+  change to it. Or it is the user's call with the switch (`alq-review off`).
 - A write to a spec.md of another checkout by its absolute path is judged by that checkout's branch, not the
   command's directory.
-- A `spec.md` path in a Bash command that only appears in a heredoc body, a comment or a quoted string the command
-  never writes to is not refused by the hook; the commit gate (scenario 3 of User Story 1) and User Story 4 stand
-  behind it.
-- During a rebase in a story checkout HEAD is detached: the story-branch rule of User Story 1 reads the branch being
-  rebased, so it holds the session and the conflict-resolver agent during the rebase that follows `rebase <ref>`.
+- During a rebase in a story checkout HEAD is detached, so the story-branch rule of User Story 1 refuses nothing;
+  a spec.md change the rebase leaves is refused at the next launch (User Story 4).
 - Audit reviewers are still not given the spec; the diff check applies to an audit launch as to any other.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: On a story branch, every `Edit`, `Write` and `NotebookEdit` of a spec.md, every Bash command of a form
-  in the writes table that writes one, and every `git commit` whose staged tree changes one MUST be refused with the
-  next step User Story 1 names. The rule MUST read the checkout's branch, the branch being rebased while a rebase is
-  in progress, and nothing from the ledger. The writes of every other file, and the same writes on any other branch,
-  MUST pass it.
+- **FR-001**: On a story branch, every `Edit`, `Write` and `NotebookEdit` of a spec.md MUST be refused with the next
+  step User Story 1 names. The rule MUST read the checkout's branch and nothing from the ledger; a detached HEAD is no
+  story branch. Bash writes and commits are not judged by it. The writes of every other file, and the same writes on
+  any other branch, MUST pass it.
 - **FR-002**: Every review-round and assess-round launch MUST read `spec.md` at the reviewed commit and nothing of
   any earlier version. The ledger MUST record the `spec` value only: no blob id, no text, no hold.
 - **FR-003**: A changed `spec.md` MUST hold nothing and ask for no `unlock`.
 - **FR-004**: A review-round launch of any stage MUST be refused on a PR whose diff adds or modifies a spec.md and
-  changes a file outside that spec folder, naming both and the next step User Story 4 names.
+  changes a file outside that spec folder. When that file is in no spec folder, the refusal names both and the next
+  step User Story 4 names; when every changed file is under a spec folder (two folders, or a folder's move), it names
+  the two folders and the two-PR route of Edge Cases.
 - **FR-005**: The refusals of FR-001 and FR-004 MUST follow the plugin's mode alone (ADR-0017 decision 3): in `log`
   mode they are recorded and nothing is blocked.
 - **FR-006**: The `issue-spec` rescope MUST run in the spec branch's worktree, `<issue>-spec` created fresh off the
@@ -309,6 +292,9 @@ two closing lines.
   round over the PR's diff, and a round's facts (the edits per file, the lines fixes wrote, the additions) MUST count
   only the commits since the first round after the release, and compare the round only with the rounds since then. A
   release by `unlock <ref>` MUST change neither.
+- **FR-011**: A review-round launch whose last counted round's head is not an ancestor of HEAD, or is a commit the
+  checkout does not know, MUST be a full round over the PR's diff, whatever rewrote the branch. It MUST NOT restart
+  the round facts; only FR-010's release does.
 
 ### Key Entities
 
@@ -323,10 +309,8 @@ two closing lines.
 
 - **SC-001**: Every scenario and edge case above has a test in `dev/alq-review/tests` (User Story 5's in
   `dev/alq-plan/tests`) that failed before the code and passes after.
-- **SC-002**: No `git commit` a session makes on a story branch changes a spec.md (the commit gate), and no story
-  PR a round opens on changes a spec.md and code together (User Story 4): each route in the writes
-  table, the commit and the mixed diff are refused in the tests. Commits made by `cherry-pick`, `merge`, `revert`,
-  `am`, `pull` or `rebase --continue` are caught by User Story 4 only.
+- **SC-002**: No PR a round opens on changes a spec.md and code together (User Story 4), and no edit tool writes a
+  spec.md on a story branch (User Story 1): both refusals, and both diff-check replies, are driven in the tests.
 - **SC-003**: `spec_blob`, `spec_held` and `text_step` appear nowhere in `plugins/alq-review` or its README. The tests
   of User Story 2 name `spec_blob` and `spec_held`, to prove nothing reads them.
 - **SC-004**: A `spec.md` change between two rounds of one PR costs no `unlock`: the second round opens in the
@@ -342,9 +326,8 @@ two closing lines.
   branch name nor the PR body", is about the `spec` and `story` arguments and stands.
 - No migration of stored ledgers: the keys of the hold are no longer read. The one PR held by a changed `spec.md`
   on 2026-10-13, #102, is superseded by this issue and closed.
-- Out of scope: the forms of Bash write beyond the table (the commit gate and the diff check stand behind the
-  hook); the engineering repo's `pr-review-loop.md` and `alq-build`'s skills, the callers that adapt; the story
-  argument of #81. No `alq-build` skill writes a spec.md (a grep of `plugins/alq-build` finds none).
+- Out of scope: refusing a Bash write or a commit of a spec.md (User Story 4 stands behind the edit rule); the
+  engineering repo's `pr-review-loop.md` and `alq-build`'s skills, the callers that adapt; the story argument of #81. No `alq-build` skill writes a spec.md (a grep of `plugins/alq-build` finds none).
 - Unchanged: ADR-0016 decisions 1-3 and 5 (the `spec` argument, its shape, `spec.md` present at the reviewed commit, the
   bound value never changes); ADR-0017 (review reads only `spec.md`); the spent-audit and `ESCALATE` locks and their
   `unlock`. ADR-0018's "`unlock` is the one release" changes for a `RESHAPE_SPEC` lock only: `unlock <ref>` releases it
@@ -375,7 +358,7 @@ Answer: It reverses ADR-0016 decision 6 (and the blob-id part of decision 4). Th
 Source: user: issue #104 Decision; https://claude.ai/artifact/318JN3nQhSgcXqCuP18CdD.
 
 ### needs-spec
-Answer: It has decisions: which branches count as story branches, how the hook detects a Bash write, where the rescope runs, what "changes code" means for the diff check, and how the ledger's stored spec state is removed.
+Answer: It has decisions: which branches count as story branches, which writes the hook refuses, where the rescope runs, what "changes code" means for the diff check, and how the ledger's stored spec state is removed.
 Source: code: plugins/alq-plan/skills/issue-spec/SKILL.md (rescope on the story branch); user: issue #104 Work 3.
 
 ## Root cause

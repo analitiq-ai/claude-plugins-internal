@@ -3,20 +3,18 @@
 Every refusal below is a test written to fail first. `<ref>` is `policy.unlock_ref(state)`: `#<pr>`, or the branch with no PR.
 `<issue>-spec` is written from `story_issue(branch)`; when the branch is not a story branch, "the issue's spec branch".
 
-## The story rule (US1), one text at three sites
+## The edit rule (US1)
 
-Sites: `Edit`, `Write`, `NotebookEdit` (`on_edit`); a Bash `write` action (`on_bash`); a `commit` action, on the paths it
-would record (`on_bash`, before the claim and shim gates). All through `hookio.refuse`, action `spec-write` (`commit` for the
-third), under `mode`: in `log` mode recorded as `would_deny`, nothing blocked.
+Site: `Edit`, `Write`, `NotebookEdit` (`on_edit`), through `hookio.refuse`, action `spec-edit`, under `mode`: in `log` mode
+recorded as `would_deny`, nothing blocked.
 
-| Site | Refusal text |
-|---|---|
-| edit, Bash write | `<path>` is the spec.md of spec folder `<folder>`, and `<branch>` is a story branch: a story branch never changes a spec.md. Next step: stop and raise the spec problem to the user. They land the change in a spec-only PR on `<issue>-spec`; once it merges, this branch rebases on it. |
-| commit | `<path>`, the spec.md of spec folder `<folder>`, is staged for this commit, and `<branch>` is a story branch: a story branch never changes a spec.md. Put it back: `git restore --staged --worktree -- <path>`, or for a file HEAD does not hold, `git rm --cached -- <path>` and delete it. Then raise the spec problem to the user: they land the change in a spec-only PR on `<issue>-spec`; once it merges, this branch rebases on it. |
+> `<path>` is the spec.md of spec folder `<folder>`, and `<branch>` is a story branch: a story branch never changes a
+> spec.md. Next step: stop and raise the spec problem to the user. They land the change in a spec-only PR on
+> `<issue>-spec`; once it merges, this branch rebases on it.
 
-Not refused by this rule: any file but a spec.md; any branch but a story branch; a Bash command with no `write` action
-(`cat`, `grep`, `git diff`, `git show`, `git log`); a path outside any checkout. During a rebase the branch is the one
-being rebased (data-model).
+Not refused by this rule: any file but a spec.md; any branch but a story branch; a detached HEAD; a path outside any
+checkout; a Bash command or a commit, whatever it writes. A spec.md change that reaches a story PR by those routes is
+refused at the next launch (the diff check).
 
 ## The binding (US2)
 
@@ -32,22 +30,22 @@ Refusals, in order (019's rows 1–6 unchanged; row 7, the hold, deleted):
 | 1–3 | missing `spec`; neither null nor a non-empty string; a folder of the wrong shape | as today |
 | 6 | a value different from the binding | both values; the bound value never changes |
 | 4–5 | `<folder>/spec.md` missing or empty at the reviewed commit; git fails reading it | step "spec.md", the path (assess: restore it with the user's commit) |
-| 8 | the diff mixes a spec.md and code (US4, review-round only) | below |
+| 8 | the diff changes a spec.md and a file outside its folder (US4, review-round only) | below |
 
 The ledger holds `spec` and nothing of the file. A lock reason names a `RESHAPE_SPEC`, `ESCALATE` or spent-audit hold only.
 
 ## `rebase <ref>` (US3)
 
-The reply of each row of data-model "`rebase <ref>`", as `additionalContext` and `systemMessage`; placeholders as its
-source table gives them.
+The reply of each check of data-model "`rebase <ref>`", as `additionalContext` and `systemMessage`. `<sha>` is the commit
+the failing read named: `<onto>` or the locked round's `head_sha`.
 
-| Row | Reply |
+| Check | Reply |
 |---|---|
 | `names` | as `unlock`'s replies, with `rebase` |
 | `ruling` | `rebase` releases a RESHAPE_SPEC lock after a spec change; this branch is held by <hold>. Next step: `unlock <ref>` once the user has decided. |
 | `bound` | This PR has no spec, so no spec change can reach it. Close it and restart the work on a new PR bound to a spec that settles the decision. |
 | `checkout` | `<root>`, where round <n> ran, is gone. Next step: check `<branch>` out there, then type `rebase <ref>` again. |
-| `default`, `fetch`, `onto read`, `head read`; `base` when gh fails | `rebase <ref>` could not <read the default branch / read the PR's base / fetch `<default>` / read `<spec>/spec.md` at `<sha>`>: <gh's or git's words>. The lock stays. Next step: fix what they name, then type `rebase <ref>` again. |
+| `default`, `fetch`; `base`, `onto spec.md`, `head spec.md` when gh or git fails | `rebase <ref>` could not <read the default branch / read the PR's base / fetch `<default>` / read `<spec>/spec.md` at `<sha>`>: <gh's or git's words>. The lock stays. Next step: fix what they name, then type `rebase <ref>` again. |
 | `base` | `rebase` checks the spec on `<default>`, and this PR's base is `<base>`, a parent story branch the spec PR never reaches. Next step: land the parent PR first, then type `rebase <ref>` again. |
 | `onto spec.md` | `<spec>/spec.md` is missing or empty on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. |
 | `changed` | The spec PR has not reached `<default>`: `<spec>/spec.md` there is the one round <n> reviewed. Next step: land the spec change as a spec-only PR on `<issue>-spec` and type `rebase <ref>` once it merges, or type `unlock <ref>` if the spec stands. |
@@ -64,22 +62,21 @@ rescope runs.
 rebase after `rebase <ref>` stops on conflicts, with the checkout where the rebase stopped as its prompt. It reads `git status`
 and `git diff` there, edits each unmerged file so that both sides' intent survives, `git add -- <file>`, `git rebase
 --continue`, and repeats while the rebase stops. It never edits a spec.md and never runs `git rebase --skip`. A spec.md among
-the unmerged files, which no story commit can cause (US1), or a file it cannot resolve: it runs `git rebase --abort` and
-reports the files, for the session to raise to the user.
+the unmerged files, or a file it cannot resolve: it runs `git rebase --abort` and reports the files, for the session to raise
+to the user.
 
 ## The diff check (US4)
 
 Site: a review-round launch of any stage, through `hookio.refuse` under `mode`. Where it reads its diff: data-model
-"The mixed-diff rule".
+"The diff check".
 
-| Row | Text |
+| Reply | Text |
 |---|---|
 | `mixed` | This PR's diff changes `<spec.md>` and `<other path>`, which is outside `<folder>`: a PR changes the spec or the code, never both. Next step: land the spec change as a spec-only PR on `<issue>-spec`, rebase this branch on it, then launch again. |
+| `folders` | This PR's diff changes `<spec.md>` and files of another spec folder, `<other folder>`: a spec-only PR changes one spec folder. To move a folder, split it in two PRs: one adds `<folder>`; a later one deletes `<other folder>` and updates its citations. Next step: split this PR, then launch again. |
 
-Passes: a spec-only PR (any `spec`); code with `plan.md`, `tasks.md` or any file of the folder but `spec.md`; a deleted
-spec.md with code. Refused: two spec folders' spec.md in one diff; a spec folder's move, even in a spec-only PR (data-model
-`worktree.name_status` row). A move passes as two PRs: one adds the new folder; a later one deletes the old folder and
-updates its citations, its spec.md a deletion.
+Passes: a spec-only PR of one folder (any `spec`); code with `plan.md`, `tasks.md` or any file of the folder but `spec.md`;
+a deleted spec.md with code.
 
 ## `/alq-plan:issue-spec rescope <spec folder> #<issue>` (US5)
 
