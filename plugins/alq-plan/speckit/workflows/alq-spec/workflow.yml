@@ -49,16 +49,18 @@ inputs:
     default: ""
 
 steps:
-  # The kind is one of its enum by now, never text the user typed.
+  # The kind is one of its enum by now, never text the user typed. Where the run starts is decided here, once.
   - id: check-folder
     type: shell
+    output_format: json
     run: python3 "$ALQ_PLAN_ROOT/scripts/spec_folder.py" check "$SPECIFY_FEATURE_DIRECTORY" "$ISSUE" "{{ inputs.kind }}"
 
   # Whether the issue is worth a spec is asked before one is written. The questions are answered in the session,
-  # which a headless command step cannot do. A re-scope amends a spec that was already judged worth writing.
+  # which a headless command step cannot do. A rescope of a spec amends one already judged worth writing; the issue of
+  # a no-spec folder is judged again.
   - id: new-spec
     type: if
-    condition: "{{ inputs.kind == 'new' }}"
+    condition: "{{ steps.check-folder.output.data.starts_at == 'premise' }}"
     then:
       # The verdict is the outcome itself, so no pick reads as approving or rejecting another.
       - id: premise
@@ -90,17 +92,27 @@ steps:
               [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
               gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
 
+      # The folder lets a later scope of the issue see it was judged.
+      - id: no-spec-needed
+        type: if
+        condition: "{{ steps.premise.output.choice == 'no spec needed' }}"
+        then:
+          - id: write-no-spec
+            type: shell
+            run: python3 "$ALQ_PLAN_ROOT/scripts/no_spec.py" write "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+
   # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
   # top-level and skips itself on a stop pick, instead of all of them sharing one block.
 
-  # specify writes spec.md from the template, so a re-scope skips it and grill amends the spec in place.
+  # specify writes spec.md from the template, over a no-spec one, so a rescope of a spec skips it and grill amends the
+  # spec in place.
   - id: scope
     type: if
-    condition: &spec-is-written "{{ inputs.kind == 'rescope' or steps.premise.output.choice == 'write the spec' }}"
+    condition: &spec-is-written "{{ steps.check-folder.output.data.starts_at == 'grill' or steps.premise.output.choice == 'write the spec' }}"
     then:
       - id: scope-kind
         type: if
-        condition: "{{ inputs.kind == 'rescope' }}"
+        condition: "{{ steps.check-folder.output.data.starts_at == 'grill' }}"
         then:
           # No step here reads it back: grill runs in the session, without the run's environment, and finds the
           # folder through feature.json. check-folder has graded the folder, so it goes into the JSON as it is.
@@ -165,14 +177,15 @@ steps:
           esac
 
   # Grill may rewrite the root cause section, so it is graded again; on a new spec, the premise answers too. A
-  # re-scope has no premise report: its premise answers are not graded, and its root cause is graded without one.
+  # rescope of a spec has no premise report: its premise answers are not graded, and its root cause is graded without
+  # one.
   - id: to-root-cause-regrade
     type: if
     condition: *spec-is-written
     then:
       - id: root-cause-regrade
         type: if
-        condition: "{{ inputs.kind == 'rescope' }}"
+        condition: "{{ steps.check-folder.output.data.starts_at == 'grill' }}"
         then:
           - id: root-cause-of-rescope
             type: shell

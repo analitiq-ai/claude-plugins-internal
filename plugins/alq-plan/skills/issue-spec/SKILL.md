@@ -1,6 +1,6 @@
 ---
 name: issue-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`) a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/alq-plan:issue-spec untracked "<what changes>"`).
+description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`), a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/alq-plan:issue-spec untracked "<what changes>"`).
 argument-hint: '#<issue> [<dir>] | rescope <spec folder> #<issue> | untracked "<what changes>" [<dir>]'
 ---
 
@@ -55,7 +55,8 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
 
 1. **Start.** `python3 DRIVE start <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a new scope,
    `python3 DRIVE rescope <SPEC_FILE> <ISSUE> <SPEC_DIR>` on a rescope. Note the `run_id`.
-   Expect `paused` at `premise`; on a rescope, `paused` at `grill`, and the next step is 4.
+   Expect `paused` at `premise`; on a rescope of a spec, `paused` at `grill`, and the next step is 4; on a rescope
+   of a folder whose spec.md says no spec is needed, `paused` at `premise`.
 2. **Premise.** Write the output of `python3 PREMISE form` to
    `.specify/workflows/runs/<run_id>/premise-report.md` in `PROJECT`. Answer each of its questions in this
    session, from the issue and the code, each with its source. Ask the user only what the issue and the code
@@ -64,10 +65,10 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    of the three by name. Never ask for approve or reject at this step. Write the user's pick in `Pick:`, and
    for either of the two stop picks the question it rests on and the reason, as the form says.
 3. **Resume past premise.** `python3 DRIVE resume <run_id> "premise_verdict=<pick>"`. After `write the spec`,
-   expect `paused` at `grill`. After either stop pick, expect `completed`; no spec was written. After
-   `not worth doing`, the workflow has closed the issue as not planned with the reason: tell the user so and
-   stop. After `no spec needed`, nothing was posted: tell the user to pass `spec: null` when the work is
-   reviewed, and stop.
+   expect `paused` at `grill`. After either stop pick, expect `completed`. After `not worth doing`, the workflow
+   has closed the issue as not planned with the reason: tell the user so and stop. After `no spec needed`, the
+   workflow has written `SPEC_DIR` with a spec.md that says no spec is needed, and nothing was posted: tell the
+   user to pass `spec: null` when the work is reviewed, and stop.
 4. **Grill.** Invoke `/speckit-grill-me` in this session, from `PROJECT`. On a rescope, give grill the open
    decision first: it is the first question. The user answers every question. Do not answer for the user.
 5. **Resume past grill.** Only after grill finished: `python3 DRIVE resume <run_id> grill_verdict=approve`.
