@@ -38,30 +38,25 @@ The ledger holds `spec` and nothing of the file. A lock reason names a `RESHAPE_
 
 ## `rebase <ref>` (US3)
 
-The checks, the release and the launch after it are data-model "`rebase <ref>`". Replies go back as `additionalContext`
-and `systemMessage`. `<default>` is the repo's default branch (`gh repo view --json defaultBranchRef`), never the PR's base.
+The reply of each row of data-model "`rebase <ref>`", as `additionalContext` and `systemMessage`. The row `base` passes
+when the branch has no open PR, so it has a reply only for a stacked PR.
 
-| Case | Reply | Lock |
-|---|---|---|
-| names no locked PR / several | as `unlock`'s replies, with `rebase` | stays |
-| the lock is not a `RESHAPE_SPEC` ruling | `rebase` releases a RESHAPE_SPEC lock after a spec change; this branch is held by <hold>. Next step: `unlock <ref>` once the user has decided. | stays |
-| bound to `null` | This PR has no spec, so no spec change can reach it. Close it and restart the work on a new PR bound to a spec that settles the decision. | stays |
-| the locked round's checkout is missing | `<root>`, where round <n> ran, is gone, so `<default>` could not be read. Next step: check `<branch>` out there, then type `rebase <ref>` again. | stays |
-| gh (the default branch or the PR's base) or git fetch fails | their words, as `_unknown_pr` gives them | stays |
-| the PR's base is not `<default>` (a stacked story PR) | `rebase` checks the spec on `<default>`, and this PR's base is `<base>`, a parent story branch the spec PR never reaches. Next step: land the parent PR first, then type `rebase <ref>` again. | stays |
-| `<spec>/spec.md` is missing at `origin/<default>` (a rescope moved or deleted the folder) | `<spec>/spec.md` is missing on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. | stays |
-| `<spec>/spec.md` at `origin/<default>` equals the one at the locked round's commit | The spec PR has not reached `<default>`: `<spec>/spec.md` there is the one round <n> reviewed. Next step: land the spec change as a spec-only PR on `<issue>-spec` and type `rebase <ref>` once it merges, or type `unlock <ref>` if the spec stands. | stays |
-| every check passes | The user released <repo>#<pr> for the spec change on `<default>` at `<onto>`: every hold named before is released. Next step, without asking the user: in `<root>`, rebase `<branch>` onto `origin/<default>`; if it stops on conflicts, dispatch `Agent(subagent_type='alq-review:conflict-resolver', prompt='<root>')`, and if it reports the rebase aborted, raise its report to the user and stop; push with `git push --force-with-lease`; then launch the next round, a full round that grades against `<spec>/spec.md` as the branch then has it. | released; `regraded_from` and `rebased_onto` set |
-
-A review-round launch of any stage while HEAD does not contain `rebased_onto`:
-
-| Case | Refusal |
+| Row | Reply |
 |---|---|
-| `git merge-base --is-ancestor <rebased_onto> HEAD` exits 1 | `rebase <ref>` released this branch for the spec on `origin/<default>` at `<onto>`, and HEAD does not contain that commit, so a round would grade the old code against the new spec. Next step: rebase onto `origin/<default>` first, push with `git push --force-with-lease`, then launch again. |
-| it fails otherwise | git's words, as `_review_base`'s refusal gives them |
+| `names` | as `unlock`'s replies, with `rebase` |
+| `ruling` | `rebase` releases a RESHAPE_SPEC lock after a spec change; this branch is held by <hold>. Next step: `unlock <ref>` once the user has decided. |
+| `bound` | This PR has no spec, so no spec change can reach it. Close it and restart the work on a new PR bound to a spec that settles the decision. |
+| `checkout` | `<root>`, where round <n> ran, is gone, so `<default>` could not be read. Next step: check `<branch>` out there, then type `rebase <ref>` again. |
+| `default`, `fetch`, `onto read`, `head read`; `base` when gh fails | `rebase <ref>` could not <read the default branch / read the PR's base / fetch `<default>` / read `<spec>/spec.md` at `<sha>`>: <gh's or git's words>. The lock stays. Next step: fix what they name, then type `rebase <ref>` again. |
+| `base` | `rebase` checks the spec on `<default>`, and this PR's base is `<base>`, a parent story branch the spec PR never reaches. Next step: land the parent PR first, then type `rebase <ref>` again. |
+| `onto spec.md` | `<spec>/spec.md` is missing or empty on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. |
+| `changed` | The spec PR has not reached `<default>`: `<spec>/spec.md` there is the one round <n> reviewed. Next step: land the spec change as a spec-only PR on `<issue>-spec` and type `rebase <ref>` once it merges, or type `unlock <ref>` if the spec stands. |
+| `release` | The user released <repo>#<pr> for the spec change on `<default>` at `<onto>`: every hold named before is released. Next step, without asking the user: in `<root>`, rebase `<branch>` onto `origin/<default>`; if it stops on conflicts, dispatch `Agent(subagent_type='alq-review:conflict-resolver', prompt='<root>')`, and if it reports the rebase aborted, raise its report to the user and stop; push with `git push --force-with-lease`; then launch the next round, a full round that grades against `<spec>/spec.md` as the branch then has it. |
+| `contains`, exit 1 | `rebase <ref>` released this branch for the spec on `origin/<default>` at `<onto>`, and HEAD does not contain that commit, so a round would grade the old code against the new spec. Next step: rebase onto `origin/<default>` first, push with `git push --force-with-lease`, then launch again. |
+| `contains`, any other exit | git's words, as `_review_base`'s refusal gives them |
 
-`unlock <ref>` on a `RESHAPE_SPEC` lock: released with no spec check, setting neither `regraded_from` nor `rebased_onto`; the
-reply carries the ruling as today, and names `<issue>-spec` as where a rescope runs.
+`unlock <ref>` on a `RESHAPE_SPEC` lock: the reply carries the ruling as today, and names `<issue>-spec` as where a
+rescope runs.
 
 ### The conflict resolver
 
@@ -70,8 +65,7 @@ rebase after `rebase <ref>` stops on conflicts, with the checkout where the reba
 and `git diff` there, edits each unmerged file so that both sides' intent survives, `git add -- <file>`, `git rebase
 --continue`, and repeats while the rebase stops. It never edits a spec.md and never runs `git rebase --skip`. A spec.md among
 the unmerged files, which no story commit can cause (US1), or a file it cannot resolve: it runs `git rebase --abort` and
-reports the files, for the session to raise to the user. It works under the hooks as any agent does; no gate code dispatches,
-admits or watches it.
+reports the files, for the session to raise to the user.
 
 ## The diff check (US4)
 

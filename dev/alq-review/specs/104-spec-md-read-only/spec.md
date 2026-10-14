@@ -44,7 +44,7 @@ branch on it before the next round.
 
 ### Session 2026-10-14
 
-- Q: Who runs the rebase after `rebase <ref>`? → A: The session, not the gate. The gate checks that the bound spec.md changed on the default branch, releases the lock and records the default branch's commit; the session rebases, dispatches the conflict-resolver agent on conflicts and pushes; the next round is refused until the branch contains that commit. This replaces the hook-run rebase in answer 6 and the hook push in answer 9.
+- Q: Who runs the rebase after `rebase <ref>`? → A: The session, not the gate. The gate checks that the bound spec.md changed on the default branch, releases the lock and records the default branch's commit; the session rebases, dispatches the conflict-resolver agent on conflicts and pushes; the next round is refused until the branch contains that commit. This replaces the hook-run rebase in answers 5 and 6 and the hook push in answer 9.
 
 ## Terms
 
@@ -147,8 +147,8 @@ review round and the assessment, and read the ledger and the refusals.
 A `RESHAPE_SPEC` lock stays on the story while its spec is rescoped on the spec branch. Once the spec PR merges, the
 user types `rebase <ref>`: the gate checks that the bound `spec.md` changed on the default branch, releases the lock,
 records the default branch's commit and tells the session to rebase the story branch on it, with a conflict-resolver
-agent for any conflict, and push. The next round waits until the branch contains that commit. The gate only checks;
-the session does the git work. `unlock <ref>` releases the lock instead when the user rules the spec stands.
+agent for any conflict, and push. The next round waits until the branch contains that commit. The session, not the
+gate, rebases and pushes (FR-009). `unlock <ref>` releases the lock instead when the user rules the spec stands.
 
 **Why this priority**: it closes the loop User Story 1 opens: a story told to stop for a wrong spec needs a way back
 to work on the changed spec. It needs User Story 2, whose rounds grade against the new `spec.md` with no hold.
@@ -167,16 +167,15 @@ the next round before and after the story branch is rebased.
    round's reviewed commit, **When** the user types `rebase <ref>`, **Then** the lock is released, the default
    branch's commit is recorded, and the reply gives the session its next step: rebase the story branch on the
    default branch, dispatch the conflict-resolver agent on conflicts, push with `git push --force-with-lease`, and
-   run the next round. Only whether the file differs is checked, not how. The gate rebases nothing, pushes nothing
-   and changes nothing in git.
+   run the next round. Only whether the file differs is checked, not how, and git changes only as FR-009 allows.
 3. **Given** a `RESHAPE_SPEC` lock and a default branch whose bound `spec.md` is the same as at the locked round's
    reviewed commit, **When** the user types `rebase <ref>`, **Then** the lock stays and the reply says the spec PR
    has not reached the default branch: land it first, or type `unlock <ref>` if the spec stands.
 4. **Given** a `RESHAPE_SPEC` lock on a story PR whose base is not the default branch (a stacked story PR), **When**
    the user types `rebase <ref>`, **Then** the lock stays, and the reply names the next step: land the parent PR
    first.
-5. **Given** a `RESHAPE_SPEC` lock and a default branch where the bound `spec.md` is missing (a rescope moved or
-   deleted its folder), **When** the user types `rebase <ref>`, **Then** the lock stays, and the reply says the
+5. **Given** a `RESHAPE_SPEC` lock and a default branch where the bound `spec.md` is missing or empty (a rescope
+   moved or deleted its folder), **When** the user types `rebase <ref>`, **Then** the lock stays, and the reply says the
    binding never changes: close this PR and restart the story on the new folder.
 6. **Given** a `RESHAPE_SPEC` lock, **When** the user types `unlock <ref>`, **Then** the lock is released with no
    spec check and nothing recorded, and the reply carries the ruling: the user has ruled the spec stands.
@@ -184,9 +183,9 @@ the next round before and after the story branch is rebased.
    **When** a review round launches, **Then** it is refused, saying to rebase onto the default branch first.
 8. **Given** a lock released by `rebase <ref>` and a story branch that contains the recorded commit, **When** the
    next review round launches, **Then** it is a full round over the PR's diff, not a delta from the last round
-   before the release, and its facts count only the commits since the release: a file edited in three rounds before
-   the rebase is not at a third edit, and the round is compared with no round before the release. After a release by
-   `unlock <ref>` the rounds are measured as before.
+   before the release, and its facts are measured as FR-010 says: a file edited in three rounds before the rebase is
+   not at a third edit, and the round is compared with no round before the release. After a release by `unlock <ref>`
+   the rounds are measured as before.
 9. **Given** the session's rebase stopped on conflicts, **When** it dispatches the conflict-resolver agent, **Then**
    the agent resolves them in that checkout and continues the rebase; it never edits a spec.md, and the story rule
    of User Story 1 holds it as it holds the session. A conflict in a spec.md cannot come from a story commit (User
@@ -294,17 +293,19 @@ two closing lines.
 - **FR-009**: A `RESHAPE_SPEC` lock MUST stay while the rescope runs, and its refusal MUST name the rescope on the spec
   branch and then `rebase <ref>`, or `unlock <ref>` if the spec stands. `rebase <ref>` MUST check against the repo's
   default branch, never the PR's base, and keep the lock, with a reply naming the next step, when: the PR's base is not
-  the default branch (a stacked story PR: land the parent PR first); the bound `spec.md` is missing on the default
-  branch (the binding never changes: close this PR and restart the story on the new folder); or it is the same as at
-  the locked round's reviewed commit (land the spec PR first, or `unlock <ref>` if the spec stands). The gate MUST run
-  no git command that changes a ref, a checkout or the remote. When every check passes it MUST release the lock as
-  `unlock <ref>` does, record the default branch's commit it read, and reply the session's next step: rebase the story
-  branch on the default branch, dispatch the conflict-resolver agent on conflicts, push with `git push
-  --force-with-lease`, and run the next round. A review-round launch MUST be refused until the story branch contains
-  that commit. The conflict-resolver agent MUST never edit a spec.md, and MUST abort the rebase and report when a
-  spec.md is in conflict or it cannot resolve a conflict; the session raises that to the user. `unlock <ref>` MUST
-  release a `RESHAPE_SPEC` lock when the user rules the spec stands, and stays the release of an `ESCALATE` or
-  spent-audit lock (ADR-0018).
+  the default branch (a stacked story PR: land the parent PR first; a branch with no open PR has no base to be stacked
+  on and passes); the bound `spec.md` is missing or empty on the default branch (the binding never changes: close this
+  PR and restart the story on the new folder); it is the same as at the locked round's reviewed commit (land the spec PR
+  first, or `unlock <ref>` if the spec stands); or git or gh cannot answer a check (their words). The gate's one git
+  write MUST be the fetch's update of `origin/<default>`: it changes no local branch, checkout, worktree or remote
+  branch. When every check passes it MUST release the lock as `unlock <ref>` does, record the default branch's commit it
+  read, replacing one an earlier release recorded, and reply the session's next step: rebase the story branch on the
+  default branch, dispatch the conflict-resolver agent on conflicts, push with `git push --force-with-lease`, and run
+  the next round. A review-round launch MUST be refused until the story branch contains that commit, and with git's
+  words when git cannot say whether it does. The conflict-resolver agent MUST never edit a spec.md, and MUST abort the
+  rebase and report when a spec.md is in conflict or it cannot resolve a conflict; the session raises that to the user.
+  `unlock <ref>` MUST release a `RESHAPE_SPEC` lock when the user rules the spec stands, and stays the release of an
+  `ESCALATE` or spent-audit lock (ADR-0018).
 - **FR-010**: A release by `rebase <ref>` MUST start the PR's measurement again: the next review round MUST be a full
   round over the PR's diff, and a round's facts (the edits per file, the lines fixes wrote, the additions) MUST count
   only the commits since the first round after the release, and compare the round only with the rounds since then. A

@@ -86,26 +86,29 @@ stand": the decision record replaces both (R1).
 ## R6: The branch under a rebase is the checkout's branch
 
 - **Decision**: `worktree.locate` returns the branch a rebase in progress is rebasing when HEAD is detached: a new
-  `worktree.rebasing(root) -> str | None` reads `head-name` under `git rev-parse --git-path rebase-merge` or `rebase-apply`
-  (`refs/heads/` stripped; None when no rebase is in progress or it names no branch); `locate` uses it where it returned None
-  for `HEAD`. Every reader of `locate` sees the branch under rebase, so the story rule (R3–R5) holds the session and the
-  conflict resolver during the rebase that follows `rebase <ref>` (R9, R10) as on the branch, reading nothing from the ledger
-  (FR-001).
+  `worktree.rebasing(root) -> str | None` reads `head-name` in the directory `git rev-parse --path-format=absolute --git-path
+  rebase-merge` names (`refs/heads/` stripped; None when no rebase is in progress or it names no branch); `locate` uses it where
+  it returned None for `HEAD`. Every reader of `locate` sees the branch under rebase, so the story rule (R3–R5) holds the
+  session and the conflict resolver during the rebase that follows `rebase <ref>` (R9, R10) as on the branch, reading nothing
+  from the ledger (FR-001).
 - **Rationale**: the spec's edge case: during a rebase the story rule reads the branch being rebased. `_held` compares
-  `here.branch` with the ledger's; with None it stops watching a checkout exactly when a rebase runs in it.
-- **Existing tools**: `git rev-parse --git-path`, which `worktree.concluding` already uses for `MERGE_HEAD`.
+  `here.branch` with the ledger's; with None it stops watching a checkout exactly when a rebase runs in it. The path is absolute
+  because git gives `--git-path` relative to the checkout, and the hook process runs elsewhere. Only `rebase-merge`: the
+  session's rebase runs git's default merge backend, which keeps its state there.
+- **Existing tools**: `worktree.concluding`'s `git rev-parse --path-format=absolute --git-path` read, the same form.
 
 ## R7: The hold goes, and the binding is the `spec` value alone
 
-- **Decision**: delete `gate._spec_text`, `SpecStep.holds`, `_refuse_spec`, `_admit_spec`'s hold clearing and `_spec_md_blob`'s
-  blob id; `_head_spec_md` becomes `_spec_md_present(root, head, folder, restore) -> str | None` (the refusal when `spec.md` is
-  missing, empty or unreadable at `head`, by the same `ls-tree -l` read). `_spec_step` binds `{"spec": value}` only; on a bound
+- **Decision**: delete `gate._spec_text`, `SpecStep.holds`, `_refuse_spec` and `_admit_spec`'s hold clearing; `_head_spec_md`
+  becomes `_spec_md_present(root, head, folder, restore) -> str | None` (the refusal when `spec.md` is missing, empty or
+  unreadable at `head`), through `_spec_md_blob`, which stays whole: the one reader of a spec.md at a commit, whose blob id
+  `rebase <ref>` compares (R9). `_spec_step` binds `{"spec": value}` only; on a bound
   PR it checks presence and binds nothing. `_assess_spec_step` checks presence only. Delete `specbinding.text_step` and its
   `released` import; `policy._spec_held` and the hold in `_holds`; the README's hold, `spec_blob` and `spec_held` text; the
   tests of the hold (R13). Nothing reads `spec_blob` or `spec_held` from a stored ledger; no migration.
 - **Rationale**: decisions 4 and 5 of issue #104: every round grades against `spec.md` at the reviewed commit, and the gate keeps
   no copy. The presence check is ADR-0016 decision 3, which stands.
-- **Existing tools**: `_spec_md_blob`'s `ls-tree -l -z` read, kept for size and type. `ledger.released`, kept for the verdict lock.
+- **Existing tools**: `_spec_md_blob`, kept. `ledger.released`, kept for the verdict lock.
 
 ## R8: What a `RESHAPE_SPEC` lock says
 
@@ -123,47 +126,36 @@ stand": the decision record replaces both (R1).
 ## R9: `rebase <ref>`: the gate checks and releases; the session rebases
 
 - **Decision**: `gate._on_release` reads `rebase <ref>` only when it is the whole prompt, trimmed: the word `rebase`, one ref
-  and nothing else. Any other prompt that starts with `rebase` ("rebase this on main", "rebase #12 now") gets None, and the hook
-  stays silent. `unlock <ref>` is read as today (ADR-0004: first words). `gate._rebase` runs the checks of data-model "`rebase
-  <ref>`" in order, finding the one locked ledger `ref` names as `_unlock` does: a `RESHAPE_SPEC` ruling, a bound folder, the
-  locked round's `root`, the PR's base the default branch (`github.default_branch(slug)`: `gh repo view --json
-  defaultBranchRef`, new; `github.pr_target`), the fetch (`worktree.fetch_target(root, <default>)`, factored out of
-  `review_base`, which calls it), and the bound `spec.md` at `origin/<default>` present and different from the one at the
-  locked round's `head_sha` (`worktree.tree_blob`). A check that fails replies its next step and keeps the lock. When all pass,
-  `_rebase` releases through `ledger.unlock`, sets `regraded_from` (R15) and `rebased_onto`, the sha it fetched, and replies
-  the session's next step: the rebase, the conflict resolver on conflicts (R10), `git push --force-with-lease`, the next round.
-  The gate runs no git command but the fetch and the reads. At a review-round launch it passes `policy.launch_round` the PR's
-  base as `unrebased_onto` while `rebased_onto` is not an ancestor of HEAD (`worktree.contains`, new: `git merge-base
-  --is-ancestor`), and the launch is refused: rebase onto `origin/<default>` first.
+  and nothing else; `unlock <ref>` is read as today (ADR-0004: first words). `gate._rebase` is data-model "`rebase <ref>`": its
+  rows in order, its release, and the launch row after it, under FR-009. New: `github.default_branch(slug)` (`gh repo view
+  --json defaultBranchRef`), `worktree.fetch_target(root, target)`, factored out of `review_base`, which calls it, and
+  `worktree.contains(root, sha)`. The spec.md reads are `gate._spec_md_blob` (R7), for the reason data-model gives.
 - **Rationale**: the user's decision in Clarifications (2026-10-14), which replaces the hook-run rebase. The default branch,
   never the PR's base: the spec PR merges into the default branch, so a stacked story PR's base never receives it, and its
-  parent lands first. A missing spec.md is a moved folder, and the binding never changes (ADR-0016 decision 5). The release
-  comes before the rebase because the rebase and the push are mutations the lock refuses; what keeps a round from grading the
-  old code against the new spec is the launch refusal, and `rebased_onto` is the one fact it needs, the commit whose spec.md
-  the check saw; a branch rebased onto a later default-branch commit contains it too. The whole-prompt match keeps an ordinary
-  request that starts with `rebase` from running a fetch. One release predicate, `ledger.unlock` and `released`, so `rebase`
-  and `unlock` release the same way and nothing else does; `rebase` releases every hold the branch has, as `unlock` does, and
-  the reply names each: a second stamp would be a second release mechanism. Every check reads only, so the keyword is safe to
-  repeat; typed again after a release it names no locked PR.
+  parent lands first. A branch with no open PR has no base that could be a parent story branch, so row `base` has nothing to
+  refuse. A missing spec.md is a moved folder, and the binding never changes (ADR-0016 decision 5). The release comes before the
+  rebase because the rebase and the push are mutations the lock refuses; what keeps a round from grading the old code against
+  the new spec is the launch refusal, and `rebased_onto` is the one fact it needs, the commit whose spec.md the check saw; a
+  branch rebased onto a later default-branch commit contains it too. The whole-prompt match keeps an ordinary request that
+  starts with `rebase` from running a fetch. One release predicate, `ledger.unlock` and `released`, so `rebase` and `unlock`
+  release the same way and nothing else does; a second stamp would be a second release mechanism. Every row only reads, so the
+  keyword is safe to repeat; typed again after a release it names no locked PR.
 - **Rejected**: the hook rebasing itself, first in place, then in a throwaway worktree: every partial failure between the
   rewrite and the push needed handling inside the gate, and four review rounds kept finding states it got wrong. A gate checks
   state and the worker changes it, as GitHub's "branch must be up to date" rule does.
 - **Existing tools**: `_unlock`, `_names`, `policy.locked`, `reshape_spec_ruling`, `ledger.unlock`, `worktree.review_base`'s
-  fetch, `tree_blob`, `github.pr_target`, reused; `github.default_branch` and `worktree.contains`, new. `ledger.py unlock` CLI,
-  unchanged.
+  fetch, `_spec_md_blob`, `github.pr_target`, reused; `github.default_branch` and `worktree.contains`, new. `ledger.py unlock`
+  CLI, unchanged.
 
 ## R10: The conflict-resolver agent ships in the plugin
 
-- **Decision**: a new `agents/conflict-resolver.md` (tools Read, Grep, Glob, Edit, Bash), which the session dispatches, as the
-  `rebase <ref>` reply says, when its rebase stops on conflicts, with the checkout as its prompt (contracts "The conflict
-  resolver"). It resolves each unmerged file, `git add -- <file>`, `git rebase --continue`, and repeats; it never edits a
-  spec.md and never runs `git rebase --skip`; on a spec.md among the unmerged files, or a file it cannot resolve, it runs `git
-  rebase --abort` and reports the files for the session to raise to the user. No gate code dispatches, admits or watches it:
-  it works under the hooks as any agent does, and the story rule holds it on the branch under the rebase (R6).
+- **Decision**: a new `agents/conflict-resolver.md`, contracts "The conflict resolver", which the session dispatches as the
+  `rebase <ref>` reply says. No gate code dispatches, admits or watches it (data-model "`rebase <ref>`"); the story rule holds
+  it on the branch under the rebase (R6).
 - **Rationale**: the user asked that a conflict be resolved without them (Clarifications). A story commit never changes a
   spec.md (US1), so a spec.md conflict is no agent's to settle; the user decides it. A hook cannot run an agent, so the reply
   names the dispatch, a deviation from P1 the plan's Complexity Tracking records; it fails safe, since no round opens until the
-  branch contains `rebased_onto` (R9).
+  branch contains `rebased_onto` (data-model, row `contains`).
 - **Existing tools**: the plugin's `agents/` and `test_agents.py`'s frontmatter reader, reused; `test_shipped_tree.py` lists the
   agent as `alq-review:conflict-resolver`.
 
@@ -207,25 +199,19 @@ stand": the decision record replaces both (R1).
   `test_shell.py`; the pure functions in `test_specbinding.py` (`SpecMdFolder`, `StoryIssue`, `StoryWriteRefusal`, `MixedDiff`,
   replacing `TextStep`); the lock text and the launch refusal in `test_policy.py`; `rebase <ref>` and the diff check in
   `test_gate.py` (`Rebase(HeldBranch)`, `MixedDiff(SpecArgument)`), the gh stub answering `api repos/*/pulls/*/files` from
-  `GH_PR_FILES` and `repo view --json defaultBranchRef`; `Rebase` covers, besides the scenarios: each failed check refused with
-  the lock kept and nothing recorded (no locked PR or several, another hold, bound to `null`, the checkout missing, gh or the
-  fetch failing); the release with `regraded_from` and `rebased_onto` set, and the story branch, its checkout, the remote
-  branch and `git worktree list` unchanged; a review-round launch refused until HEAD contains `rebased_onto`, then a full round
-  with no delta, its facts counting only commits since the release and comparing it with no round before it (R15); `rebase
-  onto main` and `rebase #<pr> now` answered with no reply; the agent file in `test_agents.py`: it exists with its tools, and
-  its prose says it never edits a spec.md and runs `git rebase --abort` on a spec.md conflict; `worktree.rebasing`, `contains`,
-  `fetch_target`, `to_commit`, `name_status` in `test_worktree_facts.py`, `name_status` with a renamed spec.md giving `R` and
-  the destination path; `policy.launch_round` with no `delta_from` across `regraded_from`, and still refused by the round cap
-  on rounds from before it, in `test_policy.py` and `facts.round_facts` reading only the rounds from it on in
-  `test_worktree_facts.py`. US2's tests name `spec_blob` and `spec_held`, a stored ledger carrying them and holding nothing, so
-  SC-003's grep covers `plugins/alq-review` and not the tests. Deleted with the hold: `test_gate.py` `SpecArgument`'s hold tests
-  (today's lines 442–470, 599–672, 709–760, 777–790, 852–877), `held()`, `assertHeldWithTheDiff`, `spec_blob` in
-  `HeldBranch.lock` and three `state.update` calls; `test_policy.py` `hold_spec`, `spec_held_state`, `SPEC_HOLD_NAMES`, four
-  `Mutation` tests and the "spec hold" case of the every-hold test; `test_specbinding.py` `TextStep`;
-  `test_worktree_facts.py:298`. `dev/alq-plan/tests/test_spec_source.py`: the rescope test becomes the spec-branch test. Each
-  test is written, run and seen to fail for the expected reason before its code (constitution IV). Before the hold's tests are
-  deleted in US2, they are run once on main and the result is recorded in the PR, so the spec's "did not converge" is observed
-  (its Root cause ran nothing).
+  `GH_PR_FILES` and `repo view --json defaultBranchRef`; `Rebase` has a test per row of data-model "`rebase <ref>`", its release
+  and its launch row, each with contracts' reply, and FR-009's git writes held to the fetch; the agent file in `test_agents.py`
+  against contracts "The conflict resolver"; `worktree.rebasing`, `contains`, `fetch_target`, `to_commit`, `name_status` in
+  `test_worktree_facts.py`, `name_status` with a renamed spec.md giving `R` and the destination path; `ledger.regraded_rounds`
+  and its callers (R15) in `test_policy.py` and `test_worktree_facts.py`. US2's tests name `spec_blob` and `spec_held`, a stored
+  ledger carrying them and holding nothing, so SC-003's grep covers `plugins/alq-review` and not the tests. Deleted with the
+  hold: `test_gate.py` `SpecArgument`'s hold tests (today's lines 442–470, 599–672, 709–760, 777–790, 852–877), `held()`,
+  `assertHeldWithTheDiff`, `spec_blob` in `HeldBranch.lock` and three `state.update` calls; `test_policy.py` `hold_spec`,
+  `spec_held_state`, `SPEC_HOLD_NAMES`, four `Mutation` tests and the "spec hold" case of the every-hold test;
+  `test_specbinding.py` `TextStep`; `test_worktree_facts.py:298`. `dev/alq-plan/tests/test_spec_source.py`: the rescope test
+  becomes the spec-branch test. Each test is written, run and seen to fail for the expected reason before its code (constitution
+  IV). Before the hold's tests are deleted in US2, they are run once on main and the result is recorded in the PR, so the spec's
+  "did not converge" is observed (its Root cause ran nothing).
 - **Rationale**: SC-001 and FR-008. The harness drives each hook event in-process (`Gate.hook`), with a bare origin for the
   fetch (`serve_remote`).
 - **Existing tools**: `Gate`, `HeldBranch.lock`, `SpecArgument.commit_files`, `Repo.serve_remote`, the gh stub, reused.
@@ -243,25 +229,24 @@ stand": the decision record replaces both (R1).
 
 ## R15: After a release by `rebase`, the story is measured afresh
 
-- **Decision**: the release of `rebase <ref>` (data-model "`rebase <ref>`") sets `state["regraded_from"] = len(state["rounds"])`
-  beside `ledger.unlock`, in the same save; `unlock <ref>` sets nothing. Every reader of round history that measures the story
-  reads only `state["rounds"][state.get("regraded_from", 0):]`. `policy.launch_round` counts as `done` only the internal rounds
-  there, so the first round after the release has `scope="full"` and no `delta_from`, and the brief's delta diff
-  (`briefs._review_prompt`, `git diff <delta_from>..HEAD`) gives way to the whole change, `git diff <base>...HEAD`.
-  `facts.round_facts` takes `first_reviewed` and the original `base` from the first of them, not `rounds[0]`, so `added_lines`,
-  `commits_per_file` and both `additions` count only commits since the release; it takes `earlier`, the finding counts behind
-  `count_not_falling`, and `seen`, the spots behind `repeat_unit`, from them too, and so `burden`. Its callers,
-  `gate.on_structured_output` (the assessor's admissible verdicts), `briefs.churned` and `briefs.brief`, change nothing. The
-  round caps (`policy._capped`) and `briefs.brief`'s `earlier_rounds` span the release on purpose: a rebase settles no round, so
-  the cap counts the rounds before it too, and earlier rounds are the assessor's context, not a gate. The field is not the
-  ledger's `epoch`, which an escalation audit advances.
+- **Decision**: FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
+  `state["rounds"][state.get("regraded_from", 0):]`, and `counted(state, stage, *, regraded_only=False)`, which filters that
+  slice instead of every round when the keyword is set. `regraded_from` is set by the release (data-model "`rebase <ref>`").
+  `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call `counted(..., regraded_only=True)`; `round_facts`'
+  `seen`, `first_reviewed` and `base` read `regraded_rounds`. So the first round after a release has `scope="full"` and no
+  `delta_from`, the brief's delta diff (`briefs._review_prompt`, `git diff <delta_from>..HEAD`) gives way to `git diff
+  <base>...HEAD`, and `added_lines`, `commits_per_file`, both `additions`, `count_not_falling`, `repeat_unit` and so `burden`
+  are measured as FR-010 says. Unsliced, the default: `policy._capped` (the round caps), `ledger._append_round`'s round
+  numbering, and `briefs.brief`'s `earlier_rounds`. Callers of `round_facts`, `gate.on_structured_output`, `briefs.churned` and
+  `briefs.brief`, change nothing.
 - **Rationale**: the rebase rewrites every commit of the story branch, so a head recorded before it is no ancestor of the
   rewritten HEAD: `<old head>..HEAD` holds every rewritten commit of the story and every commit the default branch gained, so a
   delta round would brief the whole rebase as a delta, and a file the story edited in three commits before it would read as at a
-  third edit. The whole story is regraded against the new `spec.md`, which is a full round. A round before the release graded
-  another `spec.md` and another history, so neither its finding count nor its spots say whether the story converges now: the
-  first full round after it, with more findings than the last round before it, is no count that failed to fall. `unlock <ref>`
-  rewrites nothing, so its rounds are measured as before.
-- **Existing tools**: `policy.launch_round`'s `done` and `facts.round_facts`, edited; the briefs, unchanged. The escalation
-  `epoch`: rejected, since advancing it also restarts the round cap (`_capped` counts `counted` rounds, which `epoch` filters)
-  and changes the round refs, neither of which a spec change asks for.
+  third edit. A round before the release graded another `spec.md` and another history, so neither its finding count nor its
+  spots say whether the story converges now. One slice, so no two readers disagree on where the release starts; `counted` keeps
+  its `COUNTED` filter over it, so a dead round after the release is never `done[-1]`. The cap spans the release because a
+  rebase settles no round; the numbering spans it because a round's ref, `<stage>-<epoch>.<n>`, must stay unique in its epoch;
+  earlier rounds are the assessor's context, not a gate. `unlock <ref>` rewrites nothing, so its rounds are measured as before.
+- **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round`'s `done` and `facts.round_facts`, edited; the
+  briefs, unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round cap (`_capped` counts
+  `counted` rounds, which `epoch` filters) and changes the round refs, neither of which a spec change asks for.

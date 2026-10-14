@@ -17,8 +17,8 @@
 | Field | Set by | Read by | Gone |
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
-| `regraded_from` | the release by `rebase <ref>`, `len(rounds)` then: the index of the first round after it | `facts.round_facts` (`first_reviewed`, `base`, `earlier` for `count_not_falling`, `seen` for `repeat_unit`, so `burden`) and `policy.launch_round` (`done`), each reading only `rounds[regraded_from:]`; not the round caps or `briefs.brief`'s `earlier_rounds` (R15) | –; absent reads as 0; `unlock <ref>` leaves it; not `epoch`, which an escalation audit advances (R15) |
-| `rebased_onto` | the release by `rebase <ref>`: the sha of `origin/<default>` as its fetch brought it | `gate.on_workflow`, for `policy.launch_round`'s `unrebased_onto` | –; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it |
+| `regraded_from` | the release by `rebase <ref>`, `len(rounds)` then: the index of the first round after it | `ledger.regraded_rounds` only, the slice `rounds[regraded_from:]`, which `counted(..., regraded_only=True)` filters; callers: R15 | –; absent reads as 0; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it; not `epoch` (R15) |
+| `rebased_onto` | the release by `rebase <ref>`: `<onto>`, the sha of `origin/<default>` as its fetch brought it | `gate.on_workflow`, the launch row below | –; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
 
@@ -55,30 +55,39 @@ The written paths of a segment, by the spec's table:
 ## `rebase <ref>` (`gate._rebase`)
 
 Read only when the whole prompt, trimmed, is `rebase <ref>`; any other prompt starting with `rebase` gets no reply
-(None). The gate runs `gh`, one fetch and two blob reads; it never rebases, pushes or adds a worktree: the session does
-(spec Clarifications, 2026-10-14). The checks, in order; the first that fails replies its next step and keeps the lock:
+(None). Its git work is what FR-009 allows: the fetch of row `fetch` and the reads of the rows after it. The checks, in
+order; the first that fails replies its next step (contracts, by row), keeps the lock and records nothing:
 
-| Check | Fails: next step |
-|---|---|
-| `ref` names one locked ledger, held by a `RESHAPE_SPEC` ruling (`policy.reshape_spec_ruling`) | as `unlock`'s replies; another hold: `unlock <ref>` once the user has decided |
-| `state["spec"]` is a folder | no spec: close the PR and restart on a PR bound to a spec |
-| the locked round's `root` exists; git runs there | the checkout is missing |
-| `github.default_branch` gives `<default>`, `github.pr_target` the PR's base, and the base is `<default>` | gh's words; a stacked story PR: land the parent PR first |
-| `worktree.fetch_target(root, <default>)` brings `origin/<default>`; `<onto>` is its sha | git's words |
-| `tree_blob(<spec>/spec.md)` at `<onto>` is not None | the binding never changes: close this PR and restart the story on the new folder |
-| it differs from `tree_blob(<spec>/spec.md)` at the locked round's `head_sha` | the spec PR has not reached `<default>`: land it first, or `unlock <ref>` if the spec stands |
+| Row | Check | Fails: next step |
+|---|---|---|
+| `names` | `ref` names one locked ledger (`_names`, as `_unlock`) | none or several: as `unlock`'s replies |
+| `ruling` | the lock is a `RESHAPE_SPEC` ruling (`policy.reshape_spec_ruling`) | another hold: `unlock <ref>` once the user has decided |
+| `bound` | `state["spec"]` is a folder | no spec: close the PR and restart on a PR bound to a spec |
+| `checkout` | the locked round's `root` exists | the checkout is missing |
+| `default` | `github.default_branch(slug)` gives `<default>` | gh's words |
+| `base` | `github.pr_target(slug, branch)` is None, or its base is `<default>`. None, the branch with no open PR (`<ref>` is then the branch, `policy.unlock_ref`), passes: there is no PR base to be stacked on | gh's words; a stacked story PR: land the parent PR first |
+| `fetch` | `worktree.fetch_target(root, <default>)` updates `origin/<default>`; `<onto>` is its sha | git's words |
+| `onto read` | `_spec_md_blob(root, <onto>, <spec>)` returns | RuntimeError: git's words |
+| `onto spec.md` | it is a blob, not None (missing or empty) | the binding never changes: close this PR and restart the story on the new folder |
+| `head read` | `_spec_md_blob(root, <head_sha>, <spec>)`, at the locked round's `head_sha`, returns | RuntimeError: git's words |
+| `changed` | the two blobs differ | the spec PR has not reached `<default>`: land it first, or `unlock <ref>` if the spec stands |
 
-The release, in one save: `ledger.unlock(state, "user prompt: rebase ...", now)`, the release `unlock <ref>` makes;
-`regraded_from = len(rounds)` (R15); `rebased_onto = <onto>`; `record("rebase", "released")`. The reply names every hold
-released and the session's next step: in `<root>`, rebase `<branch>` onto `origin/<default>`; on conflicts dispatch the
-conflict-resolver agent with `<root>`; push with `git push --force-with-lease`; then run the next round, a full round.
+`_spec_md_blob` (gate, kept from today, R7) is the reader because it tells the cases apart: `ls-tree` exits 0 with no
+entry for a missing path and fails for a sha the checkout does not know. `worktree.tree_blob` answers None to both.
 
-The launch after it: at a review-round launch of any stage, when `rebased_onto` is set and not an ancestor of HEAD
-(`worktree.contains(root, sha)`: `git merge-base --is-ancestor`; exit 1 is False, any other failure is git's words,
-refused as `_review_base`'s), the gate passes `policy.launch_round` `unrebased_onto=<the PR's base>`, and it refuses,
-after the lock and dirty checks: rebase onto `origin/<default>` first. Once HEAD contains it, the round opens, a full
-round (R15). The attestation needs no check of its own: `mark_ready` admits only a clean internal round at HEAD, and the
-last round before the release was ruled `RESHAPE_SPEC`, so a clean one is a round this launch admitted.
+The release (row `release`), in one save: `ledger.unlock(state, "user prompt: rebase ...", now)`, the release `unlock
+<ref>` makes; `regraded_from = len(rounds)`; `rebased_onto = <onto>`; `record("rebase", "released")`. A second release
+replaces both fields. The reply names every hold released and the session's next step.
+
+The launch after it, at a review-round launch of any stage, after the lock and dirty checks:
+
+| Row | Check | Fails |
+|---|---|---|
+| `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto)` (`git merge-base --is-ancestor <sha> HEAD`) is True | exit 1, False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=merges_into`, which refuses; any other exit (a sha the checkout does not know): RuntimeError, git's words, refused as `_review_base`'s |
+
+Once HEAD contains it the round opens, a full round (R15). The attestation needs no check of its own: `mark_ready`
+admits only a clean internal round at HEAD, and the last round before the release was ruled `RESHAPE_SPEC`, so a clean
+one is a round this launch admitted.
 
 The conflict-resolver agent (contracts) runs under the hooks as any agent does: no gate code dispatches, admits or
 watches it, and the story rule holds it on the branch under the rebase.
