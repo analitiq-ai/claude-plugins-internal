@@ -131,11 +131,12 @@ class IssueSpecSkill(unittest.TestCase):
         rule = re.search(r"^\*\*A new scope that does not land\.\*\*.*?(?=^$)", ISSUE_SPEC.read_text(), re.M | re.S)
         self.assertIsNotNone(rule)
         rule = re.sub(r"\s+", " ", rule.group(0))
-        for said in (discard, "either stop pick", "a rejected run", "a failed run"):
+        for said in (discard, "after `not worth doing`", "a rejected run", "a failed run"):
             with self.subTest(said=said):
                 self.assertIn(said, rule)
-        said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After either stop pick")]
-        self.assertTrue([s for s in said if discard in s], said)
+        self.assertNotIn("either stop pick", rule)
+        said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After `not worth doing`")]
+        self.assertTrue([s for s in said if f"on a new scope, run {discard}" in s], said)
         self.assertIn("A new scope that does not land", ISSUE_SPEC.read_text().partition("## Stops")[2])
 
     def test_every_story_heading_check_is_a_stop_the_skill_names(self):
@@ -154,11 +155,19 @@ class IssueSpecSkill(unittest.TestCase):
                       "command, then append", rescope)
         self.assertLess(rescope.index("`gh issue view`"), rescope.index("`Open decision: …`"))
 
-    def test_no_spec_needed_says_the_folder_was_written_and_tells_the_user_to_pass_a_null_spec_at_review(self):
-        """The one value review will take for this PR; nothing else tells the user."""
-        said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After `no spec needed`")]
+    def test_no_spec_needed_lands_the_folder_it_wrote_as_a_written_spec_lands(self):
+        """A new scope's no-spec folder lands through its own PR, a rescope's on its branch: discarded, it would leave
+        the issue with no folder to say no spec is needed."""
+        text = squashed(ISSUE_SPEC)
+        said = [s for s in re.split(r"(?<=\.)\s+", text) if s.startswith("After `no spec needed`")]
         self.assertTrue([s for s in said if "the workflow has written `SPEC_DIR` with a spec.md that says no spec is "
-                         "needed" in s and "tell the user to pass `spec: null` when the work is reviewed" in s], said)
+                         "needed" in s and "land it as step 8 says" in s and "discard" not in s], said)
+
+    def test_a_no_spec_rescope_tells_the_user_to_pass_a_null_spec_at_review(self):
+        """The one value review will take for this PR; a rescope's end lines do not carry it, a new scope's do."""
+        said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC))
+                if s.startswith("On a rescope that ended on `no spec needed`")]
+        self.assertTrue([s for s in said if "tell the user to pass `spec: null` when the work is reviewed" in s], said)
 
     def test_a_rescope_of_a_no_spec_folder_is_expected_to_pause_at_the_premise(self):
         self.assertIn("on a rescope of a spec, `paused` at `grill`, and the next step is 4; on a rescope of a folder "
