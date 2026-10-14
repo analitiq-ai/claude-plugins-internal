@@ -69,11 +69,12 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    of the three by name. Never ask for approve or reject at this step. Write the user's pick in `Pick:`, and
    for either of the two stop picks the question it rests on and the reason, as the form says.
 3. **Resume past premise.** `python3 DRIVE resume <run_id> "premise_verdict=<pick>"`. After `write the spec`,
-   expect `paused` at `grill`. After either stop pick, expect `completed`, then run `python3 BRANCH discard <ISSUE>`
-   as **A new scope that does not land** says. After `not worth doing`, the workflow has closed the issue as not
-   planned with the reason: tell the user so and stop. After `no spec needed`, the workflow has written `SPEC_DIR`
-   with a spec.md that says no spec is needed, and nothing was posted: tell the user to pass `spec: null` when the
-   work is reviewed, and stop.
+   expect `paused` at `grill`. After either stop pick, expect `completed`. After `not worth doing`, the workflow has
+   closed the issue as not planned with the reason: on a new scope, run `python3 BRANCH discard <ISSUE>` as **A new
+   scope that does not land** says, then tell the user so and stop. After `no spec needed`, the workflow has written
+   `SPEC_DIR` with a spec.md that says no spec is needed, and nothing was posted: land it as step 8 says. On a
+   rescope that ended on `no spec needed`, tell the user to pass `spec: null` when the work is reviewed, before
+   step 8's end lines; a new scope's end lines say so.
 4. **Grill.** Invoke `/speckit-grill-me` in this session, from `PROJECT`. On a rescope, give grill the open
    decision first: it is the first question. The user answers every question. Do not answer for the user.
 5. **Resume past grill.** Only after grill finished: `python3 DRIVE resume <run_id> grill_verdict=approve`.
@@ -99,7 +100,7 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
 
 **A new scope that does not land.** Once `BRANCH create` has made the spec branch, a new scope that stops before
 step 8 lands it runs `python3 BRANCH discard <ISSUE>` from the checkout `BRANCH create` ran in, then stops: after
-either stop pick, a rejected run, a failed run the user does not resume, or any other stop. It removes the spec
+`not worth doing`, a rejected run, a failed run the user does not resume, or any other stop. It removes the spec
 worktree, with what the run left in it, and the local branch, so that a later new scope of the issue is not told
 to rescope a spec that does not exist. It keeps a branch that holds a commit or is on origin: show the user its
 message.
