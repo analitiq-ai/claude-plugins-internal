@@ -17,10 +17,20 @@
 | Field | Set by | Read by | Gone |
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
-| `regraded_from` | the release by `rebase <ref>`, `len(rounds)` then: the index of the first round after it | `ledger.regraded_rounds` only, the slice `rounds[regraded_from:]`, which `counted(..., regraded_only=True)` filters; callers: R15 | –; absent reads as 0; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it; not `epoch` (R15) |
-| `rebased_onto` | the release by `rebase <ref>`: `{"branch": <default>, "sha": <onto>}`, the default branch the release checked and the sha its fetch brought | `gate.on_workflow`, which passes it whole to `policy.launch_round` (the launch row below) | –; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it |
+| `regraded_from` | the writer matrix below: the index of the first round after the release by `rebase <ref>` | `ledger.regraded_rounds` only, the slice `rounds[regraded_from:]`, which `counted(..., regraded_only=True)` filters; callers: R15 | –; absent reads as 0; not `epoch` (R15) |
+| `rebased_onto` | the writer matrix below: the default branch the release by `rebase <ref>` checked and the sha its fetch brought | `gate.on_workflow`, which passes it whole to `policy.launch_round` (the launch row below) | – |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
+
+The writers of `regraded_from` and `rebased_onto`, by the state before. `r0`, `o0` are the values an earlier release by
+`rebase <ref>` set; `n` is `len(rounds)` at the release. FR-010 is the rule: `unlock <ref>` changes neither. T033 has one
+test per cell.
+
+| Writer | Both absent before | `r0`, `o0` before |
+|---|---|---|
+| `rebase <ref>`, row `release` | `regraded_from = n`, `rebased_onto = {"branch": <default>, "sha": <onto>}` | the same: both replaced |
+| `unlock <ref>`, its release | both absent | `r0`, `o0` |
+| `rebase <ref>`, any failing row, `names` to `changed` | both absent | `r0`, `o0` |
 
 | State of a PR | Review-round launch with value v | Assess-round launch |
 |---|---|---|
@@ -36,7 +46,7 @@
 | `commit` | `cwd, staging, alone` | story rule on `worktree.to_commit` (first), then claim and shim gates |
 | `push`, `rerequest`, `ready` | as today | `policy.mutation` / `rerequest` / `mark_ready`; `ready` then the diff check |
 | `unlock` | as today | refused to agents |
-| `write` | `cwd, paths=(path,)`, one per written path | story rule, each path against its own checkout |
+| `write` | `cwd, path` (New interfaces) | story rule, each path against its own checkout |
 
 The written paths of a segment, by the spec's table:
 
@@ -92,14 +102,14 @@ record). A reply names only what its renderer has from its own row, an earlier r
 entry for a missing path and fails for a sha the checkout does not know. `worktree.tree_blob` answers None to both.
 
 The release (row `release`), in one save: `ledger.unlock(state, "user prompt: rebase ...", now)`, the release `unlock
-<ref>` makes; `regraded_from = len(rounds)`; `rebased_onto = {"branch": <default>, "sha": <onto>}`; `record("rebase", "released")`. A second release
-replaces both fields. The reply names every hold released and the session's next step.
+<ref>` makes; `regraded_from` and `rebased_onto` as the writer matrix gives them; `record("rebase", "released")`. The
+reply names every hold released and the session's next step.
 
 The launch after it, at a review-round launch of any stage, after the lock and dirty checks:
 
 | Row | Check | Fails |
 |---|---|---|
-| `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto["sha"])` (`git merge-base --is-ancestor <sha> HEAD`) is True | exit 1, False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=rebased_onto`, the whole record, never the PR's base, which refuses; any other exit (a sha the checkout does not know): RuntimeError, git's words, refused as `_review_base`'s |
+| `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto["sha"])` (New interfaces) is True | False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=rebased_onto`, the whole record, never the PR's base, which refuses; RuntimeError: refused as `_review_base`'s |
 
 Once HEAD contains it the round opens, a full round (R15). The attestation needs no check of its own: `mark_ready`
 admits only a clean internal round at HEAD, and the last round before the release was ruled `RESHAPE_SPEC`, so a clean
@@ -117,4 +127,23 @@ under that folder refuses. Readers of the fact:
 | Site | Reader | Base |
 |---|---|---|
 | review-round launch, any stage | `worktree.name_status(root, base)` | `_review_base`, as the round's `base_sha` |
-| attestation (`ready`) | `github.pr_files(slug, pr)`: GitHub `added→A`, `modified`/`changed→M`, `removed→D`, `renamed→R`, `copied→C`; None at 3000 files, GitHub's cap, so the ready is refused | the PR's base, as GitHub diffs it |
+| attestation (`ready`) | `github.pr_files(slug, pr)` (New interfaces) | the PR's base, as GitHub diffs it |
+
+## New interfaces
+
+Each new function and type the other documents cite, declared here once. An outcome's reply is its contracts row.
+
+| Name | Signature | Outcome | Reply (contracts) | Tested by |
+|---|---|---|---|---|
+| `shell.Action.path` | `path: str \| None = None` | kind `write`: one written path, as written; one Action per path of "The written paths of a segment" | "The story rule", edit, Bash write | T010, T012 |
+| | | any other kind: None | – | T010 |
+| `github.pr_files` | `(slug: str, pr: int) -> list[tuple[str, str]]`, through `github._answer`: `gh api --paginate repos/<slug>/pulls/<pr>/files` | the `(status, path)` pairs, GitHub's status as git's letter: `added→A`, `modified`/`changed→M`, `removed→D`, `renamed→R` at the destination path, `copied→C` | "The diff check", `mixed`, or the ready passes | T048 |
+| | | gh fails: RuntimeError in gh's words, from `_answer`; the gate refuses through `gate._unknown_pr(payload, "ready", where, exc)` | "The diff check", `gh fails` | T048 |
+| | | the list reaches 3000 files, GitHub's cap for that endpoint: raises `github.FileListCapped`, an `Exception` and not a `RuntimeError`, so no `except RuntimeError` reads it as gh failing | "The diff check", `file cap` | T048 |
+| `github.default_branch` | `(slug: str) -> str`, through `_answer`: `gh repo view --json defaultBranchRef` | the default branch's name | `rebase <ref>` row `default` passes | T033 |
+| | | gh fails: RuntimeError in gh's words | `rebase <ref>` row `default` | T033 |
+| `worktree.fetch_target` | `(root: str, target: str) -> str`, factored out of `review_base`, which calls it | `origin/<target>` updated from the remote; returns its sha | `rebase <ref>` row `fetch` passes; the sha is `<onto>` | T031, T033 |
+| | | git fails: RuntimeError in git's words | `rebase <ref>` row `fetch`; through `review_base`, `_review_base`'s refusal as today | T031, T033 |
+| `worktree.contains` | `(root: str, sha: str) -> bool`: `git merge-base --is-ancestor <sha> HEAD` | exit 0: True | launch row `contains` passes | T031, T034 |
+| | | exit 1: False | `contains`, exit 1 | T031, T034 |
+| | | any other exit, such as a sha the checkout does not know: RuntimeError in git's words | `contains`, any other exit | T031, T034 |

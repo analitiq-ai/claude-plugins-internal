@@ -58,7 +58,7 @@ backwards compatibility. The `cto` rule files and `alq-build`'s skills are out o
 | P1. Code decides | The three sites of the story rule, the commit backstop, the diff check, the keyword and the launch after it are decided in the gate. The rebase, the conflict resolver's dispatch and the push are the session's, named by the reply; code decides the launch row `contains` of data-model "`rebase <ref>`" (R9, R10). A justified deviation, not a Pass: see Complexity Tracking. |
 | P2. Only an approved entity releases a hold | The user releases a `RESHAPE_SPEC` lock by `rebase <ref>` after a spec change or `unlock <ref>` when the spec stands; both go through `ledger.unlock`, and nothing else does (R9). Two keywords for one hold: see Complexity Tracking. `rebased_onto` is no hold: it refuses only a round launch (data-model, row `contains`). Pass with the justification below. |
 | P3. Rules are pure | `spec_md_folder`, `story_issue`, `story_write_refusal`, `mixed_diff_refusal` in `specbinding.py`; the lock text and the launch refusal in `policy.py`; the gate reads git and GitHub and replies. Pass. |
-| P4. A check that could not run is its own outcome | gh or git failing in `rebase` (FR-009) or at the attestation's file list (R11) stops with the error and keeps the lock or refuses the ready. Pass. |
+| P4. A check that could not run is its own outcome | gh or git failing in `rebase` (FR-009) stops with its words and keeps the lock. At the attestation, gh failing and GitHub's file cap are each their own outcome of `github.pr_files`, each refusing the ready with its own reply: gh's words, or the cap (data-model "New interfaces"). Pass. |
 
 Re-check after Phase 1: unchanged.
 
@@ -87,9 +87,9 @@ plugins/alq-review/
 │   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: unrebased_onto, done via counted(regraded_only=True)
 │   ├── ledger.py            # + regraded_rounds; counted(..., regraded_only=False) (R15)
 │   ├── facts.py             # round_facts: earlier, seen, first_reviewed, base from the regraded rounds (R15)
-│   ├── shell.py             # Action.paths; kind write
-│   ├── worktree.py          # rebasing (locate uses it), to_commit, name_status, fetch_target, contains
-│   └── github.py            # pr_files, default_branch
+│   ├── shell.py             # Action.path; kind write (data-model "New interfaces")
+│   ├── worktree.py          # rebasing (locate uses it), to_commit, name_status; fetch_target, contains (data-model "New interfaces")
+│   └── github.py            # pr_files, FileListCapped, default_branch (data-model "New interfaces")
 ├── agents/conflict-resolver.md   # new
 └── README.md                # items 2, 5, new 8; Mode; What the user types; State; Layout
 plugins/alq-plan/skills/issue-spec/SKILL.md   # rescope on <issue>-spec

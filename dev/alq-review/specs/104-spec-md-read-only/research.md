@@ -56,13 +56,14 @@ stand": the decision record replaces both (R1).
 
 ## R4: Bash writes, read by the one shell reader
 
-- **Decision**: `shell.classify` gains the kind `write`, one `Action` per written path, with a new field `paths: tuple[str, ...]`
-  holding the path as written. The paths a segment writes, by the spec's table: a redirection target (`>`, `>>`, `&>`, `n>`,
+- **Decision**: `shell.classify` gains the kind `write`, its Action's field `path` declared in data-model "New
+  interfaces". The paths a segment writes, by the spec's table: a redirection target (`>`, `>>`, `&>`, `n>`,
   attached or as the next word); `tee`'s non-option words; the last non-option word of `cp`; every non-option word of `mv`, `rm`,
   `truncate` (after `-s <size>` / `--size=`), and of `sed` or `perl` when `-i`, `-i<suffix>` or `--in-place` is among its options;
   for `git`: the non-option words of `rm` and `mv`, the words after `--` of `checkout`, and the non-option words of `restore`
-  except the value of `-s` / `--source`. Heredoc bodies are already cut away. `gate.on_bash` resolves each path against
-  `action.cwd` (`~` expanded), locates its checkout, and judges it as R3 does; a refusal returns before the other actions.
+  except the value of `-s` / `--source`. Heredoc bodies are already cut away. `gate.on_bash` resolves each `write` action's
+  path against `action.cwd` (`~` expanded), locates its checkout, and judges it as R3 does; a refusal returns before the
+  other actions.
 - **Rationale**: one reader of a command (ADR-0005, the docstring of `shell.py`); the table is the spec's, and what it misses is
   caught at the commit (R5) and the launch (R11). A path is judged by its own checkout, so an absolute path into another
   worktree is judged by that worktree's branch (edge case). A word that is not a path, such as a `sed` script, locates nothing and
@@ -127,9 +128,9 @@ stand": the decision record replaces both (R1).
 
 - **Decision**: `gate._on_release` reads `rebase <ref>` only when it is the whole prompt, trimmed: the word `rebase`, one ref
   and nothing else; `unlock <ref>` is read as today (ADR-0004: first words). `gate._rebase` is data-model "`rebase <ref>`": its
-  rows in order, its release, and the launch row after it, under FR-009. New: `github.default_branch(slug)` (`gh repo view
-  --json defaultBranchRef`), `worktree.fetch_target(root, target)`, factored out of `review_base`, which calls it, and
-  `worktree.contains(root, sha)`. The spec.md reads are `gate._spec_md_blob` (R7), for the reason data-model gives.
+  rows in order, its release, and the launch row after it, under FR-009. New: `github.default_branch`,
+  `worktree.fetch_target` and `worktree.contains`, data-model "New interfaces". The spec.md reads are `gate._spec_md_blob`
+  (R7), for the reason data-model gives.
 - **Rationale**: the user's decision in Clarifications (2026-10-14), which replaces the hook-run rebase. The default branch,
   never the PR's base: the spec PR merges into the default branch, so a stacked story PR's base never receives it, and its
   parent lands first. A branch with no open PR has no base that could be a parent story branch, so row `base` has nothing to
@@ -169,16 +170,14 @@ stand": the decision record replaces both (R1).
   the same fact: at a review-round launch of any stage, after `_review_base` and before `ledger.open_round`,
   `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which with `--find-renames` strips the score from
   `R<score>` and yields the destination path), refused through `hookio.refuse(payload, "launch", ...)` with `then` "launch
-  again"; at the attestation, after `policy.mark_ready` allows, `github.pr_files(slug, pr)` (`gh api --paginate
-  repos/<slug>/pulls/<pr>/files`, GitHub's `status` mapped to git's letter; None when gh cannot answer, or when the list reaches
-  3000 files, GitHub's cap for that endpoint, past which the diff cannot be verified; None refuses as `_unknown_pr` refuses, P4)
-  with `then` "mark it ready again". Assess-round launches run no diff check.
+  again"; at the attestation, after `policy.mark_ready` allows, `github.pr_files(slug, pr)`, its outcomes and their refusals
+  in data-model "New interfaces" (P4), with `then` "mark it ready again". Assess-round launches run no diff check.
 - **Rationale**: FR-004: one function decides for both sites. The launch has a checkout and a base; a `gh pr ready` may run from
   anywhere, and GitHub lists the PR's files with their status, so the attestation site needs no checkout. A deleted spec.md
   grades nothing (Clarifications). Under `mode` (FR-005). An audit launch is a review-round launch (edge case).
-- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `github._gh`, the `--paginate` form
-  `released` uses; `_review_base`, `hookio.refuse`. Reusing the settled round's `base_sha` and `root` at the attestation: rejected,
-  the root may be gone and `released` PRs have no round.
+- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `github._answer`, in the `--paginate`
+  form `released` uses; `_review_base`, `_unknown_pr`, `hookio.refuse`. Reusing the settled round's `base_sha` and `root` at
+  the attestation: rejected, the root may be gone and `released` PRs have no round.
 
 ## R12: The rescope runs on the spec branch
 
@@ -231,7 +230,7 @@ stand": the decision record replaces both (R1).
 
 - **Decision**: FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
   `state["rounds"][state.get("regraded_from", 0):]`, and `counted(state, stage, *, regraded_only=False)`, which filters that
-  slice instead of every round when the keyword is set. `regraded_from` is set by the release (data-model "`rebase <ref>`").
+  slice instead of every round when the keyword is set. Its writers are data-model's writer matrix.
   `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call `counted(..., regraded_only=True)`; `round_facts`'
   `seen`, `first_reviewed` and `base` read `regraded_rounds`. So the first round after a release has `scope="full"` and no
   `delta_from`, the brief's delta diff (`briefs._review_prompt`, `git diff <delta_from>..HEAD`) gives way to `git diff
@@ -246,7 +245,7 @@ stand": the decision record replaces both (R1).
   spots say whether the story converges now. One slice, so no two readers disagree on where the release starts; `counted` keeps
   its `COUNTED` filter over it, so a dead round after the release is never `done[-1]`. The cap spans the release because a
   rebase settles no round; the numbering spans it because a round's ref, `<stage>-<epoch>.<n>`, must stay unique in its epoch;
-  earlier rounds are the assessor's context, not a gate. `unlock <ref>` rewrites nothing, so its rounds are measured as before.
+  earlier rounds are the assessor's context, not a gate. `unlock <ref>` rewrites nothing, so it changes neither field.
 - **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round`'s `done` and `facts.round_facts`, edited; the
   briefs, unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round cap (`_capped` counts
   `counted` rounds, which `epoch` filters) and changes the round refs, neither of which a spec change asks for.
