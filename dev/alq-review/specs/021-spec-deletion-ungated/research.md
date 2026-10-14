@@ -57,26 +57,14 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 - **Decision**: the agent never adds `cleanup`. No prompt keyword, no session record; the user adds the label on
   GitHub (critique clarification).
-- **Rationale**: the user's decision. It leaves the label-add check with one answer, refuse, and nothing to spend.
+- **Rationale**: the user's decision. There is no grant to spend.
 - **Existing tools**: none needed.
 
-## R6: Recognising a command that adds the label
+## R6: No refusal of a label add
 
-- **Decision**: `pre_merge_gate` recognises, after `tokenize`, every gh form that adds `cleanup` (case-insensitive,
-  comma lists and `--flag=value` included): `gh pr edit [ref] --add-label`, `gh issue edit N --add-label`,
-  `gh api` writing to `repos/O/R/issues/N/labels` or `repos/O/R/issues/N` with `cleanup` in its fields or its
-  `--input` file, and `gh pr create` with `--label`/`-l cleanup`: refused, saying only the user adds the label, on
-  GitHub. For `gh issue edit N` and the `issues/N` endpoints, N may be an issue: `fetch` answering that N is not a
-  pull request means not gated; any other `fetch` failure is refused, naming why. Any `gh api graphql` call naming
-  `addLabelsToLabelable` or `labelIds` is refused (the label is an id the hook cannot read). An unparseable command whose text matches the label forms is refused,
-  as for merge. `--remove-label` is never refused. Off (`alq-review off`) lifts this as it lifts the merge gate.
-- **Rationale**: the check must refuse in `log` mode too: `pre_merge_gate`'s merge hold refuses in every mode, and a
-  label an agent could add in log mode would be a second way out of it (P2). `gate.py`'s refusals follow log mode,
-  so the check lives in `pre_merge_gate`.
-- **Existing tools**: `pre_merge_gate.tokenize`, `arguments`, `target`, `fetch`, `name_of`, the `api_merge_bypass`
-  pattern. `shell.classify` was rejected: it feeds `gate.py`, whose refusals log-mode lifts.
-- **Not closed**: a label added by a route that is not a `gh` command the hook reads (a script, `curl` with the
-  token, a graphql query loaded from a file with `-F query=@f` or `--input`). The attestation comment has the same limit today (`shell.py` reads gh only).
+- **Decision**: this feature recognises and refuses no command that adds the label. Out of scope (user, 2026-10-14): refusing an agent's command that adds the label is left to a separate hook the user adds later.
+- **Rationale**: the user's decision.
+- **Existing tools**: none needed.
 
 ## R7: The poller on a cleanup PR
 
@@ -121,7 +109,7 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 - **Decision**: `python -m unittest -v` in `dev/alq-review/tests/`, each acceptance scenario a test written to fail
   first: `test_policy` (mark_ready facts), `test_gate` (ready, commit skip), `test_pre_merge_gate` (merge, ready,
-  label forms, an issue that is not a PR, an unreadable PR), `test_poll_pr_review` and `test_poller_contract` (exit 5, no hand-over), a new
+  an unreadable label), `test_poll_pr_review` and `test_poller_contract` (exit 5, no hand-over), a new
   `test_github.py` (`is_cleanup`, `pr_labels`, `main`).
 - **Rationale**: Principle IV.
 - **Existing tools**: these files already drive each component through its fakes, including `test_poll_pr_review`'s

@@ -34,7 +34,7 @@
 - The users are agents and the developer driving them, so `gh pr ready`, `gh pr merge`, `@codex review` and
   check-run names are the user-facing interface, not implementation. Module paths appear only in the
   premise answers and the Root cause, which the settled-design preset requires.
-- The issue's open point is resolved in FR-010 / Story 3: citation removal moves to its own reviewed PR.
+- The issue's open point is resolved in the Clarifications (no `/alq-post-merge` change): citation removal moves to its own reviewed PR.
   Widening the rule to exempt code edits was rejected (it would ungate code changes); dropping citation
   removal was rejected (leaves dangling citations).
 - Where the classifier lives (org pr-gate vs. alq-review) is left to the plan; FR-002 requires one owner
