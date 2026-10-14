@@ -127,18 +127,41 @@ under that folder refuses. Readers of the fact:
 | Site | Reader | Base |
 |---|---|---|
 | review-round launch, any stage | `worktree.name_status(root, base)` | `_review_base`, as the round's `base_sha` |
-| attestation (`ready`) | `github.pr_files(slug, pr)` (New interfaces) | the PR's base, as GitHub diffs it |
+| attestation (`ready`) | `github.pr_files(event.repo, event.pr)` (New interfaces), by form (below) | the PR's base, as GitHub diffs it |
+
+### The attestation's diff check
+
+Input: `event`, the `Target` that `gate.target(where, action.repo, action.pr)` returns for a `ready` action, once
+`policy.mark_ready` allows; never `where`. When `target` raises, `_unknown_pr` refuses as today, before any form exists.
+The forms, by `target`'s branches:
+
+| Form | When | Diff check |
+|---|---|---|
+| (a) `Target(repo, pr, branch, root)` | run in a checkout of the repo whose PR `pr_of` gives, naming that PR or none | `pr_files`, by outcome below |
+| (b) `Target(repo, pr)` | a named PR, run from no checkout or from another repo's or branch's | `pr_files`, by outcome below |
+| (c) `Target(repo, None, branch, root)` | a ready naming no PR, run in a checkout of the repo where `pr_of` is None: `gh pr create` without `--draft` always, its PR not yet existing; any other when no ledger names the branch or it has no open PR | none; `pr_files` is never called with pr None. `decide` judges an empty ledger, which holds no internal round, so `mark_ready` allows only a `released` commit and refuses any other with its own text. A released commit passes: there is no PR for GitHub to list, and a version-only release only moves its package's version (ADR-0003), so it changes no spec.md |
+| (d) None | no checkout of the repo and no named PR | none: `on_bash` judges nothing for the action, `mark_ready` included, as today |
+
+Forms (a) and (b), by `pr_files` outcome. Each refusal is `hookio.refuse(payload, "ready", text, event)`, its text the
+contracts row of "The diff check", rendered from `event.repo`, `event.pr`, `event.branch`, the pairs and gh's words only:
+
+| Outcome | Result | Contracts row |
+|---|---|---|
+| the pairs | `specbinding.mixed_diff_refusal(pairs, event.branch, "mark it ready again")`: a text refuses, None passes | `mixed` |
+| RuntimeError | refused | `gh fails` |
+| `FileListCapped` | refused | `file cap` |
 
 ## New interfaces
 
-Each new function and type the other documents cite, declared here once. An outcome's reply is its contracts row.
+The signatures and outcomes of `shell.Action.path`, `github.pr_files`, `github.default_branch`, `worktree.fetch_target`
+and `worktree.contains`, declared here once. An outcome's reply is its contracts row.
 
 | Name | Signature | Outcome | Reply (contracts) | Tested by |
 |---|---|---|---|---|
 | `shell.Action.path` | `path: str \| None = None` | kind `write`: one written path, as written; one Action per path of "The written paths of a segment" | "The story rule", edit, Bash write | T010, T012 |
 | | | any other kind: None | – | T010 |
 | `github.pr_files` | `(slug: str, pr: int) -> list[tuple[str, str]]`, through `github._answer`: `gh api --paginate repos/<slug>/pulls/<pr>/files` | the `(status, path)` pairs, GitHub's status as git's letter: `added→A`, `modified`/`changed→M`, `removed→D`, `renamed→R` at the destination path, `copied→C` | "The diff check", `mixed`, or the ready passes | T048 |
-| | | gh fails: RuntimeError in gh's words, from `_answer`; the gate refuses through `gate._unknown_pr(payload, "ready", where, exc)` | "The diff check", `gh fails` | T048 |
+| | | gh fails: RuntimeError in gh's words, from `_answer` | "The diff check", `gh fails` | T048 |
 | | | the list reaches 3000 files, GitHub's cap for that endpoint: raises `github.FileListCapped`, an `Exception` and not a `RuntimeError`, so no `except RuntimeError` reads it as gh failing | "The diff check", `file cap` | T048 |
 | `github.default_branch` | `(slug: str) -> str`, through `_answer`: `gh repo view --json defaultBranchRef` | the default branch's name | `rebase <ref>` row `default` passes | T033 |
 | | | gh fails: RuntimeError in gh's words | `rebase <ref>` row `default` | T033 |

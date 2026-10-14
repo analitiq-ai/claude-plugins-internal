@@ -1,7 +1,8 @@
 # Interfaces: spec.md is read-only on a story branch
 
 Every refusal below is a test written to fail first. `<ref>` is `policy.unlock_ref(state)`: `#<pr>`, or the branch with no PR.
-`<issue>-spec` is written from `story_issue(branch)`; when the branch is not a story branch, "the issue's spec branch".
+`<issue>-spec` is written from `story_issue(branch)`; when the branch is not a story branch, or none is known (the
+attestation's form (b), data-model), "the issue's spec branch".
 
 ## The story rule (US1), one text at three sites
 
@@ -72,13 +73,14 @@ reports the files, for the session to raise to the user.
 Sites: a review-round launch of any stage, after the review base is read; the attestation (`ready`), after `mark_ready`
 allows. Both through `hookio.refuse` under `mode`.
 
-At the attestation each row is an outcome of `github.pr_files` (data-model "New interfaces").
+At the attestation, which row answers which form and `pr_files` outcome, and where `<repo>` and `<pr>` come from:
+data-model "The attestation's diff check".
 
 | Row | Text |
 |---|---|
 | `mixed` | This PR's diff changes `<spec.md>` and `<other path>`, which is outside `<folder>`: a PR changes the spec or the code, never both. Next step: land the spec change as a spec-only PR on `<issue>-spec`, rebase this branch on it, then <launch again / mark it ready again>. |
-| `gh fails` | `_unknown_pr`'s refusal as today, its `(<exc>)` gh's words |
-| `file cap` | PR #<pr>'s file list reaches 3000 files, GitHub's cap, so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: split the PR into PRs of fewer files, then mark each ready again. |
+| `gh fails` | GitHub could not list the files of PR <repo>#<pr> (<gh's words>), so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: check `gh auth status`, then mark it ready again. |
+| `file cap` | PR <repo>#<pr>'s file list reaches 3000 files, GitHub's cap, so alq-review cannot verify that its diff keeps the spec and the code apart, and refuses the ready. Next step: split the PR into PRs of fewer files, then mark each ready again. |
 
 Passes: a spec-only PR (any `spec`); code with `plan.md`, `tasks.md` or any file of the folder but `spec.md`; a deleted
 spec.md with code. Refused: two spec folders' spec.md in one diff; a renamed spec folder with its citations.
