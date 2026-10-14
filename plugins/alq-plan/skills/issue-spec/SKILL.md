@@ -94,6 +94,7 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
   Next step: fix the `## Root cause` section of spec.md as it says.
 - `step: premise-answers` or `premise-answers-after-grill`, with `stderr` lines that each name a Next step: copy
   the premise report's answers into the `## Why this is worth doing` section of spec.md as they say.
+- `step: write-no-spec`, with a `stderr` line that names a Next step: do as it says.
 - `open_markers: true` goes back to step 4 first.
 - `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
   decision for them.

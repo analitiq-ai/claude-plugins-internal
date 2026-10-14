@@ -51,8 +51,8 @@ def main() -> None:
         write(folder, spec)
     except OSError as exc:
         print(f"The no-spec spec.md could not be written to {exc.filename or folder}: {type(exc).__name__}: "
-              f"{exc.strerror or exc}\nNext step: make that path writable or clear what is in its way, then resume "
-              "the run.", file=sys.stderr)
+              f"{exc.strerror or exc}\nNext step: make that path writable or clear what is in its way.",
+              file=sys.stderr)
         sys.exit(2)
 
 
