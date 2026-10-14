@@ -5,10 +5,8 @@ What changes at the plugin's edges. How each consumer decides is in
 
 ## Hook refusals (PreToolUse/Bash, `gate.py` and `pre_merge_gate.py`, every mode)
 
-- The missing-review refusal of `gh pr ready` / `gh pr merge` ends with `github.CLEANUP_EXEMPTION` (D1, D3 step 4).
-  Refusals for a hold the label keeps (D1–D3 step 1) carry no cleanup sentence.
-- An unread label: the refusal is `Cleanup.refusal()` alone (D1, D3 step 3).
-- A comment carrying the attestation marker is refused as D2 says, labelled or not.
+The text of each refusal is the data-model.md cell that decides it (rows D1–D4); `Cleanup.refusal()` and
+`CLEANUP_EXEMPTION` are stated in § Cleanup.
 
 ## `scripts/github.py` command line
 
@@ -16,19 +14,17 @@ What changes at the plugin's edges. How each consumer decides is in
 python3 scripts/github.py cleanup <owner/repo> <pr-number>
 ```
 
-stdout `cleanup` or `gated`, exit 0; any unread fact (data-model.md § Cleanup): stderr names why, exit 1;
-usage: exit 2.
+stdout `cleanup` or `gated`, exit 0; unread (data-model.md § Cleanup): stderr names why, exit 1; usage: exit 2.
 
 ## `poll-pr-review.sh`
 
-New exit `5` CLEANUP; exit `4` also covers a cleanup PR that is not mergeable (D5 cleanup mode). New stdout lines:
-`Cleanup PR: <repo>#<pr> carries the cleanup label; no Codex, no internal review, no triage.` and
-`CLEANUP: GitHub reports the PR mergeable and no check is failing; merge once the PR is ready.` A label not read
-prints D5's `WARNING:` line on stderr. The usage and the other exit codes are unchanged.
+New exit `5` CLEANUP; exit `4` also covers a cleanup PR with a failing check or a merge state GitHub does not
+report mergeable. The lines, exits and the `WARNING:` line are row D5 and § D5 cleanup mode. The usage and the
+other exit codes are unchanged.
 
 ## Skill (`alq-github-pr-review/SKILL.md`)
 
-Exit table gains `5`; a section *Cleanup PRs* (research R8).
+Exit table gains `5`: take the step the `CLEANUP:` line names. A section *Cleanup PRs* (research R8).
 
 ## README
 
