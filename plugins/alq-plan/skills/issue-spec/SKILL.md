@@ -1,7 +1,7 @@
 ---
 name: issue-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`) or a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`).
-argument-hint: "#<issue> [<dir>] | rescope <spec folder> #<issue>"
+description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`) a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/alq-plan:issue-spec untracked "<what changes>"`).
+argument-hint: '#<issue> [<dir>] | rescope <spec folder> #<issue> | untracked "<what changes>" [<dir>]'
 ---
 
 Drive the `alq-spec` Spec Kit workflow (this plugin's `speckit/workflows/alq-spec/workflow.yml`, which each
@@ -31,8 +31,17 @@ in this session, and passes the user's verdicts on resume. Never reimplement a w
   hold the wrong scope, so the issue is re-read as first stated: write it to `SPEC_FILE` with the same
   `gh issue view` command, then append, with the Edit tool, a blank line and `Open decision: …`, the decision
   to re-scope as this conversation states it. If the conversation states none, ask the user for it.
+- **`untracked "<what changes>" [<dir>]`** - scope a change that has no issue, after creating its issue. If
+  `<what changes>` is empty or only spaces, tell the user so and stop: no issue is created. `NEW_ISSUE` is
+  `scripts/new_issue.py` in this skill's base directory; run it from the checkout this session is in. Run
+  `python3 NEW_ISSUE types`, then draft from the text a one-line title, a body, and one of the types it prints.
+  Ask the user to confirm the title, body and type, or to change them, and create nothing until they do. Write
+  `# <title>`, a blank line and the body to `ISSUE_FILE`, a new file in the session scratchpad, with the Write
+  tool. Run `python3 NEW_ISSUE create <TYPE> <ISSUE_FILE>`. If it exits non-zero, show its message and stop: no
+  run is started. It prints the new issue's `issue` and `url`: go on as `#<issue> [<dir>]` with `ISSUE` the new
+  issue, and every stop from here on names the issue created, by its `url`.
 
-Anything else, a folder whose parent is not named `specs` included: tell the user the two forms and stop.
+Anything else, a folder whose parent is not named `specs` included: tell the user the three forms and stop.
 
 `SPEC_FILE` is a new file in the session scratchpad. Issue and conversation text never go into a command line.
 
