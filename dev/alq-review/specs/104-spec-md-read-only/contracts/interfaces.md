@@ -1,8 +1,8 @@
 # Interfaces: spec.md is read-only on a story branch
 
 Every refusal below is a test written to fail first. `<ref>` is `policy.unlock_ref(state)`: `#<pr>`, or the branch with no PR.
-`<issue>-spec` is written from `story_issue(branch)`; when the branch is not a story branch, or none is known (the
-attestation's form (b), data-model), "the issue's spec branch".
+`<issue>-spec` is written from `story_issue(branch)`; when the branch is not a story branch, "the issue's spec branch".
+At the attestation the branch is `head_branch` (data-model "The attestation's diff check").
 
 ## The story rule (US1), one text at three sites
 
@@ -73,8 +73,8 @@ reports the files, for the session to raise to the user.
 Sites: a review-round launch of any stage, after the review base is read; the attestation (`ready`), after `mark_ready`
 allows. Both through `hookio.refuse` under `mode`.
 
-At the attestation, which row answers which form and `pr_files` outcome, and where `<repo>` and `<pr>` come from:
-data-model "The attestation's diff check".
+At the attestation, when the check runs, which row answers which `pr_files` outcome, and where `<repo>`, `<pr>` and the
+branch come from: data-model "The attestation's diff check".
 
 | Row | Text |
 |---|---|

@@ -162,16 +162,16 @@ stand": the decision record replaces both (R1).
 
 ## R11: A PR changes the spec or the code, never both
 
-- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch, then) -> str | None`, pure: `changes`
+- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str, then) -> str | None`, pure: `changes`
   are `(status, path)` pairs, status git's letter (`A`, `M`, `D`, `R`, `C`, `T`); for each path with status other than `D` whose
   `spec_md_folder` is set, the first changed path (any status) not under that folder refuses, naming the spec.md, that path, the
-  rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, with `story_issue(branch)` or "the issue's
-  spec branch", rebase this branch on it, then `then`). A renamed spec.md counts at its destination. Two sites, two readers of
+  rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, `<issue>` from `story_issue(branch)`, or "the
+  issue's spec branch" when the branch is not a story branch, rebase this branch on it, then `then`). A renamed spec.md counts at its destination. Two sites, two readers of
   the same fact: at a review-round launch of any stage, after `_review_base` and before `ledger.open_round`,
   `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which with `--find-renames` strips the score from
   `R<score>` and yields the destination path), refused through `hookio.refuse(payload, "launch", ...)` with `then` "launch
-  again"; at the attestation, after `policy.mark_ready` allows, `github.pr_files(event.repo, event.pr)`, by the form of the
-  event's `Target`, its outcomes and their refusals in data-model "The attestation's diff check" (P4). Assess-round launches
+  again"; at the attestation, after `policy.mark_ready` allows, the rule of data-model "The attestation's diff check": when
+  it reads `github.pr_files(event.repo, event.pr)`, the branch it passes, and each outcome's refusal (P4). Assess-round launches
   run no diff check.
 - **Rationale**: FR-004: one function decides for both sites. The launch has a checkout and a base; a `gh pr ready` may run from
   anywhere, and GitHub lists the PR's files with their status, so the attestation site needs no checkout. A deleted spec.md

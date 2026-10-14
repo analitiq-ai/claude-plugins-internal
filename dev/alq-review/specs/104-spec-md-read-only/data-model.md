@@ -127,29 +127,45 @@ under that folder refuses. Readers of the fact:
 | Site | Reader | Base |
 |---|---|---|
 | review-round launch, any stage | `worktree.name_status(root, base)` | `_review_base`, as the round's `base_sha` |
-| attestation (`ready`) | `github.pr_files(event.repo, event.pr)` (New interfaces), by form (below) | the PR's base, as GitHub diffs it |
+| attestation (`ready`) | `github.pr_files(event.repo, event.pr)` (New interfaces), by the rule below | the PR's base, as GitHub diffs it |
 
 ### The attestation's diff check
 
-Input: `event`, the `Target` that `gate.target(where, action.repo, action.pr)` returns for a `ready` action, once
-`policy.mark_ready` allows; never `where`. When `target` raises, `_unknown_pr` refuses as today, before any form exists.
-The forms, by `target`'s branches:
+One rule, over the values `on_bash` holds for a `ready` action once `policy.mark_ready` allows. When
+`gate.target(where, action.repo, action.pr)` raises, `_unknown_pr` refuses as today; when it returns None, form (d)
+below, nothing is judged, `mark_ready` included, as today. Otherwise its `Target` is `event`, and the inputs are:
 
-| Form | When | Diff check |
-|---|---|---|
-| (a) `Target(repo, pr, branch, root)` | run in a checkout of the repo whose PR `pr_of` gives, naming that PR or none | `pr_files`, by outcome below |
-| (b) `Target(repo, pr)` | a named PR, run from no checkout or from another repo's or branch's | `pr_files`, by outcome below |
-| (c) `Target(repo, None, branch, root)` | a ready naming no PR, run in a checkout of the repo where `pr_of` is None: `gh pr create` without `--draft` always, its PR not yet existing; any other when no ledger names the branch or it has no open PR | none; `pr_files` is never called with pr None. `decide` judges an empty ledger, which holds no internal round, so `mark_ready` allows only a `released` commit and refuses any other with its own text. A released commit passes: there is no PR for GitHub to list, and a version-only release only moves its package's version (ADR-0003), so it changes no spec.md |
-| (d) None | no checkout of the repo and no named PR | none: `on_bash` judges nothing for the action, `mark_ready` included, as today |
+| Input | Value |
+|---|---|
+| `event.pr` | an int or None, as `target` and `pr_of` return it |
+| `released` | the bool `on_bash` passes to `mark_ready` |
+| `head_branch` | `event.branch` when `event.root` is set; otherwise the headRefName of `github.pr_head(event.repo, action.pr)`. `on_bash` keeps both fields of that answer, the headRefOid as `commit` and the headRefName as `head_branch`, instead of taking `[1]`. When `pr_head` fails, `commit` is `''` and `mark_ready` refuses before this rule, so `head_branch` is a str whenever the rule runs |
 
-Forms (a) and (b), by `pr_files` outcome. Each refusal is `hookio.refuse(payload, "ready", text, event)`, its text the
-contracts row of "The diff check", rendered from `event.repo`, `event.pr`, `event.branch`, the pairs and gh's words only:
+The rule:
+
+1. `released`: no diff check, in any form, because a version-only release changes no spec.md (ADR-0003).
+2. Not `released`, `event.pr` None: unreachable. `decide` reads an empty ledger, which holds no internal round, so
+   `mark_ready` refuses with its own text.
+3. Not `released`, `event.pr` set: `github.pr_files(event.repo, event.pr)`, by outcome. Each refusal is
+   `hookio.refuse(payload, "ready", text, event)`, its text the contracts row of "The diff check", rendered from
+   `event.repo`, `event.pr`, `head_branch`, the pairs and gh's words only:
 
 | Outcome | Result | Contracts row |
 |---|---|---|
-| the pairs | `specbinding.mixed_diff_refusal(pairs, event.branch, "mark it ready again")`: a text refuses, None passes | `mixed` |
-| RuntimeError | refused | `gh fails` |
-| `FileListCapped` | refused | `file cap` |
+| the pairs | `specbinding.mixed_diff_refusal(pairs, head_branch, "mark it ready again")`: a text refuses, None passes | `mixed` |
+| RuntimeError | refused, in gh's words | `gh fails` |
+| `FileListCapped` | refused; the user splits the PR | `file cap` |
+
+`head_branch` is a str, so the domain of `mixed_diff_refusal`'s `branch` and of `story_issue` stays str.
+
+The forms of `event`, by what `target` returns, and the rules each can reach:
+
+| Form | When | Rules |
+|---|---|---|
+| (a) `Target(repo, pr, branch, root)` | a checkout of the repo where `pr_of(where)` gives a PR, and the action names that PR or none | 1, 3 |
+| (b) `Target(repo, pr)` | a named PR that `pr_of(where)` does not give, or no checkout of the repo | 1, 3 |
+| (c) `Target(repo, None, branch, root)` | a checkout of the repo where `pr_of(where)` is None, because no ledger names the branch or GitHub reports no open PR, and the action names no PR | 1, 2 |
+| (d) None | no checkout of the repo and no named PR | none |
 
 ## New interfaces
 

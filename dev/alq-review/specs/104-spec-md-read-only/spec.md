@@ -211,9 +211,9 @@ rounds and run `gh pr ready` on each.
    round launches with any `spec` and any stage, **Then** it is refused, naming the spec.md and a file outside its
    folder, with the next step: land the spec change as a spec-only PR on `123-spec`, rebase this branch on it, and
    launch again.
-2. **Given** that PR, **When** the internal-review attestation is attempted (`gh pr ready`, a comment carrying the attestation marker), **Then** it is refused the
-   same way. A `gh pr create` without `--draft` has no PR to list yet; data-model "The attestation's diff check"
-   form (c) gives its outcome.
+2. **Given** that PR, **When** the internal-review attestation is attempted in its checkout (`gh pr ready`, `gh pr create`
+   without `--draft`, a comment carrying the attestation marker), **Then** it is refused the same way, with the next
+   step "mark it ready again". Data-model "The attestation's diff check" gives the rule for every attestation.
 3. **Given** a spec-only PR, **When** a round launches with `spec: null`, **Then** this check passes, and the
    reviewers are told the change needs no spec.
 4. **Given** a PR whose diff changes `b.py` and `dev/x/specs/123-login/tasks.md`, **When** a round launches,
