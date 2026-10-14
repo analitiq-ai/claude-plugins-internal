@@ -76,13 +76,14 @@ Source: `plugins/alq-review/README.md` (opening; How an agent uses it).
 ### P2. Only an Approved Entity Releases a Hold
 
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
-approved to release it (the user or another system) and the one action by which it does?
-Nothing else may release the hold, lower it or start it again. A hold with no named approver,
-or with any second way out, fails the gate.
+approved to release it (the user or another system), and is every action that releases it named
+by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
+no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
-`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`.
+`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`;
+which actions release a hold: the decision record in `dev/alq-review/docs/adr/` that decides that hold.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -138,4 +139,4 @@ organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 2.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-13
+**Version**: 3.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-14
