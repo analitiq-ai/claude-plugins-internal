@@ -32,7 +32,7 @@ reply is a failing test before its code (R10)
 **Project Type**: Claude Code plugin hooks, one agent, one skill's prose
 
 **Performance Goals**: an edit of a spec.md costs no git call beyond today's `locate`; a review-round launch one diff of the
-changed paths, and up to two ancestry checks (the last round's head, and `rebased_onto` when set). `rebase <ref>` runs its gh calls, one fetch and two reads
+changed paths, and up to three ancestry checks (`rebased_onto` when set, the two measured heads). `rebase <ref>` runs its gh calls, one fetch and two reads
 inside the prompt hook, under its default timeout
 
 **Constraints**: the edit rule reads the branch and never GitHub, nor the ledger (R3); every refusal names the next step; the
@@ -82,9 +82,9 @@ specs/104-spec-md-read-only/
 plugins/alq-review/
 ├── scripts/
 │   ├── specbinding.py       # + spec_folder, spec_md_folder, story_issue, story_edit_refusal, mixed_diff_refusal; - text_step
-│   ├── gate.py              # on_edit: edit rule; on_workflow: no hold, diff check, two `contains` facts, regraded_from on regrade; _rebase
-│   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: onto_contained, last_head_contained, Decision.regrade; done via counted(regraded_only=True)
-│   ├── ledger.py            # + regraded_rounds; counted(..., regraded_only=False) (R12)
+│   ├── gate.py              # on_edit: edit rule; on_workflow: no hold, diff check, launch_round given `contains`, regraded_from on regrade; _rebase
+│   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: ordered rows, `contains` injected, Decision.regrade; done via counted(regraded_only=True)
+│   ├── ledger.py            # + regraded_rounds, measured_heads; counted(..., regraded_only=False) (R12)
 │   ├── facts.py             # round_facts: earlier, seen, first_reviewed, base from the regraded rounds (R12)
 │   ├── worktree.py          # + name_status, fetch_target, contains
 │   └── github.py            # + default_branch
@@ -135,5 +135,4 @@ gate and the edit tools as the early refusal, with its own reply for a folder's 
 - The rescope on `<issue>-spec`, never a merged one: R9
 - The tests of each story, and the hold's deleted: R10
 - The README: R11
-- FR-010's regrade at a launch whose last head is no ancestor of HEAD, data-model "The review-round launch", one
-  `ledger.py` slice: R12
+- FR-010's regrade at a launch whose measured heads HEAD no longer contains, data-model "The review-round launch": R12

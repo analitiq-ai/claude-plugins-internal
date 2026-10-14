@@ -18,8 +18,8 @@ there and every `branch` it reads is a `str`.
 | Field | Set by | Read by | Gone |
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
-| `regraded_from` | a review-round launch whose decision has `regrade` (launch table below): the index of the round it opens, replacing an earlier one | `ledger.regraded_rounds` only (research R12) | –; absent reads as 0 |
-| `rebased_onto` | the release by `rebase <ref>`: `{"branch": <default>, "sha": <onto>}` | the review-round launch, through `policy.launch_round` (launch check below) | – |
+| `regraded_from` | a review-round launch whose decision has `regrade` (data-model "The review-round launch") | `ledger.regraded_rounds` only (research R12) | –; absent reads as 0 |
+| `rebased_onto` | the release by `rebase <ref>`: `{"branch": <default>, "sha": <onto>}` | `policy.launch_round`, row 3 | – |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
 
@@ -60,26 +60,33 @@ The conflict-resolver agent runs under the hooks as any agent does: no gate code
 
 ## The review-round launch (`gate.on_workflow`, `policy.launch_round`)
 
-Before `launch_round`, `on_workflow` reads two facts, each with `worktree.contains` in its own `try`; a RuntimeError is
-refused in git's words, as `_review_base`'s failure is, and no round opens:
+The rounds a round's facts are measured from are `ledger.regraded_rounds(state)`; their heads, for the launch, are
+`ledger.measured_heads(state)`: the `head_sha` of the first and of the last round of that slice, of any stage and epoch, or
+none when it is empty. Nothing else picks a head to check.
 
-| Fact | Read when | Value |
+`launch_round` takes `contains`, a function of one sha, and asks it only about the shas it reaches below. The gate passes
+`worktree.contains` bound to the checkout and wraps the call: a RuntimeError is refused in git's words, as `_review_base`'s
+failure is, and no round opens. The first row that holds decides:
+
+| # | When | Decision |
 |---|---|---|
-| `onto_contained` | `rebased_onto` is set | `contains(root, rebased_onto["sha"])`; else None |
-| `last_head_contained` | stage `internal` and `counted(state, "internal", regraded_only=True)` is not empty | `contains(root, <its last round's head_sha>)`; else None |
+| 1 | the lock or another obstacle, as today | refused, as today |
+| 2 | tracked files are dirty | refused, as today |
+| 3 | `rebased_onto` is set and `contains(rebased_onto["sha"])` is False | refused: contracts `rebased_onto` not contained, `<default>` and `<onto>` from `rebased_onto`, `<ref>` from `unlock_ref(state)` |
+| 4 | stage `internal` and a round cap is reached | the cap refusal, as today |
+| 5 | `contains` is False for a head of `measured_heads(state)` | allowed, `scope="full"`, no `delta_from`, `regrade=True`; an audit's `escalation` as today |
+| 6 | stage `audit` | allowed, `scope="full"`, `escalation` as today |
+| 7 | `counted(state, "internal", regraded_only=True)` is empty | allowed, `scope="full"` |
+| 8 | HEAD is its last round's `head_sha` | refused: nothing was committed, as today |
+| 9 | otherwise | allowed, `scope="delta"`, `delta_from` its last round's `head_sha` |
 
-`launch_round` decides as today (lock, dirty, caps, nothing committed), then:
+On `regrade` the gate sets `regraded_from` to the index of the round `ledger.open_round` returns, after it drops a dead
+`collecting` round, in the save that opens it, replacing an earlier value. A launch refused after `launch_round` allowed
+saves no `regraded_from`.
 
-| Input | Decision |
-|---|---|
-| `onto_contained` False | refused: contracts `contains` row False, `<default>` and `<onto>` from `rebased_onto`, `<ref>` from `unlock_ref(state)` |
-| `last_head_contained` False | allowed, `scope="full"`, no `delta_from`, `regrade=True` |
-| `last_head_contained` True | allowed, `scope="delta"`, `delta_from` the last round's head, as today |
-| both None | allowed as today (a first round is full) |
-
-On `regrade` the gate sets `regraded_from` to the index of the round it opens, in the save that opens it. After the
-rebase that follows `rebase <ref>` HEAD contains `<onto>` and no longer the last head, so that round is full and
-regraded too (research R12).
+After `rebase <ref>`, the launch at the locked head stops at row 3; once rebased, HEAD contains `<onto>` and not the old
+heads, so row 5 regrades. After an escalation audit, the next epoch's internal rounds are not yet counted, but the audit's
+head is measured, so a rebase there regrades too.
 
 ## The diff check (`specbinding.mixed_diff_refusal`)
 
@@ -105,5 +112,8 @@ Each reply named is its contracts row.
 | `github.default_branch` | `(slug: str) -> str` | the default branch's name; gh fails: RuntimeError in gh's words |
 | `worktree.fetch_target` | `(root: str, target: str) -> str`, factored out of `review_base`, which calls it | `origin/<target>` updated, its sha returned; git fails: RuntimeError in git's words |
 | `worktree.contains` | `(root: str, sha: str) -> bool`: `git rev-parse --verify --quiet <sha>^{commit}`, then `git merge-base --is-ancestor <sha> HEAD` | the first exits 1 (the checkout does not know `sha`): False; the second exits 0: True, 1: False; any other exit of either: RuntimeError in git's words |
-| `policy.launch_round` | `(state, stage, *, head_sha, dirty, inflight, onto_contained: bool \| None, last_head_contained: bool \| None) -> Decision`; `Decision` gains `regrade: bool = False` | the launch table above |
+| `ledger.regraded_rounds` | `(state) -> list[dict]`: `state["rounds"][state.get("regraded_from", 0):]` | the rounds the facts are measured from (R12) |
+| `ledger.counted` | `(state, stage, *, regraded_only: bool = False) -> list[dict]` | today's filter, over `regraded_rounds` when `regraded_only` |
+| `ledger.measured_heads` | `(state) -> list[str]` | the `head_sha` of the first and the last of `regraded_rounds`; `[]` when it is empty |
+| `policy.launch_round` | `(state, stage, *, head_sha, dirty, inflight, contains: Callable[[str], bool]) -> Decision`; `Decision` gains `regrade: bool = False` | "The review-round launch", rows 1–9; a RuntimeError from `contains` propagates to the gate |
 | `worktree.name_status` | `(root: str, base: str) -> list[tuple[str, str]]` | each path changed from the merge base of `base` and HEAD, once, as `(status, path)`, a rename as its `D` and its `A`; git fails: RuntimeError in git's words |

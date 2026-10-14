@@ -182,9 +182,9 @@ spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they
 
 ## R12: After any rebase, the story is measured afresh
 
-- **Decision**: a review-round launch whose last counted round's head is not an ancestor of HEAD regrades: data-model "The
-  review-round launch" reads `last_head_contained`, `launch_round` answers `regrade`, and the gate sets `regraded_from` to the
-  index of the round it opens. FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
+- **Decision**: a review-round launch of either stage regrades when HEAD does not contain a head of
+  `ledger.measured_heads(state)`, the first and last rounds of the measured slice: data-model "The review-round launch", row 5,
+  and the gate sets `regraded_from` to the index of the round it opens. FR-010's measurement is one helper in `ledger.py`: `regraded_rounds(state)`,
   `state["rounds"][state.get("regraded_from", 0):]`, and `counted(state, stage, *, regraded_only=False)`, which filters that
   slice instead of every round when the keyword is set. `policy.launch_round`'s `done` and `facts.round_facts`' `earlier` call
   `counted(..., regraded_only=True)`; `round_facts`' `seen`, `first_reviewed` and `base` read `regraded_rounds`. Unsliced:
@@ -195,8 +195,12 @@ spec.md, by path. No Bash write, commit or rebase-in-progress refusal: what they
   every route regrades alike: the rebase after `rebase <ref>`, the one the US1 and US4 replies send the agent to, and a
   stacked child rebased after its parent lands (the user, Clarifications 2026-10-14). A rebase resets the facts, and they climb
   again when the findings are not fixed. One slice, so no two readers disagree on where it starts. The cap spans it because a
-  rebase settles no round; the numbering spans it because a round's ref must stay unique in its epoch.
-- **Rejected**: the restart tied to `rebase <ref>` alone, with the facts kept across any other rebase: they then counted
+  rebase settles no round; the numbering spans it because a round's ref must stay unique in its epoch. The heads are read
+  from the same slice the facts read, of any stage and epoch, so an escalation audit's head counts and no second view of
+  "rounds since the regrade" exists. A GitHub round is opened from the inbox, not launched, so it is measured from the slice
+  the last launch set; the next launch checks the slice's first head as well as its last, so a rebase before it still regrades.
+- **Rejected**: a check of the last counted internal round only: `counted` is filtered by epoch and stage, so after an
+  escalation audit it is empty and a rebase went unseen (review round internal-3.8). The restart tied to `rebase <ref>` alone, with the facts kept across any other rebase: they then counted
   upstream commits as the story's own (review round internal-3.7). Measuring only the story's own commits: new measurement code.
 - **Existing tools**: `ledger.counted`, given the keyword; `policy.launch_round` and `facts.round_facts`, edited;
   `worktree.contains` (R6); the briefs, unchanged. The escalation `epoch`: rejected, since advancing it also restarts the round
