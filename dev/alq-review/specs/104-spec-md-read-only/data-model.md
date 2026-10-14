@@ -78,7 +78,7 @@ record). A reply names only what its renderer has from its own row, an earlier r
 
 | Placeholder | `gate._rebase` | `policy.launch_round` |
 |---|---|---|
-| `<ref>` | `policy.unlock_ref(state)`, the branch when there is no PR | – |
+| `<ref>` | `policy.unlock_ref(state)`, the branch when there is no PR | `policy.unlock_ref(state)` |
 | `<branch>`, `<root>`, `<n>`, `<head_sha>` | the ledger and its locked round, row `names` | – |
 | `<hold>` | the lock reason, row `ruling` | – |
 | `<spec>` | `state["spec"]`, row `bound` | – |
