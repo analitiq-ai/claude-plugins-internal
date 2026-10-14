@@ -9,9 +9,14 @@
 # those against the branch rules. The poller waits for that picture to be complete and prints it.
 #
 # SETTLED means every one of:
-#   - Codex's state lets the round settle. scripts/codexstate.py reads it from
-#     Codex's status card and replies; SKILL.md's settled paragraph is the one
-#     statement of when each state waits, settles or exits, WAIVED included;
+#   - Codex is not reviewing. Its status card's Code Review row, read only
+#     when its status time is after the trigger, is waited on while Running.
+#     Completed for the head is Codex's answer, at that status time; Completed
+#     for another commit settles the round with the re-request, never CLEAN.
+#     With no such row the round waits for one, unless Codex posted something
+#     not on scripts/codexstate.py's list: that settles it, never CLEAN, and
+#     beside a row is a WARNING. pr-gate's WAIVED run on the head stands in
+#     for the missing answer in those two cases only;
 #   - no check is running except the gate runs and those passed to
 #     --ignore-check (a gate run is a verdict, not work: its pending state is
 #     waited on only under the next rule);

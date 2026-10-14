@@ -182,12 +182,10 @@ was run. Codex's bodies are in the spec folder's `samples/`, byte for byte (R8).
 
 ## R10: The prose that states the rule changes with the code
 
-- **Decision**: the poller's header (lines 11–21) states the card rule: Codex has answered when the card's Code
-  Review row says Completed for the head since the trigger, at the row's status time; a Running row is waited
-  on; a row for another commit is reported with the re-request; any Codex item off the acknowledgement list
-  settles the round. `SKILL.md`'s *Waiting for the response* paragraph says the same in one sentence and points
-  the reader to `codexstate.py` for the list; its 👍 paragraph keeps the gate's rule and drops "Codex's only
-  answer is a 👍". The README's Layout table gains a `scripts/codexstate.py` row. No rule file under
+- **Decision**: the poller's header (lines 11–21) states the card rule as `contracts/codex-reader.md` *The
+  poller, per state* gives it, and points to `codexstate.py` for the acknowledgement list. `SKILL.md`'s
+  *Waiting for the response* paragraph says the same and points there too; its 👍 paragraph keeps the gate's
+  rule and drops "Codex's only answer is a 👍". The README's Layout table gains a `scripts/codexstate.py` row. No rule file under
   `.claude/rules` changes.
 - **Rationale**: FR-009. The README and SKILL describe the plugin and change with it (plan 019, R17); no
   governing rule file is touched, so constitution VI needs no split.
