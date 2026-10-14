@@ -111,9 +111,9 @@ The launch after it, at a review-round launch of any stage, after the lock and d
 |---|---|---|
 | `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto["sha"])` (New interfaces) is True | False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=rebased_onto`, the whole record, never the PR's base, which refuses; RuntimeError: refused as `_review_base`'s |
 
-Once HEAD contains it the round opens, a full round (R15). The attestation needs no check of its own: `mark_ready`
-admits only a clean internal round at HEAD, and the last round before the release was ruled `RESHAPE_SPEC`, so a clean
-one is a round this launch admitted.
+Once HEAD contains it the round opens, a full round (R15). The attestation needs no check of its own: it is allowed only
+as research R11 Rejected gives, and the last round before the release was ruled `RESHAPE_SPEC`, so a round settled at
+HEAD is one this launch admitted.
 
 The conflict-resolver agent (contracts) runs under the hooks as any agent does: no gate code dispatches, admits or
 watches it, and the story rule holds it on the branch under the rebase.
