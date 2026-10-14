@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `spec` | the first review-round launch that opens a round (`null` or the folder) | `_spec_step` (bind), `_assess_spec_step`, `briefs.bound_spec`, `policy.review_call`, `_rebase` | – |
 | `regraded_from` | the release by `rebase <ref>`, `len(rounds)` then: the index of the first round after it | `ledger.regraded_rounds` only, the slice `rounds[regraded_from:]`, which `counted(..., regraded_only=True)` filters; callers: R15 | –; absent reads as 0; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it; not `epoch` (R15) |
-| `rebased_onto` | the release by `rebase <ref>`: `<onto>`, the sha of `origin/<default>` as its fetch brought it | `gate.on_workflow`, the launch row below | –; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it |
+| `rebased_onto` | the release by `rebase <ref>`: `{"branch": <default>, "sha": <onto>}`, the default branch the release checked and the sha its fetch brought | `gate.on_workflow`, the launch row below | –; the next release by `rebase <ref>` replaces it; `unlock <ref>` leaves it |
 | `unlocked_at`, `unlocks[]` | `ledger.unlock`, by `unlock <ref>` and by `rebase <ref>` | `ledger.released` | – |
 | `spec_blob`, `spec_held` | nothing | nothing | deleted; a stored one is ignored |
 
@@ -72,18 +72,31 @@ order; the first that fails replies its next step (contracts, by row), keeps the
 | `head read` | `_spec_md_blob(root, <head_sha>, <spec>)`, at the locked round's `head_sha`, returns | RuntimeError: git's words |
 | `changed` | the two blobs differ | the spec PR has not reached `<default>`: land it first, or `unlock <ref>` if the spec stands |
 
+Where each reply placeholder comes from; a reply names only values from its own row, an earlier row or the ledger:
+
+| Placeholder | Source |
+|---|---|
+| `<repo>#<pr>`, `<branch>`, `<root>`, `<n>`, `<head_sha>` | the ledger and its locked round, row `names` |
+| `<hold>` | the lock reason, row `ruling` |
+| `<spec>` | `state["spec"]`, row `bound` |
+| `<issue>` | `specbinding.story_issue(<branch>)` |
+| `<default>` | row `default`; at launch, `rebased_onto["branch"]` |
+| `<base>` | row `base` |
+| `<onto>` | row `fetch`; at launch, `rebased_onto["sha"]` |
+| `<sha>` | the failing read row's sha: `<onto>` for `onto read`, `<head_sha>` for `head read` |
+
 `_spec_md_blob` (gate, kept from today, R7) is the reader because it tells the cases apart: `ls-tree` exits 0 with no
 entry for a missing path and fails for a sha the checkout does not know. `worktree.tree_blob` answers None to both.
 
 The release (row `release`), in one save: `ledger.unlock(state, "user prompt: rebase ...", now)`, the release `unlock
-<ref>` makes; `regraded_from = len(rounds)`; `rebased_onto = <onto>`; `record("rebase", "released")`. A second release
+<ref>` makes; `regraded_from = len(rounds)`; `rebased_onto = {"branch": <default>, "sha": <onto>}`; `record("rebase", "released")`. A second release
 replaces both fields. The reply names every hold released and the session's next step.
 
 The launch after it, at a review-round launch of any stage, after the lock and dirty checks:
 
 | Row | Check | Fails |
 |---|---|---|
-| `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto)` (`git merge-base --is-ancestor <sha> HEAD`) is True | exit 1, False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=merges_into`, which refuses; any other exit (a sha the checkout does not know): RuntimeError, git's words, refused as `_review_base`'s |
+| `contains` | `rebased_onto` is unset, or `worktree.contains(root, rebased_onto["sha"])` (`git merge-base --is-ancestor <sha> HEAD`) is True | exit 1, False: `gate.on_workflow` passes `policy.launch_round` `unrebased_onto=rebased_onto["branch"]`, never the PR's base, which refuses; any other exit (a sha the checkout does not know): RuntimeError, git's words, refused as `_review_base`'s |
 
 Once HEAD contains it the round opens, a full round (R15). The attestation needs no check of its own: `mark_ready`
 admits only a clean internal round at HEAD, and the last round before the release was ruled `RESHAPE_SPEC`, so a clean

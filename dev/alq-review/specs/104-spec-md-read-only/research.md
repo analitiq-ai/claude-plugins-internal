@@ -135,11 +135,11 @@ stand": the decision record replaces both (R1).
   parent lands first. A branch with no open PR has no base that could be a parent story branch, so row `base` has nothing to
   refuse. A missing spec.md is a moved folder, and the binding never changes (ADR-0016 decision 5). The release comes before the
   rebase because the rebase and the push are mutations the lock refuses; what keeps a round from grading the old code against
-  the new spec is the launch refusal, and `rebased_onto` is the one fact it needs, the commit whose spec.md the check saw; a
+  the new spec is the launch refusal, and `rebased_onto` is the one fact it needs, the commit whose spec.md the check saw and its branch; a
   branch rebased onto a later default-branch commit contains it too. The whole-prompt match keeps an ordinary request that
   starts with `rebase` from running a fetch. One release predicate, `ledger.unlock` and `released`, so `rebase` and `unlock`
-  release the same way and nothing else does; a second stamp would be a second release mechanism. Every row only reads, so the
-  keyword is safe to repeat; typed again after a release it names no locked PR.
+  release the same way and nothing else does; a second stamp would be a second release mechanism. Its one git write is FR-009's
+  fetch, so the keyword is safe to repeat; typed again after a release it names no locked PR.
 - **Rejected**: the hook rebasing itself, first in place, then in a throwaway worktree: every partial failure between the
   rewrite and the push needed handling inside the gate, and four review rounds kept finding states it got wrong. A gate checks
   state and the worker changes it, as GitHub's "branch must be up to date" rule does.

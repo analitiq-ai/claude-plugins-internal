@@ -38,15 +38,15 @@ The ledger holds `spec` and nothing of the file. A lock reason names a `RESHAPE_
 
 ## `rebase <ref>` (US3)
 
-The reply of each row of data-model "`rebase <ref>`", as `additionalContext` and `systemMessage`. The row `base` passes
-when the branch has no open PR, so it has a reply only for a stacked PR.
+The reply of each row of data-model "`rebase <ref>`", as `additionalContext` and `systemMessage`; placeholders as its
+source table gives them.
 
 | Row | Reply |
 |---|---|
 | `names` | as `unlock`'s replies, with `rebase` |
 | `ruling` | `rebase` releases a RESHAPE_SPEC lock after a spec change; this branch is held by <hold>. Next step: `unlock <ref>` once the user has decided. |
 | `bound` | This PR has no spec, so no spec change can reach it. Close it and restart the work on a new PR bound to a spec that settles the decision. |
-| `checkout` | `<root>`, where round <n> ran, is gone, so `<default>` could not be read. Next step: check `<branch>` out there, then type `rebase <ref>` again. |
+| `checkout` | `<root>`, where round <n> ran, is gone. Next step: check `<branch>` out there, then type `rebase <ref>` again. |
 | `default`, `fetch`, `onto read`, `head read`; `base` when gh fails | `rebase <ref>` could not <read the default branch / read the PR's base / fetch `<default>` / read `<spec>/spec.md` at `<sha>`>: <gh's or git's words>. The lock stays. Next step: fix what they name, then type `rebase <ref>` again. |
 | `base` | `rebase` checks the spec on `<default>`, and this PR's base is `<base>`, a parent story branch the spec PR never reaches. Next step: land the parent PR first, then type `rebase <ref>` again. |
 | `onto spec.md` | `<spec>/spec.md` is missing or empty on `<default>`, and this PR's binding to `<spec>` never changes. Next step: close this PR and restart the story on the new folder. |
