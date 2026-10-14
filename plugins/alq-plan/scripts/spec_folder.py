@@ -33,27 +33,32 @@ def problems(folder: str, issue: str, kind: str, existing: dict[str, bool], proj
     if not _ISSUE.fullmatch(issue):
         return [f"the issue is `{issue}`, not an issue number as GitHub writes it. Next step: start the run with the "
                 "issue's number."]
+
+    def in_checkout(path):
+        return f"{project}{path}"
+
+    given = in_checkout(folder)
     found = _FOLDER.fullmatch(folder)
     if not found:
-        return [f"`{folder}` is not of the form `{FORM}`, a short name being lowercase words of `[a-z0-9]` joined by "
-                f"single hyphens. Next step: start the run with a folder of that form."]
+        return [f"`{given}` is not of the form `{FORM}`, a short name being lowercase words of `[a-z0-9]` "
+                "joined by single hyphens. Next step: start the run with a folder of that form."]
     prefix = f"{issue}-"
     if not found["name"].startswith(prefix):
-        return [f"`{folder}` is not issue #{issue}'s: its name does not start with `{prefix}`. Next step: "
+        return [f"`{given}` is not issue #{issue}'s: its name does not start with `{prefix}`. Next step: "
                 f"start the run with a folder named `{prefix}<short-name>`."]
-    issue_folders = sorted(name for name in existing if name.startswith(prefix))
+    issue_folders = sorted(in_checkout(f"specs/{name}") for name in existing if name.startswith(prefix))
     if kind == "new":
         if issue_folders:
-            forms = ", ".join(f"`rescope {project}specs/{name} #{issue}`" for name in issue_folders)
+            forms = ", ".join(f"`rescope {path} #{issue}`" for path in issue_folders)
             return [f"issue #{issue} already has a spec folder, so it is not scoped again. Next step: {forms}."]
         return []
     if not existing.get(found["name"]):
-        return [f"`{project}{folder}` holds no spec.md, so there is no spec to rescope. Next step: rescope the folder that "
-                f"holds issue #{issue}'s spec, or scope the issue with `#{issue}`."]
-    others = [f"`{project}specs/{name}`" for name in issue_folders if name != found["name"]]
+        return [f"`{given}` holds no spec.md, so there is no spec to rescope. Next step: rescope the folder "
+                f"that holds issue #{issue}'s spec, or scope the issue with `#{issue}`."]
+    others = [f"`{path}`" for path in issue_folders if path != given]
     if others:
-        return [f"issue #{issue} has another spec folder besides `{project}{folder}`: {', '.join(others)}. Next step: keep one "
-                "folder for the issue, then rescope it."]
+        return [f"issue #{issue} has another spec folder besides `{given}`: {', '.join(others)}. Next step: "
+                "keep one folder for the issue, then rescope it."]
     return []
 
 
@@ -74,7 +79,8 @@ def _existing() -> dict[str, bool]:
 
 
 def _project() -> str:
-    return subprocess.run(["git", "rev-parse", "--show-prefix"], capture_output=True, text=True,
+    # Only stdout is taken: git's stderr goes to the step's, so its reason is shown when it cannot answer.
+    return subprocess.run(["git", "rev-parse", "--show-prefix"], stdout=subprocess.PIPE, text=True,
                           check=True).stdout.strip()
 
 
