@@ -102,12 +102,12 @@ class IssueSpecSkill(unittest.TestCase):
         new = self.form("#<issue>")
         self.assertIn("Before anything else, run `python3 BRANCH create <ISSUE>`", new)
         self.assertIn("`CHECKOUT` is its `worktree`", new)
-        self.assertLess(new.index("BRANCH create"), new.index("`gh issue view"))
+        self.assertLess(new.index("BRANCH create"), new.index("gh issue view"))
         self.assertIn("show the user its message and stop", new)
 
     def test_a_completed_new_scope_lands_through_its_draft_pr_launches_no_review_and_says_so_last(self):
         text = squashed(ISSUE_SPEC)
-        self.assertIn("on a new scope, `python3 BRANCH land <run_id> <spec folder>`", text)
+        self.assertIn("On a new scope, `python3 BRANCH land <run_id> <spec folder>`", text)
         self.assertIn("Launch no review.", text)
         self.assertIn("End with four lines and nothing after them: `Spec folder: <folder>`, `Branch: <branch>`, "
                       "`PR: <pr>` and `Review: spec: null`", text)
@@ -127,7 +127,7 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertEqual(len(checks), 5, checks)
         for step in checks:
             with self.subTest(step=step):
-                self.assertIn(f"`{step}`", stops)
+                self.assertRegex(stops, rf"`(step: )?{step}`")
 
     def test_a_rescope_writes_the_issue_as_first_stated_then_the_open_decision(self):
         """The folder may hold the wrong scope: the issue is read again from GitHub, not taken from the folder."""

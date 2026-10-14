@@ -74,8 +74,17 @@ def install():
         _install("workflow", "add", "--dev", str(source))
 
 
-def _state(run_id):
+def require_run(run_id):
+    if not (RUNS / run_id / "state.json").is_file():
+        sys.exit(f"no run {run_id} under {RUNS}")
+
+
+def run_state(run_id):
     return json.loads((RUNS / run_id / "state.json").read_text())
+
+
+def run_inputs(run_id):
+    return json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
 
 
 def _step_env(inputs):
@@ -100,18 +109,17 @@ def start(kind, spec_file, issue, spec_dir):
     new = set(RUNS.iterdir()) - before if RUNS.is_dir() else set()
     if len(new) != 1:
         sys.exit(f"specify started no run:\n{proc.stdout}{proc.stderr}")
-    return _state(new.pop().name)
+    return run_state(new.pop().name)
 
 
 def resume(run_id, verdict):
-    if not (RUNS / run_id / "state.json").is_file():
-        sys.exit(f"no run {run_id} under {RUNS}")
-    inputs = json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    require_run(run_id)
+    inputs = run_inputs(run_id)
     if not (inputs.get("spec_dir") and inputs.get("kind")):
         sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
                  "which folder it is for. Next step: start the scope again with /alq-plan:issue-spec.")
     proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(inputs))
-    state = _state(run_id)
+    state = run_state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
         sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")
     return state

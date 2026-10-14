@@ -238,13 +238,17 @@ class Push(unittest.TestCase):
         self.repo.git("worktree", "add", "-q", "-b", self.STORY, str(self.checkout), "origin/main")
         self.base = self.repo.git("rev-parse", "HEAD", cwd=self.checkout)
 
+    def worktrees(self):
+        return [line for line in self.repo.git("worktree", "list", "--porcelain").splitlines()
+                if line.startswith("worktree ")]
+
     def push(self, status="completed"):
         write_folder(self.checkout)
         return self.repo.run("push", write_run(self.checkout, status), FOLDER, cwd=self.checkout)
 
     def test_a_completed_rescope_commits_and_pushes_on_its_worktrees_branch_and_creates_nothing(self):
         branches = self.repo.git("branch", "--list")
-        worktrees = self.repo.git("worktree", "list", "--porcelain")
+        worktrees = self.worktrees()
         done = self.push()
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(json.loads(done.stdout), {"folder": FOLDER, "branch": self.STORY})
@@ -253,8 +257,7 @@ class Push(unittest.TestCase):
         self.assertEqual(sorted(self.repo.git("show", "--name-only", "--format=", "HEAD", cwd=self.checkout).splitlines()),
                          [f"{FOLDER}/plan.md", f"{FOLDER}/spec.md"])
         self.assertEqual(self.repo.remote_branch(self.STORY), head)
-        self.assertEqual((self.repo.git("branch", "--list"), self.repo.git("worktree", "list", "--porcelain")),
-                         (branches, worktrees))
+        self.assertEqual((self.repo.git("branch", "--list"), self.worktrees()), (branches, worktrees))
         self.assertEqual(self.repo.gh_calls(), [])
 
     def test_a_rescope_that_failed_or_was_rejected_commits_and_pushes_nothing(self):

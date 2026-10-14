@@ -1,6 +1,6 @@
 ---
 name: issue-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`), a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/alq-plan:issue-spec untracked "<what changes>"`).
+description: Scope or re-scope a change in a spec folder before it is built, by running the alq-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. A new scope lands its spec through its own draft PR, on branch `<issue>-spec`. Use for a GitHub issue that needs scoping (`/alq-plan:issue-spec #<issue>`), a spec folder that needs re-scoping (`/alq-plan:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/alq-plan:issue-spec untracked "<what changes>"`).
 argument-hint: '#<issue> [<dir>] | rescope <spec folder> #<issue> | untracked "<what changes>" [<dir>]'
 ---
 
@@ -9,23 +9,27 @@ start installs into the checkout with the settled-design preset). The workflow o
 the step order and the checks; this skill picks the checkout and the inputs, runs the three interactive steps
 in this session, and passes the user's verdicts on resume. Never reimplement a workflow step here.
 
-`PREMISE` is `../../scripts/premise_report.py` from this skill's base directory.
+`PREMISE` is `../../scripts/premise_report.py` from this skill's base directory. `BRANCH` is
+`scripts/spec_branch.py` in this skill's base directory.
 
 ## 1. Resolve the entry point
 
 `$ARGUMENTS` is one of:
 
-- **`#<issue> [<dir>]`** - scope a new bug or feature. `ISSUE` is the issue number. `CHECKOUT` is the issue's
-  worktree (create it per the repo's branch rules if there is none). `PROJECT` is `<dir>`, relative to
-  `CHECKOUT`, or `CHECKOUT` without one. Write the issue to `SPEC_FILE`:
+- **`#<issue> [<dir>]`** - scope a new bug or feature. `ISSUE` is the issue number. Before anything else, run
+  `python3 BRANCH create <ISSUE>` from the checkout this session is in. It creates branch `<ISSUE>-spec` from the
+  default branch as origin has it, in worktree `.claude/worktrees/<ISSUE>-spec` of the repo, and prints `branch`,
+  `worktree` and `base` as JSON. It refuses a branch `<ISSUE>-spec` that exists locally or on origin: show the user
+  its message and stop. `CHECKOUT` is its `worktree`. `PROJECT` is `<dir>`, relative to `CHECKOUT`, or `CHECKOUT`
+  without one. Write the issue to `SPEC_FILE`:
   `repo=$(git remote get-url origin) && gh issue view <ISSUE> --repo "$repo" --json url,title,body --jq '"\(.url)\n# \(.title)\n\n\(.body)"' > <SPEC_FILE>`.
   `SPEC_DIR` is `specs/<ISSUE>-<short name>`, picked once, here, and never changed for the run: the workflow's
   `specify` step writes the spec there, in `PROJECT`. `<short name>` is 1 to 4 words of the issue title, lowercased,
   each a run of `[a-z0-9]`, joined by single hyphens: the words that name the change. A title with no such word: stop
   before writing anything, and tell the user to retitle the issue.
 - **`rescope <spec folder> #<issue>`** - re-scope that spec folder in place; both are required. `ISSUE` is as
-  above. `CHECKOUT` is the issue's worktree on the branch of the PR bound to that spec folder: a rescope never creates one.
-  With no such worktree, stop and ask the user where it is. The folder is relative to `CHECKOUT`: for
+  above. `CHECKOUT` is the worktree this session runs in, a story's or the spec's: the spec edit lands on its branch,
+  in the PR it is run from. A rescope creates no branch, worktree or PR. The folder is relative to `CHECKOUT`: for
   `<p>/specs/<feature>`, `PROJECT` is `<p>` in `CHECKOUT` (`CHECKOUT` itself for `specs/<feature>`) and
   `SPEC_DIR` is `specs/<feature>`. The folder may
   hold the wrong scope, so the issue is re-read as first stated: write it to `SPEC_FILE` with the same
@@ -77,10 +81,19 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    spec.md/plan.md only the findings the user accepts.
 7. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
    (or `reject`). Expect `completed`.
-8. When the report says `completed`, in `CHECKOUT`: stage the spec folder, `git commit` it and `git push` the
-   branch. End with two lines and nothing after them: `Spec folder: <path>`, the folder relative to
-   `CHECKOUT`, and `Branch: <branch>`, the output of `git rev-parse --abbrev-ref HEAD` in `CHECKOUT`. Name no
-   other plugin's command. A run that is rejected or fails commits nothing and pushes nothing.
+8. When the report says `completed`, from `PROJECT`, with `<spec folder>` relative to `PROJECT` (on a new scope,
+   the `feature_directory` of `.specify/feature.json`; on a rescope, `SPEC_DIR`):
+   - On a new scope, `python3 BRANCH land <run_id> <spec folder>`. It commits the spec folder, pushes the branch,
+     opens a draft PR into the default branch whose body starts `Part of #<ISSUE>`, and prints `folder` (relative
+     to `CHECKOUT`), `branch` and `pr` as JSON. Launch no review. End with four lines and nothing after them:
+     `Spec folder: <folder>`, `Branch: <branch>`, `PR: <pr>` and `Review: spec: null`, the spec a review started
+     by hand takes.
+   - On a rescope, `python3 BRANCH push <run_id> <spec folder>`. It commits the spec folder and pushes the branch
+     it runs on, and prints `folder` and `branch` as JSON. End with two lines and nothing after them:
+     `Spec folder: <folder>` and `Branch: <branch>`.
+
+   Name no other plugin's command. `BRANCH` refuses a run that has not completed. A run that is rejected or fails
+   commits nothing, pushes nothing and opens nothing.
 
 A verdict is the user's decision. Never pass `approve`, or a premise pick, without the user saying so in this session.
 
@@ -97,6 +110,9 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
 - `step: write-no-spec`, with a `stderr` line that names a Next step: show the user the message. When it names a
   path to clear or make writable, the user does that, not you; resume only once they say it is done. When it
   names `premise_report.py check`, complete the report as it says.
+- `step: story-headings-after-specify`, `story-headings-after-grill`, `story-headings-after-critique`,
+  `rescope-story-headings-after-grill` or `rescope-story-headings-after-critique`, with `stderr` lines that each
+  name a Next step: fix the story headings of spec.md as they say, with the user where a number is theirs to pick.
 - `open_markers: true` goes back to step 4 first.
 - `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
   decision for them.
