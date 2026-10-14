@@ -149,7 +149,10 @@ class IssueSpecSkill(unittest.TestCase):
 
     def test_a_no_spec_folder_that_cannot_be_written_is_a_stop_that_resumes(self):
         stops = re.sub(r"\s+", " ", ISSUE_SPEC.read_text().split("## Stops", 1)[1])
-        self.assertIn("- `step: write-no-spec`, with a `stderr` line that names a Next step: do as it says.", stops)
+        self.assertIn("- `step: write-no-spec`, with a `stderr` line that names a Next step: show the user the "
+                      "message. When it names a path to clear or make writable, the user does that, not you; resume "
+                      "only once they say it is done. When it names `premise_report.py check`, complete the report as "
+                      "it says.", stops)
 
     def test_says_a_failed_run_leaves_nothing_behind(self):
         text = squashed(ISSUE_SPEC)
