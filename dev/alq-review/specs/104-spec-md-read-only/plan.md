@@ -88,7 +88,7 @@ plugins/alq-review/
 │   ├── policy.py            # - _spec_held and its hold; RESHAPE_SPEC lock text; launch_round: unrebased_onto, done via counted(regraded_only=True)
 │   ├── ledger.py            # + regraded_rounds; counted(..., regraded_only=False) (R15)
 │   ├── facts.py             # round_facts: earlier, seen, first_reviewed, base from the regraded rounds (R15)
-│   ├── shell.py             # Action.path; kind write; _stages counts -p (data-model "New interfaces")
+│   ├── shell.py             # Action.path; kind write; _stages counts -p, --patch, --interactive (data-model "New interfaces")
 │   ├── worktree.py          # rebasing (locate uses it), to_commit, name_status, fetch_target, contains (data-model "New interfaces")
 │   └── github.py            # default_branch (data-model "New interfaces")
 ├── agents/conflict-resolver.md   # new

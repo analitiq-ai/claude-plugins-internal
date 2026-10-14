@@ -77,7 +77,9 @@ Site: a review-round launch of any stage, through `hookio.refuse` under `mode`. 
 | `mixed` | This PR's diff changes `<spec.md>` and `<other path>`, which is outside `<folder>`: a PR changes the spec or the code, never both. Next step: land the spec change as a spec-only PR on `<issue>-spec`, rebase this branch on it, then launch again. |
 
 Passes: a spec-only PR (any `spec`); code with `plan.md`, `tasks.md` or any file of the folder but `spec.md`; a deleted
-spec.md with code. Refused: two spec folders' spec.md in one diff; a renamed spec folder with its citations.
+spec.md with code. Refused: two spec folders' spec.md in one diff; a spec folder's move, even in a spec-only PR (data-model
+`worktree.name_status` row). A move passes as two PRs: one adds the new folder; a later one deletes the old folder and
+updates its citations, its spec.md a deletion.
 
 ## `/alq-plan:issue-spec rescope <spec folder> #<issue>` (US5)
 

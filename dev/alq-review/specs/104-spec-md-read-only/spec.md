@@ -254,8 +254,10 @@ two closing lines.
 - A story branch created off `<issue>-spec` before the spec PR merged carries the spec in its diff: User Story 4
   refuses its launch until the spec PR merges and the branch rebases on the default branch.
 - A spec-only PR that changes two spec folders is refused by User Story 4: the second folder is outside the first.
-- A rename of a spec folder with its citations updated in code is refused by User Story 4; it is two PRs, or the
-  user's call with the switch (`alq-review off`).
+- A move of a spec folder is refused by User Story 4 even in a spec-only PR: a move is a deletion at the source and
+  an addition at the destination, and the old folder is outside the new one (data-model `worktree.name_status` row).
+  It is two PRs: one adds the new folder; a later one deletes the old folder and updates its citations, which passes,
+  since a deleted spec.md is not read as a change to it. Or it is the user's call with the switch (`alq-review off`).
 - A write to a spec.md of another checkout by its absolute path is judged by that checkout's branch, not the
   command's directory.
 - A `spec.md` path in a Bash command that only appears in a heredoc body, a comment or a quoted string the command
