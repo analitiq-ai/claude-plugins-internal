@@ -162,24 +162,23 @@ stand": the decision record replaces both (R1).
 
 ## R11: A PR changes the spec or the code, never both
 
-- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str, then) -> str | None`, pure: `changes`
+- **Decision**: `specbinding.mixed_diff_refusal(changes: list[tuple[str, str]], branch: str) -> str | None`, pure: `changes`
   are `(status, path)` pairs, status git's letter (`A`, `M`, `D`, `R`, `C`, `T`); for each path with status other than `D` whose
   `spec_md_folder` is set, the first changed path (any status) not under that folder refuses, naming the spec.md, that path, the
   rule, and the next step (land the spec change as a spec-only PR on `<issue>-spec`, `<issue>` from `story_issue(branch)`, or "the
-  issue's spec branch" when the branch is not a story branch, rebase this branch on it, then `then`). A renamed spec.md counts at its destination. Two sites, two readers of
-  the same fact: at a review-round launch of any stage, after `_review_base` and before `ledger.open_round`,
-  `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which with `--find-renames` strips the score from
-  `R<score>` and yields the destination path), refused through `hookio.refuse(payload, "launch", ...)` with `then` "launch
-  again"; at the attestation, the steps and rule of data-model "The attestation's diff check": which reads it makes, when,
-  and the branch it passes; each lookup's outcomes and refusals are its rows in
-  "New interfaces" (P4). Assess-round launches run no diff check.
-- **Rationale**: FR-004: one function decides for both sites. The launch has a checkout and a base; a `gh pr ready` may run from
-  anywhere, and GitHub lists the PR's files with their status, so the attestation site needs no checkout. A deleted spec.md
-  grades nothing (Clarifications). Under `mode` (FR-005). An audit launch is a review-round launch (edge case).
-- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `github._answer`, in the `--paginate`
-  form `released` uses; `github.pr_head` and `github.released`, moved from `_gh` to `_answer` (data-model "New
-  interfaces"); `_review_base`, `gate.target`, `hookio.refuse`. Reusing the settled round's `base_sha` and `root` at
-  the attestation: rejected, the root may be gone and `released` PRs have no round.
+  issue's spec branch" when the branch is not a story branch, rebase this branch on it, then launch again). A renamed spec.md
+  counts at its destination. One site: a review-round launch of any stage, after `_review_base` and before
+  `ledger.open_round`, reads the pairs with `worktree.name_status(root, base)` (`_DIFF --name-status -z base...HEAD`, which
+  with `--find-renames` strips the score from `R<score>` and yields the destination path), refused through
+  `hookio.refuse(payload, "launch", ...)`. Assess-round launches run no diff check.
+- **Rationale**: FR-004. The launch has a checkout and a base. A deleted spec.md grades nothing (Clarifications). Under `mode`
+  (FR-005). An audit launch is a review-round launch (edge case).
+- **Rejected**: a second check at the internal-review attestation (`ready`). `policy.mark_ready`
+  (`plugins/alq-review/scripts/policy.py:215-229`) allows it only for a version-only release, which changes no spec.md, or for
+  a settled internal round at `head_sha`, whose launch already ran this check on the same commit. So the check there decides
+  nothing new, and it is a second gate over the same diff (one gate per document). Four review rounds of defects came from its
+  GitHub reads (`pr_head`, `released`, `pr_files`).
+- **Existing tools**: `worktree.changed_files` and `_DIFF`, reused with `--name-status`; `_review_base`, `hookio.refuse`.
 
 ## R12: The rescope runs on the spec branch
 

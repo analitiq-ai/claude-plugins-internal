@@ -196,14 +196,14 @@ the next round before and after the story branch is rebased.
 
 ### User Story 4 - A PR changes the spec or the code, never both (Priority: P4)
 
-A review-round launch, an audit included, and the internal-review attestation are refused on a PR whose diff adds
-or modifies a spec.md and changes any file outside that spec folder.
+A review-round launch, an audit included, is refused on a PR whose diff adds or modifies a spec.md and changes any
+file outside that spec folder.
 
 **Why this priority**: it is the check that catches a spec change that reached the branch by a route the hook and
 the commit gate did not see, and it is what makes "spec PR first, then the story PR" a rule code decides.
 
 **Independent Test**: in the same harness, build branches whose diffs mix and separate spec and code, and launch
-rounds and run `gh pr ready` on each.
+rounds on each.
 
 **Acceptance Scenarios**:
 
@@ -211,20 +211,17 @@ rounds and run `gh pr ready` on each.
    round launches with any `spec` and any stage, **Then** it is refused, naming the spec.md and a file outside its
    folder, with the next step: land the spec change as a spec-only PR on `123-spec`, rebase this branch on it, and
    launch again.
-2. **Given** that PR, **When** the internal-review attestation is attempted in its checkout (`gh pr ready`, `gh pr create`
-   without `--draft`, a comment carrying the attestation marker), **Then** it is refused the same way, with the next
-   step "mark it ready again". Data-model "The attestation's diff check" gives the rule for every attestation.
-3. **Given** a spec-only PR, **When** a round launches with `spec: null`, **Then** this check passes, and the
+2. **Given** a spec-only PR, **When** a round launches with `spec: null`, **Then** this check passes, and the
    reviewers are told the change needs no spec.
-4. **Given** a PR whose diff changes `b.py` and `dev/x/specs/123-login/tasks.md`, **When** a round launches,
+3. **Given** a PR whose diff changes `b.py` and `dev/x/specs/123-login/tasks.md`, **When** a round launches,
    **Then** this check passes.
-5. **Given** a PR whose diff deletes a spec.md and changes code outside its folder, the retirement of a spec folder
+4. **Given** a PR whose diff deletes a spec.md and changes code outside its folder, the retirement of a spec folder
    with its citations, **When** a round launches with `spec: null`, **Then** this check passes: it concerns a
    spec.md present at the reviewed commit; a round bound to the deleted folder is refused as User Story 2
    scenario 4 says.
-6. **Given** a PR on a branch named otherwise than a story branch, **When** its diff mixes a spec.md and code,
+5. **Given** a PR on a branch named otherwise than a story branch, **When** its diff mixes a spec.md and code,
    **Then** the launch is refused all the same: the diff check reads the diff, not the name.
-7. **Given** `log` mode, **When** the check refuses, **Then** it is recorded as `would_deny` and the launch opens.
+6. **Given** `log` mode, **When** the check refuses, **Then** it is recorded as `would_deny` and the launch opens.
 
 ---
 
@@ -280,9 +277,8 @@ two closing lines.
 - **FR-002**: Every review-round and assess-round launch MUST read `spec.md` at the reviewed commit and nothing of
   any earlier version. The ledger MUST record the `spec` value only: no blob id, no text, no hold.
 - **FR-003**: A changed `spec.md` MUST hold nothing and ask for no `unlock`.
-- **FR-004**: A review-round launch of any stage and the internal-review attestation MUST be refused on a PR whose
-  diff adds or modifies a spec.md and changes a file outside that spec folder, naming both and the next step User
-  Story 4 names. One function MUST decide it for both sites.
+- **FR-004**: A review-round launch of any stage MUST be refused on a PR whose diff adds or modifies a spec.md and
+  changes a file outside that spec folder, naming both and the next step User Story 4 names.
 - **FR-005**: The refusals of FR-001 and FR-004 MUST follow the plugin's mode alone (ADR-0017 decision 3): in `log`
   mode they are recorded and nothing is blocked.
 - **FR-006**: The `issue-spec` rescope MUST run in the spec branch's worktree, `<issue>-spec` created fresh off the
@@ -326,7 +322,7 @@ two closing lines.
 - **SC-001**: Every scenario and edge case above has a test in `dev/alq-review/tests` (User Story 5's in
   `dev/alq-plan/tests`) that failed before the code and passes after.
 - **SC-002**: No `git commit` a session makes on a story branch changes a spec.md (the commit gate), and no story
-  PR a round opens on or is attested on changes a spec.md and code together (User Story 4): each route in the writes
+  PR a round opens on changes a spec.md and code together (User Story 4): each route in the writes
   table, the commit and the mixed diff are refused in the tests. Commits made by `cherry-pick`, `merge`, `revert`,
   `am`, `pull` or `rebase --continue` are caught by User Story 4 only.
 - **SC-003**: `spec_blob`, `spec_held` and `text_step` appear nowhere in `plugins/alq-review` or its README. The tests
@@ -365,7 +361,7 @@ Answer: observed. On main, `on_edit` (gate.py:326) refuses no write by path to s
 Source: code: plugins/alq-review/scripts/gate.py:326-342, gate.py:505-531; user: PR #102 history.
 
 ### change-alters
-Answer: Yes. The agent on a story branch tries to write spec.md: the hook refuses it, so the target cannot move. If the spec is wrong the agent stops and raises it; the change lands as a spec-only PR, merged to main, and the story rebases. Every round reads spec.md at the reviewed commit, so the gate stores no blob id, has no hold to test, and a typo costs a spec PR, not an unlock. A PR that changes spec.md and code together is refused at launch and attestation.
+Answer: Yes. The agent on a story branch tries to write spec.md: the hook refuses it, so the target cannot move. If the spec is wrong the agent stops and raises it; the change lands as a spec-only PR, merged to main, and the story rebases. Every round reads spec.md at the reviewed commit, so the gate stores no blob id, has no hold to test, and a typo costs a spec PR, not an unlock. A PR that changes spec.md and code together is refused at launch.
 Source: user: issue #104 Decision 1-5.
 
 ### owner

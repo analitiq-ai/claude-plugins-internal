@@ -35,7 +35,6 @@ its code is wrong.
    again: contracts' `release` reply, the ledger shows `rebased_onto`, and git is as FR-009 leaves it. Launch review-round
    before rebasing: row `contains` refuses. Rebase (with a conflicting change on the default branch, dispatch the conflict
    resolver as the reply says), push, launch again: a full round.
-4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both; `gh pr ready`: refused
-   the same way. Split them: both pass.
+4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both. Split them: both pass.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the
    folder, the branch and the user's next steps once.

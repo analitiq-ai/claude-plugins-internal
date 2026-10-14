@@ -11,7 +11,7 @@ command of a form in the spec's writes table, and at `git commit` on what it wou
 the user and the spec-only PR on `<issue>-spec`. The hold on a changed `spec.md` goes: the binding is the `spec` value alone,
 and every round reads `spec.md` at the reviewed commit. A `RESHAPE_SPEC` lock is released by the user's `rebase <ref>` after a
 spec change or by `unlock <ref>` when the spec stands: spec FR-009 and FR-010 say what each does, data-model "`rebase <ref>`"
-how. A review-round launch and the attestation refuse a diff that changes a spec.md and code, by one pure rule. The planning
+how. A review-round launch refuses a diff that changes a spec.md and code, by one pure rule. The planning
 rescope runs on `<issue>-spec`. Decisions are in [research.md](research.md), shapes in [data-model.md](data-model.md), refusals,
 replies and the agent in [contracts/interfaces.md](contracts/interfaces.md).
 
@@ -32,8 +32,8 @@ reply is a failing test before its code (R13)
 **Project Type**: Claude Code plugin hooks, one agent, one skill's prose
 
 **Performance Goals**: an edit costs one `rev-parse` more than today, only for a spec.md on a story branch; a commit one `diff
---cached --name-only`; a launch one `diff --name-status`, and after a release by `rebase` one `merge-base --is-ancestor`; a
-ready one `gh api` for the PR's files. `rebase <ref>` runs the gh calls, the fetch and the reads of data-model "`rebase <ref>`"
+--cached --name-only`; a launch one `diff --name-status`, and after a release by `rebase` one `merge-base --is-ancestor`.
+`rebase <ref>` runs the gh calls, the fetch and the reads of data-model "`rebase <ref>`"
 inside the prompt hook, under its default timeout
 
 **Constraints**: the story rule reads the branch and never GitHub, nor the ledger (R6); every refusal names the next step; the
@@ -49,8 +49,8 @@ backwards compatibility. The `cto` rule files and `alq-build`'s skills are out o
 
 | Principle | Answer |
 |---|---|
-| I. Contract-first | No contracts-map shape is touched. What a spec.md and a story branch are is defined once in `specbinding.py` (R2) and every site calls it; the diff rule is one function for its two sites (R11). Pass. |
-| II. Ownership & trust boundaries | The code and the record are in this repo; the git-workflow rule in the engineering repo (R1). A command's path and GitHub's file list are validated where they enter (R4, R11). The gate reads git and GitHub, and writes git only as FR-009 allows; the session changes the branch (R9). Pass. |
+| I. Contract-first | No contracts-map shape is touched. What a spec.md and a story branch are is defined once in `specbinding.py` (R2) and every site calls it; the diff rule is one function (R11). Pass. |
+| II. Ownership & trust boundaries | The code and the record are in this repo; the git-workflow rule in the engineering repo (R1). A command's path is validated where it enters (R4). The gate reads git and GitHub, and writes git only as FR-009 allows; the session changes the branch (R9). Pass. |
 | III. Fail loud, no workarounds, no backwards compatibility | Each refusal names its step; a gh or git failure in `rebase` stops with its words and keeps the lock (R9); a stored `spec_blob` is ignored, not read (R7). Pass. |
 | IV. Test-first | R13 lists each story's tests and the ones deleted with the hold; each is seen to fail first. The rules are pure and tested without git; the handlers through the in-process harness. Pass. |
 | V. Smallest complete change | The hold, its text step, its lock, its README text and its tests are deleted, not kept beside the rule that replaces them (R7). The writes table is the spec's, no wider. Pass. |
@@ -58,7 +58,7 @@ backwards compatibility. The `cto` rule files and `alq-build`'s skills are out o
 | P1. Code decides | The three sites of the story rule, the commit backstop, the diff check, the keyword and the launch after it are decided in the gate. The rebase, the conflict resolver's dispatch and the push are the session's, named by the reply; code decides the launch row `contains` of data-model "`rebase <ref>`" (R9, R10). A justified deviation, not a Pass: see Complexity Tracking. |
 | P2. Only an approved entity releases a hold | The user releases a `RESHAPE_SPEC` lock by `rebase <ref>` after a spec change or `unlock <ref>` when the spec stands; both go through `ledger.unlock`, and nothing else does (R9). Two keywords for one hold: see Complexity Tracking. `rebased_onto` is no hold: it refuses only a round launch (data-model, row `contains`). Pass with the justification below. |
 | P3. Rules are pure | `spec_md_folder`, `story_issue`, `story_write_refusal`, `mixed_diff_refusal` in `specbinding.py`; the lock text and the launch refusal in `policy.py`; the gate reads git and GitHub and replies. Pass. |
-| P4. A check that could not run is its own outcome | gh or git failing in `rebase` (FR-009) stops with its words and keeps the lock. At the attestation, gh failing and GitHub's file cap are each their own outcome of `github.pr_files`, each refusing the ready with its own reply: gh's words, or the cap (data-model "The attestation's diff check"). Pass. |
+| P4. A check that could not run is its own outcome | gh or git failing in `rebase` (FR-009) stops with its words and keeps the lock. Pass. |
 
 Re-check after Phase 1: unchanged.
 
@@ -89,7 +89,7 @@ plugins/alq-review/
 │   ├── facts.py             # round_facts: earlier, seen, first_reviewed, base from the regraded rounds (R15)
 │   ├── shell.py             # Action.path; kind write (data-model "New interfaces")
 │   ├── worktree.py          # rebasing (locate uses it), to_commit, name_status; fetch_target, contains (data-model "New interfaces")
-│   └── github.py            # pr_files, FileListCapped, default_branch (data-model "New interfaces")
+│   └── github.py            # default_branch (data-model "New interfaces")
 ├── agents/conflict-resolver.md   # new
 └── README.md                # items 2, 5, new 8; Mode; What the user types; State; Layout
 plugins/alq-plan/skills/issue-spec/SKILL.md   # rescope on <issue>-spec
@@ -123,8 +123,7 @@ handler; `facts.round_facts` by `gate.on_structured_output`, `briefs.churned` an
 Settled by the user in the spec's Clarifications: story branches by name; the rescope on `<issue>-spec`, fresh, never a merged
 one; adds or modifies only for the diff check; the record drafted from this plan; `rebase <ref>` as the release after a spec
 change, with the gate checking and releasing and the session rebasing, resolving conflicts through the agent and pushing
-(2026-10-14). Read here, not asked: the attestation site reads the PR's
-files from GitHub because a ready may run from outside any checkout (R11); `rebase` releases every hold the branch has, as
+(2026-10-14). Read here, not asked: `rebase` releases every hold the branch has, as
 `unlock` does, naming each (data-model "`rebase <ref>`").
 
 ## Mechanisms
@@ -139,7 +138,7 @@ files from GitHub because a ready may run from outside any checkout (R11); `reba
 - The `RESHAPE_SPEC` lock text and the unlock reply naming the spec branch and both keywords: R8
 - `rebase <ref>`, data-model "`rebase <ref>`": R9
 - The conflict-resolver agent, shipped, dispatched by the session, never editing a spec.md: R10
-- The mixed-diff rule, one function, read from git at a launch and from GitHub at the attestation: R11
+- The mixed-diff rule, one function, read from git at a review-round launch: R11
 - The rescope on `<issue>-spec`, never a merged one: R12
 - The tests of each story, and the hold's deleted: R13
 - The README: R14
