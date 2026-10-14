@@ -1,4 +1,5 @@
-"""specbinding.py: the review-round `spec` argument, its shape, its binding to a PR, and the spec.md hold."""
+"""specbinding.py: the review-round `spec` argument, its shape, its binding to a PR, and the spec.md hold; what a spec
+folder, a spec.md and a story branch are, and the rule that keeps a story branch's edit tools off a spec.md."""
 import unittest
 from datetime import timedelta
 
@@ -101,6 +102,54 @@ class TextStep(unittest.TestCase):
 
     def test_a_hold_unlocked_since_binds_heads_text(self):
         self.assertEqual(specbinding.text_step(BOUND_BLOB, HEAD_BLOB, EARLIER, LATER), "bind")
+
+
+class Terms(unittest.TestCase):
+    def test_spec_folder_is_the_specs_folder_a_path_lies_under(self):
+        self.assertEqual(specbinding.spec_folder("dev/x/specs/123-login/tasks.md"), "dev/x/specs/123-login")
+
+    def test_a_path_under_no_spec_folder_has_none(self):
+        for path in ("b.py", "docs/spec.md"):
+            with self.subTest(path=path):
+                self.assertIsNone(specbinding.spec_folder(path))
+
+    def test_spec_md_folder_is_the_folder_of_its_spec_md(self):
+        self.assertEqual(specbinding.spec_md_folder("dev/x/specs/123-login/spec.md"), "dev/x/specs/123-login")
+
+    def test_any_other_file_of_the_folder_is_no_spec_md(self):
+        for path in ("dev/x/specs/123-login/plan.md", "docs/spec.md", "b.py"):
+            with self.subTest(path=path):
+                self.assertIsNone(specbinding.spec_md_folder(path))
+
+    def test_a_story_branch_gives_its_issue(self):
+        self.assertEqual(specbinding.story_issue("123-us2-reset"), "123")
+
+    def test_any_other_branch_is_no_story_branch(self):
+        for branch in ("123-spec", "123-retire-spec", "123-adr-hold", "main", "feat/1-demo", None):
+            with self.subTest(branch=branch):
+                self.assertIsNone(specbinding.story_issue(branch))
+
+
+class StoryEditRefusal(unittest.TestCase):
+    SPEC_MD = "dev/x/specs/123-login/spec.md"
+
+    def test_a_story_branch_editing_a_spec_md_is_told_the_spec_only_pr(self):
+        self.assertEqual(specbinding.story_edit_refusal("123-us2-reset", self.SPEC_MD),
+                         "`dev/x/specs/123-login/spec.md` is the spec.md of spec folder `dev/x/specs/123-login`, and "
+                         "`123-us2-reset` is a story branch: a story branch never changes a spec.md. Next step: stop "
+                         "and raise the spec problem to the user. They land the change in a spec-only PR on "
+                         "`123-spec`; once it merges, this branch rebases on it.")
+
+    def test_no_other_branch_is_refused(self):
+        for branch in ("123-spec", "123-retire-spec", "123-adr-hold", "main"):
+            with self.subTest(branch=branch):
+                self.assertIsNone(specbinding.story_edit_refusal(branch, self.SPEC_MD))
+
+    def test_no_other_file_is_refused(self):
+        for path in ("dev/x/specs/123-login/plan.md", "dev/x/specs/123-login/tasks.md",
+                     "dev/x/specs/123-login/research.md", "docs/spec.md"):
+            with self.subTest(path=path):
+                self.assertIsNone(specbinding.story_edit_refusal("123-us2-reset", path))
 
 
 if __name__ == "__main__":

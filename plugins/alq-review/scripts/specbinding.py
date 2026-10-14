@@ -1,7 +1,11 @@
-"""The review-round `spec` argument: what it says, whether its folder has the shape of a spec folder, whether it
-matches the PR's binding, and what a changed spec.md does to that binding. Pure: the gate reads git."""
+"""A spec folder is a `<...>/specs/<name>` folder, the shape `shape_problem` checks; its spec.md is
+`<folder>/spec.md`, the requirements a story PR is graded against. The review-round `spec` argument names that folder
+or null, and the first round binds the PR to it. What a changed spec.md does to that binding is `text_step`. A story
+branch (`<issue>-us<n>-<slug>`) delivers one user story and never changes a spec.md: a spec change lands in a
+spec-only PR on `<issue>-spec`, so its edit tools are refused one (`story_edit_refusal`). Pure: the gate reads git."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Literal
@@ -41,6 +45,37 @@ def shape_problem(folder: str) -> str | None:
         # git lists the folder in this spelling, and the binding compares the value as a string.
         return f"{folder} is not the folder's one spelling: write it as {path.as_posix()}"
     return None
+
+
+def spec_folder(path: str) -> str | None:
+    """The spec folder repo-relative `path` lies under; None when it lies under none."""
+    return next((folder.as_posix() for folder in PurePosixPath(path).parents
+                 if folder.parts and shape_problem(folder.as_posix()) is None), None)
+
+
+def spec_md_folder(path: str) -> str | None:
+    """The spec folder whose spec.md `path` is; None when `path` is not a spec folder's spec.md."""
+    folder = spec_folder(path)
+    return folder if folder is not None and path == f"{folder}/spec.md" else None
+
+
+_STORY_BRANCH = re.compile(r"(\d+)-us\d+-")
+
+
+def story_issue(branch: str | None) -> str | None:
+    """The issue a story branch delivers a user story of; None when `branch` is not a story branch."""
+    found = _STORY_BRANCH.match(branch or "")
+    return found.group(1) if found else None
+
+
+def story_edit_refusal(branch: str, path: str) -> str | None:
+    """Why an edit tool may not write repo-relative `path` on `branch`; None when the rule allows it."""
+    issue, folder = story_issue(branch), spec_md_folder(path)
+    if issue is None or folder is None:
+        return None
+    return (f"`{path}` is the spec.md of spec folder `{folder}`, and `{branch}` is a story branch: a story branch never "
+            f"changes a spec.md. Next step: stop and raise the spec problem to the user. They land the change in a "
+            f"spec-only PR on `{issue}-spec`; once it merges, this branch rebases on it.")
 
 
 def _shown(value: str | None) -> str:
