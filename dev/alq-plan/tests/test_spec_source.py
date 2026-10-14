@@ -100,17 +100,17 @@ class IssueSpecSkill(unittest.TestCase):
 
     def test_a_new_scope_creates_its_spec_branch_and_worktree_before_anything_else_and_runs_there(self):
         new = self.form("#<issue>")
-        self.assertIn("Before anything else, run `python3 BRANCH create <ISSUE>`", new)
+        self.assertIn("Then, with nothing written yet, run `python3 BRANCH create <ISSUE>`", new)
         self.assertIn("`CHECKOUT` is its `worktree`", new)
-        self.assertLess(new.index("BRANCH create"), new.index("gh issue view"))
+        # A title with no word stops before anything is written, so before the spec branch is made.
+        self.assertLess(new.index("retitle the issue"), new.index("BRANCH create"))
         self.assertIn("show the user its message and stop", new)
 
     def test_a_completed_run_is_checked_then_committed_and_pushed_by_the_session_then_a_new_scope_opens_its_pr(self):
         """The session runs git commit and git push itself, so the commit gate sees the commit."""
         text = squashed(ISSUE_SPEC)
-        steps = ["`python3 BRANCH check new <run_id> <spec folder>`", "`python3 BRANCH check rescope <run_id> <spec folder>`",
-                 "`git add -- <spec folder>`", '`git commit -m "<message>"`', "`git push --set-upstream origin HEAD`",
-                 "`python3 BRANCH open-pr <run_id> <spec folder>`"]
+        steps = ["`python3 BRANCH check <run_id>`", "`git add -- <SPEC_DIR>`", '`git commit -m "<message>"`',
+                 "`git push --set-upstream origin HEAD`", "`python3 BRANCH open-pr <run_id>`"]
         positions = [text.find(step) for step in steps]
         self.assertNotIn(-1, positions, list(zip(steps, positions)))
         self.assertEqual(positions, sorted(positions))

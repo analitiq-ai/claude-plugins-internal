@@ -673,18 +673,17 @@ def with_stories(text, *headings):
 class StoryHeadings(unittest.TestCase):
     """The story headings are checked after every step that writes spec.md: specify, grill and the critique review.
     A rescope's are checked against spec.md as the run found it."""
-    NEW = "specs/001-new"
-    # Stands in for every agent the workflow dispatches to: `specify` writes $CLAUDE_SPEC as the new spec, `plan`
-    # a plan that passes the settled-design check, `critique-run` a report; the rest write nothing.
+    # Stands in for every agent the workflow dispatches to, in the run's folder: `specify` writes $CLAUDE_SPEC as
+    # its spec, `plan` a plan that passes the settled-design check, `critique-run` a report; the rest write nothing.
     AGENT = f"""#!{sys.executable}
 import json, os, sys
 from pathlib import Path
 command = sys.argv[2].split()[0]
+feature = Path(os.environ["SPECIFY_FEATURE_DIRECTORY"])
 if command == "/speckit-specify":
-    Path({NEW!r}).mkdir(parents=True)
-    Path({NEW!r}, "spec.md").write_text(os.environ["CLAUDE_SPEC"])
-    Path(".specify/feature.json").write_text(json.dumps({{"feature_directory": {NEW!r}}}))
-feature = Path(json.loads(Path(".specify/feature.json").read_text())["feature_directory"])
+    feature.mkdir(parents=True)
+    (feature / "spec.md").write_text(os.environ["CLAUDE_SPEC"])
+    Path(".specify/feature.json").write_text(json.dumps({{"feature_directory": str(feature)}}))
 if command == "/speckit-plan":
     (feature / "plan.md").write_text({PLAN!r})
     (feature / "research.md").write_text({RESEARCH!r})
@@ -708,8 +707,7 @@ if command == "/speckit-critique-run":
         """A new scope whose `specify` writes `written`, resumed past premise."""
         project = self.project()
         project.env["CLAUDE_SPEC"] = written
-        _, started = project.drive("start", project.spec_file("https://github.test/acme/demo/issues/7\n# Demo\n"),
-                                   ISSUE)
+        _, started = project.drive("start", project.spec_file(ISSUE_TEXT), ISSUE, NEW)
         (project.root / f".specify/workflows/runs/{started['run_id']}/premise-report.md").write_text(
             premise_report_text())
         return project, started["run_id"], self.resume(project, started["run_id"], f"premise_verdict={WRITE}")
@@ -717,8 +715,8 @@ if command == "/speckit-critique-run":
     def rescope(self, found):
         """A rescope of a spec that has `found`'s story headings, started and paused at grill."""
         project = self.project(with_stories(SETTLED, *found))
-        proc, started = project.drive("start", project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
-        self.assertEqual((proc.returncode, started["step"]), (0, "grill"), proc.stderr)
+        proc, started = project.drive("rescope", project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        self.assertEqual((proc.returncode, started and started["step"]), (0, "grill"), proc.stderr)
         return project, started["run_id"]
 
     def grilled(self, project, run_id, folder, spec_text):
@@ -744,16 +742,16 @@ if command == "/speckit-critique-run":
 
     def test_two_stories_with_one_number_left_by_grill_stop_the_run(self):
         project, run_id, _ = self.new_scope(with_stories(TRACED, 1, 2))
-        report = self.grilled(project, run_id, self.NEW, with_stories(TRACED, 1, heading(1, "Other")))
+        report = self.grilled(project, run_id, NEW, with_stories(TRACED, 1, heading(1, "Other")))
         self.assert_failed(report, "story-headings-after-grill", "number 1")
 
     def test_a_heading_the_critique_review_left_out_of_the_form_stops_the_run_until_it_is_fixed(self):
         project, run_id, _ = self.new_scope(with_stories(TRACED, 1, 2))
-        paused = self.grilled(project, run_id, self.NEW, with_stories(TRACED, 1, 2))
+        paused = self.grilled(project, run_id, NEW, with_stories(TRACED, 1, 2))
         self.assertEqual((paused["status"], paused["step"]), ("paused", "review-critique"), paused)
-        report = self.critiqued(project, run_id, self.NEW, with_stories(TRACED, 1, "### User Story 2 - Land it"))
+        report = self.critiqued(project, run_id, NEW, with_stories(TRACED, 1, "### User Story 2 - Land it"))
         self.assert_failed(report, "story-headings-after-critique", "### User Story 2 - Land it")
-        (project.root / self.NEW / "spec.md").write_text(with_stories(TRACED, 1, 2))
+        (project.root / NEW / "spec.md").write_text(with_stories(TRACED, 1, 2))
         self.assertEqual(self.resume(project, run_id)["status"], "completed")
 
     def test_a_rescope_that_numbers_a_new_story_into_a_number_dropped_before_the_run_stops_at_grill(self):
@@ -773,6 +771,27 @@ if command == "/speckit-critique-run":
         self.grilled(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3))
         report = self.critiqued(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, heading(2, "Story 3")))
         self.assert_failed(report, "rescope-story-headings-after-critique", heading(2, "Story 3"), "above 3")
+
+    def test_a_rescope_keeps_spec_md_as_it_found_it_before_any_step_can_write_spec_md(self):
+        """A rescope that runs specify (a no-spec folder's) is graded against the spec it found, not specify's."""
+        ids = [s["id"] for s in workflow_steps()]
+        [snapshot] = [s for s in workflow_steps() if s["id"] == "snapshot-spec"]
+        self.assertIn('"$SPECIFY_FEATURE_DIRECTORY/spec.md"', snapshot["run"])
+        self.assertEqual(ids.index("snapshot-spec"), ids.index("check-folder") + 1)
+        project, run_id = self.rescope((1, 3))
+        self.assertEqual((project.root / f".specify/workflows/runs/{run_id}/spec-as-found.md").read_text(),
+                         with_stories(SETTLED, 1, 3))
+
+    def test_every_story_heading_check_reads_the_folder_input_and_the_kind_of_run(self):
+        steps = list(workflow_steps())
+        checks = [s for s in steps if "story_headings.py" in s.get("run", "")]
+        self.assertEqual(len(checks), 5)
+        for step in checks:
+            with self.subTest(step=step["id"]):
+                self.assertIn('story_headings.py" check "$SPECIFY_FEATURE_DIRECTORY"', step["run"])
+        kinds = [s["condition"] for s in steps if s["id"] in ("to-snapshot-spec", "story-headings-after-grill-kind",
+                                                              "story-headings-after-critique-kind")]
+        self.assertEqual(kinds, ["{{ inputs.kind == 'rescope' }}"] * 3)
 
 
 class Report(unittest.TestCase):

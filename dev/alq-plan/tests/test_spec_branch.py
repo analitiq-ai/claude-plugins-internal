@@ -141,13 +141,14 @@ class Create(unittest.TestCase):
         self.assert_created_nothing()
 
 
-def write_run(project: Path, status: str, run_id="run-1"):
-    """A run as drive_workflow.py reads it: its state and the inputs it was started with."""
+def write_run(project: Path, status: str, run_id="run-1", kind="new", inputs=None):
+    """A run as drive_workflow.py reads it: its state and the inputs it was started with, the folder among them."""
     run = project / ".specify" / "workflows" / "runs" / run_id
     run.mkdir(parents=True)
     (run / "state.json").write_text(json.dumps({"run_id": run_id, "status": status, "current_step_id": "tasks",
                                                 "error": None, "step_results": {}}))
-    (run / "inputs.json").write_text(json.dumps({"inputs": {"spec": "# Demo\n", "issue": ISSUE}}))
+    inputs = {"spec": "# Demo\n", "issue": ISSUE, "spec_dir": FOLDER, "kind": kind} if inputs is None else inputs
+    (run / "inputs.json").write_text(json.dumps({"inputs": inputs}))
     return run_id
 
 
@@ -230,7 +231,7 @@ class Check(unittest.TestCase):
 
     def check(self, kind, project, status="completed"):
         write_folder(project)
-        return self.repo.run("check", kind, write_run(project, status, f"run-{kind}-{status}"), FOLDER, cwd=project)
+        return self.repo.run("check", write_run(project, status, f"run-{kind}-{status}", kind), cwd=project)
 
     def assert_changed_nothing(self, where):
         self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=where), self.base)
@@ -284,6 +285,16 @@ class Check(unittest.TestCase):
         self.assertEqual(json.loads(done.stdout),
                          {"folder": FOLDER, "branch": "7-us1-demo", "message": f"docs(#{ISSUE}): rescope {FOLDER}"})
 
+    def test_a_run_started_before_runs_took_their_folder_and_kind_is_refused_naming_the_next_step(self):
+        write_folder(self.repo.worktree)
+        run_id = write_run(self.repo.worktree, "completed", "run-old", inputs={"spec": "# Demo\n", "issue": ISSUE})
+        for action in ("check", "open-pr"):
+            with self.subTest(action=action):
+                done = self.repo.run(action, run_id, cwd=self.repo.worktree)
+                self.assertNotEqual(done.returncode, 0)
+                self.assertIn("Next step:", done.stderr)
+                self.assert_changed_nothing(self.repo.worktree)
+
     def test_the_script_never_commits_or_pushes_so_the_sessions_commit_gate_sees_every_commit(self):
         self.assertNotRegex(SCRIPT.read_text(), r'"(commit|push)"')
 
@@ -302,7 +313,7 @@ class OpenPr(unittest.TestCase):
 
     def landed(self, pushed=True):
         """The session's part: the folder committed as the check says, and pushed."""
-        done = self.repo.run("check", "new", self.run_id, FOLDER, cwd=self.repo.worktree)
+        done = self.repo.run("check", self.run_id, cwd=self.repo.worktree)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.repo.git("add", "--", FOLDER, cwd=self.repo.worktree)
         self.repo.git("commit", "-q", "-m", json.loads(done.stdout)["message"], cwd=self.repo.worktree)
@@ -310,7 +321,7 @@ class OpenPr(unittest.TestCase):
             self.repo.git("push", "-q", "--set-upstream", "origin", "HEAD", cwd=self.repo.worktree)
 
     def open_pr(self):
-        return self.repo.run("open-pr", self.run_id, FOLDER, cwd=self.repo.worktree)
+        return self.repo.run("open-pr", self.run_id, cwd=self.repo.worktree)
 
     def test_a_pushed_new_scope_opens_one_draft_pr_into_the_default_branch_part_of_its_issue(self):
         self.landed()
@@ -340,9 +351,17 @@ class OpenPr(unittest.TestCase):
     def test_a_run_that_has_not_completed_opens_nothing(self):
         self.landed()
         run_id = write_run(self.repo.worktree, "aborted", "run-aborted")
-        done = self.repo.run("open-pr", run_id, FOLDER, cwd=self.repo.worktree)
+        done = self.repo.run("open-pr", run_id, cwd=self.repo.worktree)
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("aborted", done.stderr)
+        self.assertEqual(self.repo.gh_calls(), self.created)
+
+    def test_a_rescope_opens_no_pr(self):
+        self.landed()
+        run_id = write_run(self.repo.worktree, "completed", "run-rescope", "rescope")
+        done = self.repo.run("open-pr", run_id, cwd=self.repo.worktree)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("rescope", done.stderr)
         self.assertEqual(self.repo.gh_calls(), self.created)
 
     def test_a_pr_github_refuses_fails_loud(self):
