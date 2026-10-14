@@ -1,5 +1,6 @@
 """story_headings.py: each story heading of spec.md is in Spec Kit's form with a number of its own, and a rescope
-numbers a new story above every story spec.md had when the run found it."""
+uses a number not there before only above every number spec.md had when the run found it. Numbers only: no story is
+told apart from another by anything but its number."""
 import subprocess
 import sys
 import tempfile
@@ -48,8 +49,8 @@ class Form(unittest.TestCase):
 
 
 class Rescope(unittest.TestCase):
-    """Against spec.md as the run found it: a story that was there keeps its number, a new one is numbered above
-    every number that was there, and a dropped number is not taken again."""
+    """Against spec.md as the run found it, by number only: every number not there before is greater than every
+    number that was, and a number that was there may be dropped."""
     FOUND = spec(1, 2, 3)
 
     def test_a_new_story_numbered_above_every_story_there_was_passes_with_one_dropped(self):
@@ -65,10 +66,22 @@ class Rescope(unittest.TestCase):
         self.assertIn("above 3", problem)
         self.assertIn("Next step:", problem)
 
-    def test_a_story_renumbered_into_a_dropped_number_is_a_problem_naming_the_numbers(self):
+    def test_a_number_not_there_before_below_the_highest_is_a_problem_whatever_its_title(self):
         [problem] = story_headings.problems(spec(1, heading(2, "Story 3")), spec(1, 3))
         self.assertIn(heading(2, "Story 3"), problem)
         self.assertIn("above 3", problem)
+
+    def test_its_words_claim_only_what_a_number_check_can_tell(self):
+        """The check compares numbers, so it cannot tell a story kept, moved or new: its words say numbers only."""
+        self.assertIn("numbers only", story_headings.__doc__)
+        self.assertNotIn("must not move", story_headings.__doc__)
+        # Number 2 twice, and each 2 is a number not there before below 3.
+        said = story_headings.problems(spec(1, 2, 2, 3), spec(1, 3))
+        self.assertEqual(len(said), 3, said)
+        for problem in said:
+            with self.subTest(problem=problem):
+                self.assertNotRegex(problem, r"keeps its number|back its number|its own|a story that was there")
+                self.assertIn("number", problem)
 
     def test_each_new_story_below_the_highest_number_is_its_own_problem(self):
         found = story_headings.problems(spec(1, 2, 4, 5, 6), spec(1, 5))

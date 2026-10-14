@@ -139,6 +139,15 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertTrue([s for s in said if f"on a new scope, run {discard}" in s], said)
         self.assertIn("A new scope that does not land", ISSUE_SPEC.read_text().partition("## Stops")[2])
 
+    def test_the_discard_rule_and_the_stops_give_one_order_ask_about_resuming_then_discard(self):
+        """A failed run may be resumed, and a discarded one cannot be: the user is asked first, in both places."""
+        order = "first ask the user whether they will resume the run; only when they say no, discard"
+        rule = re.search(r"^\*\*A new scope that does not land\.\*\*.*?(?=^$)", ISSUE_SPEC.read_text(), re.M | re.S)
+        stops = ISSUE_SPEC.read_text().partition("## Stops")[2].partition("The exceptions")[0]
+        for where, text in (("discard rule", rule.group(0)), ("Stops", stops)):
+            with self.subTest(where=where):
+                self.assertIn(order, re.sub(r"\s+", " ", text))
+
     def test_every_story_heading_check_is_a_stop_the_skill_names(self):
         stops = ISSUE_SPEC.read_text().partition("## Stops")[2]
         checks = [s["id"] for s in workflow_steps() if "story_headings.py" in s.get("run", "")]

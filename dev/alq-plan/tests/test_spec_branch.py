@@ -133,6 +133,15 @@ class Create(unittest.TestCase):
         self.assertIn(f"rescope <spec folder> #{ISSUE}", done.stderr)
         self.assert_created_nothing()
 
+    def test_a_branch_on_origin_whose_name_only_ends_in_the_spec_branchs_is_not_the_spec_branch(self):
+        self.repo.git("push", "-q", "origin", f"main:refs/heads/old/{BRANCH}", cwd=self.repo.seed)
+        done = self.repo.run("create", ISSUE)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_the_spec_worktree_path_is_made_in_one_place(self):
+        """create makes it and discard removes it: two spellings of one path would drift apart."""
+        self.assertEqual(SCRIPT.read_text().count('"worktrees"'), 1)
+
     def test_a_default_branch_github_will_not_name_creates_nothing(self):
         self.repo.env["GH_FAILS"] = "1"
         done = self.repo.run("create", ISSUE)
@@ -285,6 +294,16 @@ class Check(unittest.TestCase):
         self.assertEqual(json.loads(done.stdout),
                          {"folder": FOLDER, "branch": "7-us1-demo", "message": f"docs(#{ISSUE}): rescope {FOLDER}"})
 
+    def test_a_rescope_on_origins_default_branch_is_refused_naming_it(self):
+        """The spec edit lands through a PR, so never as a commit pushed to the default branch."""
+        default = self.repo.root / ".claude" / "worktrees" / "trunk"
+        self.repo.git("worktree", "add", "-q", "-b", "trunk", str(default), "origin/trunk")
+        done = self.check("rescope", default)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("trunk", done.stderr)
+        self.assertIn("Next step:", done.stderr)
+        self.assertEqual(self.repo.git("rev-parse", "HEAD", cwd=default), self.repo.git("rev-parse", "origin/trunk"))
+
     def test_a_run_started_before_runs_took_their_folder_and_kind_is_refused_naming_the_next_step(self):
         write_folder(self.repo.worktree)
         run_id = write_run(self.repo.worktree, "completed", "run-old", inputs={"spec": "# Demo\n", "issue": ISSUE})
@@ -347,6 +366,13 @@ class OpenPr(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("Next step:", done.stderr)
         self.assertEqual(self.repo.gh_calls(), self.created)
+
+    def test_a_branch_on_origin_whose_name_only_ends_in_the_spec_branchs_is_not_read_as_it(self):
+        self.landed()
+        # Sorted ahead of refs/heads/7-spec, so a match on the name's tail would read its sha first.
+        self.repo.git("push", "-q", "origin", f"main:refs/heads/0/{BRANCH}", cwd=self.repo.seed)
+        done = self.open_pr()
+        self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_a_run_that_has_not_completed_opens_nothing(self):
         self.landed()

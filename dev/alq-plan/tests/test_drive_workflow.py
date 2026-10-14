@@ -766,7 +766,7 @@ if command == "/speckit-critique-run":
         report = self.critiqued(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3, 4))
         self.assertEqual(report["status"], "completed", report)
 
-    def test_a_rescope_whose_critique_review_renumbers_a_story_stops_the_run(self):
+    def test_a_rescope_whose_critique_review_uses_a_new_number_below_the_highest_stops_the_run(self):
         project, run_id = self.rescope((1, 3))
         self.grilled(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, 3))
         report = self.critiqued(project, run_id, SPEC_DIR, with_stories(SETTLED, 1, heading(2, "Story 3")))
