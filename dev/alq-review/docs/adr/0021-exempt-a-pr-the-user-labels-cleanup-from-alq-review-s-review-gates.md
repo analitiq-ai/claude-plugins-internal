@@ -151,11 +151,12 @@ also lifts every other check in it.
   ADR-0003 point 2's list grows by a kind the user marks per PR, rather than by a new switch per kind.
 - Harder: the label releases the review hold, and this plugin does not guard who adds it. Its safety
   rests on the user's separate rule.
-- **How we would know this was wrong:** a PR labelled `cleanup` merges code that breaks `main`; or a
-  PR's timeline shows the label added by an agent; or the commit-time label read makes commits
+- **How we would know this was wrong:** a PR labelled `cleanup` merges code that breaks `main`; or the
+  user finds a PR labelled `cleanup` that they did not label; or the commit-time label read makes commits
   noticeably slower.
-- Revisit if: GitHub starts showing which actor added a label, so the hook could check who added it;
-  or the org gate runs in every repo the plugin serves, so one classifier could decide for both.
+- Revisit if: the user and agent sessions act on GitHub under separate identities, so a hook could check
+  who added the label; or the org gate runs in every repo the plugin serves, so one classifier could
+  decide for both.
 
 ## Action items
 
@@ -165,3 +166,4 @@ also lifts every other check in it.
 3. [ ] The user creates the rule that forbids an agent to apply the `cleanup` label.
 4. [ ] Amend constitution P2, in its own PR: the label releases the holds of point 3, and until the rule
    of item 3 exists it is a second way out.
+5. [ ] Once this record is accepted, add to ADR-0003 and ADR-0004 a note naming the amendments of point 5.

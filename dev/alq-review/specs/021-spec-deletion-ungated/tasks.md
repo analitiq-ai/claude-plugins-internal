@@ -26,8 +26,8 @@ fail for the reason it names before the implementation task after it starts.
 
 **Purpose**: Principle VI — the governing ADR lands in its own PR, merged before any code below.
 
-- [ ] T001 Create branch `114-adr-cleanup` from `main` and draft the ADR with `/speckit-adrkit-draft` at `dev/alq-review/docs/adr/0019-<slug>.md`: the cleanup PR (label `cleanup`, read at each check, whatever the diff, pushes after labelling stay exempt) is the second kind of PR needing no internal review beside the version-only release (ADR-0003 point 2); it also skips claim-check and shim-check (ADR-0003 point 1); only the user adds the label, on GitHub — the hook refuses every agent command that adds it, in every mode, with no prompt grant (relates to ADR-0004); the label releases no hold (rounds in flight, locks — ADR-0018). Relate it to 0003, 0004 and 0018; do not edit ADR-0003 in place.
-- [ ] T002 Commit, open the ADR PR, run the internal and Codex review loops per `.claude/rules/pr-review-loop.md`, and merge it before Phase 2 starts. Then create branch `114-cleanup-label` from the updated `main` for all tasks below.
+- [ ] T001 Create branch `114-adr` from `main` and draft ADR-0021 with `/speckit-adrkit-draft` at `dev/alq-review/docs/adr/0021-<slug>.md`: the cleanup PR (label `cleanup`, read at each check, whatever the diff, pushes after labelling stay exempt) is the second kind of PR needing no internal review beside the version-only release (ADR-0003 point 2); it also skips claim-check and shim-check (ADR-0003 point 1); this plugin refuses no command that adds the label, and the README names the user's rule forbidding an agent to add it as a requirement (FR-010); the label releases only the review holds, while rounds in flight, locks (ADR-0018) and `--admin` keep theirs (FR-013). Relate it to 0003, 0004, 0009 and 0018. The amendment notes on ADR-0003 and ADR-0004 are added when 0021 is accepted (R9).
+- [ ] T002 Commit, open the ADR PR, run the internal and Codex review loops per `.claude/rules/pr-review-loop.md`, and merge it before the code PR. The code is on branch `114-spec`, rebased on the updated `main`.
 
 **Checkpoint**: ADR merged on `main`; code branch created.
 
@@ -41,13 +41,13 @@ fail for the reason it names before the implementation task after it starts.
 
 ### Tests (write first, confirm they fail)
 
-- [ ] T003 [P] Create `dev/alq-review/tests/test_github.py` (new file, following the import and fake-`gh` style of `dev/alq-review/tests/test_pre_merge_gate.py`) with failing tests: `is_cleanup(["cleanup"])` true; `is_cleanup([])`, `is_cleanup(["Cleanup-ish"])`, `is_cleanup(["bug"])` false — exact name `cleanup` only; `pr_labels(slug, pr)` runs `gh pr view <pr> --repo <slug> --json labels` and returns the label names; `pr_labels` raises `RuntimeError` carrying gh's stderr words when gh exits non-zero or times out (same shape as `pr_target`); `pr_labels` raises `RuntimeError` when `labels` is missing or not a list of `{name: str}`; `branch_labels(slug, branch)` runs `gh pr list --head <branch> --state open --json number,labels` and returns the open PRs' label-name lists, `[]` when no open PR, `RuntimeError` on no answer or a malformed field.
-- [ ] T004 [P] Add failing tests to `dev/alq-review/tests/test_policy.py` for the `Cleanup` fact: `Cleanup.LABELLED`, `Cleanup.NOT_LABELLED` and `Cleanup.unread(why)` exist; `unread` carries `why`; `unread` is not `LABELLED` (gated as `NOT_LABELLED`, data-model).
+- [ ] T003 [P] Create `dev/alq-review/tests/test_github.py` (new file, following the import and fake-`gh` style of `dev/alq-review/tests/test_pre_merge_gate.py`) with failing tests: `is_cleanup(["cleanup"])` and `is_cleanup(["Cleanup"])` true; `is_cleanup([])`, `is_cleanup(["cleanup-ish"])`, `is_cleanup(["bug"])` false; `pr_labels(slug, pr)` runs `gh pr view <pr> --repo <slug> --json labels` and returns the label names; `pr_labels` raises `RuntimeError` carrying gh's words when gh exits non-zero or times out; it raises `RuntimeError` when `labels` is missing or not a list of `{name: str}` (via `label_names`); `branch_labels(slug, branch)` runs `gh pr list --head <branch> --state open --json number,labels` and returns the open PRs' label-name lists, `[]` when no open PR, `RuntimeError` on no answer or a malformed field.
+- [ ] T004 [P] Add failing tests to `dev/alq-review/tests/test_github.py` for the fact: `Cleanup(labelled=True, unread=...)` raises; `read_cleanup` gives labelled only when there is a PR and each carries the label; a reader that raises gives `Cleanup(unread=why)`, whose `refusal()` names why.
 
 ### Implementation
 
-- [ ] T005 In `plugins/alq-review/scripts/github.py` add `CLEANUP_LABEL = "cleanup"`, the pure `is_cleanup(labels: list[str]) -> bool` (exact name match, beside `version_only_release`), and the readers `pr_labels(slug, pr) -> list[str]` and `branch_labels(slug, branch) -> list[list[str]]` that go through `_answer` (20 s) and raise `RuntimeError` in gh's words as `pr_target` does; validate the `labels` field shape at the read (Principle II). Do not change `pr_target`'s return tuple (callers `gate.pr_of`, `gate._open_pr`). Makes T003 pass.
-- [ ] T006 In `plugins/alq-review/scripts/policy.py` add the `Cleanup` fact with `LABELLED`, `NOT_LABELLED` and `unread(why)` per data-model.md § Cleanup. Makes T004 pass.
+- [ ] T005 In `plugins/alq-review/scripts/github.py` add `CLEANUP_LABEL = "cleanup"`, the pure `is_cleanup(labels: list[str]) -> bool` (beside `version_only_release`), the one `labels` parser `label_names(labels) -> list[str]`, and the readers `pr_labels(slug, pr)` and `branch_labels(slug, branch)` that go through `_answer` (20 s) and `label_names`, raising `RuntimeError` in gh's words. Do not change `pr_target`'s return tuple (callers `gate.pr_of`, `gate._open_pr`). Makes T003 pass.
+- [ ] T006 In `plugins/alq-review/scripts/github.py` add `Cleanup` (data-model.md § Cleanup), `read_cleanup(labels_of)` and `Cleanup.refusal()`. Makes T004 pass.
 
 **Checkpoint**: `test_github` and the new `test_policy` cases pass; full suite still green.
 
@@ -63,15 +63,15 @@ and no attestation; commits on its branch skip claim-check and shim-check; every
 
 ### Tests for User Story 1 (write first, confirm they fail)
 
-- [ ] T007 [P] [US1] Add failing tests to `dev/alq-review/tests/test_policy.py` for `mark_ready(..., cleanup)`: `LABELLED` with no clean round at the head → allowed; `LABELLED` with a round in flight or a lock (`_obstacle`) → still refused with the obstacle's reason (R10, mirrors the release test near `test_policy.py:406`); `NOT_LABELLED` → refused exactly as today and the refusal ends "Only the user exempts a PR from review, by adding the `cleanup` label on GitHub."; `unread("why")` → refused, the refusal starts "The `cleanup` label of <PR> could not be read (why), so it is gated as unlabelled." and does not say a review is missing first (FR-007).
-- [ ] T008 [P] [US1] Add failing tests to `dev/alq-review/tests/test_pre_merge_gate.py`: `fetch` requests the `labels` JSON field; `gh pr merge` and `gh pr ready` on a PR whose labels include `cleanup` with no attestation → allowed (`unmet` returns None); same PR with `--admin` and no `override-merge` → still refused (R3); unlabelled PR → refused exactly as today plus the cleanup sentence at the end (R8); a `labels` field missing or not a list of `{name}` → refused, prefixed with the unread-label sentence (FR-007); the release path (`released`) still allows. Every existing refusal case keeps passing (SC-003).
-- [ ] T009 [P] [US1] Add failing tests to `dev/alq-review/tests/test_gate.py`: `gh pr ready` for a branch no ledger names resolves the PR via `action.pr`, else `event.pr`, else `github.pr_target(repo, branch)`, reads `github.pr_labels`, and passes `Cleanup.LABELLED` to `mark_ready` → allowed; no open PR → `NOT_LABELLED`; a `RuntimeError` from either reader → `Cleanup.unread(why)` and the refusal names why; a `git commit` on a branch whose open PR carries `cleanup` (via one `github.branch_labels` call) → neither `claimgate.on_commit` nor `shimgate.on_commit` is called; branch with no open PR, an unlabelled PR, or `branch_labels` raising → both run as today with no note (FR-012); in `log` mode a labelled branch records no claim/shim refusal.
+- [ ] T007 [P] [US1] Add failing tests to `dev/alq-review/tests/test_policy.py` for `mark_ready(..., cleanup)`: labelled with no clean round at the head → allowed; labelled with a round in flight or a lock (`_obstacle`) → still refused with the obstacle's reason (R10); not labelled → refused exactly as today, ending with `github.CLEANUP_EXEMPTION`; unread with no clean round → `Decision(False, cleanup.refusal())` (FR-007); unread with a clean round at the head → allowed. And for `attest`: refused on no clean round, allowed on a clean round or a release (FR-011).
+- [ ] T008 [P] [US1] Add failing tests to `dev/alq-review/tests/test_pre_merge_gate.py`: `fetch` requests the `labels` JSON field; `gh pr merge` and `gh pr ready` on a PR whose labels include `cleanup` with no attestation → allowed (`unmet` returns None); same PR with `--admin` and no `override-merge` → still refused (R3); unlabelled PR → refused exactly as today plus the cleanup sentence at the end (R8); a `labels` field missing or not a list of `{name}` → refused with the unread refusal alone, naming no attestation (FR-007); the release path (`released`) still allows. Every existing refusal case keeps passing (SC-003).
+- [ ] T009 [P] [US1] Add failing tests to `dev/alq-review/tests/test_gate.py` and `dev/alq-review/tests/test_shell.py`: `gh pr ready` on a PR the ledger names reads its labels by number; on a branch no ledger names, by the branch's open PRs (`github.branch_labels`); labelled → allowed; no open PR → not labelled; a reader `RuntimeError` → refused with the unread refusal alone; a comment carrying the attestation marker classifies as `attest` and is refused on a labelled PR with no clean round; a `git commit` on a branch whose open PR carries `cleanup` → neither `claimgate.on_commit` nor `shimgate.on_commit` is called; a branch with no open PR, an unlabelled PR, or `branch_labels` raising → both run as today with no note (FR-012).
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] In `plugins/alq-review/scripts/policy.py` give `mark_ready` the `cleanup: Cleanup` parameter: allow on `LABELLED` after `_obstacle` and beside `released`; prefix the unread-label sentence on `unread(why)`; append the cleanup sentence (R8) to the not-ready refusal. Update its callers: `gate.on_bash` (line ~377) and existing `test_policy` calls. Makes T007 pass.
-- [ ] T011 [US1] In `plugins/alq-review/scripts/gate.py` add `_cleanup(event, action) -> Cleanup` (PR = `action.pr` or `event.pr` or `github.pr_target(event.repo, event.branch)`; then `github.pr_labels` → `github.is_cleanup`; `RuntimeError` → `Cleanup.unread(str(err))`; no PR → `NOT_LABELLED`) and pass it to `policy.mark_ready` for `gh pr ready`. For a `commit` action, before `claimgate.on_commit` / `shimgate.on_commit` (lines ~361-362), call `github.branch_labels(event.repo, event.branch)` once and skip both when `is_cleanup` is true for an open PR's labels; on `RuntimeError` or no labelled PR run both as today. Makes T009 pass.
-- [ ] T012 [US1] In `plugins/alq-review/scripts/pre_merge_gate.py` add `labels` to the `gh pr view --json` fields in `fetch`; in `unmet` (line ~383-397), after the `--admin` and head checks, return None when `github.is_cleanup(labels)`, beside `attested(...) or released(...)`; a malformed `labels` field is unread and prefixes the unread-label sentence; append the cleanup sentence (R8) to the ready/merge refusals (`how_to_attest`). Callers: `gated` (line ~436/444) ← `main` on `PreToolUse`. Makes T008 pass.
+- [ ] T010 [US1] In `plugins/alq-review/scripts/policy.py` give `mark_ready` the `cleanup: github.Cleanup` parameter: allow on labelled after `_obstacle` and beside `released`; when unread and no clean round stands, return `cleanup.refusal()` alone; append the cleanup sentence (R8) to the not-ready refusal. Add `attest`, which is `mark_ready` with a not-labelled fact. Update the callers: `gate.on_bash` and `test_policy`. Makes T007 pass.
+- [ ] T011 [US1] In `plugins/alq-review/scripts/shell.py` classify a comment carrying the attestation marker as `attest`. In `plugins/alq-review/scripts/gate.py` add `cleanup_of(repo, pr, branch) -> github.Cleanup` (the PR named via `pr_labels`, else the branch's open PRs via `branch_labels`, through `read_cleanup`) and pass it to `policy.mark_ready` for `ready`; route `attest` to `policy.attest`. For a `commit` action, before `claimgate.on_commit` / `shimgate.on_commit`, skip both when `cleanup_of` is labelled; otherwise run both as today. Makes T009 pass.
+- [ ] T012 [US1] In `plugins/alq-review/scripts/pre_merge_gate.py` add `labels` to the `gh pr view --json` fields in `fetch`; build the fact with `read_cleanup` over `label_names` of that field; in `unmet`, after the `--admin` and head checks, return None when labelled, beside `attested(...) or released(...)`; when unread return `refusal()` alone; append the cleanup sentence (R8) to `how_to_attest`. Callers: `gated` ← `main` on `PreToolUse`. Makes T008 pass.
 
 **Checkpoint**: US1 complete — full suite green; quickstart steps 3, 4 (ready), 5 and 6 hold.
 
@@ -101,8 +101,8 @@ line, ends with exit `5` once checks are green, prints no `@codex review`, and w
 ### Implementation for User Story 2
 
 - [ ] T018 [US2] In `plugins/alq-review/scripts/github.py` add `main()` with the `cleanup <owner/repo> <pr>` subcommand running `pr_labels` then `is_cleanup` (stdout `cleanup`/`gated`, exit 0; `RuntimeError` → stderr, exit 1; usage → exit 2) and an `if __name__ == "__main__"` entry. Makes T015 pass.
-- [ ] T019 [US2] In `plugins/alq-review/skills/alq-github-pr-review/poll-pr-review.sh` run `python3 <scripts>/github.py cleanup "$repo" "$pr"` once before the first poll (as `READER` already calls Python). On `cleanup`: print the `Cleanup PR:` line; in `WAITING_ON` / `settle` wait only while a non-gate, non-ignored check runs or `mergeStateStatus` is `UNKNOWN` (no draft shortcut, no Codex, no gate lag); in `report` exit `5` with the `CLEANUP:` line when no non-ignored check fails, else exit `4` naming the failing checks; never hand over to the gate's inbox, never report a thread as a finding, never print `@codex review`. On exit 1 from the reader: print the `WARNING:` line and poll as today. Unlabelled: unchanged. Makes T016 pass.
-- [ ] T020 [US2] In `plugins/alq-review/skills/alq-github-pr-review/SKILL.md` add exit `5` CLEANUP to the exit table and a *Cleanup PRs* section: the `cleanup` label marks one and only the user adds it on GitHub; no `@codex review`, no `deepsource-pr-gate.sh`, no thread triage; exit `5` means merge once the PR is ready and CI is green; exit `4` on a cleanup PR means a failing check. Makes T017 pass.
+- [ ] T019 [US2] In `plugins/alq-review/skills/alq-github-pr-review/poll-pr-review.sh` run `python3 <scripts>/github.py cleanup "$repo" "$pr"` once before the first poll (as `READER` already calls Python). On `cleanup`: print the `Cleanup PR:` line; in `WAITING_ON` / `settle` wait only while a non-gate, non-ignored check runs or `mergeStateStatus` is `UNKNOWN` (no draft shortcut, no Codex, no gate lag); exit `5` with the `CLEANUP:` line when no non-ignored check fails, else exit `4` naming the failing checks; never hand over to the gate's inbox, never report a thread as a finding, never print `@codex review`. On any non-zero exit of the reader: print the `WARNING:` line and poll as today. On `gated`: unchanged. Makes T016 pass.
+- [ ] T020 [US2] In `plugins/alq-review/skills/alq-github-pr-review/SKILL.md` add exit `5` CLEANUP to the exit table and a *Cleanup PRs* section: the `cleanup` label marks one, and the user adds it on GitHub, not the agent; no `@codex review`, no `deepsource-pr-gate.sh`, no thread triage; exit `5` means merge once the PR is ready and CI is green; exit `4` on a cleanup PR means a failing check. Makes T017 pass.
 
 **Checkpoint**: Both stories pass; quickstart step 4 (poller) holds.
 
@@ -110,10 +110,10 @@ line, ends with exit `5` once checks are green, prints no `@codex review`, and w
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T021 [P] Update `plugins/alq-review/README.md` § *What it enforces*: the ready/merge gate names the `cleanup` label beside the version-only release; the commit checks name the cleanup exemption; only the user adds the label (contracts/interfaces.md § README).
+- [ ] T021 [P] Update `plugins/alq-review/README.md`: § *What it enforces* names the `cleanup` label beside the version-only release in the ready/merge gate, the cleanup exemption in the commit checks, and that an attestation still needs a round; a § *Requirements* names the rule, still to be created, that forbids an agent from applying the label, and says that until it exists an agent can add it (contracts/interfaces.md § README).
 - [ ] T022 [P] MINOR-bump `version` in `plugins/alq-review/.claude-plugin/plugin.json`.
 - [ ] T023 Run `cd dev/alq-review/tests && python -m unittest -v` and confirm every test passes, including every pre-existing ready/merge refusal case unchanged (SC-003).
-- [ ] T024 Run the by-hand steps 1–6 of `dev/alq-review/specs/021-spec-deletion-ungated/quickstart.md` in `claude-plugins-internal` with alq-review installed from `114-cleanup-label`; record any step that did not hold.
+- [ ] T024 Run the by-hand steps 1–6 of `dev/alq-review/specs/021-spec-deletion-ungated/quickstart.md` in `claude-plugins-internal` with alq-review installed from `114-spec`; record any step that did not hold.
 - [ ] T025 Run the tripwire `git log --name-only main..HEAD | sort | uniq -c | sort -rn`; any file above ~3 edits gets the one-shot rewrite before the PR is opened (`.claude/rules/pr-review-loop.md`).
 
 ---
@@ -123,7 +123,7 @@ line, ends with exit `5` once checks are green, prints no `@codex review`, and w
 ### Phase Dependencies
 
 - **Setup (Phase 1)**: ADR PR merged first (Principle VI) — blocks everything.
-- **Foundational (Phase 2)**: `is_cleanup`, readers, `Cleanup` — blocks all stories.
+- **Foundational (Phase 2)**: `is_cleanup`, `label_names`, the readers, `Cleanup`, `read_cleanup` — blocks all stories.
 - **US1 (Phase 3)**: after Phase 2.
 - **US2 (Phase 5)**: after Phase 2; independent of US1 code. T015 after T003 (same file).
 - **Polish (Phase 6)**: after all stories.
@@ -136,7 +136,7 @@ line, ends with exit `5` once checks are green, prints no `@codex review`, and w
 
 ### Parallel Opportunities
 
-- T003 ∥ T004; T005 ∥ T006.
+- T003 before T004 (same file); T005 before T006 (same file).
 - T007 ∥ T008 ∥ T009 (three test files).
 - T015 ∥ T016 ∥ T017.
 - US2 (Phase 5) can run alongside US1 once Phase 2 is done.
@@ -149,7 +149,7 @@ line, ends with exit `5` once checks are green, prints no `@codex review`, and w
 ```bash
 Task: "Failing mark_ready(..., cleanup) tests in dev/alq-review/tests/test_policy.py"
 Task: "Failing ready/merge cleanup tests in dev/alq-review/tests/test_pre_merge_gate.py"
-Task: "Failing ready + commit-skip tests in dev/alq-review/tests/test_gate.py"
+Task: "Failing ready, attest + commit-skip tests in dev/alq-review/tests/test_gate.py and test_shell.py"
 ```
 
 ## Parallel Example: User Story 2
@@ -172,7 +172,7 @@ out of scope (FR-010).
 ### Incremental Delivery
 
 1. ADR PR (Phase 1).
-2. Code PR on `114-cleanup-label`: Phase 2 + US1 + US2 + Polish — one PR, since the README, skill and version
+2. Code PR on `114-spec`: Phase 2 + US1 + US2 + Polish — one PR, since the README, skill and version
    bump describe the whole change.
 
 ---

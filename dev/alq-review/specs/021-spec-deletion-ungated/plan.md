@@ -6,11 +6,14 @@
 
 ## Summary
 
-A PR carrying the `cleanup` label is decided by one pure function, `github.is_cleanup` (R1). `policy.mark_ready` and
-`pre_merge_gate.unmet` allow it without a round or an attestation, after the holds they already check (R2, R3, R10);
-`gate.on_bash` skips the claim and shim commit checks for its branch (R4). Only the user adds the label, on GitHub;
-no command that adds it is refused here (R5, R6). The poller ends a cleanup PR with exit `5` and hands nothing to the gate
-(R7). A new ADR naming the cleanup PR beside the version-only release lands first, in its own PR (R9).
+A PR carrying the `cleanup` label is one fact, `github.Cleanup` (labelled, not labelled, or unread with why),
+built only by `github.read_cleanup` from label names that only `github.label_names` parses; the name test is
+`github.is_cleanup` (R1). `policy.mark_ready` and `pre_merge_gate.unmet` allow it without a round or an attestation,
+after the holds they already check, and give an unread label one refusal of its own (R2, R3, R10). An attestation
+comment is its own action kind, which the label does not exempt (R2). `gate.on_bash` skips the claim and shim commit
+checks for its branch (R4). The user adds the label on GitHub; this feature refuses no command that adds it, so until
+the user's separate rule exists an agent can add it too (R5, R6). The poller ends a cleanup PR with exit `5` and hands
+nothing to the gate (R7). ADR-0021 lands first, in its own PR (R9).
 
 Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-model.md). Edges:
 [contracts/interfaces.md](contracts/interfaces.md). This file owns the code map and the callers of what changes.
@@ -32,8 +35,8 @@ Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-
 **Performance Goals**: one `gh` call per `git commit` (R4) and one per ready, merge or poller run; each under
 `github._answer`'s 20 s, inside the hooks' 60 s / 45 s
 
-**Constraints**: one decider (FR-002); the label lifts no hold (R10); the
-org pr-gate is untouched (FR-005)
+**Constraints**: one decider (FR-002); the label lifts only the review holds, a round in flight, a lock and
+`--admin` without `override-merge` still refuse (R10, FR-013); the org pr-gate is untouched (FR-005)
 
 **Scale/Scope**: one label; nothing in `/alq-post-merge` (R12)
 
@@ -73,22 +76,25 @@ specs/021-spec-deletion-ungated/
 
 ### Source Code (repository root)
 
-The ADR first, its own PR (branch `114-adr-cleanup`, R9):
+The ADR first, its own PR (branch `114-adr`, R9):
 
 ```text
-dev/alq-review/docs/adr/0019-*.md
+dev/alq-review/docs/adr/0021-*.md
 ```
 
-Then the code (branch `114-cleanup-label`):
+Then the code (branch `114-spec`):
 
 ```text
 plugins/alq-review/
 ├── scripts/
-│   ├── github.py              # CLEANUP_LABEL; is_cleanup(); pr_labels(); branch_labels(); main() for the poller (R1, R4)
-│   ├── policy.py              # Cleanup; mark_ready(..., cleanup) (R2)
-│   ├── gate.py                # _cleanup(); on_bash: ready passes it, commit skips claim/shim on LABELLED (R2, R4)
-│   └── pre_merge_gate.py      # fetch reads labels; unmet allows cleanup; label-add recognition and
-│                              #      refusal; refusal sentences (R3, R6, R8)
+│   ├── github.py              # CLEANUP_LABEL; is_cleanup(); label_names(); Cleanup; read_cleanup(); pr_labels();
+│   │                          #      branch_labels(); main() for the poller (R1, R4)
+│   ├── policy.py              # mark_ready(..., cleanup); attest() (R2)
+│   ├── shell.py               # an attestation comment is its own kind, `attest` (R2)
+│   ├── gate.py                # cleanup_of(); on_bash: ready passes it, attest does not, commit skips claim/shim on
+│   │                          #      a labelled PR (R2, R4)
+│   └── pre_merge_gate.py      # fetch reads labels; unmet allows cleanup, one refusal when unread; refusal
+│                              #      sentences (R3, R8)
 ├── skills/alq-github-pr-review/
 │   ├── poll-pr-review.sh      # cleanup branch, exit 5, no hand-over (R7)
 │   └── SKILL.md               # exit 5; Cleanup PRs (R8)
@@ -97,6 +103,7 @@ plugins/alq-review/
 dev/alq-review/tests/
 ├── test_github.py             # new
 ├── test_policy.py
+├── test_shell.py
 ├── test_gate.py
 ├── test_pre_merge_gate.py
 ├── test_poll_pr_review.py
@@ -106,7 +113,8 @@ dev/alq-review/tests/
 **Structure Decision**: the plugin's existing split: `github.py` the GitHub boundary with its pure decider beside the
 reader (as `version_only_release` / `released`), `policy.py` the rules, `gate.py` and `pre_merge_gate.py` the handlers.
 
-**Callers of what changes**, read in the code: `policy.mark_ready` by `gate.on_bash` (line 377) and `test_policy`;
+**Callers of what changes**, read in the code: `policy.mark_ready` and `policy.attest` by `gate.on_bash` and `test_policy`;
+`shell.classify` by `gate.on_bash` and `test_shell`;
 `pre_merge_gate.unmet` by `pre_merge_gate.gated` (line 444); `pre_merge_gate.fetch` by `gated` (line 436);
 `pre_merge_gate.gated` by `main` on `PreToolUse`; `claimgate.on_commit` / `shimgate.on_commit` by `gate.on_bash` (lines 361-362);
 `github.pr_target` by `gate.pr_of` and `gate._open_pr`, unchanged; `poll-pr-review.sh` by the agent following the
@@ -115,7 +123,9 @@ unchanged. `hooks.json` is unchanged: both hooks already see every Bash call.
 
 ## Complexity Tracking
 
-None.
+| Violation | Why needed | Simpler alternative rejected because |
+|---|---|---|
+| P2: until the user's rule forbidding it exists, an agent can add the label and release its own PR's review hold | The user decided this feature refuses no label command (FR-010); a hook reads only the `gh` forms it knows, so no refusal here closes every route | Refusing the `gh` forms here was rejected by the user, who adds that rule apart from this plugin. Closed by ADR-0021 action items 3 and 4 |
 
 ## Mechanisms
 
@@ -123,7 +133,7 @@ None.
 - Ready allowed for a cleanup PR, label unread named: R2
 - Merge and ready in the pre-merge gate allowed for a cleanup PR: R3
 - Commit checks skipped on a cleanup PR's branch: R4
-- No grant; only the user adds the label: R5
+- No grant: R5
 - No label-add refusal here: R6
 - The poller's cleanup outcome (exit 5, no hand-over): R7
 - The refusal sentences and the skill's Cleanup PRs section: R8

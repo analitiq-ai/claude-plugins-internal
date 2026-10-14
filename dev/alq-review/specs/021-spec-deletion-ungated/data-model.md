@@ -4,14 +4,17 @@ No ledger field and no new state file. Shapes below are what the code passes; Gi
 
 ## Cleanup (fact passed to the rules)
 
+`github.Cleanup`, one of:
+
 | Value | Meaning | From |
 |---|---|---|
-| `LABELLED` | the PR carries `cleanup` | `is_cleanup` true |
-| `NOT_LABELLED` | it does not, or the branch has no open PR | `is_cleanup` false; `pr_target` None |
-| `unread(why)` | GitHub did not answer; gated as `NOT_LABELLED`, and the ready/merge refusal names `why` | `RuntimeError` from a reader; a `labels` field that is not a list of `{name: str}` |
+| `Cleanup(labelled=True)` | the PR carries `cleanup` | there is a PR and `is_cleanup` is true for each |
+| `Cleanup()` | it does not, or the branch has no open PR | `is_cleanup` false; no open PR |
+| `Cleanup(unread=why)` | GitHub did not answer; gated as not labelled, and the ready/merge refusal is `refusal()` alone | `RuntimeError` from a reader; a `labels` field `label_names` rejects |
 
-Decided by `github.is_cleanup(labels: list[str]) -> bool` only (R1). Never stored: read at each ready, merge, commit
-and poller run (spec Edge Cases).
+Built only by `github.read_cleanup(labels_of)`; labelled and unread at once is refused at construction. Names come
+only from `github.label_names`; the name test is `github.is_cleanup` (R1). Never stored: read at each ready, merge,
+commit and poller run (spec Edge Cases).
 
 ## Poller outcome on a cleanup PR
 

@@ -2,40 +2,42 @@
 
 Every decision below was settled by reading the code at `aecf2a3`; none needed the user.
 
-## R1: One decider, one reader
+## R1: One fact, one reader, one decider
 
-- **Decision**: `github.is_cleanup(labels: list[str]) -> bool` is the one function that decides (FR-002): true when a
-  label is named exactly `cleanup`. One reader, `github.pr_labels(slug, pr) -> list[str]`, asks
-  `gh pr view <pr> --repo <slug> --json labels` and raises `RuntimeError` in gh's words when gh gives no answer, as
-  `pr_target` does. `pre_merge_gate` reads the labels in the `gh pr view` it already makes (`fetch`, one more JSON
-  field) and hands them to `is_cleanup`. The poller calls `python3 scripts/github.py cleanup <repo> <pr>`, a `main`
-  that runs `pr_labels` then `is_cleanup` (R7).
-- **Rationale**: it mirrors the release exemption already there: a pure `version_only_release(runs)` and a reader
-  `released(slug, commit)` (`github.py:63-81`). The decision is a name test, so every component deciding through
-  `is_cleanup` cannot drift; the readers differ only in how they reach GitHub.
+- **Decision**: `github.is_cleanup(labels: list[str]) -> bool` is the one name test (FR-002): true when a label is
+  named `cleanup`, without case, as GitHub matches names. `github.label_names(labels)` is the one parser of gh's
+  `labels` field; it raises `RuntimeError` when the field is not a list of `{name: str}`. `pr_labels(slug, pr)` and
+  `branch_labels(slug, branch)` read through it, and `pre_merge_gate` calls it on the `labels` of the `gh pr view` it
+  already makes. `github.Cleanup` is the one fact, labelled, not labelled or unread with why; it cannot be labelled
+  and unread at once. `github.read_cleanup(labels_of)` alone builds it: unread when `labels_of` raises, else
+  labelled when there is a PR and each carries the label. `Cleanup.refusal()` is the one unread refusal. The poller
+  calls `python3 scripts/github.py cleanup <repo> <pr>`, whose `main` goes through `read_cleanup` (R7).
+- **Rationale**: it mirrors the release exemption: a pure `version_only_release(runs)` beside a reader
+  `released(slug, commit)`. Every component decides through `read_cleanup`, so none can read the label or render
+  the unread case its own way.
 - **Existing tools**: `github.pr_head` / `pr_target` read other fields and swallow or raise differently; extending
   `pr_target` would change the tuple `gate.pr_of` and `gate._open_pr` unpack. `pre_merge_gate.fetch` already reads
-  the PR and its failure already denies (`pre_merge_gate.py:436-441`), so adding `labels` there costs no call.
-  The GraphQL snapshot of the poller could carry labels, but deciding on them in jq would be a second decider.
+  the PR and its failure already denies, so adding `labels` there costs no call. The GraphQL snapshot of the
+  poller could carry labels, but deciding on them in jq would be a second decider.
 
-## R2: Marking ready (gate.py → policy.mark_ready)
+## R2: Marking ready and attesting (gate.py → policy)
 
-- **Decision**: `policy.mark_ready` takes one more fact, `cleanup: Cleanup` (data-model), and allows when it is
-  `LABELLED`, after `_obstacle` and beside `released`. `gate.on_bash` gets the fact from a new `_cleanup(event,
-  action)`: the PR is `action.pr`, else `event.pr`, else `github.pr_target(event.repo, event.branch)`; then
-  `github.pr_labels`. A `RuntimeError` anywhere is `Cleanup.unread(why)`; no open PR is `NOT_LABELLED`. When unread,
-  the refusal starts with "The `cleanup` label of <PR> could not be read (<why>), so it is gated as unlabelled."
-- **Rationale**: `released` is the pattern (`policy.py:216-222`), and its test pins that a release still waits for a
-  round in flight (`test_policy.py:406`). `event.pr` is None for a branch no ledger names (`gate.pr_of`), which is
-  the normal state of a cleanup PR, so the PR has to be looked up by branch.
-- **Existing tools**: `github.released` returns None on failure, which would hide the reason FR-007 asks to name;
-  `pr_target` already raises with gh's words.
+- **Decision**: `policy.mark_ready` takes one more fact, `cleanup: github.Cleanup`, and allows when it is labelled,
+  after `_obstacle` and beside `released`. When the label is unread and no clean round stands at the head, the
+  refusal is `Cleanup.refusal()` alone: it names the unread label and says to retry, not that a review is missing
+  (FR-007). `gate.cleanup_of(repo, pr, branch)` reads the PR named, else the branch's open PRs in one
+  `branch_labels` call. A comment carrying the attestation marker is its own action kind, `attest`, decided by
+  `policy.attest`: a clean round or a release, never the label, since the org pr-gate takes the attestation for the
+  review (FR-011).
+- **Rationale**: `released` is the pattern, and its test pins that a release still waits for a round in flight.
+  `event.pr` is None for a branch no ledger names, the normal state of a cleanup PR, so the branch is asked.
+- **Existing tools**: `github.released` returns None on failure, which would hide the reason FR-007 asks to name.
 
 ## R3: Merging and readying (pre_merge_gate)
 
 - **Decision**: `fetch` asks for `labels` too. `unmet` returns None when `is_cleanup` says so, after the `--admin`
   check and the head check and beside `attested` / `released`. `--admin` still needs `override-merge`. A `labels`
-  field that is missing or not a list of `{name}` is unread: the refusal is prefixed as in R2.
+  field that is missing or not a list of `{name}` is unread: the refusal is `Cleanup.refusal()` alone, as in R2.
 - **Rationale**: FR-003/FR-004. `--admin` steps around GitHub's rules, not alq-review's (`admin_needs_override`);
   the label waives only the internal review.
 - **Existing tools**: `unmet`'s `attested(...) or released(...)` line (`pre_merge_gate.py:395`) takes one more term.
@@ -55,8 +57,7 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 ## R5: No grant
 
-- **Decision**: the agent never adds `cleanup`. No prompt keyword, no session record; the user adds the label on
-  GitHub (critique clarification).
+- **Decision**: no prompt keyword and no session record grant the label. The user adds it on GitHub.
 - **Rationale**: the user's decision. There is no grant to spend.
 - **Existing tools**: none needed.
 
@@ -73,7 +74,8 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
   shortcut, no Codex, no gate lag), and ends with exit `5` CLEANUP when no non-ignored check fails, or exit `4`
   BLOCKED naming the failing checks. It hands nothing to the gate's inbox, reports no thread as a finding and never
   prints `@codex review`. A reader failure prints `WARNING: the cleanup label of <repo>#<pr> could not be read
-  (<why>); polling it as unlabelled.` and polls as today (FR-007).
+  (<why>); polling it as unlabelled.` and polls as today (FR-007). Any non-zero exit of the reader is a failure;
+  on exit 0 it prints only `cleanup` or `gated` (`test_github`).
 - **Rationale**: FR-008, SC-002. A hand-over opens a github round in the ledger, which is alq-review gating. A new
   exit code lets the skill route by code, not by the agent reading a line (P1); `0` already means "run
   `deepsource-pr-gate.sh`". CI still has to be green (spec Assumptions), so failing checks still block.
@@ -82,8 +84,8 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 ## R8: What the agent is told
 
-- **Decision**: the ready and merge refusals end with "Only the user exempts a PR from review, by adding the
-  `cleanup` label on GitHub." The skill gains a section *Cleanup PRs*:
+- **Decision**: the ready and merge refusals end with `github.CLEANUP_EXEMPTION`: "To exempt this PR from review,
+  the user adds the `cleanup` label to it on GitHub; an agent does not." The skill gains a section *Cleanup PRs*:
   the label marks one; no `@codex review`, no `deepsource-pr-gate.sh`, no triage; exit `5`.
 - **Rationale**: P1 (a refusal names the next legal step) and FR-009. Without it `/alq-post-merge`, which this
   feature does not change, leaves the agent with no route but the refusal.
@@ -91,26 +93,30 @@ Every decision below was settled by reading the code at `aecf2a3`; none needed t
 
 ## R9: The decision record ships first
 
-- **Decision**: a new ADR, drafted with `/speckit-adrkit-draft`, names the cleanup PR as the second kind of PR that
-  needs no internal review (ADR-0003 point 2), says it also skips the commit checks (point 1), and that only the
-  user adds the label. It relates to 0003 and 0004. Its own PR merges before the code.
+- **Decision**: ADR-0021, drafted with `/speckit-adrkit-draft` on branch `114-adr`, names the cleanup PR as the
+  second kind of PR that needs no internal review (ADR-0003 point 2), says it also skips the commit checks (point 1),
+  that this plugin refuses no command that adds the label, and which holds the label releases. It relates to 0003,
+  0004, 0009 and 0018. Its own PR merges before the code. The amendment notes on ADR-0003 and ADR-0004 are added
+  when 0021 is accepted, as the ADR-0014 note on ADR-0001 was.
 - **Rationale**: ADR-0003 point 2: "We will name in this ADR every kind of PR that needs no internal review."
   Principle VI: the governing record and the governed code ship apart.
-- **Existing tools**: `/speckit-adrkit-draft`, and `docs/adr/` for the record; ADR-0003 is not edited in place.
+- **Existing tools**: `/speckit-adrkit-draft`, and `docs/adr/` for the record.
 
-## R10: Holds the label does not lift
+## R10: Holds the label keeps
 
-- **Decision**: a cleanup PR still meets `_obstacle` (a round in flight, a lock). The label waives a review; it
-  releases no hold.
-- **Rationale**: P2 and ADR-0018: a lock is released only by `unlock`. The label as a second way out would fail P2.
+- **Decision**: the label releases the review holds only (ADR-0021 point 3). A cleanup PR still meets `_obstacle`
+  (a round in flight, a lock), and `--admin` still needs `override-merge` (FR-013).
+- **Rationale**: P2 and ADR-0018: a lock is released only by `unlock`. The review hold the label does release is a
+  second way out of that hold until the user's rule exists; plan.md's Complexity Tracking records it.
 - **Existing tools**: `policy._obstacle`, already checked before `released` in `mark_ready`.
 
 ## R11: Tests
 
 - **Decision**: `python -m unittest -v` in `dev/alq-review/tests/`, each acceptance scenario a test written to fail
-  first: `test_policy` (mark_ready facts), `test_gate` (ready, commit skip), `test_pre_merge_gate` (merge, ready,
+  first: `test_policy` (mark_ready and attest facts), `test_shell` (the `attest` kind), `test_gate` (ready,
+  attest, commit skip), `test_pre_merge_gate` (merge, ready,
   an unreadable label), `test_poll_pr_review` and `test_poller_contract` (exit 5, no hand-over), a new
-  `test_github.py` (`is_cleanup`, `pr_labels`, `main`).
+  `test_github.py` (`is_cleanup`, `Cleanup`, `read_cleanup`, the readers, `main`).
 - **Rationale**: Principle IV.
 - **Existing tools**: these files already drive each component through its fakes, including `test_poll_pr_review`'s
   fake `gh`, which answers the poller's new `gh pr view` too.

@@ -4,8 +4,9 @@ What changes at the plugin's edges. Internal function shapes are in [../data-mod
 
 ## Hook refusals (PreToolUse/Bash, `pre_merge_gate.py`, every mode)
 
-- `gh pr ready` / `gh pr merge` refusals (also `gate.py`'s ready refusal) end with the cleanup sentence (research R8),
-  and start with the unread-label sentence when the label could not be read.
+- `gh pr ready` / `gh pr merge` refusals (also `gate.py`'s ready refusal) end with the cleanup sentence (research R8).
+  When the label could not be read, the refusal is the unread-label refusal alone (FR-007).
+- A comment carrying the attestation marker on a cleanup PR is refused as on any PR without a clean round (FR-011).
 
 ## `scripts/github.py` command line
 
@@ -28,5 +29,6 @@ Exit table gains `5`; a section *Cleanup PRs* (research R8).
 ## README
 
 *What it enforces*: the merge and ready gate names the cleanup label beside the version-only release; the commit
-checks name the cleanup exemption. Plugin version: MINOR bump in
+checks name the cleanup exemption; an attestation still needs a round. *Requirements*: a rule must be created that
+forbids an agent from applying the `cleanup` label; until it exists an agent-added label exempts the PR. Plugin version: MINOR bump in
 `.claude-plugin/plugin.json`.

@@ -6,7 +6,7 @@
 cd dev/alq-review/tests && python -m unittest -v
 ```
 
-Each spec scenario maps to a test (research R11): US1 → `test_policy`, `test_gate`, `test_pre_merge_gate`;
+Each spec scenario maps to a test (research R11): US1 → `test_policy`, `test_shell`, `test_gate`, `test_pre_merge_gate`;
 US2 →
 `test_poll_pr_review`, `test_poller_contract`; FR-002 → `test_github`. SC-003: every existing ready/merge refusal test
 passes unchanged.

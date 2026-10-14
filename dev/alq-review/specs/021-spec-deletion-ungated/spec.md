@@ -14,8 +14,8 @@ Superseded by the Clarifications: the `cleanup` label decides, not the diff.
 
 ### Session 2026-10-14
 
-- Q: Where is the spec-deletion-only check decided: the org pr-gate (and this repo adopts it) or alq-review alone? → A: alq-review alone. Only alq-review logic changes; the org pr-gate is left alone. A PR that only deletes files under `specs/` gets none of alq-review's gating: no internal review, no Codex request or wait, no DeepSource grade check, nothing else alq-review applies.
-- Q: What identifies a PR that gets no alq-review gating, and who may mark it? → A: The PR label `cleanup` alone, whatever the diff. Only the user adds it, on GitHub.
+- Q: Where is the spec-deletion-only check decided: the org pr-gate (and this repo adopts it) or alq-review alone? → A: alq-review alone. Only alq-review logic changes; the org pr-gate is left alone. A PR that only deletes files under `specs/` gets none of alq-review's gating: no internal review, no Codex request or wait, no DeepSource grade check, nothing else alq-review applies. (Superseded: the diff wording by the next answer, the label; "nothing else" by FR-013, which keeps the holds that are not reviews.)
+- Q: What identifies a PR that gets no alq-review gating, and who may mark it? → A: The PR label `cleanup` alone, whatever the diff. Only the user adds it, on GitHub. (Not enforced by this feature: see the last answer and FR-010.)
 - Q: Does the exemption survive pushes made after the label was added? → A: Yes. The label exempts the PR whatever is pushed to it later; only removing the label brings the gate back.
 - Q: Does this feature change `/alq-post-merge` (citation removal, step 7)? → A: No. The work is alq-review only.
 - Q: Does the label also skip alq-review's commit-time checks (claim-check, shim-check)? → A: Yes. Commits on a branch whose PR carries `cleanup` skip both.
@@ -78,6 +78,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   missing.
 - The user adds the label on GitHub: the PR is a cleanup PR.
 - Removing the `cleanup` label brings the gate back.
+- A round in flight, a lock or `--admin` without `override-merge` still refuses a cleanup PR (FR-013).
+- A comment carrying the internal-review attestation marker on a cleanup PR is refused as on any PR without a clean round: the org pr-gate takes it for the review (FR-011).
 - A commit on a branch with no open PR, or whose open PR has no `cleanup` label, is checked by claim-check and
   shim-check as today.
 - A push after the label was added leaves the PR a cleanup PR: the exemption is bound to the PR, not to a
@@ -103,7 +105,7 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 - **FR-007**: When the label cannot be read, the PR is not a cleanup PR, and the gate's refusal says the label
   could not be read rather than that a review is missing.
 - **FR-008**: For a cleanup PR, the poller MUST NOT wait for a Codex answer, tell the agent to post
-  `@codex review`, or treat an unresolved review thread as blocking; no alq-review gate applies.
+  `@codex review`, or treat an unresolved review thread as blocking.
 - **FR-009**: The GitHub review skill MUST state that a cleanup PR needs no `@codex review`, no DeepSource
   grade check (`deepsource-pr-gate.sh`) and no thread triage, and that the `cleanup` label is what marks one.
 - **FR-010**: This feature refuses no command that adds or removes a label. Refusing an agent's label add is
@@ -113,6 +115,9 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   (agent-posted comment, check run from another app) releases the hold.
 - **FR-012**: A `git commit` on a branch that has an open PR carrying the `cleanup` label MUST NOT be held by
   claim-check or shim-check. When the PR or its label cannot be read, both checks apply as today.
+- **FR-013**: The label releases only the review holds FR-003, FR-004, FR-008 and FR-012 name. A cleanup PR is
+  still refused while an internal round is in flight or its branch is locked (a lock is released only by
+  `unlock`), and `gh pr merge --admin` on it still needs `override-merge`.
 
 ### Key Entities
 
