@@ -204,9 +204,9 @@ story-number check.
    stories with one number, **When** the run checks it, **Then** it fails, naming the heading.
 5. **Given** a rescope run from a story's worktree, **When** it completes, **Then** the spec edit is committed and
    pushed on that worktree's branch, and no other branch or PR is created.
-6. **Given** a rescope of a spec with stories 1 to 3, **When** the rescoped spec.md drops story 2's heading, keeps
-   1 and 3, and adds a story, **Then** the run goes on only if the new story is numbered 4. A new story numbered 2,
-   or a renumbered story, fails the run, naming the numbers.
+6. **Given** a rescope of a spec whose stories are numbered 1 and 3, **When** the rescoped spec.md adds a story,
+   **Then** the run goes on only if the new story's number is greater than 3. A new story numbered 2 fails the run,
+   naming the numbers.
 7. **Given** a run that fails or is rejected, **Then** nothing is committed, pushed or opened.
 8. **Given** a new scope that ended on `no spec needed`, **When** the skill ends, **Then** the no-spec folder lands as
    in scenario 3: committed and pushed on `<issue>-spec`, a draft PR whose body starts `Part of #<issue>`, no
@@ -328,7 +328,8 @@ Delivery Workflow.
 - **FR-016**: The workflow MUST check spec.md's story headings with one pure function after every step that writes
   spec.md: each is `### User Story <N> - <title> (Priority: P<n>)`, and no number is used twice. On a rescope it
   MUST also check, against spec.md as the run found it, that every number not there before is greater than every
-  number that was. Numbers that were there may be dropped, and are not reused.
+  number that was. Numbers that were there may be dropped. Stories are compared by number only, so a number
+  dropped and used again in the same run, or a story moved to another number, is not caught.
 - **FR-017**: A run that fails or is rejected MUST commit, push and open nothing.
 
 **Existing folders (Story 4)**
