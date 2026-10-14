@@ -36,11 +36,16 @@ class CleanupFact(unittest.TestCase):
         with self.assertRaises(ValueError):
             github.Cleanup(labelled=True, unread="HTTP 502")
 
-    def test_the_reader_needs_an_open_pr_and_the_label_on_each(self):
-        for found, labelled in (([["cleanup"]], True), ([["bug", "Cleanup"]], True), ([], False),
-                                ([["cleanup"], ["bug"]], False), ([["bug"]], False)):
+    def test_the_reader_decides_on_the_labels_of_the_one_pr(self):
+        for found, labelled in ((["cleanup"], True), (["bug", "Cleanup"], True), ([], False), (["bug"], False)):
             with self.subTest(found=found):
                 self.assertEqual(github.read_cleanup(lambda found=found: found), github.Cleanup(labelled=labelled))
+
+    def test_only_gh_failing_to_say_is_unread_any_other_error_propagates(self):
+        def broken():
+            raise KeyError("labels")
+        with self.assertRaises(KeyError):
+            github.read_cleanup(broken)
 
     def test_labels_gh_cannot_say_are_no_label_and_say_why(self):
         def fails():
@@ -98,15 +103,20 @@ class PrLabels(StubGh):
 
 
 class BranchLabels(StubGh):
-    def test_reads_the_labels_of_every_open_pr_of_a_branch_in_one_call(self):
-        answer = [{"number": 7, "labels": labels("cleanup")}, {"number": 9, "labels": []}]
-        with self.answering(json.dumps(answer)):
-            self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), [["cleanup"], []])
+    def test_reads_the_labels_of_the_branch_s_open_pr_in_one_call(self):
+        with self.answering(json.dumps([{"number": 7, "labels": labels("cleanup")}])):
+            self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), ["cleanup"])
         self.assertEqual(self.asked(), ["pr list --repo acme/demo --head feat/1-demo --state open --json number,labels"])
 
-    def test_a_branch_with_no_open_pr_has_none(self):
+    def test_a_branch_with_no_open_pr_has_no_label(self):
         with self.answering("[]"):
             self.assertEqual(github.branch_labels("acme/demo", "feat/1-demo"), [])
+
+    def test_a_branch_with_two_open_prs_is_a_runtime_error_since_a_branch_has_one(self):
+        answer = [{"number": 7, "labels": labels("cleanup")}, {"number": 9, "labels": []}]
+        with self.answering(json.dumps(answer)), self.assertRaises(RuntimeError) as raised:
+            github.branch_labels("acme/demo", "feat/1-demo")
+        self.assertIn("2 open PRs", str(raised.exception))
 
     def test_no_answer_or_another_shape_is_a_runtime_error(self):
         for out, code in (("", 1), ("{}", 0), ('[{"number": 7}]', 0), ("7 main", 0)):

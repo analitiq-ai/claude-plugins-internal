@@ -108,14 +108,13 @@ class Cleanup:
                 "Retry once GitHub answers.")
 
 
-def read_cleanup(labels_of: Callable[[], list[list[str]]]) -> Cleanup:
-    """`labels_of` gives the label names of each PR in question, or raises RuntimeError. There must be a PR, and each
-    must carry the label."""
+def read_cleanup(labels_of: Callable[[], list[str]]) -> Cleanup:
+    """`labels_of` gives the label names of the PR in question, or raises RuntimeError when gh cannot say them."""
     try:
         found = labels_of()
     except RuntimeError as exc:
         return Cleanup(unread=str(exc))
-    return Cleanup(labelled=bool(found) and all(map(is_cleanup, found)))
+    return Cleanup(labelled=is_cleanup(found))
 
 
 def label_names(labels) -> list[str]:
@@ -141,12 +140,15 @@ def pr_labels(slug: str, pr: int) -> list[str]:
     return label_names(found.get("labels"))
 
 
-def branch_labels(slug: str, branch: str) -> list[list[str]]:
-    """The label names of each open PR of `branch`, none when it has none; RuntimeError when gh cannot say them."""
+def branch_labels(slug: str, branch: str) -> list[str]:
+    """The label names of the open PR of `branch`, none when it has none; RuntimeError when gh cannot say them, or
+    gives more than one: a branch is merged through one PR."""
     found = _json(_answer("pr", "list", "--repo", slug, "--head", branch, "--state", "open", "--json", "number,labels"))
     if not isinstance(found, list) or not all(isinstance(pr, dict) for pr in found):
         raise RuntimeError(f"gh gave open PRs that are not a list of objects: {found!r:.200}")
-    return [label_names(pr.get("labels")) for pr in found]
+    if len(found) > 1:
+        raise RuntimeError(f"branch {branch} has {len(found)} open PRs; a branch has one")
+    return label_names(found[0].get("labels")) if found else []
 
 
 USAGE = "usage: github.py cleanup <owner/repo> <pr-number>"
@@ -158,7 +160,7 @@ def main(argv: list[str]) -> int:
     if len(argv) != 3 or argv[0] != "cleanup" or not (argv[2].isascii() and argv[2].isdigit()):
         print(USAGE, file=sys.stderr)
         return 2
-    cleanup = read_cleanup(lambda: [pr_labels(argv[1], int(argv[2]))])
+    cleanup = read_cleanup(lambda: pr_labels(argv[1], int(argv[2])))
     if cleanup.unread:
         print(cleanup.unread, file=sys.stderr)
         return 1

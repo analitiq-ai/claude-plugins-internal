@@ -111,8 +111,8 @@ def _unknown_pr(payload: dict, action: str, where: worktree.Worktree, exc: Runti
 
 
 def cleanup_of(repo: str, pr: int | None, branch: str | None) -> github.Cleanup:
-    """The cleanup fact of the PR named, else of the branch's open PRs: at least one, each labelled."""
-    return github.read_cleanup(lambda: [github.pr_labels(repo, pr)] if pr is not None
+    """The cleanup fact of the PR named, else of the branch's open PR."""
+    return github.read_cleanup(lambda: github.pr_labels(repo, pr) if pr is not None
                                else github.branch_labels(repo, branch))
 
 

@@ -362,7 +362,7 @@ def cleanup(pr: dict):
     """The cleanup fact of the PR `gh pr view` gave, as a github.Cleanup."""
     # Imported here for the reason released() imports github here.
     import github
-    return github.read_cleanup(lambda: [github.label_names(pr.get("labels"))])
+    return github.read_cleanup(lambda: github.label_names(pr.get("labels")))
 
 
 def how_to_attest(number: int, head: str, verb: str) -> str:

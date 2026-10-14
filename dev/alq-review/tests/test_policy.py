@@ -451,6 +451,13 @@ class MarkReady(unittest.TestCase):
         assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
         self.assertTrue(policy.attest(state, head_sha=HEAD_A, inflight=0, released=False).allow)
 
+    def test_an_attestation_waits_out_a_hold_and_binds_to_the_head(self):
+        state = state_with_round(head=HEAD_A)
+        assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")
+        self.assertFalse(policy.attest(state, head_sha=HEAD_A, inflight=1, released=True).allow)
+        self.assertFalse(policy.attest(state, head_sha=HEAD_B, inflight=0, released=False).allow)
+        self.assertFalse(policy.attest(verdict_locked(), head_sha=HEAD_A, inflight=0, released=True).allow)
+
     def test_allowed_when_every_finding_was_pushed_back(self):
         state = state_with_round(head=HEAD_A)
         assess(state, "CONVERGED_PUSHBACK", finding_verdict="PUSH_BACK")

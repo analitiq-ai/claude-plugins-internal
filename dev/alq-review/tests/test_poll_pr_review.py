@@ -884,6 +884,17 @@ class CleanupPoll(PollerRun):
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertNotIn(self.ANNOUNCED, done.stdout)
 
+    def test_any_reader_answer_but_cleanup_or_gated_on_exit_0_is_warned_of(self):
+        python3 = self.tmp / "bin" / "python3"
+        python3.write_text('#!/bin/sh\ncase "$1" in */github.py) printf %s "$FAKE_READER_OUT"; exit "$FAKE_READER_EXIT";; esac\n'
+                           f'exec {sys.executable} "$@"\n')
+        python3.chmod(0o755)
+        for code, out in ((0, ""), (0, "yes"), (0, "cleanup\ngated"), (2, "usage"), (127, "not found")):
+            with self.subTest(code=code, out=out):
+                done = self.poll(snapshot(merge="DRAFT"), env_extra={"FAKE_READER_EXIT": str(code), "FAKE_READER_OUT": out})
+                self.assertIn(f"WARNING: the cleanup label of {REPO}#{PR} could not be read (", done.stderr)
+                self.assertNotIn(self.ANNOUNCED, done.stdout)
+
     def test_an_unlabelled_pr_is_polled_as_before(self):
         done = self.poll(snapshot(merge="DRAFT"), env_extra={"FAKE_GH_LABELS": "bug"})
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)

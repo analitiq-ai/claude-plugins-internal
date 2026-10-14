@@ -395,9 +395,11 @@ settle() {
 }
 
 cleanup=false
-if verdict=$(python3 "$LABELS" cleanup "$repo" "$pr" 2>&1); then
-  [ "$verdict" = cleanup ] && cleanup=true
-else
+# Only exit 0 with exactly `cleanup` or `gated` is a label that was read.
+verdict=$(python3 "$LABELS" cleanup "$repo" "$pr" 2>&1) && read_ok=true || read_ok=false
+if [ "$read_ok" = true ] && [ "$verdict" = cleanup ]; then
+  cleanup=true
+elif [ "$read_ok" = false ] || [ "$verdict" != gated ]; then
   echo "WARNING: the cleanup label of $repo#$pr could not be read ($verdict); polling it as unlabelled." >&2
 fi
 if [ "$cleanup" = true ]; then

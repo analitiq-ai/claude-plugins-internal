@@ -662,6 +662,12 @@ class CleanupPr(Hook):
                 self.assertTrue(said.startswith("The `cleanup` label could not be read ("), said)
                 self.assertNotIn("No internal-review attestation", said)
 
+    def test_an_attested_or_released_pr_merges_whether_or_not_its_label_was_read(self):
+        for attested, runs in ((True, ()), (False, [gate_run()])):
+            with self.subTest(attested=attested):
+                self.github_has(attested=attested, runs=runs, labels=None)
+                self.assertIsNone(self.merge(PLAIN))
+
     def test_a_release_still_merges_without_the_label(self):
         self.github_has(runs=[gate_run()])
         self.assertIsNone(self.merge(PLAIN))
