@@ -35,5 +35,7 @@
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
 - One reading to confirm at grill, recorded under Assumptions: "changes a spec.md" in ADR-0020 decision 4 is read
   as adds or modifies, so a spec folder's retirement with its citations stays one PR.
+- User Story 3 changed on 2026-10-14 (Clarifications): the gate checks and releases, the session rebases and pushes.
+  The items above were re-read against it and still hold.
 - `rootcause.py check` and `premise_report.py spec` were not run in the session that wrote this spec (the command
   needed an approval the session could not get); the sections were written to their documented form.

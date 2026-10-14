@@ -20,8 +20,8 @@ grep -rn 'spec_blob\|spec_held\|text_step' plugins/alq-review ; test $? -eq 1
 ## Red first
 
 Before each story's code, run its new tests and read the failure: an `AttributeError` for a function not yet there, an
-`assertEqual` on a decision that is `None` where a deny is expected, a `KeyError` on `rebase`. A test that passes before its
-code is wrong.
+`assertEqual` on a decision that is `None` where a deny is expected, a `KeyError` on `rebased_onto`. A test that passes before
+its code is wrong.
 
 ## End to end (manual, after each story merges)
 
@@ -31,14 +31,11 @@ code is wrong.
 2. **US2.** On a draft PR bound to a folder, merge a spec change into its branch and launch review-round: the round opens; the
    ledger (`python3 scripts/ledger.py status --worktree <root>`) shows `spec` and no `spec_blob`.
 3. **US3.** Have a round ruled `RESHAPE_SPEC`. The refusal names `123-spec`, `rebase <ref>` and `unlock <ref>`. Type `rebase
-   #<pr>` before the spec PR merges: the reply says it has not reached the default branch. Merge a spec-only PR, type it again:
-   the branch is rebased in a worktree under the git dir and pushed, the story checkout moves to the pushed commit, the lock is
-   released, and the worktree is gone. With a conflicting change on the default branch, the reply dispatches the conflict
-   resolver into that worktree; the story checkout does not change and the lock holds every other edit; the push, the move and
-   the release follow its `--continue`. Push to the remote branch between the hook's fetch and its push: the push is refused,
-   nothing is forced, and the story checkout is where it was; type it again: the reply says to pull; pull, type it again: it
-   completes. Kill the hook after its push has landed: `rebase #<pr>` again releases without rebasing again. The next round
-   launched is a full round.
+   #<pr>` before the spec PR merges: the reply says it has not reached the default branch, and the lock stays. Merge a
+   spec-only PR, type it again: the lock is released, the ledger shows `rebased_onto`, the reply gives the session the rebase,
+   the conflict-resolver dispatch and the push, and nothing in git has changed. Launch review-round before rebasing: refused,
+   rebase onto `origin/<default>` first. Rebase (with a conflicting change on the default branch, dispatch the conflict
+   resolver as the reply says), push, launch again: a full round.
 4. **US4.** Commit a spec.md change and a code change on one branch and launch: refused naming both; `gh pr ready`: refused
    the same way. Split them: both pass.
 5. **US5.** `/alq-plan:issue-spec rescope specs/123-y #123`: the run works in `.claude/worktrees/123-spec`, ends with the
