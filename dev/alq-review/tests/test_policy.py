@@ -5,6 +5,7 @@ from helpers import REVIEWERS, T0, add_round, assess, state_with_round
 
 import ledger
 import policy
+import reshape
 
 HEAD_A, HEAD_B = "a" * 40, "b" * 40
 SPEC = "specs/019-demo"
@@ -165,6 +166,24 @@ class Mutation(unittest.TestCase):
         self.assertFalse(mutation(state).allow)
         ledger.unlock(state, "user decided", now=T0 + timedelta(hours=1))
         self.assertTrue(mutation(state).allow)
+
+    def test_a_failed_reshape_notice_is_named_in_the_lock_and_releases_nothing(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        rnd = state["rounds"][-1]
+        rnd["notice"] = {"issue": 123, "comment": {"done": True}, "edit": {"error": "no such label"}}
+        refused = mutation(state)
+        self.assertFalse(refused.allow)
+        self.assertIn(reshape.notice_failures("acme/demo", rnd), refused.reason)
+        ledger.unlock(state, "user decided", now=T0 + timedelta(hours=1))
+        self.assertTrue(mutation(state).allow)
+
+    def test_a_notice_whose_calls_were_done_adds_nothing_to_the_lock(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        unnoticed = mutation(state).reason
+        state["rounds"][-1]["notice"] = {"issue": 123, "comment": {"done": True}, "edit": {"done": True}}
+        self.assertEqual(mutation(state).reason, unnoticed)
 
     def test_a_lock_tells_the_agent_to_ask_the_user_for_the_unlock(self):
         """The agent is the only one who sees the refusal; the user unlocks only if the agent asks."""

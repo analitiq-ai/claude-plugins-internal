@@ -24,11 +24,13 @@ import claimgate
 import decisions
 import facts
 import github
-from hookio import (block, block_decision, claim_checks_mode, deny, log_error, max_review_files, mode, record, refuse,
-                    refuse_decision, session_file, session_state, set_switch, shim_checks_mode, switch_state)
+from hookio import (block, block_decision, claim_checks_mode, deny, escalate_to, log_error, max_review_files, mode,
+                    record, refuse, refuse_decision, session_file, session_state, set_switch, shim_checks_mode,
+                    switch_state)
 import ledger
 import policy
 from pre_merge_gate import PullRequest, first_line, first_words
+import reshape
 import shimgate
 import shell
 import specbinding
@@ -126,14 +128,13 @@ def _names(state: dict, word: str) -> bool:
 
 
 def _reshape_brief(state: dict, ruling: dict) -> str:
-    """The RESHAPE_SPEC ruling the user carries to planning by hand: nothing else hands it over."""
-    opened = f"It was held by a RESHAPE_SPEC ruling. Open decision: {ruling['user_decision']}"
-    spec = briefs.bound_spec(state)
-    if not isinstance(spec, specbinding.Folder):
-        return (f"{opened} This PR has no spec. Close it and restart the work on a new PR bound to a spec that settles "
-                "this decision.")
-    gaps = "; ".join(f"{f['mechanism']} ({f['spec_ref']})" for f in ruling["findings"] if f["kind"] == "spec_gap")
-    return (f"{opened} Why: {ruling['rationale']} Spec gaps: {gaps or 'none named'}. Spec folder: {spec.path}.")
+    """The RESHAPE_SPEC ruling the user carries to planning, and what its notice on the spec's issue failed to do."""
+    folder = briefs.spec_folder(state)
+    if folder is None:
+        return (f"It was held by a RESHAPE_SPEC ruling. Open decision: {ruling['user_decision']} This PR has no spec. "
+                "Close it and restart the work on a new PR bound to a spec that settles this decision.")
+    failed = reshape.notice_failures(state["repo"], ledger.current_round(state))
+    return f"It was held by a RESHAPE_SPEC ruling. {reshape.summary(folder, ruling)} {failed}".rstrip()
 
 
 SWITCHED_OFF_WORKFLOWS = (*ROUND_WORKFLOWS, claimgate.CHECK, shimgate.CHECK)
@@ -722,9 +723,13 @@ def after_structured_output(payload: dict) -> None:
         return
     ref, agent_type = found
     now = datetime.now(timezone.utc)
+    owed = None
     with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
         if agent_type == briefs.ASSESSOR:
             rnd = ledger.record_assessment(state, ref, payload["tool_input"], now)
+            folder = briefs.spec_folder(state)
+            if rnd["assessment"]["round_verdict"] == "RESHAPE_SPEC" and folder is not None:
+                owed = ledger.claim_notice(state, ref, reshape.notice(folder))
         else:
             rnd = ledger.record_report(state, ref, agent_type, payload["tool_input"], now)
     record(payload, "output", "recorded", f"{ref} is {rnd['status']}")
@@ -734,6 +739,27 @@ def after_structured_output(payload: dict) -> None:
         rulings = [{"id": f["id"], "verdict": f["verdict"]} for f in payload["tool_input"]["findings"] if f["id"] in raised]
         record(payload, "decision-review", "assessed", json.dumps(rulings),
                Target(state["repo"], state["pr"], state["branch"]))
+    # Last: its gh calls may run out the hook's time, and nothing recorded above should wait on them.
+    if owed is not None and owed["issue"] is not None:
+        _post_notice(ref, state["repo"], owed["issue"], reshape.comment(folder, state["pr"], rnd))
+
+
+def _post_notice(ref: str, slug: str, issue: int, body: str) -> None:
+    """Tells the spec's issue of round `ref`'s RESHAPE_SPEC ruling: one comment, then one edit whatever the comment's
+    answer, each tried once. Outside any ledger transaction: each gh call may take its whole timeout."""
+    answers = {}
+    try:
+        github.comment_issue(slug, issue, body)
+        answers["comment"] = {"done": True}
+    except RuntimeError as exc:
+        answers["comment"] = {"error": str(exc)}
+    try:
+        github.escalate_issue(slug, issue, reshape.LABEL, escalate_to())
+        answers["edit"] = {"done": True}
+    except (RuntimeError, ValueError) as exc:
+        answers["edit"] = {"error": str(exc)}
+    with ledger.open_ledger(*ledger.parse_ref(ref)) as state:
+        ledger.record_notice(state, ref, answers)
 
 
 PRE = {"Edit": on_edit, "Write": on_edit, "NotebookEdit": on_edit, "Bash": on_bash, "Agent": on_agent,

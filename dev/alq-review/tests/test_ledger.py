@@ -76,6 +76,37 @@ class Rounds(unittest.TestCase):
         self.assertEqual([(a["id"], a["verdict"]) for a in ledger.adjudicated(state)], [("code-reviewer-1", "PUSH_BACK")])
 
 
+
+class Notices(unittest.TestCase):
+    """A RESHAPE_SPEC ruling's notice: claimed once with the ruling, its GitHub answers stored once after."""
+    OWED = {"issue": 123, "comment": None, "edit": None}
+
+    def ruled(self):
+        state = state_with_round()
+        assess(state, "RESHAPE_SPEC")
+        return state, state["rounds"][-1]["ref"]
+
+    def test_the_first_claim_sets_the_notice_and_a_second_claims_nothing(self):
+        state, ref = self.ruled()
+        self.assertEqual(ledger.claim_notice(state, ref, dict(self.OWED)), self.OWED)
+        self.assertIsNone(ledger.claim_notice(state, ref, {"issue": 9, "comment": None, "edit": None}))
+        self.assertEqual(state["rounds"][-1]["notice"], self.OWED)
+
+    def test_each_answer_is_stored_once(self):
+        state, ref = self.ruled()
+        ledger.claim_notice(state, ref, dict(self.OWED))
+        answers = {"comment": {"done": True}, "edit": {"error": "no such label"}}
+        ledger.record_notice(state, ref, answers)
+        self.assertEqual(state["rounds"][-1]["notice"], dict(self.OWED, **answers))
+        with self.assertRaisesRegex(ledger.LedgerError, "already"):
+            ledger.record_notice(state, ref, answers)
+
+    def test_answers_for_a_notice_never_claimed_are_refused(self):
+        state, ref = self.ruled()
+        with self.assertRaisesRegex(ledger.LedgerError, "no notice"):
+            ledger.record_notice(state, ref, {"comment": {"done": True}, "edit": {"done": True}})
+
+
 class Polls(unittest.TestCase):
     def test_new_threads_open_a_github_round_awaiting_assessment(self):
         state = ledger.new_state("acme/demo", "feat/1-demo")

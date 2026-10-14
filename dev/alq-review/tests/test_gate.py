@@ -29,6 +29,7 @@ import helpers
 import hookio
 import ledger
 import policy
+import reshape
 import test_policy
 
 SCRIPTS = PLUGIN / "scripts"
@@ -45,11 +46,15 @@ class Gate(Repo):
         self.head = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
         self.serve_remote()
         # No network in tests: gh knows the branch's open PR ("<number> <base>", PR 7 by default; empty for none),
-        # and, when GH_ISSUE_STATE is set, every issue's state; every other lookup sees a gh that cannot answer.
+        # and, when GH_ISSUE_STATE is set, every issue's state. An issue comment or edit succeeds unless
+        # GH_FAIL_COMMENT or GH_FAIL_EDIT holds the error gh is to fail with; every other lookup sees a gh that
+        # cannot answer.
         stub = Path(self.tmp.name) / "bin"
         stub.mkdir()
         (stub / "gh").write_text('#!/bin/sh\necho "$*" >> "$GH_LOG"\ncase "$*" in\n  "pr list"*) echo "$GH_OPEN_PR" ;;\n'
                                  '  "issue view"*) [ -n "$GH_ISSUE_STATE" ] && echo "$GH_ISSUE_STATE" || exit 1 ;;\n'
+                                 '  "issue comment"*) if [ -n "$GH_FAIL_COMMENT" ]; then echo "$GH_FAIL_COMMENT" >&2; exit 1; fi ;;\n'
+                                 '  "issue edit"*) if [ -n "$GH_FAIL_EDIT" ]; then echo "$GH_FAIL_EDIT" >&2; exit 1; fi ;;\n'
                                  '  *) exit 1 ;;\nesac\n')
         (stub / "gh").chmod(0o755)
         # The machine's own org corpus and decision setting are not the test's.
@@ -1916,6 +1921,27 @@ class DecisionReview(Gate):
         self.assertEqual(json.loads(line["reason"]), [{"id": "decision-reviewer-1", "verdict": "PUSH_BACK"}])
         self.assertEqual((line["repo"], line["pr"]), ("acme/demo", 7))
 
+    def test_a_reshape_notice_that_fails_to_record_still_leaves_the_rulings_logged(self):
+        """The notice's GitHub calls and their ledger write come last: nothing they do can lose the log line."""
+        needs_adr(self)
+        folder = "dev/demo/specs/123-login"
+        (self.root / folder).mkdir(parents=True)
+        self.commit(f"{folder}/spec.md", "# Login\n", "docs: spec")
+        self.change()
+        _, args = self.launch(spec=folder)
+        found = [{"id": "decision-reviewer-1", "title": '"Keep src small"', "file": "src/a.py", "line": 1,
+                  "severity": "HIGH", "detail": "docs/adr 0001"}]
+        for reviewer in args["waves"][0]:
+            self.report(reviewer, found if reviewer["type"] == self.DECISION else [], args["round_ref"])
+        body = self.assessment(args["round_ref"], ["decision-reviewer-1"], verdict="RESHAPE_SPEC")
+        body.update(user_decision="which root is canonical?")
+        body["findings"][0]["kind"] = "spec_gap"
+        with mock.patch("ledger.record_notice", side_effect=ledger.LedgerError("simulated")), \
+                self.assertRaises(ledger.LedgerError):
+            self.submit_assessment(body)
+        [line] = [e for e in self.gate_log() if e["action"] == "decision-review"]
+        self.assertEqual(json.loads(line["reason"]), [{"id": "decision-reviewer-1", "verdict": "FIX"}])
+
     def test_a_change_nothing_governs_gets_no_decision_reviewer_and_says_what_was_checked(self):
         needs_adr(self)
         self.change("lib/b.py")
@@ -2082,6 +2108,218 @@ class DecisionReview(Gate):
     def test_the_decision_reviewer_is_not_dispatched_alone(self):
         out = self.hook("PreToolUse", "Agent", {"subagent_type": self.DECISION, "prompt": "review"})
         self.assertEqual(self.decision(out), "deny")
+
+
+class ReshapeNotice(Gate):
+    """A RESHAPE_SPEC ruling on a PR bound to a spec folder tells the spec's issue: one comment, then one edit adding
+    the reshape_spec label and the escalate_to assignee. A failed call is said wherever the lock is."""
+    FOLDER = "dev/demo/specs/123-login"
+    COMMENT, EDIT = "issue comment 123 --repo acme/demo", "issue edit 123 --repo acme/demo"
+
+    def setUp(self):
+        super().setUp()
+        self.with_spec(self.FOLDER)
+
+    def with_spec(self, folder):
+        (self.root / folder).mkdir(parents=True, exist_ok=True)
+        self.head = self.commit(f"{folder}/spec.md", "# Login\n", "docs: spec")
+
+    def awaiting(self, spec=FOLDER):
+        """A round on PR 7, bound to `spec`, whose one finding awaits assessment; its review-round args."""
+        _, args = self.launch(spec=spec)
+        first = args["waves"][0][0]
+        found = [{"id": f"{first['short']}-1", "title": "t", "file": "b.py", "line": 3, "severity": "HIGH", "detail": "d"}]
+        self.run_reviewers(args, found)
+        return args, found[0]["id"]
+
+    def ruling(self, args, finding, verdict="RESHAPE_SPEC"):
+        body = self.assessment(args["round_ref"], [finding], verdict)
+        if verdict in ("RESHAPE_SPEC", "ESCALATE"):
+            body.update(user_decision="which root is canonical?", rationale="two rounds chose different roots")
+            body["findings"][0].update(kind="spec_gap", mechanism="the canonical root is chosen round by round",
+                                       spec_ref="FR-3")
+        if verdict == "REDESIGN":
+            body.update(invariant="one structure")
+        return body
+
+    def rule(self, verdict="RESHAPE_SPEC", spec=FOLDER, mode=None):
+        args, finding = self.awaiting(spec)
+        body = self.ruling(args, finding, verdict)
+        pre = self.hook("PreToolUse", "StructuredOutput", body, agent_id="a9", agent_type="alq-review:assessor", mode=mode)
+        self.assertNotEqual(self.decision(pre), "deny", self.reason(pre))
+        self.hook("PostToolUse", "StructuredOutput", body, agent_id="a9", agent_type="alq-review:assessor", mode=mode)
+        return body
+
+    def gh_calls(self, *prefixes):
+        """The issue comment and edit calls gh was asked to make, in order: the first words of each."""
+        log = Path(self.env["GH_LOG"])
+        lines = log.read_text().splitlines() if log.exists() else []
+        return [line for line in lines if line.startswith(prefixes or ("issue comment", "issue edit"))]
+
+    def notice(self):
+        return self.saved()["rounds"][-1].get("notice")
+
+    def say(self, prompt):
+        return self.hook("UserPromptSubmit", prompt=prompt).get("hookSpecificOutput", {}).get("additionalContext", "")
+
+    def test_a_direct_assess_launch_and_a_review_launch_carry_the_bound_folder(self):
+        args, _ = self.awaiting()
+        self.assertEqual(args["spec_folder"], self.FOLDER)
+        self.assertEqual(self.launch(ASSESS)[1]["spec_folder"], self.FOLDER)
+
+    def test_a_pr_bound_to_no_spec_carries_null(self):
+        args, _ = self.awaiting(spec=None)
+        self.assertIsNone(args["spec_folder"])
+        self.assertIsNone(self.launch(ASSESS)[1]["spec_folder"])
+
+    def test_the_ruling_posts_the_comment_then_one_edit_adding_the_label_and_assignee(self):
+        body = self.rule()
+        calls = self.gh_calls()
+        self.assertEqual([c.split(" --")[0] for c in calls], ["issue comment 123", "issue edit 123"])
+        self.assertTrue(calls[0].startswith(f"{self.COMMENT} --body alq-review ruled #7, internal round 1 RESHAPE_SPEC"))
+        self.assertEqual(calls[1], f"{self.EDIT} --add-label reshape_spec --add-assignee {hookio.escalate_to()}")
+        self.assertIn(reshape.summary(self.FOLDER, body), Path(self.env["GH_LOG"]).read_text())
+        self.assertEqual(self.notice(), {"issue": 123, "comment": {"done": True}, "edit": {"done": True}})
+
+    def test_the_same_ruling_delivered_again_makes_no_call(self):
+        body = self.rule()
+        self.hook("PostToolUse", "StructuredOutput", body, agent_id="a9", agent_type="alq-review:assessor")
+        self.edit()
+        self.assertEqual(len(self.gh_calls()), 2)
+
+    def test_a_later_reshape_ruling_on_the_same_pr_gets_its_own_notice(self):
+        self.rule()
+        # An unlock stamped the ruling's second releases nothing; the user's comes after.
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.current_round(state)["assessed_at"] = ledger.stamp(helpers.T0)
+        self.say("unlock #7")
+        self.commit("c.py", "c\n", "feat: c")
+        self.rule()
+        self.assertEqual([c.split(" --")[0] for c in self.gh_calls()],
+                         ["issue comment 123", "issue edit 123", "issue comment 123", "issue edit 123"])
+
+    def test_no_other_verdict_posts(self):
+        for pr, verdict in enumerate(("PATCH", "ESCALATE", "REDESIGN"), 8):
+            with self.subTest(verdict=verdict):
+                self.env["GH_OPEN_PR"] = f"{pr} main"
+                self.rule(verdict)
+                self.assertEqual(self.gh_calls(), [])
+                self.assertIsNone(self.notice())
+
+    def test_a_changed_spec_holds_the_pr_and_posts_nothing(self):
+        _, args = self.launch(spec=self.FOLDER)
+        self.run_reviewers(args, [])
+        self.commit(f"{self.FOLDER}/spec.md", "# Login, changed\n", "docs: change the spec")
+        self.assertEqual(self.decision(self.launch(spec=self.FOLDER)[0]), "deny")
+        self.assertEqual(self.gh_calls(), [])
+
+    def test_a_pr_bound_to_no_spec_posts_nothing_and_its_unlock_says_to_restart(self):
+        self.rule(spec=None)
+        self.assertEqual(self.gh_calls(), [])
+        self.assertIn("This PR has no spec. Close it and restart", self.say("unlock #7"))
+
+    def test_a_folder_naming_no_issue_posts_nothing_and_the_lock_says_so(self):
+        self.with_spec("dev/demo/specs/020-decision-review")
+        self.rule(spec="dev/demo/specs/020-decision-review")
+        self.assertEqual(self.gh_calls(), [])
+        self.assertIn("spec folder dev/demo/specs/020-decision-review names no issue", self.reason(self.edit()))
+
+    def test_log_mode_still_posts(self):
+        self.rule(mode="log")
+        self.assertEqual(len(self.gh_calls()), 2)
+
+    def test_an_escalate_to_that_cannot_be_read_fails_the_edit_and_not_the_comment(self):
+        with mock.patch("config.load", return_value=dict(json.loads((PLUGIN / "config.json").read_text()),
+                                                          escalate_to=" ")):
+            self.rule()
+        self.assertEqual([c.split(" --")[0] for c in self.gh_calls()], ["issue comment 123"])
+        self.assertEqual(self.notice()["comment"], {"done": True})
+        self.assertIn("escalate_to", self.notice()["edit"]["error"])
+        self.assertIn("escalate_to", self.reason(self.edit()))
+
+    def test_a_failed_edit_is_said_in_the_lock_refusal_and_the_unlock_reply_and_never_retried(self):
+        self.env["GH_FAIL_EDIT"] = "could not add label: 'reshape_spec' not found"
+        self.rule()
+        self.assertEqual(self.notice()["comment"], {"done": True})
+        refusal = self.reason(self.edit())
+        self.assertEqual(self.decision(self.edit()), "deny")
+        for said in (refusal, self.say("unlock #7")):
+            with self.subTest(said=said[:40]):
+                self.assertIn("acme/demo#123", said)
+                self.assertIn("could not add label: 'reshape_spec' not found", said)
+        self.assertEqual(len(self.gh_calls()), 2)
+
+    def test_a_failed_comment_still_makes_the_edit(self):
+        self.env["GH_FAIL_COMMENT"] = "HTTP 502"
+        self.rule()
+        self.assertEqual([c.split(" --")[0] for c in self.gh_calls()], ["issue comment 123", "issue edit 123"])
+        self.assertIn("HTTP 502", self.notice()["comment"]["error"])
+        self.assertEqual(self.notice()["edit"], {"done": True})
+
+    def test_a_notice_done_adds_nothing_to_the_refusal_or_the_unlock(self):
+        self.rule()
+        for said in (self.reason(self.edit()), self.say("unlock #7")):
+            with self.subTest(said=said[:40]):
+                self.assertNotIn("RESHAPE_SPEC notice", said)
+
+    def test_an_answer_never_recorded_is_said_in_the_refusal_and_the_unlock_reply(self):
+        self.rule()
+        with mock.patch.dict(os.environ, {"ALQ_REVIEW_STATE_DIR": str(self.state_dir)}):
+            with ledger.open_ledger("acme/demo", 7) as state:
+                ledger.current_round(state)["notice"].update(comment=None, edit=None)
+        for said in (self.reason(self.edit()), self.say("unlock #7")):
+            with self.subTest(said=said[:40]):
+                self.assertIn("acme/demo#123: GitHub's answer to the comment was not recorded", said)
+
+    def test_the_unlock_reply_carries_the_comments_summary_word_for_word(self):
+        body = self.rule()
+        self.assertIn(reshape.summary(self.FOLDER, body), self.say("unlock #7"))
+
+
+class EscalateTo(unittest.TestCase):
+    """config.json names the account escalated work is handed to; nothing in code does, and nothing defaults it."""
+
+    def test_it_is_the_configured_account(self):
+        with mock.patch("config.load", return_value={"escalate_to": "someone"}):
+            self.assertEqual(hookio.escalate_to(), "someone")
+
+    def test_a_missing_or_blank_account_is_refused_by_name(self):
+        for config in ({}, {"escalate_to": ""}, {"escalate_to": "  "}, {"escalate_to": 7}):
+            with self.subTest(config=config), mock.patch("config.load", return_value=config):
+                with self.assertRaisesRegex(ValueError, "escalate_to"):
+                    hookio.escalate_to()
+
+
+class AssessRoundResult(unittest.TestCase):
+    """assess-round returns the bound spec folder it was given, by either launch path."""
+
+    def run_script(self, name, args, answers):
+        done = subprocess.run(["node", str(HARNESS), str(PLUGIN / "workflows" / name)],
+                              input=json.dumps({"args": args, "answers": answers}), capture_output=True, text=True,
+                              check=True)
+        return json.loads(done.stdout)
+
+    def test_an_assessed_result_returns_the_folder_beside_the_ruling(self):
+        ruling = {"round_verdict": "RESHAPE_SPEC", "next_step": "n", "user_decision": "q", "rationale": "r",
+                  "findings": [{"id": "f-1", "kind": "spec_gap", "mechanism": "m", "spec_ref": "FR-3"}]}
+        schema = {"properties": {"findings": {"items": {"properties": {"id": {}}}}}}
+        args = {"assess": {"prompt": "p", "schema": schema}, "findings": [{"id": "f-1"}],
+                "spec_folder": "specs/123-login"}
+        result = self.run_script("assess-round.js", args, {"alq-review:assessor": ruling})["result"]
+        self.assertEqual((result["status"], result["spec_folder"]), ("ASSESSED", "specs/123-login"))
+        self.assertEqual(result["assessment"]["findings"], ruling["findings"])
+
+    def test_review_round_hands_the_folder_to_the_nested_assessment(self):
+        reviewer = {"type": "pr-review-toolkit:code-reviewer", "short": "code-reviewer", "prompt": "p",
+                    "schema": {"properties": {}}}
+        args = {"round_ref": "acme/demo#7:internal-0.1", "label": "l", "waves": [[reviewer]], "assess": {},
+                "spec_folder": "specs/123-login"}
+        answers = {"pr-review-toolkit:code-reviewer": {"findings": [{"id": "code-reviewer-1"}]},
+                   "alq-review:assess-round": {"status": "ASSESSED"}}
+        calls = self.run_script("review-round.js", args, answers)["calls"]
+        nested = [c for c in calls if c.get("workflow") == "alq-review:assess-round"]
+        self.assertEqual([c["args"]["spec_folder"] for c in nested], ["specs/123-login"])
 
 
 class ReviewRoundResult(unittest.TestCase):

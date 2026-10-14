@@ -22,4 +22,4 @@ const assessment = await agent(
 if (!assessment) {
   return { status: 'INCOMPLETE', next_step: 'The assessor did not report. Launch alq-review:assess-round again.' }
 }
-return { status: 'ASSESSED', round_verdict: assessment.round_verdict, next_step: assessment.next_step, user_decision: assessment.user_decision, assessment, findings: args.findings }
+return { status: 'ASSESSED', round_verdict: assessment.round_verdict, next_step: assessment.next_step, user_decision: assessment.user_decision, assessment, findings: args.findings, spec_folder: args.spec_folder }
