@@ -114,10 +114,15 @@ class IssueSpecSkill(unittest.TestCase):
                       "command, then append", rescope)
         self.assertLess(rescope.index("`gh issue view`"), rescope.index("`Open decision: …`"))
 
-    def test_no_spec_needed_tells_the_user_to_pass_a_null_spec_at_review(self):
+    def test_no_spec_needed_says_the_folder_was_written_and_tells_the_user_to_pass_a_null_spec_at_review(self):
         """The one value review will take for this PR; nothing else tells the user."""
         said = [s for s in re.split(r"(?<=\.)\s+", squashed(ISSUE_SPEC)) if s.startswith("After `no spec needed`")]
-        self.assertTrue([s for s in said if "tell the user to pass `spec: null` when the work is reviewed" in s], said)
+        self.assertTrue([s for s in said if "the workflow has written `SPEC_DIR` with a spec.md that says no spec is "
+                         "needed" in s and "tell the user to pass `spec: null` when the work is reviewed" in s], said)
+
+    def test_a_rescope_of_a_no_spec_folder_is_expected_to_pause_at_the_premise(self):
+        self.assertIn("on a rescope of a spec, `paused` at `grill`, and the next step is 4; on a rescope of a folder "
+                      "whose spec.md says no spec is needed, `paused` at `premise`.", squashed(ISSUE_SPEC))
 
     def test_every_issue_view_names_the_repo_by_origins_url(self):
         """The same repo the workflow closes a not-worth-doing issue in. origin is read before gh runs: a failed read

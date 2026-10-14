@@ -20,6 +20,7 @@ from test_rootcause import SPEC as SPEC_WITH
 
 import yaml  # Spec Kit's own dependency
 
+import no_spec
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
 
 SKILL = PLUGIN / "skills" / "issue-spec"
@@ -389,6 +390,9 @@ class Install(unittest.TestCase):
         """No step reads its folder from feature.json; a rescope writes it for Spec Kit's own commands."""
         self.assertEqual([s["id"] for s in workflow_steps() if "feature.json" in s.get("run", "")], ["select-spec"])
 
+    def test_one_step_writes_every_no_spec_spec_md(self):
+        self.assertEqual(len([s for s in workflow_steps() if '/scripts/no_spec.py" write' in s.get("run", "")]), 1)
+
     def test_the_workflow_runs_the_plugins_scripts_under_the_plan_root_the_driver_sets(self):
         """The steps run in the project, which has no copy of the plugin's scripts; the driver says where they are."""
         self.assertEqual([s["id"] for s in workflow_steps() if "ALQ_REVIEW_ROOT" in s.get("run", "")], [])
@@ -519,12 +523,25 @@ class Premise(unittest.TestCase):
         self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
         self.assertIn("HTTP 502", report["stderr"])
 
-    def test_no_spec_needed_calls_github_for_nothing_and_writes_no_spec(self):
+    def test_no_spec_needed_writes_the_folder_with_only_a_no_spec_spec_md_and_calls_github_for_nothing(self):
         report = self.stop(NO_SPEC)
         self.assertEqual(report["status"], "completed", report)
         self.assertEqual(self.project.gh_calls(), [])
         self.assertEqual(self.project.prompts.read_text(), "")
-        self.assertFalse((self.project.root / "specs").exists())
+        self.assertEqual(self.project.folders(), ["7-new"])
+        self.assertEqual([p.name for p in (self.project.root / NEW).iterdir()], ["spec.md"])
+        text = (self.project.root / NEW / "spec.md").read_text()
+        self.assertTrue(no_spec.is_no_spec(text), text)
+        for line in ("Rests on: needs-spec", f"Reason: {self.REASON}"):
+            self.assertIn(line, text.splitlines())
+
+    def test_an_issue_judged_to_need_no_spec_is_not_scoped_again(self):
+        self.stop(NO_SPEC)
+        proc, report = self.project.drive("start", self.project.spec_file(ISSUE_TEXT), ISSUE, "specs/7-other")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("failed", "check-folder"), report)
+        self.assertIn(f"`rescope {NEW} #{ISSUE}`", report["stderr"])
+        self.assertEqual(self.project.folders(), ["7-new"])
 
     def test_writing_the_spec_hands_specify_the_report_and_pauses_at_grill(self):
         report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
@@ -579,6 +596,58 @@ class Premise(unittest.TestCase):
                 report = self.resume("grill_verdict=approve")
                 self.assertEqual((report["status"], report["step"]), ("failed", "root-cause-after-grill"), report)
                 self.assertIn(said, report["stderr"])
+
+
+class NoSpecRescope(unittest.TestCase):
+    """A rescope of a no-spec folder runs the new-scope workflow from the premise into that same folder."""
+    REASON = "a typo, fixed by the request"
+
+    def setUp(self):
+        self.project = Project(no_spec.text(premise_report_text(NO_SPEC, rests_on="needs-spec", reason=self.REASON,
+                                                                wrong="no")))
+        self.addCleanup(self.project.close)
+        self.project.with_specify(writes_to=SPEC_DIR)
+        proc, self.started = self.project.drive("rescope", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.report_path = self.project.root / f".specify/workflows/runs/{self.started['run_id']}/premise-report.md"
+
+    def resume(self, verdict, report_text=None):
+        if report_text is not None:
+            self.report_path.write_text(report_text)
+        proc, report = self.project.drive("resume", self.started["run_id"], verdict)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return report
+
+    def spec(self):
+        return (self.project.root / SPEC_DIR / "spec.md").read_text()
+
+    def test_it_pauses_at_the_premise_with_the_folder_untouched(self):
+        self.assertEqual((self.started["status"], self.started["step"]), ("paused", "premise"), self.started)
+        self.assertEqual(self.project.prompts.read_text(), "")
+        self.assertTrue(no_spec.is_no_spec(self.spec()))
+
+    def test_writing_the_spec_has_specify_write_over_the_no_spec_spec_md_in_that_folder(self):
+        report = self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        self.assertEqual((report["status"], report["step"]), ("paused", "grill"), report)
+        self.assertEqual([env for env, _ in self.project.specify_given()], [SPEC_DIR])
+        self.assertEqual(self.spec(), TRACED)
+        self.assertEqual(self.project.folders(), ["7-demo"])
+
+    def test_after_grill_it_is_graded_as_a_new_spec_against_its_premise_report(self):
+        """It has a premise report, unlike a rescope of a spec, so its premise answers are graded."""
+        self.resume(f"premise_verdict={WRITE}", premise_report_text())
+        (self.project.root / SPEC_DIR / "spec.md").write_text(UNANSWERED)
+        report = self.resume("grill_verdict=approve")
+        self.assertEqual((report["status"], report["step"]), ("failed", "premise-answers-after-grill"), report)
+
+    def test_no_spec_needed_again_has_the_writer_write_it_again_from_the_new_report(self):
+        report = self.resume(f"premise_verdict={NO_SPEC}", premise_report_text(
+            NO_SPEC, rests_on="change-alters", reason="the request fixes it", wrong="no"))
+        self.assertEqual(report["status"], "completed", report)
+        self.assertTrue(no_spec.is_no_spec(self.spec()))
+        self.assertIn("Reason: the request fixes it", self.spec().splitlines())
+        self.assertEqual([p.name for p in (self.project.root / SPEC_DIR).iterdir()], ["spec.md"])
+        self.assertEqual((self.project.prompts.read_text(), self.project.gh_calls()), ("", []))
 
 
 class Report(unittest.TestCase):

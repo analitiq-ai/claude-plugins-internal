@@ -1,7 +1,8 @@
 """spec_folder.py: the one check of the run's folder input before anything is written, and of the folder `specify`
 recorded after it ran.
 
-Both checks are pure: they are handed what the project's `specs/` and `.specify/feature.json` hold, and read nothing.
+The checks are pure: they are handed what the project's `specs/`, the folder's spec.md and `.specify/feature.json`
+hold, and read nothing.
 """
 import os
 import subprocess
@@ -12,7 +13,11 @@ from pathlib import Path
 
 from paths import SCRIPTS
 
+import no_spec
 import spec_folder
+from premise_report import NO_SPEC
+from test_premise_report import report
+from test_rootcause import SPEC
 
 FORM = "specs/<issue>-<short-name>"
 
@@ -119,6 +124,19 @@ class Cli(unittest.TestCase):
                                   capture_output=True, text=True)
         self.assertEqual(done.returncode, 2, done.stderr)
         self.assertIn("not a git repository", done.stderr)
+
+
+class StartsAt(unittest.TestCase):
+    """starts_at(kind, spec): where a run whose folder passed the check starts, decided once for the run."""
+
+    def test_a_new_scope_starts_at_the_premise(self):
+        self.assertEqual(spec_folder.starts_at("new", None), "premise")
+
+    def test_a_rescope_of_a_no_spec_folder_starts_at_the_premise_and_of_a_spec_at_grill(self):
+        """A no-spec spec.md has nothing to grill."""
+        no_spec_md = no_spec.text(report(NO_SPEC, rests_on="needs-spec", reason="a typo", wrong="no"))
+        self.assertEqual(spec_folder.starts_at("rescope", no_spec_md), "premise")
+        self.assertEqual(spec_folder.starts_at("rescope", SPEC.format(section="Not a defect report.")), "grill")
 
 
 class Recorded(unittest.TestCase):
