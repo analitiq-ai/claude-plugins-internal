@@ -259,7 +259,8 @@ Delivery Workflow.
 - `specs/079-x` for #79: refused. The number is the issue's number as GitHub writes it, with no padding.
 - `specs/79-x` for #7: refused. The prefix checked is `7-`, with its hyphen.
 - A short name with capitals, underscores, spaces, or nothing after the hyphen: refused by the folder check.
-- An issue title with one usable word, such as "Cleanup": the short name is that word, `specs/<issue>-cleanup`.
+- An issue title with one `[a-z0-9]` word, such as "Cleanup": the short name is that word, `specs/<issue>-cleanup`.
+  A title with none: the skill stops before writing anything and says to retitle the issue.
 - A project folder before `specs` (`dev/alq-plan/specs/79-x`): the workflow, which runs in the project, is given
   `specs/79-x`.
 - A second Spec Kit project in the same repo holds `specs/<issue>-*`: the workflow sees only its own project's
