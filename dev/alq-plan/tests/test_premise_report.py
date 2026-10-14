@@ -258,7 +258,7 @@ class Cli(unittest.TestCase):
         self.assertIn("premise_report.py form", done.stderr)
 
     def test_spec_passes_a_spec_folder_that_holds_the_answers_and_fails_one_that_does_not(self):
-        folder = self.root / "specs" / "001-demo"
+        folder = self.root / "specs" / "7-demo"
         folder.mkdir(parents=True)
         (folder / "spec.md").write_text(spec_section())
         done = self.run_cli("spec", str(folder))

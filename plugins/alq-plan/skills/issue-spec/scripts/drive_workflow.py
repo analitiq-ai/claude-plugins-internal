@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Start or resume the alq-spec workflow from the checkout, then print where the run stands as JSON.
 
-    drive_workflow.py start <spec file> <issue> [<spec dir>]
+    drive_workflow.py start <spec file> <issue> <spec dir>      a new scope
+    drive_workflow.py rescope <spec file> <issue> <spec dir>    a rescope
     drive_workflow.py resume <run id> [<input>=<value>]
 
 Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks.
@@ -25,6 +26,7 @@ ENV = {"ALQ_PLAN_ROOT": str(PLUGIN)}
 AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Edit Bash(bash .specify/*) '
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
 OPEN_MARKERS = "Open clarification markers remain"
+KIND = {"start": "new", "rescope": "rescope"}
 
 
 def report(state):
@@ -79,24 +81,18 @@ def _state(run_id):
 def _step_env(inputs):
     """The inputs a shell step reads from its environment. A resume re-runs the step the run stopped in, so a
     resume needs them as much as the start does."""
-    env = {"ISSUE": inputs["issue"]}
-    # The spec_dir input only picks the rescope branch.
-    if inputs.get("spec_dir"):
-        env["SPEC_DIR"] = inputs["spec_dir"]
-    return env
+    return {"ISSUE": inputs["issue"], "SPECIFY_FEATURE_DIRECTORY": inputs["spec_dir"]}
 
 
-def start(spec_file, issue, spec_dir):
+def start(kind, spec_file, issue, spec_dir):
     spec = Path(spec_file).read_text()
     if not spec.strip():
         sys.exit(f"{spec_file} is empty")
     if not issue:
         sys.exit("the issue is empty")
-    inputs = {"spec": spec, "issue": issue}
-    if spec_dir is not None:
-        if not spec_dir:
-            sys.exit("the spec folder is empty")
-        inputs["spec_dir"] = spec_dir
+    if not spec_dir:
+        sys.exit("the spec folder is empty")
+    inputs = {"spec": spec, "issue": issue, "spec_dir": spec_dir, "kind": kind}
     install()
     before = set(RUNS.iterdir()) if RUNS.is_dir() else set()
     flags = [arg for name, value in inputs.items() for arg in ("-i", f"{name}={value}")]
@@ -111,6 +107,9 @@ def resume(run_id, verdict):
     if not (RUNS / run_id / "state.json").is_file():
         sys.exit(f"no run {run_id} under {RUNS}")
     inputs = json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    if not (inputs.get("spec_dir") and inputs.get("kind")):
+        sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
+                 "which folder it is for. Next step: start the scope again with /alq-plan:issue-spec.")
     proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(inputs))
     state = _state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
@@ -121,18 +120,19 @@ def resume(run_id, verdict):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="action", required=True)
-    s = sub.add_parser("start")
-    s.add_argument("spec_file")
-    s.add_argument("issue")
-    s.add_argument("spec_dir", nargs="?")
+    for action in KIND:
+        s = sub.add_parser(action)
+        s.add_argument("spec_file")
+        s.add_argument("issue")
+        s.add_argument("spec_dir")
     r = sub.add_parser("resume")
     r.add_argument("run_id")
     r.add_argument("verdict", nargs="?")
     args = parser.parse_args()
-    if args.action == "start":
-        state = start(args.spec_file, args.issue, args.spec_dir)
-    else:
+    if args.action == "resume":
         state = resume(args.run_id, args.verdict)
+    else:
+        state = start(KIND[args.action], args.spec_file, args.issue, args.spec_dir)
     print(json.dumps(report(state)))
 
 
