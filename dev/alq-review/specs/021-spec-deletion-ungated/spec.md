@@ -25,14 +25,16 @@ Superseded by the Clarifications: the `cleanup` label decides, not the diff.
 ### Session 2026-10-15
 
 - Q: The agent runs `gh pr create` without `--draft` from a branch. Whose label decides it? → A: The same as `gh pr ready` run from the checkout: the label of the branch's open PR, read as for its commits. A branch with no open PR has no label, so its create is gated as today.
-- Q: Which poller runs on a cleanup PR? → A: Today's poll loop, report and exit codes, with the Codex, review-thread and hand-over terms switched off. The skill says what each exit means on a cleanup PR. No new exit code.
+- Q: Which poller runs on a cleanup PR? → A: Today's poll loop, report and exit codes, with the Codex, review-thread and hand-over terms switched off. The skill says what each exit means on a cleanup PR. No new exit code. (Superseded in part by the next answer: the review-thread and hand-over terms stay on.)
+- Q: Does the label lift the repo's own GitHub rules on a cleanup PR? → A: No. alq-review drops only its own gates. Both default-branch rulesets of `claude-plugins-internal` require every review thread resolved before merge; on a cleanup PR the poller reports and hands over threads, and the agent triages them, as on any PR. Cleanup mode only stops the poller waiting on Codex.
+- Q: When does the agent mark a draft cleanup PR ready? → A: At once, as today's draft step gives; it merges once CI is green.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A cleanup PR is readied and merged without review (Priority: P1)
 
 An agent finishing `/alq-post-merge` opens a draft PR that retires a spec folder. The user adds the `cleanup`
-label to it on GitHub. Once CI is green the agent marks the PR ready and merges it.
+label to it on GitHub. The agent marks the PR ready and, once CI is green, merges it.
 Neither step is refused for a missing internal round or attestation, and alq-review waits for no Codex review.
 The user runs no `!` command.
 
@@ -58,8 +60,8 @@ with no internal round recorded on the branch and no attestation comment.
 ### User Story 2 - The poller and the skill apply no review gating to a cleanup PR (Priority: P2)
 
 After opening or readying a cleanup PR, the agent follows the GitHub review skill. The skill and the poller
-recognise it as needing no review: no `@codex review` is posted, no Codex answer is waited on, the DeepSource
-grade gate is not run, and no review thread is treated as blocking.
+recognise it as needing no review: no `@codex review` is posted, no Codex answer is waited on, and the DeepSource
+grade gate is not run.
 
 **Why this priority**: Without it the agent still spends a Codex round, ~10–15 minutes of waiting and a
 DeepSource check on a cleanup PR, even once the hooks let the merge through.
@@ -72,7 +74,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 1. **Given** a ready cleanup PR with no Codex comment, **When** the poller runs, **Then** it ends without
    waiting for a Codex answer and does not tell the agent to request one.
 2. **Given** a cleanup PR on which a reviewer (Codex unasked, DeepSource or a human) left an unresolved
-   thread, or whose DeepSource grade is not A, **When** the poller runs, **Then** neither blocks it.
+   thread, **When** the poller runs, **Then** it reports the thread as on any PR: the repo's rulesets, not
+   alq-review, require it resolved before merge.
 3. **Given** a PR without the label, **When** the poller runs, **Then** it behaves as today.
 
 ---
@@ -91,6 +94,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   head commit.
 - A PR labelled `cleanup` in a repo whose rulesets require the org pr-gate's checks stays held by those
   checks (FR-005).
+- A cleanup PR is still held by its repo's GitHub rulesets: in `claude-plugins-internal` an unresolved review
+  thread blocks the merge. Its threads are triaged as on any PR.
 
 ## Requirements *(mandatory)*
 
@@ -109,10 +114,11 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   behave exactly as before this change.
 - **FR-007**: When the label cannot be read, the PR is not a cleanup PR. A ready refusal then also says the label
   could not be read, and the poller prints a warning saying so.
-- **FR-008**: For a cleanup PR, the poller MUST NOT wait for a Codex answer, tell the agent to post
-  `@codex review`, or treat an unresolved review thread as blocking.
+- **FR-008**: For a cleanup PR, the poller MUST NOT wait for a Codex answer or tell the agent to post
+  `@codex review`. It reports review threads and hands them to the gate as on any PR.
 - **FR-009**: The GitHub review skill MUST state that a cleanup PR needs no `@codex review`, no DeepSource
-  grade check (`deepsource-pr-gate.sh`) and no thread triage, and that the `cleanup` label is what marks one.
+  grade check (`deepsource-pr-gate.sh`), that its review threads are triaged as on any PR, and that the `cleanup`
+  label is what marks one.
 - **FR-010**: This feature refuses no command that adds or removes a label. Refusing an agent's label add is
   left to a separate hook the user adds later; until then a label an agent adds exempts the PR as one the user
   adds does.
@@ -147,10 +153,11 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 
 - The org pr-gate (`analitiq-ai/.github`) runs only in repos whose workflows call it (`analitiq-core`,
   `claude-code-plugins`); there the org `pr-gate` ruleset requires `codex-review` and `internal-review`.
-  `claude-plugins-internal` runs no org pr-gate and requires no check. This feature changes only alq-review,
-  so it fully applies where the org pr-gate does not run.
+  `claude-plugins-internal` runs no org pr-gate and requires no status check; its rulesets require every review
+  thread resolved before merge, which binds a cleanup PR as any PR. This feature changes only alq-review, so it
+  fully applies where the org pr-gate does not run.
 - Codex may still review a PR unasked when it is marked ready. This feature does not stop Codex from
-  reviewing; on a cleanup PR its threads do not block (FR-008).
+  reviewing; its threads are triaged as on any PR.
 - The repo's CI still runs on such a PR and must be green before merge.
 
 ## Why this is worth doing
@@ -195,7 +202,7 @@ falls through to "no clean internal round" and "no attestation". The org gate po
 `internal-review` for the same single case. Where it runs (`analitiq-core`, `claude-code-plugins`, through
 their `.github/workflows/pr-gate.yml`), the org `pr-gate` ruleset requires both checks, so they would stay unmet
 even if alq-review let the commands through. `claude-plugins-internal`, where #113 happened, runs no org
-pr-gate and its rulesets require no check: the alq-review hooks are its only gate, and `github.released` can
+pr-gate and its rulesets require no status check: the alq-review hooks are its only gate, and `github.released` can
 never be true there. The poller (`plugins/alq-review/skills/alq-github-pr-review/poll-pr-review.sh:203-207`)
 knows one exemption only, a `codex-review` run whose description starts `WAIVED:` (Codex out of credits), and
 none for a release or a spec deletion.
