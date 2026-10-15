@@ -22,6 +22,11 @@ Superseded by the Clarifications: the `cleanup` label decides, not the diff.
 - Q: Does this feature refuse an agent's command that adds the label? → A: No. The user adds a separate hook later that refuses a fixed set of `gh` forms; this feature refuses no label command.
 - Q: A branch can have open PRs to more than one target. Whose label decides its commits? → A: The PR `pr_target` already resolves for the branch (the first open PR gh lists). No other multi-PR handling.
 
+### Session 2026-10-15
+
+- Q: The agent runs `gh pr create` without `--draft` from a branch. Whose label decides it? → A: The same as `gh pr ready` run from the checkout: the label of the branch's open PR, read as for its commits. A branch with no open PR has no label, so its create is gated as today.
+- Q: Which poller runs on a cleanup PR? → A: Today's poll loop, report and exit codes, with the Codex, review-thread and hand-over terms switched off. The skill says what each exit means on a cleanup PR. No new exit code.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A cleanup PR is readied and merged without review (Priority: P1)
@@ -74,9 +79,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
 
 ### Edge Cases
 
-- The label is read from GitHub at each check (ready, merge, poll). When it cannot be read, the PR is treated
-  as unlabelled and gated, and the refusal says the label could not be read rather than that a review is
-  missing.
+- The label is read from GitHub at each check (ready, merge, commit, poll). When it cannot be read, the PR is
+  treated as unlabelled and gated, and the ready refusal and the poller say the label could not be read.
 - The user adds the label on GitHub: the PR is a cleanup PR.
 - Removing the `cleanup` label brings the gate back.
 - A round in flight, a lock or `--admin` without `override-merge` still refuses a cleanup PR (FR-013).
@@ -103,8 +107,8 @@ waiting on Codex and without telling the agent to post `@codex review` or run `d
   whose rulesets require those checks, a cleanup PR stays held by them; that is outside this feature.
 - **FR-006**: For a PR that is not a cleanup PR, ready, merge, the commit checks, the poller and the skill
   behave exactly as before this change.
-- **FR-007**: When the label cannot be read, the PR is not a cleanup PR, and the gate's refusal says the label
-  could not be read rather than that a review is missing.
+- **FR-007**: When the label cannot be read, the PR is not a cleanup PR. A ready refusal then also says the label
+  could not be read, and the poller prints a warning saying so.
 - **FR-008**: For a cleanup PR, the poller MUST NOT wait for a Codex answer, tell the agent to post
   `@codex review`, or treat an unresolved review thread as blocking.
 - **FR-009**: The GitHub review skill MUST state that a cleanup PR needs no `@codex review`, no DeepSource
@@ -204,4 +208,6 @@ none for a release or a spec deletion.
 - **Examined and ruled out**: `github.released` misreading the check run — it behaves as written; the head
   simply has no release title. `policy._obstacle` (in-flight rounds, locks) — its refusals name a different
   reason than the one seen on #113.
-- **Not investigated**: whether `gh pr create` without `--draft` reaches `mark_ready` for such a PR.
+- **`gh pr create` without `--draft`**: `shell.py:149-150` classifies it as `ready`, so it reaches
+  `policy.mark_ready` through `gate.on_bash`, judged against the branch's open PR as `gh pr ready` from the
+  checkout is.
