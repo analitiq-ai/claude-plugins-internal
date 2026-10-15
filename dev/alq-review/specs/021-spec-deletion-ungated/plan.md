@@ -9,8 +9,8 @@
 `github.is_cleanup` is the one name test and `github.cleanup` the one reader (R1). The ready gate treats a
 labelled PR as it treats a version-only release; an attestation comment gets its own kind so the label does not
 stand in for it (R2). The merge gate allows a labelled PR beside an attestation or a release (R3). A commit on a
-labelled branch skips claim-check and shim-check (R4). The poller runs today's loop with its Codex, thread and
-hand-over terms switched off, and keeps its exit codes (R7). A failed read gates the PR as unlabelled and says so.
+labelled branch skips claim-check and shim-check (R4). The poller stops waiting on Codex and keeps everything
+else, threads and exit codes included (R7). A failed read gates the PR as unlabelled and says so.
 The user adds the label on GitHub; this feature refuses no command that adds it (R5, R6). ADR-0021 lands first,
 in its own PR (R9).
 
@@ -31,8 +31,9 @@ Reasons: [research.md](research.md). What each consumer does: [data-model.md](da
 
 **Project Type**: Claude Code plugin (hooks, a skill and its poller)
 
-**Performance Goals**: one `gh` call per `git commit` in a located checkout, per ready and per poller run; each
-under `github._answer`'s 20 s, inside the hooks' 60 s / 45 s. Merge adds a field to a call it already makes.
+**Performance Goals**: one `gh` call more per `git commit` in a located checkout and per poller run; on the ready
+path only when `released` is false. Each is under `github._answer`'s 20 s, inside the hooks' 60 s / 45 s. Merge
+adds a field to a call it already makes.
 
 **Constraints**: one name test and one reader (FR-002); the label lifts only the review holds (FR-013); the org
 pr-gate is untouched (FR-005)
@@ -47,7 +48,7 @@ pr-gate is untouched (FR-005)
 | II. Ownership & trust boundaries | All in this repo's plugin; the org pr-gate is not touched (FR-005). Pass. |
 | III. Fail loud, no workarounds | A failed read gates the PR; the ready refusal and the poller say the label could not be read (FR-007). Pass. |
 | IV. Test-first | Every scenario a failing test first (R11). Pass. |
-| V. Smallest complete change | A name test, a reader, a CLI entry for the poller, one more term where a release already counts. No new type, loop or exit code. Pass. |
+| V. Smallest complete change | A name test, a reader, a CLI entry for the poller, one more term where a release already counts, a switch off the Codex wait. No new type, loop or exit code. Pass. |
 | VI. Governing rule ships apart | ADR-0021 is its own PR, merged first (R9). Pass. |
 | P1. Code decides | Ready, merge, commit and the poller's outcome are decided in code; the skill routes by exit code. Pass. |
 | P2. Only an approved entity releases a hold | ADR-0021 names the label as the release of the review holds only (R10). Nothing refuses an agent's label add until the user's rule exists (R6): Complexity Tracking. |
@@ -84,7 +85,7 @@ plugins/alq-review/
 │   │                          #      claim/shim on a labelled branch (R2, R4)
 │   └── pre_merge_gate.py      # fetch reads labels; unmet allows a labelled PR (R3)
 ├── skills/alq-github-pr-review/
-│   ├── poll-pr-review.sh      # cleanup switch, ERR trap (R7)
+│   ├── poll-pr-review.sh      # cleanup switch off the Codex wait, ERR trap (R7)
 │   └── SKILL.md               # Cleanup PRs (R8)
 ├── .claude-plugin/plugin.json # MINOR bump
 └── README.md                  # contracts/interfaces.md § README
@@ -100,7 +101,7 @@ dev/alq-review/tests/
 **Callers of what changes**, read in the code: `shell.classify` by `gate.on_bash` and `test_shell`;
 `gate.on_bash` by `gate.main` on `PreToolUse`; `policy.mark_ready` by `gate.on_bash` and `test_policy`, its
 signature unchanged; `pre_merge_gate.fetch` and `unmet` by `gated` (lines 436, 444) ← `main` on `PreToolUse`;
-`claimgate.on_commit` / `shimgate.on_commit` by `gate.on_bash` (lines 361-362); `poll-pr-review.sh` by the agent
+`claimgate.on_commit` / `shimgate.on_commit` by `gate.on_bash` (lines 371-372); `poll-pr-review.sh` by the agent
 following the skill, `test_poll_pr_review` and `test_poller_contract`. `github.pr_target` is unchanged.
 `hooks.json` is unchanged: both hooks already see every Bash call.
 

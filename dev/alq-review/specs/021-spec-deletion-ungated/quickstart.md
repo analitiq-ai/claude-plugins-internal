@@ -16,6 +16,7 @@ FR-002 → `test_github`. SC-003: every existing ready/merge refusal test passes
 3. Commit and push one more change on the branch: no claim-check or shim-check refusal.
 4. Run `poll-pr-review.sh analitiq-ai/claude-plugins-internal <n>`: the `Cleanup PR:` line, no `@codex review`,
    exit `4` with `mergeStateStatus=DRAFT`. Mark the PR ready: allowed. Run the poller again: it waits for CI,
-   then exits `0`. No inbox file for the PR under the state dir.
+   not for Codex. Exit `2` on an unresolved thread: triage it as on any PR and run the poller again; exit `0`
+   once none is left.
 5. Merge PR `<n>`: allowed with no attestation comment.
 6. On a second PR without the label, mark it ready: refused as today, naming the internal review.

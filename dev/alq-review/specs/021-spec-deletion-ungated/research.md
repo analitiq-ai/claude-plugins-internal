@@ -17,7 +17,7 @@ stated once, in data-model.md; the entries below give the reasons.
 
 - **Decision**: the label joins `released`, the version-only release fact `mark_ready` already takes. A comment
   carrying the attestation marker gets its own kind, `attest`, which keeps today's `released` only.
-- **Source**: code (`gate.on_bash` lines 376-378, `policy.mark_ready`, `shell.py:141-152`); Clarification
+- **Source**: code (`gate.on_bash` lines 387-388, `policy.mark_ready`, `shell.py:141-152`); Clarification
   2026-10-15 (create).
 - **Rationale**: a version-only release is today's one PR that needs no review, and `mark_ready` already
   checks `_obstacle` before it, so the holds of FR-013 keep refusing with no new code. `shell.py` gives an
@@ -36,7 +36,7 @@ stated once, in data-model.md; the entries below give the reasons.
 ## R4: Commit checks
 
 - **Decision**: `gate.on_bash` locates the checkout before the commit checks and skips both for a labelled branch.
-- **Source**: code (`gate.on_bash` lines 361-364, `worktree.locate`); Clarification Q5.
+- **Source**: code (`gate.on_bash` lines 371-372, `worktree.locate`); Clarification Q5.
 - **Rationale**: it is the one place both checks are called, so neither module learns about labels. A failed
   read runs both checks: they fail closed, and each refusal names its own cause.
 - **Existing tools**: none.
@@ -53,20 +53,22 @@ stated once, in data-model.md; the entries below give the reasons.
 
 ## R7: The poller
 
-- **Decision**: today's loop with a `cleanup` switch (data-model.md § Poller cleanup mode), and an `ERR` trap so
-  an unhandled failure exits `1`.
+- **Decision**: today's loop with a `cleanup` switch that only stops the wait on Codex (data-model.md § Poller
+  cleanup mode), and an `ERR` trap with assign-then-test reads so an unhandled failure exits `1`.
 - **Source**: code (`poll-pr-review.sh`: `ANALYZE`, `WAITING_ON`, `REPORT`, `settle`, the main loop); Clarification
   2026-10-15 (poller); FR-008, SC-002.
-- **Rationale**: the checks, the merge state and the `Gate check runs:` lines are the same on a cleanup PR, so
-  only the Codex, thread and hand-over terms change. A hand-over would open a github round in the ledger. Under
+- **Rationale**: the label lifts alq-review's gates, not the repo's GitHub rulesets, which require every review
+  thread resolved before merge. So threads, findings and the hand-over stay as on any PR, and the hand-over's
+  github round is how the agent triages them. Only the Codex wait is alq-review's own. Under
   `set -euo pipefail` a failing jq exits with jq's own code, which today can read as `3` TIMEOUT.
 - **Existing tools**: `READER` already calls a Python script from the poller.
 
 ## R8: What the agent is told
 
 - **Decision**: the skill gains a section *Cleanup PRs*: the `cleanup` label marks one and the user adds it on
-  GitHub; no `@codex review`, no `deepsource-pr-gate.sh`, no thread triage; each exit's next step as in
-  data-model.md. The header of `poll-pr-review.sh` and the skill's draft and exit-code prose say the same.
+  GitHub; no `@codex review`, no `deepsource-pr-gate.sh`; each exit's next step as in
+  data-model.md. Threads are triaged as on any PR. The header of `poll-pr-review.sh` and the skill's draft and
+  exit-code prose say the same.
 - **Source**: FR-009; P1 (a refusal or exit names the next step).
 
 ## R9: The decision record ships first

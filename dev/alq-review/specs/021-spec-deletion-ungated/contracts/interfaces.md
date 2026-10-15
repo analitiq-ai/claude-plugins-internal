@@ -17,8 +17,8 @@ stdout `cleanup` or `gated`, exit 0; the read failed: stderr names why, exit 1; 
 
 ## `poll-pr-review.sh`
 
-Usage and exit codes are unchanged. On a cleanup PR: the `Cleanup PR:` line, the report and the exits of
-data-model.md § Poller cleanup mode. An unread label: the `WARNING:` line, then today's poll.
+Usage and exit codes are unchanged. On a cleanup PR: no wait on Codex, the `Cleanup PR:` line, the report
+and the exits of data-model.md § Poller cleanup mode. An unread label: the `WARNING:` line, then today's poll.
 
 ## Skill (`alq-github-pr-review/SKILL.md`)
 
