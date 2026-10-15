@@ -1,21 +1,20 @@
 # Implementation Plan: A PR labelled cleanup gets no alq-review gating
 
-**Branch**: `114-spec` (#114) | **Date**: 2026-10-14 | **Spec**: [spec.md](spec.md)
+**Branch**: `114-spec` (#114) | **Date**: 2026-10-15 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/021-spec-deletion-ungated/spec.md`
 
 ## Summary
 
-A PR carrying the `cleanup` label is one fact, `github.Cleanup` (labelled, not labelled, or unread with why),
-built only by `github.read_cleanup` from label names that only `github.label_names` parses; the name test is
-`github.is_cleanup` (R1). `policy.mark_ready` and `pre_merge_gate.unmet` allow it without a round or an attestation,
-after the holds they already check, and give an unread label one refusal of its own (R2, R3, R10). An attestation
-comment is its own action kind, which the label does not exempt (R2). `gate.on_bash` skips the claim and shim commit
-checks for its branch (R4). The user adds the label on GitHub; this feature refuses no command that adds it, so until
-the user's separate rule exists an agent can add it too (R5, R6). The poller runs a cleanup PR through a loop of its own, ending
-it with exit `5` or `6` and handing nothing to the gate (R7). ADR-0021 lands first, in its own PR (R9).
+`github.is_cleanup` is the one name test and `github.cleanup` the one reader (R1). The ready gate treats a
+labelled PR as it treats a version-only release; an attestation comment gets its own kind so the label does not
+stand in for it (R2). The merge gate allows a labelled PR beside an attestation or a release (R3). A commit on a
+labelled branch skips claim-check and shim-check (R4). The poller runs today's loop with its Codex, thread and
+hand-over terms switched off, and keeps its exit codes (R7). A failed read gates the PR as unlabelled and says so.
+The user adds the label on GitHub; this feature refuses no command that adds it (R5, R6). ADR-0021 lands first,
+in its own PR (R9).
 
-Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-model.md). Edges:
+Reasons: [research.md](research.md). What each consumer does: [data-model.md](data-model.md). Edges:
 [contracts/interfaces.md](contracts/interfaces.md). This file owns the code map and the callers of what changes.
 
 ## Technical Context
@@ -32,32 +31,28 @@ Decisions and reasons: [research.md](research.md). Shapes: [data-model.md](data-
 
 **Project Type**: Claude Code plugin (hooks, a skill and its poller)
 
-**Performance Goals**: one `gh` call per `git commit` (R4) and one per ready, merge or poller run; each under
-`github._answer`'s 20 s, inside the hooks' 60 s / 45 s
+**Performance Goals**: one `gh` call per `git commit` in a located checkout, per ready and per poller run; each
+under `github._answer`'s 20 s, inside the hooks' 60 s / 45 s. Merge adds a field to a call it already makes.
 
-**Constraints**: one decider (FR-002); the label lifts only the review holds, a round in flight, a lock and
-`--admin` without `override-merge` still refuse (R10, FR-013); the org pr-gate is untouched (FR-005)
+**Constraints**: one name test and one reader (FR-002); the label lifts only the review holds (FR-013); the org
+pr-gate is untouched (FR-005)
 
 **Scale/Scope**: one label; nothing in `/alq-post-merge` (R12)
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
-
 | Principle | Answer |
 |---|---|
 | I. Contract-first | No new shape: GitHub's label list, read through `gh`. Pass. |
-| II. Ownership & trust boundaries | All in this repo's plugin; the org pr-gate is not touched (FR-005). Labels enter through `gh` and are validated where read (R1, R3). Pass. |
-| III. Fail loud, no workarounds | An unread label gates the PR and the refusal says why (R2, R3); an agent's label add is not refused, and that is stated (R6). Pass. |
+| II. Ownership & trust boundaries | All in this repo's plugin; the org pr-gate is not touched (FR-005). Pass. |
+| III. Fail loud, no workarounds | A failed read gates the PR; the ready refusal and the poller say the label could not be read (FR-007). Pass. |
 | IV. Test-first | Every scenario a failing test first (R11). Pass. |
-| V. Smallest complete change | One decider, one reader, one CLI entry the poller needs; no diff reading, no new module. Pass. |
-| VI. Governing rule ships apart | The ADR amending ADR-0003's list is its own PR, merged first (R9). The README and skill describe the code and ship with it. Pass. |
-| P1. Code decides | Ready, merge, commit and the poller's outcome are decided in code; the skill routes by exit code (R7). Every refusal names its next step (R6, R8). Pass. |
-| P2. Only an approved entity releases a hold | ADR-0021 names the label as the one release of the review holds, and of no other (R10); locks and rounds in flight keep the releases their own records name (ADR-0018, ADR-0020). The approved entity is the user, but nothing refuses an agent's label add until the user's rule exists (R6). Open until that rule exists; Complexity Tracking. |
-| P3. Rules are pure | `is_cleanup` and `policy.mark_ready` are pure; `gate.py`, `pre_merge_gate.py` and the poller only read and answer. Pass. |
-| P4. A check that could not run is its own outcome | An unread label is `unread(why)`: gated, never a pass, and named in the refusal and the poller's warning (data-model). Pass. |
-
-Re-check after Phase 1: unchanged.
+| V. Smallest complete change | A name test, a reader, a CLI entry for the poller, one more term where a release already counts. No new type, loop or exit code. Pass. |
+| VI. Governing rule ships apart | ADR-0021 is its own PR, merged first (R9). Pass. |
+| P1. Code decides | Ready, merge, commit and the poller's outcome are decided in code; the skill routes by exit code. Pass. |
+| P2. Only an approved entity releases a hold | ADR-0021 names the label as the release of the review holds only (R10). Nothing refuses an agent's label add until the user's rule exists (R6): Complexity Tracking. |
+| P3. Rules are pure | `is_cleanup` and `policy.mark_ready` are pure; the hooks and the poller read and answer. Pass. |
+| P4. A check that could not run is its own outcome | A failed read is never a pass, and is named (FR-007). Pass. |
 
 ## Project Structure
 
@@ -71,38 +66,30 @@ specs/021-spec-deletion-ungated/
 ├── quickstart.md
 ├── contracts/interfaces.md
 ├── checklists/requirements.md
-└── tasks.md                    # /speckit-tasks
+└── tasks.md
 ```
 
 ### Source Code (repository root)
 
-The ADR first, its own PR (branch `114-adr`, R9):
-
-```text
-dev/alq-review/docs/adr/0021-*.md
-```
+The ADR first, its own PR (branch `114-adr`, R9): `dev/alq-review/docs/adr/0021-*.md`.
 
 Then the code (branch `114-spec`):
 
 ```text
 plugins/alq-review/
 ├── scripts/
-│   ├── github.py              # CLEANUP_LABEL; is_cleanup(); label_names(); Cleanup; read_cleanup(); pr_labels();
-│   │                          #      branch_labels(); main() for the poller (R1, R4)
-│   ├── policy.py              # mark_ready(..., cleanup); attest() (R2)
-│   ├── shell.py               # an attestation comment is its own kind, `attest` (R2)
-│   ├── gate.py                # cleanup_of(); on_bash: ready passes it, attest does not, commit skips claim/shim on
-│   │                          #      a labelled PR (R2, R4)
-│   └── pre_merge_gate.py      # fetch reads labels; unmet allows cleanup, one refusal when unread; refusal
-│                              #      sentences (R3, R8)
+│   ├── github.py              # CLEANUP_LABEL, is_cleanup(), cleanup(), main() (R1, R7)
+│   ├── shell.py               # an attestation comment is kind `attest` (R2)
+│   ├── gate.py                # on_bash: ready counts the label as a release; attest does not; commit skips
+│   │                          #      claim/shim on a labelled branch (R2, R4)
+│   └── pre_merge_gate.py      # fetch reads labels; unmet allows a labelled PR (R3)
 ├── skills/alq-github-pr-review/
-│   ├── poll-pr-review.sh      # cleanup loop, exits 5 and 6, no hand-over (R7)
-│   └── SKILL.md               # exits 5 and 6; Cleanup PRs (R8)
+│   ├── poll-pr-review.sh      # cleanup switch, ERR trap (R7)
+│   └── SKILL.md               # Cleanup PRs (R8)
 ├── .claude-plugin/plugin.json # MINOR bump
 └── README.md                  # contracts/interfaces.md § README
 dev/alq-review/tests/
 ├── test_github.py             # new
-├── test_policy.py
 ├── test_shell.py
 ├── test_gate.py
 ├── test_pre_merge_gate.py
@@ -110,36 +97,18 @@ dev/alq-review/tests/
 └── test_poller_contract.py
 ```
 
-**Structure Decision**: the plugin's existing split: `github.py` the GitHub boundary with its pure decider beside the
-reader (as `version_only_release` / `released`), `policy.py` the rules, `gate.py` and `pre_merge_gate.py` the handlers.
-
-**Callers of what changes**, read in the code: `policy.mark_ready` and `policy.attest` by `gate.on_bash` and `test_policy`;
-`shell.classify` by `gate.on_bash` and `test_shell`;
-`pre_merge_gate.unmet` by `pre_merge_gate.gated` (line 444); `pre_merge_gate.fetch` by `gated` (line 436);
-`pre_merge_gate.gated` by `main` on `PreToolUse`; `claimgate.on_commit` / `shimgate.on_commit` by `gate.on_bash` (lines 361-362);
-`github.pr_target` by `gate.pr_of` and `gate._open_pr`, unchanged; `poll-pr-review.sh` by the agent following the
-skill, `test_poll_pr_review` and `test_poller_contract`; `pre_merge_gate.PullRequest` / `first_words` by `gate.py`,
-unchanged. `hooks.json` is unchanged: both hooks already see every Bash call.
+**Callers of what changes**, read in the code: `shell.classify` by `gate.on_bash` and `test_shell`;
+`gate.on_bash` by `gate.main` on `PreToolUse`; `policy.mark_ready` by `gate.on_bash` and `test_policy`, its
+signature unchanged; `pre_merge_gate.fetch` and `unmet` by `gated` (lines 436, 444) ← `main` on `PreToolUse`;
+`claimgate.on_commit` / `shimgate.on_commit` by `gate.on_bash` (lines 361-362); `poll-pr-review.sh` by the agent
+following the skill, `test_poll_pr_review` and `test_poller_contract`. `github.pr_target` is unchanged.
+`hooks.json` is unchanged: both hooks already see every Bash call.
 
 ## Complexity Tracking
 
 | Violation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| P2: until the user's rule forbidding it exists, an agent can add the label and release its own PR's review hold, so the user is not yet the one entity that releases it | The user decided this feature refuses no label command (FR-010); a hook reads only the `gh` forms it knows, so no refusal here closes every route | Refusing the `gh` forms here was rejected by the user, who adds that rule apart from this plugin. Closed by ADR-0021 action item 3 |
-
-## Mechanisms
-
-- The cleanup decider and the label reader: R1
-- Ready allowed for a cleanup PR, label unread named: R2
-- Merge and ready in the pre-merge gate allowed for a cleanup PR: R3
-- Commit checks skipped on a cleanup PR's branch: R4
-- No grant: R5
-- No label-add refusal here: R6
-- The poller's cleanup loop (exits 5 and 6, no hand-over): R7
-- The refusal sentences and the skill's Cleanup PRs section: R8
-- The ADR naming the cleanup PR: R9
-- Holds kept on a cleanup PR: R10
-- Tests: R11
+| P2: until the user's rule forbidding it exists, an agent can add the label and release its own PR's review hold | The user decided this feature refuses no label command (FR-010) | Refusing the `gh` forms here was rejected by the user, who adds that rule apart from this plugin. Closed by ADR-0021 action item 3 |
 
 ## Open points
 

@@ -1,12 +1,11 @@
 # Interfaces: A PR labelled cleanup gets no alq-review gating
 
-What changes at the plugin's edges. How each consumer decides is in
-[../data-model.md](../data-model.md) § Decisions per consumer (rows D1–D5).
+What changes at the plugin's edges. What each consumer does is in [../data-model.md](../data-model.md).
 
-## Hook refusals (PreToolUse/Bash, `gate.py` and `pre_merge_gate.py`, every mode)
+## Hook refusals (`gate.py` and `pre_merge_gate.py`)
 
-The text of each refusal is the data-model.md cell that decides it (rows D1–D4); `Cleanup.refusal()` and
-`CLEANUP_EXEMPTION` are stated in § Cleanup.
+The refusal texts are unchanged. A ready refusal given while the label could not be read ends with
+`The cleanup label could not be read (<why>).`
 
 ## `scripts/github.py` command line
 
@@ -14,20 +13,20 @@ The text of each refusal is the data-model.md cell that decides it (rows D1–D4
 python3 scripts/github.py cleanup <owner/repo> <pr-number>
 ```
 
-stdout `cleanup` or `gated`, exit 0; unread (data-model.md § Cleanup): stderr names why, exit 1; usage: exit 2.
+stdout `cleanup` or `gated`, exit 0; the read failed: stderr names why, exit 1; usage: exit 2.
 
 ## `poll-pr-review.sh`
 
-New exits `5` CLEANUP and `6` READY_NEXT; on a cleanup PR, `4` and `3` are the lines of § D5 cleanup mode. Every
-line, exit and the `WARNING:` line are row D5 and § D5 cleanup mode. The usage and today's loop are unchanged.
+Usage and exit codes are unchanged. On a cleanup PR: the `Cleanup PR:` line, the report and the exits of
+data-model.md § Poller cleanup mode. An unread label: the `WARNING:` line, then today's poll.
 
 ## Skill (`alq-github-pr-review/SKILL.md`)
 
-Exit table gains `5` and `6`, each with the next step § D5 cleanup mode gives it. A section *Cleanup PRs* (research R8).
+A section *Cleanup PRs* (research R8).
 
 ## README
 
-*What it enforces*: the merge and ready gate names the cleanup label beside the version-only release; the commit
+*What it enforces*: the ready and merge gate names the cleanup label beside the version-only release; the commit
 checks name the cleanup exemption; an attestation still needs a round. *Requirements*: a rule must be created that
 forbids an agent from applying the `cleanup` label; until it exists an agent-added label exempts the PR. Plugin
 version: MINOR bump in `.claude-plugin/plugin.json`.

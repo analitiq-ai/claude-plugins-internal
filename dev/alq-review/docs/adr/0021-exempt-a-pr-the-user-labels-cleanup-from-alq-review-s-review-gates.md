@@ -73,8 +73,8 @@ ADR-0004 as well as from ADR-0003; point 5 names each departure.
 3. We will let the label release every hold point 1 lifts, and no other. A round in flight and a lock
    still refuse a cleanup PR as any PR. The label releases no lock: each lock keeps the releases its own
    record names (ADR-0018, ADR-0020).
-4. When the label cannot be read, the PR is gated as unlabelled, and the ready or merge refusal says the
-   label could not be read rather than that a review is missing (ADR-0009).
+4. When the label cannot be read, the PR is gated as unlabelled. The ready refusal and the poller say the
+   label could not be read (ADR-0009).
 5. This record amends two accepted records:
    - ADR-0003 point 1 says the commit checks do not depend on which reviews are run. A cleanup PR's
      commits skip them (ADR-0021 point 1): a commit check alone would still hold a #113-shaped PR on
