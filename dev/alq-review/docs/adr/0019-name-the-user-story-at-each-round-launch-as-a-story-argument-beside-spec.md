@@ -66,7 +66,7 @@ findings against the PR, and the folder alone cannot say which story the PR deli
    only another story delivers. Spec authors need not tag requirements by story. The assessor brief carries the story number
    beside the folder. This supersedes ADR-0017, decision 2.
 
-ADR-0020 decides what happens to a story PR that changes `spec.md`: its review-round launch is refused.
+Each round grades the story against `spec.md` at the reviewed commit, as ADR-0020, decision 2, decides; the PR binds no copy of it.
 
 ## Options considered
 
@@ -107,8 +107,6 @@ Reviewers keep grading a story PR against every story of its spec.
   to merge.
 - The heading check is textual: a heading inside a fenced code block counts.
 - Which requirements apply to the story is the reviewer's judgement: the spec need not tag them.
-- With parallel stories, a spec edit merged from one story holds every other open story PR once it rebases: one
-  unlock each. Accepted in #81.
 - Nothing checks that the story a launch names is the one the PR's `Implements:` line names.
 
 ## Consequences
