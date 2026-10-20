@@ -31,11 +31,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
-    label: "org ADR-0005: The orchestrator alone writes the working lanes, derived from the PR"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
+    label: "orchestrator ADR-0002: The orchestrator alone writes the working lanes, derived from the PR"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0013-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
-    label: "org ADR-0013: Take an escalation's answer from a writer's issue comment"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0010-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
+    label: "orchestrator ADR-0010: Take an escalation's answer from a writer's issue comment"
 ---
 
 # ADR-0023: Give every hold one id and one release: the launch after Ready, or `unlock <id>`
@@ -91,7 +91,7 @@ Replies resolve the threads; a hold needs a failing merge blocker.
 ## Consequences
 
 - Easier: a new hold is an id, a row and an aftermath.
-- Harder: an escalation also needs ANSWERED, else Ready bounces to Blocked (org ADR-0013).
+- Harder: an escalation also needs ANSWERED, else Ready bounces to Blocked (orchestrator ADR-0010).
 - **How we would know this was wrong:** a hold released without a human's Ready or `unlock <id>`, or
   an agent's Ready the hook let through.
 - Revisit if: a hold appears whose release cannot be the launch after Ready, or `UserPromptSubmit`

@@ -29,8 +29,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0013-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
-    label: "org ADR-0013: Take an escalation's answer from a writer's issue comment"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0010-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
+    label: "orchestrator ADR-0010: Take an escalation's answer from a writer's issue comment"
 ---
 
 # ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer
@@ -79,7 +79,7 @@ Lost: the round queries GitHub at the round's launch.
 
 - A defect reported from off the list is closed unread until a trusted reviewer re-raises it.
 - Two trust rules coexist: this list for threads, WRITER (author_association) for an escalation
-  answer (org ADR-0013).
+  answer (orchestrator ADR-0010).
 
 ## Consequences
 

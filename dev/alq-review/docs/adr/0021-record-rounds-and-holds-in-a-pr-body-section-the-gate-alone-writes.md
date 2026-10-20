@@ -29,11 +29,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0006-keep-the-loop-s-durable-state-in-github-objects.md"
-    label: "org ADR-0006: Keep the loop's durable state in GitHub objects"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md"
+    label: "orchestrator ADR-0003: Keep the loop's durable state in GitHub objects"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0007-attest-the-internal-review-as-a-commit-status-written-by-the-orchestrator-s-app.md"
-    label: "org ADR-0007: Attest the internal review as a commit status written by the orchestrator's App"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0004-attest-the-internal-review-as-a-commit-status-written-by-the-orchestrator-s-app.md"
+    label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
 # ADR-0021: Record rounds and holds in a PR body section reviewer alone writes
@@ -55,7 +55,7 @@ record; its decision 1, the state directory, stands for session-scoped files onl
 2. We will make reviewer the section's only writer after builder creates the PR (ADR-0022), inside
    the session it gates; the orchestrator reads ATTESTED and HOLD from it and never writes it.
 3. We will keep `ledger.db` beside the session as a hot-path cache, rebuilt from the section when
-   missing. Reviewer reports and session grants stay session-scoped files (org ADR-0006, decision 4).
+   missing. Reviewer reports and session grants stay session-scoped files (orchestrator ADR-0003, decision 4).
 
 ## Options considered
 
@@ -78,7 +78,7 @@ Rejected: lanes are the state channel; nothing is parsed out of prose.
 ## Trade-offs
 
 - Reviewer writes the machine block with the session's own credential, so the hook's refusal of a
-  later agent body edit is the only boundary on what the orchestrator attests from (org ADR-0007,
+  later agent body edit is the only boundary on what the orchestrator attests from (orchestrator ADR-0004,
   decision 4).
 - A hold has nowhere to live until the PR exists.
 

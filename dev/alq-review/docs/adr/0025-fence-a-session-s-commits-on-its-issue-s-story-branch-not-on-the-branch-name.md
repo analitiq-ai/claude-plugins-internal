@@ -30,8 +30,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0008-exempt-a-pr-from-the-internal-review-by-its-bot-author-or-a-label-a-writer-appli.md"
-    label: "org ADR-0008: Exempt a PR from the internal review by its Bot author or a label a writer applied"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0005-exempt-a-pr-from-the-internal-review-by-its-bot-author-or-a-label-a-writer-appli.md"
+    label: "orchestrator ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied"
 ---
 
 # ADR-0025: Fence a session's commits on its issue's story branch, not on the branch name
@@ -58,7 +58,7 @@ Reviewer already runs on every Skill call and keeps a state file per session.
 ### Option B: Refuse any commit on a branch outside the grammar, keyed on the name
 
 It would refuse every revert, release-bump and retire-spec commit unless each tooling branch had a name
-kind, and the grammar has none: a tooling PR is exempt by its Bot author or a writer's label (org ADR-0008).
+kind, and the grammar has none: a tooling PR is exempt by its Bot author or a writer's label (orchestrator ADR-0005).
 
 ## Trade-offs
 
