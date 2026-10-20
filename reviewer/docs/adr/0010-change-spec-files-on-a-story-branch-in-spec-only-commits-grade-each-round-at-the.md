@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0020"
+id: "0010"
 title: "Change spec files on a story branch in spec-only commits; grade each round at the reviewed commit"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [spec, review-round, holds, rescope]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0023", "0024", "0025"]
+relatesTo: ["0013", "0014", "0015"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,policy,specbinding,shell}.py"
@@ -41,12 +41,12 @@ externalRefs:
     label: "org ADR-0002: Keep one spec per issue, in the repo"
 ---
 
-# ADR-0020: Change spec files on a story branch in spec-only commits; grade each round at the reviewed commit
+# ADR-0010: Change spec files on a story branch in spec-only commits; grade each round at the reviewed commit
 
 ## Context
 
-On a story branch the agent graded against `spec.md` can also edit it. The draft's launch refusal on a mixed
-diff and its `rebase <ref>` release assumed a spec PR; with none (org ADR-0002), both go.
+On a story branch the agent graded against `spec.md` can also edit it. No spec PR exists (org ADR-0002), so a
+spec change lands on the story branch itself.
 
 ## Decision
 
@@ -57,7 +57,7 @@ diff and its `rebase <ref>` release assumed a spec PR; with none (org ADR-0002),
 2. We will grade every round against `spec.md` at the reviewed commit: no blob id, no hold on a changed
    `spec.md`. The round after a spec-only commit is full scope.
 3. We will have a `RESCOPE` verdict place `rescope-<pr>`, which refuses code commits and lets spec-only
-   commits pass; its release is every hold's (ADR-0023).
+   commits pass; its release is every hold's (ADR-0013).
 
 ## Options considered
 
@@ -65,17 +65,17 @@ diff and its `rebase <ref>` release assumed a spec PR; with none (org ADR-0002),
 
 A round reads the committed `spec.md`, so a changed spec needs no acknowledgement.
 
-### Option B: Refuse a launch on a mixed diff (as drafted)
+### Option B: Refuse a launch on a mixed diff
 
 Rejected: a rescope lands spec-only on the open story branch, so the story PR's diff carries it.
 
-### Option C: `rebase <ref>` after a spec PR (as drafted)
+### Option C: `rebase <ref>` after a spec PR
 
-No spec PR exists (org ADR-0002); a hold is released at the launch after Ready or by `unlock <id>` (ADR-0023).
+No spec PR exists (org ADR-0002); a hold is released at the launch after Ready or by `unlock <id>` (ADR-0013).
 
-### Option D: A blob-id hold on a changed `spec.md` (ADR-0016, decision 6)
+### Option D: A blob-id hold on a changed `spec.md`
 
-Stays rejected.
+Rejected: any edit to `spec.md`, a typo fix included, would hold the PR until the user releases it.
 
 ## Trade-offs
 

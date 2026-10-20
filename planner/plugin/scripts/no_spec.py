@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The no-spec spec.md: what a `no spec needed` pick leaves in its spec folder, so that a later scope of the issue
-sees it was judged (planner ADR-0008).
+sees it was judged (planner ADR-0007).
 
 It says no spec is needed and carries the question the pick rests on and the reason, as the premise report records
 them. This module is the one writer of it and the one place that tells it apart from a spec: by its first line.

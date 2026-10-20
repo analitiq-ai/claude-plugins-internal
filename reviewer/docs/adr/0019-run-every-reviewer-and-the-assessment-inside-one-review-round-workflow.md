@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0029"
+id: "0019"
 title: "Run every reviewer and the assessment inside one review-round workflow"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [review-round, reviewers, assessment, launch-gate, dependencies]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0006", "0009", "0024", "0026"]
+relatesTo: ["0003", "0005", "0014", "0016"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/{review-round,assess-round}.js"
@@ -38,7 +38,7 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
 ---
 
-# ADR-0029: Run every reviewer and the assessment inside one review-round workflow
+# ADR-0019: Run every reviewer and the assessment inside one review-round workflow
 
 ## Context
 
@@ -50,13 +50,13 @@ nothing reviewer can enforce.
 
 ## Decision
 
-1. We will run every stage in one workflow, `review-round {worktree, stage}` (ADR-0024):
-   reviewers behind a barrier (internal, audit) or the github stage's findings (ADR-0026), then
+1. We will run every stage in one workflow, `review-round {worktree, stage}` (ADR-0014):
+   reviewers behind a barrier (internal, audit) or the github stage's findings (ADR-0016), then
    the assess phase. `assess-round` launched from outside is refused. Every reviewer's report is
    validated against its typed verdict before the assess phase reads it.
 2. We will refuse any reviewer type dispatched from the main thread, outside a round, on a story
    branch or on a branch inside the grammar with an open PR, naming review-round; main and branches
-   outside the grammar (ADR-0024) keep main-thread dispatch.
+   outside the grammar (ADR-0014) keep main-thread dispatch.
 3. We will have reviewer's decision-reviewer join every internal round; with no governing
    record, its brief is to flag a decision made in the diff with no record.
 4. We will declare pr-review-toolkit and auditor as dependencies, with the accepted

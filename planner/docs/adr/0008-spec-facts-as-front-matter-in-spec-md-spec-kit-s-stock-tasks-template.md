@@ -1,9 +1,9 @@
 ---
 schemaVersion: 0.2.0
-id: "0009"
+id: "0008"
 title: "Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [spec, front-matter, tasks, spec-kit, presets]
 scope: component
@@ -35,25 +35,25 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    id: "reviewer ADR-0024"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "reviewer ADR-0024: Derive the spec from the branch at launch and read the folder as data"
+    id: "reviewer ADR-0014"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
+    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
   - type: doc
     id: "builder ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
     label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
   - type: doc
-    id: "reviewer ADR-0027"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0027-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
-    label: "reviewer ADR-0027: Judge the root cause once per level; every FIX names its mechanism"
+    id: "reviewer ADR-0017"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
+    label: "reviewer ADR-0017: Judge the root cause once per level; every FIX names its mechanism"
 ---
 
-# ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template
+# ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template
 
 ## Context
 
 builder and reviewer read the spec folder planner writes. Today builder's root-cause-check reads the
-`## Root cause` heading (builder ADR-0002 before its amendment). The brainstorm also gave planner a `[US<k>]` tag on every tasks.md line, though Spec Kit leaves Setup, Foundational and Polish untagged by design.
+`## Root cause` heading. The brainstorm also gave planner a `[US<k>]` tag on every tasks.md line, though Spec Kit leaves Setup, Foundational and Polish untagged by design.
 
 ## Decision
 
@@ -65,7 +65,7 @@ builder and reviewer read the spec folder planner writes. Today builder's root-c
    and Polish are present and untagged. The planning check is that upstream rule, pinned to the
    installed template by a drift test.
 3. We will commit `premise.md` in every spec folder except a no-spec one, whose spec.md carries the premise
-   question and reason (ADR-0008), read by planner's root-cause check in a new spec and a rescope alike
+   question and reason (ADR-0007), read by planner's root-cause check in a new spec and a rescope alike
    (ADR-0005), and customise Spec Kit's templates through presets and overrides only.
 
 ## Options considered
@@ -94,7 +94,7 @@ Lost: not the sanctioned path.
 
 ## Consequences
 
-- Easier: the no-spec folder (ADR-0008) and the root-cause dispatch (reviewer ADR-0027) each read one key.
+- Easier: the no-spec folder (ADR-0007) and the root-cause dispatch (reviewer ADR-0017) each read one key.
 - Harder: a spec.md without the block gives builder and reviewer nothing to read.
 - **How we would know this was wrong:** the drift test fails on a Spec Kit release that left the phase
   rule intact.

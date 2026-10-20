@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0005"
 title: "Exempt a PR from the internal review by its Bot author or a label a writer applied"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [review, exemption, labels, pull-requests, trust]
 scope: component
@@ -27,14 +27,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0025-fence-a-session-s-commits-on-its-issue-s-story-branch-not-on-the-branch-name.md"
-    label: "reviewer ADR-0025: Fence a session's commits on its issue's story branch, not on the branch name"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0015-fence-a-session-s-commits-on-its-issue-s-story-branch-not-on-the-branch-name.md"
+    label: "reviewer ADR-0015: Fence a session's commits on its issue's story branch, not on the branch name"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0003-guard-commits-leave-the-rules-of-a-pr-to-github-and-read-the-org-gate-s-verdict.md"
-    label: "reviewer ADR-0003: Guard commits, leave the rules of a PR to GitHub and read the org gate's verdict from its check run"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
+    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
 ---
 
 # ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied
@@ -43,8 +40,6 @@ externalRefs:
 
 ADR, revert, retire-spec and release PRs, and PRs that Bot accounts open, are not story PRs and get no
 launch, yet the ruleset requires `internal-review` (ADR-0004), so who may waive it is a trust decision.
-reviewer ADR-0003 decision 2 listed the exempt kinds in a record (one, a version-only release); this
-record replaces that list.
 
 ## Decision
 
@@ -55,7 +50,7 @@ record replaces that list.
    retire-spec and release PRs are labelled or Bot-authored; no branch-name kinds, no list of exempt
    diff shapes.
 4. We will let only a human create or apply an exempt label; the hook refuses a label write from any
-   agent session (reviewer ADR-0022).
+   agent session (reviewer ADR-0012).
 
 ## Options considered
 
@@ -65,14 +60,13 @@ Covers retire-spec, reverts and releases; the labeled event's sender is GitHub's
 
 ### Option B: Exempt kinds named in a record
 
-reviewer ADR-0003, decision 2: a version-only release is exempt, and the user switches the plugin off
-for any other PR that should go without it. Rejected: every new kind needed a record; the label
-is the general exemption.
+For example, a version-only release is exempt, and the user switches the plugin off for any other PR
+that should go without it. Rejected: every new kind needs a record; the label is the general exemption.
 
 ### Option C: Branch-name kinds for tooling branches
 
 Rejected: a session with no recorded issue commits freely on any branch (reviewer
-ADR-0025), and the label or a Bot author exempts its PR, so a branch name does no work.
+ADR-0015), and the label or a Bot author exempts its PR, so a branch name does no work.
 
 ### Option D: The pr-gate App sets "exempt" on the labeled event
 

@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0007"
 title: "Mark a story PR ready on the attestation alone; In review once green with no findings"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [pull-requests, ready-flip, orchestrator, review-loop, lanes]
 scope: component

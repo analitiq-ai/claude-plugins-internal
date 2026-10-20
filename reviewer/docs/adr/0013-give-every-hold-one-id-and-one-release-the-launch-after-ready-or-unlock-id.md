@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0023"
+id: "0013"
 title: "Give every hold one id and one release: the launch after Ready, or `unlock <id>`"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [holds, release, user-authority, unlock, orchestrator]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0004", "0014", "0018", "0020", "0021", "0022"]
+relatesTo: ["0001", "0008", "0010", "0011", "0012"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,policy,ledger,claimgate,shimgate,hookio}.py"
@@ -38,22 +38,18 @@ externalRefs:
     label: "orchestrator ADR-0010: Take an escalation's answer from a writer's issue comment"
 ---
 
-# ADR-0023: Give every hold one id and one release: the launch after Ready, or `unlock <id>`
+# ADR-0013: Give every hold one id and one release: the launch after Ready, or `unlock <id>`
 
 ## Context
 
-ADR-0004 and ADR-0018 accepted no release but a keyword prompt (`unlock <ref>` for a `RESHAPE_SPEC`
-lock). The orchestrator's launch from a human's Ready types no prompt, so a held PR stayed held.
-This record supersedes ADR-0004 and ADR-0018, reversing their one-route rule and ADR-0004's keyword
-per user-only action.
+A hold that only a keyword prompt releases stays held when the orchestrator launches from a human's
+Ready, because that launch types no prompt.
 
 ## Decision
 
 1. We will give every hold reviewer places (rescope-<pr>, escalation-<pr>, pushback-<pr>, claim-<id>,
-   shim-<id>, audit-<pr>) an id and a row in the PR body section (ADR-0021); the orchestrator keeps
-   the card Blocked while one is open. `RESHAPE_SPEC` is RESCOPE, its lock rescope-<pr>;
-   `override shim-<id>` folds into `unlock shim-<id>`; `unlock #<pr>` goes, and `rebase <ref>` with it (ADR-0020); a
-   refusal names the exact id.
+   shim-<id>, audit-<pr>) an id and a row in the PR body section (ADR-0011); the orchestrator keeps
+   the card Blocked while one is open. A refusal names the exact id.
 2. We will release holds by one function, two callers: reviewer, at the start of the launch that
    follows a human's Ready, releases every open hold of the PR (escalation once ANSWERED); a prompt
    starting `unlock <id>`, read in the `UserPromptSubmit` hook, releases that one. Nothing else does.
@@ -66,7 +62,7 @@ per user-only action.
 
 Every hold released by one function; the guarantee sits at Ready's writer.
 
-### Option B: Keyword prompt only (ADR-0004, ADR-0018)
+### Option B: Keyword prompt only
 
 The launch types no prompt.
 
@@ -86,7 +82,7 @@ Replies resolve the threads; a hold needs a failing merge blocker.
 
 - Ready names no author and releases every open hold of the PR at once; the orchestrator trusts
   the lane whoever moved it.
-- The guarantee is one hook refusal (ADR-0022); a lane write past it counts as a human's.
+- The guarantee is one hook refusal (ADR-0012); a lane write past it counts as a human's.
 
 ## Consequences
 

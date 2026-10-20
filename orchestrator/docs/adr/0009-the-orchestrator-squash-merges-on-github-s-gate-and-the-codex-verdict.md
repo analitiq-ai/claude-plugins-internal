@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0009"
 title: "The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [orchestrator, merge, ruleset, github, pull-requests]
 scope: component
@@ -36,9 +36,7 @@ externalRefs:
 ## Context
 
 Once a story's card is In review, something must merge its PR and hold the merge condition: the
-plugin's pre-merge gate, as today; GitHub's auto-merge; or the orchestrator. The design reversed the choice
-twice: the orchestrator's merge, then auto-merge never disarmed, then the orchestrator
-again.
+plugin's pre-merge gate, as today; GitHub's auto-merge; or the orchestrator.
 
 ## Decision
 

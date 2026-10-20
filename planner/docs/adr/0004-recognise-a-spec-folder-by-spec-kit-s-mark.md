@@ -3,7 +3,7 @@ schemaVersion: 0.1.0
 id: "0004"
 title: "Recognise a spec folder by Spec Kit's mark"
 status: draft
-date: 2026-10-09
+date: 2026-10-20
 deciders: []
 tags: [spec-folder, workflow]
 scope: component
@@ -29,23 +29,14 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
     label: "Move planning (issue-spec) out of reviewer into its own plugin"
   - type: doc
-    id: "reviewer ADR-0012"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-find-spec-folders-by-spec-kit-s-mark-and-keep-no-list-of-design-documents.md"
-    label: "Decision 1, decided here again for planner"
-  - type: doc
-    id: "reviewer ADR-0016"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-tell-review-the-spec-at-each-round-launch-and-bind-it-to-the-pr.md"
-    label: "Review verifies a named folder by its parent `specs` and its spec.md"
+    id: "reviewer ADR-0014"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
+    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
 ---
 
 # ADR-0004: Recognise a spec folder by Spec Kit's mark
 
 ## Context
-
-reviewer's ADR-0012, decision 1, recognises a spec folder by Spec Kit's own mark: `specs/<feature>/` directly
-beside a committed `.specify/` folder. Spec 019 FR-023 has an existing record that binds a new plugin decided again
-in that plugin's log, not copied, and research R16 names that decision as one planner decides again. This is that
-record.
 
 Spec Kit marks a project with a `.specify/` folder and creates spec folders only in the `specs/` beside it.
 `specify` takes the directory it runs in as its project, and that directory must hold `.specify/`; a parent's does
@@ -55,13 +46,8 @@ planner's rescope takes a spec folder as its argument and does not look one up (
 is the workflow's `select-spec` step: `specs/<feature>`, with `spec.md` present (R6).
 
 Review and build are told the folder planning writes. Review checks less than this mark: the path is relative with
-no `..`, its parent is named `specs`, and `spec.md` is in HEAD and not empty (FR-007, reviewer's ADR-0016,
-decision 3). Review does not use ADR-0012, decision 1 (reviewer's ADR-0017). `/builder:issue-tackle` takes
-`spec` in the same form (FR-015).
-
-Why now: PR #75, on main, gave planning its present shape inside reviewer. Research R16 gives planner a log of
-its own and has it land before the move into planner. This record was written first, on the branch of PR #72. The
-move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
+no `..`, its parent is named `specs`, and `spec.md` is in HEAD and not empty (FR-007). Review does not use
+Spec Kit's mark (reviewer ADR-0014). `/builder:issue-tackle` takes `spec` in the same form (FR-015).
 
 ## Decision
 
@@ -85,8 +71,7 @@ planner's log holds no definition, and each change to planning decides again whe
 
 ### Option C: Any `specs/<x>/` folder, at any depth
 
-What review checked before reviewer's ADR-0012, and checks again since its ADR-0016. ADR-0012 rejected it as the
-definition: any folder that happens to be named `specs/<x>/` counts.
+Rejected as the definition: any folder that happens to be named `specs/<x>/` counts.
 
 ## Trade-offs
 

@@ -31,7 +31,7 @@ class SpanNotFound(ValueError):
 
 def install_step(executable: str, in_venv: bool, externally_managed: bool) -> str:
     """The command that installs the library for the interpreter that runs the hooks. A PEP 668 interpreter outside a
-    venv refuses pip, so the step named there is the system package: it must be one that can succeed (ADR-0009)."""
+    venv refuses pip, so the step named there is the system package: it must be one that can succeed (ADR-0005)."""
     if externally_managed and not in_venv:
         return f"sudo apt install python3-{LIBRARY}"
     return f"{executable} -m pip install {LIBRARY}"

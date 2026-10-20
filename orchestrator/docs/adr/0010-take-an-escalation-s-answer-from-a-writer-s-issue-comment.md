@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0010"
 title: "Take an escalation's answer from a writer's issue comment"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [orchestrator, escalation, holds, issue-comments, trust]
 scope: component
@@ -27,11 +27,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0023-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md"
-    label: "reviewer ADR-0023: Give every hold one id and one release: the launch after Ready, or `unlock <id>`"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md"
+    label: "reviewer ADR-0013: Give every hold one id and one release: the launch after Ready, or `unlock <id>`"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "reviewer ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
+    label: "reviewer ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer"
 ---
 
 # ADR-0010: Take an escalation's answer from a writer's issue comment
@@ -39,7 +39,7 @@ externalRefs:
 ## Context
 
 An escalation hold keeps the card Blocked until a human answers the round's question (reviewer
-ADR-0023). The orchestrator must know
+ADR-0013). The orchestrator must know
 when the answer is in, yet it parses no prose and reads no plugin config (ADR-0001).
 
 Whose comment counts is a trust choice: some repos the orchestrator serves are public, so anyone can
@@ -72,7 +72,7 @@ config.
 ## Trade-offs
 
 - Who may answer and who is trusted differ: a collaborator outside `trusted_reviewers` can answer an
-  escalation, yet a thread they last commented on is resolved unread (reviewer ADR-0026).
+  escalation, yet a thread they last commented on is resolved unread (reviewer ADR-0016).
 - The orchestrator checks that a writer commented after the question, not what was written.
 
 ## Consequences

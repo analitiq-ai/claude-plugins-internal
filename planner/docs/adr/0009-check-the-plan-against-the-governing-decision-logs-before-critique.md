@@ -1,9 +1,9 @@
 ---
 schemaVersion: 0.2.0
-id: "0010"
+id: "0009"
 title: "Check the plan against the governing decision logs before critique"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [adr, alignment, planning, decision-log, workflow]
 scope: component
@@ -36,7 +36,7 @@ externalRefs:
     label: "orchestrator ADR-0006: Land an issue's decision record as an exempt PR before its first story PR"
 ---
 
-# ADR-0010: Check the plan against the governing decision logs before critique
+# ADR-0009: Check the plan against the governing decision logs before critique
 
 ## Context
 

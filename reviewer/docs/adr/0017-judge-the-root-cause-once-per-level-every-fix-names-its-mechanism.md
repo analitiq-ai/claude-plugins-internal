@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0027"
+id: "0017"
 title: "Judge the root cause once per level; every FIX names its mechanism"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [root-cause, assessment, policy, shim-check, reviewer-set]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0007", "0014", "0029"]
+relatesTo: ["0004", "0008", "0019"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{policy,briefs,assessment,shimcheck,jev}.py"
@@ -31,21 +31,21 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
+    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
     label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
 ---
 
-# ADR-0027: Judge the root cause once per level; every FIX names its mechanism
+# ADR-0017: Judge the root cause once per level; every FIX names its mechanism
 
 ## Context
 
 Today cause versus symptom is judged twice and binds no ruling: builder's root-cause-check reads
 nothing from the round; the shim check guesses it beside the site coverage it measures
-(ADR-0007). And a FIX may say "fix it" and leave the mechanism to the agent. planner
-ADR-0009's observed-cause fact now tells a round when a root-cause verdict is due.
+(ADR-0004). And a FIX may say "fix it" and leave the mechanism to the agent. planner
+ADR-0008's observed-cause fact now tells a round when a root-cause verdict is due.
 
 ## Decision
 

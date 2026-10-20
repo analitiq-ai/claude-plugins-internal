@@ -220,7 +220,7 @@ def _counted(chain: dict, tree: str) -> dict:
 
 
 def survivor(chains: list[dict]) -> dict:
-    """The bug that goes on when several are one: the higher count, the smaller id on a tie (ADR-0014)."""
+    """The bug that goes on when several are one: the higher count, the smaller id on a tie (ADR-0008)."""
     return min(chains, key=lambda c: (-c["count"], c["id"]))
 
 

@@ -1,9 +1,9 @@
 ---
 schemaVersion: 0.1.0
-id: "0005"
+id: "0002"
 title: "Check the exact staged tree and refuse a commit command that could change it"
-status: accepted
-date: 2026-10-06
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, commit-gate]
 scope: component
@@ -17,7 +17,6 @@ affects:
     pattern: "specs/004-spec-folder-checks/**"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -31,7 +30,7 @@ externalRefs:
     label: "The batch of decisions already made, written as ADRs"
 ---
 
-# ADR-0005: Check the exact staged tree and refuse a commit command that could change it
+# ADR-0002: Check the exact staged tree and refuse a commit command that could change it
 
 ## Context
 
@@ -111,4 +110,4 @@ gate for no claim the hooks write.
 
 ## Action items
 
-1. [x] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.

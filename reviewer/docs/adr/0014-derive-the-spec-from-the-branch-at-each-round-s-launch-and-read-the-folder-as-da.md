@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0024"
+id: "0014"
 title: "Derive the spec from the branch at each round's launch and read the folder as data"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [spec, spec-folder, review-round, branch-grammar, front-matter]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0008", "0009", "0012", "0016", "0017", "0020"]
+relatesTo: ["0005", "0010"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/review-round.js"
@@ -37,8 +37,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
+    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0005-exempt-a-pr-from-the-internal-review-by-its-bot-author-or-a-label-a-writer-appli.md"
     label: "orchestrator ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied"
@@ -46,20 +46,15 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md"
     label: "planner ADR-0005: Have the skill that shapes an issue read and write the spec in its spec folder"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
     label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
 ---
 
-# ADR-0024: Derive the spec from the branch at each round's launch and read the folder as data
+# ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data
 
 ## Context
 
-Which spec governs a PR, and what review reads from it, was decided four times.
-
-This supersedes ADR-0008 (decision 3: the issue names its spec folder in a comment), ADR-0012
-(decisions 1 and 4: a spec folder is found by Spec Kit's mark and settled before round 1),
-ADR-0016 (every launch names its `spec`, bound in the PR's ledger) and ADR-0017 (decision 1:
-review reads only `spec.md`).
+A review round has to know which spec governs its PR, and what to read from that spec's folder.
 
 ## Decision
 
@@ -68,9 +63,9 @@ review reads only `spec.md`).
    `<n>-adr-<slug>` none, and the decision-reviewer grades the record; any other branch is
    refused a round. reviewer stays the only parser of branch names; no issue comment, no list
    of spec or design-document paths. Every round derives the spec afresh and grades `spec.md` at
-   the reviewed commit (ADR-0020); no value or blob id is recorded, no rebind exists.
+   the reviewed commit (ADR-0010); no value or blob id is recorded, no rebind exists.
 2. We will read the folder as data and validate none of it (planning checks its own output):
-   `spec.md` whole for reviewers and assessor, its `codeworks` keys for dispatch (planner ADR-0009),
+   `spec.md` whole for reviewers and assessor, its `codeworks` keys for dispatch (planner ADR-0008),
    and `tasks.md` ticks through next_story for LAST_STORY at attestation; never headings.
 
 ## Options considered
@@ -79,21 +74,21 @@ review reads only `spec.md`).
 
 Keys survive a template change where headings do not.
 
-### Option B: `spec` passed at the round's launch, bound in the ledger (ADR-0016)
+### Option B: `spec` passed at the round's launch, bound in the ledger
 
 Rejected: the branch already names the spec (redraw fix); `null` for a PR with no issue has no
 case left.
 
-### Option C: The issue names its folder in a comment (ADR-0008)
+### Option C: The issue names its folder in a comment
 
 Rejected: nothing is parsed out of prose.
 
-### Option D: Found by Spec Kit's mark, settled before round 1 (ADR-0012)
+### Option D: Found by Spec Kit's mark, settled before round 1
 
-Rejected: the folder is named by the issue number, not found; review validates nothing of the
-folder, and ADR-0017 had already reversed decision 4.
+Rejected: the folder is named by the issue number, not found, and review validates nothing of the
+folder.
 
-### Option E: Review reads only `spec.md` (ADR-0017)
+### Option E: Review reads only `spec.md`
 
 Rejected: LAST_STORY is read from `tasks.md` at attestation.
 
@@ -101,7 +96,7 @@ Rejected: LAST_STORY is read from `tasks.md` at attestation.
 
 - A PR from a branch outside the grammar never gets internal-review; a revert or release bump
   reaches main only as an exempt PR (orchestrator ADR-0005).
-- A folder written outside planning reaches review unchecked, as ADR-0017 accepted.
+- A folder written outside planning reaches review unchecked.
 
 ## Consequences
 

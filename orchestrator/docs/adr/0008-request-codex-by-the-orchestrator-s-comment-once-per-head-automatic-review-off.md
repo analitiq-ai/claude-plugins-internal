@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0008"
 title: "Request Codex by the orchestrator's comment once per head, automatic review off"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [codex, external-review, orchestrator, pull-requests, github]
 scope: component
@@ -27,8 +27,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
+    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
 ---
 
 # ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off
@@ -45,7 +45,7 @@ triggers (Options B and C, `.claude/rules/pr-review-loop.md`) asks exactly once 
    reviewing from ready on.
 2. We will post it once per head, when there is no verdict and no request yet: on a story PR once attested,
    green and without findings; on an exempt PR once ready. The hook refuses it from any agent session
-   (reviewer ADR-0022).
+   (reviewer ADR-0012).
 3. We will read the verdict from the pr-gate App's `codex-review` status at the head (ADR-0009), never the
    review text.
 4. We will move the card to Blocked, naming the reporter, when a required context, CodeRabbit or Codex is

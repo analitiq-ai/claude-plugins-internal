@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0026"
+id: "0016"
 title: "Resolve unread every thread whose latest author is not a trusted reviewer"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [threads, trust, findings, prompt-injection, gate]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0029"]
+relatesTo: ["0019"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{github,gate,briefs,codexstate}.py"
@@ -33,7 +33,7 @@ externalRefs:
     label: "orchestrator ADR-0010: Take an escalation's answer from a writer's issue comment"
 ---
 
-# ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer
+# ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer
 
 ## Context
 
@@ -44,7 +44,7 @@ wrote it, and a thread an agent reads is text it acts on (OWASP LLM01).
 
 1. We will keep one list, `trusted_reviewers` in reviewer's config.json, naming the review bots
    and the named humans; a thread is trusted when its latest comment's author is on it.
-2. We will make reviewer the only owner of trust: at a github round's launch (ADR-0029) it
+2. We will make reviewer the only owner of trust: at a github round's launch (ADR-0019) it
    queries GitHub for the PR's unresolved threads, failing required checks and a conflict with
    main, resolves every untrusted thread unread with a fixed reply naming the reason, and opens
    the round on the rest in one gate decision. No agent reads an untrusted thread; the

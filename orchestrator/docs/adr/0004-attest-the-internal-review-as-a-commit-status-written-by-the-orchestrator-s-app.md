@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0004"
 title: "Attest the internal review as a commit status written by the orchestrator's App"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [attestation, commit-status, merge-gate, github-app, orchestrator]
 scope: component
@@ -27,8 +27,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md"
-    label: "reviewer ADR-0021: Record rounds and holds in a PR body section reviewer alone writes"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md"
+    label: "reviewer ADR-0011: Record rounds and holds in a PR body section reviewer alone writes"
 ---
 
 # ADR-0004: Attest the internal review as a commit status written by the orchestrator's App
@@ -37,7 +37,7 @@ externalRefs:
 
 The merge contract is GitHub's ruleset (ADR-0009), which needs a status saying the internal review
 passed at the head. Reviewer records each round's verdict in the PR body section (reviewer
-ADR-0021) from inside the agent session, with its credential. Which credential turns that record into
+ADR-0011) from inside the agent session, with its credential. Which credential turns that record into
 the status the ruleset trusts is the ruleset's trust root.
 
 ## Decision
@@ -50,7 +50,7 @@ the status the ruleset trusts is the ruleset's trust root.
 3. We will have the ruleset (ADR-0009) require `internal-review` from that App alone, so a status
    written with any session token counts for nothing.
 4. We will accept the reviewer hook, which refuses a body edit from the agent after creation
-   (reviewer ADR-0021), as the only boundary on the block the orchestrator reads.
+   (reviewer ADR-0011), as the only boundary on the block the orchestrator reads.
 
 ## Options considered
 
@@ -79,7 +79,7 @@ Rejected: the graded session would attest its own review.
 - Harder: while the orchestrator is down no PR is attested.
 - **How we would know this was wrong:** a CLEAN round in the block that no review round produced
   because an agent session rewrote the block past the hook.
-- Revisit if: reviewer stops recording rounds in the PR body (reviewer ADR-0021), or the ruleset
+- Revisit if: reviewer stops recording rounds in the PR body (reviewer ADR-0011), or the ruleset
   stops being the merge contract (ADR-0009).
 
 ## Action items

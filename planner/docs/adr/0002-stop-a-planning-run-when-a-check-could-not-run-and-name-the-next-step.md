@@ -3,7 +3,7 @@ schemaVersion: 0.1.0
 id: "0002"
 title: "Stop a planning run when a check could not run and name the next step"
 status: draft
-date: 2026-10-09
+date: 2026-10-20
 deciders: []
 tags: [failure-handling, workflow]
 scope: component
@@ -31,45 +31,34 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
     label: "Move planning (issue-spec) out of reviewer into its own plugin"
   - type: doc
-    id: "reviewer ADR-0009"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0009-refuse-when-a-check-could-not-run-and-name-the-next-step.md"
-    label: "Decided here again for planner"
+    id: "reviewer ADR-0005"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0005-refuse-when-a-check-could-not-run-and-name-the-next-step.md"
+    label: "reviewer ADR-0005: Refuse when a check could not run and name the next step"
   - type: doc
-    id: "reviewer ADR-0017"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-leave-the-spec-folder-s-contents-to-planning-review-reads-only-spec-md.md"
-    label: "Planning checks its own output; review does not"
+    id: "reviewer ADR-0014"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
+    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
 ---
 
 # ADR-0002: Stop a planning run when a check could not run and name the next step
 
 ## Context
 
-reviewer's ADR-0009 decides, for review's gates, to refuse the call a check was deciding whenever that check could
-not run. Spec 019 FR-023 has an existing record that binds a new plugin decided again in that plugin's log, not
-copied, and research R16 names ADR-0009 as one planner decides again. This is that record.
+reviewer's ADR-0005 decides, for review's gates, to refuse the call a check was deciding whenever that check could
+not run. This record decides the same question for planning.
 
-Planning has no hooks (R16). Its checks are steps of its Spec Kit workflow that run a script: the premise report,
-the root cause, the premise answers, the rescope folder, the settled-design check (FR-020), and closing an issue
-that is not worth doing (R5). A step that exits non-zero stops the run, and the planning skill shows the message and
-stops. Those steps depend on things that can fail to answer: git, `gh` and GitHub, Spec Kit, the step's own script.
-When one does not answer, the step has no verdict. The run still has to go on or stop.
+Planning has no hooks (R16). Its checks are Spec Kit workflow steps that run a script: the premise report, the
+root cause, the premise answers, the rescope folder, the settled-design check (FR-020), and closing an issue that
+is not worth doing (R5). A step that exits non-zero stops the run, and the planning skill shows the message. A step
+depends on git, `gh` and GitHub, Spec Kit and its own script; when one does not answer, the step has no verdict,
+and the run must go on or stop.
 
 planner takes constitution principle P4 (R16): a check that could not run is reported as a failed check or a named
 `cannot verify`, never as a pass, never as a finding against the author, and never as a guess. P4 does not say
 whether the run goes on.
 
-Review no longer checks the spec folder's contents. Planning checks its own output, and a spec folder that did not
-pass planning's checks reaches review unchecked (reviewer's ADR-0017).
-
-Today's stops do not meet decisions 2 and 3 below. When a check could not run, `settled_design.py`,
-`premise_report.py` and `rootcause.py` print the exception and exit 2, naming no next step. `settled_design.py` given
-the wrong arguments prints only its usage line, which says neither that the check failed nor what to do next. A
-failed `gh` or `git` in a shell step shows only that tool's error. Ratified, this record changes that behaviour; it
-changes no script itself (constitution VI).
-
-Why now: PR #75, on main, gave planning its present shape inside reviewer. Research R16 gives planner a log of
-its own and has it land before the move into planner. This record was written first, on the branch of PR #72. The
-move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
+Review validates none of the spec folder. Planning checks its own output, and a spec folder that did not pass
+planning's checks reaches review unchecked (reviewer ADR-0014).
 
 ## Decision
 
@@ -96,7 +85,7 @@ planner's log holds no rule, and each new check decides by which error looks che
 ### Option C: Let the run go on and report `cannot verify`
 
 P4 allows it. Rejected: the run completes with a spec folder its check did not pass, and nothing after planning
-checks the folder's contents (reviewer's ADR-0017).
+checks the folder's contents (reviewer ADR-0014).
 
 ## Trade-offs
 

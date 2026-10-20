@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0001"
 title: "Drive the issue loop with a deterministic orchestrator outside the plugins"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [orchestrator, issue-loop, automation, plugins, github-app]
 scope: component

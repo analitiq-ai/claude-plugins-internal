@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0002"
 title: "The orchestrator alone writes the working lanes, derived from the PR"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [board, lanes, orchestrator, github-projects, workflow]
 scope: component
@@ -27,8 +27,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
+    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
 ---
 
 # ADR-0002: The orchestrator alone writes the working lanes, derived from the PR
@@ -39,7 +39,7 @@ The human and the orchestrator of ADR-0001 share a card's state, and the orchest
 
 ## Decision
 
-1. We will keep six lanes on the Project status field, with issues as the cards, never PRs, and give each lane one writer: GitHub Backlog and Done, a human Ready, the orchestrator In progress, In review and Blocked; reviewer refuses a lane write from any agent session (reviewer ADR-0022); the board's PR-linked, PR-merged and reopen workflows are off.
+1. We will keep six lanes on the Project status field, with issues as the cards, never PRs, and give each lane one writer: GitHub Backlog and Done, a human Ready, the orchestrator In progress, In review and Blocked; reviewer refuses a lane write from any agent session (reviewer ADR-0012); the board's PR-linked, PR-merged and reopen workflows are off.
 2. We will treat In progress and In review, the working lanes, as output, re-derived from the PR every tick, and the other four as inputs; the orchestrator acts on a card in either only when it has claimed it (the bot as assignee).
 3. We will make Blocked the one sink for anything needing a human, its reason posted on the issue (ADR-0003); a human clears the cause and moves the card to Ready; a PR GitHub refuses on a rule outside the merge contract stays In review instead (ADR-0009).
 4. We will read a human's drag to Backlog, Blocked or Done as a stop: the running launch is stopped, nothing merges, the card stays; a drag into a working lane is inert when the card is unclaimed, undone when claimed, and bounced to Blocked when a hold is open.

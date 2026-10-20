@@ -3,13 +3,13 @@ schemaVersion: 0.2.0
 id: "0006"
 title: "Close an issue not worth doing and post nothing for one that needs no spec"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [premise, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0005", "0008"]
+relatesTo: ["0002", "0005", "0007"]
 affects:
   - type: path
     pattern: "planner/plugin/scripts/premise_report.py"
@@ -34,26 +34,21 @@ externalRefs:
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    id: "reviewer ADR-0024"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "Supersedes reviewer ADR-0016 (spec: null at launch); review derives the spec from the branch, null exists nowhere"
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec
 
 ## Context
 
-The premise step ends in `write the spec`, `no spec needed` or `not worth doing` (ADR-0002). As drafted, this
-record had the step close a `not worth doing` issue and the user pass `spec: null` at review (reviewer
-ADR-0016); the design drops both (Options B and D).
+The premise step ends in `write the spec`, `no spec needed` or `not worth doing` (ADR-0002). This record decides
+what a run does with the issue on the last two.
 
 ## Decision
 
 1. We will end the run on `not worth doing` by naming the step for the user: close the issue as not planned, with
    the premise report's reason; an empty reason fails the premise step.
 2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user nothing to pass: its
-   record is the spec folder ADR-0008 writes, which review and build find by the issue number.
+   record is the spec folder ADR-0007 writes, which review and build find by the issue number.
 3. We will have no `#<issue> none <reason>` entry form.
 
 ## Options considered
@@ -64,11 +59,11 @@ ADR-0016); the design drops both (Options B and D).
 
 ### Option B: Tell the user to pass `spec: null` at review
 
-Lost: nothing takes `spec` any more.
+Lost: nothing takes `spec`.
 
 ### Option C: Post a comment naming the outcome on the issue for both picks
 
-Stays rejected: no plugin reads it.
+Rejected: no plugin reads it.
 
 ### Option D: The premise step closes the issue
 

@@ -2,20 +2,19 @@
 schemaVersion: 0.1.0
 id: "0001"
 title: "Follow a piece of text across edits by a lineage carried from version to version"
-status: accepted
-date: 2026-10-06
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, holds]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0014"]
+relatesTo: ["0008"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{claimcheck,claimgate,shimcheck,shimgate,ledger,lineage}.py"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka" 
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -82,8 +81,8 @@ Known gap: we will not follow text that is moved and reworded in one step. The s
 whose second half lands elsewhere in the file: the half in the rewritten range inherits the lineage, and
 the half in a pure insertion starts a new one.
 
-ADR-0014 amends "holds will not be merged" (point 2) for the shim check: two bugs that one staged change
-overlaps are one bug from then on, at the higher count. A bug also keeps its line ranges, against "a hold will
+For the shim check, ADR-0008 makes an exception to "holds will not be merged" (point 2): two bugs that
+one staged change overlaps are one bug from then on, at the higher count. A bug also keeps its line ranges, against "a hold will
 carry no line ranges": spec 018 (R9) carries them across edits by the mapping of point 2. In the claim check a
 lineage records where its words are by character, not by line, and lineages merge only when one claim
 inherits several, as point 2 says.

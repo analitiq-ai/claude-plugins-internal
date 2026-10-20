@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0025"
+id: "0015"
 title: "Fence a session's commits on its issue's story branch, not on the branch name"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [commit-gate, fence, branch-grammar, session-state, hooks]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0024"]
+relatesTo: ["0002", "0014"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,hookio,worktree}.py"
@@ -34,7 +34,7 @@ externalRefs:
     label: "orchestrator ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied"
 ---
 
-# ADR-0025: Fence a session's commits on its issue's story branch, not on the branch name
+# ADR-0015: Fence a session's commits on its issue's story branch, not on the branch name
 
 ## Context
 
@@ -47,7 +47,7 @@ The brainstorm had reviewer refuse a commit on any branch outside the grammar, k
    `<n>-us<j>` on origin; any other branch is refused.
 2. We will let a session with no recorded issue commit freely on any branch: reverts, release bumps and
    retire-spec need no name and no label before their PR.
-3. We will enforce the grammar only at the review-round launch (ADR-0024) and by this fence.
+3. We will enforce the grammar only at the review-round launch (ADR-0014) and by this fence.
 
 ## Options considered
 

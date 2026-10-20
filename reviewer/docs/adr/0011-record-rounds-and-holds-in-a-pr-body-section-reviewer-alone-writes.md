@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0021"
+id: "0011"
 title: "Record rounds and holds in a PR body section reviewer alone writes"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [state, ledger, holds, pr-body, orchestrator]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0002", "0022", "0023"]
+relatesTo: ["0001", "0012", "0013"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{ledger,github,gate,hookio,pre_merge_gate}.py"
@@ -36,23 +36,18 @@ externalRefs:
     label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
-# ADR-0021: Record rounds and holds in a PR body section reviewer alone writes
+# ADR-0011: Record rounds and holds in a PR body section reviewer alone writes
 
 ## Context
 
-ADR-0002 kept reviewer's record in one local SQLite file on the session's machine, which the
-orchestrator, on an unspecified host and running no plugin code, cannot read, and which a host change
-loses.
-
-This record supersedes ADR-0002 and reverses its decision 2, one local SQLite file as reviewer's
-record; its decision 1, the state directory, stands for session-scoped files only; its decision 6,
-`gate.log` and `errors.log`, stands; its decisions 3 to 5 fall with it.
+A record of rounds and holds kept in one local SQLite file on the session's machine cannot be read by
+the orchestrator, which runs on an unspecified host and runs no plugin code, and a host change loses it.
 
 ## Decision
 
 1. We will record rounds, holds and `Closes #n` on the last story in one PR body section: a rendered
    table and one machine block; a released hold keeps its row.
-2. We will make reviewer the section's only writer after builder creates the PR (ADR-0022), inside
+2. We will make reviewer the section's only writer after builder creates the PR (ADR-0012), inside
    the session it gates; the orchestrator reads ATTESTED and HOLD from it and never writes it.
 3. We will keep `ledger.db` beside the session as a hot-path cache, rebuilt from the section when
    missing. Reviewer reports and session grants stay session-scoped files (orchestrator ADR-0003, decision 4).
@@ -63,7 +58,7 @@ record; its decision 1, the state directory, stands for session-scoped files onl
 
 One writer after creation, so no conditional update is needed.
 
-### Option B: ADR-0002's local SQLite store as the record
+### Option B: A local SQLite store as the record
 
 Rejected: the problem in Context.
 

@@ -3,13 +3,13 @@ schemaVersion: 0.2.0
 id: "0005"
 title: "Have the skill that shapes an issue read and write the spec in its spec folder"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [spec, spec-folder, skills, rescope]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0002", "0008", "0010"]
+relatesTo: ["0001", "0002", "0007", "0009"]
 affects:
   - type: path
     pattern: "planner/plugin/skills/issue-spec/**"
@@ -30,10 +30,6 @@ externalRefs:
     id: "63"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
     label: "Move planning (issue-spec) out of reviewer into its own plugin"
-  - type: doc
-    id: "reviewer ADR-0024"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "Supersedes reviewer ADR-0008 and reviewer ADR-0016; decision 1 here re-decides reviewer ADR-0008 decision 2's part about the skill that shapes an issue"
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
@@ -57,9 +53,8 @@ externalRefs:
 ## Context
 
 The target design keeps one spec per issue on `<n>-us<k>` (org ADR-0002) and has an orchestrator that
-launches on a Ready card. This amendment drops the draft's `rescope` keyword, folder argument and in-place
-rewrite, because the branch's state already says whether a spec exists. The draft's decision 1 and its closing
-message (decision 3) stand.
+launches on a Ready card. The branch's state already says whether a spec exists, so the skill needs no
+`rescope` keyword, folder argument or in-place rewrite.
 
 ## Decision
 

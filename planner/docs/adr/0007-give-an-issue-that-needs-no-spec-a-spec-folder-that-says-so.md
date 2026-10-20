@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0008"
+id: "0007"
 title: "Give an issue that needs no spec a spec folder that says so"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [premise, spec-folder, front-matter, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006", "0009"]
+relatesTo: ["0005", "0006", "0008"]
 affects:
   - type: path
     pattern: "planner/plugin/scripts/no_spec.py"
@@ -44,23 +44,22 @@ externalRefs:
     label: "org ADR-0002: Keep one spec per issue, in the repo"
   - type: doc
     id: "builder ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
     label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
   - type: doc
-    id: "reviewer ADR-0024"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "reviewer ADR-0024: Derive the spec from the branch at launch and read the folder as data"
+    id: "reviewer ADR-0014"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
+    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
 ---
 
-# ADR-0008: Give an issue that needs no spec a spec folder that says so
+# ADR-0007: Give an issue that needs no spec a spec folder that says so
 
 ## Context
 
 Planning, build and reviewer find an issue's spec by its folder (org ADR-0002). A `no spec needed` pick
 leaving no folder is invisible to all three: the issue can be scoped again as if never judged.
 
-The draft landed it through its own PR with `spec: null` at review; the design drops both (Option B), and
-ADR-0009 moves the kind into front matter.
+ADR-0008 puts the kind into front matter.
 
 ## Decision
 
@@ -78,7 +77,7 @@ Every reader keyed on the issue number sees it; no special value anywhere.
 ### Option B: A spec PR and `spec: null` at review
 
 Rejected: no spec PR exists, and no user passes `spec: null`, since the launch derives the folder from the
-branch (reviewer ADR-0024).
+branch (reviewer ADR-0014).
 
 ### Option C: No record, drop `no spec needed`, or a mark on the issue
 
@@ -88,7 +87,7 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 ## Trade-offs
 
 - A folder with no requirements sits beside real specs, told apart by one front-matter key.
-- `no spec needed` now pushes `<n>-us1` from planning, and the no-spec folder reaches main with the first story
+- `no spec needed` pushes `<n>-us1` from planning, and the no-spec folder reaches main with the first story
   PR, like any spec (org ADR-0002).
 
 ## Consequences

@@ -1,21 +1,20 @@
 ---
 schemaVersion: 0.1.0
-id: "0015"
+id: "0009"
 title: "Send private source to the outside classifier"
-status: accepted
-date: 2026-10-07
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [classifier, private-source]
 scope: org
 reversibility: one-way-door
 blastRadius: org
-relatesTo: ["0007"]
+relatesTo: ["0004"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/jev.py"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -29,12 +28,12 @@ externalRefs:
     label: "The batch of ADRs this one belongs to"
 ---
 
-# ADR-0015: Send private source to the outside classifier
+# ADR-0009: Send private source to the outside classifier
 
 ## Context
 
 An alq-review check can judge a staged change with Jev, a classifier outside the org. Today one check does,
-the shim check (ADR-0007). To judge a change, Jev has to read it. So source code leaves the org, to
+the shim check (ADR-0004). To judge a change, Jev has to read it. So source code leaves the org, to
 OpenRouter and to TypeSafe.
 
 What is sent today: the diff of the staged change and, for a fix, the lists of sites the sweep found, each
@@ -48,8 +47,7 @@ private source. Neither gives a reason, and no alternative was weighed.
 This ADR widens that from the shim check to any alq-review check. A check of prose claims may use Jev
 later.
 
-Why now: the decision was one point of seven in ADR-0007, which is about how a verdict is made. It reaches
-every repo, and it cannot be undone for code already sent.
+Why now: the decision reaches every repo, and it cannot be undone for code already sent.
 
 ## Decision
 
@@ -71,7 +69,8 @@ every repo, and it cannot be undone for code already sent.
 
 ### Option B: Do nothing
 
-The permission stays one point of ADR-0007, marked as reaching one component and as easy to undo.
+The permission is left as one point of ADR-0004, a record marked as reaching one component and as easy to
+undo.
 
 ### Option C: The shim check only
 
@@ -104,4 +103,4 @@ No alternative to sending private source was weighed.
 
 ## Action items
 
-1. [x] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.

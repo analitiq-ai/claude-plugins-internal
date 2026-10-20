@@ -1,9 +1,9 @@
 ---
 schemaVersion: 0.1.0
-id: "0013"
+id: "0007"
 title: "Start the count again when a file is moved"
-status: accepted
-date: 2026-10-07
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, holds]
 scope: component
@@ -15,7 +15,6 @@ affects:
     pattern: "reviewer/plugin/scripts/{claimcheck,claimgate,ledger}.py"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -29,7 +28,7 @@ externalRefs:
     label: "The lineage design that ADR-0001 decided and this ADR adds to"
 ---
 
-# ADR-0013: Start the count again when a file is moved
+# ADR-0007: Start the count again when a file is moved
 
 ## Context
 
@@ -81,5 +80,5 @@ accurate way to detect that a file was moved.
 
 ## Action items
 
-1. [x] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [x] Carry it into the design of ADR-0001's rule (issue #17). Done in #60.

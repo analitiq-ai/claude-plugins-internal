@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0028"
+id: "0018"
 title: "After N review-driven edits to one file, only REDESIGN is admissible"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [review-round, assessment, policy, redesign, churn]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0013", "0027"]
+relatesTo: ["0007", "0017"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{policy,assessment,facts}.py"
@@ -30,7 +30,7 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
 ---
 
-# ADR-0028: After N review-driven edits to one file, only REDESIGN is admissible
+# ADR-0018: After N review-driven edits to one file, only REDESIGN is admissible
 
 ## Context
 
@@ -44,7 +44,7 @@ only when the file moves.
    commits touched it since the reset; REDESIGN must carry an invariant and a diagnosis:
    unsettled design, too many responsibilities, or review polish.
 2. We will reset at the latest of round 1's head, the last settled round's head, the commit
-   closing that file's last REDESIGN finding, and a move of the file (ADR-0013); the assessor's
+   closing that file's last REDESIGN finding, and a move of the file (ADR-0007); the assessor's
    facts will carry edits_since_reset and the reset event.
 3. We will define the rule once, in reviewer's policy; the cto rule file only points at reviewer;
    the pre-PR "unsettled branch" concern belongs to the history-shape audit reviewer.

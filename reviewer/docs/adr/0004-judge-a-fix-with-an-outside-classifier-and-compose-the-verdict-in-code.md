@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.1.0
-id: "0007"
+id: "0004"
 title: "Judge a fix with an outside classifier and compose the verdict in code"
-status: accepted
-date: 2026-10-06
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [shim-check, classifier, verdict]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0015"]
+relatesTo: ["0009"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{jev,shimcheck,shimgate}.py"
@@ -17,7 +17,6 @@ affects:
     pattern: "specs/{011-shim-no-site-left,012-tests-only-tree}/**"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-fable-5-1
@@ -31,7 +30,7 @@ externalRefs:
     label: "The batch of ADRs this one belongs to"
 ---
 
-# ADR-0007: Judge a fix with an outside classifier and compose the verdict in code
+# ADR-0004: Judge a fix with an outside classifier and compose the verdict in code
 
 ## Context
 
@@ -46,7 +45,7 @@ reach the other sites with the same defect. A model has to give them, within thr
 
 Two later specs met the same limits and each added a rule. The rules are spread over three spec folders.
 
-ADR-0015 decides that private source may be sent to the classifier.
+ADR-0009 decides that private source may be sent to the classifier.
 
 ## Decision
 
@@ -67,7 +66,7 @@ ADR-0015 decides that private source may be sent to the classifier.
 |---|---|
 | Fits inside a hook | Yes, a call is about a second |
 | Verdict rule | Set in code |
-| What leaves the org | The diff of the change, and for a fix the lists of sites (ADR-0015) |
+| What leaves the org | The diff of the change, and for a fix the lists of sites (ADR-0009) |
 
 ### Option B: Do nothing
 
@@ -95,4 +94,4 @@ Rejected: its overall answer would differ from its two answers.
 
 ## Action items
 
-1. [x] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.

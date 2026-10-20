@@ -96,7 +96,7 @@ def _mint(claim: dict, ref: str, words: lineage.Words) -> dict:
 
 def _end_gone(claims: ledger.Claims, check: dict) -> None:
     """Ends the open lineages of each file the staged tree and the checkout both lack: a moved file starts again
-    (ADR-0013), and a deleted one has no hunk to say so. A file only unstaged is still on disk and keeps its lineages."""
+    (ADR-0007), and a deleted one has no hunk to say so. A file only unstaged is still on disk and keeps its lineages."""
     root, tree, branch = check["root"], check["tree"], check["branch"]
     for item in claims.open_lineages(branch):
         if worktree.tree_text(root, tree, item["file"]) is None and not worktree.on_disk(root, item["file"]):

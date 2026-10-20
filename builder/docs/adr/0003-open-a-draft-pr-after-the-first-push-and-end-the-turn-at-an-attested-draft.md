@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0003"
 title: "Open a draft PR after the first push and end the turn at an attested draft"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [draft-pr, turn-end, relaunch, orchestrator, issue-tackle]
 scope: component
@@ -35,14 +35,14 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0007-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
     label: "orchestrator ADR-0007: Mark a story PR ready on the attestation alone; In review once green with no findings"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md"
-    label: "reviewer ADR-0021: Record rounds and holds in a PR body section reviewer alone writes"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md"
+    label: "reviewer ADR-0011: Record rounds and holds in a PR body section reviewer alone writes"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
+    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "reviewer ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
+    label: "reviewer ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0008-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
     label: "orchestrator ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off"
@@ -58,13 +58,13 @@ build turn ends, and which GitHub moves it never makes. The brainstorm gave buil
 ## Decision
 
 1. We will open the story PR as a draft after the first push, and a new one on the same branch after a
-   PR closed unmerged; builder writes its description once, at creation (reviewer ADR-0021). Ticks in tasks.md land in
+   PR closed unmerged; builder writes its description once, at creation (reviewer ADR-0011). Ticks in tasks.md land in
    ordinary commits in the story PR.
 2. We will end the turn at an attested draft, or at a stop with a message: a pre-PR stop, or the folder stop of ADR-0002, Decision 3. builder polls
-   nothing and makes none of the GitHub moves reviewer ADR-0022 refuses; the orchestrator relaunches
+   nothing and makes none of the GitHub moves reviewer ADR-0012 refuses; the orchestrator relaunches
    it.
 3. We will resume a relaunch from the open story PR (ADR-0002, Decision 2): findings open a github round (reviewer
-   ADR-0026), an unattested head resumes the internal loop at the current head.
+   ADR-0016), an unattested head resumes the internal loop at the current head.
 
 ## Options considered
 

@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0006"
 title: "Land an issue's decision record as an exempt PR before its first story PR"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [adr, git-workflow, pull-requests, orchestrator, review]
 scope: component
@@ -27,15 +27,15 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0010-check-the-plan-against-the-governing-decision-logs-before-critique.md"
-    label: "planner ADR-0010: Check the plan against the governing decision logs before critique"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md"
+    label: "planner ADR-0009: Check the plan against the governing decision logs before critique"
 ---
 
 # ADR-0006: Land an issue's decision record as an exempt PR before its first story PR
 
 ## Context
 
-A plan can need a decision record (planner ADR-0010), which the decision-reviewer then grades every
+A plan can need a decision record (planner ADR-0009), which the decision-reviewer then grades every
 internal round against. The orchestrator launches on any Ready card (ADR-0001): nothing said who
 merges the record, or that story 1 waits for it.
 

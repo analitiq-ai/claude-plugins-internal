@@ -1,15 +1,15 @@
 ---
 schemaVersion: 0.2.0
-id: "0022"
+id: "0012"
 title: "Refuse from any agent session every GitHub write the orchestrator or a human owns"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [hooks, mutation-gate, ownership, orchestrator, merge-gate]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003"]
+relatesTo: []
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,pre_merge_gate,github,hookio,shell}.py"
@@ -48,16 +48,12 @@ externalRefs:
     label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 ---
 
-# ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns
+# ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns
 
 ## Context
 
 An agent session can make every write Decision 1 lists, though none is the agent's. GitHub
 voids a stray status through the ruleset's App pin and refuses a disallowed merge, nothing else.
-
-This supersedes ADR-0003: it reverses d1's merge and ready gate, d2's exempt kinds and switch, and
-d3's reading of the org gate's check run; d1's commit guard and its refusal to repeat GitHub's rules
-stand.
 
 ## Decision
 
@@ -78,21 +74,21 @@ stand.
 The guarantee sits at the writer; every write the ruleset trusts has one
 writer.
 
-### Option B: Gate the merge and the ready flip (ADR-0003 d1)
+### Option B: Gate the merge and the ready flip
 
 No agent session merges or flips.
 
-### Option C: Name the exempt PR kinds and a switch for the rest (ADR-0003 d2)
+### Option C: Name the exempt PR kinds and a switch for the rest
 
 The label and the session fence replace both.
 
-### Option D: Read the org gate's check run (ADR-0003 d3)
+### Option D: Read the org gate's check run
 
 The ruleset pins each status to its App.
 
-### Option E: Re-check GitHub's rules in the hook (ADR-0003 option C)
+### Option E: Re-check GitHub's rules in the hook
 
-Stays rejected: the copy drifts.
+Rejected: the copy drifts.
 
 ## Trade-offs
 

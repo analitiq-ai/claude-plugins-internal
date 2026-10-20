@@ -1,9 +1,9 @@
 ---
 schemaVersion: 0.1.0
-id: "0014"
+id: "0008"
 title: "Treat bugs that converge as one bug"
-status: accepted
-date: 2026-10-07
+status: draft
+date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [shim-check, holds]
 scope: component
@@ -15,7 +15,6 @@ affects:
     pattern: "reviewer/plugin/scripts/{shimcheck,shimgate,ledger}.py"
 provenance:
   authoredBy: agent-drafted
-  ratifiedBy: "@Analitiq-Bot-Wonka"
   agent:
     name: Claude Code
     model: claude-opus-5-5
@@ -29,7 +28,7 @@ externalRefs:
     label: "The lineage design that ADR-0001 decided and this ADR adds to"
 ---
 
-# ADR-0014: Treat bugs that converge as one bug
+# ADR-0008: Treat bugs that converge as one bug
 
 ## Context
 
@@ -94,5 +93,5 @@ Rejected: a commit that touches two bugs would wipe both counts.
 
 ## Action items
 
-1. [x] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this ADR, or sends it back.
 2. [x] Carry it into the design of ADR-0001's rule (issue #17). Done in #60.

@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0002"
 title: "Have the build skills derive the spec folder from the issue number, never from an issue comment"
 status: draft
-date: 2026-10-19
+date: 2026-10-20
 deciders: []
 tags: [spec, spec-folder, skills, issue-tackle, root-cause-check, story]
 scope: component
@@ -41,20 +41,18 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
     label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0027-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
-    label: "reviewer ADR-0027: Judge the root cause once per level; every FIX names its mechanism"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
+    label: "reviewer ADR-0017: Judge the root cause once per level; every FIX names its mechanism"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
+    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
 ---
 
 # ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment
 
 ## Context
 
-This record decides how `builder` finds the spec folder (ADR-0001) and the story. The draft
-(issue #63) had the caller pass `spec` and `branch` and had `issue-tackle` run `root-cause-check`; the
-design (issue #133) drops both and makes `builder` depend on `reviewer`. The caller is now a
+This record decides how `builder` finds the spec folder (ADR-0001) and the story. The caller is a
 deterministic orchestrator (orchestrator ADR-0001), which computes no story order.
 
 ## Decision
@@ -63,11 +61,11 @@ deterministic orchestrator (orchestrator ADR-0001), which computes no story orde
    `builder` declares `reviewer` as a dependency.
 2. We will derive everything from `<n>`: the spec folder is the one `specs/<n>-*/` on the issue branch;
    the requirement is its `spec.md`, or the issue body when its front matter's `codeworks.kind` is `no_spec`
-   (planner ADR-0009); the story is the open story PR's (never an `<n>-adr-*` PR), else the one `next_story` returns (org ADR-0003).
+   (planner ADR-0008); the story is the open story PR's (never an `<n>-adr-*` PR), else the one `next_story` returns (org ADR-0003).
 3. We will stop, never plan, on no `specs/`, no `specs/<n>-*` or an inconsistent folder, with a message naming the state and any open PR.
 4. We will have neither skill read any issue comment for the spec.
 5. We will drop `root-cause-check` as a build step: the round's root-cause reviewer verifies the cause
-   (reviewer ADR-0027).
+   (reviewer ADR-0017).
 
 ## Options considered
 
@@ -75,7 +73,7 @@ deterministic orchestrator (orchestrator ADR-0001), which computes no story orde
 
 See Decisions 1–2.
 
-### Option B: `spec` and `branch` from the caller (as drafted)
+### Option B: `spec` and `branch` from the caller
 
 Rejected: the orchestrator computes no story order.
 
@@ -87,7 +85,7 @@ Rejected: a priority change lives in the spec; a rescope renumbers.
 
 Rejected (brainstorm): the skill stops with a message naming the state, never a planning command.
 
-### Option E: `root-cause-check` as a build step (as drafted)
+### Option E: `root-cause-check` as a build step
 
 Rejected (Root cause, option D′): the check reads nothing from the round; it becomes the round's
 root-cause reviewer.

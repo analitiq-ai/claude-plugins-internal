@@ -68,7 +68,7 @@ code it governs in the same PR).
 
 A principle carries one number across the repo and names the components it applies to. Where its gate
 differs by component, each component's gate is given. reviewer alone has hooks, so P6's refusals are
-reviewer's for every component (`reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`,
+reviewer's for every component (`reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`,
 decision 1).
 
 ### P1. Code Decides, Not Prose
@@ -97,7 +97,7 @@ no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
-`reviewer/docs/adr/0023-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md`;
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
@@ -146,8 +146,8 @@ Gate: for every state the plan reads or writes (a lane, a label, a status, the a
 body, a hold, a commit), does the plan name its one writer, and does the component write only the
 state it owns and refuse, from any agent session, every write it does not own?
 
-Source: reviewer: `reviewer/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md`
-(decision 2); `reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md`
+(decision 2); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
 (decision 1). planner: `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
 (decision 4); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
@@ -162,11 +162,11 @@ Gate: does every fact the plan reads come from a key, a field, a status or a nam
 never from a heading, a comment's wording or free text; and does every fact the plan writes for
 another reader land in such a form?
 
-Source: reviewer: `reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md`
-(decisions 1, 2); `reviewer/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md`
-(decision 1). planner: `planner/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
-(decision 1); `planner/docs/adr/0008-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
-(decision 1). builder: `builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md`
+Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
+(decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md`
+(decision 1). planner: `planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
+(decision 1); `planner/docs/adr/0007-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
+(decision 1). builder: `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
 (decisions 2, 4). orchestrator: `orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md`
 (decision 2).
 
@@ -178,13 +178,13 @@ Gate: does the plan assume of a repository only the branch grammar, the spec fol
 own objects, with every per-repository value in config and no repository name, path or setting
 special-cased?
 
-Source: reviewer: `reviewer/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md`
-(decision 1); `reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
-(decision 3); `reviewer/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md`
-(decision 1). planner: `planner/docs/adr/0010-check-the-plan-against-the-governing-decision-logs-before-critique.md`
+Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
+(decision 1); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 3); `reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md`
+(decision 1). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
 (decisions 1–2); `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
 (decision 2); `planner/docs/adr/0004-recognise-a-spec-folder-by-spec-kit-s-mark.md`. builder:
-`builder/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md`
+`builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
 (decision 2).
 
 ## Platform Constraints
