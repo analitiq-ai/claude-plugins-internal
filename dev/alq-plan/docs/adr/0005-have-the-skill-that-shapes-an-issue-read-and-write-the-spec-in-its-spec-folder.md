@@ -48,7 +48,7 @@ externalRefs:
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
     id: "orchestrator ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
     label: "orchestrator ADR-0002: The orchestrator alone writes the working lanes, derived from the PR"
 ---
 

@@ -32,7 +32,7 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "orchestrator ADR-0006"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0006-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0006-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
     label: "orchestrator ADR-0006: Land an issue's decision record as an exempt PR before its first story PR"
 ---
 
