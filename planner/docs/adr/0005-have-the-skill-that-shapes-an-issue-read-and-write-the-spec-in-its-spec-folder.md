@@ -5,11 +5,11 @@ title: "Have the skill that shapes an issue read and write the spec in its spec 
 status: draft
 date: 2026-10-20
 deciders: []
-tags: [spec, spec-folder, skills, rescope]
+tags: [spec, spec-folder, skills, rescope, lanes, holds]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0002", "0007", "0009"]
+relatesTo: ["0001", "0002", "0007", "0008", "0009", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/skills/issue-spec/**"
@@ -37,11 +37,11 @@ externalRefs:
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "org ADR-0002: Keep one spec per issue, in the repo"
+    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
   - type: doc
-    id: "org ADR-0003"
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
+    id: "orchestrator ADR-0006"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0006-launch-no-story-while-its-spec-s-issue-has-an-open-spec-pr-or-before-one-merged.md"
+    label: "orchestrator ADR-0006: Launch no story while its spec's issue has an open spec PR, or before one merged"
   - type: doc
     id: "orchestrator ADR-0002"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
@@ -52,58 +52,62 @@ externalRefs:
 
 ## Context
 
-The target design keeps one spec per issue on `<n>-us<k>` (org ADR-0002) and has an orchestrator that
-launches on a Ready card. The branch's state already says whether a spec exists, so the skill needs no
-`rescope` keyword, folder argument or in-place rewrite.
+An issue's spec lands by a spec PR on `<p>-spec`, `<p>` the spec's issue: the parent when the story issue has
+one, else the story issue itself (org ADR-0002). While a spec's issue has an open spec PR, no story under it
+launches (orchestrator ADR-0006).
 
 ## Decision
 
 1. We will have `/planner:issue-spec` write the spec into its spec folder and read no issue comment for it
    (ADR-0001).
-2. We will take `#<n>` (or `untracked "<what>"`) as the only entry: a folder with `spec.md` on the issue
-   branch means a rescope, from grill; otherwise a new spec, from premise.
-3. We will refuse a rescope while the card is Ready, In progress or In review, naming the step "move the card
-   to Backlog" (ADR-0002); a rescope may add stories and renumbers no frozen story (org ADR-0003).
-4. We will commit and push the spec on the branch org ADR-0002 names; the run opens no PR and writes no
-   lane (org ADR-0002, orchestrator ADR-0002); a completed run posts nothing on the issue, and ends with a message
-   that gives the spec folder and the branch it is committed on, and names no command of another plugin.
+2. We will take an issue number (or `untracked "<what>"`) as the only entry and resolve it to its spec's
+   issue `<p>`: a `specs/<p>-*/spec.md` on the default branch means a rescope, from grill; otherwise a new spec,
+   from premise.
+3. We will work on an issue only while its card is in Backlog or Blocked. A rescope also needs every story
+   issue under the spec that has a branch in Backlog or Blocked; otherwise the run stops naming the cards to
+   move to Blocked. A closed spec's issue is refused: "open a new issue for the new work".
+4. We will commit the spec, or its rescope, on `<p>-spec` cut from the default branch, and open it as a draft
+   spec PR (ADR-0010), placing the rescope hold on each story issue under the spec that has a branch. The run
+   writes no lane, posts nothing on the issue, and ends naming the spec folder and the spec PR, and no
+   command of another plugin.
 5. We will have the human drive every approval at grill and at critique; the critique's verdict is advisory
    and no script reads it.
 
 ## Options considered
 
-### Option A: `#<n>` only; state decides; the human approves every step (chosen)
+### Option A: Refuse a rescope only on a closed issue, in any lane
 
-Decisions 2–5.
+Rejected: a story in progress builds under the spec being changed, and two writers share its state comment.
 
 ### Option B: `rescope <spec folder> #<issue>`
 
-Dropped at the brainstorm: the branch already says whether the folder exists.
+Rejected: the default branch already says whether the folder exists.
 
-### Option C: A rescope on a Ready card
+### Option C: Work only on cards in Backlog or Blocked (chosen)
 
-Lost: the orchestrator may launch mid-rescope.
+No session works on the issue meanwhile (builder ADR-0002), so its state comment has one writer at a time.
 
-### Option D: Refuse approval on RETHINK unless `override`, its reason appended to the critique file
+### Option D: Refuse approval on RETHINK unless `override`
 
-Proposed at the brainstorm. Lost: no script reads the verdict.
+Rejected: no script reads the verdict.
 
-### Option E: planner writes Blocked when it needs the user (brainstorm)
+### Option E: planner writes Blocked when it needs the user
 
-Lost: no plugin writes a lane (orchestrator ADR-0002).
+Rejected: no plugin writes a lane (orchestrator ADR-0002).
 
 ## Trade-offs
 
-- A rescope on a Ready card costs two board moves.
+- A rescope stops every launched story under the spec until it merges the new spec.
+- A rescope that leaves spec.md unchanged needs a human unlock of each hold.
 - A RETHINK the human goes past leaves no recorded reason.
 
 ## Consequences
 
-- Easier: one entry for new spec and rescope.
-- Harder: the skill reads the board lane.
-- **How we would know this was wrong:** a launch started under a rescope, or a rescope that rewrote the wrong
-  folder.
-- Revisit if: the orchestrator launches on a lane other than Ready, or planning is no longer human-driven.
+- Easier: one entry for a new spec and a rescope; no story builds while its spec changes.
+- Harder: the skill reads the board; a human moves running stories to Blocked first.
+- **How we would know this was wrong:** a story merged under a spec an open rescope changes, or a rescope
+  of the wrong folder.
+- Revisit if: planning runs without a human.
 
 ## Action items
 

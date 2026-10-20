@@ -31,68 +31,68 @@ externalRefs:
     label: "builder ADR-0003: Open a draft PR after the first push and end the turn at an attested draft"
 ---
 
+
 # ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins
 
 ## Context
 
-Between the turns of one issue, something must watch GitHub and decide the next move. Until now that
-was the cron prompt and the bot-picker skill, with builder polling for its own loop; the prompt is
-neither deterministic nor restartable, and builder cannot wait for CI.
+Between a story's turns, something must watch GitHub and decide the next move; builder cannot wait
+for CI.
 
 ## Decision
 
-1. We will drive one issue from Ready to merge with a deterministic script outside the plugins, its own
-   GitHub App, host unspecified; it claims the issue and launches `builder:issue-tackle <n>`. Its code
-   lives in this repo under `orchestrator/`, beside the plugins, imports none of their code, and
-   releases and deploys on its own.
-2. We will give it only the board, open PRs, issue comments and its own state (ADR-0003); it parses no
-   prose, runs no plugin code, reads no plugin config, and runs an LLM only by launching one.
-3. We will have the plugins poll nothing: builder ends its turn at an attested draft or a pre-PR stop
-   (builder ADR-0003), planner at a push.
-4. We will run one session per issue, under a process lock per (repo, issue) that dies with its
+1. We will drive one story issue from Ready to merge with a deterministic script, running as the org's
+   existing GitHub App (no new App), host unspecified; it claims the story issue and launches
+   `builder:issue-tackle <s>`. Its code lives in this repo under `orchestrator/` and releases and deploys
+   on its own.
+2. We will give it only these inputs: the board and its issues (assignee, parent, sub-issues,
+   `blockedBy`); open PRs; issue comments, reviewer's tagged state comments among them (reviewer
+   ADR-0011); the effective rules for each PR's base branch, from the one rules endpoint, rulesets
+   being the only source of required checks; its own section and `[shared]` of `codeworks.toml`
+   (root ADR-0002); its host state (ADR-0003). It parses no prose and runs an LLM only by launching one.
+3. We will have it import no plugin code, only `core/` (root ADR-0001): the state-comment read and the
+   validator modules with their Findings contract (root ADR-0003), installed as a package pinned to the
+   orchestrator's release, the way each plugin installs it.
+4. We will have the plugins poll nothing: builder ends its turn at an attested draft or a pre-PR stop
+   (builder ADR-0003); planner at the draft spec PR it opens (planner ADR-0010).
+5. We will run one session per story issue, under a process lock per (repo, issue) that dies with its
    process. REPEAT bounds the relaunch: a launch that had work (an unattested head or findings) and
-   ended with the head and findings unchanged moves the card to Blocked.
+   ended with both unchanged moves the card to Blocked.
 
 ## Options considered
 
-### Option A: A deterministic script, its own App (chosen)
+### Option A: A deterministic script under the existing App (chosen)
 
 Restartable, idempotent ticks.
 
-### Option B: The cron prompt and the bot-picker skill
+### Option B: A cron prompt driving the loop
 
-An LLM driving the loop. Rejected: not deterministic, not restartable, parses comments.
+Rejected: not deterministic, not restartable, parses comments.
 
 ### Option C: builder drives its own loop
 
 Rejected: it cannot wait for CI; its lane writes cannot be told from a human's.
 
-### Option D: Run plugin code on a shared host
+### Option D: A repository of its own
 
-Rejected: it binds the orchestrator to the plugins' code and to a host shared with the sessions.
+Rejected: it shares `core/` and the status names with the plugins, which release from this repo.
 
-### Option E: The orchestrator relaunches builder to run the merge
+### Option E: Import the shared code from a plugin's folder
 
-Rejected: the orchestrator merges itself.
-
-### Option F: A repository of its own
-
-Rejected: the PR body block, the hold ids and the status names are a contract with reviewer; in one
-repo both sides change in one PR.
+Rejected: a plugin's internals would become the orchestrator's contract.
 
 ## Trade-offs
 
-- A script to host; every repo it serves installs its App.
-- A move waits for the next tick: the orchestrator polls.
+- A move waits for the next tick.
 
 ## Consequences
 
-- Easier: a safe restart; one session per issue; no orchestrator credential in any session.
-- Harder: diagnosis spans GitHub and the host's launch log; a CI check must keep `orchestrator/` from
-  importing plugin code.
+- Easier: a safe restart; no orchestrator credential in any session.
+- Harder: diagnosis spans GitHub and the launch log; a CI check keeps `orchestrator/` importing nothing
+  from the plugins.
 - **How we would know this was wrong:** a human moving a card for the orchestrator; two sessions on one
-  issue.
-- Revisit if: a plugin can wait for CI, or the loop needs more than one host.
+  story issue.
+- Revisit if: a plugin can wait for CI; the loop needs a second host.
 
 ## Action items
 

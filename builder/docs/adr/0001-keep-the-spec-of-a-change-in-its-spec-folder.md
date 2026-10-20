@@ -77,16 +77,15 @@ from".
 
 ## Trade-offs
 
-- A spec folder lives in a checkout. A spec can no longer be written from anywhere with only `gh`.
-- An issue needs a branch that holds its spec folder before anyone can build it.
+- A spec folder lives in a checkout. A spec cannot be written from anywhere with only `gh`.
+- An issue needs its spec PR merged before any story of it is built (planner ADR-0010).
 
 ## Consequences
 
 - Easier: `issue-tackle` and `root-cause-check` read one file for the spec, and a change to it shows in a
   diff.
-- Harder: whoever starts `issue-tackle` needs the spec folder on a branch first.
-- **How we would know this was wrong:** an issue nobody can build because its spec is on a branch that was
-  never pushed.
+- Harder: whoever starts `issue-tackle` needs the spec PR merged first.
+- **How we would know this was wrong:** an issue nobody can build because its spec PR was never merged.
 - Revisit if: specs have to be written for repos where no checkout exists when the issue is scoped.
 
 ## Action items

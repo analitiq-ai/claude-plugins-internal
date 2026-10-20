@@ -32,10 +32,10 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "org ADR-0002: Keep one spec per issue, in the repo"
+    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
+    label: "org ADR-0003: Open one issue, one branch and one PR per user story"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
     label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
@@ -54,30 +54,31 @@ externalRefs:
 
 ## Context
 
-A review round has to know which spec governs its PR, and what to read from that spec's folder.
+A review round has to know which spec governs its PR, and what to read from that spec's folder. A story
+issue is either a sub-issue, whose spec belongs to its parent, or an issue with no sub-issues, which owns
+its spec (org ADR-0003).
 
 ## Decision
 
-1. We will take `review-round {worktree, stage}`, no `spec`: the review-round launch gate reads `<n>` from
-   the branch name; on `<n>-us<k>` the spec is the one `specs/<n>-*/` folder at HEAD; on
-   `<n>-adr-<slug>` none, and the decision-reviewer grades the record; any other branch is
-   refused a round. reviewer stays the only parser of branch names; no issue comment, no list
-   of spec or design-document paths. Every round derives the spec afresh and grades `spec.md` at
-   the reviewed commit (ADR-0010); no value or blob id is recorded, no rebind exists.
+1. We will take `review-round {worktree, stage}`, no `spec`: the review-round launch gate reads the story
+   issue `<s>` from a branch `<s>-us<k>-<slug>` and asks GitHub for its parent; the spec's issue `<p>` is
+   that parent, or `<s>` when it has none, and the spec is the one `specs/<p>-*/` folder at HEAD. Any other
+   branch, `<p>-spec` included, is refused a round. reviewer stays the only parser of branch names; no
+   issue comment, no list of spec or design-document paths. Every round derives the spec afresh and
+   grades `spec.md` at the reviewed commit (ADR-0010); no value or blob id is recorded, no rebind exists.
 2. We will read the folder as data and validate none of it (planning checks its own output):
-   `spec.md` whole for reviewers and assessor, its `codeworks` keys for dispatch (planner ADR-0008),
-   and `tasks.md` ticks through next_story for LAST_STORY at attestation; never headings.
+   `spec.md` whole for reviewers and assessor, its `codeworks` keys for dispatch (planner ADR-0008);
+   never headings.
 
 ## Options considered
 
-### Option A: Derived from `<n>` in the branch name; read by keys (chosen)
+### Option A: Derived from the story issue in the branch name and its parent; read by keys (chosen)
 
 Keys survive a template change where headings do not.
 
 ### Option B: `spec` passed at the round's launch, bound in the ledger
 
-Rejected: the branch already names the spec (redraw fix); `null` for a PR with no issue has no
-case left.
+Rejected: the branch already names the story issue, and GitHub names its parent.
 
 ### Option C: The issue names its folder in a comment
 
@@ -85,17 +86,18 @@ Rejected: nothing is parsed out of prose.
 
 ### Option D: Found by Spec Kit's mark, settled before round 1
 
-Rejected: the folder is named by the issue number, not found, and review validates nothing of the
+Rejected: the folder is named by the spec's issue number, not found, and review validates nothing of the
 folder.
 
-### Option E: Review reads only `spec.md`
+### Option E: The folder named by the story issue's number
 
-Rejected: LAST_STORY is read from `tasks.md` at attestation.
+Rejected: a sub-issue owns no spec; its parent does.
 
 ## Trade-offs
 
-- A PR from a branch outside the grammar never gets internal-review; a revert or release bump
-  reaches main only as an exempt PR (orchestrator ADR-0005).
+- A PR from a branch outside the grammar never gets internal-review; a spec PR, a revert or a release
+  bump reaches the default branch only as an exempt PR (orchestrator ADR-0005).
+- Every round's launch costs one more GitHub read, the story issue's parent.
 - A folder written outside planning reaches review unchecked.
 
 ## Consequences
@@ -104,7 +106,7 @@ Rejected: LAST_STORY is read from `tasks.md` at attestation.
 - Harder: a third branch kind needs a grammar change.
 - **How we would know this was wrong:** a review-round launch cannot find a story branch's spec; a round
   grades another issue's folder; a template change breaks a reader.
-- Revisit if: an issue needs two spec folders (org ADR-0002).
+- Revisit if: a spec's issue needs two spec folders (org ADR-0002).
 
 ## Action items
 

@@ -9,7 +9,7 @@ tags: [adr, alignment, planning, decision-log, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0005"]
+relatesTo: ["0002", "0005", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/speckit/workflows/**"
@@ -31,9 +31,13 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    id: "orchestrator ADR-0006"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0006-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
-    label: "orchestrator ADR-0006: Land an issue's decision record as an exempt PR before its first story PR"
+    id: "org ADR-0002"
+    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
+    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
+  - type: doc
+    id: "builder ADR-0004"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0004-resolve-a-conflict-by-merging-the-default-branch-never-rebase-or-force-push.md"
+    label: "builder ADR-0004: Resolve a conflict by merging the default branch, never rebase or force-push"
 ---
 
 # ADR-0009: Check the plan against the governing decision logs before critique
@@ -52,7 +56,9 @@ behind its remote and lack the record that now binds.
    machine has credentials for it. A checkout behind its remote stops the run naming "pull it"; one that
    cannot be fetched or cloned is a check that could not run (ADR-0002).
 3. We will record the org-log commit SHA the check saw in the plan artifact.
-4. We will draft a record the plan needs on `<n>-adr-<slug>`; orchestrator ADR-0006 governs how it lands.
+4. We will commit a record the plan needs into the spec PR, beside the spec it governs (ADR-0010). A record
+   found late rides in the rescope's spec PR and governs a story in flight from the round after that story
+   merges the default branch (builder ADR-0004).
 
 ## Options considered
 
@@ -72,6 +78,11 @@ log nobody can name.
 ### Option D: Only the review-round decision-reviewer
 
 Rejected: the contradiction would surface after the code is written.
+
+### Option E: A record on its own `<p>-adr-<slug>` branch and PR
+
+Rejected: a second branch kind and a second rule blocking launch, for a record the spec PR carries with no
+code beside it either way.
 
 ## Trade-offs
 

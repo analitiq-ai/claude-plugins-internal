@@ -9,10 +9,12 @@ tags: [layout, repository, spec-kit, plugins]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0002", "0003"]
 affects:
   - type: path
     pattern: ".claude-plugin/marketplace.json"
+  - type: path
+    pattern: "core/**"
   - type: path
     pattern: ".specify/**"
   - type: path
@@ -36,22 +38,27 @@ externalRefs:
 
 ## Context
 
-An install copies a plugin's whole folder, so tests, specs and records cannot sit inside it. The repo
-answered with two trees: `plugins/<name>/` installed, `dev/<name>/` not, each `dev/` folder its own Spec
-Kit project with its own constitution. Each component then lives in two places, Spec Kit is installed
-once per plugin, and the constitutions repeat the same principles. The orchestrator is never installed,
-so it fits neither tree; the renaming to the Codeworks names moves every path anyway.
+An install copies a plugin's whole folder, so tests, specs and records cannot sit inside it, and a plugin
+may reference only paths inside its own root. The repo answered with two trees: `plugins/<name>/`
+installed, `dev/<name>/` not, each `dev/` folder its own Spec Kit project. Each component lives in two
+places, and the constitutions repeat the same principles. The orchestrator is never installed, so it fits
+neither tree. reviewer, planner and the orchestrator all use the state comment and the validator modules.
 
 ## Decision
 
-1. We will give each component one top-level folder: `plugin/` (what an install copies), `tests/`,
-   `docs/adr/`. The orchestrator's folder has no `plugin/`.
-2. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<n>-<slug>/`.
-3. We will keep records of the repo as a whole in `docs/adr/` at the root.
+1. We will give each component one top-level folder, `planner/`, `builder/`, `reviewer/`, `auditor/`,
+   `orchestrator/` and `core/`, holding `plugin/` (what an install copies), `tests/` and `docs/adr/`. The
+   orchestrator's folder has no `plugin/`; `core/` holds a package in place of `plugin/`.
+2. We will make `core/` the one home of code more than one component runs: the state-comment read and
+   write and the validator modules with their Findings contract (ADR-0003). Each plugin installs it into its
+   `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version; the orchestrator imports it the same way, and
+   imports no plugin code.
+3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
+4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 
 ## Options considered
 
-### Option A: One folder per component, one Spec Kit project (chosen)
+### Option A: One folder per component, shared code as the installed `core/` package (chosen)
 
 Ownership, CI and an import boundary are each one path rule per component.
 
@@ -61,24 +68,27 @@ Rejected: each plugin stays split across two trees, and the orchestrator is a th
 
 ### Option C: A repository per component
 
-Rejected: reviewer and the orchestrator share a contract (the PR body section, hold ids, status names)
-that should change in one PR.
+Rejected: the components share contracts (the state comment, hold ids, status names, the validator
+modules) that should change in one PR.
 
-### Option D: A shared code folder for the plugins
+### Option D: Shared code inside one plugin, or vendored into each
 
-Rejected: an install copies only the plugin's folder, so shared code needs a build step to vendor it.
+Rejected: a plugin cannot reference a path outside its root, and a vendored copy per plugin drifts.
 
 ## Trade-offs
 
 - One constitution serves every component; a principle names the components it applies to.
-- The move breaks links to `main` by path; they are rewritten in the same change.
+- A change to `core/` reaches a plugin only in that plugin's next version.
 
 ## Consequences
 
-- Easier: one Spec Kit to upgrade; a component's code, tests and records in one place.
-- Harder: an install's source is `<component>/plugin`, one level deeper than the usual `plugins/<name>`.
-- **How we would know this was wrong:** a component needing its own Spec Kit project or constitution.
-- Revisit if: plugins need code shared at runtime.
+- Easier: one Spec Kit to upgrade; a component's code, tests and records in one place; one implementation
+  of the state comment and of each validator.
+- Harder: an install's source is `<component>/plugin`, one level deeper than the usual `plugins/<name>`;
+  every plugin installs `core/` before it runs.
+- **How we would know this was wrong:** a component needing its own Spec Kit project or constitution, or
+  code two components run that lives outside `core/`.
+- Revisit if: Claude Code plugins gain a native way to share code between plugins.
 
 ## Action items
 

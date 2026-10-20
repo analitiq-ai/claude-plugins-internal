@@ -37,7 +37,7 @@ externalRefs:
   - type: doc
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
 ---
 
 # ADR-0002: Stop a planning run when a check could not run and name the next step

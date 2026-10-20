@@ -9,7 +9,7 @@ tags: [spec, front-matter, tasks, spec-kit, presets]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0005"]
+relatesTo: ["0004", "0005", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/speckit/presets/**"
@@ -33,11 +33,11 @@ externalRefs:
   - type: doc
     id: "org ADR-0003"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
+    label: "org ADR-0003: Open one issue, one branch and one PR per user story"
   - type: doc
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
   - type: doc
     id: "builder ADR-0002"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
@@ -52,8 +52,10 @@ externalRefs:
 
 ## Context
 
-builder and reviewer read the spec folder planner writes. Today builder's root-cause-check reads the
-`## Root cause` heading. The brainstorm also gave planner a `[US<k>]` tag on every tasks.md line, though Spec Kit leaves Setup, Foundational and Polish untagged by design.
+builder and reviewer read the spec folder planner writes. A reader that parses a heading such as
+`## Root cause` changes its verdict when a template changes. Spec Kit tags story phases in tasks.md `[US<k>]`
+and leaves Setup, Foundational and Polish untagged by design, yet every task belongs to one story issue
+(ADR-0010), and a story branch may tick only its own story's tasks (reviewer ADR-0010).
 
 ## Decision
 
@@ -62,7 +64,9 @@ builder and reviewer read the spec folder planner writes. Today builder's root-c
    filled by planner's checks at commit; builder, reviewer and the root-cause reviewer read these
    keys, never a heading.
 2. We will keep Spec Kit's stock tasks template: story phases are tagged `[US<k>]`; Setup, Foundational
-   and Polish are present and untagged. The planning check is that upstream rule, pinned to the
+   and Polish are present and untagged. When planner creates the story issues (ADR-0010), it labels each task
+   block in tasks.md with its story issue's number: a story's phase with its own, Setup and Foundational
+   with the first story's, Polish with the last's. The planning check is that upstream rule, pinned to the
    installed template by a drift test.
 3. We will commit `premise.md` in every spec folder except a no-spec one, whose spec.md carries the premise
    question and reason (ADR-0007), read by planner's root-cause check in a new spec and a rescope alike
@@ -76,16 +80,20 @@ Readers survive a template edit; presets are the sanctioned path.
 
 ### Option B: `[US<k>]` on every task line and at least one task per story, planner's own check
 
-The brainstorm's rule. Lost: untagged phases belong to no story by Spec Kit's design; the org maps
-them (org ADR-0003).
+Rejected: untagged phases belong to no story by Spec Kit's design; planner assigns them to a story issue
+when it plans (Decision 2).
 
 ### Option C: Readers parse headings such as `## Root cause`
 
-Lost: a template change would change every verdict.
+Rejected: a template change would change every verdict.
 
 ### Option D: A forked tasks template
 
-Lost: not the sanctioned path.
+Rejected: not the sanctioned path.
+
+### Option E: Map the untagged phases to a story at runtime
+
+Rejected: a script would derive at every launch what planner knows when it plans.
 
 ## Trade-offs
 
@@ -94,7 +102,8 @@ Lost: not the sanctioned path.
 
 ## Consequences
 
-- Easier: the no-spec folder (ADR-0007) and the root-cause dispatch (reviewer ADR-0017) each read one key.
+- Easier: the no-spec folder (ADR-0007) and the root-cause dispatch (reviewer ADR-0017) each read one key;
+  reviewer finds a session's ticks by its issue number on the block.
 - Harder: a spec.md without the block gives builder and reviewer nothing to read.
 - **How we would know this was wrong:** the drift test fails on a Spec Kit release that left the phase
   rule intact.

@@ -9,7 +9,7 @@ tags: [board, lanes, orchestrator, github-projects, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: org
-relatesTo: ["0001", "0009", "0010"]
+relatesTo: ["0001", "0006", "0007", "0009", "0010"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -35,47 +35,55 @@ externalRefs:
 
 ## Context
 
-The human and the orchestrator of ADR-0001 share a card's state, and the orchestrator parses no prose. The brainstorm let plugins move cards (builder to In review, any plugin to Blocked); the orchestrator never checks who moved a card, so a plugin's move would read as a human's.
+Humans and the orchestrator (ADR-0001) share the board; the orchestrator never checks who moved a card.
 
 ## Decision
 
-1. We will keep six lanes on the Project status field, with issues as the cards, never PRs, and give each lane one writer: GitHub Backlog and Done, a human Ready, the orchestrator In progress, In review and Blocked; reviewer refuses a lane write from any agent session (reviewer ADR-0012); the board's PR-linked, PR-merged and reopen workflows are off.
-2. We will treat In progress and In review, the working lanes, as output, re-derived from the PR every tick, and the other four as inputs; the orchestrator acts on a card in either only when it has claimed it (the bot as assignee).
-3. We will make Blocked the one sink for anything needing a human, its reason posted on the issue (ADR-0003); a human clears the cause and moves the card to Ready; a PR GitHub refuses on a rule outside the merge contract stays In review instead (ADR-0009).
-4. We will read a human's drag to Backlog, Blocked or Done as a stop: the running launch is stopped, nothing merges, the card stays; a drag into a working lane is inert when the card is unclaimed, undone when claimed, and bounced to Blocked when a hold is open.
+1. We will keep six lanes on the Project status field, issues as the cards, each lane with one writer:
+   GitHub Backlog and Done, a human Ready, the orchestrator In progress, In review and Blocked; reviewer
+   refuses a lane write from any agent session (reviewer ADR-0012).
+2. We will re-derive In progress and In review from the story's PR every tick, acting on a card only
+   when claimed: Analitiq-Bot as the story issue's assignee, set at every launch, never cleared.
+3. We will start a story only from Ready, never because another story merged, and only once every
+   issue in its `blockedBy` is closed; until then the card waits in Ready. Every launch also needs no
+   launch running and the spec-PR rule to allow it (ADR-0006); ADR-0007 names the Ready card needing no
+   launch. An open hold never stops a launch from Ready: reviewer releases holds in that launch (reviewer ADR-0013).
+   A Ready card whose PR closed unmerged relaunches on its branch; builder opens a new PR.
+4. We will never launch on a parent issue (one with sub-issues): moved to Ready, it goes to Blocked, the
+   reason naming the sub-issues to move instead; its other lanes are the human's.
+5. We will make Blocked the one sink for what needs a human: an open hold on a working-lane card
+   (reviewer ADR-0011), REPEAT, a converted PR, a PR closed unmerged, a silent reporter, a Ready card
+   the spec-PR rule holds (ADR-0006), or a launch that opened no PR (reason: its final message). The
+   reason is posted first; the lane write is the commit point. These moves wait while a launch runs.
+6. We will read a human's drag to Backlog, Blocked or Done as a stop: the launch is stopped, nothing
+   merges. A drag into a working lane is inert when unclaimed, undone when claimed, bounced to Blocked
+   under an open hold.
 
 ## Options considered
 
 ### Option A: One writer per lane (chosen)
 
-Each lane has one source, so no move needs a check of who made it.
+No move needs a check of who made it.
 
 ### Option B: Plugins write lanes
 
-Lost: a plugin's lane write cannot be told from a human's, and a planning stop changes no lane.
+Lost: a plugin's lane write cannot be told from a human's.
 
-### Option C: Hold comments as state
+### Option C: Launch the next story without Ready after a merge
 
-Lost: a hold comment is prose, and the orchestrator parses none (ADR-0001).
-
-### Option D: The orchestrator writes Done
-
-Lost: the board writes Done when the last story's merge closes the issue.
-
-### Option E: An allow-list of humans on the Ready move
-
-Lost: the guarantee sits at the writer; reviewer refuses an agent's Ready.
+Lost: `blockedBy` carries the order; a human's Ready starts every story.
 
 ## Trade-offs
 
 - A human's drag into a working lane starts nothing.
-- Ready's guarantee is reviewer's refusal inside the agent session, not a check by the orchestrator.
+- Ready's guarantee is reviewer's refusal inside the session, not the orchestrator's check.
 
 ## Consequences
 
-- Easier: a restart needs no stored lane state, since the working lanes come from the PR.
-- Harder: a planning stop never shows on the board; the card waits in its lane for Ready.
-- **How we would know this was wrong:** a claimed working-lane card the orchestrator neither wrote nor undid; a plugin that needs to move a card.
+- Easier: a restart needs no stored lane state.
+- Harder: a parent's lanes are kept by hand; a Ready card under an open blocker waits silently.
+- **How we would know this was wrong:** a claimed working-lane card the orchestrator neither wrote nor
+  undid; a story launched before its blockers closed.
 - Revisit if: GitHub adds an Actions event for a Projects lane change.
 
 ## Action items

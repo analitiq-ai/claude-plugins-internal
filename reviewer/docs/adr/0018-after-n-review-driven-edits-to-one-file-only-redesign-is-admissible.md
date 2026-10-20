@@ -13,8 +13,6 @@ relatesTo: ["0007", "0017"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{policy,assessment,facts}.py"
-  - type: path
-    pattern: "reviewer/plugin/config.json"
 provenance:
   authoredBy: agent-drafted
   agent:

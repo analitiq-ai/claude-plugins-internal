@@ -1,8 +1,9 @@
 # Codeworks Constitution
 
 Constitution for building the components of `analitiq-ai/claude-plugins-internal`: the `reviewer`,
-`planner`, `builder` and `auditor` plugins and the `orchestrator`. Each component is a top-level folder;
-a plugin's `plugin/` is what an install copies, and nothing else in the repo is installed. Paths are
+`planner`, `builder` and `auditor` plugins, the `orchestrator`, and the shared `core/` package. Each
+component is a top-level folder; a plugin's `plugin/` is what an install copies, and `core/` is installed
+as each plugin's and the orchestrator's pinned dependency; nothing else in the repo is installed. Paths are
 relative to the repo root unless they name another repo. Each principle is a plan-time gate: a plan
 passes only if it answers the gate question for the components it applies to. The files named in each
 Source line are the source of truth; this document indexes them and never restates their text.
@@ -88,7 +89,7 @@ Source: reviewer: `reviewer/plugin/README.md` (opening; How an agent uses it). p
 
 ### P2. Only an Approved Entity Releases a Hold
 
-Applies to: reviewer.
+Applies to: reviewer, planner.
 
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
 approved to release it (the user or another system), and is every action that releases it named
@@ -96,9 +97,12 @@ by a decision record? Nothing else may release the hold, lower it or start it ag
 no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
-`scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
-`reviewer/docs/adr/0013-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md`;
+`scripts/pre_merge_gate.py`); how the user's action is recognised:
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
+planner places the rescope hold only:
+`planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
+(decision 4).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -142,11 +146,11 @@ settled-design step).
 
 Applies to: reviewer, planner, builder, orchestrator.
 
-Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, the PR
-body, a hold, a commit), does the plan name its one writer, and does the component write only the
+Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, a state
+comment, a hold, a commit), does the plan name its one writer, and does the component write only the
 state it owns and refuse, from any agent session, every write it does not own?
 
-Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md`
+Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
 (decision 2); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
 (decision 1). planner: `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
 (decision 4); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
@@ -163,7 +167,7 @@ never from a heading, a comment's wording or free text; and does every fact the 
 another reader land in such a form?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
-(decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-a-pr-body-section-reviewer-alone-writes.md`
+(decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
 (decision 1). planner: `planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
 (decision 1); `planner/docs/adr/0007-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
 (decision 1). builder: `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
@@ -172,11 +176,11 @@ Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-eac
 
 ### P8. Generic over Repositories
 
-Applies to: reviewer, planner, builder.
+Applies to: reviewer, planner, builder, orchestrator.
 
 Gate: does the plan assume of a repository only the branch grammar, the spec folder and GitHub's
-own objects, with every per-repository value in config and no repository name, path or setting
-special-cased?
+own objects, with every per-repository value in `codeworks.toml` and no repository name, path or
+setting special-cased?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decision 1); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
@@ -185,24 +189,28 @@ Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-eac
 (decisions 1–2); `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
 (decision 2); `planner/docs/adr/0004-recognise-a-spec-folder-by-spec-kit-s-mark.md`. builder:
 `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
-(decision 2).
+(decision 2). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md`
+(decision 2). All: `docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`.
 
 ## Platform Constraints
 
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
 - Repo shape: one top-level folder per component; a plugin's `plugin/` is what an install copies,
-  listed in `.claude-plugin/marketplace.json`; its `tests/` and `docs/adr/` are never installed
+  listed in `.claude-plugin/marketplace.json`; `core/` is a package each plugin and the orchestrator
+  install pinned to their own version; `tests/` and `docs/adr/` are never installed
   (`README.md`; `docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md`).
 - Tests: CI runs every `<component>/tests/` folder (`.github/workflows/tests.yml`).
 - reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the
   plugin's mode; the review-round `spec` check follows the plugin's mode alone
-  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: `reviewer/plugin/README.md` (State).
+  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: tagged comments on the story issue
+  (`reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`).
   Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision
   reviewer, which is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
 - planner has no hooks: it runs as the Spec Kit workflow its skill starts
   (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and requires no other plugin:
-  its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`).
+  its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
+  the rescope hold through `core/`.
 - builder is two skills, with no scripts and no hooks (`builder/plugin/`); its review step is
   reviewer's internal round, which no install requires
   (`builder/plugin/skills/issue-tackle/SKILL.md`).
@@ -211,11 +219,13 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 
 ## Delivery Workflow
 
-Not gates — context so `/speckit-tasks` shapes tasks to fit: issue-numbered branch, worktree at
-`.claude/worktrees/<n>`, draft PR, then the review loops and the pre-merge checklist. Owned by the
-organisation's `.claude/rules/github-workflow.md` and `.claude/rules/pr-review-loop.md`. Feature specs
-go in `specs/<n>-<slug>/`; decision records in the component's `docs/adr/`, or in `docs/adr/` at the
-root for the repo as a whole. The adrkit `after_plan` hook is optional: it offers to check a plan
+Not gates — context so `/speckit-tasks` shapes tasks to fit: one issue per user story (sub-issues
+under the spec's issue when a spec has several), a story branch `<s>-us<k>-<slug>` with its worktree at
+`.claude/worktrees/<branch>`, a draft PR closing its story issue, then the review loops and the
+pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.md` and
+`.claude/rules/pr-review-loop.md`. The spec and its decision records land first by a spec PR on
+`<p>-spec`, in `specs/<p>-<slug>/`, `<p>` being the spec's issue; decision records go in the
+component's `docs/adr/`, or in `docs/adr/` at the root for the repo as a whole. The adrkit `after_plan` hook is optional: it offers to check a plan
 against them.
 
 ## Governance

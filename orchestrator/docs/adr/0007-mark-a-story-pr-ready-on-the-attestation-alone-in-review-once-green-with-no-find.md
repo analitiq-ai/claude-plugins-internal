@@ -9,7 +9,7 @@ tags: [pull-requests, ready-flip, orchestrator, review-loop, lanes]
 scope: component
 reversibility: two-way-door
 blastRadius: org
-relatesTo: ["0001", "0008"]
+relatesTo: ["0001", "0002", "0008", "0009"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -42,10 +42,19 @@ skips drafts, sees. A second choice is whether a failing check is a finding or a
 
 1. We will have the orchestrator flip a story PR to ready once per PR, when the head is attested with
    no launch running and no hold open; a human's click counts the same.
-2. We will evaluate CI, CodeRabbit and DeepSource after ready: a failing required check, an unresolved
-   thread or a conflict with main is a finding that relaunches builder; a pending check is a wait. The
-   card moves to In review only once the head is green with no findings.
-3. We will treat a PR a human converts back to draft as CONVERTED: Blocked until the human re-marks it
+2. We will evaluate the external reviewers and the required checks after ready. Each tick the
+   orchestrator reads `status` from every validator module the config enables (root ADR-0003) and
+   calls `trigger` as ADR-0008 decides. GREEN is every check the base branch's effective rules require
+   (ADR-0001) success at the head; no status is an input to its own wait, so GREEN leaves out
+   `internal-review`, decided by the attestation (ADR-0004), and `codex-review`, requested once GREEN
+   (ADR-0008). FINDINGS is a module reporting open findings, a required check failing, an unresolved
+   review thread of any author, or a conflict with main; it relaunches builder. A pending module or
+   check is a wait.
+3. We will move the card to In review only once the head is attested and GREEN with no findings and no
+   hold.
+4. We will give a Ready card whose head is attested with no hold open no launch: a draft goes to the
+   flip, a ready PR to In review once GREEN with no findings.
+5. We will treat a PR a human converts back to draft as CONVERTED: Blocked until the human re-marks it
    ready and moves the card to Ready.
 
 ## Options considered
@@ -56,32 +65,31 @@ CodeRabbit skips drafts, so external review needs the PR ready at internal-clean
 
 ### Option B: Ready only once every required check is green
 
-Rejected: holding the draft until green keeps CodeRabbit off a head the internal review already
-cleared.
+Rejected: holding the draft keeps CodeRabbit off a head the internal review already cleared.
 
-### Option C: builder marks the PR ready at the end of its loop (brainstorm)
+### Option C: builder marks the PR ready at the end of its loop
 
-Rejected: the ready flip has one writer past the PR's creation, the orchestrator (ADR-0001);
-builder ends its turn at an attested draft and never flips it (builder ADR-0003).
+Rejected: the ready flip has one writer, the orchestrator (ADR-0001); builder ends its turn at an
+attested draft (builder ADR-0003).
 
-### Option D: A failing check as a poller BLOCKED exit, never a finding (brainstorm)
+### Option D: A failing check as a human's stop, never a finding
 
 Rejected: the agent fixes a failing check, so it is a finding; Blocked is for what only a human can
 clear.
 
 ## Trade-offs
 
-- CodeRabbit reviews every push from ready on, including a head that CI then fails and the fix that
-  follows it.
+- CodeRabbit reviews every push from ready on, including heads that CI then fails.
 - A converted PR waits on the human who converted it.
 
 ## Consequences
 
-- Easier: the agent clears a failing check itself.
-- Harder: a ready PR's card stays In progress until CI is green with no findings.
-- **How we would know this was wrong:** most github rounds open on ci findings alone, or converted PRs
+- Easier: the agent clears a failing check itself; a new reviewer is a new module, not new orchestrator
+  code.
+- Harder: a ready PR's card stays In progress until GREEN with no findings.
+- **How we would know this was wrong:** most github rounds open on CI findings alone, or converted PRs
   pile up in Blocked.
-- Revisit if: CodeRabbit reviews drafts, so nothing external reacts to ready.
+- Revisit if: CodeRabbit reviews drafts.
 
 ## Action items
 

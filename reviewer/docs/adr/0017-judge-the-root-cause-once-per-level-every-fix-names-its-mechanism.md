@@ -45,12 +45,14 @@ externalRefs:
 Today cause versus symptom is judged twice and binds no ruling: builder's root-cause-check reads
 nothing from the round; the shim check guesses it beside the site coverage it measures
 (ADR-0004). And a FIX may say "fix it" and leave the mechanism to the agent. planner
-ADR-0008's observed-cause fact now tells a round when a root-cause verdict is due.
+ADR-0008's `codeworks.root_cause.observed` fact (`anchored`, `hypothesis` or `none`) tells a round when
+a root-cause verdict is due.
 
 ## Decision
 
 1. We will have the root-cause reviewer, reviewer's own agent, verify the spec's Root cause in
-   every internal round whose spec says the cause was observed; otherwise the round records root_cause: not_applicable.
+   every internal round whose spec's `codeworks.root_cause.observed` is `anchored` or `hypothesis`; with
+   `none`, the round records root_cause: not_applicable.
 2. We will type its verdict (AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL), record it on the
    round, and rule in policy which rulings each verdict admits: SPEC_WRONG admits a spec-gap
    FIX or a PUSH_BACK citing a spec line; CANNOT_TELL admits ESCALATE or a PUSH_BACK naming where
@@ -80,9 +82,13 @@ Rejected: it reads nothing from the round.
 
 Rejected: a verdict fixes a set of admissible rulings in policy, not one kind.
 
+### Option E: The root-cause reviewer only on an `anchored` cause
+
+Rejected: a hypothesised cause is the one most in need of a check against the diff.
+
 ## Trade-offs
 
-- Every internal round with an observed cause carries one more reviewer.
+- Every internal round with an anchored or hypothesised cause carries one more reviewer.
 - An assessor that cannot name a mechanism cannot rule FIX.
 - A symptom patch with full site coverage passes the shim gate.
 

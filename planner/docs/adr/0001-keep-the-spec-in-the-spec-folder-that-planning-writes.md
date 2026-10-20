@@ -9,7 +9,7 @@ tags: [spec, spec-folder, skills]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0005"]
+relatesTo: ["0004", "0005", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/skills/issue-spec/**"
@@ -31,7 +31,7 @@ externalRefs:
   - type: doc
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
 ---
 
 # ADR-0001: Keep the spec in the spec folder that planning writes
@@ -40,12 +40,12 @@ externalRefs:
 
 planner scopes an issue into a spec folder (spec 019, Terms; issue #63).
 
-planner writes the spec; the other two plugins read it. Review derives the spec folder from the branch at each
-round's launch, and its reviewers read its `spec.md` (reviewer ADR-0014). `/builder:issue-tackle` takes the same
+planner writes the spec; the other two plugins read it. Review finds the spec folder from the spec's issue at
+each round's launch, and its reviewers read its `spec.md` (reviewer ADR-0014). `/builder:issue-tackle` takes the same
 folder, and `/builder:root-cause-check` reads that `spec.md`'s `## Root cause` (spec 019, Key entities).
 
-Nothing reads an issue comment for the spec: review derives it from the branch, and `issue-tackle` reads no issue
-comment (FR-016).
+Nothing reads an issue comment for the spec: review finds it from the spec's issue, and `issue-tackle` reads no
+issue comment (FR-016).
 
 ## Decision
 
@@ -78,9 +78,9 @@ Rejected: the copy drifts from the one it copies.
 ## Trade-offs
 
 - A spec folder lives in a checkout. A spec cannot be written from anywhere with only `gh`.
-- A scoped issue needs a pushed branch that holds its spec folder before anyone else can pick it up.
-- Nothing on the issue says where its spec is. A spec folder's name need not carry the issue number (spec 019,
-  Assumptions).
+- A scoped issue needs its spec PR merged before any story is built (ADR-0010).
+- Nothing on the issue says where its spec is; readers find it by the spec's issue number in the folder name,
+  `specs/<p>-*/`.
 - The bot's issue picker and the `alq-claude-bot-assign` skill look for the spec in an issue comment and find none.
   Spec 019 leaves them out of scope.
 
@@ -88,9 +88,10 @@ Rejected: the copy drifts from the one it copies.
 
 - Easier: one place to read and to change the spec, and the change shows in a diff. Review and build need nothing
   from the issue to read it.
-- Harder: whoever builds has to be told the folder and its branch. Planning's last message gives both (ADR-0005).
-- **How we would know this was wrong:** a scoped issue that nobody can pick up because its spec is on a branch that
-  was never pushed, or because nobody can find which folder holds it.
+- Harder: a folder's name must carry its spec's issue number, since build and review find it by that number
+  (builder ADR-0002).
+- **How we would know this was wrong:** a scoped issue that nobody can pick up because its spec PR was never
+  opened or merged, or because nobody can find which folder holds it.
 - Revisit if: specs have to be written for repos where no checkout exists at scoping time.
 
 ## Action items

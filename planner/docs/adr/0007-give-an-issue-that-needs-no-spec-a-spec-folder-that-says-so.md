@@ -9,7 +9,7 @@ tags: [premise, spec-folder, front-matter, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006", "0008"]
+relatesTo: ["0005", "0006", "0008", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/scripts/no_spec.py"
@@ -41,15 +41,11 @@ externalRefs:
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "org ADR-0002: Keep one spec per issue, in the repo"
+    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
   - type: doc
     id: "builder ADR-0002"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
     label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
-  - type: doc
-    id: "reviewer ADR-0014"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
 ---
 
 # ADR-0007: Give an issue that needs no spec a spec folder that says so
@@ -63,21 +59,21 @@ ADR-0008 puts the kind into front matter.
 
 ## Decision
 
-1. We will have a `no spec needed` pick write `specs/<n>-<slug>/spec.md` saying so, with `codeworks.kind: no_spec` in its
+1. We will have a `no spec needed` pick write `specs/<p>-<slug>/spec.md` saying so, with `codeworks.kind: no_spec` in its
    front matter, the premise question the pick rests on and the reason; the folder holds nothing else.
-2. We will land it like any spec (ADR-0005), on `<n>-us1`. builder takes the issue body as the requirement
-   (builder ADR-0002).
+2. We will land it like any spec, by a draft spec PR on `<p>-spec` (ADR-0005, ADR-0010). builder takes the
+   issue body as the requirement (builder ADR-0002).
 
 ## Options considered
 
-### Option A: A folder saying so in front matter, on the story branch (chosen)
+### Option A: A folder saying so in front matter, landed by a spec PR (chosen)
 
 Every reader keyed on the issue number sees it; no special value anywhere.
 
-### Option B: A spec PR and `spec: null` at review
+### Option B: No folder, and `spec: null` passed at review
 
-Rejected: no spec PR exists, and no user passes `spec: null`, since the launch derives the folder from the
-branch (reviewer ADR-0014).
+Rejected: no user passes `spec: null`, since every launch derives the folder from the spec's issue (builder
+ADR-0002).
 
 ### Option C: No record, drop `no spec needed`, or a mark on the issue
 
@@ -87,13 +83,12 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 ## Trade-offs
 
 - A folder with no requirements sits beside real specs, told apart by one front-matter key.
-- `no spec needed` pushes `<n>-us1` from planning, and the no-spec folder reaches main with the first story
-  PR, like any spec (org ADR-0002).
+- A `no spec needed` pick still costs a spec PR a human merges before the story launches (org ADR-0002).
 
 ## Consequences
 
 - Easier: every issue planning saw and left open has one folder.
-- Harder: a second `issue-spec #n` is a rescope at grill (ADR-0005), with nothing to grill.
+- Harder: a second `issue-spec #p` is a rescope at grill (ADR-0005), with nothing to grill.
 - **How we would know this was wrong:** no-spec folders deleted by hand to scope the issue afresh; or a no-spec
   issue built against its folder as a spec.
 - Revisit if: build or reviewer need more from a no-spec folder than its kind.

@@ -35,7 +35,7 @@ externalRefs:
   - type: doc
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
 ---
 
 # ADR-0003: Ship every planning check enforcing from its first release
@@ -50,9 +50,9 @@ A check in planner is a workflow step that runs a script (R16). A new one can st
 or first only record what it would have stopped and be switched to stopping later. planner owns the settled-design
 check and runs it on its own output before a run completes (FR-020).
 
-The brake reviewer's ADR-0006 names, the user setting a check to `log`, is a setting in review's `config.json`.
-planner ships no such file and no mode: it ships its skill, its scripts and its Spec Kit files (spec 019,
-data-model.md, Plugins).
+The brake reviewer's ADR-0006 names, the user setting a check to `log`, is a setting in the `[reviewer]`
+section of `codeworks.toml` (root ADR-0002). planner has no mode there: it ships its skill, its scripts and
+its Spec Kit files (spec 019, data-model.md, Plugins).
 
 Review validates none of the spec folder. A spec folder that is not settled is caught only if planning ran
 (reviewer ADR-0014).

@@ -9,7 +9,7 @@ tags: [hooks, mutation-gate, ownership, orchestrator, merge-gate]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0011"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,pre_merge_gate,github,hookio,shell}.py"
@@ -58,14 +58,16 @@ voids a stray status through the ruleset's App pin and refuses a disallowed merg
 ## Decision
 
 1. We will refuse from any agent session: a lane write, the issue assignee, a label, a commit status,
-   a PR body edit after creation, the ready flip, a Codex or CodeRabbit request, a merge, and writes to
-   config.json and the state directory. The pre-merge hook still refuses an `--admin` / API bypass in
-   an interactive session. Each refusal names the owner and the next step.
+   a PR body edit after creation, an issue body edit, a tagged state comment not written through `core/`
+   (ADR-0011), the ready flip, a Codex or CodeRabbit request, a merge, and writes to `codeworks.toml`
+   (root ADR-0002) and the state directory. A session may open a draft PR; a non-draft `gh pr create`
+   counts as the ready flip and is refused. The pre-merge hook refuses an `--admin` / API bypass in an interactive session. Each refusal
+   names the owner and the next step.
 2. We will keep no merge or ready gate and repeat none of GitHub's rules: the plugin guards commits
    and rounds; the orchestrator flips, requests and merges; the ruleset decides when.
-3. We will read no external verdict and name no exempt PR kinds: exemption is the org's label and
-   Bot-author rule (orchestrator ADR-0005), read from `exempt_labels` only to skip a round;
-   `codex-review` is the orchestrator's input.
+3. We will read no external verdict and name no exempt PR kinds: the orchestrator alone decides
+   exemption and writes `internal-review` = "exempt" (orchestrator ADR-0005); reviewer reads that status
+   to skip a round and never reads `exempt_labels`. `codex-review` is the orchestrator's input.
 
 ## Options considered
 
@@ -82,9 +84,9 @@ No agent session merges or flips.
 
 The label and the session fence replace both.
 
-### Option D: Read the org gate's check run
+### Option D: Read `codex-review` as a verdict
 
-The ruleset pins each status to its App.
+Rejected: the orchestrator writes it with its App, and the ruleset requires it, so GitHub enforces it.
 
 ### Option E: Re-check GitHub's rules in the hook
 
@@ -98,7 +100,7 @@ Rejected: the copy drifts.
 
 ## Consequences
 
-- Easier: the plugin holds no copy of GitHub's rules, exempt kinds or App name.
+- Easier: the plugin holds no copy of GitHub's rules, exempt labels or App name.
 - Harder: a flip, Codex request or merge waits for the orchestrator's tick or a human; even a
   harmless re-request is refused.
 - **How we would know this was wrong:** a refusal names no owner or next step, or a PR needs an

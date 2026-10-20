@@ -12,7 +12,9 @@ blastRadius: component
 relatesTo: []
 affects:
   - type: path
-    pattern: "reviewer/plugin/{config.json,README.md}"
+    pattern: "reviewer/plugin/README.md"
+  - type: path
+    pattern: "reviewer/plugin/scripts/{hookio,gate}.py"
   - type: path
     pattern: "specs/004-spec-folder-checks/**"
 provenance:
@@ -34,25 +36,22 @@ externalRefs:
 
 ## Context
 
-A new check can refuse from its first release. Or it can first only record what it would have refused, and
-be switched to refusing later. The specs give both answers:
+A new check can refuse from its first release, or first only record what it would have refused. Specs 005
+and 006 chose `enforce` from the first release, with no record-only phase; spec 004 FR-023 switches to
+`enforce` only after every existing spec folder passes.
 
-- Spec 005, Clarifications: blocking is on "From the first release. There is no record-only phase and no
-  accuracy bar to pass first".
-- Spec 006, Clarifications: the check's setting ships "`enforce` from the first release; no record-only
-  phase".
-- Spec 004 FR-023: "The checks MUST be switched to `enforce` only after every existing spec folder passes
-  them."
-
-The plugin ships with its mode and every check's own setting on `enforce`
-(`reviewer/plugin/config.json`).
+The plugin ships with its mode and every check's own setting on `enforce`.
 
 Why now: the next check has two specs to follow and they disagree.
 
 ## Decision
 
-We will ship every new check refusing from its first release, with no record-only phase, no accuracy bar to
-pass first, and no built-in threshold that turns it off later.
+1. We will ship every new check refusing from its first release, with no record-only phase, no accuracy bar
+   to pass first, and no built-in threshold that turns it off later.
+2. We will read the mode and every check's setting only from the `[reviewer]` section of `codeworks.toml`
+   (root ADR-0002). No environment variable sets or overrides them.
+3. We will name, in the refusal of a call the gate crashed deciding, the user-only `reviewer off` switch as
+   the way to work while the gate is broken.
 
 ## Options considered
 
@@ -62,7 +61,7 @@ pass first, and no built-in threshold that turns it off later.
 |---|---|
 | Matches | Specs 005 and 006, and the shipped settings |
 | Accuracy bar to pass before refusing | None |
-| The brake | The user, who reads the log and sets a check to `log` |
+| The brake | The user, who reads the log and sets a check to `log` in the config file, or types `reviewer off` |
 
 ### Option B: Do nothing
 
@@ -70,17 +69,23 @@ The specs keep two answers, and each new check picks one.
 
 ### Option C: A record-only phase first (spec 004 FR-023)
 
-Rejected for the claim check and the shim check in the clarifications quoted above. The cost: a check
-refuses before its verdicts are measured.
+Rejected for the claim check and the shim check in specs 005 and 006. The cost: a check refuses before its
+verdicts are measured.
 
 ### Option D: Enforce, with a built-in threshold
 
 Proposed in critique. Rejected: a check that turns itself off stops guarding without anyone deciding that.
 
+### Option E: Environment variables that override the config
+
+Rejected: whoever launches a session, an agent included, could switch a check to `log` with no edit the
+hook can refuse.
+
 ## Trade-offs
 
 - A check can refuse correct work on its first day. No accuracy bar comes first.
 - Nothing reminds anyone to look at the log.
+- Only the user can switch a check off for one session, with `reviewer off`.
 
 ## Consequences
 

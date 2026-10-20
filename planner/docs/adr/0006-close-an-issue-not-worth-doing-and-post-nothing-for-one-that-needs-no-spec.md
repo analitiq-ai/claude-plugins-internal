@@ -48,14 +48,14 @@ what a run does with the issue on the last two.
 1. We will end the run on `not worth doing` by naming the step for the user: close the issue as not planned, with
    the premise report's reason; an empty reason fails the premise step.
 2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user nothing to pass: its
-   record is the spec folder ADR-0007 writes, which review and build find by the issue number.
+   record is the spec folder ADR-0007 writes, which review and build find by the spec's issue number.
 3. We will have no `#<issue> none <reason>` entry form.
 
 ## Options considered
 
 ### Option A: The user closes it; the folder is the no-spec record (chosen)
 
-`spec: null` exists nowhere; every launched branch carries `<n>` and finds its folder.
+`spec: null` exists nowhere; every launch finds its folder from its spec's issue.
 
 ### Option B: Tell the user to pass `spec: null` at review
 

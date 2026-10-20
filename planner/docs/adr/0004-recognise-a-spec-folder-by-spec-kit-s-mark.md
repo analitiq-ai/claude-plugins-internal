@@ -49,8 +49,8 @@ not count. So a planning run writes its spec folder into the `specs/` of the pro
 planner's rescope takes a spec folder as its argument and does not look one up (FR-021). The folder check it makes
 is the workflow's `select-spec` step: `specs/<feature>`, with `spec.md` present (R6).
 
-Review and build do not use the mark: each finds the folder by the issue number, `specs/<n>-*/`, and review
-validates none of it (reviewer ADR-0014, builder ADR-0002).
+Review and build do not use the mark: each finds the folder by the spec's issue number, `specs/<p>-*/`, and
+review validates none of it (reviewer ADR-0014, builder ADR-0002).
 
 ## Decision
 

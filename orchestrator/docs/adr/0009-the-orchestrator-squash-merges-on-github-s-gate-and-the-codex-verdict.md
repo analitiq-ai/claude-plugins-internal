@@ -9,7 +9,7 @@ tags: [orchestrator, merge, ruleset, github, pull-requests]
 scope: component
 reversibility: two-way-door
 blastRadius: org
-relatesTo: ["0002", "0004", "0008"]
+relatesTo: ["0002", "0004", "0007", "0008"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -28,28 +28,35 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
+    label: "org ADR-0003: one issue, one branch and one PR per story; each PR closes its own story issue"
 ---
 
 # ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict
 
 ## Context
 
-Once a story's card is In review, something must merge its PR and hold the merge condition: the
-plugin's pre-merge gate, as today; GitHub's auto-merge; or the orchestrator.
+Once a story's card is In review, something must merge its PR and hold the merge condition.
 
 ## Decision
 
-1. We will have the orchestrator squash-merge an In review card's PR once no launch is running, Codex's
-   verdict at the head is success and GitHub allows the merge, naming the head it evaluated so a push
-   in between fails the call.
-2. We will make GitHub's ruleset the merge contract: `internal-review` from the orchestrator's App
-   (ADR-0004) and `codex-review` from the pr-gate App (ADR-0008), required checks and thread resolution;
-   DeepSource's grade a report, not a gate, its policy kept in DeepSource settings.
+1. We will have the orchestrator squash-merge an In review card's PR, passing no message, once no launch
+   is running, no hold is open on its story issue (reviewer ADR-0013), Codex's verdict at the head is
+   success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
+2. We will make GitHub's ruleset the merge contract: it requires `internal-review` and `codex-review`,
+   both from the orchestrator's App (ADR-0004, ADR-0008), the required checks and every conversation
+   resolved, so GitHub refuses a merge without them.
 3. We will never update a branch that is only behind main; a conflict stays a finding.
-4. We will leave Done to GitHub (ADR-0002): the last story's `Closes #n` (org ADR-0003) closes the issue on
-   merge.
+4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation (builder
+   ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once its
+   `subIssuesSummary` shows every sub-issue completed, its only issue-close write.
 5. We will leave a PR refused on a rule outside this contract In review.
+6. We will require of every served repo: the org's existing App installed; that ruleset, required checks
+   coming from rulesets only, no classic branch protection; conversation resolution required; squash merging with the default squash
+   message set to "commit messages", so every session-id trailer reaches main; no required human
+   approval; no up-to-date rule; a ruleset bypass list of the humans who may override; Codex installed
+   with Automatic review off; CodeRabbit installed; board workflows auto-add issues to Backlog, auto-add
+   sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off;
+   lanes spelled Backlog, Ready, In progress, In review, Blocked, Done.
 
 ## Options considered
 
@@ -59,23 +66,20 @@ A repo without the ruleset never merges unreviewed, since the orchestrator requi
 
 ### Option B: GitHub auto-merge, never disarmed
 
-Rejected: it could merge while a card sat Blocked, and needed its own event reads and a repo setting.
+Rejected: it could merge while a card sat Blocked or a hold was open.
 
-### Option C: The plugin's pre-merge gate re-checks GitHub's rules; `deepsource-pr-gate.sh` scrapes DeepSource's grade (today)
+### Option C: A plugin pre-merge gate re-checking GitHub's rules
 
 Rejected: GitHub owns the checks.
 
 ### Option D: Required human approval
 
-Rejected: the attestation and the external verdicts are the merge condition.
+Rejected: the attestation and the external verdicts are the merge condition; a human overrides through
+the bypass list.
 
 ### Option E: An up-to-date-branch rule or a stale-branch update
 
 Rejected: conflicts are resolved, never staleness.
-
-### Option F: A catch-all Blocked exit
-
-Rejected as out of scope.
 
 ## Trade-offs
 
@@ -84,12 +88,11 @@ Rejected as out of scope.
 
 ## Consequences
 
-- Easier: one merge condition, read from the card, the launch lock and the PR's head; a stop is a board move.
-- Harder: every served repo needs the ruleset and squash merging first.
-- **How we would know this was wrong:** the orchestrator merged a PR without `codex-review` success at
-  its head, or merged while the card sat Blocked.
-- Revisit if: a rule outside the contract becomes a routine blocker, or the Codex verdict stops arriving
-  as the pr-gate App's status (ADR-0008).
+- Easier: one merge condition; a stop is a board move.
+- Harder: every served repo needs decision 6 first.
+- **How we would know this was wrong:** a merge without `codex-review` success at its head or under an
+  open hold; a squash commit on main missing a session-id trailer.
+- Revisit if: a rule outside the contract becomes a routine blocker.
 
 ## Action items
 
