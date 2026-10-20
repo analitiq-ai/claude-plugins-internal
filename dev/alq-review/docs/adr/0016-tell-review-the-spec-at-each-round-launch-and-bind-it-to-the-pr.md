@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0016"
 title: "Tell review the spec at each round launch and bind it to the PR"
-status: accepted
+status: superseded
+supersededBy: "0024"
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, review-round, ledger]

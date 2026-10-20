@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0004"
 title: "Take the user's authority from a prompt that starts with a keyword"
-status: accepted
+status: superseded
+supersededBy: "0023"
 date: 2026-10-06
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [release, holds, user-authority]

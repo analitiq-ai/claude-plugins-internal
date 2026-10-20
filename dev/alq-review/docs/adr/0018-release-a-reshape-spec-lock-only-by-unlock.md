@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0018"
 title: "Release a RESHAPE_SPEC lock only by unlock"
-status: accepted
+status: superseded
+supersededBy: "0023"
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [release, holds, user-authority, spec]
