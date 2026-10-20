@@ -66,6 +66,8 @@ code it governs in the same PR).
 
 ### Plugin Principles
 
+Numbered so a principle carries one number in every plugin of this repo; P5 is `alq-plan`'s own.
+
 ### P1. Code Decides, Not Prose
 
 Gate: is every rule the plan adds decided by code on the hook path, with no step that relies on
@@ -82,7 +84,7 @@ no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
-`dev/alq-review/docs/adr/0004-take-the-user-s-authority-from-a-prompt-that-starts-with-a-keyword.md`;
+`dev/alq-review/docs/adr/0023-give-every-hold-one-id-and-one-release-the-launch-after-ready-or-unlock-id.md`;
 which actions release a hold: the decision record in `dev/alq-review/docs/adr/` that decides that hold.
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
@@ -99,6 +101,45 @@ reported as a failed check or a named `cannot verify` — never as a pass, never
 against the author, and never as a guess?
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 5, 6; Mode: the shim check).
+
+### P6. One Writer per State
+
+Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, the PR
+body, a hold, a commit), does the plan name its one writer, and does the plugin write only the
+state it owns and refuse, from any agent session, every write it does not own?
+
+Source: `dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md`
+(decision 2);
+`dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 1);
+https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
+(decision 1).
+
+### P7. Facts Are Read as Data, Never Parsed from Prose
+
+Gate: does every fact the plan reads come from a key, a field, a status or a name with a grammar,
+never from a heading, a comment's wording or free text; and does every fact the plan writes for
+another reader land in such a form?
+
+Source: `dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md`
+(decisions 1, 2);
+`dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md`
+(decision 1);
+https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0006-keep-the-loop-s-durable-state-in-github-objects.md
+(decision 2).
+
+### P8. Generic over Repositories
+
+Gate: does the plan assume of a repository only the branch grammar, the spec folder and GitHub's
+own objects, with every per-repository value in config and no repository name, path or setting
+special-cased?
+
+Source: `dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md`
+(decision 1);
+`dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 3);
+`dev/alq-review/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md`
+(decision 1).
 
 ## Platform Constraints
 
@@ -139,4 +180,4 @@ organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 3.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-14
+**Version**: 3.1.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-20

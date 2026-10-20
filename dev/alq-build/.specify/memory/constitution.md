@@ -66,8 +66,10 @@ code it governs in the same PR).
 
 ### Plugin Principles
 
-Numbered as in the alq-review constitution they are taken from. P1 to P3 govern hooks, holds
-and scripts, which this plugin does not have.
+Numbered so a principle carries one number in every plugin of this repo; P4 as in the
+`alq-review` constitution. P1 to P3 govern hooks, holds and scripts, which this plugin does
+not have; P5 is `alq-plan`'s own. alq-build has no hooks: P6's refusals are alq-review's
+(ADR-0002, decision 1; ADR-0003, decision 2).
 
 ### P4. A Check That Could Not Run Is Its Own Outcome
 
@@ -77,6 +79,37 @@ against the author, and never as a guess?
 
 Source: `plugins/alq-build/skills/root-cause-check/SKILL.md` (verdict CANNOT TELL; The rule
 that keeps this honest).
+
+### P6. One Writer per State
+
+Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, the PR
+body, a hold, a commit), does the plan name its one writer, and does the plugin write only the
+state it owns and refuse, from any agent session, every write it does not own?
+
+Source: `dev/alq-build/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
+(decisions 1, 2); org ADR-0005,
+https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
+(decision 1).
+
+### P7. Facts Are Read as Data, Never Parsed from Prose
+
+Gate: does every fact the plan reads come from a key, a field, a status or a name with a
+grammar, never from a heading, a comment's wording or free text; and does every fact the plan
+writes for another reader land in such a form?
+
+Source: `dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md`
+(decisions 2, 4); org ADR-0006,
+https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0006-keep-the-loop-s-durable-state-in-github-objects.md
+(decision 2).
+
+### P8. Generic over Repositories
+
+Gate: does the plan assume of a repository only the branch grammar, the spec folder and GitHub's
+own objects, with every per-repository value in config and no repository name, path or setting
+special-cased?
+
+Source: `dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md`
+(decision 2).
 
 ## Platform Constraints
 
@@ -115,4 +148,4 @@ organisation's `.claude/rules/github-workflow.md` and
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-12
+**Version**: 2.1.0 | **Ratified**: 2026-10-09 | **Last Amended**: 2026-10-20
