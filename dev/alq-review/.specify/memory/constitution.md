@@ -112,7 +112,7 @@ Source: `dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-secti
 (decision 2);
 `dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
 (decision 1);
-https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
 (decision 1).
 
 ### P7. Facts Are Read as Data, Never Parsed from Prose
@@ -125,7 +125,7 @@ Source: `dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-
 (decisions 1, 2);
 `dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md`
 (decision 1);
-https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0006-keep-the-loop-s-durable-state-in-github-objects.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md
 (decision 2).
 
 ### P8. Generic over Repositories
