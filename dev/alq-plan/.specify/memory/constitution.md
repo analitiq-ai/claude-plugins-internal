@@ -117,7 +117,7 @@ state it owns and refuse, from any agent session, every write it does not own?
 Source: `dev/alq-plan/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
 (decision 4); `dev/alq-plan/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2); orchestrator ADR-0002,
-https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
 (decision 1).
 
 ### P7. Facts Are Read as Data, Never Parsed from Prose
@@ -129,7 +129,7 @@ another reader land in such a form?
 Source: `dev/alq-plan/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
 (decision 1); `dev/alq-plan/docs/adr/0008-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
 (decision 1); orchestrator ADR-0003,
-https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md
 (decision 2).
 
 ### P8. Generic over Repositories

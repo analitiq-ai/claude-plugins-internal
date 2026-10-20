@@ -88,7 +88,7 @@ state it owns and refuse, from any agent session, every write it does not own?
 
 Source: `dev/alq-build/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
 (decisions 1, 2); orchestrator ADR-0002,
-https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md
 (decision 1).
 
 ### P7. Facts Are Read as Data, Never Parsed from Prose
@@ -99,7 +99,7 @@ writes for another reader land in such a form?
 
 Source: `dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md`
 (decisions 2, 4); orchestrator ADR-0003,
-https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md
+https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md
 (decision 2).
 
 ### P8. Generic over Repositories
