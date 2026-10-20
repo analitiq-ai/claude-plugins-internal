@@ -13,8 +13,6 @@ relatesTo: ["0014"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{claimcheck,claimgate,shimcheck,shimgate,ledger,lineage}.py"
-  - type: path
-    pattern: "dev/alq-review/specs/018-lineage-count/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka" 

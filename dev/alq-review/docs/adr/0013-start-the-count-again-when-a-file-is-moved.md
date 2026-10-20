@@ -13,8 +13,6 @@ relatesTo: ["0001"]
 affects:
   - type: path
     pattern: "plugins/alq-review/scripts/{claimcheck,claimgate,ledger}.py"
-  - type: path
-    pattern: "dev/alq-review/specs/018-lineage-count/**"
 provenance:
   authoredBy: agent-drafted
   ratifiedBy: "@Analitiq-Bot-Wonka"

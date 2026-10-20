@@ -305,14 +305,14 @@ class SucceedTest(unittest.TestCase):
         _, inherited = self.succeed([self.lineage("L1", old, "The tool is fast.")], old, new, [outside])
         self.assertEqual(inherited, {})
 
-    def test_a_claim_in_a_range_replaced_past_the_budget_keeps_its_lineage(self):  # X2
+    def test_a_claim_in_a_range_replaced_past_the_budget_keeps_its_lineage(self):
         old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
         reread = self.claim(new, "THREE")
         with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
             [kept], inherited = self.succeed([self.lineage("L1", old, "three")], old, new, [reread])
         self.assertEqual((kept["state"], inherited), ("open", {reread["id"]: ["L1"]}))
 
-    def test_words_in_a_range_replaced_past_the_budget_go_on_over_the_whole_replacement(self):  # X2
+    def test_words_in_a_range_replaced_past_the_budget_go_on_over_the_whole_replacement(self):
         old, new = "Intro.\nOne two three four.\n", "Intro.\nOne two THREE four.\n"
         with mock.patch.object(lineage, "CHAR_DIFF_BUDGET", 10):
             [kept], _ = self.succeed([self.lineage("L1", old, "three")], old, new, [])
