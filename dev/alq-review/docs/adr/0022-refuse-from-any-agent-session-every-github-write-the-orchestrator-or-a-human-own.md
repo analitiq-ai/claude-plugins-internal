@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
     label: "org ADR-0005: The orchestrator alone writes the working lanes, derived from the PR"

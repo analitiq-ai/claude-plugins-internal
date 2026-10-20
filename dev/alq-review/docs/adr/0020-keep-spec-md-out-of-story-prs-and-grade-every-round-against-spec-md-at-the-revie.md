@@ -35,7 +35,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per issue, in the repo"
@@ -79,7 +79,7 @@ Stays rejected.
 
 ## Trade-offs
 
-- The gate admits a spec-only commit by its paths alone, so the graded agent can change the spec it is
+- Reviewer admits a spec-only commit by its paths alone, so the graded agent can change the spec it is
   graded against.
 - Every spec-only commit costs a full-scope round.
 

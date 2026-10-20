@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.2.0
 id: "0021"
-title: "Record rounds and holds in a PR body section the gate alone writes"
+title: "Record rounds and holds in a PR body section reviewer alone writes"
 status: draft
 date: 2026-10-19
 deciders: []
@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0006-keep-the-loop-s-durable-state-in-github-objects.md"
     label: "org ADR-0006: Keep the loop's durable state in GitHub objects"
@@ -36,15 +36,15 @@ externalRefs:
     label: "org ADR-0007: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
-# ADR-0021: Record rounds and holds in a PR body section the gate alone writes
+# ADR-0021: Record rounds and holds in a PR body section reviewer alone writes
 
 ## Context
 
-ADR-0002 kept the gate's record in one local SQLite file on the session's machine, which the
+ADR-0002 kept reviewer's record in one local SQLite file on the session's machine, which the
 orchestrator, on an unspecified host and running no plugin code, cannot read, and which a host change
 loses.
 
-This record supersedes ADR-0002 and reverses its decision 2, one local SQLite file as the gate's
+This record supersedes ADR-0002 and reverses its decision 2, one local SQLite file as reviewer's
 record; its decision 1, the state directory, stands for session-scoped files only; its decision 6,
 `gate.log` and `errors.log`, stands; its decisions 3 to 5 fall with it.
 
@@ -52,7 +52,7 @@ record; its decision 1, the state directory, stands for session-scoped files onl
 
 1. We will record rounds, holds and `Closes #n` on the last story in one PR body section: a rendered
    table and one machine block; a released hold keeps its row.
-2. We will make the gate the section's only writer after alq-build creates the PR (ADR-0022), inside
+2. We will make reviewer the section's only writer after builder creates the PR (ADR-0022), inside
    the session it gates; the orchestrator reads ATTESTED and HOLD from it and never writes it.
 3. We will keep `ledger.db` beside the session as a hot-path cache, rebuilt from the section when
    missing. Reviewer reports and session grants stay session-scoped files (org ADR-0006, decision 4).
@@ -77,7 +77,7 @@ Rejected: lanes are the state channel; nothing is parsed out of prose.
 
 ## Trade-offs
 
-- The gate writes the machine block with the session's own credential, so the hook's refusal of a
+- Reviewer writes the machine block with the session's own credential, so the hook's refusal of a
   later agent body edit is the only boundary on what the orchestrator attests from (org ADR-0007,
   decision 4).
 - A hold has nowhere to live until the PR exists.
@@ -88,7 +88,7 @@ Rejected: lanes are the state channel; nothing is parsed out of prose.
   sees rounds and holds in the PR.
 - Harder: no transition is recorded without reaching GitHub.
 - **How we would know this was wrong:** the orchestrator and a session disagree on a PR's
-  attestation or hold; anything but the gate writes the section; a second durable record of rounds
+  attestation or hold; anything but reviewer writes the section; a second durable record of rounds
   or holds appears.
 - Revisit if: the orchestrator may read plugin state; GitHub gains a conditional update; a hold must outlive its PR.
 

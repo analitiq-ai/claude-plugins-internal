@@ -35,7 +35,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
 ---
 
 # ADR-0029: Run every reviewer and the assessment inside one review-round workflow
@@ -43,10 +43,10 @@ externalRefs:
 ## Context
 
 Today the agent launches the assessment itself, any reviewer type can be
-dispatched from the main thread (pr-audit's trigger), and alq-anti-pattern's dispatch is copied
+dispatched from the main thread (pr-audit's trigger), and auditor's dispatch is copied
 into `briefs.py`. Whether an assessment ran on reports from reviewers behind a
 barrier, whether a reviewer ran inside a round at all, and which plugins a round depends on, is
-nothing the gate can enforce.
+nothing reviewer can enforce.
 
 ## Decision
 
@@ -57,11 +57,11 @@ nothing the gate can enforce.
 2. We will refuse any reviewer type dispatched from the main thread, outside a round, on a story
    branch or on a branch inside the grammar with an open PR, naming review-round; main and branches
    outside the grammar (ADR-0024) keep main-thread dispatch.
-3. We will have alq-review's decision-reviewer join every internal round; with no governing
+3. We will have reviewer's decision-reviewer join every internal round; with no governing
    record, its brief is to flag a decision made in the diff with no record.
-4. We will declare pr-review-toolkit and alq-anti-pattern as dependencies, with the accepted
-   alq-anti-pattern version pinned in config.json, refuse a round's launch when an expected agent
-   type is missing, and read alq-anti-pattern's dispatch as data at the round's launch.
+4. We will declare pr-review-toolkit and auditor as dependencies, with the accepted
+   auditor version pinned in config.json, refuse a round's launch when an expected agent
+   type is missing, and read auditor's dispatch as data at the round's launch.
 
 ## Options considered
 
@@ -82,7 +82,7 @@ the diff would go unflagged.
 
 ### Option E: A dispatch copy in `briefs.py`
 
-Rejected: it is a second copy of a dispatch alq-anti-pattern publishes as data.
+Rejected: it is a second copy of a dispatch auditor publishes as data.
 
 ## Trade-offs
 
@@ -93,7 +93,7 @@ Rejected: it is a second copy of a dispatch alq-anti-pattern publishes as data.
 ## Consequences
 
 - Easier: both loops are "run review-round, act on its rulings".
-- Harder: alq-review works only with two other plugins installed.
+- Harder: reviewer works only with two other plugins installed.
 - **How we would know this was wrong:** a reviewer type runs on a story branch outside a round;
   an assessment no round produced is recorded; a dispatch copy returns to `briefs.py`.
 - Revisit if: the audit agents move into this repo, or a reviewer must run outside a round.

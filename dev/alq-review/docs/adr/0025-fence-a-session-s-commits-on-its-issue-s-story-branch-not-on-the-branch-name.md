@@ -25,7 +25,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
@@ -38,11 +38,11 @@ externalRefs:
 
 ## Context
 
-The brainstorm had alq-review refuse a commit on any branch outside the grammar, keyed on the name. The risk a commit-time refusal must cover is narrower: a build session committing on a branch other than its own story's. On a repo with no ruleset, the session hook is the only line between the bot and main.
+The brainstorm had reviewer refuse a commit on any branch outside the grammar, keyed on the name. The risk a commit-time refusal must cover is narrower: a build session committing on a branch other than its own story's. On a repo with no ruleset, the session hook is the only line between the bot and main.
 
 ## Decision
 
-1. We will key the fence on the session's issue: when `alq-build:issue-tackle <n>` starts, the gate
+1. We will key the fence on the session's issue: when `builder:issue-tackle <n>` starts, the gate
    records n for the session, and every commit in that session must land on `<n>-us<k>` with no other
    `<n>-us<j>` on origin; any other branch is refused.
 2. We will let a session with no recorded issue commit freely on any branch: reverts, release bumps and
@@ -53,7 +53,7 @@ The brainstorm had alq-review refuse a commit on any branch outside the grammar,
 
 ### Option A: A fence keyed on the session's issue (chosen)
 
-The gate already runs on every Skill call and keeps a state file per session.
+Reviewer already runs on every Skill call and keeps a state file per session.
 
 ### Option B: Refuse any commit on a branch outside the grammar, keyed on the name
 

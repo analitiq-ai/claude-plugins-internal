@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0013-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
     label: "org ADR-0013: Take an escalation's answer from a writer's issue comment"
@@ -42,9 +42,9 @@ wrote it, and a thread an agent reads is text it acts on (OWASP LLM01).
 
 ## Decision
 
-1. We will keep one list, `trusted_reviewers` in alq-review's config.json, naming the review bots
+1. We will keep one list, `trusted_reviewers` in reviewer's config.json, naming the review bots
    and the named humans; a thread is trusted when its latest comment's author is on it.
-2. We will make the gate the only owner of trust: at a github round's launch (ADR-0029) it
+2. We will make reviewer the only owner of trust: at a github round's launch (ADR-0029) it
    queries GitHub for the PR's unresolved threads, failing required checks and a conflict with
    main, resolves every untrusted thread unread with a fixed reply naming the reason, and opens
    the round on the rest in one gate decision. No agent reads an untrusted thread; the
@@ -55,7 +55,7 @@ wrote it, and a thread an agent reads is text it acts on (OWASP LLM01).
 
 ## Options considered
 
-### Option A: The gate owns trust; untrusted threads resolved unread (chosen)
+### Option A: Reviewer owns trust; untrusted threads resolved unread (chosen)
 
 One owner; no brief carries untrusted text; resolving satisfies GitHub's rule.
 
@@ -83,7 +83,7 @@ Lost: the round queries GitHub at the round's launch.
 
 ## Consequences
 
-- Easier: one config file decides trust, and only the gate reads it.
+- Easier: one config file decides trust, and only reviewer reads it.
 - Harder: adding a reviewer is a hand edit to config.json that agent sessions are refused.
 - **How we would know this was wrong:** an untrusted comment's text appears in a brief; the
   orchestrator grows a trust list or a Blocked move for an untrusted thread; a trusted reply to a

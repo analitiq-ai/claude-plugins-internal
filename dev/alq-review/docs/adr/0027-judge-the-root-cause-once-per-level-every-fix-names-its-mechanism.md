@@ -29,27 +29,27 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-plan/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "alq-plan ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
+    label: "planner ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
-    label: "alq-build ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
+    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
 ---
 
 # ADR-0027: Judge the root cause once per level; every FIX names its mechanism
 
 ## Context
 
-Today cause versus symptom is judged twice and binds no ruling: alq-build's root-cause-check reads
+Today cause versus symptom is judged twice and binds no ruling: builder's root-cause-check reads
 nothing from the round; the shim check guesses it beside the site coverage it measures
-(ADR-0007). And a FIX may say "fix it" and leave the mechanism to the agent. alq-plan
+(ADR-0007). And a FIX may say "fix it" and leave the mechanism to the agent. planner
 ADR-0009's observed-cause fact now tells a round when a root-cause verdict is due.
 
 ## Decision
 
-1. We will have the root-cause reviewer, alq-review's own agent, verify the spec's Root cause in
+1. We will have the root-cause reviewer, reviewer's own agent, verify the spec's Root cause in
    every internal round whose spec says the cause was observed; otherwise the round records root_cause: not_applicable.
 2. We will type its verdict (AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL), record it on the
    round, and rule in policy which rulings each verdict admits: SPEC_WRONG admits a spec-gap
@@ -60,7 +60,7 @@ ADR-0009's observed-cause fact now tells a round when a root-cause verdict is du
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.
 4. At the commit level, we will have the shim check rule complete or patch on site coverage alone.
-5. We will retire alq-build's root-cause-check skill (alq-build ADR-0002).
+5. We will retire builder's root-cause-check skill (builder ADR-0002).
 
 ## Options considered
 
@@ -72,7 +72,7 @@ Each level's cause is checked where it can be checked.
 
 Rejected: it needs a commit-to-finding mapping.
 
-### Option C: root-cause-check as an alq-build step before review (today)
+### Option C: root-cause-check as a builder step before review (today)
 
 Rejected: it reads nothing from the round.
 

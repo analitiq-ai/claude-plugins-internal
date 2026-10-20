@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
 ---
 
 # ADR-0028: After N review-driven edits to one file, only REDESIGN is admissible
@@ -35,7 +35,7 @@ externalRefs:
 ## Context
 
 Today the churn bound is defined twice, with two meanings of "edit": prose in the cto rule file
-`pr-review-loop.md`, and the gate's count of commits per file since round 1's head, which resets
+`pr-review-loop.md`, and reviewer's count of commits per file since round 1's head, which resets
 only when the file moves.
 
 ## Decision
@@ -46,12 +46,12 @@ only when the file moves.
 2. We will reset at the latest of round 1's head, the last settled round's head, the commit
    closing that file's last REDESIGN finding, and a move of the file (ADR-0013); the assessor's
    facts will carry edits_since_reset and the reset event.
-3. We will define the rule once, in alq-review's policy; the cto rule file only points at the gate;
+3. We will define the rule once, in reviewer's policy; the cto rule file only points at reviewer;
    the pre-PR "unsettled branch" concern belongs to the history-shape audit reviewer.
 
 ## Options considered
 
-### Option A: The bar in the gate, N in config, a reset at settled points (chosen)
+### Option A: The bar in reviewer, N in config, a reset at settled points (chosen)
 
 Brainstorm Third-edit rule, option 2, plus decision 2's reset.
 
@@ -71,7 +71,7 @@ Rejected: it would force REDESIGN on polish after a settled design.
 
 ## Consequences
 
-- Easier: the assessor rules from facts the gate computed.
+- Easier: the assessor rules from facts reviewer computed.
 - Harder: the rule file no longer states the bound.
 - **How we would know this was wrong:** REDESIGN forced on polish after a settled design despite
   the reset; a file still churning after the REDESIGN that closed its finding.

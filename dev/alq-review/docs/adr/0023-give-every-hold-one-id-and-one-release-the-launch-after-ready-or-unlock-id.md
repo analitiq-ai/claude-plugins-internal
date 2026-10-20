@@ -29,7 +29,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
     label: "org ADR-0005: The orchestrator alone writes the working lanes, derived from the PR"
@@ -49,12 +49,12 @@ per user-only action.
 
 ## Decision
 
-1. We will give every hold the gate places (rescope-<pr>, escalation-<pr>, pushback-<pr>, claim-<id>,
+1. We will give every hold reviewer places (rescope-<pr>, escalation-<pr>, pushback-<pr>, claim-<id>,
    shim-<id>, audit-<pr>) an id and a row in the PR body section (ADR-0021); the orchestrator keeps
    the card Blocked while one is open. `RESHAPE_SPEC` is RESCOPE, its lock rescope-<pr>;
    `override shim-<id>` folds into `unlock shim-<id>`; `unlock #<pr>` goes, and `rebase <ref>` with it (ADR-0020); a
    refusal names the exact id.
-2. We will release holds by one function, two callers: the gate, at the start of the launch that
+2. We will release holds by one function, two callers: reviewer, at the start of the launch that
    follows a human's Ready, releases every open hold of the PR (escalation once ANSWERED); a prompt
    starting `unlock <id>`, read in the `UserPromptSubmit` hook, releases that one. Nothing else does.
 3. We will place pushback-<pr> only when a github round rules no FIX while a merge blocker stays
