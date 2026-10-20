@@ -48,8 +48,7 @@ reviewer's ADR-0005 decides, for review's gates, to refuse the call a check was 
 not run. This record decides the same question for planning.
 
 Planning has no hooks (R16). Its checks are Spec Kit workflow steps that run a script: the premise report, the
-root cause, the premise answers, the rescope folder, the settled-design check (FR-020), and closing an issue that
-is not worth doing (R5). A step that exits non-zero stops the run, and the planning skill shows the message. A step
+root cause, the premise answers, the rescope folder, and the settled-design check (FR-020). A step that exits non-zero stops the run, and the planning skill shows the message. A step
 depends on git, `gh` and GitHub, Spec Kit and its own script; when one does not answer, the step has no verdict,
 and the run must go on or stop.
 
@@ -90,7 +89,6 @@ checks the folder's contents (reviewer ADR-0014).
 ## Trade-offs
 
 - A dependency that is down stops a run for no fault of the spec.
-- On `not worth doing`, a `gh` that fails stops the run, and the issue stays open until the step succeeds (R5).
 
 ## Consequences
 

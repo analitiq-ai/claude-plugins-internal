@@ -31,7 +31,11 @@ externalRefs:
   - type: doc
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
+  - type: doc
+    id: "builder ADR-0002"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
+    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
 ---
 
 # ADR-0004: Recognise a spec folder by Spec Kit's mark
@@ -45,9 +49,8 @@ not count. So a planning run writes its spec folder into the `specs/` of the pro
 planner's rescope takes a spec folder as its argument and does not look one up (FR-021). The folder check it makes
 is the workflow's `select-spec` step: `specs/<feature>`, with `spec.md` present (R6).
 
-Review and build are told the folder planning writes. Review checks less than this mark: the path is relative with
-no `..`, its parent is named `specs`, and `spec.md` is in HEAD and not empty (FR-007). Review does not use
-Spec Kit's mark (reviewer ADR-0014). `/builder:issue-tackle` takes `spec` in the same form (FR-015).
+Review and build do not use the mark: each finds the folder by the issue number, `specs/<n>-*/`, and review
+validates none of it (reviewer ADR-0014, builder ADR-0002).
 
 ## Decision
 
@@ -61,7 +64,6 @@ folder. A `specs/` folder with no `.specify/` beside it holds no spec folders.
 | Dimension | Assessment |
 |---|---|
 | What makes a folder a spec folder | The committed `.specify/` beside its `specs/` |
-| Passes review's shape check | Yes, every folder planning writes: review's check is looser than the mark |
 | Hand-maintained lists | None |
 | A project that does not commit `.specify/` | Has no spec folders |
 
@@ -76,16 +78,16 @@ Rejected as the definition: any folder that happens to be named `specs/<x>/` cou
 ## Trade-offs
 
 - Nothing checks that `.specify/` is committed. Planning's `select-spec` matches only `specs/<feature>` with a
-  `spec.md`, `speckit.specify` needs only that `.specify/` exists, review checks only a parent named `specs` and a
-  `spec.md` in HEAD that is not empty, and build only the `spec.md`. A run in a project whose `.specify/` is untracked
-  writes and commits a folder this decision does not count, and review accepts it.
+  `spec.md`, and `speckit.specify` needs only that `.specify/` exists; review and build check nothing of the folder.
+  A run in a project whose `.specify/` is untracked writes and commits a folder this decision does not count, and
+  review and build still read it.
 - A spec written anywhere but in Spec Kit's `specs/` is not a spec folder.
 
 ## Consequences
 
-- Easier: every folder planning writes passes review's shape check.
-- Harder: no step enforces the mark. Planning writes beside `.specify/`, but nothing checks that it is committed, so
-  a folder planning writes, like one made by hand, is held only to review's check.
+- Easier: one definition of a spec folder, Spec Kit's own, with no list to maintain.
+- Harder: no step enforces the mark. Planning writes beside `.specify/`, but nothing checks that it is committed,
+  and review and build read a folder made by hand the same way.
 - **How we would know this was wrong:** a spec folder is found committed in a project with no committed `.specify/`;
   or Spec Kit writes spec folders outside the `specs/` beside `.specify/`.
 - Revisit if: Spec Kit changes how it marks a project.
