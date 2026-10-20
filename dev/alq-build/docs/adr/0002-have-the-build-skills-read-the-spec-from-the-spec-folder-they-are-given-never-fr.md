@@ -38,7 +38,7 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
     label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0027-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
