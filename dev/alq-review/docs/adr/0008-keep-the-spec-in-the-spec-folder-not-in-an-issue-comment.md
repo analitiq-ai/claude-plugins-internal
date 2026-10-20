@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0008"
 title: "Keep the spec in the spec folder, not in an issue comment"
-status: accepted
+status: superseded
+supersededBy: "0024"
 date: 2026-10-06
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, review-round, skills]

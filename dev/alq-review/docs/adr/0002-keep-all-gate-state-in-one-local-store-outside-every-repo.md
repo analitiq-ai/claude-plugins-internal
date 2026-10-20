@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0002"
 title: "Keep all gate state in one local store outside every repo"
-status: accepted
+status: superseded
+supersededBy: "0021"
 date: 2026-10-06
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [state, ledger]

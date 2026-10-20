@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0012"
 title: "Find spec folders by Spec Kit's mark and keep no list of design documents"
-status: accepted
+status: superseded
+supersededBy: "0024"
 date: 2026-10-06
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec-folder, settled-design, review-round]

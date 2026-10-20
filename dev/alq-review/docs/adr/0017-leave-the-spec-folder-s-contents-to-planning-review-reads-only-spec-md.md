@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0017"
 title: "Leave the spec folder's contents to planning; review reads only spec.md"
-status: accepted
+status: superseded
+supersededBy: "0024"
 date: 2026-10-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, spec-folder, settled-design, review-round, mode]

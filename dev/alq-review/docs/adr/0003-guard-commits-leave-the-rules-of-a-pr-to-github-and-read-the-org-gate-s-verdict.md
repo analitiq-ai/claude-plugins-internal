@@ -2,7 +2,8 @@
 schemaVersion: 0.1.0
 id: "0003"
 title: "Guard commits, leave the rules of a PR to GitHub and read the org gate's verdict from its check run"
-status: accepted
+status: superseded
+supersededBy: "0022"
 date: 2026-10-06
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [merge-gate, org-gate, github]
