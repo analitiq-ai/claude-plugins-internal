@@ -31,9 +31,9 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    id: "org ADR-0009"
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0009-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
-    label: "org ADR-0009: Land an issue's decision record as an exempt PR before its first story PR"
+    id: "orchestrator ADR-0006"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0006-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
+    label: "orchestrator ADR-0006: Land an issue's decision record as an exempt PR before its first story PR"
 ---
 
 # ADR-0010: Check the plan against the governing decision logs before critique
@@ -52,7 +52,7 @@ behind its remote and lack the record that now binds.
    machine has credentials for it. A checkout behind its remote stops the run naming "pull it"; one that
    cannot be fetched or cloned is a check that could not run (ADR-0002).
 3. We will record the org-log commit SHA the check saw in the plan artifact.
-4. We will draft a record the plan needs on `<n>-adr-<slug>`; org ADR-0009 governs how it lands.
+4. We will draft a record the plan needs on `<n>-adr-<slug>`; orchestrator ADR-0006 governs how it lands.
 
 ## Options considered
 

@@ -47,9 +47,9 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    id: "org ADR-0005"
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0005-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
-    label: "org ADR-0005: The orchestrator alone writes the working lanes, derived from the PR"
+    id: "orchestrator ADR-0002"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
+    label: "orchestrator ADR-0002: The orchestrator alone writes the working lanes, derived from the PR"
 ---
 
 # ADR-0005: Have the skill that shapes an issue read and write the spec in its spec folder
@@ -70,7 +70,7 @@ message (decision 3) stand.
 3. We will refuse a rescope while the card is Ready, In progress or In review, naming the step "move the card
    to Backlog" (ADR-0002); a rescope may add stories and renumbers no frozen story (org ADR-0003).
 4. We will commit and push the spec on the branch org ADR-0002 names; the run opens no PR and writes no
-   lane (org ADR-0002, org ADR-0005); a completed run posts nothing on the issue, and ends with a message
+   lane (org ADR-0002, orchestrator ADR-0002); a completed run posts nothing on the issue, and ends with a message
    that gives the spec folder and the branch it is committed on, and names no command of another plugin.
 5. We will have the human drive every approval at grill and at critique; the critique's verdict is advisory
    and no script reads it.
@@ -95,7 +95,7 @@ Proposed at the brainstorm. Lost: no script reads the verdict.
 
 ### Option E: planner writes Blocked when it needs the user (brainstorm)
 
-Lost: no plugin writes a lane (org ADR-0005).
+Lost: no plugin writes a lane (orchestrator ADR-0002).
 
 ## Trade-offs
 
