@@ -27,13 +27,13 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0025-fence-a-session-s-commits-on-its-issue-s-story-branch-not-on-the-branch-name.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0025-fence-a-session-s-commits-on-its-issue-s-story-branch-not-on-the-branch-name.md"
     label: "reviewer ADR-0025: Fence a session's commits on its issue's story branch, not on the branch name"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0003-guard-commits-leave-the-rules-of-a-pr-to-github-and-read-the-org-gate-s-verdict.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0003-guard-commits-leave-the-rules-of-a-pr-to-github-and-read-the-org-gate-s-verdict.md"
     label: "reviewer ADR-0003: Guard commits, leave the rules of a PR to GitHub and read the org gate's verdict from its check run"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
     label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
 ---
 

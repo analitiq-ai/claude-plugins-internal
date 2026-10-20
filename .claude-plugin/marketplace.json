@@ -1,20 +1,24 @@
 {
-  "name": "alq-internal",
+  "name": "codeworks",
   "owner": {
     "name": "Analitiq"
   },
   "plugins": [
     {
-      "name": "alq-review",
-      "source": "./plugins/alq-review"
+      "name": "reviewer",
+      "source": "./reviewer/plugin"
     },
     {
-      "name": "alq-plan",
-      "source": "./plugins/alq-plan"
+      "name": "planner",
+      "source": "./planner/plugin"
     },
     {
-      "name": "alq-build",
-      "source": "./plugins/alq-build"
+      "name": "builder",
+      "source": "./builder/plugin"
+    },
+    {
+      "name": "auditor",
+      "source": "./auditor/plugin"
     }
   ]
 }

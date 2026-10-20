@@ -1,5 +1,5 @@
 # Moving a record to `status: accepted` is the ratifier's decision, so every change here needs their review.
-/dev/alq-review/docs/adr/ @Analitiq-Bot-Wonka
+docs/adr/ @Analitiq-Bot-Wonka
 
 # Owned too, or the rule above could be removed without that approval.
 /.github/CODEOWNERS @Analitiq-Bot-Wonka

@@ -27,7 +27,7 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-plan/docs/adr/0010-check-the-plan-against-the-governing-decision-logs-before-critique.md"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0010-check-the-plan-against-the-governing-decision-logs-before-critique.md"
     label: "planner ADR-0010: Check the plan against the governing decision logs before critique"
 ---
 
