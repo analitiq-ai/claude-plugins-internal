@@ -27,7 +27,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0004-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
     label: "org ADR-0004: Drive the issue loop with a deterministic orchestrator outside the plugins"
@@ -36,13 +36,13 @@ externalRefs:
     label: "org ADR-0010: Mark a story PR ready on the attestation alone; In review once green with no findings"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md"
-    label: "alq-review ADR-0021: Record rounds and holds in a PR body section the gate alone writes"
+    label: "reviewer ADR-0021: Record rounds and holds in a PR body section reviewer alone writes"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "alq-review ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
+    label: "reviewer ADR-0022: Refuse from any agent session every GitHub write the orchestrator or a human owns"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "alq-review ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer"
+    label: "reviewer ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0011-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
     label: "org ADR-0011: Request Codex by the orchestrator's comment once per head, automatic review off"
@@ -53,17 +53,17 @@ externalRefs:
 ## Context
 
 Under org ADR-0004 the orchestrator drives the GitHub loop; the plugin owns the other half: where a
-build turn ends, and which GitHub moves it never makes. The brainstorm gave alq-build the flip; today the session polls the reviewers and re-requests Codex.
+build turn ends, and which GitHub moves it never makes. The brainstorm gave builder the flip; today the session polls the reviewers and re-requests Codex.
 
 ## Decision
 
 1. We will open the story PR as a draft after the first push, and a new one on the same branch after a
-   PR closed unmerged; alq-build writes its description once, at creation (alq-review ADR-0021). Ticks in tasks.md land in
+   PR closed unmerged; builder writes its description once, at creation (reviewer ADR-0021). Ticks in tasks.md land in
    ordinary commits in the story PR.
-2. We will end the turn at an attested draft, or at a stop with a message: a pre-PR stop, or the folder stop of ADR-0002, Decision 3. alq-build polls
-   nothing and makes none of the GitHub moves alq-review ADR-0022 refuses; the orchestrator relaunches
+2. We will end the turn at an attested draft, or at a stop with a message: a pre-PR stop, or the folder stop of ADR-0002, Decision 3. builder polls
+   nothing and makes none of the GitHub moves reviewer ADR-0022 refuses; the orchestrator relaunches
    it.
-3. We will resume a relaunch from the open story PR (ADR-0002, Decision 2): findings open a github round (alq-review
+3. We will resume a relaunch from the open story PR (ADR-0002, Decision 2): findings open a github round (reviewer
    ADR-0026), an unattested head resumes the internal loop at the current head.
 
 ## Options considered
@@ -72,13 +72,13 @@ build turn ends, and which GitHub moves it never makes. The brainstorm gave alq-
 
 The session never waits for GitHub.
 
-### Option B: alq-build marks the PR ready and writes In review (the brainstorm)
+### Option B: builder marks the PR ready and writes In review (the brainstorm)
 
 Rejected: the orchestrator flips the PR and moves the card; no plugin writes a lane, and the
 hook refuses one from an agent session. A pre-PR stop likewise ends with a message and the orchestrator
 moves the card (the 2026-10-18 redraw: no plugin writes Blocked).
 
-### Option C: alq-build polls the reviewers and re-requests Codex (today's loop)
+### Option C: builder polls the reviewers and re-requests Codex (today's loop)
 
 Rejected (brainstorm): a session cannot wait for CI, and the re-request is due only after it; the
 orchestrator makes it (org ADR-0011).

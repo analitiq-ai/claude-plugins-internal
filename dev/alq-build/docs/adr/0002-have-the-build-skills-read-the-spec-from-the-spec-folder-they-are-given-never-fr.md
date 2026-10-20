@@ -33,7 +33,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
@@ -42,32 +42,32 @@ externalRefs:
     label: "org ADR-0004: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0027-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
-    label: "alq-review ADR-0027: Judge the root cause once per level; every FIX names its mechanism"
+    label: "reviewer ADR-0027: Judge the root cause once per level; every FIX names its mechanism"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-plan/docs/adr/0009-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "alq-plan ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
+    label: "planner ADR-0009: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
 ---
 
 # ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment
 
 ## Context
 
-This record decides how `alq-build` finds the spec folder (ADR-0001) and the story. The draft
+This record decides how `builder` finds the spec folder (ADR-0001) and the story. The draft
 (issue #63) had the caller pass `spec` and `branch` and had `issue-tackle` run `root-cause-check`; the
-design (issue #133) drops both and makes `alq-build` depend on `alq-review`. The caller is now a
+design (issue #133) drops both and makes `builder` depend on `reviewer`. The caller is now a
 deterministic orchestrator (org ADR-0004), which computes no story order.
 
 ## Decision
 
 1. We will have `issue-tackle <n>` take the issue number only, for the orchestrator and humans;
-   `alq-build` declares `alq-review` as a dependency.
+   `builder` declares `reviewer` as a dependency.
 2. We will derive everything from `<n>`: the spec folder is the one `specs/<n>-*/` on the issue branch;
-   the requirement is its `spec.md`, or the issue body when its front matter's `alq.kind` is `no_spec`
-   (alq-plan ADR-0009); the story is the open story PR's (never an `<n>-adr-*` PR), else the one `next_story` returns (org ADR-0003).
+   the requirement is its `spec.md`, or the issue body when its front matter's `codeworks.kind` is `no_spec`
+   (planner ADR-0009); the story is the open story PR's (never an `<n>-adr-*` PR), else the one `next_story` returns (org ADR-0003).
 3. We will stop, never plan, on no `specs/`, no `specs/<n>-*` or an inconsistent folder, with a message naming the state and any open PR.
 4. We will have neither skill read any issue comment for the spec.
 5. We will drop `root-cause-check` as a build step: the round's root-cause reviewer verifies the cause
-   (alq-review ADR-0027).
+   (reviewer ADR-0027).
 
 ## Options considered
 
@@ -95,7 +95,7 @@ root-cause reviewer.
 ## Trade-offs
 
 - The skill repairs nothing; a missing or inconsistent folder costs a Blocked card and a human.
-- `alq-build` now depends on `alq-review`.
+- `builder` now depends on `reviewer`.
 
 ## Consequences
 
