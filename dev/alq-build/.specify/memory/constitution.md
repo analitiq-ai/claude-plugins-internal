@@ -1,6 +1,6 @@
-# alq-build Constitution
+# builder Constitution
 
-Constitution for building the `alq-build` plugin. Its Spec Kit project is `dev/alq-build/` in
+Constitution for building the `builder` plugin. Its Spec Kit project is `dev/alq-build/` in
 `analitiq-ai/claude-plugins-internal`; the plugin it governs is `plugins/alq-build/`. Paths are
 relative to the repo root unless they name another repo. Nothing under `dev/` is installed with
 the plugin. Each principle is a plan-time gate: a plan passes only if it answers the
@@ -19,7 +19,7 @@ is not tagged yet).
 
 Gate: does the plan introduce a data shape, validator, type-name list or hand-written schema? If so,
 it MUST name the owning artifact from the contracts map and be an adapter against it. A new contract
-or a second validator over an already-gated shape fails the gate.
+or a second validator over an already-gated shape fails reviewer.
 
 Source: `.claude/rules/schema-contracts.md`; `.claude/rules/coding-principles.md` (Structure &
 consistency: contract-first, define once).
@@ -67,8 +67,8 @@ code it governs in the same PR).
 ### Plugin Principles
 
 Numbered so a principle carries one number in every plugin of this repo; P4 as in the
-`alq-review` constitution. P1 to P3 govern hooks, holds and scripts, which this plugin does
-not have; P5 is `alq-plan`'s own. alq-build has no hooks: P6's refusals are alq-review's
+`reviewer` constitution. P1 to P3 govern hooks, holds and scripts, which this plugin does
+not have; P5 is `planner`'s own. builder has no hooks: P6's refusals are reviewer's
 (ADR-0002, decision 1; ADR-0003, decision 2).
 
 ### P4. A Check That Could Not Run Is Its Own Outcome
@@ -120,7 +120,7 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   project, its `specs/<nnn>-<feature>/` and its `tests/`) and is never installed (`README.md`).
 - Tests: CI runs every `tests/` folder under `dev/` that is not inside a `fixtures/` folder (`.github/workflows/tests.yml`).
 - The plugin is two skills, with no scripts and no hooks (`plugins/alq-build/`).
-- The review step is the `alq-review` plugin's internal round, which no install requires
+- The review step is the `reviewer` plugin's internal round, which no install requires
   (`plugins/alq-build/skills/issue-tackle/SKILL.md`).
 - Private repo: Principle II's public-repo limits bind what the plugin writes into public repos,
   not this repo's own files.

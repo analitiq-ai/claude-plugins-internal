@@ -1,6 +1,6 @@
-# alq-plan Constitution
+# planner Constitution
 
-Constitution for building the `alq-plan` plugin. Its Spec Kit project is `dev/alq-plan/` in
+Constitution for building the `planner` plugin. Its Spec Kit project is `dev/alq-plan/` in
 `analitiq-ai/claude-plugins-internal`; the plugin it governs is `plugins/alq-plan/`. Paths are
 relative to the repo root unless they name another repo. Nothing under `dev/` is installed with
 the plugin. Each principle is a plan-time gate: a plan passes only if it answers the
@@ -19,7 +19,7 @@ is not tagged yet).
 
 Gate: does the plan introduce a data shape, validator, type-name list or hand-written schema? If so,
 it MUST name the owning artifact from the contracts map and be an adapter against it. A new contract
-or a second validator over an already-gated shape fails the gate.
+or a second validator over an already-gated shape fails reviewer.
 
 Source: `.claude/rules/schema-contracts.md`; `.claude/rules/coding-principles.md` (Structure &
 consistency: contract-first, define once).
@@ -67,9 +67,9 @@ code it governs in the same PR).
 ### Plugin Principles
 
 Numbered so a principle carries one number in every plugin of this repo: P1, P3 and P4 as in the
-`alq-review` constitution (`dev/alq-review/.specify/memory/constitution.md`); P6 to P8 as in
+`reviewer` constitution (`dev/alq-review/.specify/memory/constitution.md`); P6 to P8 as in
 every plugin of this repo; P5 is planning's own. There is no P2: planning holds nothing, so
-there is no hold to release. alq-plan has no hooks: P6's refusals are alq-review's
+there is no hold to release. planner has no hooks: P6's refusals are reviewer's
 (`dev/alq-review/docs/adr/0022-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`,
 decision 1).
 

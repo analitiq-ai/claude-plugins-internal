@@ -1,6 +1,6 @@
-# alq-review Constitution
+# reviewer Constitution
 
-Constitution for building the `alq-review` plugin. Its Spec Kit project is `dev/alq-review/` in
+Constitution for building the `reviewer` plugin. Its Spec Kit project is `dev/alq-review/` in
 `analitiq-ai/claude-plugins-internal`; the plugin it governs is `plugins/alq-review/`. Paths are
 relative to the repo root unless they name another repo. Nothing under `dev/` is installed with
 the plugin. Each principle is a plan-time gate: a plan passes only if it answers the
@@ -19,7 +19,7 @@ is not tagged yet).
 
 Gate: does the plan introduce a data shape, validator, type-name list or hand-written schema? If so,
 it MUST name the owning artifact from the contracts map and be an adapter against it. A new contract
-or a second validator over an already-gated shape fails the gate.
+or a second validator over an already-gated shape fails reviewer.
 
 Source: `.claude/rules/schema-contracts.md`; `.claude/rules/coding-principles.md` (Structure &
 consistency: contract-first, define once).
@@ -66,7 +66,7 @@ code it governs in the same PR).
 
 ### Plugin Principles
 
-Numbered so a principle carries one number in every plugin of this repo; P5 is `alq-plan`'s own.
+Numbered so a principle carries one number in every plugin of this repo; P5 is `planner`'s own.
 
 ### P1. Code Decides, Not Prose
 
@@ -80,7 +80,7 @@ Source: `plugins/alq-review/README.md` (opening; How an agent uses it).
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
-no named approver, or with a way out no decision record names, fails the gate.
+no named approver, or with a way out no decision record names, fails reviewer.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
@@ -152,7 +152,7 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - The claim, shim and decision checks each have a `log` / `enforce` setting beside the plugin's mode; the
   review-round `spec` check follows the plugin's mode alone (`plugins/alq-review/README.md`: Mode).
 - Where the plugin keeps its state: `plugins/alq-review/README.md` (State).
-- Reviewer agents come from the `pr-review-toolkit` and `alq-anti-pattern` plugins, except the decision
+- Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision
   reviewer, which is this plugin's own `agents/decision-reviewer.md` (`plugins/alq-review/README.md`, end of Layout).
 - Private repo: Principle II's public-repo limits bind what the plugin writes into public repos,
   not this repo's own files.
