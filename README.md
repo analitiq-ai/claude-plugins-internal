@@ -29,7 +29,7 @@ The repo is private: the clone uses your git credentials for github.com.
 ## Layout
 
 `<component>/plugin/` holds what an install copies. Beside it, never installed: `tests/` and the component's
-decision records in `docs/adr/`. The repo is one Spec
+decision records in `docs/adr/`. Records about the repo as a whole are in `docs/adr/`. The repo is one Spec
 Kit project (`.specify/`, with the constitution, and the `speckit-*` commands); feature specs are in
 `specs/<n>-<slug>/`. Start Claude Code at the root for spec work. CI runs every `<component>/tests/`
 (`.github/workflows/tests.yml`).
