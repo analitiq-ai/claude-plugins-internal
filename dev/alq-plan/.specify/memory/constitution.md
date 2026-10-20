@@ -19,7 +19,7 @@ is not tagged yet).
 
 Gate: does the plan introduce a data shape, validator, type-name list or hand-written schema? If so,
 it MUST name the owning artifact from the contracts map and be an adapter against it. A new contract
-or a second validator over an already-gated shape fails reviewer.
+or a second validator over an already-gated shape fails the gate.
 
 Source: `.claude/rules/schema-contracts.md`; `.claude/rules/coding-principles.md` (Structure &
 consistency: contract-first, define once).

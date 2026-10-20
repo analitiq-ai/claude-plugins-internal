@@ -19,7 +19,7 @@ is not tagged yet).
 
 Gate: does the plan introduce a data shape, validator, type-name list or hand-written schema? If so,
 it MUST name the owning artifact from the contracts map and be an adapter against it. A new contract
-or a second validator over an already-gated shape fails reviewer.
+or a second validator over an already-gated shape fails the gate.
 
 Source: `.claude/rules/schema-contracts.md`; `.claude/rules/coding-principles.md` (Structure &
 consistency: contract-first, define once).
@@ -80,7 +80,7 @@ Source: `plugins/alq-review/README.md` (opening; How an agent uses it).
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
-no named approver, or with a way out no decision record names, fails reviewer.
+no named approver, or with a way out no decision record names, fails the gate.
 
 Source: `plugins/alq-review/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`, the org gate's release); how the user's action is recognised:
