@@ -33,11 +33,11 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    id: "alq-review ADR-0024"
+    id: "reviewer ADR-0024"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "Supersedes alq-review ADR-0016 (spec: null at launch); review derives the spec from the branch, null exists nowhere"
+    label: "Supersedes reviewer ADR-0016 (spec: null at launch); review derives the spec from the branch, null exists nowhere"
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec
@@ -45,7 +45,7 @@ externalRefs:
 ## Context
 
 The premise step ends in `write the spec`, `no spec needed` or `not worth doing` (ADR-0002). As drafted, this
-record had the step close a `not worth doing` issue and the user pass `spec: null` at review (alq-review
+record had the step close a `not worth doing` issue and the user pass `spec: null` at review (reviewer
 ADR-0016); the design drops both (Options B and D).
 
 ## Decision

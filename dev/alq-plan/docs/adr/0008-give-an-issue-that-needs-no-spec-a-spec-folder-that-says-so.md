@@ -37,26 +37,26 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per issue, in the repo"
   - type: doc
-    id: "alq-build ADR-0002"
+    id: "builder ADR-0002"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
-    label: "alq-build ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
+    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
   - type: doc
-    id: "alq-review ADR-0024"
+    id: "reviewer ADR-0024"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "alq-review ADR-0024: Derive the spec from the branch at launch and read the folder as data"
+    label: "reviewer ADR-0024: Derive the spec from the branch at launch and read the folder as data"
 ---
 
 # ADR-0008: Give an issue that needs no spec a spec folder that says so
 
 ## Context
 
-Planning, build and the gate find an issue's spec by its folder (org ADR-0002). A `no spec needed` pick
+Planning, build and reviewer find an issue's spec by its folder (org ADR-0002). A `no spec needed` pick
 leaving no folder is invisible to all three: the issue can be scoped again as if never judged.
 
 The draft landed it through its own PR with `spec: null` at review; the design drops both (Option B), and
@@ -64,10 +64,10 @@ ADR-0009 moves the kind into front matter.
 
 ## Decision
 
-1. We will have a `no spec needed` pick write `specs/<n>-<slug>/spec.md` saying so, with `alq.kind: no_spec` in its
+1. We will have a `no spec needed` pick write `specs/<n>-<slug>/spec.md` saying so, with `codeworks.kind: no_spec` in its
    front matter, the premise question the pick rests on and the reason; the folder holds nothing else.
-2. We will land it like any spec (ADR-0005), on `<n>-us1`. alq-build takes the issue body as the requirement
-   (alq-build ADR-0002).
+2. We will land it like any spec (ADR-0005), on `<n>-us1`. builder takes the issue body as the requirement
+   (builder ADR-0002).
 
 ## Options considered
 
@@ -78,7 +78,7 @@ Every reader keyed on the issue number sees it; no special value anywhere.
 ### Option B: A spec PR and `spec: null` at review
 
 Rejected: no spec PR exists, and no user passes `spec: null`, since the launch derives the folder from the
-branch (alq-review ADR-0024).
+branch (reviewer ADR-0024).
 
 ### Option C: No record, drop `no spec needed`, or a mark on the issue
 
@@ -97,7 +97,7 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 - Harder: a second `issue-spec #n` is a rescope at grill (ADR-0005), with nothing to grill.
 - **How we would know this was wrong:** no-spec folders deleted by hand to scope the issue afresh; or a no-spec
   issue built against its folder as a spec.
-- Revisit if: build or the gate need more from a no-spec folder than its kind.
+- Revisit if: build or reviewer need more from a no-spec folder than its kind.
 
 ## Action items
 

@@ -29,7 +29,7 @@ externalRefs:
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0009"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0009-land-an-issue-s-decision-record-as-an-exempt-pr-before-its-first-story-pr.md"
@@ -41,7 +41,7 @@ externalRefs:
 ## Context
 
 Two decision logs bind a plan: the repo's own and the org log governing it. Planning read neither, so a
-contradiction first surfaced at alq-review's decision-reviewer. A local copy of the org log can fall
+contradiction first surfaced at reviewer's decision-reviewer. A local copy of the org log can fall
 behind its remote and lack the record that now binds.
 
 ## Decision

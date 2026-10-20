@@ -31,13 +31,13 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
     label: "Move planning (alq-spec) out of alq-review into its own plugin"
   - type: doc
-    id: "alq-review ADR-0024"
+    id: "reviewer ADR-0024"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
-    label: "Supersedes alq-review ADR-0008 and alq-review ADR-0016; decision 1 here re-decides alq-review ADR-0008 decision 2's part about the skill that shapes an issue"
+    label: "Supersedes reviewer ADR-0008 and reviewer ADR-0016; decision 1 here re-decides reviewer ADR-0008 decision 2's part about the skill that shapes an issue"
   - type: issue
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
+    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
@@ -93,7 +93,7 @@ Lost: the orchestrator may launch mid-rescope.
 
 Proposed at the brainstorm. Lost: no script reads the verdict.
 
-### Option E: alq-plan writes Blocked when it needs the user (brainstorm)
+### Option E: planner writes Blocked when it needs the user (brainstorm)
 
 Lost: no plugin writes a lane (org ADR-0005).
 
