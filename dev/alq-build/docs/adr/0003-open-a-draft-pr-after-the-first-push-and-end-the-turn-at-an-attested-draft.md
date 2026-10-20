@@ -29,11 +29,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0004-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
-    label: "org ADR-0004: Drive the issue loop with a deterministic orchestrator outside the plugins"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
+    label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0010-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
-    label: "org ADR-0010: Mark a story PR ready on the attestation alone; In review once green with no findings"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0007-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
+    label: "orchestrator ADR-0007: Mark a story PR ready on the attestation alone; In review once green with no findings"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0021-record-rounds-and-holds-in-a-pr-body-section-the-gate-alone-writes.md"
     label: "reviewer ADR-0021: Record rounds and holds in a PR body section reviewer alone writes"
@@ -44,15 +44,15 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0026-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
     label: "reviewer ADR-0026: Resolve unread every thread whose latest author is not a trusted reviewer"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0011-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
-    label: "org ADR-0011: Request Codex by the orchestrator's comment once per head, automatic review off"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0008-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
+    label: "orchestrator ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off"
 ---
 
 # ADR-0003: Open a draft PR after the first push and end the turn at an attested draft
 
 ## Context
 
-Under org ADR-0004 the orchestrator drives the GitHub loop; the plugin owns the other half: where a
+Under orchestrator ADR-0001 the orchestrator drives the GitHub loop; the plugin owns the other half: where a
 build turn ends, and which GitHub moves it never makes. The brainstorm gave builder the flip; today the session polls the reviewers and re-requests Codex.
 
 ## Decision
@@ -81,7 +81,7 @@ moves the card (the 2026-10-18 redraw: no plugin writes Blocked).
 ### Option C: builder polls the reviewers and re-requests Codex (today's loop)
 
 Rejected (brainstorm): a session cannot wait for CI, and the re-request is due only after it; the
-orchestrator makes it (org ADR-0011).
+orchestrator makes it (orchestrator ADR-0008).
 
 ### Option D: A tasks.md tick gates something
 

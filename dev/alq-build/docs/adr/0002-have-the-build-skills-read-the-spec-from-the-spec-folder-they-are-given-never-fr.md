@@ -38,8 +38,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one PR per user story; only the last PR closes the issue"
   - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0004-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
-    label: "org ADR-0004: Drive the issue loop with a deterministic orchestrator outside the plugins"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
+    label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0027-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
     label: "reviewer ADR-0027: Judge the root cause once per level; every FIX names its mechanism"
@@ -55,7 +55,7 @@ externalRefs:
 This record decides how `builder` finds the spec folder (ADR-0001) and the story. The draft
 (issue #63) had the caller pass `spec` and `branch` and had `issue-tackle` run `root-cause-check`; the
 design (issue #133) drops both and makes `builder` depend on `reviewer`. The caller is now a
-deterministic orchestrator (org ADR-0004), which computes no story order.
+deterministic orchestrator (orchestrator ADR-0001), which computes no story order.
 
 ## Decision
 
