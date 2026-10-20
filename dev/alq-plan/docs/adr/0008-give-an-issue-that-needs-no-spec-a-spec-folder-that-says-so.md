@@ -1,22 +1,22 @@
 ---
-schemaVersion: 0.1.0
+schemaVersion: 0.2.0
 id: "0008"
 title: "Give an issue that needs no spec a spec folder that says so"
 status: draft
-date: 2026-10-12
+date: 2026-10-19
 deciders: []
-tags: [premise, spec-folder, issue, workflow]
+tags: [premise, spec-folder, front-matter, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006"]
+relatesTo: ["0005", "0006", "0009"]
 affects:
   - type: path
+    pattern: "plugins/alq-plan/scripts/no_spec.py"
+  - type: path
+    pattern: "plugins/alq-plan/speckit/presets/**"
+  - type: path
     pattern: "plugins/alq-plan/skills/issue-spec/**"
-  - type: path
-    pattern: "plugins/alq-plan/speckit/workflows/**"
-  - type: path
-    pattern: "plugins/alq-plan/scripts/*.py"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -34,78 +34,71 @@ externalRefs:
     id: "82"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/82"
     label: "alq-build: issue-tackle builds one user story; the spec=null form goes"
+  - type: issue
+    id: "133"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
   - type: doc
-    id: "engineering ADR-0002"
+    id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "Every issue has exactly one spec; an issue without one has not been specified yet"
+    label: "org ADR-0002: Keep one spec per issue, in the repo"
+  - type: doc
+    id: "alq-build ADR-0002"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-build/docs/adr/0002-have-the-build-skills-read-the-spec-from-the-spec-folder-they-are-given-never-fr.md"
+    label: "alq-build ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
+  - type: doc
+    id: "alq-review ADR-0024"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
+    label: "alq-review ADR-0024: Derive the spec from the branch at launch and read the folder as data"
 ---
 
 # ADR-0008: Give an issue that needs no spec a spec folder that says so
 
 ## Context
 
-The premise step ends in one of three picks: `write the spec`, `no spec needed` or `not worth doing`. ADR-0006
-closes a `not worth doing` issue and posts nothing for a `no spec needed` one, so that outcome lives only in the
-session that picked it. ADR-0006 says to revisit this when something other than the user needs to know it.
+Planning, build and the gate find an issue's spec by its folder (org ADR-0002). A `no spec needed` pick
+leaving no folder is invisible to all three: the issue can be scoped again as if never judged.
 
-Something now does. The organisation gives every issue one spec folder and treats an issue without one as not yet
-specified (engineering ADR-0002, decision 1), and #79 has alq-plan refuse a second scope of an issue that has a
-folder. A `no spec needed` issue with no folder is invisible to that refusal: it can be scoped again as if it had
-never been judged. The user chose on 2026-10-12 to keep the outcome rather than drop it.
-
-Why now: issue #79, part of #80.
+The draft landed it through its own PR with `spec: null` at review; the design drops both (Option B), and
+ADR-0009 moves the kind into front matter.
 
 ## Decision
 
-We will have a `no spec needed` pick write `specs/<issue>-<slug>/spec.md`, in the folder the run was given, saying
-that no spec is needed and carrying the premise question the pick rests on and the reason. The folder holds nothing
-else, and lands like a spec, through its own PR (engineering ADR-0002, decision 3).
-
-ADR-0006, decision 2, stands for the issue: nothing is posted on it, and the user is still told to pass `spec: null`
-when the work is reviewed. What changes is where the outcome lives: in the repo, not the session. ADR-0006,
-decisions 1 and 3, stand.
+1. We will have a `no spec needed` pick write `specs/<n>-<slug>/spec.md` saying so, with `alq.kind: no_spec` in its
+   front matter, the premise question the pick rests on and the reason; the folder holds nothing else.
+2. We will land it like any spec (ADR-0005), on `<n>-us1`. alq-build takes the issue body as the requirement
+   (alq-build ADR-0002).
 
 ## Options considered
 
-### Option A: A folder whose `spec.md` says no spec is needed (chosen)
+### Option A: A folder saying so in front matter, on the story branch (chosen)
 
-| Dimension | Assessment |
-|---|---|
-| Record of the pick | In the repo, named by its issue, beside the specs |
-| Seen by the one-folder refusal | Yes |
-| Writes to GitHub | A PR, like a spec |
+Every reader keyed on the issue number sees it; no special value anywhere.
 
-### Option B: Keep ADR-0006 as it is
+### Option B: A spec PR and `spec: null` at review
 
-No record. A `no spec needed` issue can be scoped again, and under engineering ADR-0002 it counts as not yet
-specified. Rejected: this is the gap.
+Rejected: no spec PR exists, and no user passes `spec: null`, since the launch derives the folder from the
+branch (alq-review ADR-0024).
 
-### Option C: Drop `no spec needed`
+### Option C: No record, drop `no spec needed`, or a mark on the issue
 
-Every issue that is built gets a full spec. Rejected by the user: a change whose request fixes the outcome has
-nothing for a spec to decide.
-
-### Option D: Record the pick on the issue
-
-A label or a comment. Rejected: the refusal reads folders, not issues, and ADR-0006 already rejected a comment that
-no plugin reads.
+Rejected: no record is the gap; dropping the pick was rejected by the user, since a change whose request fixes
+the outcome has nothing for a spec to decide; a mark on the issue is read by nothing (ADR-0006).
 
 ## Trade-offs
 
-- A folder with no requirements sits beside real specs, and nothing refuses passing it to review or build as a spec.
-- `no spec needed` now writes to the repo and opens a PR, where it wrote nothing before.
-- Build and review are moving to user-story values: #82 drops build's `spec=null` form, and alq-review's launch
-  value has its own sub-issue. A no-spec folder has no story, so what they take for such an issue's work is not
-  decided here.
+- A folder with no requirements sits beside real specs, told apart by one front-matter key.
+- `no spec needed` now pushes `<n>-us1` from planning, and the no-spec folder reaches main with the first story
+  PR, like any spec (org ADR-0002).
 
 ## Consequences
 
-- Easier: every issue planning has seen, and not closed, has one folder, so a second scope is refused.
-- Harder: a rescope of a no-spec folder starts at the premise, not at grill, since there is nothing to grill.
-- **How we would know this was wrong:** no-spec folders passed to review or build as a spec; or no-spec folders
-  deleted by hand so the issue can be scoped.
-- Revisit if: build or review take only a user story, and so have no form for a no-spec issue's work.
+- Easier: every issue planning saw and left open has one folder.
+- Harder: a second `issue-spec #n` is a rescope at grill (ADR-0005), with nothing to grill.
+- **How we would know this was wrong:** no-spec folders deleted by hand to scope the issue afresh; or a no-spec
+  issue built against its folder as a spec.
+- Revisit if: build or the gate need more from a no-spec folder than its kind.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this record, or sends it back.

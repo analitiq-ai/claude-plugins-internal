@@ -1,9 +1,9 @@
 ---
-schemaVersion: 0.1.0
+schemaVersion: 0.2.0
 id: "0006"
 title: "Close an issue not worth doing and post nothing for one that needs no spec"
 status: draft
-date: 2026-10-09
+date: 2026-10-19
 deciders: []
 tags: [premise, issue, workflow]
 scope: component
@@ -30,77 +30,63 @@ externalRefs:
     id: "63"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
     label: "Move planning (alq-spec) out of alq-review into its own plugin"
+  - type: issue
+    id: "133"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+    label: "ALQ plugins target design: rewrite the decision records of alq-review, alq-plan and alq-build"
   - type: doc
-    id: "alq-review ADR-0016"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0016-tell-review-the-spec-at-each-round-launch-and-bind-it-to-the-pr.md"
-    label: "Review takes spec: null at launch; leaves these two outcomes to planning"
+    id: "alq-review ADR-0024"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/dev/alq-review/docs/adr/0024-derive-the-spec-from-the-branch-at-launch-and-read-the-folder-as-data.md"
+    label: "Supersedes alq-review ADR-0016 (spec: null at launch); review derives the spec from the branch, null exists nowhere"
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec
 
 ## Context
 
-Planning first asks whether an issue is worth a spec. In the premise step the user picks one of three outcomes:
-`write the spec`, `no spec needed` or `not worth doing`.
-
-Before PR #75, both stop picks posted the location comment on the issue, with the outcome and the reason from the
-premise report (the `record` command of `premise_report.py`, removed in #75). The `#<issue> none <reason>` entry
-form posted the same comment for an issue the user had already judged to need no spec. Review read that comment as
-the answer that a change has no spec (alq-review's ADR-0009, decision 4).
-
-alq-review's ADR-0016 removes the location comment. Review takes `spec: null` at launch for a change with no spec;
-whether a change needs a spec is planning's decision, and review only takes the answer. It leaves what planning does
-with these two outcomes undecided, and research R16 gives that to alq-plan's log. Spec 019 settles it (Clarifications;
-FR-019). This is that record.
-
-Why now: PR #75, on main, gave planning its present shape inside alq-review. Research R16 gives alq-plan a log of
-its own and has it land before the move into alq-plan. This record was written first, on the branch of PR #72. The
-move (PR #76) merged into that branch, not into main, so the move and this record reach main together, in PR #72.
+The premise step ends in `write the spec`, `no spec needed` or `not worth doing` (ADR-0002). As drafted, this
+record had the step close a `not worth doing` issue and the user pass `spec: null` at review (alq-review
+ADR-0016); the design drops both (Options B and D).
 
 ## Decision
 
-1. We will close an issue the user picks as `not worth doing` as not planned, with the premise report's reason as the
-   closing comment: `gh issue close <issue> --reason "not planned" --comment "<reason>"`. An empty reason fails the
-   step, and a failed `gh` fails the run (R5).
-2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user to pass `spec: null` when
-   the work is reviewed.
-3. We will have no `#<issue> none <reason>` entry form, which only posted the comment (R6). PR #75 removed it.
+1. We will end the run on `not worth doing` by naming the step for the user: close the issue as not planned, with
+   the premise report's reason; an empty reason fails the premise step.
+2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user nothing to pass: its
+   record is the spec folder ADR-0008 writes, which review and build find by the issue number.
+3. We will have no `#<issue> none <reason>` entry form.
 
 ## Options considered
 
-### Option A: Close as not planned; tell the user about `spec: null` (chosen)
+### Option A: The user closes it; the folder is the no-spec record (chosen)
 
-| Dimension | Assessment |
-|---|---|
-| Record of `not worth doing` | GitHub's own: the issue closed as not planned, with the reason |
-| Record of `no spec needed` | None on the issue; the user is told what to pass at review |
-| Comment format to keep | None |
-| Writes to GitHub | Only on `not worth doing` |
+`spec: null` exists nowhere; every launched branch carries `<n>` and finds its folder.
 
-### Option B: Return to posting the location comment
+### Option B: Tell the user to pass `spec: null` at review
 
-Both stop picks would post the location comment again, as they did before PR #75. No plugin reads it, since review
-takes `spec` at launch (alq-review's ADR-0016).
+Lost: nothing takes `spec` any more.
 
-The spec weighed no other answer for these two outcomes.
+### Option C: Post a comment naming the outcome on the issue for both picks
+
+Stays rejected: no plugin reads it.
+
+### Option D: The premise step closes the issue
+
+Lost: a plugin write outside the State table.
 
 ## Trade-offs
 
-- `no spec needed` leaves no trace on the issue. Whoever builds learns it from the user.
-- Nothing checks that a change reviewed with `spec: null` was picked as `no spec needed` (alq-review's ADR-0016,
-  Trade-offs).
-- Closing an issue writes to GitHub from a workflow step. When `gh` fails, the run fails and the issue stays open
-  (ADR-0002).
+- `no spec needed` leaves no trace on the issue.
+- A `not worth doing` issue stays open until the user closes it.
 
 ## Consequences
 
-- Easier: a `not worth doing` issue leaves the open list with its reason. No comment format is kept for anything to
-  parse.
-- Harder: a `no spec needed` outcome lives only in the session that picked it.
-- **How we would know this was wrong:** changes reviewed with `spec: null` whose issue planning never picked as
-  `no spec needed`; or issues closed as not planned that are reopened and scoped.
-- Revisit if: something other than the user needs to know that an issue needs no spec.
+- Easier: neither stop pick writes to the issue.
+- Harder: a `no spec needed` outcome is read from the branch, never from the issue.
+- **How we would know this was wrong:** `not worth doing` issues left open; humans checking out a branch to learn
+  that an issue needs no spec.
+- Revisit if: anything needs the `no spec needed` outcome from the issue rather than from the spec folder.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this record, or sends it back.
