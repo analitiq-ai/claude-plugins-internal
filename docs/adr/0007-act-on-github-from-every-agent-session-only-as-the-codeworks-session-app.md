@@ -9,7 +9,7 @@ tags: [security, identity, github-app, credentials, sessions, trust]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0003"]
+relatesTo: ["0001", "0003", "0008"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -31,11 +31,10 @@ review:
 
 ## Context
 
-Agent sessions push branches, open PRs and post reviewer's state. reviewer's hook runs in the session's
-process with its credential, so it cannot stop a direct API call. A session acting as an org-admin user on
-the ruleset bypass list can merge past the ruleset, rewrite rulesets and workflows, move lanes and write
-statuses. Every trust predicate (EXEMPT, WRITER, TRUSTED, the state comment's author) must also tell a
-session's write from a human's and from the orchestrator's.
+Agent sessions push branches and open PRs, and a session's token reaches the API past any hook. A session
+acting as an org-admin user on the ruleset bypass list can merge past the ruleset, rewrite rulesets and
+workflows, move lanes and write statuses. Every trust predicate (EXEMPT, WRITER, TRUSTED, the state
+comment's author) must also tell a session's write from a human's and from the orchestrator's.
 
 ## Decision
 
@@ -44,15 +43,14 @@ session's write from a human's and from the orchestrator's.
    and issues write; metadata, checks, statuses and actions read; organization projects read. It has no
    administration, workflows, secrets or environments permission, and no statuses, checks or projects
    write.
-2. We will have the orchestrator mint that token for each launch and hand it to that session alone;
-   an interactive session mints its own through `core/`.
+2. We will have the orchestrator mint that token for each launch and hand it to that session alone; in
+   an interactive session reviewer's hook mints it through `core/` into a gh config of that session's
+   own, minting a fresh one before the hour runs out. No session reads the key (ADR-0008).
 3. We will put the session App on no ruleset bypass list (orchestrator ADR-0009) and count it as no
    human, WRITER, TRUSTED or EXEMPT actor in any component's predicate.
-4. We will accept that a session can post a forged reviewer-state comment through the API with its
-   token, past reviewer's hook. The orchestrator reads the newest state comment by the session App
-   (reviewer ADR-0011), so a forged snapshot can record a CLEAN round. Running rounds outside the
-   session would close this; we do not adopt it. Nor do we guard an interactive session from the
-   credentials its human's OS account holds.
+4. We will accept that a review round runs inside the session it grades; only its record is written
+   outside it, by reviewer's hook as the reviewer App (reviewer ADR-0011), so a state comment the
+   session's token posts counts for nothing.
 
 ## Options considered
 
@@ -68,10 +66,10 @@ Rejected: a long-lived token that concurrent sessions share.
 
 Rejected: a direct API call passes the hook.
 
-### Option D: Run rounds and the state write outside the session
+### Option D: Run rounds outside the session
 
-Closes the forged comment. Not adopted: it moves the review round out of the session, a redesign of
-reviewer ADR-0011 and ADR-0012.
+Not adopted: it moves the review round out of the session, a redesign of reviewer ADR-0011 and
+ADR-0012. The state write alone moves out, into reviewer's hook.
 
 ## Trade-offs
 
@@ -83,8 +81,7 @@ reviewer ADR-0011 and ADR-0012.
 
 - Easier: no session can change a ruleset, a workflow, a lane, a status or a check.
 - Harder: each served repo installs a second App; every author filter names the session App.
-- **How we would know this was wrong:** a write by the session App outside its permission set, or a
-  CLEAN round recorded that no review round produced.
+- **How we would know this was wrong:** a write by the session App outside its permission set.
 - Revisit if: rounds move out of the session, or GitHub adds a merge-only permission.
 
 ## Action items

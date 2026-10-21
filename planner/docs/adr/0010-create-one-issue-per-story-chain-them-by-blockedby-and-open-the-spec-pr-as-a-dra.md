@@ -56,8 +56,8 @@ PR on `<p>-spec`, `<p>` the spec's issue (org ADR-0002), which gates every launc
 3. We will push the spec folder and its records (ADR-0009), and no code, to `<p>-spec`: to its open PR if
    there is one, else to a branch cut from the default branch and opened as a draft PR, the spec PR. A
    `<p>-spec` whose PR closed unmerged stops the run, naming the branch for a human to delete.
-4. We will place the rescope hold (reviewer ADR-0013) on the story issues root ADR-0006 names when we open
-   a rescope's spec PR, through the one `core/` writer a session may call (root ADR-0001).
+4. We will write no reviewer state: opening a rescope's spec PR is what makes reviewer's hook place the
+   rescope hold on the story issues root ADR-0006 names (reviewer ADR-0013).
 5. We will name, in a rescope's spec PR description, each story issue whose task block it drops, for a
    human to close. A rescope that edits or drops a merged story's task block stops before it pushes.
 6. We will write into the description of decision 2's spec PR the steps that undo its issue writes if a
@@ -81,7 +81,8 @@ Rejected: closing an issue and releasing a hold are a human's acts (reviewer ADR
 
 ## Trade-offs
 
-- planner writes issues, links, holds and a draft PR, as the session App (root ADR-0007).
+- planner writes issues, links and a draft PR, as the session App (root ADR-0007); a rescope places its
+  holds only where reviewer is installed.
 - Renaming `specs/<n>-*` breaks path links; a rejected spec PR leaves cleanup to a human.
 
 ## Consequences

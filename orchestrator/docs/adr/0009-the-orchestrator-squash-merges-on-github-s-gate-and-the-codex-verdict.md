@@ -49,8 +49,6 @@ session's token can call GitHub's merge endpoint (root ADR-0007).
    "commit messages", so every session-id trailer reaches main; head branches deleted on merge; no
    required human approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
    sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off.
-7. We will run the orchestrator as its own OS user, its App key readable by no other user, so no
-   session can read it.
 
 ## Options considered
 

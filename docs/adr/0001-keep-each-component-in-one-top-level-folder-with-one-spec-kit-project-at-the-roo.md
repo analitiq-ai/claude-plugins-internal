@@ -48,8 +48,8 @@ neither tree. reviewer, planner and the orchestrator all use the state comment a
    write, the validator modules with their Findings contract (ADR-0003), the spec facts' model (ADR-0003)
    and the parser of a story's identity (ADR-0005). Each plugin installs it into its
    `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version; the orchestrator imports it the same way, and
-   imports no plugin code. A session's tool calls may reach one `core/` writer only, "place a rescope
-   hold" (planner ADR-0010); every other state write runs in reviewer's hook process.
+   imports no plugin code. Every state write runs in reviewer's hook process, outside the session's
+   sandbox (ADR-0008).
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 

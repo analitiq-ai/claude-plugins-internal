@@ -102,8 +102,8 @@ Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unl
 `reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
 Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
-(decision 2). planner places the rescope hold only:
-`planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
+(decision 2). Only reviewer's hook writes state, the rescope hold included:
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`
 (decision 4).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
@@ -228,7 +228,7 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - planner has no hooks: it runs as the Spec Kit workflow its skill starts
   (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and requires no other plugin:
   its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
-  the rescope hold through `core/`.
+  no reviewer state.
 - builder is two skills, with no scripts and no hooks (`builder/plugin/`); its review step is
   reviewer's internal round, which no install requires: its manifest declares no plugin dependency
   (`builder/plugin/skills/issue-tackle/SKILL.md`;
@@ -265,4 +265,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-20
+**Version**: 1.0.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-21
