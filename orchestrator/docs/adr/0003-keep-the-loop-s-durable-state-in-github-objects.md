@@ -21,14 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md"
-    label: "reviewer ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the session App wins"
 ---
 
 # ADR-0003: Keep the loop's durable state in GitHub objects

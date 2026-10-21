@@ -23,11 +23,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
 ---
 
 # ADR-0020: Freeze the head under review, and have a Bash change the commit gate refuses put back

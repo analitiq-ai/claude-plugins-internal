@@ -27,11 +27,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design"
 ---
 
 # ADR-0001: Keep each component in one top-level folder, with one Spec Kit project at the root
@@ -50,8 +45,8 @@ neither tree. reviewer, planner and the orchestrator all use the state comment a
    `orchestrator/` and `core/`, holding `plugin/` (what an install copies), `tests/` and `docs/adr/`. The
    orchestrator's folder has no `plugin/`; `core/` holds a package in place of `plugin/`.
 2. We will make `core/` the one home of code more than one component runs: the state-comment read and
-   write, the validator modules with their Findings contract (ADR-0003), and the parser of a story's
-   identity (ADR-0005). Each plugin installs it into its
+   write, the validator modules with their Findings contract (ADR-0003), the spec facts' model (ADR-0003)
+   and the parser of a story's identity (ADR-0005). Each plugin installs it into its
    `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version; the orchestrator imports it the same way, and
    imports no plugin code. A session's tool calls may reach one `core/` writer only, "place a rescope
    hold" (planner ADR-0010); every other state write runs in reviewer's hook process.

@@ -23,19 +23,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "63"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Move planning (issue-spec) out of reviewer into its own plugin"
-  - type: doc
-    id: "reviewer ADR-0014"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
-  - type: doc
-    id: "root ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0001: Keep the spec in the spec folder that planning writes

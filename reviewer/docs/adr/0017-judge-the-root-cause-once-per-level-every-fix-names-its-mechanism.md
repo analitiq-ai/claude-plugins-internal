@@ -25,17 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
-    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
 ---
 
 # ADR-0017: Judge the root cause once per level; every FIX names its mechanism
@@ -53,11 +42,11 @@ a root-cause verdict is due.
 1. We will have the root-cause reviewer, reviewer's own agent, verify the spec's Root cause in
    every internal round whose spec's `codeworks.root_cause.observed` is `anchored` or `hypothesis`; with
    `none`, the round records root_cause: not_applicable.
-2. We will type its verdict (AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL), record it on the
-   round, and rule in policy which rulings each verdict admits: SPEC_WRONG admits a spec-gap
-   FIX or a PUSH_BACK citing a spec line; CANNOT_TELL admits ESCALATE or a PUSH_BACK naming where
-   the mechanism was located; AT_SYMPTOM, when ruled FIX, admits PATCH, CLASS_FIX or
-   REDESIGN with the mechanism named.
+2. We will type its verdict (AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL), record it on the round in the
+   state snapshot (root ADR-0003), and rule in policy which rulings each verdict admits: SPEC_WRONG admits
+   a spec-gap FIX or a PUSH_BACK citing a spec line; CANNOT_TELL admits ESCALATE or a PUSH_BACK naming
+   where the mechanism was located; AT_SYMPTOM, when ruled FIX, admits PATCH, CLASS_FIX or REDESIGN with
+   the mechanism named.
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.

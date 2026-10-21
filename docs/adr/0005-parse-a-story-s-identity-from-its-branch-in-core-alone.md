@@ -27,20 +27,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design"
-  - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one issue, one branch and one PR per user story"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0004-attest-the-internal-review-as-a-commit-status-written-by-the-orchestrator-s-app.md"
-    label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
 # ADR-0005: Parse a story's identity from its branch in core/ alone

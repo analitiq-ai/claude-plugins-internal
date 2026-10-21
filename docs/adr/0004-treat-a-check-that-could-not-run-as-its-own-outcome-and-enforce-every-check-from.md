@@ -29,14 +29,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0006-take-reviewer-s-mode-from-the-config-and-its-off-switch-only-from-the-user-s-pro.md"
-    label: "reviewer ADR-0006: Take reviewer's mode from the config and its off switch only from the user's prompt"
 ---
 
 # ADR-0004: Treat a check that could not run as its own outcome, and enforce every check from its first release

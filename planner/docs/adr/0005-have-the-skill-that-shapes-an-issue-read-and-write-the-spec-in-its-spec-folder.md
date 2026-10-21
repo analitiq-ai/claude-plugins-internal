@@ -26,38 +26,10 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "63"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Move planning (issue-spec) out of reviewer into its own plugin"
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
-  - type: doc
-    id: "orchestrator ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
-    label: "orchestrator ADR-0002: The orchestrator alone writes the working lanes, derived from the PR"
-  - type: doc
-    id: "root ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
-  - type: doc
-    id: "root ADR-0006"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0006-keep-planning-and-building-in-disjoint-lanes-of-an-issue.md"
-    label: "root ADR-0006: Keep planning and building in disjoint lanes of an issue"
-  - type: doc
-    id: "reviewer ADR-0015"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0015-fence-a-session-on-its-issue-s-branch-prefix-and-lane-a-session-needs-an-issue.md"
-    label: "reviewer ADR-0015: Fence a session on its issue's branch prefix and lane; a session needs an issue"
-  - type: doc
-    id: "reviewer ADR-0013"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md"
-    label: "reviewer ADR-0013: Give every hold one id and a human release; a changed spec releases a rescope hold"
 ---
 
 # ADR-0005: Have the skill that shapes an issue read and write the spec in its spec folder

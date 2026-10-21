@@ -23,17 +23,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0010-take-an-escalation-s-answer-from-a-writer-s-issue-comment.md"
-    label: "orchestrator ADR-0010: Take an escalation's answer from a writer's issue comment"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0007-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
-    label: "orchestrator ADR-0007: Mark a story PR ready on the attestation alone; In review once green with no findings"
 ---
 
 # ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text

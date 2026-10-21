@@ -21,23 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0010-keep-a-story-branch-off-its-spec-folder-but-ticks-in-its-issue-s-task-block-grad.md"
-    label: "reviewer ADR-0010: Keep a story branch off its spec folder but ticks in its issue's task block; grade each round at the reviewed commit"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md"
-    label: "planner ADR-0009: Check the plan against the governing decision logs before critique"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md"
-    label: "reviewer ADR-0013: Give every hold one id and a human release; a changed spec releases a rescope hold"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
-    label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 ---
 
 # ADR-0004: Resolve a conflict by merging the default branch, never rebase or force-push

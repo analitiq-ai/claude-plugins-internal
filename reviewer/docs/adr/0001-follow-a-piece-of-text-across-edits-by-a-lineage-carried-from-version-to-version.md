@@ -21,11 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "17"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
-    label: "The full design (D1 to D9), the evidence and the rejected options"
 ---
 
 # ADR-0001: Follow a piece of text across edits by a lineage carried from version to version
@@ -65,9 +60,10 @@ Rejected: the defects in Context.
 
 Rejected: each rewording starts a new count; a rebase rewrites shas.
 
-### Option D: Similarity matching, or carrying a count to a moved file
+### Option D: A model, similarity matching, or a count carried to a moved file
 
-Rejected: both need a similarity threshold (git pairs moves by one).
+Rejected: a model's answer varies between asks and would run in every commit's hook; the others need a
+similarity threshold (git pairs moves by one).
 
 ## Trade-offs
 

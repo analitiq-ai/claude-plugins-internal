@@ -25,26 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
-    label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0007-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
-    label: "orchestrator ADR-0007: Mark a story PR ready on the attestation alone; In review once green with no findings"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0008-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
-    label: "orchestrator ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-read-a-pr-s-findings-only-through-core-s-modules-and-brief-only-trusted-reviewer.md"
-    label: "reviewer ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
-    label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 ---
 
 # ADR-0003: Keep the validator modules and the state comment behind one contract each, in core/
@@ -64,8 +44,8 @@ issue comment (reviewer ADR-0011) that reviewer and planner write and the orches
 2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
    thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
    (ADR-0002).
-3. We will define the Findings contract and the state comment's snapshot as Pydantic models and generate
-   their JSON Schemas.
+3. We will define the Findings contract, the state comment's snapshot and the spec facts (planner
+   ADR-0008) as Pydantic models and generate their JSON Schemas.
 4. We will have no component reach the state comment other than through `core/`'s one read and write
    (ADR-0001).
 5. We will make the modules the only way a component reads an external reviewer: the orchestrator calls

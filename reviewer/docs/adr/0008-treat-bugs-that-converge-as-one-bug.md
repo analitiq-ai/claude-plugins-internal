@@ -21,11 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "17"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
-    label: "The lineage design that ADR-0001 decided and this ADR adds to"
 ---
 
 # ADR-0008: Treat bugs that converge as one bug

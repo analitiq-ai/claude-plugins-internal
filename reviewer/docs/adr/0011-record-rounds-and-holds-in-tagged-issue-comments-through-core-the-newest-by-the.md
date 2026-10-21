@@ -25,25 +25,14 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md"
-    label: "orchestrator ADR-0003: Keep the loop's durable state in GitHub objects"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0004-attest-the-internal-review-as-a-commit-status-written-by-the-orchestrator-s-app.md"
-    label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
 # ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the session App wins
 
 ## Context
 
-A local SQLite record is unreadable from the orchestrator's host. A hold can exist before the story's PR,
-and a PR can be closed and reopened; the story issue outlives both. Every session posts as the
+A record kept beside the session is unreadable from the orchestrator's host. A hold can exist before the
+story's PR, and a PR can be closed and reopened; the story issue outlives both. Every session posts as the
 codeworks-session App (root ADR-0007), and a comment can be edited or deleted.
 
 ## Decision
@@ -60,14 +49,14 @@ codeworks-session App (root ADR-0007), and a comment can be edited or deleted.
    way is refused (ADR-0012).
 4. We will keep the two writers apart by the lane rule (root ADR-0006): planner writes only while the
    issue is in Blocked or Backlog, where reviewer runs no round and takes no story commit (ADR-0015).
-5. We will keep `ledger.db` beside the session as a cache, rebuilt from the newest tagged comment at the
+5. We will keep a ledger beside the session as a cache, rebuilt from the newest tagged comment at the
    session's start. Reviewer reports and session grants stay session-scoped files.
 
 ## Options considered
 
 ### Option A: Tagged issue comments through one shared module, failing closed (chosen)
 
-### Option B: A local SQLite store as the record
+### Option B: A store beside the session as the record
 
 Rejected: the problem in Context.
 

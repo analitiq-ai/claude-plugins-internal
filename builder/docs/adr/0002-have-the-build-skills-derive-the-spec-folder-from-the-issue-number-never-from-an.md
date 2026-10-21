@@ -26,38 +26,9 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "63"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Move planning (issue-spec) out of reviewer into its own plugin"
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one issue, one branch and one PR per user story"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
-    label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md"
-    label: "orchestrator ADR-0003: Keep the loop's durable state in GitHub objects"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
-    label: "reviewer ADR-0017: Judge the root cause once per level; every FIX names its mechanism"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md"
-    label: "planner ADR-0010: Create one issue per story, chain them by blockedBy, and open the spec PR as a draft"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0006-keep-planning-and-building-in-disjoint-lanes-of-an-issue.md"
-    label: "root ADR-0006: Keep planning and building in disjoint lanes of an issue"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md"
-    label: "planner ADR-0001: Keep the spec in the spec folder that planning writes"
 ---
 
 # ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment
@@ -70,7 +41,7 @@ a parent issue with one sub-issue per story (org ADR-0003, planner ADR-0010).
 
 ## Decision
 
-1. We will have `issue-tackle <s>` take the story issue number only, for the orchestrator and humans, and
+1. We will have `issue-tackle <s>` take the story issue number only, and
    derive the spec folder, the requirement, the branch and the PR from it through `core/` (root ADR-0005),
    never from an issue comment. `builder` declares no plugin dependency.
 2. We will cut the story's branch from the default branch at its first launch, and build every later

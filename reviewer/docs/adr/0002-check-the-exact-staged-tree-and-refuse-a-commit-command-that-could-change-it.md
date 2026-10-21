@@ -23,11 +23,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "30"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of decisions already made, written as ADRs"
 ---
 
 # ADR-0002: Check the exact staged tree and refuse a commit command that could change it

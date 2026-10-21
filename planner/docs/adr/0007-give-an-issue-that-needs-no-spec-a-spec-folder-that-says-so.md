@@ -26,26 +26,10 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "79"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/79"
-    label: "planner: name spec folders by their issue, land the spec through its own reviewed PR"
-  - type: issue
-    id: "82"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/82"
-    label: "builder: issue-tackle builds one user story; the spec=null form goes"
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
-  - type: doc
-    id: "root ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0007: Give an issue that needs no spec a spec folder that says so

@@ -25,14 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0019-run-every-reviewer-and-the-assessment-inside-one-review-round-workflow.md"
-    label: "reviewer ADR-0019: Run every reviewer and the assessment inside one review-round workflow"
 ---
 
 # ADR-0001: Publish the audit dispatch as data; find, never rule or fix

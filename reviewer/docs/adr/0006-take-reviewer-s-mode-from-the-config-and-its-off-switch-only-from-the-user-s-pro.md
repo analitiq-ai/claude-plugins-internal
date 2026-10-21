@@ -25,11 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "30"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0006: Take reviewer's mode from the config and its off switch only from the user's prompt
@@ -43,9 +38,9 @@ cannot type the user's prompt.
 
 ## Decision
 
-1. We will read the mode, `enforce` or `log`, and each check's own setting only from the `[reviewer]`
-   section of `codeworks.toml` (root ADR-0002). Under `log` a refusal is recorded as `would_deny` and does
-   not block.
+1. We will give reviewer two modes, `enforce` and `log`, set like every key in its section (root
+   ADR-0002). Under `log` a refusal by the commit gates or the round-launch gate is recorded as
+   `would_deny` and does not block; every refusal of ADR-0012 blocks in every mode.
 2. We will switch reviewer off only on a prompt the user types that starts with `reviewer off`, read in the
    `UserPromptSubmit` hook, never from a `claude` command run in Bash (ADR-0012), and on again with
    `reviewer on`. The switch covers that session, its subagents and workflows included, and ends with it.
@@ -59,24 +54,19 @@ cannot type the user's prompt.
 
 Only a human editing `codeworks.toml`, or the user's typed prompt, loosens a gate, for one session.
 
-### Option B: Environment variables over the config
-
-Rejected: whoever launches a session, an agent included, could switch a check to `log` with no edit the
-hook can refuse.
-
-### Option C: An off switch in the config
+### Option B: An off switch in the config
 
 Rejected: it would switch reviewer off for every session on the branch.
 
-### Option D: Off releases the holds
+### Option C: Off releases the holds
 
 Rejected: switching back on would lose every decision the holds were waiting for.
 
-### Option E: Run the workflows while off, recording only
+### Option D: Run the workflows while off, recording only
 
 Rejected: a round run with its gates lifted would record a verdict the orchestrator attests from.
 
-### Option F: Off lifts every rule
+### Option E: Off lifts every rule
 
 Rejected: a session switched off could make every write the orchestrator or a human owns.
 

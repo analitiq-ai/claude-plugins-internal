@@ -25,23 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    id: "org ADR-0002"
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
-  - type: doc
-    id: "reviewer ADR-0010"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0010-keep-a-story-branch-off-its-spec-folder-but-ticks-in-its-issue-s-task-block-grad.md"
-    label: "reviewer ADR-0010: Keep a story branch off its spec folder but ticks in its issue's task block; grade each round at the reviewed commit"
-  - type: doc
-    id: "root ADR-0004"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md"
-    label: "root ADR-0004: Treat a check that could not run as its own outcome, and enforce every check from its first release"
 ---
 
 # ADR-0009: Check the plan against the governing decision logs before critique

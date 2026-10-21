@@ -21,14 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
-  - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: one issue, one branch and one PR per story; each PR closes its own story issue"
 ---
 
 # ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict

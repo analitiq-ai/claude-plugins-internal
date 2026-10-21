@@ -30,10 +30,9 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
+  - type: doc
+    url: "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit"
+    label: "pr-review-toolkit@claude-plugins-official: Anthropic's review agents plugin"
 ---
 
 # ADR-0019: Run every reviewer and the assessment inside one review-round workflow
@@ -100,7 +99,7 @@ Rejected: the whole-PR audit can end the churn alone; its hold brings a human in
 - Harder: reviewer needs two other plugins installed.
 - **How we would know this was wrong:** a reviewer type runs on a story branch outside a round, or
   an assessment no round produced is recorded.
-- Revisit if: the audit agents move into this repo, or a reviewer must run outside a round.
+- Revisit if: a reviewer must run outside a round.
 
 ## Action items
 

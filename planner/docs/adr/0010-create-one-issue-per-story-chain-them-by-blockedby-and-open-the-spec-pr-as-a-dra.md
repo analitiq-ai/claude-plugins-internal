@@ -28,10 +28,6 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     id: "org ADR-0002"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
@@ -40,38 +36,6 @@ externalRefs:
     id: "org ADR-0003"
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
     label: "org ADR-0003: Open one issue, one branch and one PR per user story"
-  - type: doc
-    id: "orchestrator ADR-0006"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0006-launch-no-story-while-its-spec-s-issue-has-an-open-spec-pr-or-before-one-merged.md"
-    label: "orchestrator ADR-0006: Launch no story while its spec's issue has an open spec PR, or before one merged"
-  - type: doc
-    id: "reviewer ADR-0012"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
-  - type: doc
-    id: "reviewer ADR-0013"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md"
-    label: "reviewer ADR-0013: Give every hold one id and a human release; a changed spec releases a rescope hold"
-  - type: doc
-    id: "orchestrator ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0005-exempt-a-pr-from-the-internal-review-by-its-bot-author-or-a-label-a-writer-appli.md"
-    label: "orchestrator ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied"
-  - type: doc
-    id: "root ADR-0001"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md"
-    label: "root ADR-0001: Keep each component in one top-level folder, with one Spec Kit project at the root"
-  - type: doc
-    id: "root ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
-  - type: doc
-    id: "root ADR-0006"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0006-keep-planning-and-building-in-disjoint-lanes-of-an-issue.md"
-    label: "root ADR-0006: Keep planning and building in disjoint lanes of an issue"
-  - type: doc
-    id: "root ADR-0007"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0007-act-on-github-from-every-agent-session-only-as-the-codeworks-session-app.md"
-    label: "root ADR-0007: Act on GitHub from every agent session only as the codeworks-session App"
 ---
 
 # ADR-0010: Create one issue per story, chain them by blockedBy, and open the spec PR as a draft

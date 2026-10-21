@@ -24,18 +24,6 @@ provenance:
 review:
   tier: async
 externalRefs:
-  - type: issue
-    id: "104"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/104"
-    label: "reviewer: spec.md is read-only on a story branch; a spec change lands in its own spec-only PR"
-  - type: pr
-    id: "108"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/pull/108"
-    label: "Spec, plan and research the first draft of this record was drafted from"
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
@@ -45,9 +33,10 @@ externalRefs:
 
 ## Context
 
-On a story branch the agent is graded against `spec.md`, and could edit it. The spec and every rescope land
-as a spec PR on the spec's issue (org ADR-0002), so a story branch has no reason to change the spec. A story
-spans several launches (builder ADR-0003), and each launch has to know which of its tasks are done.
+On a story branch the agent is graded against `spec.md`, a file in the worktree it writes and commits
+to. The spec and every rescope land as a spec PR on the spec's issue (org ADR-0002), so a story branch has
+no reason to change the spec. A story spans several launches (builder ADR-0003), and each launch has to
+know which of its tasks are done.
 
 ## Decision
 

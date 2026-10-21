@@ -25,27 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    id: "org ADR-0003"
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0003-one-pr-per-user-story.md"
-    label: "org ADR-0003: Open one issue, one branch and one PR per user story"
-  - type: doc
-    id: "reviewer ADR-0014"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
-    label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
-  - type: doc
-    id: "builder ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
-    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
-  - type: doc
-    id: "reviewer ADR-0017"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
-    label: "reviewer ADR-0017: Judge the root cause once per level; every FIX names its mechanism"
 ---
 
 # ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template
@@ -62,7 +41,7 @@ and leaves Setup, Foundational and Polish untagged by design, yet every task bel
 1. We will have the settled-design preset prepend front matter to the spec template,
    `codeworks: {v: 1, kind: no_spec | feature | defect, root_cause: {observed: anchored | hypothesis | none}}`,
    filled by planner's checks at commit; builder, reviewer and the root-cause reviewer read these
-   keys, never a heading.
+   keys through core's model (root ADR-0003), never a heading.
 2. We will keep Spec Kit's stock tasks template, customised only through presets and overrides: story
    phases are tagged `[US<k>]`; Setup, Foundational and Polish are present and untagged. When planner
    creates the story issues (ADR-0010), it labels each task block in tasks.md with its story issue's

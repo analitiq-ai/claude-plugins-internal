@@ -25,23 +25,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "63"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
-    label: "Move planning (issue-spec) out of reviewer into its own plugin"
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
-  - type: doc
-    id: "orchestrator ADR-0009"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
-    label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
-  - type: doc
-    id: "root ADR-0005"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
-    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec

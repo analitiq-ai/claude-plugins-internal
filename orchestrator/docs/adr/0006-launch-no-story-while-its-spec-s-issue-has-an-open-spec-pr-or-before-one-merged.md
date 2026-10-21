@@ -21,14 +21,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "133"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
-    label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
-  - type: doc
-    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
-    label: "org ADR-0002: one spec per spec's issue, landed by a spec PR before any story"
 ---
 
 # ADR-0006: Launch no story while its spec's issue has an open spec PR, or before one merged

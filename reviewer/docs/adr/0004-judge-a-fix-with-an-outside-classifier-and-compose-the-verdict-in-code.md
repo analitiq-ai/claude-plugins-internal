@@ -23,11 +23,6 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
 review:
   tier: async
-externalRefs:
-  - type: issue
-    id: "30"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
-    label: "The batch of ADRs this one belongs to"
 ---
 
 # ADR-0004: Judge a fix with an outside classifier and compose the verdict in code
@@ -46,11 +41,11 @@ ADR-0009 decides that private source may be sent to the classifier.
 
 ## Decision
 
-1. We will judge a fix with Jev, an outside one-shot classifier, called from the hook.
+1. We will judge a fix with an outside one-shot classifier, called from the hook.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
 3. We will compose the verdict in code.
-4. We will store an answer as Jev gave it, so the ledger and the log report what it said. Code may leave an
-   answer unread; it does not rewrite one.
+4. We will store an answer as the classifier gave it, so the ledger and the log report what it said.
+   Code may leave an answer unread; it does not rewrite one.
 
 ## Options considered
 
@@ -66,7 +61,7 @@ ADR-0009 decides that private source may be sent to the classifier.
 
 The sweep lists sites and nothing says whether the change reaches them.
 
-### Option C: Ask Jev for the overall verdict
+### Option C: Ask the classifier for the overall verdict
 
 Rejected: its overall answer would differ from its two answers.
 
@@ -84,7 +79,8 @@ Rejected: an agent cannot answer within the hook's time.
 
 ## Consequences
 
-- Easier: a change to the verdict rule is a code change with a unit test. The stored answers are Jev's own.
+- Easier: a change to the verdict rule is a code change with a unit test. The stored answers are the
+  classifier's own.
 - Harder: the check depends on one outside model and its provider.
 - **How we would know this was wrong:** recorded fixes stop getting their expected verdict, or the share of
   commits refused as too large rises above 6 to 8%.
