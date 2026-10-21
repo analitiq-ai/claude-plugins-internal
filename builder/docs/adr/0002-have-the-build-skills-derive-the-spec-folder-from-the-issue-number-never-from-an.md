@@ -5,11 +5,11 @@ title: "Have the build skills derive the spec folder from the issue number, neve
 status: draft
 date: 2026-10-20
 deciders: []
-tags: [spec, spec-folder, skills, issue-tackle, root-cause-check, story, lanes]
+tags: [spec, spec-folder, skills, issue-tackle, root-cause-check, story, lanes, launch-lock]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0003", "0004"]
+relatesTo: ["0003", "0004"]
 affects:
   - type: path
     pattern: "builder/plugin/skills/issue-tackle/**"
@@ -41,48 +41,54 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
     label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
   - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md"
+    label: "orchestrator ADR-0003: Keep the loop's durable state in GitHub objects"
+  - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0017-judge-the-root-cause-once-per-level-every-fix-names-its-mechanism.md"
     label: "reviewer ADR-0017: Judge the root cause once per level; every FIX names its mechanism"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
-    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
-  - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md"
     label: "planner ADR-0010: Create one issue per story, chain them by blockedBy, and open the spec PR as a draft"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
+    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0006-keep-planning-and-building-in-disjoint-lanes-of-an-issue.md"
+    label: "root ADR-0006: Keep planning and building in disjoint lanes of an issue"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0001-keep-the-spec-in-the-spec-folder-that-planning-writes.md"
+    label: "planner ADR-0001: Keep the spec in the spec folder that planning writes"
 ---
 
 # ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment
 
 ## Context
 
-This record decides how `builder` finds the spec folder (ADR-0001), the story and its branch. The caller is
-a deterministic orchestrator (orchestrator ADR-0001), which computes no story order. Each story has its own
-issue, branch and PR; a spec with several stories sits on a parent issue with one sub-issue per story
-(org ADR-0003, planner ADR-0010).
+The spec of a change lives in its spec folder (planner ADR-0001). The caller is a deterministic
+orchestrator (orchestrator ADR-0001), which computes no story order. Each story has its own issue, branch and PR; a spec with several stories sits on
+a parent issue with one sub-issue per story (org ADR-0003, planner ADR-0010).
 
 ## Decision
 
-1. We will have `issue-tackle <s>` take the story issue number only, for the orchestrator and humans;
-   `builder` declares `reviewer` as a dependency.
-2. We will derive everything from `<s>`: the spec's issue `<p>` is `<s>`'s parent when it has one, else
-   `<s>`; the spec folder is the one `specs/<p>-*/`; the requirement is its `spec.md`, or the issue body
-   when its front matter's `codeworks.kind` is `no_spec` (planner ADR-0008); the story is the one `<s>`
-   names (planner ADR-0010).
-3. We will build each story on one branch, `<s>-us<k>-<slug>`, cut from the default branch at its first
-   launch; the story's PR is the newest PR whose head is that branch.
-4. We will stop, never plan, on no `specs/`, no `specs/<p>-*` or an inconsistent folder, with a message
-   naming the state and any open PR.
-5. We will never work on an issue in Backlog or Blocked: `issue-tackle` stops on one, building nothing and
-   naming the lane.
-6. We will have neither skill read any issue comment for the spec.
-7. We will drop `root-cause-check` as a build step: the round's root-cause reviewer verifies the cause
+1. We will have `issue-tackle <s>` take the story issue number only, for the orchestrator and humans, and
+   derive the spec folder, the requirement, the branch and the PR from it through `core/` (root ADR-0005),
+   never from an issue comment. `builder` declares no plugin dependency.
+2. We will cut the story's branch from the default branch at its first launch, and build every later
+   launch of the story on it.
+3. We will stop, never plan or repair, on no `specs/`, no `specs/<p>-*` or an inconsistent folder, naming
+   the state and any open PR.
+4. We will enforce root ADR-0006 at launch: `issue-tackle` stops on an issue in Backlog or Blocked,
+   building nothing.
+5. We will have `issue-tackle` take the story's launch lock (orchestrator ADR-0003) before any work, and
+   stop, naming the holder, when another launch holds it or this host cannot take it.
+6. We will retire the `root-cause-check` skill: the round's root-cause reviewer verifies the cause
    (reviewer ADR-0017).
 
 ## Options considered
 
 ### Option A: Everything from `<s>` (chosen)
 
-See Decisions 1–3.
+The orchestrator and a human launch the same way, with one number.
 
 ### Option B: `spec` and `branch` from the caller
 
@@ -96,15 +102,19 @@ Rejected: the story is its issue, and order is the issues' `blockedBy` chain (pl
 
 Rejected: the skill stops with a message naming the state, never a planning command.
 
-### Option E: `root-cause-check` as a build step
+### Option E: Keep `root-cause-check` as a skill or a build step
 
-Rejected: the check reads nothing from the round; it becomes the round's root-cause reviewer.
+Rejected: it reads nothing from the round; the round's root-cause reviewer does its job.
+
+### Option F: An interactive `issue-tackle` without the launch lock
+
+Rejected: it and an orchestrator launch would build one story at once.
 
 ## Trade-offs
 
 - The skill repairs nothing; a missing or inconsistent folder costs a Blocked card and a human.
-- `builder` depends on `reviewer`.
-- Finding the spec costs one more API read, the issue's parent, and the lane one more.
+- Without `reviewer` installed, the turn has no round to run and stops there.
+- `issue-tackle` runs only where the launch lock lives.
 
 ## Consequences
 

@@ -33,20 +33,17 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md"
     label: "orchestrator ADR-0002: The orchestrator alone writes the working lanes, derived from the PR"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0007-mark-a-story-pr-ready-on-the-attestation-alone-in-review-once-green-with-no-find.md"
-    label: "orchestrator ADR-0007: Mark a story PR ready on the attestation alone; In review once green with no findings"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md"
-    label: "reviewer ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the bot wins"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
-    label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "reviewer ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-read-a-pr-s-findings-only-through-core-s-modules-and-brief-only-trusted-reviewer.md"
+    label: "reviewer ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0008-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
     label: "orchestrator ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
+    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md"
+    label: "planner ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
 ---
 
 # ADR-0003: Open a draft PR after the first push and end the turn at an attested draft
@@ -61,16 +58,12 @@ spans several launches, and each relaunch has to know what the last one left.
 
 1. We will open the story PR as a draft after the first push, and a new one on the same branch after a
    PR closed unmerged. builder writes its description once, at creation, with `Closes #s` for the story
-   issue, so the merge closes it. Ticks in the tasks.md block labelled with the story's issue number
-   (planner ADR-0008) land in ordinary commits in the story PR.
+   issue, so the merge closes it.
 2. We will end the turn at an attested draft, or at a stop with a message naming why: a pre-PR stop, or the
-   folder or lane stop of ADR-0002. A launch that opens no PR goes to Blocked with its final message as the
-   reason (orchestrator ADR-0002). A card moved to Backlog or Blocked ends the turn (reviewer ADR-0015).
-   builder polls nothing and makes none of the GitHub moves reviewer ADR-0012 refuses; the orchestrator
-   relaunches it.
+   folder or lane stop of ADR-0002. The orchestrator relaunches it (orchestrator ADR-0001).
 3. We will resume a relaunch from the story's PR (ADR-0002): findings open a github round
-   (reviewer ADR-0016), an unattested head resumes the internal loop at the current head, and the ticks say
-   which of the story's tasks are done.
+   (reviewer ADR-0016), an unattested head resumes the internal loop at the current head, and the ticks in
+   the story's task block (planner ADR-0008) say which of its tasks are done.
 
 ## Options considered
 
@@ -78,16 +71,16 @@ spans several launches, and each relaunch has to know what the last one left.
 
 ### Option B: builder marks the PR ready and writes In review
 
-Rejected: the orchestrator flips the PR and moves the card; no plugin writes a lane, and the hook refuses
-one from an agent session.
+Rejected: the orchestrator flips the PR and moves the card; no plugin writes a lane (orchestrator
+ADR-0002).
 
 ### Option C: builder polls the reviewers and re-requests Codex
 
-Rejected: a session cannot wait for CI; the orchestrator re-requests (orchestrator ADR-0008).
+Rejected: no plugin polls (orchestrator ADR-0001); the orchestrator re-requests (orchestrator ADR-0008).
 
 ### Option D: A tasks.md tick gates something
 
-Rejected: the round grades the diff against the spec, and a closed story issue marks the story done.
+Rejected: the round grades the diff against the spec, and root ADR-0005 decides when a story is done.
 
 ### Option E: `Closes #s` written later, on the last story's PR only
 

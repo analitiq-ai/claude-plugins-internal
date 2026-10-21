@@ -9,7 +9,7 @@ tags: [layout, repository, spec-kit, plugins]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0003"]
+relatesTo: ["0002", "0003", "0005"]
 affects:
   - type: path
     pattern: ".claude-plugin/marketplace.json"
@@ -50,9 +50,11 @@ neither tree. reviewer, planner and the orchestrator all use the state comment a
    `orchestrator/` and `core/`, holding `plugin/` (what an install copies), `tests/` and `docs/adr/`. The
    orchestrator's folder has no `plugin/`; `core/` holds a package in place of `plugin/`.
 2. We will make `core/` the one home of code more than one component runs: the state-comment read and
-   write and the validator modules with their Findings contract (ADR-0003). Each plugin installs it into its
+   write, the validator modules with their Findings contract (ADR-0003), and the parser of a story's
+   identity (ADR-0005). Each plugin installs it into its
    `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version; the orchestrator imports it the same way, and
-   imports no plugin code.
+   imports no plugin code. A session's tool calls may reach one `core/` writer only, "place a rescope
+   hold" (planner ADR-0010); every other state write runs in reviewer's hook process.
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 

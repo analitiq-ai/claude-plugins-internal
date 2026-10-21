@@ -32,15 +32,9 @@ externalRefs:
 
 ## Context
 
-The shim check keeps one record per bug, with the bug's line ranges and its count of refusals. One staged
-change can overlap two bugs that have a record each.
-
-Spec 006 says of it: "One commit edits sites of two refused bugs: it counts toward both (FR-015 applies to
-each)." It does not say which bug the deep sweep, the hold and the override then belong to. The third review
-round of the amendment of specs 005 and 006 found the gap. Its reviewers proposed fills that contradict each other.
-
-Why now: the amendment of spec 006 to ADR-0001 was stopped in review on this question. The plan did not
-weigh merging.
+The shim check keeps one record per bug, with the bug's line ranges (ADR-0001) and its count of refusals.
+One staged change can overlap two bugs that have a record each. The deep sweep, the hold and the override
+each belong to one bug, so a change that overlaps two has to say which bug they then belong to.
 
 ## Decision
 
@@ -56,18 +50,16 @@ weigh merging.
 |---|---|
 | One check of a change that overlaps two bugs | One verdict for one bug |
 | Deep sweep | One, for both together |
-| Later steps | Applied to both together |
 | Count of refusals | The higher of the two |
 
-### Option B: Do nothing
+### Option B: Count toward both, and say nothing more
 
-The commit keeps counting toward both bugs, and the spec keeps saying nothing of their deep sweep, hold and
-override.
+Leaves the deep sweep, the hold and the override of each bug undecided.
 
 ### Option C: Keep the bugs apart and treat each as if it were alone
 
-Each bug keeps its own count and gets its own deep sweep at its own third refusal. Rejected: a commit that
-fixes two bugs and is ruled a patch needs both sent for the deeper sweep together.
+Each bug keeps its own count and gets its own deep sweep. Rejected: a commit that fixes two bugs and is
+ruled a patch needs both sent for the deeper sweep together.
 
 ### Option D: Add the two counts
 
@@ -85,13 +77,11 @@ Rejected: a commit that touches two bugs would wipe both counts.
 ## Consequences
 
 - Easier: one check of one change gives one verdict to one bug.
-- Harder: the shim check's design has to say how two bugs become one, and a commit no longer counts toward
-  both. ADR-0001 says "holds will not be merged", and has to be read with this ADR.
+- Harder: the shim check records how two bugs became one.
 - **How we would know this was wrong:** users who override a merged bug and say its two halves had nothing to
   do with each other.
 - Revisit if: such reports come in.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
-2. [x] Carry it into the design of ADR-0001's rule (issue #17). Done in #60.
+1. [ ] The ratifier ratifies this record, or sends it back.

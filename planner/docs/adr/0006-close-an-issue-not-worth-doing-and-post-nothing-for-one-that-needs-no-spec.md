@@ -9,7 +9,7 @@ tags: [premise, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0005", "0007"]
+relatesTo: ["0005", "0007"]
 affects:
   - type: path
     pattern: "planner/plugin/scripts/premise_report.py"
@@ -34,28 +34,36 @@ externalRefs:
     id: "133"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner and builder"
+  - type: doc
+    id: "orchestrator ADR-0009"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
+    label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
+  - type: doc
+    id: "root ADR-0005"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
+    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec
 
 ## Context
 
-The premise step ends in `write the spec`, `no spec needed` or `not worth doing` (ADR-0002). This record decides
-what a run does with the issue on the last two.
+The premise step ends in `write the spec`, `no spec needed` or `not worth doing`. This record decides what
+a run does with the issue on the last two. No plugin closes an issue; the orchestrator closes only a parent
+whose sub-issues are all done (orchestrator ADR-0009), done as root ADR-0005 defines it.
 
 ## Decision
 
-1. We will end the run on `not worth doing` by naming the step for the user: close the issue as not planned, with
-   the premise report's reason; an empty reason fails the premise step.
-2. We will post nothing for an issue the user picks as `no spec needed`, and tell the user nothing to pass: its
-   record is the spec folder ADR-0007 writes, which review and build find by the spec's issue number.
-3. We will have no `#<issue> none <reason>` entry form.
+1. We will leave closing a `not worth doing` issue to the user: the run ends naming that step and the
+   premise report's reason, and planner closes no issue.
+2. We will post nothing on the issue for either pick; a `no spec needed` pick's record is its no-spec
+   folder (ADR-0007).
 
 ## Options considered
 
 ### Option A: The user closes it; the folder is the no-spec record (chosen)
 
-`spec: null` exists nowhere; every launch finds its folder from its spec's issue.
+Every launch finds the folder from its spec's issue (root ADR-0005).
 
 ### Option B: Tell the user to pass `spec: null` at review
 

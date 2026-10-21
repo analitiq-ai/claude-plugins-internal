@@ -42,9 +42,9 @@ externalRefs:
 
 ## Context
 
-Today cause versus symptom is judged twice and binds no ruling: builder's root-cause-check reads
-nothing from the round; the shim check guesses it beside the site coverage it measures
-(ADR-0004). And a FIX may say "fix it" and leave the mechanism to the agent. planner
+Cause versus symptom can be judged by a step that reads nothing from the round, or by the shim check
+beside the site coverage it measures (ADR-0004), and then binds no ruling. A FIX that says "fix it" leaves
+the mechanism to the agent. planner
 ADR-0008's `codeworks.root_cause.observed` fact (`anchored`, `hypothesis` or `none`) tells a round when
 a root-cause verdict is due.
 
@@ -61,8 +61,9 @@ a root-cause verdict is due.
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.
-4. At the commit level, we will have the shim check rule complete or patch on site coverage alone.
-5. We will retire builder's root-cause-check skill (builder ADR-0002).
+4. At the commit level, we will have the shim check rule complete or patch on site coverage alone. The
+   root-cause reviewer is the one judge of cause versus symptom; builder's root-cause-check skill is
+   retired (builder ADR-0002).
 
 ## Options considered
 
@@ -74,7 +75,7 @@ Each level's cause is checked where it can be checked.
 
 Rejected: it needs a commit-to-finding mapping.
 
-### Option C: root-cause-check as a builder step before review (today)
+### Option C: root-cause-check as a builder step before review
 
 Rejected: it reads nothing from the round.
 

@@ -9,7 +9,7 @@ tags: [spec, front-matter, tasks, spec-kit, presets]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0005", "0010"]
+relatesTo: ["0007", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/speckit/presets/**"
@@ -63,14 +63,11 @@ and leaves Setup, Foundational and Polish untagged by design, yet every task bel
    `codeworks: {v: 1, kind: no_spec | feature | defect, root_cause: {observed: anchored | hypothesis | none}}`,
    filled by planner's checks at commit; builder, reviewer and the root-cause reviewer read these
    keys, never a heading.
-2. We will keep Spec Kit's stock tasks template: story phases are tagged `[US<k>]`; Setup, Foundational
-   and Polish are present and untagged. When planner creates the story issues (ADR-0010), it labels each task
-   block in tasks.md with its story issue's number: a story's phase with its own, Setup and Foundational
-   with the first story's, Polish with the last's. The planning check is that upstream rule, pinned to the
-   installed template by a drift test.
-3. We will commit `premise.md` in every spec folder except a no-spec one, whose spec.md carries the premise
-   question and reason (ADR-0007), read by planner's root-cause check in a new spec and a rescope alike
-   (ADR-0005), and customise Spec Kit's templates through presets and overrides only.
+2. We will keep Spec Kit's stock tasks template, customised only through presets and overrides: story
+   phases are tagged `[US<k>]`; Setup, Foundational and Polish are present and untagged. When planner
+   creates the story issues (ADR-0010), it labels each task block in tasks.md with its story issue's
+   number: a story's phase with its own, Setup and Foundational with the first story's, Polish with the
+   last's.
 
 ## Options considered
 
@@ -98,15 +95,15 @@ Rejected: a script would derive at every launch what planner knows when it plans
 ## Trade-offs
 
 - Changing a key is a change to three plugins, not to a template.
-- An upstream template change fails the drift test until the pin moves.
+- An upstream change to Spec Kit's phase rule is a change to how planner labels task blocks.
 
 ## Consequences
 
 - Easier: the no-spec folder (ADR-0007) and the root-cause dispatch (reviewer ADR-0017) each read one key;
   reviewer finds a session's ticks by its issue number on the block.
 - Harder: a spec.md without the block gives builder and reviewer nothing to read.
-- **How we would know this was wrong:** the drift test fails on a Spec Kit release that left the phase
-  rule intact.
+- **How we would know this was wrong:** a task block labelled with the wrong story's issue, or a reader
+  that still parses a heading.
 - Revisit if: Spec Kit changes the phase rule, or ships front matter of its own for spec.md.
 
 ## Action items

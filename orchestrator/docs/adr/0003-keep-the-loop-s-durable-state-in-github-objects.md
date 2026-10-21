@@ -28,7 +28,7 @@ externalRefs:
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md"
-    label: "reviewer ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the bot wins"
+    label: "reviewer ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the session App wins"
 ---
 
 # ADR-0003: Keep the loop's durable state in GitHub objects
@@ -41,24 +41,23 @@ The orchestrator (ADR-0001) and reviewer act on the same facts; the orchestrator
 
 1. We will keep every state that outlives a session on GitHub: the claim is the story issue's
    assignee; the attestation is a commit status at the head (ADR-0004); rounds and holds are reviewer's
-   tagged state comments on the story issue, the newest by the bot account winning (reviewer ADR-0011);
-   findings come from the validator modules, the required checks, unresolved review threads and the
-   mergeable field (ADR-0007);
-   the escalation question, its answer and every Blocked reason are issue comments.
-2. We will link a PR to its story issue by its head branch prefix `<s>-us` (reviewer ADR-0015), never
-   by `Closes #s` or `closingIssuesReferences`; a story's PR is the newest PR whose head is its branch.
-   Only a same-repo head links; a fork PR is never attested from reviewer's state, though the exempt
-   label applies (ADR-0004).
-3. We will keep every fact the orchestrator acts on machine-readable: the state comment is a machine
-   snapshot; a Blocked reason carries its cause's key and is posted only when no comment with
-   that key exists.
+   tagged state comments on the story issue, read as reviewer ADR-0011 decides; findings come from
+   `core/`'s modules, the required checks and the mergeable field (ADR-0007); the escalation question,
+   its answer and every Blocked reason are issue comments.
+2. We will link a PR to its story issue only by its head branch, as root ADR-0005 decides; a fork PR
+   as ADR-0004 decides.
+3. We will keep every fact the orchestrator acts on machine-readable: a Blocked reason carries its cause's key and is posted only when no comment with that key
+   exists (HANDLED). The Blocked move fires whether or not the reason is HANDLED, a card dragged back to
+   a working lane after a handled no-PR launch included.
 4. We will post Blocked reasons and Codex requests with the orchestrator's App, and count only that
    App's comments for HANDLED and REQUESTED.
-5. We will let the orchestrator keep on its host only its process lock and launch log, keyed per
-   (repo, issue); it re-reads GitHub every tick and stores nothing it could read there. Its config is
-   its section of `codeworks.toml` (root ADR-0002).
-6. We will let the plugins keep session-scoped files and a cache rebuilt from the state comments; no
-   record elsewhere.
+5. We will let the orchestrator keep on its host only the launch lock and the launch log, keyed per
+   (repo, issue). The lock is `core/`'s, taken by every launch and by builder's issue-tackle, which
+   refuses beside a running launch; a lock an interactive session holds counts as RUNNING. It lives on
+   the orchestrator's host, so issue-tackle elsewhere refuses. The lock dies with its process. At
+   start-up a launch-log entry with no exit is dropped only if its lock is free, so the next tick
+   relaunches that story. The orchestrator re-reads GitHub every tick and stores nothing it could read
+   there.
 
 ## Options considered
 
@@ -76,23 +75,20 @@ Rejected: a deployment assumption; the orchestrator runs no plugin code.
 
 Rejected: the comment's key is the record; a restart re-reads the issue.
 
-### Option E: The PR linked by `Closes #s`
-
-Rejected: the body is author-written prose; the branch prefix is the link FENCE already enforces.
-
 ## Trade-offs
 
-- A state comment is trusted only from the bot account and only while reviewer refuses tagged comments
-  from sessions (reviewer ADR-0012).
-- A launch that died leaves no record: at start-up its entry is dropped and it is relaunched.
+- A state comment is trusted from the session App, so a session can forge one through the API (root
+  ADR-0007).
+- A launch that died is relaunched from the start of its turn.
 
 ## Consequences
 
 - Easier: the orchestrator restarts anywhere; a hold survives a re-created PR.
 - Harder: a fact to remember needs a GitHub object or is not state.
-- **How we would know this was wrong:** a record kept off GitHub beyond decisions 5 and 6, or two hosts
+- **How we would know this was wrong:** a record kept off GitHub beyond decision 5, or two hosts
   disagreeing about one issue.
-- Revisit if: a second account writes tagged state comments, or orchestrator and plugins share one host.
+- Revisit if: rounds move out of the session, or stories must be built away from the orchestrator's
+  host.
 
 ## Action items
 

@@ -1,11 +1,11 @@
 ---
 schemaVersion: 0.2.0
 id: "0011"
-title: "Record rounds and holds in tagged issue comments through core/; the newest by the bot wins"
+title: "Record rounds and holds in tagged issue comments through core/; the newest by the session App wins"
 status: draft
 date: 2026-10-20
 deciders: []
-tags: [state, ledger, holds, issue-comments, orchestrator]
+tags: [state, ledger, holds, issue-comments, orchestrator, fail-closed]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -38,35 +38,34 @@ externalRefs:
     label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
-# ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the bot wins
+# ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the session App wins
 
 ## Context
 
-A local SQLite record of rounds and holds is unreadable from the orchestrator's host and lost with its own. A hold can exist before the story's PR, and a PR can be closed and reopened;
-the story issue outlives both. reviewer writes this state, planner places a rescope hold, and the
-orchestrator reads it.
+A local SQLite record is unreadable from the orchestrator's host. A hold can exist before the story's PR,
+and a PR can be closed and reopened; the story issue outlives both. Every session posts as the
+codeworks-session App (root ADR-0007), and a comment can be edited or deleted.
 
 ## Decision
 
 1. We will record rounds and holds in comments on the story issue tagged
    `<!-- codeworks:reviewer-state -->`. Each is the full snapshot, a released hold keeping its row and a
-   rescope hold its `spec.md` blob SHA (ADR-0013); the newest tagged comment by the bot account wins, read
-   with GraphQL `comments(last: N)`. No tagged comment is no state; deleting the newest rolls back to the
-   one before, whose rounds name older heads and whose holds only block more.
-2. We will read and write the snapshot only through the state module in `core/` (root ADR-0001,
-   ADR-0003): reviewer writes inside the session it gates, planner only to place a rescope hold (planner
-   ADR-0005), and the orchestrator only reads ATTESTED and HOLD. A tagged comment a session posts any other
+   rescope hold its `spec.md` blob SHA (ADR-0013). The newest tagged comment by the session App wins.
+2. We will fail closed: when the newest such comment was edited, or a story with a PR has no snapshot,
+   the story is held, as by an open hold. A story with neither a PR nor a snapshot has no state. A
+   human's Ready releases it: reviewer then posts a snapshot rebuilt from the newest unedited one.
+3. We will read and write the snapshot only through the state module in `core/` (root ADR-0003):
+   reviewer writes inside the session it gates, planner only to place a rescope hold (planner
+   ADR-0010), and the orchestrator only reads ATTESTED and HOLD. A tagged comment a session posts any other
    way is refused (ADR-0012).
-3. We will keep the two writers apart by lane: planner works on an issue only in Blocked or Backlog, where
-   reviewer runs no round and takes no commit (ADR-0015).
-4. We will keep `ledger.db` beside the session as a cache, rebuilt from the newest tagged comment at the
-   session's start. Reviewer reports and session grants stay session-scoped files (orchestrator ADR-0003).
+4. We will keep the two writers apart by the lane rule (root ADR-0006): planner writes only while the
+   issue is in Blocked or Backlog, where reviewer runs no round and takes no story commit (ADR-0015).
+5. We will keep `ledger.db` beside the session as a cache, rebuilt from the newest tagged comment at the
+   session's start. Reviewer reports and session grants stay session-scoped files.
 
 ## Options considered
 
-### Option A: Tagged issue comments through one shared module (chosen)
-
-Each write is a new comment, a hold lives before the PR exists, and one module owns the format.
+### Option A: Tagged issue comments through one shared module, failing closed (chosen)
 
 ### Option B: A local SQLite store as the record
 
@@ -74,25 +73,29 @@ Rejected: the problem in Context.
 
 ### Option C: A section of the PR body
 
-Rejected: a hold has nowhere to live before the PR exists, and any other writer of the body can drop a row.
+Rejected: a hold has nowhere to live before the PR exists.
 
 ### Option D: The state module private to reviewer's plugin
 
-Rejected: planner and the orchestrator would each need their own copy of one format.
+Rejected: planner and the orchestrator would each need a copy.
+
+### Option E: Fall back to the previous snapshot when the newest is edited or gone
+
+Rejected: deleting or editing the newest comment would drop the hold it placed.
 
 ## Trade-offs
 
 - Every state change notifies the issue's subscribers.
-- Sessions post as the bot account, so the hook's refusal is the only boundary on what the orchestrator
-  attests from (orchestrator ADR-0004).
+- A session can post a forged tagged comment through the API, past the hook; root ADR-0007 accepts that
+  risk.
+- An edited or lost snapshot holds the story until a human acts.
 
 ## Consequences
 
-- Easier: the orchestrator reads attestation and holds from the issue alone.
-- Harder: a change to the snapshot format is a `core/` release every component pins.
-- **How we would know this was wrong:** the orchestrator and a session disagree on attestation or a hold;
-  a tagged comment not written through `core/` is read as state; a snapshot loses another writer's row.
-- Revisit if: two writers need one issue outside the lane rule.
+- Harder: a snapshot format change is a `core/` release every component pins.
+- **How we would know this was wrong:** a tagged comment not written through `core/`, or by another
+  author, is read as state; an edited or deleted snapshot releases a hold.
+- Revisit if: two writers need one issue outside the lane rule, or rounds run outside the session.
 
 ## Action items
 

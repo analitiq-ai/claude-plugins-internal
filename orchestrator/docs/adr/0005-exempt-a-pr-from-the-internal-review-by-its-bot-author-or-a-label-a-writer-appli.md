@@ -35,17 +35,20 @@ externalRefs:
 
 ## Context
 
-Spec, revert, retire-spec and release PRs, and PRs that Bot accounts open, are not story PRs and get no
+Spec, revert, retire-spec and release PRs, and PRs that other Apps open, are not story PRs and get no
 launch, yet the ruleset requires `internal-review` (ADR-0004), so who may waive it is a trust decision.
 
 ## Decision
 
-1. We will exempt a PR whose author is of GitHub type Bot, or which carries a label from `exempt_labels`
-   whose labeled event's sender is a User other than the bot with write permission. `exempt_labels` is
+1. We will exempt a PR whose author is a GitHub App other than the session App (root ADR-0007) and
+   which changes no path ADR-0004 protects, or which carries a label from `exempt_labels` applied after the head's push by a User other than Analitiq-Bot
+   with write permission. A push after the label voids it until a human labels again. `exempt_labels` is
    a key of the orchestrator's section of `codeworks.toml` (root ADR-0002).
 2. We will have the orchestrator alone decide EXEMPT and write `internal-review` "exempt"; reviewer and
-   every other component read that status, never the list (reviewer ADR-0012).
-3. We will have the orchestrator never launch on an exempt PR.
+   every other component read that status, never the list.
+3. We will never launch on an exempt PR. An exempt story PR's card goes to Blocked, the reason "exempt: a
+   human merges", adding "push a fix" when it has findings; a push after the label sends it to Blocked
+   naming the re-label.
 4. We will make exemption the only way a PR to main goes without the internal review: spec, revert,
    retire-spec and release PRs are labelled or Bot-authored; no branch-name kinds, no list of exempt
    diff shapes. A spec PR's label is the human's approval of it (planner ADR-0010).
@@ -60,8 +63,7 @@ Covers spec PRs, retire-spec, reverts and releases; the labeled event's sender i
 
 ### Option B: Exempt kinds named in a record
 
-For example, a version-only release is exempt. Rejected: every new kind needs a record; the label is the
-general exemption.
+Rejected: every new kind needs a record; the label is the general exemption.
 
 ### Option C: Branch-name kinds for tooling branches
 
@@ -80,10 +82,10 @@ Rejected: two readers of one list can disagree; the status is the one answer.
 
 - Easier: a new exempt kind costs a label, not a record.
 - Harder: the label exempts any PR a writer puts it on, a story PR included, on that human's
-  judgment; the bot's own PRs are never Bot-exempt, since its account is a User.
+  judgment; every push after it needs a new label.
 - **How we would know this was wrong:** PRs attested "exempt" that needed a round: a labelled story PR,
   or a Bot-authored PR carrying code.
-- Revisit if: GitHub stops carrying the sender on the labeled event.
+- Revisit if: GitHub stops carrying the sender or time on the labeled event.
 
 ## Action items
 

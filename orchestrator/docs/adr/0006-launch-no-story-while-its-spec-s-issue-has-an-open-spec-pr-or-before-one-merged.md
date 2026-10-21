@@ -27,9 +27,6 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design: rewrite the decision records of reviewer, planner, builder and orchestrator"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md"
-    label: "planner ADR-0009: Check the plan against the governing decision logs before critique"
-  - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: one spec per spec's issue, landed by a spec PR before any story"
 ---
@@ -50,11 +47,8 @@ built against the old one.
    which the merge respects (ADR-0009).
 2. We will move a Ready card the rule holds to Blocked, the reason naming the open spec PR, or saying
    none has merged.
-3. We will never launch on a spec PR and run no internal round on it: planner opens it as a draft
-   (planner ADR-0010), a human reviews it, applies the exempt label, marks it ready and merges it; it is
-   attested and Codex is requested as for any exempt PR (ADR-0005, ADR-0008).
-4. We will have a decision record that lands late ride in the rescope's spec PR; it governs an in-flight
-   story from the round after that story's branch merges main (builder ADR-0004).
+3. We will never launch on a spec PR (planner ADR-0010) and run no internal round on it; it is attested
+   and Codex is requested as for any exempt PR (ADR-0005, ADR-0008).
 
 ## Options considered
 
@@ -65,18 +59,10 @@ branch carries the new spec.
 
 ### Option B: The same rule on merge as well
 
-Rejected: the rescope hold already refuses the merge of every story with a branch until that branch
-carries the new spec.
+Rejected: the rescope hold already refuses the merge of every open story under the spec until its
+branch carries the new spec (root ADR-0006).
 
-### Option C: A separate `<p>-adr-<slug>` branch for records, blocking launches while open
-
-Rejected: a second branch kind and blocking rule for what the spec PR already carries.
-
-### Option D: Records inside the story PR
-
-Rejected: a governing rule would land with the code it grades.
-
-### Option E: Leave a held Ready card in Ready
+### Option C: Leave a held Ready card in Ready
 
 Rejected: the card would show no reason, and a human could not tell it from one waiting on a blocker.
 

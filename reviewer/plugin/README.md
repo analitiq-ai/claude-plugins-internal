@@ -184,6 +184,14 @@ plugin's mode is `log`, a commit the check would refuse is only recorded. Jev is
 key in `~/.config/openrouter/key` (`JEV_KEY_FILE` overrides it); when Jev cannot answer, the check is recorded as
 failed, and a failed check refuses the commit as a patch does.
 
+The numbers the decision records leave to reviewer's settings default to: 4 github rounds before the audit
+stage; a claim hold at 3 `WRONG` rulings on one lineage; a shim hold at a bug's count of 4; an audit hold
+after 2 escalation audits not ruled `CONVERGED_PUSHBACK`, whose release grants 2 more.
+
+The shim check's Jev call is the only model call made inside a hook. Its questions are kept word for word as
+they were replayed over recorded commits: a change to their wording, or to the request's shape, needs a new
+replay first.
+
 ## What the user types
 
 `unlock`, `override`, `override-merge` and the switch are read from a prompt's first words, by

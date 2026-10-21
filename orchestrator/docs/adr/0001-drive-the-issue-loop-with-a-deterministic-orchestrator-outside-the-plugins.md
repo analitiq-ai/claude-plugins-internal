@@ -9,7 +9,7 @@ tags: [orchestrator, issue-loop, automation, plugins, github-app]
 scope: component
 reversibility: two-way-door
 blastRadius: org
-relatesTo: ["0002", "0003"]
+relatesTo: ["0002", "0003", "0009"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -41,23 +41,26 @@ for CI.
 
 ## Decision
 
-1. We will drive one story issue from Ready to merge with a deterministic script, running as the org's
-   existing GitHub App (no new App), host unspecified; it claims the story issue and launches
-   `builder:issue-tackle <s>`. Its code lives in this repo under `orchestrator/` and releases and deploys
-   on its own.
+1. We will drive one story issue from Ready to merge with a deterministic script, acting as the org's
+   existing GitHub App, run as its own OS user (ADR-0009); it claims the story issue, mints the session's
+   token (root ADR-0007) and launches `builder:issue-tackle <s>`. Its code lives in this repo under
+   `orchestrator/` and releases and deploys on its own.
 2. We will give it only these inputs: the board and its issues (assignee, parent, sub-issues,
-   `blockedBy`); open PRs; issue comments, reviewer's tagged state comments among them (reviewer
-   ADR-0011); the effective rules for each PR's base branch, from the one rules endpoint, rulesets
-   being the only source of required checks; its own section and `[shared]` of `codeworks.toml`
-   (root ADR-0002); its host state (ADR-0003). It parses no prose and runs an LLM only by launching one.
-3. We will have it import no plugin code, only `core/` (root ADR-0001): the state-comment read and the
-   validator modules with their Findings contract (root ADR-0003), installed as a package pinned to the
-   orchestrator's release, the way each plugin installs it.
+   `blockedBy`, closer); open PRs, their changed files, review threads, mergeable field, statuses and
+   checks at the head; issue comments with author, edit and time, reviewer's state comments (reviewer
+   ADR-0011) among them; an exempt label's labeled event, its sender, that user's permission and the
+   head's push time (ADR-0005); the effective rules for each PR's base branch (ADR-0009); its own section
+   and `[shared]` of `codeworks.toml` (root ADR-0002); its host state and the launch lock (ADR-0003). It
+   parses no prose except through `core/`'s modules (root ADR-0003), and runs an LLM only by launching
+   one.
+3. We will have it import no plugin code, only `core/`, as each plugin does (root ADR-0001).
 4. We will have the plugins poll nothing: builder ends its turn at an attested draft or a pre-PR stop
    (builder ADR-0003); planner at the draft spec PR it opens (planner ADR-0010).
-5. We will run one session per story issue, under a process lock per (repo, issue) that dies with its
-   process. REPEAT bounds the relaunch: a launch that had work (an unattested head or findings) and
-   ended with both unchanged moves the card to Blocked.
+5. We will run one session per story issue, under the launch lock (ADR-0003), and bound relaunches
+   twice, each moving the card to Blocked naming its bound: REPEAT, a launch that had work (an
+   unattested head or findings), ended with both unchanged, and whose exit state still needs work; and
+   two launches in a row from a working lane that each end with an unattested head. A human's Ready
+   resets the count.
 
 ## Options considered
 
@@ -71,15 +74,11 @@ Rejected: not deterministic, not restartable, parses comments.
 
 ### Option C: builder drives its own loop
 
-Rejected: it cannot wait for CI; its lane writes cannot be told from a human's.
+Rejected: it cannot wait for CI.
 
 ### Option D: A repository of its own
 
 Rejected: it shares `core/` and the status names with the plugins, which release from this repo.
-
-### Option E: Import the shared code from a plugin's folder
-
-Rejected: a plugin's internals would become the orchestrator's contract.
 
 ## Trade-offs
 

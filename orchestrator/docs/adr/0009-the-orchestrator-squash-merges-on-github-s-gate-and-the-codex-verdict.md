@@ -35,28 +35,30 @@ externalRefs:
 
 ## Context
 
-Once a story's card is In review, something must merge its PR and hold the merge condition.
+Once a story's card is In review, something must merge its PR and hold the merge condition. A
+session's token can call GitHub's merge endpoint (root ADR-0007).
 
 ## Decision
 
 1. We will have the orchestrator squash-merge an In review card's PR, passing no message, once no launch
    is running, no hold is open on its story issue (reviewer ADR-0013), Codex's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
-2. We will make GitHub's ruleset the merge contract: it requires `internal-review` and `codex-review`,
-   both from the orchestrator's App (ADR-0004, ADR-0008), the required checks and every conversation
-   resolved, so GitHub refuses a merge without them.
+2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
+   classic branch protection: they require `internal-review` and `codex-review`, pinned to the
+   orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
+   it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
+   humans only, the only override.
 3. We will never update a branch that is only behind main; a conflict stays a finding.
 4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation (builder
-   ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once its
-   `subIssuesSummary` shows every sub-issue completed, its only issue-close write.
+   ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
+   sub-issue is done (root ADR-0005), its only issue-close write.
 5. We will leave a PR refused on a rule outside this contract In review.
-6. We will require of every served repo: the org's existing App installed; that ruleset, required checks
-   coming from rulesets only, no classic branch protection; conversation resolution required; squash merging with the default squash
-   message set to "commit messages", so every session-id trailer reaches main; no required human
-   approval; no up-to-date rule; a ruleset bypass list of the humans who may override; Codex installed
-   with Automatic review off; CodeRabbit installed; board workflows auto-add issues to Backlog, auto-add
-   sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off;
-   lanes spelled Backlog, Ready, In progress, In review, Blocked, Done.
+6. We will require of every served repo: squash merging with the default squash message set to
+   "commit messages", so every session-id trailer reaches main; head branches deleted on merge; no
+   required human approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
+   sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off.
+7. We will run the orchestrator as its own OS user, its App key readable by no other user, so no
+   session can read it.
 
 ## Options considered
 
@@ -68,16 +70,11 @@ A repo without the ruleset never merges unreviewed, since the orchestrator requi
 
 Rejected: it could merge while a card sat Blocked or a hold was open.
 
-### Option C: A plugin pre-merge gate re-checking GitHub's rules
+### Option C: Required human approval
 
-Rejected: GitHub owns the checks.
+Rejected: the attestation and the external verdicts are the merge condition.
 
-### Option D: Required human approval
-
-Rejected: the attestation and the external verdicts are the merge condition; a human overrides through
-the bypass list.
-
-### Option E: An up-to-date-branch rule or a stale-branch update
+### Option D: An up-to-date-branch rule or a stale-branch update
 
 Rejected: conflicts are resolved, never staleness.
 
@@ -89,7 +86,7 @@ Rejected: conflicts are resolved, never staleness.
 ## Consequences
 
 - Easier: one merge condition; a stop is a board move.
-- Harder: every served repo needs decision 6 first.
+- Harder: every served repo needs decisions 2 and 6 first.
 - **How we would know this was wrong:** a merge without `codex-review` success at its head or under an
   open hold; a squash commit on main missing a session-id trailer.
 - Revisit if: a rule outside the contract becomes a routine blocker.

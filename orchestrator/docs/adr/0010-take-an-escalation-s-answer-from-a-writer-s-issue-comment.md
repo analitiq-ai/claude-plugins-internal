@@ -9,7 +9,7 @@ tags: [orchestrator, escalation, holds, issue-comments, trust]
 scope: component
 reversibility: two-way-door
 blastRadius: org
-relatesTo: ["0001", "0002"]
+relatesTo: ["0001", "0002", "0007"]
 affects:
   - type: path
     pattern: "orchestrator/**"
@@ -30,8 +30,8 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md"
     label: "reviewer ADR-0013: Give every hold one id and a human release; a changed spec releases a rescope hold"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "reviewer ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-read-a-pr-s-findings-only-through-core-s-modules-and-brief-only-trusted-reviewer.md"
+    label: "reviewer ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text"
 ---
 
 # ADR-0010: Take an escalation's answer from a writer's issue comment
@@ -40,19 +40,18 @@ externalRefs:
 
 An escalation hold, `escalation-<s>` in reviewer's state comment on the story issue, keeps the card
 Blocked until a human answers the round's question (reviewer ADR-0013). The orchestrator must know when
-the answer is in, yet it parses no prose and reads only its own and the shared config sections
-(ADR-0001).
+the answer is in, yet it parses no prose (ADR-0001).
 
 Whose comment counts is a trust choice: some repos the orchestrator serves are public, so anyone can
 comment.
 
 ## Decision
 
-1. We will have the orchestrator post the hold's question as an issue comment, with its App, when an
-   escalation hold moves the card to Blocked, keyed to the hold instance (id, since).
-2. We will take as the answer an issue comment created after that question by a User other than the
-   bot whose author_association is OWNER, MEMBER or COLLABORATOR.
-3. We will have reviewer carry the answer into the next round's briefs.
+1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
+   escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
+2. We will take as the answer an issue comment created after that question by a User other than
+   Analitiq-Bot whose author_association is OWNER, MEMBER or COLLABORATOR; no agent session's comment
+   counts (root ADR-0007).
 
 ## Options considered
 
@@ -67,13 +66,13 @@ answer and reach the next round's briefs.
 
 ### Option C: Only an author in `trusted_reviewers`
 
-Rejected: trust has one owner, reviewer; `trusted_reviewers` lives in reviewer's config section,
-which the orchestrator does not read.
+Rejected: `trusted_reviewers` names whose review threads are findings (root ADR-0003); who may answer
+a question is write permission, which GitHub records on the comment.
 
 ## Trade-offs
 
 - Who may answer and who is trusted differ: a collaborator outside `trusted_reviewers` can answer an
-  escalation, yet a thread they last commented on is resolved unread (reviewer ADR-0016).
+  escalation, yet a thread they start is resolved unread (ADR-0007).
 - The orchestrator checks that a writer commented after the question, not what was written.
 
 ## Consequences
@@ -82,8 +81,7 @@ which the orchestrator does not read.
 - Harder: an answer is a new comment after the question; an edited earlier comment does not count.
 - **How we would know this was wrong:** an escalation released by a writer's comment that did not
   answer it, or write permission reaching people who should not answer.
-- Revisit if: GitHub stops recording the author's association, or the orchestrator comes to read
-  reviewer's config section.
+- Revisit if: GitHub stops recording the author's association.
 
 ## Action items
 

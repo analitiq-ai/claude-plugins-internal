@@ -33,6 +33,9 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md"
     label: "planner ADR-0009: Check the plan against the governing decision logs before critique"
   - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md"
+    label: "reviewer ADR-0013: Give every hold one id and a human release; a changed spec releases a rescope hold"
+  - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
     label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 ---
@@ -54,7 +57,6 @@ never reaches the default branch. reviewer records each round's verdict at the h
    issue merged, so the story is built and reviewed against the spec and records in force. A new spec.md
    that merge brings releases the story's rescope hold (reviewer ADR-0013). The merge runs before the
    spec-folder check (ADR-0002), which then finds the folder the new spec names.
-3. We will resolve, in that merge, a tick that conflicts with a rescope's `tasks.md` edit.
 
 ## Options considered
 

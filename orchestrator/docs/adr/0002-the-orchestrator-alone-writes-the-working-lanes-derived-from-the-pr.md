@@ -35,55 +35,57 @@ externalRefs:
 
 ## Context
 
-Humans and the orchestrator (ADR-0001) share the board; the orchestrator never checks who moved a card.
+Humans and the orchestrator share the board; the orchestrator never checks who moved a card.
 
 ## Decision
 
-1. We will keep six lanes on the Project status field, issues as the cards, each lane with one writer:
-   GitHub Backlog and Done, a human Ready, the orchestrator In progress, In review and Blocked; reviewer
-   refuses a lane write from any agent session (reviewer ADR-0012).
+1. We will keep six lanes on the Project status field, issues as cards, each with at most one automated
+   writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and Blocked; none for
+   Ready, a human's alone. No agent session can write a lane (root ADR-0007).
 2. We will re-derive In progress and In review from the story's PR every tick, acting on a card only
    when claimed: Analitiq-Bot as the story issue's assignee, set at every launch, never cleared.
-3. We will start a story only from Ready, never because another story merged, and only once every
-   issue in its `blockedBy` is closed; until then the card waits in Ready. Every launch also needs no
-   launch running and the spec-PR rule to allow it (ADR-0006); ADR-0007 names the Ready card needing no
-   launch. An open hold never stops a launch from Ready: reviewer releases holds in that launch (reviewer ADR-0013).
-   A Ready card whose PR closed unmerged relaunches on its branch; builder opens a new PR.
-4. We will never launch on a parent issue (one with sub-issues): moved to Ready, it goes to Blocked, the
-   reason naming the sub-issues to move instead; its other lanes are the human's.
-5. We will make Blocked the one sink for what needs a human: an open hold on a working-lane card
-   (reviewer ADR-0011), REPEAT, a converted PR, a PR closed unmerged, a silent reporter, a Ready card
-   the spec-PR rule holds (ADR-0006), or a launch that opened no PR (reason: its final message). The
-   reason is posted first; the lane write is the commit point. These moves wait while a launch runs.
+3. We will launch a story only from Ready (root ADR-0006), once every issue in its `blockedBy` is done
+   (root ADR-0005), no launch runs and the spec-PR rule allows it (ADR-0006); a merge launches nothing.
+   The launch releases holds as reviewer ADR-0013 decides; only an unanswered escalation (ADR-0010)
+   stops it, with or without an open PR, sending the card back to Blocked with no new comment. A Ready
+   card whose PR closed unmerged relaunches on its branch.
+4. We will never launch on a parent issue (one with sub-issues): moved to Ready, it goes to Blocked,
+   naming the sub-issues to move instead; its other lanes are the human's.
+5. We will make Blocked the one sink for what needs a human, each cause decided in its own record
+   (ADR-0001, ADR-0004 to ADR-0010). This record's causes: a launch that opened no PR, or a PR closed
+   unmerged (reason: the launch's final message); an In review PR whose `codex-review` failed with no
+   findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
+   the lane write is the commit point; these moves wait while a launch runs. Every tick, the
+   orchestrator posts any missing keyed reason for every open hold, in any lane.
 6. We will read a human's drag to Backlog, Blocked or Done as a stop: the launch is stopped, nothing
    merges. A drag into a working lane is inert when unclaimed, undone when claimed, bounced to Blocked
    under an open hold.
+7. We will launch nothing on a done story (root ADR-0005).
 
 ## Options considered
 
-### Option A: One writer per lane (chosen)
+### Option A: One automated writer per lane (chosen)
 
-No move needs a check of who made it.
+No move needs a check of its author.
 
 ### Option B: Plugins write lanes
 
-Lost: a plugin's lane write cannot be told from a human's.
+Lost: a session would move the card it is graded on.
 
 ### Option C: Launch the next story without Ready after a merge
 
-Lost: `blockedBy` carries the order; a human's Ready starts every story.
+Lost: `blockedBy` carries the order.
 
 ## Trade-offs
 
-- A human's drag into a working lane starts nothing.
-- Ready's guarantee is reviewer's refusal inside the session, not the orchestrator's check.
+- A Ready card waits silently on a blocker.
 
 ## Consequences
 
-- Easier: a restart needs no stored lane state.
-- Harder: a parent's lanes are kept by hand; a Ready card under an open blocker waits silently.
-- **How we would know this was wrong:** a claimed working-lane card the orchestrator neither wrote nor
-  undid; a story launched before its blockers closed.
+- Easier: a restart needs no lane state.
+- Harder: a parent's lanes are kept by hand.
+- **How we would know this was wrong:** a story launched before its blockers were done, or after it was
+  done.
 - Revisit if: GitHub adds an Actions event for a Projects lane change.
 
 ## Action items

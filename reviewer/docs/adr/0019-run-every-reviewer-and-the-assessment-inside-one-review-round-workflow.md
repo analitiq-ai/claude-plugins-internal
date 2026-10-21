@@ -9,7 +9,7 @@ tags: [review-round, reviewers, assessment, launch-gate, dependencies, round-cap
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003", "0005", "0013", "0014", "0016"]
+relatesTo: ["0003", "0013", "0014", "0015", "0016", "0020"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/{review-round,assess-round}.js"
@@ -40,9 +40,9 @@ externalRefs:
 
 ## Context
 
-Today the agent launches the assessment itself, any reviewer type can be dispatched from the main
-thread, and auditor's dispatch is copied into `briefs.py`. reviewer cannot enforce that an assessment
-ran on reports from reviewers behind a barrier, or which plugins a round depends on.
+A self-launched assessment, a reviewer dispatched from the main thread, or a copy of auditor's dispatch
+inside reviewer each leave reviewer unable to enforce that an assessment ran on reports from reviewers
+behind a barrier, or which plugins a round depends on.
 
 ## Decision
 
@@ -51,16 +51,18 @@ ran on reports from reviewers behind a barrier, or which plugins a round depends
    the assess phase; `assess-round` launched from outside is refused. Each report is validated
    against its typed verdict first.
 2. We will refuse any reviewer type dispatched from the main thread, outside a round, on a story
-   branch or on a branch inside the grammar with an open PR, naming review-round; main and branches
-   outside the grammar (ADR-0014) keep main-thread dispatch.
+   branch or on a branch inside the grammar with an open PR: on a story branch naming review-round, on
+   `<p>-spec`, where no round runs (ADR-0014), naming the human's review of the spec PR. main and branches
+   outside the grammar keep main-thread dispatch.
 3. We will have reviewer's decision-reviewer join every internal round; with no governing
    record, it flags a decision made in the diff with no record.
 4. We will declare pr-review-toolkit and auditor as dependencies, pin the accepted auditor version in
    the `[reviewer]` section of `codeworks.toml` (root ADR-0002), refuse a round's launch when an
    expected agent type is missing, and read auditor's dispatch as data at launch.
-5. We will cap github rounds at a number in the `[reviewer]` section (default 4). Past it, the next round
-   runs the audit stage on the whole PR; a clean round or CONVERGED_PUSHBACK resets the count. The cap
-   switches the stage, locking nothing; a human comes in only through the audit hold (ADR-0013).
+5. We will cap github rounds at a number in the `[reviewer]` section. Past it, the next round
+   runs the audit stage on the whole PR. Only a human resets the count, by Ready or by
+   `unlock audit-<issue>`. The cap switches the stage, locking
+   nothing; a human comes in only through the audit hold (ADR-0013).
 
 ## Options considered
 

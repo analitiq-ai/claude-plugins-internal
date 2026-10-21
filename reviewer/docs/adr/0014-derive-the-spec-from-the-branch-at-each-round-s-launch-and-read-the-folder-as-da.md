@@ -9,7 +9,7 @@ tags: [spec, spec-folder, review-round, branch-grammar, front-matter]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0010"]
+relatesTo: ["0010"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/review-round.js"
@@ -54,44 +54,33 @@ externalRefs:
 
 ## Context
 
-A review round has to know which spec governs its PR, and what to read from that spec's folder. A story
-issue is either a sub-issue, whose spec belongs to its parent, or an issue with no sub-issues, which owns
-its spec (org ADR-0003).
+A review round has to know which spec governs its PR, and what to read from that spec's folder. The branch
+names the story issue, and `core/` derives the spec's issue and its folder from it (root ADR-0005).
 
 ## Decision
 
-1. We will take `review-round {worktree, stage}`, no `spec`: the review-round launch gate reads the story
-   issue `<s>` from a branch `<s>-us<k>-<slug>` and asks GitHub for its parent; the spec's issue `<p>` is
-   that parent, or `<s>` when it has none, and the spec is the one `specs/<p>-*/` folder at HEAD. Any other
-   branch, `<p>-spec` included, is refused a round. reviewer stays the only parser of branch names; no
-   issue comment, no list of spec or design-document paths. Every round derives the spec afresh and
-   grades `spec.md` at the reviewed commit (ADR-0010); no value or blob id is recorded, no rebind exists.
-2. We will read the folder as data and validate none of it (planning checks its own output):
-   `spec.md` whole for reviewers and assessor, its `codeworks` keys for dispatch (planner ADR-0008);
-   never headings.
+1. We will take `review-round {worktree, stage}`, no `spec`: the review-round launch gate derives the
+   story issue, the spec's issue and the spec folder from the branch at HEAD through `core/` (root
+   ADR-0005). Any other branch, `<p>-spec` included, is refused a round. Every round derives the spec
+   afresh and grades at the reviewed commit (ADR-0010); the round records no spec binding, neither a value
+   nor a blob id, and none can be rebound.
+2. We will read the folder as data and validate none of it (planning checks its own output): `spec.md`
+   whole for reviewers and assessor, or the issue body as the requirement when `codeworks.kind` is
+   `no_spec` (root ADR-0005), and the `codeworks` keys for dispatch (planner ADR-0008); never headings.
 
 ## Options considered
 
-### Option A: Derived from the story issue in the branch name and its parent; read by keys (chosen)
+### Option A: Derived from the branch at each launch; read by keys (chosen)
 
 Keys survive a template change where headings do not.
 
 ### Option B: `spec` passed at the round's launch, bound in the ledger
 
-Rejected: the branch already names the story issue, and GitHub names its parent.
+Rejected: the branch already names the story issue, and a bound copy can drift from the committed spec.
 
-### Option C: The issue names its folder in a comment
+### Option C: Reviewers read the spec folder by its headings
 
-Rejected: nothing is parsed out of prose.
-
-### Option D: Found by Spec Kit's mark, settled before round 1
-
-Rejected: the folder is named by the spec's issue number, not found, and review validates nothing of the
-folder.
-
-### Option E: The folder named by the story issue's number
-
-Rejected: a sub-issue owns no spec; its parent does.
+Rejected: a template change breaks every reader.
 
 ## Trade-offs
 
@@ -103,7 +92,7 @@ Rejected: a sub-issue owns no spec; its parent does.
 ## Consequences
 
 - Easier: a review-round launch needs only the checkout and the stage.
-- Harder: a third branch kind needs a grammar change.
+- Harder: a third branch kind needs a grammar change in `core/`.
 - **How we would know this was wrong:** a review-round launch cannot find a story branch's spec; a round
   grades another issue's folder; a template change breaks a reader.
 - Revisit if: a spec's issue needs two spec folders (org ADR-0002).

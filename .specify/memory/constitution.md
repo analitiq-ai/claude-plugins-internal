@@ -94,14 +94,16 @@ Applies to: reviewer, planner.
 Gate: for every lock, count or hold the plan adds or changes, does the plan name the one entity
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
-no named approver, or with a way out no decision record names, fails the gate.
+no named approver, or with a way out no decision record names, fails the gate. State that may have been
+tampered with reads as held: an edited newest state snapshot, or a story with a PR and no snapshot.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`); how the user's action is recognised:
 `reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
-planner places the rescope hold only:
-`planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
+Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
+(decision 2). planner places the rescope hold only:
+`planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 4).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
@@ -120,16 +122,17 @@ Source: reviewer: `reviewer/plugin/README.md` (Layout). planner: `planner/plugin
 
 ### P4. A Check That Could Not Run Is Its Own Outcome
 
-Applies to: reviewer, planner, builder.
+Applies to: reviewer, planner, orchestrator.
 
 Gate: when a reader, judge, model or service the plan depends on does not answer, is that
-reported as a failed check or a named `cannot verify` — never as a pass, never as a finding
-against the author, and never as a guess?
+reported as its own outcome — a named `cannot verify`, or `error` on GitHub, never `failure` — and
+never as a pass, never as a finding against the author, and never as a guess? The one named
+exception: a Codex review out of credits passes, marked WAIVED.
 
-Source: reviewer: `reviewer/plugin/README.md` (What it enforces 2, 5, 6; Mode: the shim check).
-planner: `planner/plugin/scripts/premise_report.py`, `rootcause.py`, `settled_design.py` (each exit
-status). builder: `builder/plugin/skills/root-cause-check/SKILL.md` (verdict CANNOT TELL; The rule
-that keeps this honest).
+Source: `docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md`
+(decisions 1–4); the exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+(decision 6). reviewer: `reviewer/plugin/README.md` (What it enforces 2, 5, 6). planner:
+`planner/plugin/scripts/premise_report.py`, `rootcause.py`, `settled_design.py` (each exit status).
 
 ### P5. Settled Design, Existing Tools First
 
@@ -151,28 +154,30 @@ comment, a hold, a commit), does the plan name its one writer, and does the comp
 state it owns and refuse, from any agent session, every write it does not own?
 
 Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
-(decision 2); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
-(decision 1). planner: `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
-(decision 4); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
+(decision 3); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 1). planner: `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
+(decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
 (decisions 1, 2). orchestrator: `orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md`
 (decision 1).
 
 ### P7. Facts Are Read as Data, Never Parsed from Prose
 
-Applies to: reviewer, planner, builder, orchestrator.
+Applies to: reviewer, planner, orchestrator.
 
 Gate: does every fact the plan reads come from a key, a field, a status or a name with a grammar,
 never from a heading, a comment's wording or free text; and does every fact the plan writes for
-another reader land in such a form?
+another reader land in such a form? The one exception is Codex's verdict, which `core/`'s Codex
+module alone reads from Codex's review text.
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
 (decision 1). planner: `planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
 (decision 1); `planner/docs/adr/0007-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
-(decision 1). builder: `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
-(decisions 2, 4). orchestrator: `orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md`
-(decision 2).
+(decision 1); `orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md`
+(decision 3). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`; the
+exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+(decision 6).
 
 ### P8. Generic over Repositories
 
@@ -184,13 +189,26 @@ setting special-cased?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decision 1); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
-(decision 3); `reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md`
-(decision 1). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
-(decisions 1–2); `planner/docs/adr/0005-have-the-skill-that-shapes-an-issue-read-and-write-the-spec-in-its-spec-folder.md`
-(decision 2); `planner/docs/adr/0004-recognise-a-spec-folder-by-spec-kit-s-mark.md`. builder:
-`builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`
-(decision 2). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md`
-(decision 2). All: `docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`.
+(decision 3). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
+(decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md`
+(decision 2). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`;
+`docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`;
+`docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+(decision 2).
+
+### P9. Trust Only Named Identities
+
+Applies to: reviewer, planner, builder, orchestrator.
+
+Gate: does every predicate the plan adds that trusts an actor (a human, a WRITER, TRUSTED or EXEMPT
+actor, a trusted reviewer) read that actor's GitHub identity; count no agent session, which acts on
+GitHub only as the `codeworks-session` App, as any of them; and count a review thread as a finding only
+when a trusted reviewer started it?
+
+Source: All: `docs/adr/0007-act-on-github-from-every-agent-session-only-as-the-codeworks-session-app.md`
+(decisions 1–3; decision 4 names the accepted risk);
+`docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+(decision 2).
 
 ## Platform Constraints
 
@@ -212,8 +230,10 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
   the rescope hold through `core/`.
 - builder is two skills, with no scripts and no hooks (`builder/plugin/`); its review step is
-  reviewer's internal round, which no install requires
-  (`builder/plugin/skills/issue-tackle/SKILL.md`).
+  reviewer's internal round, which no install requires: its manifest declares no plugin dependency
+  (`builder/plugin/skills/issue-tackle/SKILL.md`;
+  `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`,
+  decision 1).
 - Private repo: Principle II's public-repo limits bind what a component writes into public repos,
   not this repo's own files.
 
@@ -223,7 +243,9 @@ Not gates — context so `/speckit-tasks` shapes tasks to fit: one issue per use
 under the spec's issue when a spec has several), a story branch `<s>-us<k>-<slug>` with its worktree at
 `.claude/worktrees/<branch>`, a draft PR closing its story issue, then the review loops and the
 pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.md` and
-`.claude/rules/pr-review-loop.md`. The spec and its decision records land first by a spec PR on
+`.claude/rules/pr-review-loop.md`. A story is done when its PR merged or a human closed its issue
+(`docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`, decision 5). The spec and
+its decision records land first by a spec PR on
 `<p>-spec`, in `specs/<p>-<slug>/`, `<p>` being the spec's issue; decision records go in the
 component's `docs/adr/`, or in `docs/adr/` at the root for the repo as a whole. The adrkit `after_plan` hook is optional: it offers to check a plan
 against them.

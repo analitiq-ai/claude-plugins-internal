@@ -9,7 +9,7 @@ tags: [spec, spec-folder, skills]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0005", "0010"]
+relatesTo: ["0005", "0010"]
 affects:
   - type: path
     pattern: "planner/plugin/skills/issue-spec/**"
@@ -32,6 +32,10 @@ externalRefs:
     id: "reviewer ADR-0014"
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md"
     label: "reviewer ADR-0014: Derive the spec from the branch at each round's launch and read the folder as data"
+  - type: doc
+    id: "root ADR-0005"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
+    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0001: Keep the spec in the spec folder that planning writes
@@ -41,8 +45,8 @@ externalRefs:
 planner scopes an issue into a spec folder (spec 019, Terms; issue #63).
 
 planner writes the spec; the other two plugins read it. Review finds the spec folder from the spec's issue at
-each round's launch, and its reviewers read its `spec.md` (reviewer ADR-0014). `/builder:issue-tackle` takes the same
-folder, and `/builder:root-cause-check` reads that `spec.md`'s `## Root cause` (spec 019, Key entities).
+each round's launch, and its reviewers read its `spec.md` (reviewer ADR-0014). `/builder:issue-tackle` builds
+against the same folder (root ADR-0005).
 
 Nothing reads an issue comment for the spec: review finds it from the spec's issue, and `issue-tackle` reads no
 issue comment (FR-016).
@@ -89,7 +93,7 @@ Rejected: the copy drifts from the one it copies.
 - Easier: one place to read and to change the spec, and the change shows in a diff. Review and build need nothing
   from the issue to read it.
 - Harder: a folder's name must carry its spec's issue number, since build and review find it by that number
-  (builder ADR-0002).
+  (root ADR-0005).
 - **How we would know this was wrong:** a scoped issue that nobody can pick up because its spec PR was never
   opened or merged, or because nobody can find which folder holds it.
 - Revisit if: specs have to be written for repos where no checkout exists at scoping time.

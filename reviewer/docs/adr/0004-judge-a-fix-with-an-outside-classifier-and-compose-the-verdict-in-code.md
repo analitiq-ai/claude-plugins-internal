@@ -35,28 +35,22 @@ externalRefs:
 ## Context
 
 The shim check needs three judgements of a staged change: is it a fix, where does the fix act, and does it
-reach the other sites with the same defect. A model has to give them, within three limits:
+reach the other sites with the same defect. A model has to give them, within two limits:
 
-- The answers are needed inside a hook, so within seconds.
-- The check's success criterion is a replay over recorded commits. The replay measured the questions as
-  worded, so a reworded question is an unmeasured one.
+- The verdict has to exist before the author commits, so the answers are needed inside a hook, within
+  seconds.
 - A refusal has to follow from a rule that can be tested. Asked for the overall verdict, the classifier
   answers differently from its own two answers.
-
-Two later specs met the same limits and each added a rule. The rules are spread over three spec folders.
 
 ADR-0009 decides that private source may be sent to the classifier.
 
 ## Decision
 
-1. We will judge a fix with Jev, an outside one-shot classifier.
+1. We will judge a fix with Jev, an outside one-shot classifier, called from the hook.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
 3. We will compose the verdict in code.
-4. We will keep the replayed questions word for word. A change to their wording or to the request's shape
-   needs a new replay.
-5. We will store an answer as Jev gave it, so the ledger and the log report what it said. Code may leave an
+4. We will store an answer as Jev gave it, so the ledger and the log report what it said. Code may leave an
    answer unread; it does not rewrite one.
-6. We will put a rule in code ahead of the model wherever code can decide.
 
 ## Options considered
 
@@ -70,28 +64,33 @@ ADR-0009 decides that private source may be sent to the classifier.
 
 ### Option B: Do nothing
 
-The sweep lists sites and nothing says whether the change reaches them. No source weighed a different judge.
+The sweep lists sites and nothing says whether the change reaches them.
 
 ### Option C: Ask Jev for the overall verdict
 
 Rejected: its overall answer would differ from its two answers.
 
+### Option D: A judge inside the session
+
+Rejected: an agent cannot answer within the hook's time.
+
 ## Trade-offs
 
-- A diff too large for the classifier cannot be judged, and the commit must be split. Measured: 6 to 8% of
-  recent commits.
-- A better-worded question cannot ship on its own. It needs a new replay first, and the replay calls live Jev.
-- The answer to "is it a fix" is not stable on one ask, so it is asked more than once. In the replay it called
-  close to half of the non-fix commits a fix.
+- A diff too large for the classifier cannot be judged, and the commit must be split: 6 to 8% of recent
+  commits, measured.
+- The answer to "is it a fix" is not stable on one ask, so it is asked more than once; on recorded commits
+  it called close to half of the non-fix commits a fix.
+- A call to an outside service sits on the hook path.
 
 ## Consequences
 
 - Easier: a change to the verdict rule is a code change with a unit test. The stored answers are Jev's own.
-- Harder: every change to a question, or to what is sent with it, waits on a replay.
-- **How we would know this was wrong:** the replay stops giving every evidence fix its expected verdict; or
-  the share of commits refused as too large rises above the measured 6 to 8%.
-- Revisit if: the model is changed or withdrawn, or a judge inside the session can answer within the hook's time.
+- Harder: the check depends on one outside model and its provider.
+- **How we would know this was wrong:** recorded fixes stop getting their expected verdict, or the share of
+  commits refused as too large rises above 6 to 8%.
+- Revisit if: the model is changed or withdrawn, or a judge inside the session can answer within the hook's
+  time.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [ ] The ratifier ratifies this record, or sends it back.

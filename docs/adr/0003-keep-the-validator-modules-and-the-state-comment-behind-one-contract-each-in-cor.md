@@ -9,7 +9,7 @@ tags: [validators, findings, contract, state-comment, core, codex, coderabbit, d
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0002"]
+relatesTo: ["0001", "0002", "0004"]
 affects:
   - type: path
     pattern: "core/**"
@@ -40,8 +40,11 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0008-request-codex-by-the-orchestrator-s-comment-once-per-head-automatic-review-off.md"
     label: "orchestrator ADR-0008: Request Codex by the orchestrator's comment once per head, automatic review off"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-resolve-unread-every-thread-whose-latest-author-is-not-a-trusted-reviewer.md"
-    label: "reviewer ADR-0016: Resolve unread every thread whose latest author is not a trusted reviewer"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0016-read-a-pr-s-findings-only-through-core-s-modules-and-brief-only-trusted-reviewer.md"
+    label: "reviewer ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text"
+  - type: doc
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0009-the-orchestrator-squash-merges-on-github-s-gate-and-the-codex-verdict.md"
+    label: "orchestrator ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict"
 ---
 
 # ADR-0003: Keep the validator modules and the state comment behind one contract each, in core/
@@ -49,31 +52,32 @@ externalRefs:
 ## Context
 
 Codex, CodeRabbit, DeepSource and CI grade a PR, each its own way. The orchestrator needs their status at
-the head; reviewer's github stage, their findings. reviewer's state, rounds and holds, lives in a tagged issue comment
-(reviewer ADR-0011) that reviewer and planner write (planner ADR-0010) and the orchestrator reads.
+the head; reviewer's github stage, their findings. reviewer's state, rounds and holds, lives in a tagged
+issue comment (reviewer ADR-0011) that reviewer and planner write and the orchestrator reads.
 
 ## Decision
 
 1. We will put one validator module per external reviewer behind one contract: `trigger(pr, head)`, a no-op
    for a self-triggering tool; `status(pr, head)` → pending · pass · fail · silent, silent once the module's
    timeout passes; `findings(pr, head)` → a list in the Findings schema (source, author, file, line, text,
-   thread id if any, resolvable on GitHub). Shim and claim checks stay commit gates, not modules.
-2. We will count every unresolved review thread on the PR, of any author, as a finding.
+   thread id if any, resolvable on GitHub).
+2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
+   thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
+   (ADR-0002).
 3. We will define the Findings contract and the state comment's snapshot as Pydantic models and generate
    their JSON Schemas.
-4. We will keep the modules, both contracts and the one state-comment read and write in `core/` (ADR-0001);
-   no component reaches the state comment another way. `[shared]` lists the enabled modules and their
-   timeouts (ADR-0002).
-5. We will have the orchestrator call `trigger` and `status` each tick (orchestrator ADR-0007, ADR-0008),
-   and reviewer's github stage read `findings`, with trusted_reviewers applied to `author` (reviewer
-   ADR-0016).
+4. We will have no component reach the state comment other than through `core/`'s one read and write
+   (ADR-0001).
+5. We will make the modules the only way a component reads an external reviewer: the orchestrator calls
+   `trigger` and `status` (orchestrator ADR-0008) and reads `findings` (orchestrator ADR-0007); reviewer's
+   github stage reads `findings` (reviewer ADR-0016). The orchestrator alone closes threads no trusted
+   reviewer started (orchestrator ADR-0007).
 6. We will give the Codex module its verdict as Codex's newest review naming the head, a dismissed one
    ignored: the clean template passes, a findings preamble fails, no review at the head is pending. Codex
-   out of credits with no verdict passes, marked WAIVED. A human overrides a fail only by merging with the
-   ruleset bypass; no override label, no version-only release detection. This module replaces the pr-gate
-   service.
-7. We will have the CodeRabbit module return its outside-diff items as findings with no thread, each closed
-   by a fix or by a pushback recorded in reviewer's state.
+   out of credits with no verdict passes, marked WAIVED: the one exception to ADR-0004's fail-closed
+   rule.
+7. We will have the CodeRabbit module return its outside-diff items as findings with no thread, closed by
+   a fix or by a pushback recorded in reviewer's state.
 
 ## Options considered
 
@@ -87,10 +91,14 @@ Rejected: planner and the orchestrator would import another plugin's code.
 
 Rejected: one source parsed per consumer, with as many answers.
 
+### Option D: An override label for a Codex fail, or a release detected from a version-only change
+
+Rejected: a named human on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
+is a human's decision.
+
 ## Trade-offs
 
-- Nothing writes `codex-review` while the orchestrator is down, so nothing merges.
-- A thread a human leaves open blocks the merge like a reviewer's finding.
+- A thread from someone outside `trusted_reviewers` is resolved unread, a human writer's included.
 
 ## Consequences
 

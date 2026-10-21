@@ -35,50 +35,40 @@ externalRefs:
     url: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
     label: "Codeworks target design"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md"
-    label: "orchestrator ADR-0001: Drive the issue loop with a deterministic orchestrator outside the plugins"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0005-exempt-a-pr-from-the-internal-review-by-its-bot-author-or-a-label-a-writer-appli.md"
-    label: "orchestrator ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied"
-  - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0006-ship-every-check-enforcing-from-its-first-release.md"
-    label: "reviewer ADR-0006: Ship every check enforcing from its first release"
-  - type: doc
     url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md"
     label: "reviewer ADR-0012: Refuse from any agent session every GitHub write the orchestrator or a human owns"
   - type: doc
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0019-run-every-reviewer-and-the-assessment-inside-one-review-round-workflow.md"
-    label: "reviewer ADR-0019: Run every reviewer and the assessment inside one review-round workflow"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/orchestrator/docs/adr/0004-attest-the-internal-review-as-a-commit-status-written-by-the-orchestrator-s-app.md"
+    label: "orchestrator ADR-0004: Attest the internal review as a commit status written by the orchestrator's App"
 ---
 
 # ADR-0002: Keep every component's settings in one TOML file, one section per component
 
 ## Context
 
-reviewer keeps its settings in a `config.json` inside its plugin, and reads its modes from environment
-variables too (`REVIEWER_MODE`, `REVIEWER_CLAIM_CHECKS`, `REVIEWER_SHIM_CHECKS`, `REVIEWER_DECISION_CHECKS`),
-which whoever launches a session sets, the session included. The orchestrator has a file of its own. One
-setting, `exempt_labels`, sits in reviewer's file while only the orchestrator decides what it governs. The
-validator modules (ADR-0003) need settings that both the orchestrator and reviewer read.
+reviewer keeps its settings in a `config.json` inside its plugin and reads its modes from environment
+variables too, which whoever launches a session sets, the session included. The orchestrator has a file of
+its own. A setting can sit in one component's file while another component decides what it governs. The
+validator modules (ADR-0003) need settings that both the orchestrator and reviewer read. The orchestrator
+works across branches and PRs of a repo, some from forks.
 
 ## Decision
 
 1. We will keep every component's settings in one TOML file, `codeworks.toml` at the target repo's root: a
    `[shared]` section and one section per component, `[orchestrator]`, `[reviewer]`, `[builder]`, and
-   `[planner]` when it has settings.
+   `[planner]` when it has settings. No session writes it (reviewer ADR-0012), and no PR changing it is
+   attested but by a human's label (orchestrator ADR-0004).
 2. We will put each key in exactly one section; a key two components read goes in `[shared]`. Each
    component reads only its own section and `[shared]`, validates its own section, and refuses an unknown
    key.
-3. We will place `exempt_labels` in `[orchestrator]` (orchestrator ADR-0005); the github round cap in
-   `[reviewer]`, default 4 (reviewer ADR-0019); reviewer's modes in `[reviewer]`, with no environment
-   override (reviewer ADR-0006); the enabled validator modules and their timeouts in `[shared]`, read by
-   `core/` (ADR-0003).
-4. We will have reviewer refuse every session write to the file (reviewer ADR-0012). Each component reads
-   the file in the checkout it runs from.
+3. We will let no environment variable set or override any key.
+4. We will have each component read the file from the branch it works on. The orchestrator reads it from a
+   PR's head for that PR's work, from the default branch for work with no PR, and from the base branch for
+   a fork PR, whose head nobody trusted wrote (orchestrator ADR-0004).
 
 ## Options considered
 
-### Option A: One file, one section per component (chosen)
+### Option A: One file, one section per component, read from the branch worked on (chosen)
 
 A human reads what runs in one place; every key has one owner.
 
@@ -90,19 +80,19 @@ Rejected: a key two components read lives in two files, or one component reads a
 
 Rejected: whoever launches a session sets them, so the reviewed file does not say what runs.
 
-### Option D: Read the file from the default branch
+### Option D: Always read the file from the default branch
 
 Rejected: a second read path guarding a file sessions already cannot write.
 
 ## Trade-offs
 
-- A branch's copy of the file is what runs on that branch; a human edit to it takes effect before it
-  merges.
+- A branch's copy of the file is what runs on that branch; a human edit to it takes effect there before
+  it merges.
 - A misspelled key stops the component that owns its section instead of being ignored.
 
 ## Consequences
 
-- Easier: the orchestrator reads no plugin config; a mode cannot be changed from inside a session.
+- Easier: the orchestrator reads no plugin config; a setting cannot be changed from inside a session.
 - Harder: each component validates a schema for its own section.
 - **How we would know this was wrong:** one key wanted in two sections, or a setting changed by a session.
 - Revisit if: a component ships to repos without the others.

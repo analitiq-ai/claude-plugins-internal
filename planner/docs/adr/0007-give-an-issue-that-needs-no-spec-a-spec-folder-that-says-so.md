@@ -9,7 +9,7 @@ tags: [premise, spec-folder, front-matter, issue, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0005", "0006", "0008", "0010"]
+relatesTo: ["0005", "0006", "0008"]
 affects:
   - type: path
     pattern: "planner/plugin/scripts/no_spec.py"
@@ -43,37 +43,37 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
   - type: doc
-    id: "builder ADR-0002"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md"
-    label: "builder ADR-0002: Have the build skills derive the spec folder from the issue number, never from an issue comment"
+    id: "root ADR-0005"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md"
+    label: "root ADR-0005: Parse a story's identity from its branch in core/ alone"
 ---
 
 # ADR-0007: Give an issue that needs no spec a spec folder that says so
 
 ## Context
 
-Planning, build and reviewer find an issue's spec by its folder (org ADR-0002). A `no spec needed` pick
-leaving no folder is invisible to all three: the issue can be scoped again as if never judged.
+Planning, build and reviewer find an issue's spec by its folder (org ADR-0002, root ADR-0005). A `no spec
+needed` pick leaving no folder is invisible to all three: the issue can be scoped again as if never judged.
+builder and reviewer take such a story's issue body as its requirement (root ADR-0005).
 
 ADR-0008 puts the kind into front matter.
 
 ## Decision
 
-1. We will have a `no spec needed` pick write `specs/<p>-<slug>/spec.md` saying so, with `codeworks.kind: no_spec` in its
-   front matter, the premise question the pick rests on and the reason; the folder holds nothing else.
-2. We will land it like any spec, by a draft spec PR on `<p>-spec` (ADR-0005, ADR-0010). builder takes the
-   issue body as the requirement (builder ADR-0002).
+1. We will have a `no spec needed` pick write `specs/<p>-<slug>/spec.md` saying so, with
+   `codeworks.kind: no_spec` in its front matter, the premise question the pick rests on and the reason;
+   the folder holds nothing else.
 
 ## Options considered
 
-### Option A: A folder saying so in front matter, landed by a spec PR (chosen)
+### Option A: A folder saying so in front matter (chosen)
 
 Every reader keyed on the issue number sees it; no special value anywhere.
 
 ### Option B: No folder, and `spec: null` passed at review
 
-Rejected: no user passes `spec: null`, since every launch derives the folder from the spec's issue (builder
-ADR-0002).
+Rejected: no user passes `spec: null`, since every launch derives the folder from the spec's issue (root
+ADR-0005).
 
 ### Option C: No record, drop `no spec needed`, or a mark on the issue
 

@@ -100,3 +100,14 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
 - `open_markers: true` goes back to step 4 first.
 - `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
   decision for them.
+
+## Undo a rejected rescope that created a parent
+
+When a rescope gives a one-story issue `#n` a second story, it creates parent `#p` and opens its spec PR on
+`<p>-spec` (planner ADR-0010, decision 2). Write these steps into that PR's description, for the human who
+closes it unmerged; planner takes none of them:
+1. Close the story issue the rescope added as not planned.
+2. Remove `#n` from `#p`'s sub-issues, then close `#p` as not planned.
+3. Delete the branch `<p>-spec`.
+4. Type `unlock rescope-<n>` in a session: the default branch's spec.md did not change, so nothing else
+   releases the hold (reviewer ADR-0013).

@@ -9,7 +9,7 @@ tags: [adr, alignment, planning, decision-log, workflow]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0002", "0005", "0010"]
+relatesTo: ["0010"]
 affects:
   - type: path
     pattern: "planner/plugin/speckit/workflows/**"
@@ -35,36 +35,37 @@ externalRefs:
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
     label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
   - type: doc
-    id: "builder ADR-0004"
-    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/builder/docs/adr/0004-resolve-a-conflict-by-merging-the-default-branch-never-rebase-or-force-push.md"
-    label: "builder ADR-0004: Resolve a conflict by merging the default branch, never rebase or force-push"
+    id: "reviewer ADR-0010"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/reviewer/docs/adr/0010-keep-a-story-branch-off-its-spec-folder-but-ticks-in-its-issue-s-task-block-grad.md"
+    label: "reviewer ADR-0010: Keep a story branch off its spec folder but ticks in its issue's task block; grade each round at the reviewed commit"
+  - type: doc
+    id: "root ADR-0004"
+    url: "https://github.com/analitiq-ai/claude-plugins-internal/blob/main/docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md"
+    label: "root ADR-0004: Treat a check that could not run as its own outcome, and enforce every check from its first release"
 ---
 
 # ADR-0009: Check the plan against the governing decision logs before critique
 
 ## Context
 
-Two decision logs bind a plan: the repo's own and the org log governing it. Planning read neither, so a
-contradiction first surfaced at reviewer's decision-reviewer. A local copy of the org log can fall
+Two decision logs bind a plan: the repo's own and the org log governing it. Unchecked at planning, a
+contradiction first surfaces at reviewer's decision-reviewer, after the code is written. A local copy of the org log can fall
 behind its remote and lack the record that now binds.
 
 ## Decision
 
 1. We will run `adr check` after plan and before critique, against the repo's log and then the org log the
    repo declares. A public repo declares a public log only.
-2. We will take the org log from a configured checkout, fetched first, and cloned when absent if the
-   machine has credentials for it. A checkout behind its remote stops the run naming "pull it"; one that
-   cannot be fetched or cloned is a check that could not run (ADR-0002).
-3. We will record the org-log commit SHA the check saw in the plan artifact.
-4. We will commit a record the plan needs into the spec PR, beside the spec it governs (ADR-0010). A record
-   found late rides in the rescope's spec PR and governs a story in flight from the round after that story
-   merges the default branch (builder ADR-0004).
+2. We will check against the org log as its remote holds it: a checkout behind its remote, or one that
+   cannot be fetched or cloned, is a check that could not run (root ADR-0004).
+3. We will commit a record the plan needs into the spec PR beside the spec it governs (ADR-0010), and a
+   record found late into the rescope's spec PR; it governs a story in flight as reviewer ADR-0010 decides.
 
 ## Options considered
 
-### Option A: Check both logs after plan, pinned by SHA (chosen)
+### Option A: Check both logs after plan, at the org log's remote head (chosen)
 
-Chosen: the SHA says which org log the check saw.
+A plan passes only against the log that binds it now.
 
 ### Option B: The repo's log alone
 
