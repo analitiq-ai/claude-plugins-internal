@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - id: find
-        run: echo "suites=$(find dev -type d -name tests -not -path '*/fixtures/*' | sort | jq -Rcs 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
+        run: echo "suites=$(find * -mindepth 1 -maxdepth 1 -type d -name tests | sort | jq -Rcs 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
 
   unittest:
     name: unittest (${{ matrix.suite }})
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: claude-plugins-internal
-      # alq-review's attestation marker is pinned against the org pr-gate that reads it, checked out beside
+      # reviewer's attestation marker is pinned against the org pr-gate that reads it, checked out beside
       # this repo as it is locally.
       - uses: actions/checkout@v5
         with:
@@ -39,11 +39,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      # alq-spec drives the real Spec Kit CLI, at the minimum version its workflow declares.
+      # planner drives the real Spec Kit CLI, at the minimum version its workflow declares.
       - run: pip install specify-cli==1.0.7
-      # alq-review's claim and shim checks map text across edits with it and refuse to run without it.
+      # reviewer's claim and shim checks map text across edits with it and refuse to run without it.
       - run: pip install diff-match-patch==20241021
-      # alq-review asks adrkit which decisions govern a round's change, at the one version it is built for.
+      # reviewer asks adrkit which decisions govern a round's change, at the one version it is built for.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

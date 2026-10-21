@@ -1,0 +1,14 @@
+{
+  "name": "auditor",
+  "description": "Anti-pattern detection for Analitiq work — a PR-delta audit and a whole-codebase sweep, sharing one set of scope-agnostic detector agents partitioned by the evidence each must gather.",
+  "version": "0.2.0",
+  "keywords": [
+    "code-review",
+    "anti-patterns",
+    "audit",
+    "analitiq"
+  ],
+  "author": {
+    "name": "Analitiq"
+  }
+}
