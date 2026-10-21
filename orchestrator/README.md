@@ -4,11 +4,12 @@ The deterministic script that drives a story issue from Ready to merge. Its deci
 
 ## Setting up a served repo
 
-1. Install the org's existing GitHub App, the orchestrator's (ADR-0001).
-2. Create and install the `codeworks-session` GitHub App with exactly the permissions root ADR-0007
-   lists, on no ruleset bypass list.
-3. Run the orchestrator as its own OS user, its App key readable by that user alone (ADR-0009).
-4. Delete the `PR_GATE_APP_KEY` Actions secret; the orchestrator writes `codex-review` (ADR-0008).
-5. Add the ruleset and the repo settings ADR-0009 requires.
-6. Install Codex with Automatic review off (ADR-0008), and CodeRabbit.
-7. Spell the board's lanes Backlog, Ready, In progress, In review, Blocked, Done.
+1. Create and install three GitHub Apps, each with exactly the permissions its record lists and on no
+   ruleset bypass list: `codeworks-orchestrator` (ADR-0001), its key only on the orchestrator's host;
+   `codeworks-session` (root ADR-0007) and `codeworks-reviewer` (reviewer ADR-0011), their keys on every
+   machine that runs a session.
+2. Install the managed settings root ADR-0008 lists on every machine that runs a session.
+3. Delete the `PR_GATE_APP_KEY` Actions secret; the orchestrator writes `codex-review` (ADR-0008).
+4. Add the ruleset and the repo settings ADR-0009 requires.
+5. Install Codex with Automatic review off (ADR-0008), and CodeRabbit.
+6. Spell the board's lanes Backlog, Ready, In progress, In review, Blocked, Done.

@@ -33,10 +33,11 @@ for CI.
 
 ## Decision
 
-1. We will drive one story issue from Ready to merge with a deterministic script, acting as the org's
-   existing GitHub App, run as its own OS user (ADR-0009); it claims the story issue, mints the session's
-   token (root ADR-0007) and launches `builder:issue-tackle <s>`. Its code lives in this repo under
-   `orchestrator/` and releases and deploys on its own.
+1. We will drive one story issue from Ready to merge with a deterministic script, acting as its own GitHub
+   App, `codeworks-orchestrator` (contents, pull requests, issues and statuses write; checks read;
+   organization projects write), whose key only its host holds and no session reads (root ADR-0008); it
+   claims the story issue, mints the session's token (root ADR-0007) and launches `builder:issue-tackle
+   <s>`. Its code lives under `orchestrator/` and ships on its own.
 2. We will give it only these inputs: the board and its issues (assignee, parent, sub-issues,
    `blockedBy`, closer); open PRs, their changed files, review threads, mergeable field, statuses and
    checks at the head; issue comments with author, edit and time, reviewer's state comments (reviewer
@@ -56,13 +57,13 @@ for CI.
 
 ## Options considered
 
-### Option A: A deterministic script under the existing App (chosen)
+### Option A: A deterministic script under its own App (chosen)
 
 Restartable, idempotent ticks.
 
 ### Option B: A cron prompt driving the loop
 
-Rejected: not deterministic, not restartable, parses comments.
+Rejected: not deterministic or restartable; parses comments.
 
 ### Option C: builder drives its own loop
 
@@ -72,13 +73,17 @@ Rejected: it cannot wait for CI.
 
 Rejected: it shares `core/` and the status names with the plugins, which release from this repo.
 
+### Option E: The org's existing App
+
+Rejected: anything else acting as it would pass the orchestrator's trust filters.
+
 ## Trade-offs
 
 - A move waits for the next tick.
 
 ## Consequences
 
-- Easier: a safe restart; no orchestrator credential in any session.
+- Easier: a safe restart; no orchestrator key in any session.
 - Harder: diagnosis spans GitHub and the launch log; a CI check keeps `orchestrator/` importing nothing
   from the plugins.
 - **How we would know this was wrong:** a human moving a card for the orchestrator; two sessions on one

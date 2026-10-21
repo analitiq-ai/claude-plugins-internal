@@ -41,7 +41,7 @@ grade it.
    orchestrator writes `internal-review` and `codex-review` (ADR-0008) on every open PR of the repo,
    story PR or not, when the status at the head differs from its value, so a write never repeats and a
    removed exempt label is undone.
-2. We will write it with the orchestrator's App, the org's existing App (ADR-0001), from GitHub state
+2. We will write it with the orchestrator's App (ADR-0001), from GitHub state
    alone; no session can read that App's key (ADR-0009).
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a status written
    with any other token counts for nothing.
@@ -70,7 +70,7 @@ Rejected: a fork author names the branch and opens the PR outside any session.
 
 ## Trade-offs
 
-- A session can forge a CLEAN round through the API, an accepted risk (root ADR-0007).
+- A review round runs inside the session it grades, an accepted risk (root ADR-0007).
 - Every change to the config, workflows or hooks waits on a human's label.
 - A fork contribution waits on a writer's exempt label or same-repo push.
 

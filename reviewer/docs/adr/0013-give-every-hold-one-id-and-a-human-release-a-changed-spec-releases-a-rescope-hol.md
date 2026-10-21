@@ -56,11 +56,9 @@ a story in flight is graded against.
    | `claim-<id>` | the count of WRONG rulings on its lineage | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |
    | `audit-<issue>` | the count of escalation audits not CONVERGED | rounds | that many audits |
-4. We will place `rescope-<issue>` on a `RESCOPE` verdict, and through `core/` when planner opens a rescope
-   spec PR, on every open story issue under that spec (root ADR-0006, planner ADR-0010). It records the
-   blob SHA of `spec.md` on the story branch, else the default
-   branch, and refuses every code commit but the session's merge of the
-   default branch; it blocks no launch, since the launch merges that branch. reviewer releases it once the
+4. We will place `rescope-<issue>` on a `RESCOPE` verdict, and when a session opens a rescope's spec PR
+   (planner ADR-0010) on every open story issue under that spec (root ADR-0006). It records the blob SHA of `spec.md` on the story branch, else the default
+   branch, and refuses every code commit but the session's merge of the default branch; it blocks no launch, since the launch merges that branch. reviewer releases it once the
    branch's `spec.md` differs from that SHA and equals the default branch's, checked at each commit and
    round launch, or on `unlock rescope-<issue>`; never on Ready.
 

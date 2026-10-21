@@ -69,8 +69,6 @@ Rejected: the comment's key is the record; a restart re-reads the issue.
 
 ## Trade-offs
 
-- A state comment is trusted from the session App, so a session can forge one through the API (root
-  ADR-0007).
 - A launch that died is relaunched from the start of its turn.
 
 ## Consequences

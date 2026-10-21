@@ -44,7 +44,7 @@ human stops a story by dragging it to Blocked (orchestrator ADR-0002).
 1. We will let planner work on an issue only while its card is in Blocked or Backlog, and builder and
    reviewer never while it is there.
 2. We will start a rescope only when the spec's issue and every open story issue under it are in Blocked
-   or Backlog, and place the rescope hold (reviewer ADR-0013) on each of those story issues; a human
+   or Backlog; reviewer's hook then places the rescope hold (reviewer ADR-0013) on each of them; a human
    moves an in-flight story there, which stops it.
 3. We will refuse work on a closed issue; new work goes in a new issue.
 

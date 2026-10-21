@@ -37,8 +37,7 @@ the user's to type.
 ## Decision
 
 1. We will refuse from any agent session: a lane write, the issue assignee, a label, a commit status,
-   a PR body edit after creation, an issue body edit, a tagged state comment not written through `core/`
-   and any edit or delete of one (ADR-0011), the ready flip, a Codex or CodeRabbit request, a merge, and
+   a PR body edit after creation, an issue body edit, the ready flip, a Codex or CodeRabbit request, a merge, and
    writes to `codeworks.toml` (root ADR-0002) and the state directory, and a Bash command that starts
    `claude`. A session may open a draft PR; a non-draft `gh pr create` counts as the ready flip and is
    refused. Each refusal names the owner and the next step.
