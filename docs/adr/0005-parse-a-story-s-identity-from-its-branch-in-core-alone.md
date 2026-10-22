@@ -83,7 +83,7 @@ Rejected: that file states no requirement.
 
 - Easier: a claim needs only the issue number; a renumbered story or a reopened done issue changes
   nothing.
-- Harder: a grammar change is a `core/` release every component must install.
+- Harder: a grammar change is a `core/` change every plugin that carries core ships in a new version.
 - **How we would know this was wrong:** two components name a different story, spec or PR for one
   branch, or disagree on whether a story is done.
 - Revisit if: a story needs more than one branch, or a spec more than one folder.

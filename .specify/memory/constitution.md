@@ -1,12 +1,8 @@
 <!--
 Sync Impact Report
-- Version: 1.0.1 -> 1.1.0 (MINOR: a platform constraint added for the agent environment)
-- Changed: opening and Repo shape name the orchestrator as a plugin; the Repo Principles note gives
-  P6's refusals to reviewer's hook; P9 counts no command the model runs as a trusted actor and cites
-  the renamed root ADR-0007; the planner and builder constraints say where each runs; P4's WAIVED
-  exception and P7's review-text exception name no provider; the tampered-state rule counts a deleted
-  reviewer App state comment.
-- Added: Platform Constraints "Agent environment" (root ADR-0008).
+- Version: 1.1.0 -> 1.2.0 (MINOR: a platform constraint added for core's language)
+- Changed: Repo shape ships `core/` inside each plugin through a symlink, not an install (root ADR-0001).
+- Added: Platform Constraints "Language" (root ADR-0009) and "Value sets" (root ADR-0010).
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -15,8 +11,8 @@ Sync Impact Report
 
 Constitution for building the components of `analitiq-ai/claude-plugins-internal`: the `reviewer`,
 `planner`, `builder`, `auditor` and `orchestrator` plugins, and the shared `core/` package. Each
-component is a top-level folder; a plugin's `plugin/` is what an install copies, and `core/` is installed
-as each plugin's pinned dependency; nothing else in the repo is installed. Paths are relative to the
+component is a top-level folder; a plugin's `plugin/` is what an install copies, `core/` included
+through a symlink in each plugin that runs it; nothing else in the repo is installed. Paths are relative to the
 repo root unless they name another repo. Each principle is a plan-time gate: a plan passes only if it
 answers the gate question for the components it applies to. The files named in each
 Source line are the source of truth; this document indexes them and never restates their text.
@@ -229,10 +225,15 @@ Source: All: `docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
 - Repo shape: one top-level folder per component; a plugin's `plugin/` is what an install copies,
-  listed in `.claude-plugin/marketplace.json`; `core/` is a package each plugin installs pinned to its
-  own version; `tests/` and `docs/adr/` are never installed
+  listed in `.claude-plugin/marketplace.json`; `core/` reaches each plugin that runs its code through a
+  symlink an install copies; `tests/` and `docs/adr/` are never installed
   (`README.md`; `docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md`).
 - Tests: CI runs every `<component>/tests/` folder (`.github/workflows/tests.yml`).
+- Language: `core/` is TypeScript on Node, its contracts Zod schemas; no Python code calls core, and a
+  plugin's script moves to TypeScript in the change that first makes it call core
+  (`docs/adr/0009-build-core-in-typescript-and-move-a-plugin-s-scripts-to-typescript-when-they-fi.md`).
+- Value sets: every verdict, ruling, outcome and hold kind is an enum defined once; code never repeats
+  a value's string (`docs/adr/0010-name-every-verdict-ruling-and-outcome-once-as-an-enum-in-core-s-contracts.md`).
 - Agent environment: the orchestrator, builder and reviewer run in one session in a dedicated
   environment with no human GitHub credential, under Claude Code's managed settings; only hooks read a
   key, and no session runs Docker; planner runs outside it, where its human works
@@ -283,4 +284,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
+**Version**: 1.2.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22

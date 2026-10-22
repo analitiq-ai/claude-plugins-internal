@@ -46,15 +46,16 @@ the state comment and the validator modules.
    `core/` holds a package in place of `plugin/`.
 2. We will make `core/` the one home of code more than one component runs: the state-comment read and
    write, the validator modules with their Findings contract (ADR-0003), the spec facts' model (ADR-0003)
-   and the parser of a story's identity (ADR-0005). Each plugin, the orchestrator included, installs it
-   into its `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version, and imports no other plugin's code.
+   and the parser of a story's identity (ADR-0005). Each plugin that runs core code, the orchestrator
+   included, carries a symlink to `core/`, which an install copies into the plugin, and lists core's
+   dependencies in its own lockfile, which the install also fetches; no plugin imports another's code.
    Every state-comment write runs in reviewer's hook process, outside the sandbox (ADR-0008).
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 
 ## Options considered
 
-### Option A: One folder per component, shared code as the installed `core/` package (chosen)
+### Option A: One folder per component, shared code in `core/`, copied into each plugin (chosen)
 
 Ownership, CI and an import boundary are each one path rule per component.
 
@@ -67,9 +68,10 @@ Rejected: each plugin stays split across two trees.
 Rejected: the components share contracts (the state comment, hold ids, status names, the validator
 modules) that should change in one PR.
 
-### Option D: Shared code inside one plugin, or vendored into each
+### Option D: Shared code inside one plugin, a hand-kept copy in each, or installed at session start
 
-Rejected: a plugin cannot reference a path outside its root, and a vendored copy per plugin drifts.
+Rejected: a plugin cannot reference a path outside its root, a hand-kept copy drifts, and a session-start
+install needs a release tag and a fetch of this repo from every environment.
 
 ## Trade-offs
 
@@ -81,7 +83,7 @@ Rejected: a plugin cannot reference a path outside its root, and a vendored copy
 - Easier: one Spec Kit to upgrade; a component's code, tests and records in one place; one implementation
   of the state comment and of each validator.
 - Harder: an install's source is `<component>/plugin`, one level deeper than the usual `plugins/<name>`;
-  every plugin installs `core/` before it runs.
+  each plugin that runs core code lists core's dependencies in its own lockfile.
 - **How we would know this was wrong:** a component needing its own Spec Kit project or constitution, or
   code two components run that lives outside `core/`.
 - Revisit if: Claude Code plugins gain a native way to share code between plugins.

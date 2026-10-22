@@ -41,7 +41,7 @@ a root-cause verdict is due.
 
 1. We will have the root-cause reviewer, reviewer's own agent, verify the spec's Root cause in
    every internal round whose spec's `codeworks.root_cause.observed` is `anchored` or `hypothesis`; with
-   `none`, the round records root_cause: not_applicable.
+   `none`, the round records NOT_APPLICABLE.
 2. We will type its verdict (AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL), record it on the round in the
    state snapshot (root ADR-0003), and rule in policy which rulings each verdict admits: SPEC_WRONG admits
    a spec-gap FIX or a PUSH_BACK citing a spec line; CANNOT_TELL admits ESCALATE or a PUSH_BACK naming

@@ -172,7 +172,8 @@ It covers every reviewer workflow: `review-round`, `claim-check`, `shim-check`.
    seen before, or the executed script copy (`tool_response.scriptPath`) differs from the plugin's file.
 3. A verdict counts only from a live `StructuredOutput` event of an agent bound to that run by its
    `agent_transcript_path`; never from task notifications, task output files, the journal or transcripts.
-4. A round is CLEAN only when every expected agent answered; otherwise DIRTY or INCOMPLETE.
+4. A round is INCOMPLETE when an expected agent is silent, else DIRTY when one found something,
+   else CLEAN.
 5. Any other workflow runs untouched, and its results never count.
 
 reviewer records the round as the reviewer App; the orchestrator attests `internal-review` only from that
@@ -235,16 +236,16 @@ The other rows ran on 2.1.300 to 2.1.306.
   the token cannot merge past the ruleset.
 - **Hold window:** an open hold turns `internal-review` pending (orchestrator ADR-0004), but only at the
   orchestrator's next hook run; until then the session token can merge the head. That head had a CLEAN
-  round, so §1 holds: the hold is a guardrail, not the boundary (root ADR-0007 d6). Closing the window
-  would need the hold itself in a required check: GitHub cannot write a comment and a status in one step,
-  and only the orchestrator App writes `internal-review`.
+  or CONVERGED_PUSHBACK round, so §1 holds: the hold is a guardrail, not the boundary (root ADR-0007
+  d6). Closing the window would need the hold itself in a required check: GitHub cannot write a comment
+  and a status in one step, and only the orchestrator App writes `internal-review`.
 - **E2:** whether the session App can delete a reviewer comment is untested. If it can, the hold stays:
   GitHub records the deletion of another account's comment on the issue timeline, which no token can
   remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
   GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer
   never deletes its own.
-- **Open:** how the orchestrator waits on CI and external reviewers (its spec); how core's installer
-  fetches the private repo in an environment with no credential (moot once the repo is public); how the
+- **Open:** how the orchestrator waits on CI and external reviewers (its spec); whether Claude Code's
+  install of a plugin's npm dependencies reaches the registry under the managed settings; how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Claude Code upgrades:** every result in §7 holds only for the versions tested. Pin the version in the
   agent environment and re-run these tests before moving to a new one.
