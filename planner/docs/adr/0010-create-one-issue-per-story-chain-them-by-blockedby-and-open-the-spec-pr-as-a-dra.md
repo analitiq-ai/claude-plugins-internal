@@ -43,7 +43,8 @@ externalRefs:
 ## Context
 
 Each story has its own issue, branch and PR (org ADR-0003). The spec and its records land first, by a spec
-PR on `<p>-spec`, `<p>` the spec's issue (org ADR-0002), which gates every launch (orchestrator ADR-0006).
+PR on `<p>-spec`, `<p>` the spec's issue (org ADR-0002), which gates every story's start (orchestrator
+ADR-0006).
 
 ## Decision
 
@@ -56,8 +57,8 @@ PR on `<p>-spec`, `<p>` the spec's issue (org ADR-0002), which gates every launc
 3. We will push the spec folder and its records (ADR-0009), and no code, to `<p>-spec`: to its open PR if
    there is one, else to a branch cut from the default branch and opened as a draft PR, the spec PR. A
    `<p>-spec` whose PR closed unmerged stops the run, naming the branch for a human to delete.
-4. We will write no reviewer state: opening a rescope's spec PR is what makes reviewer's hook place the
-   rescope hold on the story issues root ADR-0006 names (reviewer ADR-0013).
+4. We will write no state: reviewer's hook in the agent environment, on seeing a rescope's spec PR open,
+   places the rescope hold on the story issues root ADR-0006 names (reviewer ADR-0013).
 5. We will name, in a rescope's spec PR description, each story issue whose task block it drops, for a
    human to close. A rescope that edits or drops a merged story's task block stops before it pushes.
 6. We will write into the description of decision 2's spec PR the steps that undo its issue writes if a
@@ -73,7 +74,7 @@ Rejected: a script computes order from ticks.
 
 ### Option C: planner opens the spec PR ready for review
 
-Rejected: that is the ready flip, which no session makes (reviewer ADR-0012).
+Rejected: no model action makes the ready flip (reviewer ADR-0012).
 
 ### Option D: planner closes dropped stories and undoes a rejected rescope
 
@@ -81,15 +82,15 @@ Rejected: closing an issue and releasing a hold are a human's acts (reviewer ADR
 
 ## Trade-offs
 
-- planner writes issues, links and a draft PR, as the session App (root ADR-0007); a rescope places its
-  holds only where reviewer is installed.
+- planner writes issues, links and a draft PR as the session App (root ADR-0007); a rescope's holds wait
+  until the agent environment sees its PR.
 - Renaming `specs/<n>-*` breaks path links; a rejected spec PR leaves cleanup to a human.
 
 ## Consequences
 
 - Easier: done (root ADR-0005) and order are GitHub fields, never read from `tasks.md`.
 - Harder: reordering stories is a human edit of `blockedBy`.
-- **How we would know this was wrong:** stories launched out of order, or story issues out of step with
+- **How we would know this was wrong:** stories built out of order, or story issues out of step with
   spec.md after a rescope.
 - Revisit if: GitHub drops sub-issues or issue dependencies.
 

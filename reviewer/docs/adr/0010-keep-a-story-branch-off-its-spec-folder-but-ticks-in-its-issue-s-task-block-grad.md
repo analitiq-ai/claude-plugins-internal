@@ -35,7 +35,7 @@ externalRefs:
 
 On a story branch the agent is graded against `spec.md`, a file in the worktree it writes and commits
 to. The spec and every rescope land as a spec PR on the spec's issue (org ADR-0002), so a story branch has
-no reason to change the spec. A story spans several launches (builder ADR-0003), and each launch has to
+no reason to change the spec. A story spans several continuations (builder ADR-0003), and each has to
 know which of its tasks are done.
 
 ## Decision
@@ -62,7 +62,7 @@ change the spec it is graded against, admitted by its paths alone.
 
 ### Option C: Task progress outside `tasks.md`
 
-Rejected: a second record of which tasks are done, beside the file each launch reads.
+Rejected: a second record of which tasks are done, beside the file each continuation reads.
 
 ### Option D: A hold placed whenever `spec.md` changes on the branch
 
@@ -82,7 +82,7 @@ Rejected: a session could mark another story's tasks done.
 - Easier: no stored copy of `spec.md` can drift from the committed one; ticks merge with the story.
 - Harder: the commit gate parses a `tasks.md` diff to tell a tick from an edit.
 - **How we would know this was wrong:** a story PR whose diff changes the spec folder beyond ticks in its
-  own issue's block, or a launch that redoes a task already ticked.
+  own issue's block, or a continuation that redoes a task already ticked.
 - Revisit if: task progress moves out of `tasks.md`.
 
 ## Action items

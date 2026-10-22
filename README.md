@@ -1,7 +1,7 @@
 # codeworks
 
-Analitiq's Claude Code plugins and the orchestrator that drives them. One top-level folder per component;
-the plugins are listed in `.claude-plugin/marketplace.json`.
+Analitiq's Claude Code plugins. One top-level folder per component; the plugins are listed in
+`.claude-plugin/marketplace.json`.
 
 | Component | |
 |---|---|
@@ -9,22 +9,42 @@ the plugins are listed in `.claude-plugin/marketplace.json`.
 | [`planner`](planner/plugin/skills/issue-spec/SKILL.md) | scoping a change into a spec folder before it is built |
 | [`builder`](builder/plugin/skills/issue-tackle/SKILL.md) | building an issue from its spec folder, then launching review on it |
 | [`auditor`](auditor/plugin/README.md) | audit agents that hunt anti-patterns in a PR or a codebase |
-| `orchestrator` | the deterministic script that drives an issue from Ready to merge (records only, so far) |
+| [`orchestrator`](orchestrator/README.md) | hooks that drive an issue from Ready to merge inside the agent session (records only, so far) |
 
 `builder` launches `reviewer`'s review round and says so when it is not installed; `reviewer`'s rounds
 dispatch `auditor`'s agents.
 
 ## Install
 
+The orchestrator, builder and reviewer run together in one session in a dedicated agent environment that
+holds no human GitHub credential, under Claude Code's managed settings
+([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md));
+planner runs where you work. Setting up that environment and a served repo:
+[`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
+`SECURITY.md`.
+
+In the agent environment:
+
 ```
 claude plugin marketplace add analitiq-ai/claude-plugins-internal
-claude plugin install reviewer@codeworks
-claude plugin install planner@codeworks
+claude plugin install orchestrator@codeworks
 claude plugin install builder@codeworks
+claude plugin install reviewer@codeworks
 claude plugin install auditor@codeworks
 ```
 
-The repo is private: the clone uses your git credentials for github.com.
+`orchestrator` installs once its plugin ships.
+
+Where you work:
+
+```
+claude plugin marketplace add analitiq-ai/claude-plugins-internal
+claude plugin install planner@codeworks
+claude plugin install reviewer@codeworks
+```
+
+The repo is private: on your machine the clone uses your git credentials for github.com. How the agent
+environment, which holds none, fetches it is open; it is moot once the repo is public.
 
 ## Layout
 

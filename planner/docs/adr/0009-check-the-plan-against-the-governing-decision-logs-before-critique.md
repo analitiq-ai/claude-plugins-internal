@@ -65,8 +65,8 @@ Rejected: the contradiction would surface after the code is written.
 
 ### Option E: A record on its own `<p>-adr-<slug>` branch and PR
 
-Rejected: a second branch kind and a second rule blocking launch, for a record the spec PR carries with no
-code beside it either way.
+Rejected: a second branch kind and a second rule blocking a story's start, for a record the spec PR
+carries with no code beside it either way.
 
 ## Trade-offs
 

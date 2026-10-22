@@ -27,13 +27,13 @@ review:
 
 ## Context
 
-Once a story's card is In review, something must merge its PR and hold the merge condition. A
-session's token can call GitHub's merge endpoint (root ADR-0007).
+Once a story's card is In review, something must merge its PR and hold the merge condition. The
+model's token can call GitHub's merge endpoint (root ADR-0007).
 
 ## Decision
 
-1. We will have the orchestrator squash-merge an In review card's PR, passing no message, once no launch
-   is running, no hold is open on its story issue (reviewer ADR-0013), Codex's verdict at the head is
+1. We will have the orchestrator squash-merge an In review card's PR, passing no message, between turns,
+   once no hold is open on its story issue (reviewer ADR-0013), Codex's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
 2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
    classic branch protection: they require `internal-review` and `codex-review`, pinned to the

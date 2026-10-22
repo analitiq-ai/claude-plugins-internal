@@ -31,15 +31,15 @@ review:
 
 On a public repo anyone can open a review thread or reply in one, and a comment an agent reads is text it
 acts on (OWASP LLM01). `core/`'s threads module counts a thread as a finding only if a trusted reviewer
-started it (root ADR-0003), and the orchestrator resolves every other thread unread, launching nothing
-(orchestrator ADR-0007).
+started it (root ADR-0003), and the orchestrator's hooks resolve every other thread unread, starting no
+work (orchestrator ADR-0007).
 
 ## Decision
 
-1. We will read a github round's findings only through `core/`: at the round's launch (ADR-0019), the
-   gate reads `findings(pr, head)` from every enabled validator module, the threads module among them,
-   never raw threads, with the failing required checks and a conflict with the default branch, and opens
-   the round on them in one gate decision.
+1. We will read a github round's findings only through `core/`, in reviewer's hook: at the round's
+   launch (ADR-0019), the gate reads `findings(pr, head)` from every enabled validator module, the
+   threads module among them, never raw threads or a file the session wrote, with the failing required
+   checks and a conflict with the default branch, and opens the round on them in one gate decision.
 2. We will put into a brief only the comments of trusted reviewers; any other comment in a finding's
    thread is left out unread.
 3. We will identify a thread's finding by thread URL and its latest trusted comment id: a trusted reply is
@@ -54,7 +54,7 @@ started it (root ADR-0003), and the orchestrator resolves every other thread unr
 ### Option B: reviewer resolves untrusted threads at a round's launch
 
 Rejected: an untrusted thread opens no round, so it would block the merge unresolved, or anyone could
-launch a session by opening one.
+start work by opening one.
 
 ### Option C: Trust keyed on a thread's latest author
 
@@ -77,7 +77,7 @@ Rejected: the text still reaches the assessor.
 ## Consequences
 
 - Easier: reviewer holds no trust rule of its own and closes no thread it did not rule on.
-- Harder: adding a reviewer is a hand edit to `codeworks.toml`, which sessions may not write.
+- Harder: adding a reviewer is a hand edit to `codeworks.toml`, which the model may not write (ADR-0012).
 - **How we would know this was wrong:** an untrusted comment's text appears in a brief; a trusted reply to
   a ruled thread is not a finding; reviewer reads a thread outside `core/`.
 - Revisit if: GitHub's conversation rule can exclude authors, or every served repo is private.

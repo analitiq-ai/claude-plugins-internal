@@ -39,8 +39,8 @@ comment.
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
    escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
 2. We will take as the answer an issue comment created after that question by a User other than
-   Analitiq-Bot whose author_association is OWNER, MEMBER or COLLABORATOR; no agent session's comment
-   counts (root ADR-0007).
+   Analitiq-Bot whose author_association is OWNER, MEMBER or COLLABORATOR; no comment from the agent
+   session counts, since it acts on GitHub only as Apps (root ADR-0007).
 
 ## Options considered
 

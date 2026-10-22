@@ -33,7 +33,7 @@ review:
 
 Codex, CodeRabbit, DeepSource and CI grade a PR, each its own way. The orchestrator needs their status at
 the head; reviewer's github stage, their findings. reviewer's state, rounds and holds, lives in a tagged
-issue comment (reviewer ADR-0011) that reviewer and planner write and the orchestrator reads.
+issue comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator reads.
 
 ## Decision
 

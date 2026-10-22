@@ -36,7 +36,7 @@ never reaches the default branch. reviewer records each round's verdict at the h
 
 1. We will resolve a conflict on a story branch by merging the default branch into it, and never rebase or
    force-push the branch.
-2. We will merge the default branch into a story branch at its next launch after a spec PR of its spec's
+2. We will merge the default branch into a story branch at its next step after a spec PR of its spec's
    issue merged, so the story is built and reviewed against the spec and records in force. A new spec.md
    that merge brings releases the story's rescope hold (reviewer ADR-0013). The merge runs before the
    spec-folder check (ADR-0002), which then finds the folder the new spec names.
@@ -49,7 +49,7 @@ Every commit and every head a round was recorded at stays on the branch.
 
 ### Option B: Rebase onto the default branch and force-push
 
-Rejected: it rewrites the heads rounds were recorded at, and a force-push can drop commits another launch
+Rejected: it rewrites the heads rounds were recorded at, and a force-push can drop commits already
 pushed.
 
 ### Option C: Do nothing
@@ -65,7 +65,7 @@ Rejected: each session picks rebase or merge on its own, and the first rebase st
 ## Consequences
 
 - Easier: recorded heads stay reachable, and no push is refused for rewriting history.
-- Harder: a rescope reaches a story in flight only at its next launch.
+- Harder: a rescope reaches a story in flight only at its next step.
 - **How we would know this was wrong:** rounds after a merge re-review the default branch's changes, or a
   merge's resolution drops a change of the default branch.
 - Revisit if: story PRs stop being squash-merged.

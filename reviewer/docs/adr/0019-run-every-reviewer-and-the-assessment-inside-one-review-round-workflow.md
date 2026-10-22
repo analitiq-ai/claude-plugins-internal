@@ -9,7 +9,7 @@ tags: [review-round, reviewers, assessment, launch-gate, dependencies, round-cap
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003", "0013", "0014", "0015", "0016", "0020"]
+relatesTo: ["0003", "0013", "0014", "0015", "0016", "0020", "0021"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/{review-round,assess-round}.js"
@@ -45,10 +45,10 @@ behind a barrier, or which plugins a round depends on.
 
 ## Decision
 
-1. We will run every stage in one workflow, `review-round {worktree, stage}` (ADR-0014):
-   reviewers behind a barrier (internal, audit) or the github stage's findings (ADR-0016), then
-   the assess phase; `assess-round` launched from outside is refused. Each report is validated
-   against its typed verdict first.
+1. We will run every stage in one workflow, `review-round {worktree, stage}` (ADR-0014), launched
+   and counted by the gate rule (ADR-0021): reviewers behind a barrier (internal, audit) or the github
+   stage's findings (ADR-0016), then the assess phase; an assessment from any other run never counts.
+   Each report is validated against its typed verdict first.
 2. We will refuse any reviewer type dispatched from the main thread, outside a round, on a story
    branch or on a branch inside the grammar with an open PR: on a story branch naming review-round, on
    `<p>-spec`, where no round runs (ADR-0014), naming the human's review of the spec PR. main and branches
@@ -69,7 +69,7 @@ behind a barrier, or which plugins a round depends on.
 
 ### Option B: `assess-round` launched separately
 
-Rejected: an assessment the agent can run on its own cannot be refused.
+Rejected: an assessment the agent runs alone is bound to no round.
 
 ### Option C: Reviewers dispatched from the main thread
 
@@ -98,7 +98,7 @@ Rejected: the whole-PR audit can end the churn alone; its hold brings a human in
 - Easier: both loops run review-round and act on its rulings.
 - Harder: reviewer needs two other plugins installed.
 - **How we would know this was wrong:** a reviewer type runs on a story branch outside a round, or
-  an assessment no round produced is recorded.
+  an assessment no round produced, or a verdict ADR-0021 rejects, is recorded.
 - Revisit if: a reviewer must run outside a round.
 
 ## Action items

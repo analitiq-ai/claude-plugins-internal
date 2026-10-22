@@ -1,11 +1,22 @@
+<!--
+Sync Impact Report
+- Version: 1.0.1 -> 1.1.0 (MINOR: a platform constraint added for the agent environment)
+- Changed: opening and Repo shape name the orchestrator as a plugin; the Repo Principles note gives
+  P6's refusals to reviewer's hook; P9 counts no command the model runs as a trusted actor and cites
+  the renamed root ADR-0007; the planner and builder constraints say where each runs.
+- Added: Platform Constraints "Agent environment" (root ADR-0008).
+- Removed: none.
+- Templates: .specify/templates/* need no change.
+- Follow-up: none.
+-->
 # Codeworks Constitution
 
 Constitution for building the components of `analitiq-ai/claude-plugins-internal`: the `reviewer`,
-`planner`, `builder` and `auditor` plugins, the `orchestrator`, and the shared `core/` package. Each
+`planner`, `builder`, `auditor` and `orchestrator` plugins, and the shared `core/` package. Each
 component is a top-level folder; a plugin's `plugin/` is what an install copies, and `core/` is installed
-as each plugin's and the orchestrator's pinned dependency; nothing else in the repo is installed. Paths are
-relative to the repo root unless they name another repo. Each principle is a plan-time gate: a plan
-passes only if it answers the gate question for the components it applies to. The files named in each
+as each plugin's pinned dependency; nothing else in the repo is installed. Paths are relative to the
+repo root unless they name another repo. Each principle is a plan-time gate: a plan passes only if it
+answers the gate question for the components it applies to. The files named in each
 Source line are the source of truth; this document indexes them and never restates their text.
 
 ## Core Principles
@@ -68,8 +79,8 @@ code it governs in the same PR).
 ### Repo Principles
 
 A principle carries one number across the repo and names the components it applies to. Where its gate
-differs by component, each component's gate is given. reviewer alone has hooks, so P6's refusals are
-reviewer's for every component (`reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`,
+differs by component, each component's gate is given. P6's refusals are reviewer's hook's for every
+component (`reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`,
 decision 1).
 
 ### P1. Code Decides, Not Prose
@@ -151,10 +162,10 @@ Applies to: reviewer, planner, builder, orchestrator.
 
 Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, a state
 comment, a hold, a commit), does the plan name its one writer, and does the component write only the
-state it owns and refuse, from any agent session, every write it does not own?
+state it owns and refuse, from the model's tool calls, every write it does not own?
 
 Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
-(decision 3); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 3); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`
 (decision 1). planner: `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
@@ -188,9 +199,9 @@ own objects, with every per-repository value in `codeworks.toml` and no reposito
 setting special-cased?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
-(decision 1); `reviewer/docs/adr/0012-refuse-from-any-agent-session-every-github-write-the-orchestrator-or-a-human-own.md`
+(decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`
 (decision 3). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
-(decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-with-a-deterministic-orchestrator-outside-the-plugins.md`
+(decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-from-the-orchestrator-plugin-s-hooks-inside-the-agent-sessi.md`
 (decision 2). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`;
 `docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`;
 `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
@@ -201,12 +212,12 @@ Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-eac
 Applies to: reviewer, planner, builder, orchestrator.
 
 Gate: does every predicate the plan adds that trusts an actor (a human, a WRITER, TRUSTED or EXEMPT
-actor, a trusted reviewer) read that actor's GitHub identity; count no agent session, which acts on
-GitHub only as the `codeworks-session` App, as any of them; and count a review thread as a finding only
-when a trusted reviewer started it?
+actor, a trusted reviewer) read that actor's GitHub identity; count no command the model runs, which
+acts on GitHub only as the `codeworks-session` App, as any of them; and count a review thread as a
+finding only when a trusted reviewer started it?
 
-Source: All: `docs/adr/0007-act-on-github-from-every-agent-session-only-as-the-codeworks-session-app.md`
-(decisions 1–3; decision 4 names the accepted risk);
+Source: All: `docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`
+(decisions 1, 3, 4 and 5);
 `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
 (decision 2).
 
@@ -215,10 +226,14 @@ Source: All: `docs/adr/0007-act-on-github-from-every-agent-session-only-as-the-c
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
 - Repo shape: one top-level folder per component; a plugin's `plugin/` is what an install copies,
-  listed in `.claude-plugin/marketplace.json`; `core/` is a package each plugin and the orchestrator
-  install pinned to their own version; `tests/` and `docs/adr/` are never installed
+  listed in `.claude-plugin/marketplace.json`; `core/` is a package each plugin installs pinned to its
+  own version; `tests/` and `docs/adr/` are never installed
   (`README.md`; `docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md`).
 - Tests: CI runs every `<component>/tests/` folder (`.github/workflows/tests.yml`).
+- Agent environment: the orchestrator, builder and reviewer run in one session in a dedicated
+  environment with no human GitHub credential, under Claude Code's managed settings; only hooks read a
+  key, and no session runs Docker; planner runs outside it, where its human works
+  (`docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md`).
 - reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the
   plugin's mode; the review-round `spec` check follows the plugin's mode alone
   (`reviewer/plugin/README.md`: Mode). Where it keeps its state: tagged comments on the story issue
@@ -228,12 +243,12 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - planner has no hooks: it runs as the Spec Kit workflow its skill starts
   (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and requires no other plugin:
   its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
-  no reviewer state.
-- builder is two skills, with no scripts and no hooks (`builder/plugin/`); its review step is
-  reviewer's internal round, which no install requires: its manifest declares no plugin dependency
-  (`builder/plugin/skills/issue-tackle/SKILL.md`;
+  no reviewer state, and runs outside the agent environment.
+- builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only in the agent
+  environment; its review step is reviewer's internal round, which no install requires: its manifest
+  declares no plugin dependency (`builder/plugin/skills/issue-tackle/SKILL.md`;
   `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`,
-  decision 1).
+  decisions 1, 5).
 - Private repo: Principle II's public-repo limits bind what a component writes into public repos,
   not this repo's own files.
 
@@ -265,4 +280,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.0.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-21
+**Version**: 1.1.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22

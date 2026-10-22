@@ -28,7 +28,8 @@ review:
 ## Context
 
 Spec, revert, retire-spec and release PRs, and PRs that other Apps open, are not story PRs and get no
-launch, yet the ruleset requires `internal-review` (ADR-0004), so who may waive it is a trust decision.
+builder turn, yet the ruleset requires `internal-review` (ADR-0004), so who may waive it is a trust
+decision.
 
 ## Decision
 
@@ -38,14 +39,14 @@ launch, yet the ruleset requires `internal-review` (ADR-0004), so who may waive 
    a key of the orchestrator's section of `codeworks.toml` (root ADR-0002).
 2. We will have the orchestrator alone decide EXEMPT and write `internal-review` "exempt"; reviewer and
    every other component read that status, never the list.
-3. We will never launch on an exempt PR. An exempt story PR's card goes to Blocked, the reason "exempt: a
-   human merges", adding "push a fix" when it has findings; a push after the label sends it to Blocked
-   naming the re-label.
+3. We will name no builder step on an exempt PR. An exempt story PR's card goes to Blocked, the reason
+   "exempt: a human merges", adding "push a fix" when it has findings; a push after the label sends it
+   to Blocked naming the re-label.
 4. We will make exemption the only way a PR to main goes without the internal review: spec, revert,
    retire-spec and release PRs are labelled or Bot-authored; no branch-name kinds, no list of exempt
    diff shapes. A spec PR's label is the human's approval of it (planner ADR-0010).
-5. We will let only a human create or apply an exempt label; the hook refuses a label write from any
-   agent session (reviewer ADR-0012).
+5. We will let only a human create or apply an exempt label; reviewer's hook refuses a label write from
+   the model's commands (reviewer ADR-0012).
 
 ## Options considered
 

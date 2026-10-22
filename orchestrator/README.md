@@ -1,15 +1,21 @@
 # orchestrator
 
-The deterministic script that drives a story issue from Ready to merge. Its decisions are in `docs/adr/`.
+The plugin whose hooks drive a story issue from Ready to merge inside the agent session. Its decisions
+are in `docs/adr/`.
 
 ## Setting up a served repo
 
 1. Create and install three GitHub Apps, each with exactly the permissions its record lists and on no
-   ruleset bypass list: `codeworks-orchestrator` (ADR-0001), its key only on the orchestrator's host;
-   `codeworks-session` (root ADR-0007) and `codeworks-reviewer` (reviewer ADR-0011), their keys on every
-   machine that runs a session.
-2. Install the managed settings root ADR-0008 lists on every machine that runs a session.
-3. Delete the `PR_GATE_APP_KEY` Actions secret; the orchestrator writes `codex-review` (ADR-0008).
-4. Add the ruleset and the repo settings ADR-0009 requires.
-5. Install Codex with Automatic review off (ADR-0008), and CodeRabbit.
-6. Spell the board's lanes Backlog, Ready, In progress, In review, Blocked, Done.
+   ruleset bypass list: `codeworks-orchestrator` (ADR-0001), `codeworks-session` (root ADR-0007) and
+   `codeworks-reviewer` (reviewer ADR-0011).
+2. Provision the agent environment (root ADR-0008), any machine, VM or container: no human GitHub
+   credential on it, the managed settings in `SECURITY.md` installed, and the three App keys, the
+   DeepSource token and the classifier key in `~/.config/codeworks/`. Where planner runs, keep the
+   session App's key for reviewer's hook (root ADR-0007).
+3. Install the orchestrator, builder and reviewer plugins in the agent environment.
+4. Delete the `PR_GATE_APP_KEY` Actions secret; the orchestrator writes `codex-review` (ADR-0008).
+5. Add the ruleset and the repo settings ADR-0009 requires.
+6. Install Codex with Automatic review off (ADR-0008), and CodeRabbit.
+7. Spell the board's lanes Backlog, Ready, In progress, In review, Blocked, Done.
+8. Start one session in the agent environment (`claude -p`, or by hand); the orchestrator's hooks take
+   it from there.

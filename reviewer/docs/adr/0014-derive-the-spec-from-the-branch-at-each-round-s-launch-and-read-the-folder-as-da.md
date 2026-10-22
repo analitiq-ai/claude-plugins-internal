@@ -9,7 +9,7 @@ tags: [spec, spec-folder, review-round, branch-grammar, front-matter]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0010"]
+relatesTo: ["0010", "0021"]
 affects:
   - type: path
     pattern: "reviewer/plugin/workflows/review-round.js"
@@ -40,9 +40,9 @@ names the story issue, and `core/` derives the spec's issue and its folder from 
 
 ## Decision
 
-1. We will take `review-round {worktree, stage}`, no `spec`: the review-round launch gate derives the
-   story issue, the spec's issue and the spec folder from the branch at HEAD through `core/` (root
-   ADR-0005). Any other branch, `<p>-spec` included, is refused a round. Every round derives the spec
+1. We will launch `review-round {worktree, stage}` with the args the gate supplies (ADR-0021), no
+   `spec` among them: the gate derives the story issue, the spec's issue and the spec folder from the
+   branch at HEAD through `core/` (root ADR-0005). Any other branch, `<p>-spec` included, is refused a round. Every round derives the spec
    afresh and grades at the reviewed commit (ADR-0010); the round records no spec binding, neither a value
    nor a blob id, and none can be rebound.
 2. We will read the folder as data and validate none of it (planning checks its own output): `spec.md`

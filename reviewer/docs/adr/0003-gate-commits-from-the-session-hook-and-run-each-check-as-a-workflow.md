@@ -9,7 +9,7 @@ tags: [claim-check, shim-check, commit-gate, hooks]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: []
+relatesTo: ["0021"]
 affects:
   - type: path
     pattern: "reviewer/plugin/hooks/hooks.json"
@@ -38,10 +38,11 @@ commit-time check needs the same way from the refusal to the check and back.
 ## Decision
 
 1. We will refuse a commit from the plugin's session hook, which sees `git commit` before the Bash tool runs
-   it. The hook decides from recorded state, git, the ledger and GitHub reads (the state comments, the
-   board lane), and does no slow work.
+   it. The hook decides from recorded state, git (run with `core.fsmonitor` and `core.hooksPath`
+   disabled), the ledger and GitHub reads (the state comments, the board lane), and does no slow work.
 2. We will run each check as a Claude Workflow. The workflow only orders the work; the gate supplies its
-   prompts and schemas at launch, and a hook validates each answer before it is recorded.
+   prompts and schemas at launch, and a hook validates each answer before it is recorded. Which launches
+   and answers count is ADR-0021's gate rule.
 3. We will make a model call inside a hook only where a decision record names it; ADR-0004 names the shim
    check's classifier, whose verdict has to exist before the author commits.
 
@@ -67,7 +68,7 @@ blocking on its verdict needs Option A anyway.
 
 ## Trade-offs
 
-- A checked commit costs a workflow for each check it needs, and the refused commit when it is tried first.
+- A checked commit costs a workflow per check it needs, and a refused first try.
 - A commit made other than by `git commit` in the Bash tool (`git merge`, `rebase`, `am`, `commit-tree`,
   aliases) is seen only after the command, by ADR-0020's tip check, and put back; one made outside a
   Claude Code session is not seen.

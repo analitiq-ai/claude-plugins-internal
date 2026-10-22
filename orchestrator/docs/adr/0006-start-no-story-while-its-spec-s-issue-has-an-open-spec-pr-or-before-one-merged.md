@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.2.0
 id: "0006"
-title: "Launch no story while its spec's issue has an open spec PR, or before one merged"
+title: "Start no story while its spec's issue has an open spec PR, or before one merged"
 status: draft
 date: 2026-10-20
 deciders: []
@@ -23,30 +23,30 @@ review:
   tier: async
 ---
 
-# ADR-0006: Launch no story while its spec's issue has an open spec PR, or before one merged
+# ADR-0006: Start no story while its spec's issue has an open spec PR, or before one merged
 
 ## Context
 
 A spec and its decision records land in a spec PR on `<p>-spec`, with no code, before any story (org
 ADR-0002); a rescope is another spec PR on the same issue. The spec's issue is the parent when the story
-issue has one, else the story issue itself. A story launched under a spec that is changing would be
+issue has one, else the story issue itself. A story started under a spec that is changing would be
 built against the old one.
 
 ## Decision
 
-1. We will launch no story while its spec's issue has an open spec PR or none merged (ADR-0002). The
-   rule gates launch only; an in-flight story's merge is held by its rescope hold (reviewer ADR-0013),
+1. We will start no story while its spec's issue has an open spec PR or none merged (ADR-0002). The
+   rule gates a story's start only; an in-flight story's merge is held by its rescope hold (reviewer ADR-0013),
    which the merge respects (ADR-0009).
 2. We will move a Ready card the rule holds to Blocked, the reason naming the open spec PR, or saying
    none has merged.
-3. We will never launch on a spec PR (planner ADR-0010) and run no internal round on it; it is attested
+3. We will name no builder step on a spec PR (planner ADR-0010) and run no internal round on it; it is attested
    and Codex is requested as for any exempt PR (ADR-0005, ADR-0008).
 
 ## Options considered
 
-### Option A: The spec-PR rule on launch, the rescope hold on merge (chosen)
+### Option A: The spec-PR rule on start, the rescope hold on merge (chosen)
 
-Each move is held by the fact that bears on it: a launch by the spec PR, a merge by whether the story's
+Each move is held by the fact that bears on it: a start by the spec PR, a merge by whether the story's
 branch carries the new spec.
 
 ### Option B: The same rule on merge as well
@@ -67,7 +67,7 @@ Rejected: the card would show no reason, and a human could not tell it from one 
 
 - Easier: every story starts from a merged spec and merged records.
 - Harder: every spec and rescope waits on a human to merge it.
-- **How we would know this was wrong:** spec PRs merged unread to unblock stories; a story launched
+- **How we would know this was wrong:** spec PRs merged unread to unblock stories; a story started
   while its spec's issue had an open spec PR.
 - Revisit if: a round can grade a branch against a spec still in review.
 

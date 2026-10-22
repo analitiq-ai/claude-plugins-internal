@@ -38,7 +38,8 @@ externalRefs:
 
 An issue's spec lives in its spec folder (ADR-0001) and lands by a spec PR on `<p>-spec`, `<p>` the spec's
 issue (org ADR-0002, root ADR-0005). A rescope changes a spec that stories may be building against. Planning
-is run by a human in a session, and its grill and critique steps ask that human for verdicts.
+is run by a human where they work, outside the agent environment, so the managed settings (root
+ADR-0008) do not apply to it. Its grill and critique steps ask that human for verdicts.
 
 ## Decision
 
@@ -47,7 +48,7 @@ is run by a human in a session, and its grill and critique steps ask that human 
    default branch makes the run a rescope; otherwise the run writes a new spec.
 2. We will make `<p>` the session's issue when the run starts, and commit only on `<p>-spec`, inside
    `specs/<p>-*/` and the decision-record folders; reviewer's fence admits exactly these commits while
-   `<p>` is in Backlog or Blocked (reviewer ADR-0015).
+   `<p>` is in Backlog or Blocked (reviewer ADR-0015), a guardrail under the human's oversight.
 3. We will enforce root ADR-0006 at the start of a run: a card outside Backlog or Blocked, or a closed
    spec's issue, stops the run before it writes anything, naming the cards to move.
 4. We will land a new spec and a rescope alike only through the spec PR (ADR-0010), a rescope with its
@@ -71,7 +72,7 @@ Rejected: no script reads the verdict.
 
 ### Option D: planner writes Blocked when it needs the user
 
-Rejected: no plugin writes a lane (orchestrator ADR-0002).
+Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 ### Option E: Run planning with reviewer off
 

@@ -38,11 +38,11 @@ its own only when a PR opens or turns ready, never on a push.
    reviewing from ready on; its `trigger` does nothing.
 2. We will trigger once per head, when there is no verdict and no request yet: on a story PR once
    attested, GREEN and without findings; on an exempt PR once ready. REQUESTED counts only a comment by
-   the orchestrator's App (ADR-0003); the hook refuses the request from any agent session (reviewer
-   ADR-0012).
+   the orchestrator's App (ADR-0003); reviewer's hook refuses the request from the model's commands
+   (reviewer ADR-0012).
 3. We will have the orchestrator write `codex-review` at the head with its App, from the Codex module's
    `status`: pass is success, WAIVED when marked so; fail is failure; pending is pending. No other
-   service writes it, so while the orchestrator is down no PR has a verdict and none merges.
+   service writes it, so while no agent session runs no PR has a verdict and none merges.
 4. We will move the card to Blocked, naming the reporter, when a module reports silent past its
    configured timeout, Codex's timed from the request comment, or a required check (ADR-0007) is
    missing or pending past the configured timeout. We never ask twice for one head; the second ask is a human's.
@@ -59,7 +59,7 @@ Rejected: it never reviews a push, so every later head needs the comment anyway.
 
 ### Option C: builder re-requests after pushing fixes
 
-Rejected: it cannot wait for CI; the orchestrator owns the GitHub loop.
+Rejected: a request is the orchestrator's move under its App, never the model's.
 
 ### Option D: A separate service and App write `codex-review`
 

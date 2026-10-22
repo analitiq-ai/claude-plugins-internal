@@ -28,21 +28,21 @@ review:
 ## Context
 
 The merge contract is GitHub's ruleset (ADR-0009), which needs a status saying the internal review
-passed at the head. reviewer records each round's verdict in its state comment on the story issue
-(reviewer ADR-0011), from inside the agent session. Which credential turns that record into the status
-the ruleset trusts is the ruleset's trust root. A PR can also change the config, workflows and hooks that
-grade it.
+passed at the head. reviewer's hook records each round's verdict as the reviewer App in its state
+comment on the story issue (reviewer ADR-0011), only from a run its gate accepts (reviewer ADR-0021).
+Which credential turns that record into the status the ruleset trusts is the ruleset's trust root. A PR
+can also change the config, workflows and hooks that grade it.
 
 ## Decision
 
 1. We will attest the internal review as the commit status `internal-review` at the head: success when
    reviewer's state on the PR's story issue, read as reviewer ADR-0011 decides, records a CLEAN round at
-   the head; success marked "exempt" on an exempt PR (ADR-0005); else pending. Every tick the
+   the head; success marked "exempt" on an exempt PR (ADR-0005); else pending. At every hook run the
    orchestrator writes `internal-review` and `codex-review` (ADR-0008) on every open PR of the repo,
    story PR or not, when the status at the head differs from its value, so a write never repeats and a
    removed exempt label is undone.
-2. We will write it with the orchestrator's App (ADR-0001), from GitHub state
-   alone; no session can read that App's key (ADR-0009).
+2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
+   that App's key (root ADR-0008).
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a status written
    with any other token counts for nothing.
 4. We will never attest a PR that changes `codeworks.toml`, `.github/` or `.claude/`, Bot-authored or
@@ -54,15 +54,15 @@ grade it.
 
 ### Option A: The orchestrator's App writes the status from reviewer's state comment (chosen)
 
-One writer, its key only on the orchestrator's host.
+One writer, its key read only by hooks.
 
 ### Option B: An attestation comment a second App turns into the status
 
-Rejected: a comment any session can post would be the attestation's only evidence.
+Rejected: a comment the model's token can post would be the attestation's only evidence.
 
-### Option C: reviewer writes the status from the session with its token
+### Option C: reviewer writes the status itself
 
-Rejected: the graded session would attest its own review.
+Rejected: one App would both record and attest a round.
 
 ### Option D: Attest fork PRs from reviewer's state like same-repo PRs
 
@@ -70,14 +70,15 @@ Rejected: a fork author names the branch and opens the PR outside any session.
 
 ## Trade-offs
 
-- A review round runs inside the session it grades, an accepted risk (root ADR-0007).
+- A review round runs inside the session it grades; only that gate keeps a forged verdict out of the
+  record.
 - Every change to the config, workflows or hooks waits on a human's label.
 - A fork contribution waits on a writer's exempt label or same-repo push.
 
 ## Consequences
 
-- Easier: the credential that attests never enters an agent session.
-- Harder: while the orchestrator is down no PR is attested.
+- Easier: the model never reads the credential that attests.
+- Harder: while no agent session runs, no PR is attested.
 - **How we would know this was wrong:** a CLEAN round no review round produced, or a
   protected-path or fork PR attested from reviewer's state.
 - Revisit if: rounds move out of the session (root ADR-0007), or the ruleset stops being the merge
