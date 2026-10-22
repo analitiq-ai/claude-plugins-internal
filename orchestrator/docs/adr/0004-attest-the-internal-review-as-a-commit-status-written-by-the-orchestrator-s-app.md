@@ -36,8 +36,8 @@ can also change the config, workflows and hooks that grade it.
 ## Decision
 
 1. We will attest the internal review as the commit status `internal-review` at the head: success when
-   reviewer's state on the PR's story issue, read as reviewer ADR-0011 decides, records a CLEAN round at
-   the head and no open hold; success marked "exempt" on an exempt PR (ADR-0005); else pending. At every
+   reviewer's state on the PR's story issue, read as reviewer ADR-0011 decides, records a CLEAN or
+   CONVERGED_PUSHBACK round at the head and no open hold; success marked "exempt" on an exempt PR (ADR-0005); else pending. At every
    hook run the orchestrator writes `internal-review` and each module's `<module>-review` (ADR-0008) on
    every open PR of the repo when the status at the head differs from its value, so a write never
    repeats and a removed exempt label is undone.
@@ -79,7 +79,7 @@ Rejected: a fork author names the branch and opens the PR outside any session.
 
 - Easier: the model never reads the credential that attests.
 - Harder: no session, no attestation; a hold placed mid-turn reaches the status at the next hook run.
-- **How we would know this was wrong:** a CLEAN round no review round produced, or a
+- **How we would know this was wrong:** an attesting round no review round produced, or a
   protected-path or fork PR attested from reviewer's state.
 - Revisit if: rounds move out of the session (root ADR-0007), or the ruleset stops being the merge
   contract.

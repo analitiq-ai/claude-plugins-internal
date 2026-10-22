@@ -48,8 +48,8 @@ have stopped.
 1. We will treat a check that could not run as its own outcome: never a pass, never a finding against the
    author, never a guess.
 2. We will fail closed on it: the call, workflow step or merge the check decides does not go ahead until
-   the check runs. The one exception is an external reviewer out of credits, which passes marked WAIVED
-   (ADR-0003).
+   the check runs. The one exception is an external reviewer out of credits, which is WAIVED and counts as a
+   pass (ADR-0003).
 3. We will count every verdict a check returns as an answer, not as this outcome: a judge's `UNSURE` and a
    planning premise pick included.
 4. We will read a GitHub status or check in `error` as a check that could not run, and only `failure` as

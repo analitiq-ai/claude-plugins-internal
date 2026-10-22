@@ -41,9 +41,9 @@ The merge waits on each external reviewer's verdict, which counts only for the h
    posted by the orchestrator's App (ADR-0003); reviewer's hook refuses the request from the model's
    commands (reviewer ADR-0012).
 3. We will have the orchestrator write each module's `<module>-review` at the head with its App, from
-   that module's `status`: pass is success, WAIVED when marked so; fail is failure; pending is pending.
+   that module's `status`: PASS is success, WAIVED success marked so, FAIL failure, PENDING pending.
    No other service writes it, so while no agent session runs no PR has a verdict and none merges.
-4. We will move the card to Blocked, naming the reporter, when a module reports silent past its
+4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past its
    timeout from config, timed from its request where it posted one, or a required check (ADR-0007) is
    missing or pending past the configured timeout. We never ask twice for one head; the second ask is
    a human's.

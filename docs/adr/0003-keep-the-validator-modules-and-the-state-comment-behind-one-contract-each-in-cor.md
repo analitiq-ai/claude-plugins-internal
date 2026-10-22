@@ -38,14 +38,14 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
 ## Decision
 
 1. We will put one validator module per external reviewer behind one contract: `trigger(pr, head)`, a
-   no-op for a self-triggering provider; `status(pr, head)` → pending · pass · fail · silent, silent once
+   no-op for a self-triggering provider; `status(pr, head)` → PENDING · PASS · FAIL · SILENT, SILENT once
    the module's timeout passes; `findings(pr, head)` → a list in the Findings schema (source, author,
    file, line, text, thread id if any, resolvable on GitHub).
 2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
    thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
    (ADR-0002).
 3. We will define the Findings contract, the state comment's snapshot and the spec facts (planner
-   ADR-0008) as Pydantic models and generate their JSON Schemas.
+   ADR-0008) as Zod schemas (ADR-0009) and generate their JSON Schemas.
 4. We will have no component reach the state comment other than through `core/`'s one read and write
    (ADR-0001).
 5. We will make the modules the only way a component reads an external reviewer: the orchestrator calls
@@ -53,8 +53,8 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
    github stage reads `findings` (reviewer ADR-0016). The orchestrator alone closes threads no trusted
    reviewer started (orchestrator ADR-0007).
 6. We will have a module whose provider publishes its verdict only in review text read it there, in
-   `core/` alone. A provider out of credits with no verdict passes, marked WAIVED: the one exception to
-   ADR-0004's fail-closed rule.
+   `core/` alone. A provider out of credits with no verdict is WAIVED, which counts as a pass: the one
+   exception to ADR-0004's fail-closed rule.
 7. We will have a module return items its provider publishes outside any thread as findings with no
    thread, closed by a fix or by a pushback recorded in reviewer's state.
 
@@ -82,7 +82,7 @@ is a human's decision.
 ## Consequences
 
 - Easier: a new reviewer is one module; every consumer reads one answer.
-- Harder: a contract change reaches every component that installs `core/`.
+- Harder: a contract change reaches every plugin that carries `core/`.
 - **How we would know this was wrong:** two components disagree on a status, finding or hold at one head.
 - Revisit if: a component must run without `core/`.
 

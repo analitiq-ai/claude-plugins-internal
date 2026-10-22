@@ -47,8 +47,9 @@ read from. A verdict read from any of those can be forged.
    differs from the plugin's file. A run the gate did not record never counts.
 3. We will count a verdict only from a live `StructuredOutput` event of an agent bound to that run by its
    `agent_transcript_path`; never from task notifications, task output files, the journal or transcripts.
-4. We will rule a round CLEAN only when every expected agent answered; otherwise DIRTY or INCOMPLETE.
-5. We will let every other workflow run untouched, and count none of its results.
+4. We will rule a round INCOMPLETE when an expected agent is silent, else DIRTY when one found
+   something, else CLEAN.
+5. We will let every other workflow run untouched, counting none of its results.
 
 ## Options considered
 

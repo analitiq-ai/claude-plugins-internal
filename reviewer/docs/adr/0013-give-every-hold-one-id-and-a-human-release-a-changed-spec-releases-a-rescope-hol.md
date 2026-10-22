@@ -33,7 +33,7 @@ review:
 
 ## Context
 
-A story claimed from Ready types no prompt. A story's PR can be closed and reopened. A rescope changes the spec
+A story claimed from Ready types no prompt. Its PR can be closed and reopened. A rescope changes the spec
 a story in flight is graded against.
 
 ## Decision
@@ -46,7 +46,7 @@ a story in flight is graded against.
    orchestrator's App (orchestrator ADR-0002), but `rescope-<issue>`, and `escalation-<issue>` only once
    ANSWERED (orchestrator ADR-0010), carrying the answer into the next round's briefs. A user prompt
    starting `unlock <id>` releases that one.
-3. We will place each hold, and grant on its release, as follows; each count is a number in `[reviewer]`.
+3. We will place each hold, and grant on its release, as follows; each count is a `[reviewer]` key.
    A merge blocker is a validator module's failure through `core/` (ADR-0016) or a failing required check;
    pushed-back threads alone are resolved by the replies.
 
@@ -56,7 +56,7 @@ a story in flight is graded against.
    | `pushback-<issue>` | a github round rules no FIX while a merge blocker fails at the head | rounds | rounds |
    | `claim-<id>` | the count of WRONG rulings on its lineage | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |
-   | `audit-<issue>` | the count of escalation audits not CONVERGED | rounds | that many audits |
+   | `audit-<issue>` | the count of escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
 4. We will place `rescope-<issue>` on a `RESCOPE` verdict, and, when reviewer's hook sees a rescope's
    spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006). It
    records the blob SHA of `spec.md` on the story branch, else the default branch, and refuses every code
