@@ -158,7 +158,9 @@ hand), so no repo settings file loads: a repo's `env` would otherwise reach ever
 starts, the codeworks hooks included. Managed settings always load.
 
 Two rules live in hooks, not in the file: hooks run git with `core.fsmonitor` and `core.hooksPath` off,
-and every hook that reads a key refuses unless the managed settings are present and in effect.
+and every hook that reads a key refuses unless the managed settings are present and in effect. The one
+exception is reviewer's hook reading the session App's key where planner runs, which has no managed
+settings (§2).
 
 ## 6. The review gate rule
 
