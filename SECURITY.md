@@ -231,6 +231,11 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **WebFetch (accepted risk):** an injected prompt can make the model send what it reads, private source
   and the one-hour session token included, to any host through WebFetch. The merge boundary (§1) holds:
   the token cannot merge past the ruleset.
+- **Hold window:** an open hold turns `internal-review` pending (orchestrator ADR-0004), but only at the
+  orchestrator's next hook run; until then the session token can merge the head. That head had a CLEAN
+  round, so §1 holds: the hold is a guardrail, not the boundary (root ADR-0007 d6). Closing the window
+  would need the hold itself in a required check: GitHub cannot write a comment and a status in one step,
+  and only the orchestrator App writes `internal-review`.
 - **E2:** whether the session App can delete a reviewer comment is untested. If it can, the hold stays:
   GitHub records the deletion of another account's comment on the issue timeline, which no token can
   remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from

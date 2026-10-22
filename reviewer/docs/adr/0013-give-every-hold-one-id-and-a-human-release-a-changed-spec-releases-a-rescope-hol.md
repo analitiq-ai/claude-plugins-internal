@@ -40,7 +40,7 @@ a story in flight is graded against.
 
 1. We will give every hold an id and a row in the state snapshot (ADR-0011), keyed by the story issue's
    number but `claim-<id>` (its lineage) and `shim-<id>` (its bug). While one is open the story merges
-   nothing (orchestrator ADR-0009). A refusal names the id.
+   nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
 2. We will release holds by one function. Only on the orchestrator's claim from Ready,
    reviewer releases each open hold of the story issue that has a Blocked-reason comment by the
    orchestrator's App (orchestrator ADR-0002), but `rescope-<issue>`, and `escalation-<issue>` only once
