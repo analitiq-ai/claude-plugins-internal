@@ -36,20 +36,19 @@ review:
 An install copies a plugin's whole folder, so tests, specs and records cannot sit inside it, and a plugin
 may reference only paths inside its own root. The repo answered with two trees: `plugins/<name>/`
 installed, `dev/<name>/` not, each `dev/` folder its own Spec Kit project. Each component lives in two
-places, and the constitutions repeat the same principles. The orchestrator is never installed, so it fits
-neither tree. reviewer, planner and the orchestrator all use the state comment and the validator modules.
+places, and the constitutions repeat the same principles. reviewer, planner and the orchestrator all use
+the state comment and the validator modules.
 
 ## Decision
 
 1. We will give each component one top-level folder, `planner/`, `builder/`, `reviewer/`, `auditor/`,
-   `orchestrator/` and `core/`, holding `plugin/` (what an install copies), `tests/` and `docs/adr/`. The
-   orchestrator's folder has no `plugin/`; `core/` holds a package in place of `plugin/`.
+   `orchestrator/` and `core/`, holding `plugin/` (what an install copies), `tests/` and `docs/adr/`;
+   `core/` holds a package in place of `plugin/`.
 2. We will make `core/` the one home of code more than one component runs: the state-comment read and
    write, the validator modules with their Findings contract (ADR-0003), the spec facts' model (ADR-0003)
-   and the parser of a story's identity (ADR-0005). Each plugin installs it into its
-   `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version; the orchestrator imports it the same way, and
-   imports no plugin code. Every state write runs in reviewer's hook process, outside the session's
-   sandbox (ADR-0008).
+   and the parser of a story's identity (ADR-0005). Each plugin, the orchestrator included, installs it
+   into its `${CLAUDE_PLUGIN_DATA}`, pinned to the plugin's version, and imports no other plugin's code.
+   Every state-comment write runs in reviewer's hook process, outside the sandbox (ADR-0008).
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 
@@ -59,9 +58,9 @@ neither tree. reviewer, planner and the orchestrator all use the state comment a
 
 Ownership, CI and an import boundary are each one path rule per component.
 
-### Option B: Keep `plugins/` and `dev/`, add `orchestrator/`
+### Option B: Keep `plugins/` and `dev/`
 
-Rejected: each plugin stays split across two trees, and the orchestrator is a third shape.
+Rejected: each plugin stays split across two trees.
 
 ### Option C: A repository per component
 

@@ -56,7 +56,7 @@ Every reader keyed on the issue number sees it; no special value anywhere.
 
 ### Option B: No folder, and `spec: null` passed at review
 
-Rejected: no user passes `spec: null`, since every launch derives the folder from the spec's issue (root
+Rejected: no user passes `spec: null`, since every step derives the folder from the spec's issue (root
 ADR-0005).
 
 ### Option C: No record, drop `no spec needed`, or a mark on the issue
@@ -67,7 +67,7 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 ## Trade-offs
 
 - A folder with no requirements sits beside real specs, told apart by one front-matter key.
-- A `no spec needed` pick still costs a spec PR a human merges before the story launches (org ADR-0002).
+- A `no spec needed` pick still costs a spec PR a human merges before the story starts (org ADR-0002).
 
 ## Consequences
 

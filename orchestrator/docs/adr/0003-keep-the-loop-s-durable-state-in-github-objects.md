@@ -27,29 +27,26 @@ review:
 
 ## Context
 
-The orchestrator (ADR-0001) and reviewer act on the same facts; the orchestrator's host is unspecified.
+The orchestrator (ADR-0001) and reviewer act on the same facts; the agent environment's host is
+unspecified (root ADR-0008).
 
 ## Decision
 
 1. We will keep every state that outlives a session on GitHub: the claim is the story issue's
-   assignee; the attestation is a commit status at the head (ADR-0004); rounds and holds are reviewer's
-   tagged state comments on the story issue, read as reviewer ADR-0011 decides; findings come from
-   `core/`'s modules, the required checks and the mergeable field (ADR-0007); the escalation question,
-   its answer and every Blocked reason are issue comments.
+   assignee; the attestation is a commit status at the head (ADR-0004); rounds and holds are the
+   reviewer App's tagged state comments on the story issue, read as reviewer ADR-0011 decides; findings
+   come from `core/`'s modules, the required checks and the mergeable field (ADR-0007); the escalation
+   question, its answer and every Blocked reason are issue comments.
 2. We will link a PR to its story issue only by its head branch, as root ADR-0005 decides; a fork PR
    as ADR-0004 decides.
 3. We will keep every fact the orchestrator acts on machine-readable: a Blocked reason carries its cause's key and is posted only when no comment with that key
    exists (HANDLED). The Blocked move fires whether or not the reason is HANDLED, a card dragged back to
-   a working lane after a handled no-PR launch included.
-4. We will post Blocked reasons and Codex requests with the orchestrator's App, and count only that
+   a working lane after a handled no-PR turn included.
+4. We will post Blocked reasons and external review requests with the orchestrator's App, and count only that
    App's comments for HANDLED and REQUESTED.
-5. We will let the orchestrator keep on its host only the launch lock and the launch log, keyed per
-   (repo, issue). The lock is `core/`'s, taken by every launch and by builder's issue-tackle, which
-   refuses beside a running launch; a lock an interactive session holds counts as RUNNING. It lives on
-   the orchestrator's host, so issue-tackle elsewhere refuses. The lock dies with its process. At
-   start-up a launch-log entry with no exit is dropped only if its lock is free, so the next tick
-   relaunches that story. The orchestrator re-reads GitHub every tick and stores nothing it could read
-   there.
+5. We will keep no lock: one session builds one story at a time (root ADR-0008). The orchestrator re-reads
+   GitHub at every hook run and stores nothing it could read there; a new session resumes a claimed
+   story from GitHub. Where the bound counts of ADR-0001 live is the orchestrator's spec to settle.
 
 ## Options considered
 
@@ -59,26 +56,25 @@ The orchestrator (ADR-0001) and reviewer act on the same facts; the orchestrator
 
 Rejected: there is no PR before the first push, and every whole-body writer can drop a hold.
 
-### Option C: A shared-host ledger the orchestrator reads
+### Option C: A ledger in the agent environment
 
-Rejected: a deployment assumption; the orchestrator runs no plugin code.
+Rejected: it dies with the environment; GitHub is what every session reads.
 
-### Option D: A local handled flag in the launch log
+### Option D: A local handled flag
 
 Rejected: the comment's key is the record; a restart re-reads the issue.
 
 ## Trade-offs
 
-- A launch that died is relaunched from the start of its turn.
+- A turn cut short by the session's end restarts from its start in the next session.
 
 ## Consequences
 
-- Easier: the orchestrator restarts anywhere; a hold survives a re-created PR.
+- Easier: a session in any agent environment resumes the loop; a hold survives a re-created PR.
 - Harder: a fact to remember needs a GitHub object or is not state.
-- **How we would know this was wrong:** a record kept off GitHub beyond decision 5, or two hosts
+- **How we would know this was wrong:** a record kept off GitHub beyond decision 5, or two sessions
   disagreeing about one issue.
-- Revisit if: rounds move out of the session, or stories must be built away from the orchestrator's
-  host.
+- Revisit if: rounds move out of the session, or a board needs a second session.
 
 ## Action items
 

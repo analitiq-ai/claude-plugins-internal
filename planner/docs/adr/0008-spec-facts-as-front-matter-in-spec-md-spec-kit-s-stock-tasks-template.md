@@ -69,7 +69,7 @@ Rejected: not the sanctioned path.
 
 ### Option E: Map the untagged phases to a story at runtime
 
-Rejected: a script would derive at every launch what planner knows when it plans.
+Rejected: a script would derive at every step what planner knows when it plans.
 
 ## Trade-offs
 

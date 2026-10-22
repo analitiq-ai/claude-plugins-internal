@@ -33,18 +33,19 @@ review:
 
 ## Context
 
-A launch from Ready types no prompt. A story's PR can be closed and reopened. A rescope changes the spec
+A story claimed from Ready types no prompt. A story's PR can be closed and reopened. A rescope changes the spec
 a story in flight is graded against.
 
 ## Decision
 
 1. We will give every hold an id and a row in the state snapshot (ADR-0011), keyed by the story issue's
    number but `claim-<id>` (its lineage) and `shim-<id>` (its bug). While one is open the story merges
-   nothing (orchestrator ADR-0009). A refusal names the id.
-2. We will release holds by one function. Only at a session's first start, reviewer releases each open
-   hold of the story issue that has a Blocked-reason comment by the orchestrator's App (orchestrator
-   ADR-0002), but `rescope-<issue>`, and `escalation-<issue>` only once ANSWERED (orchestrator ADR-0010),
-   carrying the answer into the next round's briefs. A user prompt starting `unlock <id>` releases that one.
+   nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
+2. We will release holds by one function. Only on the orchestrator's claim from Ready,
+   reviewer releases each open hold of the story issue that has a Blocked-reason comment by the
+   orchestrator's App (orchestrator ADR-0002), but `rescope-<issue>`, and `escalation-<issue>` only once
+   ANSWERED (orchestrator ADR-0010), carrying the answer into the next round's briefs. A user prompt
+   starting `unlock <id>` releases that one.
 3. We will place each hold, and grant on its release, as follows; each count is a number in `[reviewer]`.
    A merge blocker is a validator module's failure through `core/` (ADR-0016) or a failing required check;
    pushed-back threads alone are resolved by the replies.
@@ -56,11 +57,12 @@ a story in flight is graded against.
    | `claim-<id>` | the count of WRONG rulings on its lineage | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |
    | `audit-<issue>` | the count of escalation audits not CONVERGED | rounds | that many audits |
-4. We will place `rescope-<issue>` on a `RESCOPE` verdict, and when a session opens a rescope's spec PR
-   (planner ADR-0010) on every open story issue under that spec (root ADR-0006). It records the blob SHA of `spec.md` on the story branch, else the default
-   branch, and refuses every code commit but the session's merge of the default branch; it blocks no launch, since the launch merges that branch. reviewer releases it once the
-   branch's `spec.md` differs from that SHA and equals the default branch's, checked at each commit and
-   round launch, or on `unlock rescope-<issue>`; never on Ready.
+4. We will place `rescope-<issue>` on a `RESCOPE` verdict, and, when reviewer's hook sees a rescope's
+   spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006). It
+   records the blob SHA of `spec.md` on the story branch, else the default branch, and refuses every code
+   commit but a merge of the default branch; it blocks no story start, which merges that branch. reviewer
+   releases it once the branch's `spec.md` differs from that SHA and equals the default branch's, checked
+   at each commit and round launch, or on `unlock rescope-<issue>`; never on Ready.
 
 ## Options considered
 
@@ -80,7 +82,7 @@ Rejected: the agent could release its own hold mid-session.
 
 ## Trade-offs
 
-- A rescope that leaves `spec.md` unchanged holds until a human unlocks it.
+- A rescope leaving `spec.md` unchanged holds until a human unlocks it.
 
 ## Consequences
 

@@ -36,7 +36,7 @@ review:
 ## Context
 
 reviewer keeps its settings in a `config.json` inside its plugin and reads its modes from environment
-variables too, which whoever launches a session sets, the session included. The orchestrator has a file of
+variables too, which whoever starts a session sets, the session included. The orchestrator has a file of
 its own. A setting can sit in one component's file while another component decides what it governs. The
 validator modules (ADR-0003) need settings that both the orchestrator and reviewer read. The orchestrator
 works across branches and PRs of a repo, some from forks.
@@ -46,7 +46,7 @@ works across branches and PRs of a repo, some from forks.
 1. We will keep every component's settings in one TOML file, `codeworks.toml` at the target repo's root: a
    `[shared]` section and one section per component, `[orchestrator]`, `[reviewer]`, `[builder]`, and
    `[planner]` when it has settings. No session writes it (reviewer ADR-0012), and no PR changing it is
-   attested but by a human's label (orchestrator ADR-0004).
+   attested but by an exempt label (orchestrator ADR-0004, ADR-0005).
 2. We will put each key in exactly one section; a key two components read goes in `[shared]`. Each
    component reads only its own section and `[shared]`, validates its own section, and refuses an unknown
    key.
@@ -67,7 +67,7 @@ Rejected: a key two components read lives in two files, or one component reads a
 
 ### Option C: Environment variables over the file
 
-Rejected: whoever launches a session sets them, so the reviewed file does not say what runs.
+Rejected: whoever starts a session sets them, so the reviewed file does not say what runs.
 
 ### Option D: Always read the file from the default branch
 
@@ -81,7 +81,8 @@ Rejected: a second read path guarding a file sessions already cannot write.
 
 ## Consequences
 
-- Easier: the orchestrator reads no plugin config; a setting cannot be changed from inside a session.
+- Easier: no component reads a config file inside a plugin; a setting cannot be changed from inside a
+  session.
 - Harder: each component validates a schema for its own section.
 - **How we would know this was wrong:** one key wanted in two sections, or a setting changed by a session.
 - Revisit if: a component ships to repos without the others.

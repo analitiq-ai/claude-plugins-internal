@@ -32,8 +32,8 @@ review:
 ## Context
 
 The premise step ends in `write the spec`, `no spec needed` or `not worth doing`. This record decides what
-a run does with the issue on the last two. No plugin closes an issue; the orchestrator closes only a parent
-whose sub-issues are all done (orchestrator ADR-0009), done as root ADR-0005 defines it.
+a run does with the issue on the last two. No plugin but the orchestrator's hooks closes an issue, and they
+close only a parent whose sub-issues are all done (orchestrator ADR-0009), done as root ADR-0005 defines it.
 
 ## Decision
 
@@ -46,7 +46,7 @@ whose sub-issues are all done (orchestrator ADR-0009), done as root ADR-0005 def
 
 ### Option A: The user closes it; the folder is the no-spec record (chosen)
 
-Every launch finds the folder from its spec's issue (root ADR-0005).
+Every step finds the folder from its spec's issue (root ADR-0005).
 
 ### Option B: Tell the user to pass `spec: null` at review
 

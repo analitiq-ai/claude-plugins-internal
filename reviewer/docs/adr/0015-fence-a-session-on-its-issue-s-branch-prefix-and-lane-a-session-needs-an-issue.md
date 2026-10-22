@@ -40,7 +40,7 @@ only outside Blocked and Backlog, planning only inside (root ADR-0006).
    the issue is in Backlog or Blocked and only inside `specs/<s>-*/` and the decision-record folders.
 2. We will refuse, while reviewer is on, every commit of a session with no recorded issue, naming the ways
    forward: name the issue, or switch reviewer off (ADR-0006). Ad-hoc work runs with reviewer off; its PR
-   merges once a human applies the exempt label (orchestrator ADR-0005).
+   merges once a writer other than the session App applies the exempt label (orchestrator ADR-0005).
 3. We will enforce root ADR-0006's lane rule by refusing every story-branch commit and every round's
    launch while the session's issue is in Blocked or Backlog, read from the board at each.
 4. We will gate every new commit on the branch, however made (ADR-0020), and refuse a change to a merged
@@ -68,7 +68,7 @@ Rejected: a story dragged to Blocked would keep committing beside planner.
 
 ## Trade-offs
 
-- Every ad-hoc change needs reviewer off and a human's exempt label.
+- Every ad-hoc change needs reviewer off and an exempt label.
 - The fence is a hook in the session's process, not a server rule.
 
 ## Consequences

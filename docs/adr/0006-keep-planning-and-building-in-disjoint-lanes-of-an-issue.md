@@ -9,7 +9,7 @@ tags: [lanes, board, rescope, concurrency, state-comment]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0003", "0005"]
+relatesTo: ["0003", "0005", "0008"]
 affects:
   - type: path
     pattern: "planner/plugin/skills/issue-spec/**"
@@ -34,9 +34,9 @@ review:
 ## Context
 
 reviewer's state comment on a story issue is a full snapshot, the newest winning (reviewer ADR-0011).
-reviewer writes it while a story is built, and planner writes it when a rescope places holds (reviewer
-ADR-0013); two writers at once would lose one snapshot. A spec that changes under a running story is built
-against the old one. The board already says what runs: the orchestrator launches only from Ready, and a
+reviewer's hook writes it while a story is built, and again when a rescope places holds (reviewer
+ADR-0013); two writes at once would lose one snapshot. A spec that changes under a running story is built
+against the old one. The board already says what runs: the orchestrator claims only from Ready, and a
 human stops a story by dragging it to Blocked (orchestrator ADR-0002).
 
 ## Decision
@@ -44,8 +44,9 @@ human stops a story by dragging it to Blocked (orchestrator ADR-0002).
 1. We will let planner work on an issue only while its card is in Blocked or Backlog, and builder and
    reviewer never while it is there.
 2. We will start a rescope only when the spec's issue and every open story issue under it are in Blocked
-   or Backlog; reviewer's hook then places the rescope hold (reviewer ADR-0013) on each of them; a human
-   moves an in-flight story there, which stops it.
+   or Backlog. planner opens the rescope's spec PR from where its human works; reviewer's hook in the
+   agent environment (ADR-0008) places the rescope hold (reviewer ADR-0013) on each of them when it sees
+   that PR open. A human moves an in-flight story there, which stops it.
 3. We will refuse work on a closed issue; new work goes in a new issue.
 
 ## Options considered
@@ -64,11 +65,11 @@ Rejected: a second mechanism for what the lanes already keep apart.
 
 ### Option D: planner moves the cards to Blocked itself
 
-Rejected: no plugin writes a lane (orchestrator ADR-0002).
+Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 ## Trade-offs
 
-- A rescope stops every launched story under the spec until a human returns it to Ready.
+- A rescope stops every claimed story under the spec until a human returns it to Ready.
 - A human moves every open story under the spec to Blocked or Backlog before a rescope can start, a
   claimed story not yet pushed included.
 
@@ -78,8 +79,8 @@ Rejected: no plugin writes a lane (orchestrator ADR-0002).
   changes.
 - Harder: every component that starts work reads the board first. Each enforces this record in its own:
   planner ADR-0005, builder ADR-0002, reviewer ADR-0015, orchestrator ADR-0002.
-- **How we would know this was wrong:** a state snapshot written by planner lost to one reviewer wrote, or a
-  story built under a spec a rescope was changing.
+- **How we would know this was wrong:** a rescope hold lost to another state write, or a story built
+  under a spec a rescope was changing.
 - Revisit if: planning runs without a human, or state moves out of a single snapshot.
 
 ## Action items

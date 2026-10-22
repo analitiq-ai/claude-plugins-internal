@@ -60,7 +60,7 @@ Every component reads the same story, spec and PR from the same name.
 
 ### Option B: Each component parses the branch itself, or asks reviewer
 
-Rejected: three parsers drift at the edges, and the orchestrator imports no plugin code (ADR-0001).
+Rejected: three parsers drift at the edges, and no plugin imports another's code (ADR-0001).
 
 ### Option C: Link a PR by `Closes #s` or `closingIssuesReferences`
 
@@ -81,7 +81,7 @@ Rejected: that file states no requirement.
 
 ## Consequences
 
-- Easier: a launch needs only the issue number; a renumbered story or a reopened done issue changes
+- Easier: a claim needs only the issue number; a renumbered story or a reopened done issue changes
   nothing.
 - Harder: a grammar change is a `core/` release every component must install.
 - **How we would know this was wrong:** two components name a different story, spec or PR for one
