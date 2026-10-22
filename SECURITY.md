@@ -93,7 +93,7 @@ their answers count only through the gate rule.
 
 ## 5. Managed settings
 
-The block below is the target setup. It differs from the tested one (§7) in three ways listed in §8.
+The block below is the target setup. It differs from the tested one (§7) in the ways listed in §8.
 `<V>` stands for the test folder and `<C>` for the session's package cache folder. In the agent environment: `<V>/keys`
 is `~/.config/codeworks/`; `<V>/ghcreds` stands for every other credential (gh, git, SSH, cloud); `/tmp/verify-b-ghsess` is the session's gh config folder;
 `<V>/plugin/gaterev` is the installed plugin code and data; `<V>/state` is reviewer's state folder
@@ -113,6 +113,8 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
  "Edit(**/.claude/agents/**)","Edit(**/.claude/skills/**)","Edit(**/.claude/commands/**)","Edit(**/.claude/hooks/**)",
  "Edit(**/.mcp.json)","Edit(**/.git/config)","Edit(**/.git/hooks/**)"]},
 "allowedMcpServers":[],"allowManagedMcpServersOnly":true,
+"allowManagedHooksOnly":true,"enabledPlugins":{"orchestrator@codeworks":true,"builder@codeworks":true,
+ "reviewer@codeworks":true,"auditor@codeworks":true},
 "env":{"PIP_CACHE_DIR":"<C>/pip","npm_config_cache":"<C>/npm"}}
 ```
 
@@ -145,7 +147,15 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   accepted but never checked, so the block has none.
 - `allowedMcpServers: []` with `allowManagedMcpServersOnly`: no MCP server loads unless the managed file
   lists it.
+- `allowManagedHooksOnly` with the codeworks plugins in `enabledPlugins`: only their hooks run. Hooks a
+  served repo commits in its settings, skills or agents would otherwise run outside the sandbox with the
+  user's full access, even in a folder never trusted, because a `-p` session treats every folder as
+  trusted.
 - `env`: package caches sit in the session's temp folder, which the sandbox lets commands write.
+
+The session starts with `--setting-sources user` (`claude -p --setting-sources user`, or the same flag by
+hand), so no repo settings file loads: a repo's `env` would otherwise reach every process Claude Code
+starts, the codeworks hooks included. Managed settings always load.
 
 Two rules live in hooks, not in the file: hooks run git with `core.fsmonitor` and `core.hooksPath` off,
 and every hook that reads a key refuses unless the managed settings are present and in effect.
@@ -208,7 +218,8 @@ The other rows ran on 2.1.300 to 2.1.306.
   - the gate rewriting every Workflow launch, where §6 rewrites only reviewer workflows and lets other
     results never count;
   - the network and MCP allowlists, unix-socket blocking and `allowManagedReadPathsOnly`;
-  - hooks running git with `core.fsmonitor` and `core.hooksPath` off.
+  - hooks running git with `core.fsmonitor` and `core.hooksPath` off;
+  - `allowManagedHooksOnly` with `enabledPlugins`, and `--setting-sources user` (Claude Code docs only).
 - **Managed-only keys** (`allowManagedReadPathsOnly`, `allowManagedDomainsOnly`,
   `allowManagedMcpServersOnly`) do nothing under `--settings`; only an installed managed file tests them.
 - **Wildcard Edit rules on Linux** never reach the sandbox's write-deny list; Bash writes to those files

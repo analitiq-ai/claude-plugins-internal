@@ -19,5 +19,5 @@ are in `docs/adr/`.
 6. Install each external reviewer, for example Codex or CodeRabbit, its automatic review off wherever
    its module triggers it (ADR-0008).
 7. Spell the board's lanes Backlog, Ready, In progress, In review, Blocked, Done.
-8. Start one session in the agent environment (`claude -p`, or by hand); the orchestrator's hooks take
-   it from there.
+8. Start one session in the agent environment with `--setting-sources user` (`claude -p`, or by hand),
+   so no served repo's settings load (`SECURITY.md` §5); the orchestrator's hooks take it from there.
