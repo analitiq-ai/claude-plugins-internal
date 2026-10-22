@@ -43,9 +43,10 @@ or deleted.
    rescope hold its `spec.md` blob SHA (ADR-0013). The newest tagged comment by the reviewer App,
    `codeworks-reviewer` (issues write alone), wins; reviewer's hook posts it with that App's key, which
    only hooks read (root ADR-0008), and only from verdicts ADR-0021 counts.
-2. We will fail closed: when the newest such comment was edited, or a story with a PR has no snapshot,
-   the story is held, as by an open hold. A story with neither a PR nor a snapshot has no state. A
-   human's Ready releases it: reviewer then posts a snapshot rebuilt from the newest unedited one.
+2. We will fail closed: when the newest such comment was edited, when the issue's timeline shows a
+   reviewer App comment deleted after it, or when a story with a PR has no snapshot, the story is held.
+   A story with neither a PR nor a snapshot has no state. A human's Ready releases it: reviewer then
+   posts a snapshot rebuilt from the newest unedited one.
 3. We will read and write the snapshot only through the state module in `core/` (root ADR-0003):
    reviewer's hook alone writes, and the orchestrator only reads ATTESTED and HOLD.
 4. We will have planner write no state: reviewer's hook in the agent environment places a rescope hold
@@ -59,7 +60,7 @@ or deleted.
 
 ### Option B: A store beside the session as the record
 
-Rejected: the problem in Context.
+Rejected: lost with the environment.
 
 ### Option C: A section of the PR body
 

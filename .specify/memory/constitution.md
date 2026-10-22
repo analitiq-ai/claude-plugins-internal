@@ -4,7 +4,8 @@ Sync Impact Report
 - Changed: opening and Repo shape name the orchestrator as a plugin; the Repo Principles note gives
   P6's refusals to reviewer's hook; P9 counts no command the model runs as a trusted actor and cites
   the renamed root ADR-0007; the planner and builder constraints say where each runs; P4's WAIVED
-  exception and P7's review-text exception name no provider.
+  exception and P7's review-text exception name no provider; the tampered-state rule counts a deleted
+  reviewer App state comment.
 - Added: Platform Constraints "Agent environment" (root ADR-0008).
 - Removed: none.
 - Templates: .specify/templates/* need no change.
@@ -107,7 +108,8 @@ Gate: for every lock, count or hold the plan adds or changes, does the plan name
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
 no named approver, or with a way out no decision record names, fails the gate. State that may have been
-tampered with reads as held: an edited newest state snapshot, or a story with a PR and no snapshot.
+tampered with reads as held: an edited newest state snapshot, a reviewer App state comment deleted
+after it, or a story with a PR and no snapshot.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`); how the user's action is recognised:

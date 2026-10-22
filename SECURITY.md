@@ -231,7 +231,11 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **WebFetch (accepted risk):** an injected prompt can make the model send what it reads, private source
   and the one-hour session token included, to any host through WebFetch. The merge boundary (§1) holds:
   the token cannot merge past the ruleset.
-- **E2:** whether the session App can delete a reviewer comment is untested.
+- **E2:** whether the session App can delete a reviewer comment is untested. If it can, the hold stays:
+  GitHub records the deletion of another account's comment on the issue timeline, which no token can
+  remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
+  GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer
+  never deletes its own.
 - **Open:** how the orchestrator waits on CI and external reviewers (its spec); how core's installer
   fetches the private repo in an environment with no credential (moot once the repo is public); how the
   decision-reviewer reads a private org log with a one-repo token.
