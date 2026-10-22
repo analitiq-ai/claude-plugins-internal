@@ -8,8 +8,9 @@ reviewer ADR-0011, ADR-0012 and ADR-0021.
 
 Only code that passed review merges. Four things hold that:
 
-1. Each served repo's ruleset requires CI, and `internal-review` and `codex-review` from the orchestrator
-   App. No App is on its bypass list (orchestrator ADR-0009).
+1. Each served repo's ruleset requires CI, `internal-review` and each external reviewer module's
+   `<module>-review` (for example `codex-review`) from the orchestrator App. No App is on its bypass
+   list (orchestrator ADR-0009).
 2. The orchestrator App's key is readable only by hooks, never by the model.
 3. The orchestrator attests `internal-review` only from a round record posted by the reviewer App.
 4. reviewer posts that record only from verdicts the gate rule (§6) accepts.
@@ -26,11 +27,14 @@ security change.
   (`claude -p`, or a human); the orchestrator's hooks drive it from there. The orchestrator and reviewer
   App keys exist only here. builder runs nowhere else.
 - **Planner** runs where its human works, outside the agent environment and its managed settings, under
-  the human's oversight. It never runs in a container.
+  human supervision. Its agent acts on GitHub as the session App, through the token reviewer's hook mints
+  from the session key there (root ADR-0007 d2), never with a person's credentials. It never runs in a
+  container.
 
 Accepted risks:
 
-- planner's agent can read what its human can, including the session App key kept there.
+- planner's agent works without managed settings: that it acts on GitHub only with the agent
+  credentials on its machine, never a person's, rests on human supervision.
 - A flaw in Claude Code's sandbox is a codeworks hole.
 - All hooks run as one OS user. Each App key is read only by its own plugin's hooks by convention; what
   enforces it is that plugin code is pinned and the model cannot write it.
@@ -46,13 +50,13 @@ Three GitHub Apps per served repo, none on a ruleset bypass list.
 | App | Acts for | Repository permissions | Organization permissions | Key read by |
 |---|---|---|---|---|
 | `codeworks-session` | the model's commands, through a one-hour, one-repo installation token | contents, pull requests, issues: write; metadata, checks, statuses, actions: read; no administration, workflows, secrets or environments | projects: read | the orchestrator's SessionStart hook in the agent environment; reviewer's hook where planner runs |
-| `codeworks-orchestrator` | the orchestrator's hooks: claim, lanes, `internal-review`, the Codex request, `codex-review`, the ready flip, merge, Blocked moves | contents, pull requests, issues, statuses: write; checks: read | projects: write | the orchestrator's hooks, agent environment only |
+| `codeworks-orchestrator` | the orchestrator's hooks: claim, lanes, `internal-review`, external review requests, each module's `<module>-review`, the ready flip, merge, Blocked moves | contents, pull requests, issues, statuses: write; checks: read | projects: write | the orchestrator's hooks, agent environment only |
 | `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | issues: write | none | reviewer's hooks, agent environment only |
 
 A hook mints the session token into a gh config folder the model can read but not write, outside
 `~/.claude` and the session's temp folder, and refreshes it before the hour runs out. No trust check
-counts the session App as a human, writer, trusted or exempt actor. The App keys, the DeepSource token and
-the classifier key live in `~/.config/codeworks/`.
+counts the session App as a human, writer, trusted or exempt actor. The App keys, the validator modules'
+tokens (for example a DeepSource token) and the classifier key live in `~/.config/codeworks/`.
 
 ## 4. Boundaries per component
 
@@ -75,11 +79,14 @@ statuses or merges (GitHub). It runs the gate rule (§6).
 opens draft PRs.
 - GitHub: it cannot write a status, change a ruleset or workflow, or merge past the ruleset.
 - Managed settings (§5): no key or credential read, no write to plugin code, reviewer's state or Claude
-  Code config, listed hosts only, no unlisted MCP server, no Docker.
+  Code config, listed hosts only for sandboxed commands (WebFetch stays allowed), no unlisted MCP server,
+  no Docker.
 - Hook guardrails: commit gates, the lane fence and reviewer's write refusals.
 
-**Planner.** Without managed settings, as the session App. It opens spec PRs and writes no reviewer
-state: reviewer's hook in the agent environment places a rescope hold when it sees the rescope's PR open.
+**Planner.** Under human supervision, without managed settings, as the session App: its agent acts on
+GitHub with the agent credentials on its machine, never a person's. It opens spec PRs and writes no
+reviewer state: reviewer's hook in the agent environment places a rescope hold when it sees the
+rescope's PR open.
 
 **Auditor.** Agents dispatched inside reviewer's rounds. They hold no key and write nothing to GitHub;
 their answers count only through the gate rule.
@@ -121,12 +128,15 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   reviewer's state, the session's gh config or `~/.claude`.
 - `sandbox.filesystem.allowManagedReadPathsOnly`: user, project and repo settings cannot reopen a denied
   path.
-- `sandbox.network.allowedDomains`: sandboxed commands reach only GitHub and the listed registries.
+- `sandbox.network.allowedDomains`: sandboxed commands reach only GitHub and the listed registries. It
+  does not cover WebFetch or WebSearch.
 - `sandbox.network.allowManagedDomainsOnly`: lower settings cannot add a host.
-- `sandbox.network.strictAllowlist`: unlisted hosts stay blocked, also under `bypassPermissions`; tests
-  can set it with `--settings`.
+- `sandbox.network.strictAllowlist`: unlisted hosts stay blocked to sandboxed commands, also under
+  `bypassPermissions`; tests can set it with `--settings`.
 - `sandbox.network.allowAllUnixSockets: false`: on Linux, seccomp blocks unix sockets, so a command cannot
   reach a local daemon such as Docker.
+- WebFetch and WebSearch stay allowed: they run outside the sandbox and reach any host, so agents can
+  check claims about third-party tools and best practice (§8).
 - `permissions.deny` `Read(...)`: Claude's Read and Grep tools, which ignore the sandbox, cannot read the
   keys or credentials.
 - `permissions.deny` `Edit(...)`: Claude's Edit and Write tools, which ignore the sandbox, cannot write
@@ -205,10 +215,14 @@ The other rows ran on 2.1.300 to 2.1.306.
   rely on the sandbox's built-in protected paths (docs, not tested).
 - **Prompt injection through the code under review:** code, comments, issues and findings are untrusted
   and reach builder's model and reviewer's agents. The settings bound what a steered model can do; they do
-  not stop injected text swaying a reviewer agent's verdict. Codex's required review is a second reading.
+  not stop injected text swaying a reviewer agent's verdict. Each external reviewer's required review
+  (for example Codex's) is a second reading.
+- **WebFetch (accepted risk):** an injected prompt can make the model send what it reads, private source
+  and the one-hour session token included, to any host through WebFetch. The merge boundary (§1) holds:
+  the token cannot merge past the ruleset.
 - **E2:** whether the session App can delete a reviewer comment is untested.
-- **Open:** how the orchestrator waits on CI and Codex (its spec); how core's installer fetches the
-  private repo in an environment with no credential (moot once the repo is public); how the
+- **Open:** how the orchestrator waits on CI and external reviewers (its spec); how core's installer
+  fetches the private repo in an environment with no credential (moot once the repo is public); how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Claude Code upgrades:** every result in §7 holds only for the versions tested. Pin the version in the
   agent environment and re-run these tests before moving to a new one.

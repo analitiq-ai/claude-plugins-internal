@@ -46,7 +46,7 @@ works across branches and PRs of a repo, some from forks.
 1. We will keep every component's settings in one TOML file, `codeworks.toml` at the target repo's root: a
    `[shared]` section and one section per component, `[orchestrator]`, `[reviewer]`, `[builder]`, and
    `[planner]` when it has settings. No session writes it (reviewer ADR-0012), and no PR changing it is
-   attested but by a human's label (orchestrator ADR-0004).
+   attested but by an exempt label (orchestrator ADR-0004, ADR-0005).
 2. We will put each key in exactly one section; a key two components read goes in `[shared]`. Each
    component reads only its own section and `[shared]`, validates its own section, and refuses an unknown
    key.

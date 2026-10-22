@@ -38,7 +38,7 @@ can also change the config, workflows and hooks that grade it.
 1. We will attest the internal review as the commit status `internal-review` at the head: success when
    reviewer's state on the PR's story issue, read as reviewer ADR-0011 decides, records a CLEAN round at
    the head; success marked "exempt" on an exempt PR (ADR-0005); else pending. At every hook run the
-   orchestrator writes `internal-review` and `codex-review` (ADR-0008) on every open PR of the repo,
+   orchestrator writes `internal-review` and each module's `<module>-review` (ADR-0008) on every open PR of the repo,
    story PR or not, when the status at the head differs from its value, so a write never repeats and a
    removed exempt label is undone.
 2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
@@ -46,7 +46,7 @@ can also change the config, workflows and hooks that grade it.
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a status written
    with any other token counts for nothing.
 4. We will never attest a PR that changes `codeworks.toml`, `.github/` or `.claude/`, Bot-authored or
-   not: its card goes to Blocked naming the paths, and only a human's exempt label (ADR-0005) attests it.
+   not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005) attests it.
 5. We will never attest a fork PR (head repo ≠ base repo) from reviewer's state. The exempt label still
    applies to a fork PR (ADR-0005).
 
@@ -72,7 +72,7 @@ Rejected: a fork author names the branch and opens the PR outside any session.
 
 - A review round runs inside the session it grades; only that gate keeps a forged verdict out of the
   record.
-- Every change to the config, workflows or hooks waits on a human's label.
+- Every change to the config, workflows or hooks waits on an exempt label.
 - A fork contribution waits on a writer's exempt label or same-repo push.
 
 ## Consequences

@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.2.0
 id: "0009"
-title: "The orchestrator squash-merges on GitHub's gate and the Codex verdict"
+title: "The orchestrator squash-merges on GitHub's gate and the external reviewers' verdicts"
 status: draft
 date: 2026-10-20
 deciders: []
@@ -23,7 +23,7 @@ review:
   tier: async
 ---
 
-# ADR-0009: The orchestrator squash-merges on GitHub's gate and the Codex verdict
+# ADR-0009: The orchestrator squash-merges on GitHub's gate and the external reviewers' verdicts
 
 ## Context
 
@@ -33,11 +33,11 @@ model's token can call GitHub's merge endpoint (root ADR-0007).
 ## Decision
 
 1. We will have the orchestrator squash-merge an In review card's PR, passing no message, between turns,
-   once no hold is open on its story issue (reviewer ADR-0013), Codex's verdict at the head is
+   once no hold is open on its story issue (reviewer ADR-0013), every module's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
 2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
-   classic branch protection: they require `internal-review` and `codex-review`, pinned to the
-   orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
+   classic branch protection: they require `internal-review` and each module's `<module>-review`,
+   pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
    humans only, the only override.
 3. We will never update a branch that is only behind main; a conflict stays a finding.
@@ -77,8 +77,8 @@ Rejected: conflicts are resolved, never staleness.
 
 - Easier: one merge condition; a stop is a board move.
 - Harder: every served repo needs decisions 2 and 6 first.
-- **How we would know this was wrong:** a merge without `codex-review` success at its head or under an
-  open hold; a squash commit on main missing a session-id trailer.
+- **How we would know this was wrong:** a merge without every `<module>-review` success at its head
+  or under an open hold; a squash commit on main missing a session-id trailer.
 - Revisit if: a rule outside the contract becomes a routine blocker.
 
 ## Action items

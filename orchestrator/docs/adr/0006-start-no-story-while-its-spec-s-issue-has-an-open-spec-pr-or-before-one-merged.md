@@ -40,7 +40,7 @@ built against the old one.
 2. We will move a Ready card the rule holds to Blocked, the reason naming the open spec PR, or saying
    none has merged.
 3. We will name no builder step on a spec PR (planner ADR-0010) and run no internal round on it; it is attested
-   and Codex is requested as for any exempt PR (ADR-0005, ADR-0008).
+   and its external reviews requested as for any exempt PR (ADR-0005, ADR-0008).
 
 ## Options considered
 

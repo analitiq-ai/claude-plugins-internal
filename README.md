@@ -19,7 +19,8 @@ dispatch `auditor`'s agents.
 The orchestrator, builder and reviewer run together in one session in a dedicated agent environment that
 holds no human GitHub credential, under Claude Code's managed settings
 ([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md));
-planner runs where you work. Setting up that environment and a served repo:
+planner runs where you work, under your supervision, and acts on GitHub with the agent credentials there,
+never yours. Setting up that environment and a served repo:
 [`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
 `SECURITY.md`.
 

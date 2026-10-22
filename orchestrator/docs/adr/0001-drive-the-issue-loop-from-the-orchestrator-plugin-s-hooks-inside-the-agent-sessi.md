@@ -39,7 +39,7 @@ Between a story's turns, code, not the model, must make the next move from GitHu
 2. We will give it only these inputs: the board and its issues (assignee, parent, sub-issues,
    `blockedBy`, closer); open PRs, their changed files, review threads, mergeable field, statuses and
    checks at the head; issue comments with author, edit and time, reviewer's state comments (reviewer
-   ADR-0011) among them; an exempt label's labeled event, its sender, that user's permission and the
+   ADR-0011) among them; an exempt label's labeled event, its sender, that sender's permission and the
    head's push time (ADR-0005); the effective rules for each PR's base branch (ADR-0009); its own section
    and `[shared]` of `codeworks.toml` (root ADR-0002); its hook's event. It parses no prose except
    through `core/`'s modules (root ADR-0003) and runs no LLM.
@@ -47,7 +47,7 @@ Between a story's turns, code, not the model, must make the next move from GitHu
    claims the next Ready story, one at a time (root ADR-0008), and names `builder:issue-tackle <s>`;
    Stop refuses the stop with the next step until none is left. It ignores a Stop while a workflow runs
    and takes no task notification as a prompt. A hook that crashes or times out attests, flips and
-   merges nothing. How it waits on CI and Codex is its spec's to settle.
+   merges nothing. How it waits on CI and the external reviewers is its spec's to settle.
 4. We will have builder and planner poll nothing: each ends its turn at its draft PR or a stop before
    one (builder ADR-0003, planner ADR-0010).
 5. We will move a story's card to Blocked, naming the bound, on REPEAT (a turn that had work, an

@@ -39,7 +39,7 @@ the session's token, though none is the model's. A `claude` command run from Bas
 
 1. We will refuse from the model's tool calls (Bash, MCP and file tools): a lane write, the issue
    assignee, a label, a commit status, a PR body edit after creation, an issue body edit, the ready flip,
-   a Codex or CodeRabbit request, a merge, and writes to `codeworks.toml` (root ADR-0002) and the state
+   an external review request, a merge, and writes to `codeworks.toml` (root ADR-0002) and the state
    directory, and a Bash command that starts `claude`. The model may open a draft PR; a non-draft
    `gh pr create` counts as the ready flip and is refused. Each refusal names the owner and the next step.
 2. We will keep each refusal a guardrail; the merge boundary in Context catches a bypass of one.
@@ -64,7 +64,7 @@ The model never merges or flips.
 
 The label and the session fence replace both.
 
-### Option D: Read `codex-review` as a verdict
+### Option D: Read a `<module>-review` as a verdict
 
 Rejected: the orchestrator writes it with its App, and the ruleset requires it, so GitHub enforces it.
 
@@ -76,12 +76,12 @@ Rejected: the copy drifts.
 
 - A refused write the session App and the ruleset leave open rests on the hook alone, but merges no
   unreviewed code.
-- A label the session App applies exempts nothing (orchestrator ADR-0005), so a human applies it in GitHub.
+- A label the session App applies exempts nothing (orchestrator ADR-0005), so a writer applies it in GitHub.
 
 ## Consequences
 
 - Easier: the plugin holds no copy of GitHub's rules or exempt labels, and reads one status.
-- Harder: a flip, Codex request or merge waits for orchestrator hooks or a human.
+- Harder: a flip, external review request or merge waits for orchestrator hooks or a human.
 - **How we would know this was wrong:** a refusal names no owner or next step, or a PR needs an
   exemption no writer can label.
 - Revisit if: the model needs one of these writes.

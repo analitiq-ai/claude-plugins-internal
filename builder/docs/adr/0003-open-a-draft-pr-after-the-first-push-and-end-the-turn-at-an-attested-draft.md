@@ -30,8 +30,8 @@ review:
 builder runs in one session with the orchestrator and reviewer (root ADR-0008). The orchestrator's hooks drive
 the GitHub loop there (orchestrator ADR-0001): at each turn's end its Stop hook reads GitHub and names the
 next step or lets the session stop. builder owns the other half: what a build turn writes when it opens
-the PR, where the turn ends, and which GitHub moves it never makes. A story spans several steps, and each
-has to know what the last one left.
+the PR, where the turn ends, and which GitHub moves it never makes. Each of a story's steps has to know what
+the last one left.
 
 ## Decision
 
@@ -41,10 +41,10 @@ has to know what the last one left.
 2. We will end the turn at an attested draft, or at a stop with a message naming why: a pre-PR stop, or the
    folder or lane stop of ADR-0002. The Stop hook then names the next step in this session or lets it stop
    (orchestrator ADR-0001).
-3. We will start every step from the story's PR (ADR-0002), never from what the session remembers:
-   findings open a github round (reviewer ADR-0016), an unattested head resumes the internal loop at the
-   current head, and the ticks in the story's task block (planner ADR-0008) say which of its tasks are
-   done.
+3. We will begin every step the orchestrator's Stop hook names (orchestrator ADR-0001) from the story's
+   PR (ADR-0002), its comments, findings and head's attestation, and the story issue's task ticks
+   (planner ADR-0008), never the session's memory: findings open a github round (reviewer ADR-0016), an
+   unattested head resumes the internal loop at the current head, and the ticks say which tasks are done.
 
 ## Options considered
 
@@ -55,9 +55,9 @@ has to know what the last one left.
 Rejected: the orchestrator's hooks flip the PR and move the card; the model writes no lane (orchestrator
 ADR-0002).
 
-### Option C: builder polls the reviewers and re-requests Codex
+### Option C: builder polls the reviewers and re-requests external reviews
 
-Rejected: the orchestrator's hooks decide every wait on GitHub and request Codex (orchestrator
+Rejected: the orchestrator's hooks decide every wait and request external reviews (orchestrator
 ADR-0008).
 
 ### Option D: A tasks.md tick gates something
@@ -73,7 +73,7 @@ Rejected: every story PR closes its own issue.
 - The next step waits for the turn to end.
 - A turn that pushes and ends before attesting costs a continuation; REPEAT, or two unattested ends in a
   row, moves the story to Blocked (orchestrator ADR-0001).
-- Context carried between steps may be stale; decision 3 re-derives from GitHub.
+- Context carried between steps may be stale; decision 3 re-reads GitHub.
 
 ## Consequences
 

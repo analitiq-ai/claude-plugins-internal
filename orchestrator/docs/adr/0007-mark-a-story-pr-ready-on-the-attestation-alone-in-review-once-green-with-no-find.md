@@ -27,9 +27,9 @@ review:
 
 ## Context
 
-A story PR opens as a draft (builder ADR-0003). When it leaves draft decides what CodeRabbit, which
-skips drafts, sees. A second choice is whether a failing check is a finding or a human's stop. Anyone
-can open a review thread on a public repo.
+A story PR opens as a draft (builder ADR-0003), which an external reviewer may skip. Also to decide:
+whether a failing check is a finding or a human's stop. Anyone can open a review thread on a public
+repo.
 
 ## Decision
 
@@ -37,8 +37,8 @@ can open a review thread on a public repo.
    attested with no hold open; a human's click counts the same.
 2. We will evaluate the external reviewers and the required checks after ready, reading every enabled
    module's `status` at each hook run (root ADR-0003). GREEN is every check the base branch's effective
-   rules require (ADR-0009) success at the head, leaving out `internal-review` and `codex-review`, so no
-   status waits on itself. FINDINGS is a module's open finding, the threads module's trusted threads
+   rules require (ADR-0009) success at the head, leaving out `internal-review` and each module's
+   `<module>-review`, so no status waits on itself. FINDINGS is a module's open finding, the threads module's trusted threads
    included (root ADR-0003), unless it has no thread and reviewer's state records it as pushed back; a
    required check in `failure`; or a conflict with main. FINDINGS names builder's next step; a pending
    module or check is a wait; a required check in `error` could not run (root ADR-0004) and moves the card to
@@ -56,11 +56,11 @@ can open a review thread on a public repo.
 
 ### Option A: Ready at internal-clean; In review at green with no findings (chosen)
 
-CodeRabbit skips drafts, so external review needs the PR ready at internal-clean.
+A reviewer that skips drafts sees the PR from internal-clean.
 
 ### Option B: Ready only once every required check is green
 
-Rejected: holding the draft keeps CodeRabbit off a head the internal review already cleared.
+Rejected: holding the draft keeps such a reviewer off a head the internal review already cleared.
 
 ### Option C: A failing check as a human's stop, never a finding
 
@@ -68,7 +68,7 @@ Rejected: the agent fixes a failing check; Blocked is for what only a human can 
 
 ## Trade-offs
 
-- CodeRabbit reviews every push from ready on, including heads that CI then fails.
+- External reviewers may review every push from ready on, including failing heads.
 - A writer outside `trusted_reviewers` gets no answer on a thread they start.
 
 ## Consequences
@@ -77,7 +77,7 @@ Rejected: the agent fixes a failing check; Blocked is for what only a human can 
 - Harder: a ready PR's card stays In progress until GREEN with no findings.
 - **How we would know this was wrong:** most github rounds open on CI findings alone, or converted PRs
   pile up in Blocked.
-- Revisit if: CodeRabbit reviews drafts.
+- Revisit if: no configured external reviewer skips drafts.
 
 ## Action items
 

@@ -35,7 +35,8 @@ Humans and the orchestrator share the board; the orchestrator never checks who m
    writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and Blocked; none for
    Ready, a human's alone. The model's token cannot write a lane (root ADR-0007).
 2. We will re-derive In progress and In review from the story's PR at every hook run, acting on a card
-   only when claimed: Analitiq-Bot as the story issue's assignee, set at every start, never cleared.
+   only when claimed: the story issue assigned to the orchestrator's `claim_account` (root ADR-0002) at
+   every start, never unassigned.
 3. We will start a story only from Ready (root ADR-0006), once every issue in its `blockedBy` is done
    (root ADR-0005), no story is in flight (root ADR-0008) and the spec-PR rule allows it (ADR-0006); a
    merge starts nothing. The start releases holds as reviewer ADR-0013 decides; only an unanswered
@@ -45,7 +46,7 @@ Humans and the orchestrator share the board; the orchestrator never checks who m
    naming the sub-issues to move instead; its other lanes are the human's.
 5. We will make Blocked the one sink for what needs a human, each cause decided in its own record
    (ADR-0001, ADR-0004 to ADR-0010). This record's causes: a turn that opened no PR, or a PR closed
-   unmerged (reason: that turn's final message); an In review PR whose `codex-review` failed with no
+   unmerged (reason: that turn's final message); an In review PR whose `<module>-review` failed with no
    findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
    the lane write is the commit point; these moves fall between turns. At every hook run, the
    orchestrator posts any missing keyed reason for every open hold, in any lane.

@@ -37,32 +37,31 @@ review:
 
 ## Context
 
-The model's commands can read every credential on their machine: App keys (ADR-0007) and a human's
-GitHub login. Claude Code's sandbox confines Bash at the OS level; hooks run outside it. Only managed
-settings cannot be loosened from a session.
+The model's commands can read every credential on their machine: App keys (ADR-0007), a human's
+GitHub login. Claude Code's sandbox confines Bash at OS level, not hooks, WebFetch or WebSearch.
+Only managed settings cannot be loosened from a session.
 
 ## Decision
 
 1. We will run the orchestrator, builder and reviewer in one session per board, in one dedicated agent
-   environment (any machine, VM or container) holding no human GitHub credential, under Claude Code's
-   managed settings. Something outside codeworks starts the session; builder runs nowhere else, one story
-   at a time.
-2. We will run planner where its human works, outside those settings, accepting that its agent reads
-   what the human can, under the human's oversight.
+   environment holding no human GitHub credential, under managed settings. Something outside codeworks
+   starts the session; builder runs nowhere else, one story at a time.
+2. We will run planner where its human works, outside those settings, under human supervision; its
+   agent acts on GitHub with agent credentials there, never a person's.
 3. We will require the sandbox (fail if unavailable, nothing unsandboxed or excluded) and unix sockets
    blocked.
-4. We will keep the App keys, DeepSource token and classifier key in `~/.config/codeworks/`, which only
-   hooks read; the orchestrator and reviewer keys exist nowhere else.
+4. We will keep the App keys, the validator modules' tokens and the classifier key in
+   `~/.config/codeworks/`, which only hooks read; the orchestrator and reviewer keys exist nowhere else.
 5. We will deny the model that folder and any read of other credentials (gh, git, SSH, cloud, Claude
    Code's own), with `allowManagedReadPathsOnly`.
 6. We will deny the model any write to plugin code and data, reviewer's state folder, `~/.claude`, the
-   repo's `.claude/settings*.json`, `.claude/{workflows,agents,skills,commands,hooks}/`, `.mcp.json`,
-   `.git/config` and `.git/hooks/`.
-7. We will allow network only to GitHub and the repo's package registries, caches in the session's temp
-   folder; load only listed MCP servers; and run no Docker in a session.
+   repo's `.claude/settings*.json`, `.claude/{workflows,agents,skills,commands,hooks}/`, `.mcp.json` and
+   `.git/{config,hooks}`.
+7. We will allow sandboxed commands network only to GitHub and the repo's package registries, caches in
+   the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers; run no Docker.
 8. We will have hooks run git with `core.fsmonitor` and `core.hooksPath` off.
-9. We will have every hook that reads a key, and reviewer for builder and review work, refuse while the
-   managed settings are not in effect, naming what is missing. `SECURITY.md` holds the exact settings.
+9. We will have every key-reading hook, and reviewer for builder and review work, refuse unless
+   managed settings are in effect, naming what is missing. `SECURITY.md` holds the exact settings.
 
 ## Options considered
 
@@ -84,9 +83,10 @@ Rejected: a command can be disguised; any same-user process can query the keycha
 
 ## Trade-offs
 
-- Every host a session reaches is listed in the managed file.
+- An injected prompt can make WebFetch send what the model reads, the session token included,
+  anywhere; the token cannot merge past the ruleset.
 - A flaw in Claude Code's sandbox is a codeworks hole.
-- Docker-based tests run only in CI: a session's Docker would hand the model the host.
+- Docker-based tests run only in CI: Docker would hand the model the host.
 
 ## Consequences
 

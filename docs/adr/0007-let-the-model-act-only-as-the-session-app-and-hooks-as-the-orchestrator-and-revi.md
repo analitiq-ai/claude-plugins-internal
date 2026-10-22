@@ -31,10 +31,10 @@ review:
 
 ## Context
 
-Only reviewed code may merge: the ruleset requires CI, `internal-review` and `codex-review` from the
-orchestrator App (orchestrator ADR-0009). The model and the hooks share one session (ADR-0008), and a
-token reaches the API past any hook. Every trust predicate must tell the model's write from a human's
-and a hook's.
+Only reviewed code may merge: the ruleset requires CI, `internal-review` and each module's
+`<module>-review` from the orchestrator App (orchestrator ADR-0009). The model and the hooks share one
+session (ADR-0008), and a token reaches the API past any hook. Every trust predicate must tell the
+model's write from a human's and a hook's.
 
 ## Decision
 
@@ -45,10 +45,10 @@ and a hook's.
    `~/.claude` and the session's temp folder, refreshed before it expires: the orchestrator's
    SessionStart hook in the agent environment; reviewer's hook, from a session key kept there, where
    planner runs.
-3. We will have hooks alone act as `codeworks-orchestrator` (claim, lanes, `internal-review`, the Codex
-   request, `codex-review`, the ready flip, merge, Blocked moves) and `codeworks-reviewer` (rounds,
-   holds, rescope holds), each App's key read only by its plugin's hooks: all hooks run as one OS
-   user, so pinned, write-denied plugin code holds this (ADR-0008).
+3. We will have hooks alone act as `codeworks-orchestrator` (claim, lanes, `internal-review`, external
+   review requests, each module's `<module>-review`, the ready flip, merge, Blocked moves) and
+   `codeworks-reviewer` (rounds, holds, rescope holds), each App's key read only by its plugin's hooks:
+   all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count the session App as no
    human, WRITER, TRUSTED or EXEMPT actor in any predicate.
 5. We will count a review round only by its record: reviewer's hook writes it as the reviewer App from

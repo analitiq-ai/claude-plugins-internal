@@ -42,7 +42,7 @@ unspecified (root ADR-0008).
 3. We will keep every fact the orchestrator acts on machine-readable: a Blocked reason carries its cause's key and is posted only when no comment with that key
    exists (HANDLED). The Blocked move fires whether or not the reason is HANDLED, a card dragged back to
    a working lane after a handled no-PR turn included.
-4. We will post Blocked reasons and Codex requests with the orchestrator's App, and count only that
+4. We will post Blocked reasons and external review requests with the orchestrator's App, and count only that
    App's comments for HANDLED and REQUESTED.
 5. We will keep no lock: one session builds one story at a time (root ADR-0008). The orchestrator re-reads
    GitHub at every hook run and stores nothing it could read there; a new session resumes a claimed

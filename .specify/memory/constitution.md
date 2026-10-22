@@ -3,7 +3,8 @@ Sync Impact Report
 - Version: 1.0.1 -> 1.1.0 (MINOR: a platform constraint added for the agent environment)
 - Changed: opening and Repo shape name the orchestrator as a plugin; the Repo Principles note gives
   P6's refusals to reviewer's hook; P9 counts no command the model runs as a trusted actor and cites
-  the renamed root ADR-0007; the planner and builder constraints say where each runs.
+  the renamed root ADR-0007; the planner and builder constraints say where each runs; P4's WAIVED
+  exception and P7's review-text exception name no provider.
 - Added: Platform Constraints "Agent environment" (root ADR-0008).
 - Removed: none.
 - Templates: .specify/templates/* need no change.
@@ -138,7 +139,7 @@ Applies to: reviewer, planner, orchestrator.
 Gate: when a reader, judge, model or service the plan depends on does not answer, is that
 reported as its own outcome — a named `cannot verify`, or `error` on GitHub, never `failure` — and
 never as a pass, never as a finding against the author, and never as a guess? The one named
-exception: a Codex review out of credits passes, marked WAIVED.
+exception: an external reviewer out of credits passes, marked WAIVED.
 
 Source: `docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md`
 (decisions 1–4); the exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
@@ -178,8 +179,8 @@ Applies to: reviewer, planner, orchestrator.
 
 Gate: does every fact the plan reads come from a key, a field, a status or a name with a grammar,
 never from a heading, a comment's wording or free text; and does every fact the plan writes for
-another reader land in such a form? The one exception is Codex's verdict, which `core/`'s Codex
-module alone reads from Codex's review text.
+another reader land in such a form? The one exception is a verdict a provider publishes only in its
+review text, which that provider's validator module reads there, in `core/` alone.
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`

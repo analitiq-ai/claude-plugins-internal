@@ -28,7 +28,7 @@ review:
 ## Context
 
 An escalation hold, `escalation-<s>` in reviewer's state comment on the story issue, keeps the card
-Blocked until a human answers the round's question (reviewer ADR-0013). The orchestrator must know when
+Blocked until a writer answers the round's question (reviewer ADR-0013). The orchestrator must know when
 the answer is in, yet it parses no prose (ADR-0001).
 
 Whose comment counts is a trust choice: some repos the orchestrator serves are public, so anyone can
@@ -38,9 +38,9 @@ comment.
 
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
    escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
-2. We will take as the answer an issue comment created after that question by a User other than
-   Analitiq-Bot whose author_association is OWNER, MEMBER or COLLABORATOR; no comment from the agent
-   session counts, since it acts on GitHub only as Apps (root ADR-0007).
+2. We will take as the answer an issue comment created after that question by a writer
+   (author_association OWNER, MEMBER or COLLABORATOR) other than the session App; no comment from
+   the agent session counts, since it acts on GitHub only as Apps (root ADR-0007).
 
 ## Options considered
 
@@ -48,7 +48,7 @@ comment.
 
 Write permission is GitHub's own fact on the comment.
 
-### Option B: Any author except Analitiq-Bot
+### Option B: Any author except the session App
 
 Rejected: on a public repo a stranger's comment would count as the
 answer and reach the next round's briefs.
