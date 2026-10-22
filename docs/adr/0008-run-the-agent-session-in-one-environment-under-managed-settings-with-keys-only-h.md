@@ -63,7 +63,7 @@ from a session.
 8. We will run only the codeworks plugins' hooks, load no repo settings file, and have hooks run git
    with `core.fsmonitor` and `core.hooksPath` off.
 9. We will have every key-reading hook, and reviewer for builder and review work, refuse unless
-   managed settings are in effect. `SECURITY.md` holds the exact settings.
+   managed settings are in effect (`SECURITY.md`); planner's session-key read is exempt (d2).
 
 ## Options considered
 
