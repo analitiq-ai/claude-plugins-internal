@@ -12,7 +12,9 @@ Only code that passed review merges. Four things hold that:
    `<module>-review` (for example `codex-review`) from the orchestrator App. No App is on its bypass
    list (orchestrator ADR-0009).
 2. The orchestrator App's key is readable only by hooks, never by the model.
-3. The orchestrator attests `internal-review` only from a round record posted by the reviewer App.
+3. The orchestrator attests `internal-review` only from a round record posted by the reviewer App: an
+   internal round that passed at the head or at a commit in its history. Commits after it (stage 2) are
+   graded by the external reviewers alone (orchestrator ADR-0004 d1).
 4. reviewer posts that record only from verdicts the gate rule (§6) accepts.
 
 Every other refusal (commit gates, lane rules, reviewer's refusals of the model's GitHub writes) is a
@@ -235,8 +237,8 @@ The other rows ran on 2.1.300 to 2.1.306.
   and the one-hour session token included, to any host through WebFetch. The merge boundary (§1) holds:
   the token cannot merge past the ruleset.
 - **Hold window:** an open hold turns `internal-review` pending (orchestrator ADR-0004), but only at the
-  orchestrator's next hook run; until then the session token can merge the head. That head had a CLEAN
-  or CONVERGED_PUSHBACK round, so §1 holds: the hold is a guardrail, not the boundary (root ADR-0007
+  orchestrator's next hook run; until then the session token can merge the head. That head passed stage
+  1 and its external reviews, so §1 holds: the hold is a guardrail, not the boundary (root ADR-0007
   d6). Closing the window would need the hold itself in a required check: GitHub cannot write a comment
   and a status in one step, and only the orchestrator App writes `internal-review`.
 - **E2:** whether the session App can delete a reviewer comment is untested. If it can, the hold stays:
