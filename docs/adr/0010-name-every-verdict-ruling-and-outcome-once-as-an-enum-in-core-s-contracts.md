@@ -42,7 +42,8 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
    enum: the sets a component other than reviewer reads in core's contracts (ADR-0003), the rest in
    reviewer's. Code, JSON Schemas and agents' answer schemas take values only from there; a Python
    script reads them from the generated JSON Schemas until it moves to TypeScript (ADR-0009).
-2. We will spell every value in upper snake case, except a hold kind, which is written into a hold id.
+2. We will spell every value in upper snake case, except a value also written as a name elsewhere: a
+   hold kind, in a hold id, and a module name, in `codeworks.toml` and in check names.
 3. We will define each value's meaning beside its enum, and add or rename a value only with the record
    that owns its set.
 
@@ -54,6 +55,9 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 | Root cause | AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL, NOT_APPLICABLE | core; reviewer ADR-0017 |
 | Check outcome | PENDING, PASS, FAIL, SILENT, COULD_NOT_RUN, WAIVED | core; ADR-0003, ADR-0004 |
 | Hold kind | rescope, escalation, pushback, claim, shim, audit | core; reviewer ADR-0013 |
+| Hold state | OPEN, RELEASED | core; reviewer ADR-0011, ADR-0013 |
+| Round stage | INTERNAL, AUDIT, GITHUB | core; reviewer ADR-0019 |
+| Module name, a finding's source | codex, coderabbit, deepsource, threads, required-checks | core; ADR-0003 |
 | Finding kind | DEFECT, FIX_INDUCED, CLASS_SIBLING, DUPLICATE, SPEC_GAP, BIKESHED, GOLD_PLATING, NOT_REAL | reviewer |
 | Claim verdict | CORRECT, WRONG, UNSURE | reviewer |
 | Shim ruling | SHARES, NOT_SHARED, DEFERRED | reviewer |
