@@ -167,6 +167,8 @@ Readings of the spec, stated so they can be checked:
 - FR-026a "`api` takes both from DeepSource's API" covers status and thread-less items; DeepSource's review
   threads come from GitHub in both sources, as FR-028 requires (R20).
 - FR-026a's "exact message text" in a key is carried as its SHA-256, which identifies the same text (R20).
+- FR-016 "deleted after the state comment" counts a deletion in the same second as after: GitHub's times are
+  whole seconds, so the order is unknown and the story is held (R15).
 
 Deferred, not in scope: `.deepsource.toml` has no JavaScript analyzer and names `dev/*/tests/**`, so DeepSource
 will not analyse `core/`.

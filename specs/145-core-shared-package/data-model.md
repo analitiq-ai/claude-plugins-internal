@@ -82,8 +82,8 @@ Checked by the schema and its refinements: `(stage, n)` unique; hold `id` unique
 `verdict` and `spec_md_blob` rules above; each pushback's round exists.
 
 Transitions a write may make against the current snapshot (R16): append rounds; add hold rows; move a hold
-`OPEN → RELEASED` or `RELEASED → OPEN`; add pushbacks. Nothing is removed or rewritten. A rescope hold on an
-existing `rescope-<issue>` row re-opens it with the new blob SHA.
+`OPEN → RELEASED` or `RELEASED → OPEN`; add pushbacks. Nothing else is removed or rewritten: a rescope row's
+`spec_md_blob` changes only with its `RELEASED → OPEN` move (R16).
 
 ### SpecFacts (FR-010; planner ADR-0008 d1)
 

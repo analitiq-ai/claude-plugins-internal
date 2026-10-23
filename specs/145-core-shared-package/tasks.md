@@ -114,8 +114,10 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   - `storyBranch`: refs under `heads/212-us` parsing to 212 → it; none → null; several fail naming them (R13)
   - `requirement`: `kind: feature` → the folder's `spec.md`; `kind: no_spec` → the issue body (FR-010, AS8)
   - `doneFrom` and `isDone`: a merged PR → done; a `ClosedEvent` by a `User` → done; closed by the session App
-    with the PR unmerged → not done; a reopened done issue → done; a merged PR whose head branch was deleted,
-    closed by a `Bot`, found through `pullRequests(headRefName:)` (recorded response) → done (FR-011, AS9; R13)
+    with the PR unmerged → not done; a reopened done issue → done; a merged PR found only from the timeline
+    (`ClosedEvent.closer`, `CrossReferencedEvent`, `ConnectedEvent`) with its head branch deleted and a `Bot`
+    closer → done; a timeline PR that is unmerged, cross-repo, or whose `headRefName` does not parse to
+    `{story: 212}` never counts (FR-011, AS9; R13)
 - [ ] T017 [P] [US1] Write `core/tests/carriers.test.ts` on the pure decision of `check-carriers.ts` over fixture
   carriers: symlink not `../../core/src`; `package.json` without `"type": "module"`; a core pin missing or at
   another version; lockfile missing, not v3, or pinning another version; a change to `core/src/**` or to
@@ -186,7 +188,8 @@ hold through the recorded fake and inspect the comment posted (quickstart.md, US
   Snapshot)
 - [ ] T030 [P] [US2] Write `core/tests/state-read.test.ts` on `parseState(comments, deletions, reviewerLogin)`:
   AS1 (the newest by the reviewer App among newer human and session App comments); AS2 (`tampered` on
-  `lastEditedAt`; `deleted` when a reviewer App deletion's `createdAt` is later than the state comment's, or with
+  `lastEditedAt`; `deleted` when a reviewer App deletion's `createdAt` is at or after the state comment's (same second
+  included), or with
   no reviewer App comment; `invalid` for an untagged newest beside an older tagged one, the older never read);
   AS3 (no reviewer App comment and no deletion → no state, not held); AS4; AS5 (contract error named with the
   comment URL); AS10; a `Bot` login matched with `[bot]` appended; the tag only in a quoted reply → `invalid`;
@@ -195,9 +198,11 @@ hold through the recorded fake and inspect the comment posted (quickstart.md, US
   DELETE: `writeState` posts one comment, the tag line then the snapshot in a `json` fence, sorted keys,
   two-space indent (AS6); refused while `tampered`, `deleted` or `invalid` stands, naming it and its release
   (AS7); `checkTransition` refuses dropping or rewriting a round, hold row or pushback and allows appending
-  rounds, adding rows, OPEN ↔ RELEASED and adding pushbacks; a body over 65,536 characters is refused naming
+  rounds, adding rows, OPEN ↔ RELEASED, a rescope row's new `spec_md_blob` only with RELEASED → OPEN, and adding
+  pushbacks; a body over 65,536 characters is refused naming
   the size; `placeRescopeHold` on 212 adds an open `rescope-212` with `spec.md`'s blob SHA on the story's branch,
-  else the default branch, and re-opens an existing row with the new SHA (AS8); `releaseState` reposts the
+  else the default branch, moves a RELEASED row to OPEN with the new SHA, and posts nothing on an OPEN row
+  (AS8); `releaseState` reposts the
   newest unedited, tagged, valid comment, or `{"holds": [], "pushbacks": [], "rounds": [], "v": 1}`, and is
   refused when none of the three causes stands (FR-018 to FR-020; R16; contracts/state-comment.md)
 - [ ] T032 [P] [US2] Write `core/tests/attests.test.ts`: `passingHeads` lists INTERNAL and AUDIT rounds CLEAN, or

@@ -225,13 +225,18 @@ view` lists no dependencies for zod 4.6.7, smol-toml 1.9.1 or yaml 2.9.1. Nothin
     parse to `#s`; none → no branch; several fail naming them.
   - requirement: `<folder>/spec.md` at the ref unless its facts' kind is `no_spec`, then the issue body (R9).
   - done: a same-repo PR on the story's branch merged, or the issue's timeline holds a `ClosedEvent` whose actor
-    is a `User`. Read from history, so a reopened done issue stays done. The PR is found by
-    `pullRequests(headRefName:)`, which still returns a merged PR after its head branch is deleted on merge
-    (orchestrator ADR-0009 d6): run 2026-10-23 on PR #150, branch deleted, returned `MERGED`, same-repo.
-- **Rationale**: root ADR-0005 d2–d5; P7 (no `Closes #s`); P9 (the closer's GitHub type, so an App's close never
-  counts). The branch name is the one link (root ADR-0005 d3), so no second lookup of the story's PR exists.
+    is a `User`. Read from history, so a reopened done issue stays done. `isDone` has only `s`, and the head
+    branch is deleted on merge (orchestrator ADR-0009 d6), so no ref gives the branch's full name: candidate
+    PRs come from the issue's timeline (`ClosedEvent.closer`, `CrossReferencedEvent` and `ConnectedEvent`
+    sources that are PullRequests), and one counts only when it is merged, same-repo, and its `headRefName`
+    parses to `{story: s}`. Run 2026-10-23: issue #111's `ClosedEvent.closer` is merged PR #115 with its
+    `headRefName`, its branch deleted.
+- **Rationale**: root ADR-0005 d2–d5; P9 (the closer's GitHub type, so an App's close never counts). The timeline
+  only finds candidates; the branch grammar decides, so no PR body or closing reference makes a PR the story's
+  (root ADR-0005 d3).
 - **Existing tools**: GraphQL `parent`, `pullRequests(headRefName:)`, `timelineItems`; REST `git/matching-refs`.
-- **Alternatives considered**: the search API (exact branch only); linked PRs (from PR bodies, rejected by root
+- **Alternatives considered**: the search API's `head:` (matches a prefix, run 2026-10-23, but an index that lags
+  and is rate-limited apart); linked PRs (from PR bodies, rejected by root
   ADR-0005 d3).
 
 ## R14: `codeworks.toml` (FR-006)
@@ -254,7 +259,8 @@ view` lists no dependencies for zod 4.6.7, smol-toml 1.9.1 or yaml 2.9.1. Nothin
   1. keeps comments whose author is the reviewer App (a `Bot` whose login plus `[bot]` equals `[shared]
      reviewer_app_login`), whatever the body; the highest `databaseId` is the state comment;
   2. adds causes: `tampered` when it has `lastEditedAt`; `deleted` when a reviewer App comment deletion's
-     `createdAt` is later than its `createdAt`, or when there is no reviewer App comment and such a deletion exists; `invalid` when its body does
+     `createdAt` is at or after its `createdAt` (GitHub's times are whole seconds, so a same-second deletion
+     may be later and is held), or when there is no reviewer App comment and such a deletion exists; `invalid` when its body does
      not open with `<!-- codeworks:reviewer-state -->`, is not contracts/state-comment.md's format, or fails
      `Snapshot`, naming the comment URL and the error; `open_hold` per open hold row;
   3. returns `StateReading` (data-model.md). No reviewer App comment and no deletion is no state, not held, PR or
@@ -281,7 +287,9 @@ view` lists no dependencies for zod 4.6.7, smol-toml 1.9.1 or yaml 2.9.1. Nothin
     snapshot when there is none; refused when none of those three causes stands. Its caller calls it after the
     human's Ready (reviewer ADR-0011 d2); core cannot see the board.
   - `placeRescopeHold` finds the story's branch (R13), else the default branch, reads `spec.md`'s blob SHA
-    there, and adds `rescope-<issue>` as OPEN with it, or re-opens that row with the new SHA (FR-020).
+    there, and adds `rescope-<issue>` as OPEN with it, or moves a RELEASED row to OPEN with the new SHA
+    (FR-020). On an OPEN row it posts nothing: the recorded SHA is what its release compares with (reviewer
+    ADR-0013 d4).
   - `attests(reader, repo, reading, head)`: true exactly when nothing holds the story and an INTERNAL or AUDIT
     round with result CLEAN, or DIRTY with verdict CONVERGED_PUSHBACK, is at `head` or at a commit in its
     history (FR-016; orchestrator ADR-0004 d1). GITHUB rounds never count, for or against. A passing round's

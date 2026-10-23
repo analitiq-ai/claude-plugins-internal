@@ -26,7 +26,7 @@ exactly:
 |---|---|---|
 | newest reviewer App comment unedited, valid, no open hold, no later deletion | no | none |
 | newest has `lastEditedAt` | yes | `tampered` |
-| a reviewer App comment deleted after the newest by `createdAt` (or any, when there is none) | yes | `deleted` |
+| a reviewer App comment deleted at or after the newest's `createdAt`, same second included (or any, when there is none) | yes | `deleted` |
 | newest lacks the tag, or fails the format or the schema | yes | `invalid` (comment URL, error) |
 | open hold rows | yes | one `open_hold` (id) each |
 | no reviewer App comment and no deletion, PR or not | no | none: "no state" |
