@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-- Version: 1.1.0 -> 1.2.0 (MINOR: a platform constraint added for core's language)
-- Changed: Repo shape ships `core/` inside each plugin through a symlink, not an install (root ADR-0001).
-- Added: Platform Constraints "Language" (root ADR-0009) and "Value sets" (root ADR-0010).
+- Version: 1.2.0 -> 1.2.1 (PATCH: P2's list of tampered state follows reviewer ADR-0011 d2)
+- Changed: P2 no longer holds a story with a PR and no snapshot; an untagged newest reviewer App
+  comment reads as held.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -104,8 +104,8 @@ Gate: for every lock, count or hold the plan adds or changes, does the plan name
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
 no named approver, or with a way out no decision record names, fails the gate. State that may have been
-tampered with reads as held: an edited newest state snapshot, a reviewer App state comment deleted
-after it, or a story with a PR and no snapshot.
+tampered with reads as held: a newest reviewer App comment that was edited or lacks the state tag, or a
+reviewer App comment deleted after it.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`); how the user's action is recognised:
@@ -284,4 +284,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
+**Version**: 1.2.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-23
