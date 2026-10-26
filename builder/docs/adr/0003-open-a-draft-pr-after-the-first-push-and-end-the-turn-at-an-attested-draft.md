@@ -29,15 +29,17 @@ review:
 
 builder runs in one session with the orchestrator and reviewer (root ADR-0008). The orchestrator's hooks drive
 the GitHub loop there (orchestrator ADR-0001): at each turn's end its Stop hook reads GitHub and names the
-next step or lets the session stop. builder owns the other half: what a build turn writes when it opens
-the PR, where the turn ends, and which GitHub moves it never makes. Each of a story's steps has to know what
+next step or lets the session stop. builder owns the other half: when the PR opens and what it says,
+where the turn ends, and which GitHub moves it never makes. The model's token writes nothing on GitHub
+(root ADR-0007). Each of a story's steps has to know what
 the last one left.
 
 ## Decision
 
-1. We will open the story PR as a draft after the first push, and a new one on the same branch after a
-   PR closed unmerged. builder writes its description once, at creation, with `Closes #s` for the story
-   issue, so the merge closes it.
+1. We will have the story PR open as a draft after the first push, and a new one on the same branch
+   after a PR closed unmerged; the orchestrator's hooks push builder's commits and open it (orchestrator
+   ADR-0001). Its description is written once, at creation, with `Closes #s` for the story issue, so the
+   merge closes it.
 2. We will end the turn at an attested draft, or at a stop with a message naming why: a pre-PR stop, or the
    folder or lane stop of ADR-0002. The Stop hook then names the next step in this session or lets it stop
    (orchestrator ADR-0001).

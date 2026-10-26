@@ -57,6 +57,12 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
    exception to ADR-0004's fail-closed rule.
 7. We will have a module return items its provider publishes outside any thread as findings with no
    thread, closed by a fix or by a pushback recorded in reviewer's state.
+8. We will treat every module listed in `validators` (a `[shared]` key) alike: each is required, with one
+   `<module>-review` (orchestrator ADR-0008), and no module has a setting of its own. A module reads its
+   provider's verdict only from objects GitHub shows that provider authored, or from the provider's API,
+   never from a commit status, whose creator GitHub leaves empty. The DeepSource module reads
+   DeepSource's API when a DeepSource token is present, else its review threads and check-run
+   annotations.
 
 ## Options considered
 
@@ -74,6 +80,15 @@ Rejected: one source parsed per consumer, with as many answers.
 
 Rejected: a named human on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
 is a human's decision.
+
+### Option E: An advisory module, or settings per module
+
+Rejected by the user on 2026-10-25: every module is treated the same.
+
+### Option F: A verdict from the provider's commit status
+
+Rejected: a commit status names no creator, so any writer could post it; CodeRabbit posted `success`
+for a review it never ran.
 
 ## Trade-offs
 

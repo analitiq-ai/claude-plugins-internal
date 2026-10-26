@@ -1,8 +1,9 @@
 <!--
 Sync Impact Report
-- Version: 1.2.0 -> 1.2.1 (PATCH: P2's list of tampered state follows reviewer ADR-0011 d2)
-- Changed: P2 no longer holds a story with a PR and no snapshot; an untagged newest reviewer App
-  comment reads as held.
+- Version: 1.2.1 -> 1.2.2 (PATCH: wording follows root ADR-0007, ADR-0008 and reviewer ADR-0013)
+- Changed: Platform Constraints' agent environment bullet names the agent machine, the person who starts
+  each session on one issue, and the read-only model token; P2's citation of reviewer ADR-0013 follows
+  its rename and renumbering; P6's list of states names a check run, not a status or the assignee.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -109,12 +110,12 @@ reviewer App comment deleted after it.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
 `scripts/pre_merge_gate.py`); how the user's action is recognised:
-`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`;
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-human-s-ready-and-comment.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
 Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
 (decision 2). Only reviewer's hook writes state, the rescope hold included:
-`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`
-(decision 4).
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-human-s-ready-and-comment.md`
+(decision 5).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -159,7 +160,7 @@ settled-design step).
 
 Applies to: reviewer, planner, builder, orchestrator.
 
-Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, a state
+Gate: for every state the plan reads or writes (a lane, a label, a check run, a state
 comment, a hold, a commit), does the plan name its one writer, and does the component write only the
 state it owns and refuse, from the model's tool calls, every write it does not own?
 
@@ -234,10 +235,13 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   (`docs/adr/0009-build-core-in-typescript-and-move-a-plugin-s-scripts-to-typescript-when-they-fi.md`).
 - Value sets: every verdict, ruling, outcome and hold kind is an enum defined once; code never repeats
   a value's string (`docs/adr/0010-name-every-verdict-ruling-and-outcome-once-as-an-enum-in-core-s-contracts.md`).
-- Agent environment: the orchestrator, builder and reviewer run in one session in a dedicated
-  environment with no human GitHub credential, under Claude Code's managed settings; only hooks read a
-  key, and no session runs Docker; planner runs outside it, where its human works
+- Agent machine: the orchestrator, builder and reviewer run in one session on a dedicated machine with
+  no human GitHub credential, under Claude Code's managed settings; a person starts each session naming
+  one issue; only hooks read a key, and no session runs Docker; planner runs outside it, where its human
+  works, as its own App
   (`docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md`).
+  The model's GitHub token is read-only; hooks make every write
+  (`docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`).
 - reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the
   plugin's mode; the review-round `spec` check follows the plugin's mode alone
   (`reviewer/plugin/README.md`: Mode). Where it keeps its state: tagged comments on the story issue
@@ -247,9 +251,9 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - planner has no hooks: it runs as the Spec Kit workflow its skill starts
   (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and requires no other plugin:
   its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
-  no reviewer state, and runs outside the agent environment.
-- builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only in the agent
-  environment; its review step is reviewer's internal round, which no install requires: its manifest
+  no reviewer state, and runs outside the agent machine.
+- builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only on the agent
+  machine; its review step is reviewer's internal round, which no install requires: its manifest
   declares no plugin dependency (`builder/plugin/skills/issue-tackle/SKILL.md`;
   `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`,
   decisions 1, 5).
@@ -284,4 +288,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.2.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-23
+**Version**: 1.2.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-26

@@ -28,7 +28,7 @@ review:
 ## Context
 
 Once a story's card is In review, something must merge its PR and hold the merge condition. The
-model's token can call GitHub's merge endpoint (root ADR-0007).
+model's token is read-only (root ADR-0007): only the orchestrator's App and the humans can merge.
 
 ## Decision
 
@@ -36,13 +36,13 @@ model's token can call GitHub's merge endpoint (root ADR-0007).
    once no hold is open on its story issue (reviewer ADR-0013), every module's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
 2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
-   classic branch protection: they require `internal-review` and each module's `<module>-review`,
-   pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
+   classic branch protection: they require the check runs `internal-review` and each module's
+   `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
    humans only, the only override.
 3. We will never update a branch that is only behind main; a conflict stays a finding.
-4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation (builder
-   ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
+4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the
+   orchestrator (builder ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
    sub-issue is done (root ADR-0005), its only issue-close write.
 5. We will leave a PR refused on a rule outside this contract In review.
 6. We will require of every served repo: squash merging with the default squash message set to

@@ -38,7 +38,7 @@ externalRefs:
 
 An issue's spec lives in its spec folder (ADR-0001) and lands by a spec PR on `<p>-spec`, `<p>` the spec's
 issue (org ADR-0002, root ADR-0005). A rescope changes a spec that stories may be building against. Planning
-is run by a human where they work, outside the agent environment, so the managed settings (root
+is run by a human where they work, outside the agent machine, so the managed settings (root
 ADR-0008) do not apply to it. Its grill and critique steps ask that human for verdicts.
 
 ## Decision

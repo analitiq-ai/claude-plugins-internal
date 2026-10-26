@@ -32,8 +32,8 @@ needs one meaning of "edit" and a reset that does not punish polish after a sett
 
 ## Decision
 
-1. We will stop offering PATCH and CLASS_FIX for a file once `edits_before_redesign` review-driven
-   commits touched it since the reset; REDESIGN must carry an invariant and a diagnosis:
+1. We will stop offering PATCH and CLASS_FIX for a file once `edits_before_redesign` (3, a `[reviewer]`
+   key) review-driven commits touched it since the reset; REDESIGN must carry an invariant and a diagnosis:
    unsettled design, too many responsibilities, or review polish.
 2. We will reset at the latest of round 1's head, the last settled round's head, the commit
    closing that file's last REDESIGN finding, and a move of the file (ADR-0001); the assessor's

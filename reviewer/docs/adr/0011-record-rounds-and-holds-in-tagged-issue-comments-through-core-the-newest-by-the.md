@@ -31,10 +31,10 @@ review:
 
 ## Context
 
-A record beside the session is lost with the agent environment and unreadable where planner and
-humans work. A hold can exist before the story's PR, and a PR can be closed and reopened; the story issue
-outlives both. A session's token can post any issue comment (root ADR-0007), and a comment can be edited
-or deleted.
+A record beside the session is lost with the agent machine and unreadable where planner and humans
+work. A hold can exist before the story's PR, and a PR can be closed and reopened; the story issue
+outlives both. The model's token posts nothing (root ADR-0007), but planner's App and every human writer
+can comment, and a comment can be edited or deleted.
 
 ## Decision
 
@@ -45,8 +45,8 @@ or deleted.
    hooks read (root ADR-0008), and only from verdicts ADR-0021 counts.
 2. We will fail closed: when the newest such comment lacks the tag or was edited, or the issue's
    timeline shows a reviewer App comment deleted after it, the story is held. A story with no reviewer
-   App comment has no state. A human's Ready releases it: reviewer then posts a snapshot rebuilt from
-   the newest unedited tagged one.
+   App comment has no state. A human's Ready and comment release it (ADR-0013): reviewer then posts a
+   snapshot rebuilt from the newest unedited tagged one.
 3. We will read and write the snapshot only through the state module in `core/` (root ADR-0003):
    reviewer's hook alone writes, and the orchestrator only reads ATTESTED and HOLD.
 4. We will have planner write no state: reviewer's hook places a rescope hold when it sees the rescope's

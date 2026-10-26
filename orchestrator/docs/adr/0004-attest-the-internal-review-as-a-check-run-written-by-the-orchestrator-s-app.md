@@ -1,11 +1,11 @@
 ---
 schemaVersion: 0.2.0
 id: "0004"
-title: "Attest the internal review as a commit status written by the orchestrator's App"
+title: "Attest the internal review as a check run written by the orchestrator's App"
 status: draft
 date: 2026-10-20
 deciders: []
-tags: [attestation, commit-status, merge-gate, github-app, orchestrator]
+tags: [attestation, check-run, merge-gate, github-app, orchestrator]
 scope: component
 reversibility: two-way-door
 blastRadius: org
@@ -23,18 +23,18 @@ review:
   tier: async
 ---
 
-# ADR-0004: Attest the internal review as a commit status written by the orchestrator's App
+# ADR-0004: Attest the internal review as a check run written by the orchestrator's App
 
 ## Context
 
-The merge contract is GitHub's ruleset (ADR-0009), which needs a status saying the internal review
+The merge contract is GitHub's ruleset (ADR-0009), which needs a check saying the internal review
 passed. reviewer's hook records each round, as the reviewer App, on the story issue (reviewer
-ADR-0011, ADR-0021). Which credential turns that record into the trusted status is the
+ADR-0011, ADR-0021). Which credential turns that record into the trusted check is the
 ruleset's trust root. A PR can also change the config, workflows and hooks that grade it.
 
 ## Decision
 
-1. We will attest the internal review, stage 1, as the commit status `internal-review` at the head:
+1. We will attest the internal review, stage 1, as the check run `internal-review` at the head:
    success when reviewer's state (reviewer ADR-0011) records an INTERNAL or AUDIT round CLEAN or
    CONVERGED_PUSHBACK at the head or a commit in its history, and no hold is open; success marked
    "exempt" on an exempt PR (ADR-0005); else pending. Later commits and github rounds, stage 2, never
@@ -42,8 +42,8 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    `<module>-review` (ADR-0008) whose value changed.
 2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
    its key (root ADR-0008).
-3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a status from
-   any other token counts for nothing.
+3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a check from
+   any other App, or a commit status of that name, counts for nothing.
 4. We will never attest a PR that changes `codeworks.toml`, `.github/` or `.claude/`, Bot-authored or
    not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005) attests it.
 5. We will never attest a fork PR (head repo ≠ base repo) from reviewer's state; the exempt label still
@@ -51,15 +51,15 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
 
 ## Options considered
 
-### Option A: The orchestrator's App writes the status from reviewer's state comment (chosen)
+### Option A: The orchestrator's App writes the check run from reviewer's state comment (chosen)
 
 One writer; only hooks read its key.
 
-### Option B: An attestation comment a second App turns into the status
+### Option B: An attestation comment a second App turns into the check
 
-Rejected: a comment the model's token can post would be the attestation's only evidence.
+Rejected: a comment would be the attestation's only evidence.
 
-### Option C: reviewer writes the status itself
+### Option C: reviewer writes the check itself
 
 Rejected: one App would both record and attest a round.
 
@@ -67,7 +67,11 @@ Rejected: one App would both record and attest a round.
 
 Rejected: a fork author names the branch and opens the PR outside any session.
 
-### Option E: Run the internal review again at every head
+### Option E: A commit status
+
+Rejected: a commit status names no creator; a check run names the App that wrote it.
+
+### Option F: Run the internal review again at every head
 
 Rejected: each stage 2 fix would return to stage 1; external reviewers grade every head.
 
@@ -80,7 +84,7 @@ Rejected: each stage 2 fix would return to stage 1; external reviewers grade eve
 ## Consequences
 
 - Easier: the model never reads the attesting key.
-- Harder: no session, no attestation; a mid-turn hold reaches the status at the next hook run.
+- Harder: no session, no attestation; a mid-turn hold reaches the check at the next hook run.
 - **How we would know this was wrong:** an attesting round no review round produced, or a
   protected-path or fork PR attested from reviewer's state.
 - Revisit if: rounds leave the session (root ADR-0007), or the ruleset stops being the merge

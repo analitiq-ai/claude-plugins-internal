@@ -16,15 +16,16 @@ dispatch `auditor`'s agents.
 
 ## Install
 
-The orchestrator, builder and reviewer run together in one session in a dedicated agent environment that
+The orchestrator, builder and reviewer run together in one session on a dedicated agent machine that
 holds no human GitHub credential, under Claude Code's managed settings
-([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md));
-planner runs where you work, under your supervision, and acts on GitHub with the agent credentials there,
-never yours. Setting up that environment and a served repo:
+([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md)).
+You start each session there naming one issue, `/codeworks <issue>`. planner runs where you work, under
+your supervision, and acts on GitHub as its own App, never with your credentials. Setting up that machine
+and a served repo:
 [`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
 `SECURITY.md`.
 
-In the agent environment:
+On the agent machine:
 
 ```
 claude plugin marketplace add analitiq-ai/claude-plugins-internal

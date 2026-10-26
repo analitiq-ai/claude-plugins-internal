@@ -58,9 +58,9 @@ behind a barrier, or which plugins a round depends on.
 4. We will declare pr-review-toolkit and auditor as dependencies, pin the accepted auditor version in
    the `[reviewer]` section of `codeworks.toml` (root ADR-0002), refuse a round's launch when an
    expected agent type is missing, and read auditor's dispatch as data at launch.
-5. We will cap github rounds at a number in the `[reviewer]` section. Past it, the next round
-   runs the audit stage on the whole PR. Only a human resets the count, by Ready or by
-   `unlock audit-<issue>`. The cap switches the stage, locking
+5. We will cap the rounds of each stage at `max_rounds` (4), a `[reviewer]` key. Past it, the next
+   round runs the audit stage on the whole PR. Only a human resets the count, by Ready and a comment
+   (ADR-0013), or by `/codeworks reset` on the story issue. The cap switches the stage, locking
    nothing; a human comes in only through the audit hold (ADR-0013).
 
 ## Options considered

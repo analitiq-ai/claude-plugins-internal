@@ -38,7 +38,7 @@ repo.
 2. We will evaluate the external reviewers and the required checks after ready, reading every enabled
    module's `status` at each hook run (root ADR-0003). GREEN is every check the base branch's effective
    rules require (ADR-0009) success at the head, leaving out `internal-review` and each module's
-   `<module>-review`, so no status waits on itself. FINDINGS is a module's open finding, the threads module's trusted threads
+   `<module>-review`, so no check waits on itself. FINDINGS is a module's open finding, the threads module's trusted threads
    included (root ADR-0003), unless it has no thread and reviewer's state records it as pushed back; a
    required check in `failure`; or a conflict with main. FINDINGS names builder's next step; a pending
    module or check is a wait; a required check in `error` could not run (root ADR-0004) and moves the card to
@@ -51,6 +51,9 @@ repo.
    ready and moves the card to Ready.
 6. We will have the orchestrator resolve, unread, every unresolved review thread no trusted reviewer
    started, replying with its App that it was not read, and name no step for it.
+7. We will have the orchestrator post, with its App, the reply each ruling that reviewer's state records
+   on a trusted thread carries, and resolve that thread: a FIX once its commits are pushed, a PUSH_BACK
+   or DEFER at once. The model's token writes neither (root ADR-0007).
 
 ## Options considered
 
