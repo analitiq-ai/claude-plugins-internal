@@ -35,8 +35,8 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
 1. We will make the orchestrator a plugin, importing only `core/` (root ADR-0001), whose hooks act as
    its own GitHub App, `codeworks-orchestrator` (contents, pull requests, issues, checks and workflows
    write; organization projects write), its key read only by hooks (root ADR-0008). Workflows write lets
-   it push a branch that carries a workflow change, a merge of the default branch included; the change
-   itself merges only under an exempt label (ADR-0004). "The orchestrator" in these
+   it push a merge of the default branch that carries a workflow change; reviewer passes no other change
+   to `.github/` (reviewer ADR-0002 d4). "The orchestrator" in these
    records means these hooks.
 2. We will give it only these inputs: the prompt that names the session's issue; the board and its
    issues (lane and when it was set, parent, sub-issues, `blockedBy`, closer); open PRs, their changed files,

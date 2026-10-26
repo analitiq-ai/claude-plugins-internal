@@ -75,9 +75,10 @@ Stops, strongest first: **GitHub** (App permissions, ruleset), **managed setting
 
 **Orchestrator.** Hooks only, as the orchestrator App. It runs no LLM and parses no prose except through
 core.
-- GitHub: no administration access; workflows write only so a push can carry a workflow change, which
-  merges only under an exempt label (orchestrator ADR-0004 d4). The ruleset decides whether a merge goes
-  through, and the merge names the head it evaluated.
+- GitHub: no administration access; workflows write only so a push can carry a merge of the default branch
+  that changes a workflow. reviewer fails every other change to `.github/` (reviewer ADR-0002 d4), since a
+  workflow runs on the push before any review. The ruleset decides whether a merge goes through, and the
+  merge names the head it evaluated.
 - It attests `internal-review` only from the reviewer App's newest record.
 - It pushes only commits reviewer's commit check passed (reviewer ADR-0002) whose author and committer
   are the agent identity, the name and email of the agent machine's global git config, set at setup and
