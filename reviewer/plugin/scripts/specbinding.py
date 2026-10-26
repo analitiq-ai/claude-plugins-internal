@@ -75,7 +75,7 @@ def story_edit_refusal(branch: str, path: str) -> str | None:
         return None
     return (f"`{path}` is the spec.md of spec folder `{folder}`, and `{branch}` is a story branch: a story branch never "
             f"changes a spec.md. Next step: stop and raise the spec problem to the user. They land the change in a "
-            f"spec-only PR on `{issue}-spec`; once it merges, this branch rebases on it.")
+            f"spec-only PR on `{issue}-spec`; once it merges, this branch merges the default branch.")
 
 
 def _shown(value: str | None) -> str:

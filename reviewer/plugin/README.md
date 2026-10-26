@@ -136,8 +136,8 @@ that is under review.
 9. **A story branch never changes a spec.md.** On a story branch (`<issue>-us<n>-<slug>`), `Edit`, `Write` and
    `NotebookEdit` of a spec folder's `spec.md` are refused, read from the branch and the path alone, with or without
    a PR. The next step: stop and raise the spec problem to the user, who lands it in a spec-only PR on
-   `<issue>-spec`; once it merges, the story branch rebases on it. The folder's other files stay editable, so a
-   story PR ticks its tasks.
+   `<issue>-spec`; once it merges, the story branch merges the default branch. The folder's other files stay
+   editable, so a story PR ticks its tasks.
 
 ## How an agent uses it
 
