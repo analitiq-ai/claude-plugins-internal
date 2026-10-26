@@ -36,7 +36,8 @@ machine, and planner and the humans work elsewhere (root ADR-0008).
    to In progress by the orchestrator's App (ADR-0002); the attestation is a check run at the head
    (ADR-0004); rounds and holds are the
    reviewer App's tagged state comments on the story issue, read as reviewer ADR-0011 decides; findings
-   come from `core/`'s modules, the required checks and the mergeable field (ADR-0007); the escalation
+   come from the validator modules (root ADR-0003), the required checks and the mergeable field
+   (ADR-0007); the escalation
    question, its answer and every Blocked reason are issue comments.
 2. We will link a PR to its story issue only by its head branch, as root ADR-0005 decides; a fork PR
    as ADR-0004 decides.

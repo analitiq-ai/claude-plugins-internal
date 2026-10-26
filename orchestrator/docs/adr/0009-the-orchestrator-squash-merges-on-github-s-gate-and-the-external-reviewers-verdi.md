@@ -45,8 +45,10 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
    orchestrator (builder ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
    sub-issue is done (root ADR-0005), its only issue-close write.
 5. We will leave a PR refused on a rule outside this contract In review.
-6. We will require of every served repo: squash merging with the default squash message set to
-   "commit messages", so every session-id trailer reaches main; head branches deleted on merge; no
+6. We will require of every served repo: squash merging with the default commit title the PR title and
+   the default message the PR body, which the orchestrator's hooks write: `Closes #s` at creation
+   (builder ADR-0003), and each session's id trailer as that session first pushes, so no
+   model-written commit message reaches main; head branches deleted on merge; no
    required human approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
    sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off.
 

@@ -46,13 +46,13 @@ built against the old one.
 
 ### Option A: The spec-PR rule on start, the rescope hold on merge (chosen)
 
-Each move is held by the fact that bears on it: a start by the spec PR, a merge by whether the story's
-branch carries the new spec.
+Each move is held by the fact that bears on it: a start by the spec PR, a merge by the rescope hold a
+human releases.
 
 ### Option B: The same rule on merge as well
 
-Rejected: the rescope hold already refuses the merge of every open story under the spec until its
-branch carries the new spec (root ADR-0006).
+Rejected: the rescope hold already refuses the merge of every open story under the spec until a human
+releases it (root ADR-0006).
 
 ### Option C: Leave a held Ready card in Ready
 

@@ -36,8 +36,9 @@ review:
 reviewer's state comment on a story issue is a full snapshot, the newest winning (reviewer ADR-0011).
 reviewer's hook writes it while a story is built, and again when a rescope places holds (reviewer
 ADR-0013); two writes at once would lose one snapshot. A spec that changes under a running story is built
-against the old one. The board already says what runs: the orchestrator claims only from Ready, and a
-human stops a story by dragging it to Blocked (orchestrator ADR-0002).
+against the old one. The board already says what runs: the orchestrator claims only from Ready, resumes
+only a story In progress or In review, and a human stops a story by dragging it to Blocked (orchestrator
+ADR-0002).
 
 ## Decision
 

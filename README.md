@@ -25,14 +25,17 @@ and a served repo:
 [`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
 `SECURITY.md`.
 
-On the agent machine:
+On the agent machine, from a shell, with a read-only deploy key of this repo loaded for SSH and kept
+with the credentials the model is denied (`SECURITY.md` §5):
 
 ```
-claude plugin marketplace add analitiq-ai/claude-plugins-internal
+claude plugin marketplace add git@github.com:analitiq-ai/claude-plugins-internal.git
+claude plugin marketplace add anthropics/claude-plugins-official
 claude plugin install orchestrator@codeworks
 claude plugin install builder@codeworks
 claude plugin install reviewer@codeworks
 claude plugin install auditor@codeworks
+claude plugin install pr-review-toolkit@claude-plugins-official
 ```
 
 `orchestrator` installs once its plugin ships.
@@ -45,8 +48,8 @@ claude plugin install planner@codeworks
 claude plugin install reviewer@codeworks
 ```
 
-The repo is private: on your machine the clone uses your git credentials for github.com. How the agent
-environment, which holds none, fetches it is open; it is moot once the repo is public.
+The repo is private: on your machine the clone uses your git credentials for github.com; the agent
+machine, which holds none, uses the deploy key.
 
 ## Layout
 

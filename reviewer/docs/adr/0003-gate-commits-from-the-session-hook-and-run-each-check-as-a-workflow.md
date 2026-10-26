@@ -37,9 +37,10 @@ commit-time check needs the same way from the refusal to the check and back.
 
 ## Decision
 
-1. We will refuse a commit from the plugin's session hook, which sees `git commit` before the Bash tool runs
-   it. The hook decides from recorded state, git (run with `core.fsmonitor` and `core.hooksPath`
-   disabled), the ledger and GitHub reads (the state comments, the board lane), and does no slow work.
+1. We will gate commits from the plugin's session hook, which sees each new commit after the Bash command
+   that made it (ADR-0020), however it was made, and names the checks it needs; only commits that passed
+   are pushed (ADR-0002). The hook decides from recorded state, git (run as root ADR-0008 decision 8
+   says), the ledger and GitHub reads (the state comments, the board lane), and does no slow work.
 2. We will run each check as a Claude Workflow. The workflow only orders the work; the gate supplies its
    prompts and schemas at launch, and a hook validates each answer before it is recorded. Which launches
    and answers count is ADR-0021's gate rule.
@@ -68,10 +69,7 @@ blocking on its verdict needs Option A anyway.
 
 ## Trade-offs
 
-- A checked commit costs a workflow per check it needs, and a refused first try.
-- A commit made other than by `git commit` in the Bash tool (`git merge`, `rebase`, `am`, `commit-tree`,
-  aliases) is seen only after the command, by ADR-0020's tip check, and put back; one made outside a
-  Claude Code session is not seen.
+- A checked commit costs a workflow per check it needs.
 - The workflow depends on a hook rewriting `Workflow` input, which the docs do not promise.
 - A model call inside a hook gets less time than the hook itself has.
 
@@ -79,8 +77,8 @@ blocking on its verdict needs Option A anyway.
 
 - Easier: a new commit-time check adds a commit rule, a launch handler and a workflow.
 - Harder: every such check inherits the blind spots above.
-- **How we would know this was wrong:** commits no check saw reach review more than rarely, or a hook
-  reaches its timeout in normal use.
+- **How we would know this was wrong:** a commit no check passed reaches review, or a hook reaches its
+  timeout in normal use.
 - Revisit if: Claude Code offers a hook that can run a workflow and block on its result.
 
 ## Action items

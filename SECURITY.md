@@ -47,6 +47,10 @@ Accepted risks:
   counts and every story stalls: it fails closed.
 - A Stop hook that crashes fails open: the session ends, nothing is attested, and nothing else happens
   (orchestrator ADR-0001 d5).
+- codeworks builds its own repo: a story PR can change the hooks and gates that review later stories,
+  once a person installs that version on the agent machine. Human review of such a PR is the only stop.
+- Where Claude Code signs in with a Team or Enterprise claude.ai account, settings an admin adds on
+  claude.ai apply mid-session; the hooks refuse at the next start (§5).
 
 ## 3. Identities
 
@@ -55,7 +59,7 @@ Four GitHub Apps per served repo, none on a ruleset bypass list, and the human's
 | App | Acts for | Repository permissions | Organization permissions | Key read by |
 |---|---|---|---|---|
 | `codeworks-session` | the model's commands, through a one-hour, one-repo installation token | metadata, contents, pull requests, issues, checks, statuses, actions: read; no write | projects: read | the orchestrator's SessionStart hook, agent machine only |
-| `codeworks-orchestrator` | the orchestrator's hooks: the claim, lanes, pushes, the draft PR, the ready flip, `internal-review` and each module's `<module>-review` check runs, external review requests, thread replies and resolution, merge, Blocked reasons and moves, the status issue | contents, pull requests, issues, checks: write | projects: write | the orchestrator's hooks, agent machine only |
+| `codeworks-orchestrator` | the orchestrator's hooks: the claim, lanes, pushes, the draft PR and its body, the ready flip, `internal-review` and each module's `<module>-review` check runs, external review requests, thread replies and resolution, merge, Blocked reasons and moves, the status issue | contents, pull requests, issues, checks, workflows: write | projects: write | the orchestrator's hooks, agent machine only |
 | `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | issues: write | none | reviewer's hooks, agent machine only |
 | `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | reviewer's hook, human machine only |
 
@@ -71,11 +75,14 @@ Stops, strongest first: **GitHub** (App permissions, ruleset), **managed setting
 
 **Orchestrator.** Hooks only, as the orchestrator App. It runs no LLM and parses no prose except through
 core.
-- GitHub: no administration or workflow access; the ruleset decides whether a merge goes through, and
-  the merge names the head it evaluated.
+- GitHub: no administration access; workflows write only so a push can carry a workflow change, which
+  merges only under an exempt label (orchestrator ADR-0004 d4). The ruleset decides whether a merge goes
+  through, and the merge names the head it evaluated.
 - It attests `internal-review` only from the reviewer App's newest record.
-- It pushes only commits whose author and committer are the agent identity, in range; at stage 2 only
-  commits a FIX ruling names or a merge of the default branch (orchestrator ADR-0001 d4).
+- It pushes only commits reviewer's commit check passed (reviewer ADR-0002) whose author and committer
+  are the agent identity, the name and email of the agent machine's global git config, set at setup and
+  write-denied (§5); at stage 2 only commits a FIX ruling names or a merge of the default branch
+  (orchestrator ADR-0001 d4).
 - A hook that crashes or times out attests, flips, pushes and merges nothing.
 
 **Reviewer.** Hooks as the reviewer App, which can write only issues, so a record cannot touch code,
@@ -111,18 +118,18 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 ```json
 {"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"excludedCommands":[],
  "filesystem":{"denyRead":["<V>/keys","<V>/ghcreds","~/.claude/.credentials.json"],
-  "denyWrite":["<V>/keys","<V>/ghcreds","<V>/plugin/gaterev","<V>/state","/tmp/verify-b-ghsess","~/.claude"],
+  "denyWrite":["<V>/keys","<V>/ghcreds","<V>/plugin/gaterev","<V>/state","/tmp/verify-b-ghsess","~/.claude","~/.gitconfig"],
   "allowManagedReadPathsOnly":true},
  "network":{"allowedDomains":["github.com","api.github.com","*.githubusercontent.com","pypi.org","files.pythonhosted.org"],
   "allowManagedDomainsOnly":true,"strictAllowlist":true,"allowAllUnixSockets":false}},
 "permissions":{"deny":["TaskStop","Read(/<V>/keys/**)","Edit(/<V>/keys/**)","Read(/<V>/ghcreds/**)","Edit(/<V>/ghcreds/**)",
  "Read(~/.claude/.credentials.json)","Edit(/<V>/plugin/gaterev/**)","Edit(/<V>/state/**)","Edit(//tmp/verify-b-ghsess/**)",
- "Edit(~/.claude/**)","Edit(**/.claude/settings.json)","Edit(**/.claude/settings.local.json)","Edit(**/.claude/workflows/**)",
+ "Edit(~/.claude/**)","Edit(~/.gitconfig)","Edit(**/.claude/settings.json)","Edit(**/.claude/settings.local.json)","Edit(**/.claude/workflows/**)",
  "Edit(**/.claude/agents/**)","Edit(**/.claude/skills/**)","Edit(**/.claude/commands/**)","Edit(**/.claude/hooks/**)",
  "Edit(**/.mcp.json)","Edit(**/.git/config)","Edit(**/.git/hooks/**)"]},
 "allowedMcpServers":[],"allowManagedMcpServersOnly":true,
 "allowManagedHooksOnly":true,"enabledPlugins":{"orchestrator@codeworks":true,"builder@codeworks":true,
- "reviewer@codeworks":true,"auditor@codeworks":true},
+ "reviewer@codeworks":true,"auditor@codeworks":true,"pr-review-toolkit@claude-plugins-official":true},
 "env":{"PIP_CACHE_DIR":"<C>/pip","npm_config_cache":"<C>/npm"}}
 ```
 
@@ -135,7 +142,7 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 - `sandbox.filesystem.denyRead`: sandboxed commands cannot read the keys, other credentials or Claude
   Code's own login.
 - `sandbox.filesystem.denyWrite`: sandboxed commands cannot write the keys, credentials, plugin code,
-  reviewer's state, the session's gh config or `~/.claude`.
+  reviewer's state, the session's gh config, `~/.claude` or the agent identity in `~/.gitconfig`.
 - `sandbox.filesystem.allowManagedReadPathsOnly`: user, project and repo settings cannot reopen a denied
   path.
 - `sandbox.network.allowedDomains`: sandboxed commands reach only GitHub and the listed registries. It
@@ -157,20 +164,27 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   accepted but never checked, so the block has none.
 - `allowedMcpServers: []` with `allowManagedMcpServersOnly`: no MCP server loads unless the managed file
   lists it.
-- `allowManagedHooksOnly` with the codeworks plugins in `enabledPlugins`: only their hooks run. Hooks a
+- `allowManagedHooksOnly` with the codeworks plugins and reviewer's dependency pr-review-toolkit in
+  `enabledPlugins`: only their hooks run. Hooks a
   served repo commits in its settings, skills or agents would otherwise run outside the sandbox with the
   user's full access, even in a folder never trusted, because a `-p` session treats every folder as
   trusted.
 - `env`: package caches sit in the session's temp folder, which the sandbox lets commands write.
 
-A person starts each session with `--setting-sources user` and the prompt `/codeworks <issue>`, so no
-repo settings file loads: a repo's `env` would otherwise reach every process Claude Code
-starts, the codeworks hooks included. Managed settings always load.
+A person starts each session with `claude --setting-sources "" --permission-mode bypassPermissions` and
+the prompt `/codeworks <issue>`, so no user, project or local settings file loads: a repo's `env` would
+otherwise reach every process Claude Code starts, the codeworks hooks included. Managed settings always
+load, and the plugins they enable still load (§7).
 
-Two rules live in hooks, not in the file: hooks run git with `core.fsmonitor` and `core.hooksPath` off,
-and every hook that reads a key refuses unless the managed settings are present and in effect. The one
-exception is reviewer's hook reading the planner App's key where planner runs, which has no managed
-settings (§2).
+The managed file is the one source of managed settings. Claude Code also merges a
+`managed-settings.d/` folder beside it and, for a Team or Enterprise claude.ai account, settings from
+claude.ai, cached in `~/.claude/remote-settings.json`; every hook that reads a key refuses while either
+exists. The machine's Claude Code signs in with a claude.ai account.
+
+Two rules live in hooks, not in the file: hooks run git with no global or system config, no credential
+helper, and `core.fsmonitor` and `core.hooksPath` off; and every hook that reads a key refuses unless the
+managed settings are present and in effect. The one exception is reviewer's hook reading the planner
+App's key where planner runs, which has no managed settings (§2).
 
 ## 6. The review gate rule
 
@@ -231,6 +245,8 @@ The other rows ran on 2.1.300 to 2.1.306.
 | `allowManagedHooksOnly` passed with `--settings` | No effect: it works only in the managed file |
 | Commit statuses DeepSource and CodeRabbit posted | No creator recorded; CodeRabbit posted success while rate limited, without reviewing |
 | The tool name a deny rule or hook matcher needs for subagents | `Task` (and `Agent` on newer builds) |
+| `--setting-sources ""` with an installed plugin enabled by `--settings` (2.1.310) | The plugin loaded; not enabled, it did not |
+| Read, Bash and Write deny rules under `bypassPermissions` with `--setting-sources ""` (2.1.310) | All denied |
 
 ## 8. Known limits and open items
 
@@ -241,8 +257,10 @@ The other rows ran on 2.1.300 to 2.1.306.
   - the gate rewriting every Workflow launch, where §6 rewrites only reviewer workflows and lets other
     results never count;
   - the network and MCP allowlists, unix-socket blocking and `allowManagedReadPathsOnly`;
-  - hooks running git with `core.fsmonitor` and `core.hooksPath` off;
-  - `allowManagedHooksOnly` with `enabledPlugins`, and `--setting-sources user` (Claude Code docs only);
+  - hooks running git with no global or system config, no credential helper, and `core.fsmonitor` and
+    `core.hooksPath` off;
+  - `allowManagedHooksOnly` with `enabledPlugins`, and plugins enabled in the managed file under
+    `--setting-sources ""` (Claude Code docs only);
   - the `TaskStop` deny;
   - the ruleset requiring each check run by name from the orchestrator App, and the read-only session
     App.
@@ -263,8 +281,7 @@ The other rows ran on 2.1.300 to 2.1.306.
   remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
   GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer
   never deletes its own.
-- **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the board
-  restarts after a billing or login failure stops it (orchestrator ADR-0001 d8); whether Claude Code's
+- **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); whether Claude Code's
   install of a plugin's npm dependencies reaches the registry under the managed settings; how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Claude Code upgrades:** every result in §7 holds only for the versions tested. Pin the version on the

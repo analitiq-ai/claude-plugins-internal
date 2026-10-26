@@ -33,11 +33,11 @@ needs one meaning of "edit" and a reset that does not punish polish after a sett
 ## Decision
 
 1. We will stop offering PATCH and CLASS_FIX for a file once `edits_before_redesign` (3, a `[reviewer]`
-   key) review-driven commits touched it since the reset; REDESIGN must carry an invariant and a diagnosis:
-   unsettled design, too many responsibilities, or review polish.
-2. We will reset at the latest of round 1's head, the last settled round's head, the commit
-   closing that file's last REDESIGN finding, and a move of the file (ADR-0001); the assessor's
-   facts will carry edits_since_reset and the reset event.
+   key) rounds' fixes touched it since the reset, the file followed across renames; REDESIGN must carry
+   an invariant and a diagnosis: unsettled design, too many responsibilities, or review polish.
+2. We will reset at the latest of round 1's head, the last settled round's head and the commit closing
+   that file's last REDESIGN finding; the assessor's facts will carry edits_since_reset and the reset
+   event.
 3. We will define the rule once, in reviewer's policy; the pre-PR "unsettled branch" concern belongs to
    the history-shape audit reviewer.
 

@@ -33,8 +33,10 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
 ## Decision
 
 1. We will make the orchestrator a plugin, importing only `core/` (root ADR-0001), whose hooks act as
-   its own GitHub App, `codeworks-orchestrator` (contents, pull requests, issues and checks write;
-   organization projects write), its key read only by hooks (root ADR-0008). "The orchestrator" in these
+   its own GitHub App, `codeworks-orchestrator` (contents, pull requests, issues, checks and workflows
+   write; organization projects write), its key read only by hooks (root ADR-0008). Workflows write lets
+   it push a branch that carries a workflow change, a merge of the default branch included; the change
+   itself merges only under an exempt label (ADR-0004). "The orchestrator" in these
    records means these hooks.
 2. We will give it only these inputs: the prompt that names the session's issue; the board and its
    issues (lane and when it was set, parent, sub-issues, `blockedBy`, closer); open PRs, their changed files,
@@ -45,16 +47,19 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
    `codeworks.toml` (root ADR-0002); its hook's event. It parses no prose except through `core/`'s
    modules (root ADR-0003) and runs no LLM.
 3. We will drive the loop from three hooks. SessionStart mints the session's token (root ADR-0007).
-   The prompt `/codeworks <issue>` claims that issue when ADR-0002 lets it start, refusing any other with
-   the reason, and names `builder:issue-tackle <s>`; nothing picks an issue on its own. Stop refuses the
-   stop with the next step until none is left. While CI or an external reviewer is pending, that step is
-   to poll GitHub in the session with reviewer's poller, each reviewer bounded by `review_timeout`
-   (ADR-0008). It ignores a Stop while a workflow runs and takes no task notification as a prompt.
+   The prompt `/codeworks <issue>` claims or resumes that issue when ADR-0002 lets it, refusing any other
+   with the reason, and names `builder:issue-tackle <s>`; nothing picks an issue on its own. Stop refuses
+   the stop with the next step until none is left. While CI or an external reviewer is pending, the Stop
+   hook polls each module's `status` (root ADR-0003) and the required checks, and refuses the stop with
+   the step "wait" until each answers or `review_timeout` passes (ADR-0008). It ignores a Stop while a
+   workflow runs and takes no task notification as a prompt.
 4. We will have the orchestrator's hooks push the session's commits and open the story PR as a draft
-   after the first push (builder ADR-0003). They push only commits whose author and committer are the
-   agent identity, in the range since the last push; at stage 2 (ADR-0004), only commits that a FIX
-   ruling names or a merge of the default branch. Which hook pushes, and when in a turn, is this
-   plugin's spec to settle.
+   after the first push (builder ADR-0003). Every commit a push adds, but those a merge of the default
+   branch brings in from it, must have passed reviewer's commit check (reviewer ADR-0002) and have the
+   agent identity as author and committer: the name and email of the agent machine's global git config,
+   set once when the machine is set up. At stage 2 (ADR-0004) a push adds only commits that a FIX ruling
+   names or a merge of the default branch. Which hook pushes, and when in a turn, is this plugin's spec
+   to settle.
 5. We will have a hook that crashes or times out attest, flip, push and merge nothing. A crashed Stop
    hook fails open: the session ends with nothing attested, and nothing else happens. The user accepted
    this on 2026-10-26.
@@ -64,13 +69,11 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
    unattested head or findings, ended with both unchanged and still needing work), on two turns in a
    row from a working lane each ending with an unattested head, or when a count below reaches its
    threshold. A human's Ready resets every count.
-8. We will classify how each session ended, each class with one next step. Ended normally, or out of
-   budget or turns: a turn, toward `max_turns`. Killed by `session_timeout`, or crashed: a death, toward
-   `k_deaths`. An API error: nothing counted, and posted on the status issue (ADR-0002) after `k_transient`
-   in a row. A billing or login failure, or a session whose hooks never ran: nothing counted, posted on the
-   status issue, and the board stops; how it restarts is this plugin's spec to settle. The thresholds
-   are `[orchestrator]` keys with defaults: `max_turns` 6, `k_deaths` 2, `k_transient` 3,
-   `review_timeout` 30 minutes, `session_timeout` 3 hours.
+8. We will classify how each session ended, each class with one next step. Ended through its Stop hook,
+   normally or out of budget or turns: a turn, toward `max_turns`. Ended without its Stop hook (killed,
+   crashed, or stopped by an API, billing or login failure): a death, toward `k_deaths`, which the next
+   session on the issue infers from a start its hooks recorded with no end. The thresholds are
+   `[orchestrator]` keys with defaults: `max_turns` 6, `k_deaths` 2, `review_timeout` 30 minutes.
 
 ## Options considered
 
@@ -95,6 +98,11 @@ Rejected: its other users would pass the trust filters.
 ### Option F: SessionStart claims the next Ready story
 
 Rejected by the user on 2026-10-26: a person names the issue each session tackles.
+
+### Option G: A launcher that watches how each session ends, and a session time limit
+
+Rejected by the user on 2026-10-26: the next session infers an end without the Stop hook, with no
+component added.
 
 ## Trade-offs
 

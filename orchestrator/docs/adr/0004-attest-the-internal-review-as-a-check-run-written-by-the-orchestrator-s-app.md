@@ -38,14 +38,22 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    success when reviewer's state (reviewer ADR-0011) records an INTERNAL or AUDIT round CLEAN or
    CONVERGED_PUSHBACK at the head or a commit in its history, and no hold is open; success marked
    "exempt" on an exempt PR (ADR-0005); else pending. Later commits and github rounds, stage 2, never
-   undo that round. At every hook run the orchestrator rewrites each open PR's `internal-review` and
-   `<module>-review` (ADR-0008) whose value changed.
+   undo that round, except that it lapses, and a new internal round runs at the head, when: the default
+   branch's `spec.md` of the story's spec, its `**/docs/adr/` folders or `.specify/memory/` differ from
+   those at the round's commit; a merge of the default branch since that round differs from the merge
+   git makes of its parents without conflict; or a human's comment released a hold since that round
+   (reviewer ADR-0013), the new round briefed with it. A `/codeworks reset` lapses nothing. At every
+   hook run the orchestrator rewrites each open PR's `internal-review` and `<module>-review` (ADR-0008)
+   whose value changed.
 2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
    its key (root ADR-0008).
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a check from
    any other App, or a commit status of that name, counts for nothing.
-4. We will never attest a PR that changes `codeworks.toml`, `.github/` or `.claude/`, Bot-authored or
-   not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005) attests it.
+4. We will never attest a PR that changes `codeworks.toml`, `.github/`, `.claude/`, `.specify/memory/`,
+   a `docs/adr/` folder, or an `AGENTS.md` or `CLAUDE.md` file, at any depth and in any letter case,
+   Bot-authored or not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005)
+   attests it. A validator's own config, `.deepsource.toml` for one, belongs to its package in
+   `validators/` (root ADR-0003) and is not on this list.
 5. We will never attest a fork PR (head repo ≠ base repo) from reviewer's state; the exempt label still
    applies (ADR-0005).
 

@@ -39,12 +39,11 @@ script, `cp`, `git reset`.
 1. We will freeze the head under review: while a reviewer subagent of the session runs, while its round
    collects reports, and while a round awaits assessment, the session's `Edit`, `Write`, `git commit`,
    `git push` and replies on the PR are refused.
-2. We will bracket every Bash command of a session with an issue. After it, a new commit the commit gate
-   did not pass blocks the command's result and tells the agent to put the branch back. While the head is
-   frozen or a hold that refuses commits is open (ADR-0013), a changed file the gate would refuse does the
-   same; the checkout's tracked and untracked changes are digested before the command for that. What the
-   gate accepts passes, such as a merge of the default branch under a rescope hold. A checkout the watch
-   cannot read refuses the command (root ADR-0004).
+2. We will bracket every Bash command of a session with an issue. After it, a new commit names the checks
+   it needs (ADR-0002); while the head is frozen, a moved branch tip blocks the command's result and tells
+   the agent to put the branch back. A hold that refuses commits (ADR-0013) is enforced by the check of
+   the commits, which are pushed only once passed. A checkout the watch cannot read refuses the command
+   (root ADR-0004).
 
 ## Options considered
 
@@ -68,7 +67,7 @@ Rejected: a held branch moves by `git reset` or a script, out from under its hol
 
 - A command that changed a held branch has already run; the agent puts it back, and a command that
   cannot be undone stays done.
-- Every Bash command pays for a tip check, and a held session's for two snapshots of its checkout.
+- Every Bash command pays for a tip check.
 - A command from another session in the same checkout is not watched.
 
 ## Consequences
@@ -76,7 +75,7 @@ Rejected: a held branch moves by `git reset` or a script, out from under its hol
 - Easier: the head a round ruled on is the head that is pushed and answered for.
 - Harder: an agent waits for its round and the assessment before it edits again.
 - **How we would know this was wrong:** a commit, push or reply lands between a round's launch and its
-  assessment; the watch misses or blocks a change the commit gate would refuse or accept.
+  assessment.
 - Revisit if: Claude Code can confine a session's writes by path or branch.
 
 ## Action items

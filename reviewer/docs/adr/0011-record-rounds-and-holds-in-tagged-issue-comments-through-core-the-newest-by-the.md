@@ -40,7 +40,7 @@ can comment, and a comment can be edited or deleted.
 
 1. We will record rounds and holds in comments on the story issue tagged
    `<!-- codeworks:reviewer-state -->`. Each is the full snapshot, a released hold keeping its row and a
-   rescope hold its `spec.md` blob SHA (ADR-0013). The newest comment by the reviewer App,
+   rescope hold the number of the spec PR that placed it (ADR-0013). The newest comment by the reviewer App,
    `codeworks-reviewer`, wins whatever its text; reviewer's hook alone posts as that App, whose key only
    hooks read (root ADR-0008), and only from verdicts ADR-0021 counts.
 2. We will fail closed: when the newest such comment lacks the tag or was edited, or the issue's

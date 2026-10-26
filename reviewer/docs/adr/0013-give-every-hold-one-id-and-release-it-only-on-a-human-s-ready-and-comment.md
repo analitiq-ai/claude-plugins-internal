@@ -43,11 +43,13 @@ loop only through GitHub: the board and issue comments.
    number but `claim-<id>` (its lineage) and `shim-<id>` (its bug). While one is open the story merges
    nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
 2. We will release holds by one function, only on the orchestrator's claim from Ready (orchestrator
-   ADR-0002). reviewer releases each open hold of the story issue for which both the card's Ready and a
-   human's comment on the story issue are newer than the state comment that placed the hold. A human
-   is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one; for an escalation
-   hold, that comment is its answer. reviewer carries the comment into the next round's briefs. A hold
-   with no such comment stays open, and the start stops (orchestrator ADR-0002).
+   ADR-0002). reviewer releases each open hold of the story issue for which both a person's move of the
+   card to Ready on the board `[shared] board` names and a human's comment on the story issue are newer
+   than the state comment that placed the hold. A human is a writer other than a codeworks App, read as
+   orchestrator ADR-0010 reads one; for an escalation hold, that comment is its answer. A release by a
+   comment lapses the attestation, and the new internal round at the head is briefed with the comment
+   (orchestrator ADR-0004). A hold with no such comment stays open, and the start stops (orchestrator
+   ADR-0002).
 3. We will have a human's comment `/codeworks reset` on the story issue release every open hold of the
    story and restart every count that places one, the orchestrator's included (orchestrator ADR-0001).
    It moves no card: the human sets Ready.
@@ -63,11 +65,11 @@ loop only through GitHub: the board and issue comments.
    | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |
    | `audit-<issue>` | the count of escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
 5. We will place `rescope-<issue>` on a `RESCOPE` verdict, and, when reviewer's hook sees a rescope's
-   spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006). It
-   records the blob SHA of `spec.md` on the story branch, else the default branch, and refuses every code
-   commit but a merge of the default branch; it blocks no story start, which merges that branch. It
-   releases as every hold does (d2). The next round's briefs carry whether the default branch's `spec.md`
-   differs from that SHA; where it does not, the human's comment says why the old spec stands.
+   spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording
+   that spec PR's number. reviewer's hook derives this at each run: a spec PR whose number a story's
+   rescope row already records places nothing again, released or not; a new spec PR places the hold
+   again. It refuses every code commit but a merge of the default branch, and releases as every hold
+   does (d2).
 
 ## Options considered
 

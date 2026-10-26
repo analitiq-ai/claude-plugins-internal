@@ -33,8 +33,8 @@ repo.
 
 ## Decision
 
-1. We will have the orchestrator flip a story PR to ready once per PR, between turns, when the head is
-   attested with no hold open; a human's click counts the same.
+1. We will have the orchestrator flip a story PR to ready once per PR, and again after CONVERTED (d5),
+   between turns, when the head is attested with no hold open; a human's click counts the same.
 2. We will evaluate the external reviewers and the required checks after ready, reading every enabled
    module's `status` at each hook run (root ADR-0003). GREEN is every check the base branch's effective
    rules require (ADR-0009) success at the head, leaving out `internal-review` and each module's
@@ -47,8 +47,8 @@ repo.
    hold.
 4. We will name no builder step for a Ready card whose head is attested with no hold open: a draft goes
    to the flip, a ready PR to In review once GREEN with no findings.
-5. We will treat a PR a human converts back to draft as CONVERTED: Blocked until the human re-marks it
-   ready and moves the card to Ready.
+5. We will treat a PR a human converts back to draft as CONVERTED: Blocked until a human moves the card
+   to Ready, after which the orchestrator flips it to ready again (d1).
 6. We will have the orchestrator resolve, unread, every unresolved review thread no trusted reviewer
    started, replying with its App that it was not read, and name no step for it.
 7. We will have the orchestrator post, with its App, the reply each ruling that reviewer's state records

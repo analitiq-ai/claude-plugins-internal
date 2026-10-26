@@ -43,7 +43,7 @@ only outside Blocked and Backlog, planning only inside (root ADR-0006).
    merges once a writer other than a codeworks App applies the exempt label (orchestrator ADR-0005).
 3. We will enforce root ADR-0006's lane rule by refusing every story-branch commit and every round's
    launch while the session's issue is in Blocked or Backlog, read from the board at each.
-4. We will gate every new commit on the branch, however made (ADR-0020), and refuse a change to a merged
+4. We will gate every new commit on the branch, however made (ADR-0002), and refuse a change to a merged
    story's task block. After a merge of the default branch, the spec folder must equal
    the default branch's but the story's own ticks (ADR-0010).
 5. We will enforce the branch grammar at three sites only, each parsing the branch through `core/` (root

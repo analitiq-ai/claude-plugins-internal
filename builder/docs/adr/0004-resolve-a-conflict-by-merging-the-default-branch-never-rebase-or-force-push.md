@@ -37,9 +37,8 @@ never reaches the default branch. reviewer records each round's verdict at the h
 1. We will resolve a conflict on a story branch by merging the default branch into it, and never rebase or
    force-push the branch.
 2. We will merge the default branch into a story branch at its next step after a spec PR of its spec's
-   issue merged, so the story is built and reviewed against the spec and records in force. A new spec.md
-   that merge brings releases the story's rescope hold (reviewer ADR-0013). The merge runs before the
-   spec-folder check (ADR-0002), which then finds the folder the new spec names.
+   issue merged, so the story is built and reviewed against the spec and records in force. The merge
+   runs before the spec-folder check (ADR-0002), which then finds the folder the new spec names.
 
 ## Options considered
 
@@ -58,8 +57,9 @@ Rejected: each session picks rebase or merge on its own, and the first rebase st
 
 ## Trade-offs
 
-- The round after a merge reviews the merge's conflict resolution, diffed against the merge base
-  (reviewer ADR-0010), so every merge costs a round.
+- A merge that differs from git's clean merge, or brings a new spec or records, costs a round
+  (orchestrator ADR-0004), which reviews the resolution diffed against the merge base (reviewer
+  ADR-0010).
 - The branch carries merge commits; the squash merge keeps them off the default branch.
 
 ## Consequences

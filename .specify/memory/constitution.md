@@ -1,9 +1,8 @@
 <!--
 Sync Impact Report
-- Version: 1.2.1 -> 1.2.2 (PATCH: wording follows root ADR-0007, ADR-0008 and reviewer ADR-0013)
-- Changed: Platform Constraints' agent environment bullet names the agent machine, the person who starts
-  each session on one issue, and the read-only model token; P2's citation of reviewer ADR-0013 follows
-  its rename and renumbering; P6's list of states names a check run, not a status or the assignee.
+- Version: 1.2.2 -> 1.2.3 (PATCH: wording follows root ADR-0001 and ADR-0003)
+- Changed: the scope and Platform Constraints' repo shape name the validator packages in `validators/`;
+  P7's exception reads a provider's review text in that provider's module, not in `core/`.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -11,9 +10,10 @@ Sync Impact Report
 # Codeworks Constitution
 
 Constitution for building the components of `analitiq-ai/claude-plugins-internal`: the `reviewer`,
-`planner`, `builder`, `auditor` and `orchestrator` plugins, and the shared `core/` package. Each
-component is a top-level folder; a plugin's `plugin/` is what an install copies, `core/` included
-through a symlink in each plugin that runs it; nothing else in the repo is installed. Paths are relative to the
+`planner`, `builder`, `auditor` and `orchestrator` plugins, the shared `core/` package, and the
+validator packages in `validators/`. Each component is a top-level folder; a plugin's `plugin/` is what
+an install copies, `core/` and `validators/` included through a symlink in each plugin that runs them;
+nothing else in the repo is installed. Paths are relative to the
 repo root unless they name another repo. Each principle is a plan-time gate: a plan passes only if it
 answers the gate question for the components it applies to. The files named in each
 Source line are the source of truth; this document indexes them and never restates their text.
@@ -179,7 +179,7 @@ Applies to: reviewer, planner, orchestrator.
 Gate: does every fact the plan reads come from a key, a field, a status or a name with a grammar,
 never from a heading, a comment's wording or free text; and does every fact the plan writes for
 another reader land in such a form? The one exception is a verdict a provider publishes only in its
-review text, which that provider's validator module reads there, in `core/` alone.
+review text, which that provider's validator module reads there, in that module alone.
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
@@ -226,8 +226,8 @@ Source: All: `docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
 - Repo shape: one top-level folder per component; a plugin's `plugin/` is what an install copies,
-  listed in `.claude-plugin/marketplace.json`; `core/` reaches each plugin that runs its code through a
-  symlink an install copies; `tests/` and `docs/adr/` are never installed
+  listed in `.claude-plugin/marketplace.json`; `core/` and `validators/` reach each plugin that runs
+  their code through a symlink an install copies; `tests/` and `docs/adr/` are never installed
   (`README.md`; `docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md`).
 - Tests: CI runs every `<component>/tests/` folder (`.github/workflows/tests.yml`).
 - Language: `core/` is TypeScript on Node, its contracts Zod schemas; no Python code calls core, and a
@@ -288,4 +288,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.2.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-26
+**Version**: 1.2.3 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-26

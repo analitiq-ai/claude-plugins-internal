@@ -38,8 +38,8 @@ the last one left.
 
 1. We will have the story PR open as a draft after the first push, and a new one on the same branch
    after a PR closed unmerged; the orchestrator's hooks push builder's commits and open it (orchestrator
-   ADR-0001). Its description is written once, at creation, with `Closes #s` for the story issue, so the
-   merge closes it.
+   ADR-0001). Its description, which the squash merge takes as its message (orchestrator ADR-0009),
+   carries `Closes #s` for the story issue from creation, so the merge closes it.
 2. We will end the turn at an attested draft, or at a stop with a message naming why: a pre-PR stop, or the
    folder or lane stop of ADR-0002. The Stop hook then names the next step in this session or lets it stop
    (orchestrator ADR-0001).

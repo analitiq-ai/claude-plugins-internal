@@ -31,17 +31,21 @@ Humans and the orchestrator share the board; the orchestrator never checks who m
 
 ## Decision
 
-1. We will keep six lanes on the Project status field, issues as cards, each with at most one automated
-   writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and Blocked; none for
-   Ready, a human's alone. The model's token cannot write a lane (root ADR-0007), and planner writes none
-   (planner ADR-0005).
+1. We will keep six lanes on the Status field of one project, the board, which `board` in the `[shared]`
+   section of `codeworks.toml` names (root ADR-0002); issues are its cards, each lane with at most one
+   automated writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and
+   Blocked; none for Ready, a human's alone. A move to Ready counts only on the board and only when a
+   person made it, not a board workflow. The model's token cannot write a lane (root ADR-0007), and
+   planner writes none (planner ADR-0005).
 2. We will claim a story only on the prompt that names it (ADR-0001): the orchestrator's App moves its card
    from Ready to In progress and records it as the session's issue (reviewer ADR-0015). It re-derives a
    claimed card's In progress and In review from the story's PR at every hook run.
 3. We will start a story only from Ready (root ADR-0006), once every issue in its `blockedBy` is done
-   (root ADR-0005) and the spec-PR rule allows it (ADR-0006); a merge starts nothing. The start releases
-   holds as reviewer ADR-0013 decides; an open hold that no human comment newer than it answers stops the
-   start, with or without an open PR, sending the card back to Blocked with no new comment. A prompt
+   (root ADR-0005) and the spec-PR rule allows it (ADR-0006); a merge starts nothing. We will resume,
+   without Ready, a story whose card is In progress or In review, so a session that died is counted
+   (ADR-0001); a resume releases no hold. The start releases holds as reviewer ADR-0013 decides. An open
+   hold stops a resume, and on a start an open hold that no human comment newer than it answers stops it,
+   with or without an open PR, either sending the card back to Blocked with no new comment. A prompt
    naming a card these rules refuse claims nothing; the refusal names the reason. A Ready card whose PR
    closed unmerged restarts on its branch.
 4. We will never start a parent issue (one with sub-issues): named from Ready, it goes to Blocked, naming
@@ -52,8 +56,8 @@ Humans and the orchestrator share the board; the orchestrator never checks who m
    findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
    the lane write is the commit point; these moves fall between turns. At every hook run, the
    orchestrator posts any missing keyed reason for every open hold, in any lane. A failure that belongs
-   to no story, such as a key that mints no token or a session ended without its hooks (ADR-0001), is
-   posted on the board's status issue, whose card goes to Blocked.
+   to no story, such as a key that mints no token, is posted on the board's status issue, whose card goes
+   to Blocked.
 6. We will read a human's drag to Backlog, Blocked or Done as a stop: no further step is named, nothing
    merges. A drag into a working lane starts nothing; a claimed card dragged there is re-derived (d2), or
    bounced to Blocked under an open hold.

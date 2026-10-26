@@ -64,12 +64,16 @@ from a session.
    `.git/{config,hooks}`.
 7. We will allow sandboxed commands network only to GitHub and the repo's package registries, caches in
    the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers; run no Docker.
-8. We will run only the codeworks plugins' hooks, load no repo settings file, deny the model `TaskStop`,
-   and have hooks run git with `core.fsmonitor` and `core.hooksPath` off. In a test the model ended a
-   wait the Stop hook imposed by stopping the task it waited on.
+8. We will run only the codeworks plugins' hooks; start each session with `--setting-sources ""`, so no
+   user, project or local settings file loads, while an enabled plugin still does, and
+   `--permission-mode bypassPermissions`, under which Read, Bash and Write deny rules held in a test;
+   deny the model `TaskStop`; and have hooks run git with no global or
+   system config, no credential helper, and `core.fsmonitor` and `core.hooksPath` off. In a test the
+   model ended a wait the Stop hook imposed by stopping the task it waited on.
 9. We will have every key-reading hook, and reviewer for builder and review work, refuse unless
    managed settings are in effect (`SECURITY.md`); reading the planner App's key where planner runs is
-   exempt (d2).
+   exempt (d2). The managed settings file is their one source: the hooks refuse while a
+   `managed-settings.d/` folder sits beside it or Claude Code holds settings from claude.ai.
 
 ## Options considered
 
@@ -94,6 +98,10 @@ Rejected: a command can be disguised; any same-user process reads the keychain.
 
 Rejected by the user on 2026-10-24: the agent machine runs on its own OS.
 
+### Option F: Managed settings from several sources merged
+
+Rejected by the user on 2026-10-26: managed settings are recorded in one place.
+
 ## Trade-offs
 
 - An injected prompt can make WebFetch send what the model reads, the session token included,
@@ -101,6 +109,8 @@ Rejected by the user on 2026-10-24: the agent machine runs on its own OS.
 - A sandbox flaw is a codeworks hole.
 - Docker-based tests run only in CI.
 - No session runs until a person starts one.
+- Where Claude Code signs in with a Team or Enterprise claude.ai account, settings an admin adds on
+  claude.ai apply mid-session; the next start refuses.
 
 ## Consequences
 
