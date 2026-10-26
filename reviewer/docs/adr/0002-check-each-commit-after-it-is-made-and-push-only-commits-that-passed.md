@@ -41,8 +41,7 @@ the check reads (ADR-0021).
    commit it names, and passes every commit in that range.
 2. We will push only commits that passed: the orchestrator's push goes up to the newest passed commit
    (orchestrator ADR-0001).
-3. We will not check an empty commit. A merge is checked on its conflict resolution; a cherry-pick or
-   revert like any commit (ADR-0015).
+3. We will check a merge on its conflict resolution, as its round reviews it (ADR-0010).
 4. We will fail a check whose change, as d1 and d3 grade it, touches a `.github/` folder, matched as
    orchestrator ADR-0004 d4 matches one: a workflow on the branch runs on the push, before any review.
    Such a change is a human's, merged under an exempt label (orchestrator ADR-0005).

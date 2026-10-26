@@ -21,7 +21,8 @@ are in `docs/adr/`.
 6. Install each external reviewer listed in `validators`, as its package in `validators/<name>/` says
    (root ADR-0003), its automatic review off wherever its module triggers it (ADR-0008).
 7. Name the board in `board` under `[shared]` in `codeworks.toml`, spell its lanes Backlog, Ready,
-   In progress, In review, Blocked, Done, and add the status issue to it (ADR-0002).
+   In progress, In review, Blocked, Done (ADR-0002), and add to it a status issue, where the orchestrator
+   posts a failure that belongs to no story.
 8. To work a story, move its card to Ready, start a session on the agent machine with
    `claude --setting-sources "" --permission-mode bypassPermissions`, so no served repo's settings load
    (`SECURITY.md` §5), and name the issue: `/codeworks <issue>`. The orchestrator's hooks take it from

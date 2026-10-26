@@ -59,7 +59,7 @@ loop only through GitHub: the board and issue comments.
 
    | Hold | Placed when | Refuses | A release grants |
    |---|---|---|---|
-   | `escalation-<issue>` | a round verdict ESCALATE, or a trusted thread answered after its ruling `k_topic` (2) times (ADR-0016) | commits and rounds | both |
+   | `escalation-<issue>` | a round verdict ESCALATE, or a trusted thread answered after its ruling `k_topic` times (ADR-0016) | commits and rounds | both |
    | `pushback-<issue>` | a github round rules no FIX while a merge blocker fails at the head | rounds | rounds |
    | `claim-<id>` | the count of WRONG rulings on its lineage | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |

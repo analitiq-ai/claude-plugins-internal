@@ -55,11 +55,11 @@ behind a barrier, or which plugins a round depends on.
    outside the grammar keep main-thread dispatch.
 3. We will have reviewer's decision-reviewer join every internal round; with no governing
    record, it flags a decision made in the diff with no record.
-4. We will declare pr-review-toolkit, from Anthropic's `claude-plugins-official` marketplace, and auditor
+4. We will declare pr-review-toolkit and auditor
    as dependencies, pin the accepted version of each in the `[reviewer]` section of `codeworks.toml`
    (root ADR-0002), refuse a round's launch when an
    expected agent type is missing, and read auditor's dispatch as data at launch.
-5. We will cap the rounds of each stage at `max_rounds` (4), a `[reviewer]` key. Past it, the next
+5. We will cap the rounds of each stage at `max_rounds`, a `[reviewer]` key. Past it, the next
    round runs the audit stage on the whole PR. Only a human resets the count, by Ready and a comment
    (ADR-0013), or by `/codeworks reset` on the story issue. The cap switches the stage, locking
    nothing; a human comes in only through the audit hold (ADR-0013).

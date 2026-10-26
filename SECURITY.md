@@ -46,7 +46,7 @@ Accepted risks:
 - The gate rule relies on hook fields Claude Code does not promise to keep. If one changes, no verdict
   counts and every story stalls: it fails closed.
 - A Stop hook that crashes fails open: the session ends, nothing is attested, and nothing else happens
-  (orchestrator ADR-0001 d5).
+  (orchestrator ADR-0001).
 - codeworks builds its own repo: a story PR can change the hooks and gates that review later stories,
   once a person installs that version on the agent machine. Human review of such a PR is the only stop.
 - Where Claude Code signs in with a Team or Enterprise claude.ai account, settings an admin adds on

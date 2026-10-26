@@ -64,16 +64,13 @@ from a session.
    `.git/{config,hooks}`.
 7. We will allow sandboxed commands network only to GitHub and the repo's package registries, caches in
    the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers; run no Docker.
-8. We will run only the codeworks plugins' hooks; start each session with `--setting-sources ""`, so no
-   user, project or local settings file loads, while an enabled plugin still does, and
-   `--permission-mode bypassPermissions`, under which Read, Bash and Write deny rules held in a test;
-   deny the model `TaskStop`; and have hooks run git with no global or
-   system config, no credential helper, and `core.fsmonitor` and `core.hooksPath` off. In a test the
-   model ended a wait the Stop hook imposed by stopping the task it waited on.
+8. We will run only the codeworks plugins' hooks, load no user, project or local settings file, and
+   have hooks run git with no global or system config, no credential helper, and `core.fsmonitor` and
+   `core.hooksPath` off.
 9. We will have every key-reading hook, and reviewer for builder and review work, refuse unless
    managed settings are in effect (`SECURITY.md`); reading the planner App's key where planner runs is
-   exempt (d2). The managed settings file is their one source: the hooks refuse while a
-   `managed-settings.d/` folder sits beside it or Claude Code holds settings from claude.ai.
+   exempt (d2). The managed settings file is their one source: any other source of managed
+   settings makes them refuse.
 
 ## Options considered
 

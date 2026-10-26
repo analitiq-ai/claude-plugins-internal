@@ -56,7 +56,7 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
    `trigger` and `status` (orchestrator ADR-0008) and reads `findings` (orchestrator ADR-0007); reviewer's
    github stage reads `findings` (reviewer ADR-0016). The orchestrator alone closes threads no trusted
    reviewer started (orchestrator ADR-0007).
-6. We will keep each validator module in a package of its own, `validators/<name>/` (ADR-0001), which
+6. We will keep each validator module in a package of its own (ADR-0001), which
    owns how it reaches its provider and reads and interprets the provider's results, its token if it
    needs one included; `core/` holds only the contract, the threads module and the read of required
    checks. A module whose provider publishes its verdict only in review text reads it there, in that

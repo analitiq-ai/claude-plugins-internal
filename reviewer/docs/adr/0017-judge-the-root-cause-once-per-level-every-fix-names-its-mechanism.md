@@ -49,9 +49,7 @@ a root-cause verdict is due.
    the mechanism named.
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
-   from the ruling; the assessor's free-text next-step field is removed. A DEFER names an open issue; a
-   finding to defer with none makes the round's verdict ESCALATE, its question asking a human to open
-   one.
+   from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.
 4. At the commit level, we will have the shim check rule complete or patch on site coverage alone. The
    root-cause reviewer is the one judge of cause versus symptom; builder's root-cause-check skill is
    retired (builder ADR-0002).

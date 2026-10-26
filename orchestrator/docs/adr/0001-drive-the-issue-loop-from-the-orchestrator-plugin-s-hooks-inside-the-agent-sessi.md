@@ -49,31 +49,25 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
 3. We will drive the loop from three hooks. SessionStart mints the session's token (root ADR-0007).
    The prompt `/codeworks <issue>` claims or resumes that issue when ADR-0002 lets it, refusing any other
    with the reason, and names `builder:issue-tackle <s>`; nothing picks an issue on its own. Stop refuses
-   the stop with the next step until none is left. While CI or an external reviewer is pending, the Stop
-   hook polls each module's `status` (root ADR-0003) and the required checks, and refuses the stop with
-   the step "wait" until each answers or `review_timeout` passes (ADR-0008). It ignores a Stop while a
-   workflow runs and takes no task notification as a prompt.
+   the stop with the next step until none is left. It ignores a Stop while a workflow runs and takes no
+   task notification as a prompt. How it waits on CI and the external reviewers, up to `review_timeout`
+   (ADR-0008), is its spec's to settle.
 4. We will have the orchestrator's hooks push the session's commits and open the story PR as a draft
    after the first push (builder ADR-0003). Every commit a push adds, but those a merge of the default
-   branch brings in from it, must have passed reviewer's commit check (reviewer ADR-0002) and have the
-   agent identity as author and committer: the name and email of the agent machine's global git config,
-   set once when the machine is set up. At stage 2 (ADR-0004) a push adds only commits that a FIX ruling
-   names or a merge of the default branch. Which hook pushes, and when in a turn, is this plugin's spec
-   to settle.
-5. We will have a hook that crashes or times out attest, flip, push and merge nothing. A crashed Stop
-   hook fails open: the session ends with nothing attested, and nothing else happens. The user accepted
-   this on 2026-10-26.
+   branch brings in from it, must have passed reviewer's commit check (reviewer ADR-0002). At stage 2
+   (ADR-0004) a push adds only commits that a FIX ruling names or a merge of the default branch. Which
+   hook pushes, and when in a turn, is this plugin's spec to settle.
+5. We will have a hook that crashes or times out attest, flip, push and merge nothing.
 6. We will have builder and planner poll nothing on their own: each ends its turn at its draft PR or a
    stop before one (builder ADR-0003, planner ADR-0010); the wait is the Stop hook's step.
 7. We will move a story's card to Blocked, naming the bound, on REPEAT (a turn that had work, an
    unattested head or findings, ended with both unchanged and still needing work), on two turns in a
    row from a working lane each ending with an unattested head, or when a count below reaches its
    threshold. A human's Ready resets every count.
-8. We will classify how each session ended, each class with one next step. Ended through its Stop hook,
-   normally or out of budget or turns: a turn, toward `max_turns`. Ended without its Stop hook (killed,
-   crashed, or stopped by an API, billing or login failure): a death, toward `k_deaths`, which the next
-   session on the issue infers from a start its hooks recorded with no end. The thresholds are
-   `[orchestrator]` keys with defaults: `max_turns` 6, `k_deaths` 2, `review_timeout` 30 minutes.
+8. We will count a story's turns toward `max_turns`, and the sessions on it that ended without their
+   Stop hook toward `k_deaths`, which the next session on the issue infers from a start its hooks
+   recorded with no end; nothing outside the session watches how one ends. These and `review_timeout`
+   are `[orchestrator]` keys.
 
 ## Options considered
 
@@ -107,6 +101,7 @@ component added.
 ## Trade-offs
 
 - A move waits for the session's next hook run.
+- A crashed Stop hook fails open: the session ends with nothing attested.
 - A session waiting on an external reviewer stays open for up to `review_timeout`.
 
 ## Consequences

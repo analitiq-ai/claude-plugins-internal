@@ -46,11 +46,9 @@ model's write from a human's and a hook's.
 2. We will have the orchestrator's SessionStart hook mint that token into a gh config folder the model
    can read but not write, outside `~/.claude` and the session's temp folder, and refresh it before it
    expires.
-3. We will have hooks alone act as `codeworks-orchestrator` (the claim, lanes, pushes, the draft PR,
-   the ready flip, `internal-review` and each module's `<module>-review`, external review requests,
-   replies to and resolution of review threads, merge, Blocked reasons and moves, the status issue) and
-   `codeworks-reviewer` (rounds, holds), each App's key read only by its plugin's hooks: all hooks run
-   as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
+3. We will have hooks alone act as `codeworks-orchestrator` (every write the orchestrator's records
+   give it) and `codeworks-reviewer` (rounds, holds), each App's key read only by its plugin's hooks:
+   all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will have planner act on GitHub only as its own App, `codeworks-planner` (contents, pull requests
    and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists only where planner runs and whose
    token reviewer's hook mints there as decision 2 does; and the human only through their personal

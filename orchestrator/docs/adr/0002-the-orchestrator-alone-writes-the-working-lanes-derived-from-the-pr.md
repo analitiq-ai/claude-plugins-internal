@@ -55,9 +55,7 @@ Humans and the orchestrator share the board; the orchestrator never checks who m
    unmerged (reason: that turn's final message); an In review PR whose `<module>-review` failed with no
    findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
    the lane write is the commit point; these moves fall between turns. At every hook run, the
-   orchestrator posts any missing keyed reason for every open hold, in any lane. A failure that belongs
-   to no story, such as a key that mints no token, is posted on the board's status issue, whose card goes
-   to Blocked.
+   orchestrator posts any missing keyed reason for every open hold, in any lane.
 6. We will read a human's drag to Backlog, Blocked or Done as a stop: no further step is named, nothing
    merges. A drag into a working lane starts nothing; a claimed card dragged there is re-derived (d2), or
    bounced to Blocked under an open hold.

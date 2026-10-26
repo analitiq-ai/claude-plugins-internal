@@ -51,10 +51,8 @@ read from. A verdict read from any of those can be forged.
    something, else CLEAN.
 5. We will let every other workflow run untouched, counting none of its results.
 6. We will have reviewer agents read only an export of the committed head, made by the hook from a bare
-   copy the hooks own, never the model's working tree. Hooks take the session's commits only by fetching them
-   from the model's clone over a local path into their own refs in that copy, with `--no-tags`; no hook
-   runs any other git command in the clone. In a test, that fetch ran none of the git drivers, hooks or
-   helpers the clone set.
+   copy the hooks own, never the model's working tree. Hooks take the session's commits into that copy
+   only by a fetch from the model's clone, and run no other git command in the clone (`SECURITY.md`).
 
 ## Options considered
 
