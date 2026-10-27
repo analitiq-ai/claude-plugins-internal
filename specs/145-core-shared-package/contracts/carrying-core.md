@@ -35,7 +35,7 @@ which blocks the action, names the package and runs nothing that needs core (FR-
 is declared with `"onFailure": "block"` (Claude Code 2.1.295 or later), so a crash, a timeout or a Node that
 cannot run `.ts` also blocks; without it Claude Code lets the action go ahead (R4). The Stop hook alone exits 1
 and has no `onFailure`: a refused or crashed Stop hook fails open and the session ends (orchestrator ADR-0001
-d5).
+d5 and its Trade-offs).
 
 ## What CI checks (`core/scripts/check-carriers.ts`, on every pull request and push to `main`)
 

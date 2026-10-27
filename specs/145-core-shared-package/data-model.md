@@ -147,9 +147,9 @@ has none. `Shared` in contracts/codeworks-toml.md.
 | `newest_round` | Round or null |
 | `pushed_back` | map finding key → `{stage, n}` |
 | `releasable` | list of `{id, comment: {id, url, at}, reset}`: each open hold a start releases and the comment that releases it (contracts/state-comment.md, Release) |
-| `tamper_released` | true when a `tampered`, `deleted` or `invalid` cause stands and a Ready move and a human comment release it |
+| `tamper_released` | true when a `tampered`, `deleted` or `invalid` cause stands and a Ready move and an admin comment release it |
 | `startable` | true when every tamper cause is released and every open hold is in `releasable` |
-| `reset` | `{url, at}` of the newest human `/codeworks reset`, or null |
+| `reset` | `{url, at}` of the newest admin `/codeworks reset`, or null |
 
 `held` is true exactly when `causes` is not empty. No snapshot and no cause is "no state", not held. Causes are a
 `StateReading` field, not a value set: no component but core writes or compares them. The state comment's

@@ -59,16 +59,16 @@ after (GitHub's times are whole seconds); "after" between two comments is `datab
 
 | Term | Read as |
 |---|---|
-| human comment | an issue comment whose author is none of the four `[shared]` App logins and whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR (orchestrator ADR-0010 d2) |
-| Ready move | the newest status-change event on the issue's timeline whose `status` is `Ready`, whose `project.url` is `[shared] board`, whose `wasAutomated` is false and whose actor is a `User` none of the four App logins (orchestrator ADR-0002 d1) |
+| admin comment | an issue comment whose author is none of the four `[shared]` App logins and whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR (orchestrator ADR-0010 d2) |
+| Ready move | the newest status-change event on the issue's timeline whose `status` is `Ready`, whose `project.url` is `[shared] board`, whoever made it (orchestrator ADR-0002 d1; reviewer ADR-0013 d2) |
 | an escalation hold's question | the oldest comment by `orchestrator_app_login` whose first line is `<!-- codeworks:hold-question <id> <since> -->`, the hold's id and `since` |
-| reset | the newest human comment whose body, trimmed, is `/codeworks reset` |
+| reset | the newest admin comment whose body, trimmed, is `/codeworks reset` |
 
 An OPEN hold is **releasable** when a reset is after its `since`, released by the reset; or when a Ready move and
-a human comment are both after its `since`, that comment also after the question for an escalation hold, released
+an admin comment are both after its `since`, that comment also after the question for an escalation hold, released
 by the newest such comment. An escalation hold whose question is not posted is releasable only by a reset.
 
-A `tampered`, `deleted` or `invalid` cause is **released** when a Ready move and a human comment are both after
+A `tampered`, `deleted` or `invalid` cause is **released** when a Ready move and an admin comment are both after
 the newest of: the state comment's `lastEditedAt`, the newest reviewer App comment deletion, the invalid comment's
 `createdAt`.
 

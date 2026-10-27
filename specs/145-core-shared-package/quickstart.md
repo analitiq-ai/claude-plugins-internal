@@ -56,15 +56,15 @@ await readState(gitHub(readerToken), 'org/repo', 212, shared);
 - Edit the newest state comment in the GitHub UI and read again: `held` with `tampered`; `writeState` now throws
   `StateWriteRefused` naming the cause and its release (AS2, AS7).
 - Post a comment as the reviewer App without the tag after a tagged one: `held` with `invalid` (AS2).
-- Place an escalation hold with `placeHold`; comment as a human, then have the orchestrator App post the hold's
+- Place an escalation hold with `placeHold`; comment as an admin, then have the orchestrator App post the hold's
   question (`questionTag`), then move the card to Ready on the board: the hold is not in `releasable`. Comment
-  again as a human: it is, naming that comment (AS12, AS13). A comment by a codeworks App, a move on another
-  project or by a board workflow never makes it so.
-- Comment `/codeworks reset` as a human: every hold placed before it is in `releasable` and `reset` names the
+  again as an admin: it is, naming that comment (AS12, AS13). A comment by a codeworks App or a move on another
+  project never makes it so.
+- Comment `/codeworks reset` as an admin: every hold placed before it is in `releasable` and `reset` names the
   comment (AS14). `releaseOnClaim` then posts one snapshot with those rows RELEASED and the rest unchanged (AS15).
 - `placeRescopeHold` for spec PR #301 twice: one snapshot posted. Release it, place it for #301 again: nothing;
   for #305: the row is OPEN recording 305 (AS8).
-- With the newest state comment edited, `releaseOnClaim` is refused naming the edit until a Ready move and a human
+- With the newest state comment edited, `releaseOnClaim` is refused naming the edit until a Ready move and an admin
   comment both follow it; then it posts the working snapshot, rebuilt from the newest unedited one (AS7).
 
 Attestation, in a clone of the test repo fetched to the head and `origin/main`:
@@ -77,7 +77,7 @@ await attests(clone, reading, head, 'origin/main', 'specs/145-x');
 - With an INTERNAL round CLEAN at commit A recorded, push commit B on top: attested at B; force-push a history
   without A: not (AS11).
 - Then change a `docs/adr/` file on `main`, or merge `main` into the branch and amend the merge, or release a hold
-  by a human comment: not attested, `reason` naming it; release by `/codeworks reset` instead: attested (AS11).
+  by an admin's comment: not attested, `reason` naming it; release by `/codeworks reset` instead: attested (AS11).
 
 ## US3: the validator contract
 
@@ -102,5 +102,5 @@ On a machine with `SECURITY.md` §5's managed settings in effect, `mintToken('re
 'reviewer', 'org/repo')` returns a token expiring within one hour. With it, a comment on another repo's issue and
 a push to `org/repo` are both refused by GitHub (SC-008). A session token's push and comment are refused too.
 Remove `allowManagedHooksOnly` from the managed file: the same mint throws `KeyReadRefused` naming it, as does the
-orchestrator's mint reading `session-app.pem`; reviewer's mint reading `planner-app.pem` still goes ahead (AS4).
+orchestrator's mint reading `session-app.pem`; planner's mint reading `planner-app.pem` still goes ahead (AS4).
 Create `/etc/claude-code/managed-settings.d/`: the mint throws naming the folder (AS5).

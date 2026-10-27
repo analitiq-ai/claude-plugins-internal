@@ -1,9 +1,9 @@
 # Research: core, the shared package every Codeworks component imports
 
-Read for this: `spec.md` (Clarifications through Session 2026-10-26, rulings); the constitution 1.2.3; root ADR-0001
+Read for this: `spec.md` (Clarifications through Session 2026-10-27, records of #153); the constitution 1.2.2; root ADR-0001
 to ADR-0010; orchestrator ADR-0001, 0002, 0004, 0007 to 0010; reviewer ADR-0011, 0013, 0016, 0017, 0019; planner
 ADR-0008; builder ADR-0003, 0004; `SECURITY.md` §2, §3, §5 and §7; all as on branch `145-spec` at e476454, whose
-records are commit ab83f33. Also `.github/workflows/tests.yml`, `.gitignore`, `.deepsource.toml`,
+records are commit ab83f33, and for Session 2026-10-27 the records as #153 merged them (main at 74ef3d1). Also `.github/workflows/tests.yml`, `.gitignore`, `.deepsource.toml`,
 `.claude-plugin/marketplace.json`; `reviewer/plugin/scripts/{specbinding,policy,ledger}.py` (parts);
 `reviewer/plugin/skills/github-pr-review/poll-pr-review.sh`; the org gate
 `analitiq-org-github/.github/scripts/pr-gate.js`; Claude Code's plugin docs (manifest reference, plugin loading,
@@ -85,7 +85,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   `MissingDependency(name, root)`. A carrier's hook imports `guard.ts` statically, calls it, and only then imports
   other core modules with `await import(...)`. On `MissingDependency` the hook names the package on stderr and
   exits 2, and every hook that runs core is declared with `"onFailure": "block"`; the Stop hook alone exits 1
-  and has no `onFailure`, so the session ends (orchestrator ADR-0001 d5).
+  and has no `onFailure`, so the session ends (orchestrator ADR-0001 d5 and its Trade-offs).
 - **Rationale**: root ADR-0009 d4 and its Trade-off (a failed install still loads the plugin). A static import of
   a core module is evaluated before any guard runs, and Node's own failure names the package only in prose.
   Reading the carrier's `package.json` uses the list the install itself used; R5 holds it equal to core's.
@@ -123,10 +123,13 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   matrix's run step branches: for `core/tests` it runs `npm ci` and `npm test` in `claude-plugins-internal/core`
   (`tsc -p .`, then `node --test 'tests/**/*.test.ts'`); every other suite keeps `python -m unittest -v`. A
   `carriers` job on `pull_request` and on push to `main` checks out with full history, sets up Node 22, runs
-  `npm ci` in `core/` and R5's script against `origin/<base>`, or `HEAD~1` on a push.
+  `npm ci` in `core/` and R5's script against `origin/<base>`, or `HEAD~1` on a push. Both land in admin PRs of
+  their own: the branch before US1, the `carriers` job after US1 and before any carrier.
 - **Rationale**: the platform constraint "CI runs every `<component>/tests/`". Without the branch, `python -m
-  unittest` in `core/tests` finds no tests and exits 5 (seen). `setup-node` at `22` is already in the job. A PR
-  changing `.github/` is attested only by an exempt label (orchestrator ADR-0004 d4), which US1's PR needs.
+  unittest` in `core/tests` finds no tests and exits 5 (seen). `setup-node` at `22` is already in the job. A story
+  never changes `.github/` (reviewer ADR-0002 d4); an admin's PR that does is attested by the exempt label
+  (orchestrator ADR-0004 d4). The branch lands before US1, whose `core/tests` would otherwise exit 5; the
+  `carriers` job runs `npm ci` in `core/`, so it lands after US1, and before any carrier it grades.
 - **Existing tools**: the current matrix and `actions/setup-node`.
 - **Alternatives considered**: a separate workflow for core (a second place deciding what CI runs).
 
@@ -223,7 +226,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   board while the state write must post as it: two clients, reviewer's hook reading with the session App's
   token. COULD_NOT_RUN is a check outcome (root ADR-0010), so modules
   return it; identity and state reads are not checks, so a no-answer there stops the caller, which then attests
-  and merges nothing (orchestrator ADR-0001 d3). GitHub answers a GraphQL primary rate limit with `200` and
+  and merges nothing (orchestrator ADR-0001 d5). GitHub answers a GraphQL primary rate limit with `200` and
   `errors`, and a secondary limit with 403 or 429 and `retry-after` (GitHub's rate-limit docs, not run); read
   by status alone, those would return empty data or read as a refusal. A hold's time is compared with GitHub's
   `createdAt` values, so it is taken from GitHub's clock, not the machine's.
@@ -241,14 +244,16 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   - story's PR from a branch: PRs with `headRefName` = the branch and `isCrossRepository` false; the highest
     number wins; PR bodies are never read.
   - requirement: `<folder>/spec.md` at the ref unless its facts' kind is `no_spec`, then the issue body (R9).
-  - done: a same-repo PR on the story's branch merged, or the issue's timeline holds a `ClosedEvent` whose actor
-    is a `User`. Read from history, so a reopened done issue stays done. `isDone` has only `s`, and the head
+  - done: a same-repo PR on the story's branch merged, or the issue's timeline holds a `ClosedEvent` by an admin:
+    its actor a `User` (every App acts as a `Bot`) with `admin`, `maintain` or `write` permission on the repo,
+    from `GET /repos/{o}/{r}/collaborators/{login}/permission` (not run). Read from history, so a reopened done issue stays done. `isDone` has only `s`, and the head
     branch is deleted on merge (orchestrator ADR-0009 d6), so no ref gives the branch's full name: candidate
     PRs come from the issue's timeline (`ClosedEvent.closer`, `CrossReferencedEvent` and `ConnectedEvent`
     sources that are PullRequests), and one counts only when it is merged, same-repo, and its `headRefName`
     parses to `{story: s}`. Run 2026-10-23: issue #111's `ClosedEvent.closer` is merged PR #115 with its
     `headRefName`, its branch deleted.
-- **Rationale**: root ADR-0005 d2–d5; P9 (the closer's GitHub type, so an App's close never counts). The timeline
+- **Rationale**: root ADR-0005 d2–d5; P9 (the closer's GitHub type, so an App's close never counts, and its write permission, the writer fact
+  orchestrator ADR-0010 d2 reads, so a close by a user who is not an admin never counts). The timeline
   only finds candidates; the branch grammar decides, so no PR body or closing reference makes a PR the story's
   (root ADR-0005 d3).
 - **Existing tools**: GraphQL `parent`, `pullRequests(headRefName:)`, `timelineItems`.
@@ -273,8 +278,8 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 
 - **Decision**: one GraphQL read of the story issue: its comments (`databaseId`, `author { __typename login }`,
   `authorAssociation`, `body`, `createdAt`, `lastEditedAt`, `url`); its `COMMENT_DELETED_EVENT` (`createdAt`,
-  `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`, `wasAutomated`,
-  `actor { __typename login }`, `project { url }`) timeline items; and its `projectItems` (`project { url }`),
+  `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`,
+  `project { url }`) timeline items; and its `projectItems` (`project { url }`),
   each paginated to the end. When no project item's URL is `[shared] board`, the read throws
   `BoardNotVisible(board)`: a reader that cannot see the board never reads as "no Ready". One pure function,
   `stateFrom(comments, deletions, moves, shared)`, then:
@@ -300,8 +305,8 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   without state is not held. The reader needs issues read and the board's read: the session App's or the
   orchestrator App's token (`SECURITY.md` §3).
 - **Existing tools**: GraphQL `IssueComment.lastEditedAt`, `IssueComment.authorAssociation`,
-  `CommentDeletedEvent.deletedCommentAuthor`, `ProjectV2ItemStatusChangedEvent` (its `project`, `actor` and
-  `wasAutomated` seen in the 2026-10-26 critique's run), `Issue.projectItems` (not run); the `[bot]` login form in
+  `CommentDeletedEvent.deletedCommentAuthor`, `ProjectV2ItemStatusChangedEvent` (its `project` seen in the
+  2026-10-26 critique's run), `Issue.projectItems` (not run); the `[bot]` login form in
   `pr-gate.js`.
 - **Alternatives considered**: REST comments (no deletion events); reading only tagged comments and falling back
   to an older snapshot for the held answer (rejected by reviewer ADR-0011, Option E); holding a story with a PR
@@ -312,7 +317,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 - **Decision**: library calls only (FR-021): `writeState`, `placeHold`, `placeRescopeHold`, `releaseOnClaim`.
   Each reads first (R15) and posts at most one comment through `writer`; nothing edits or deletes (FR-018). Each
   is refused while a `tampered`, `deleted` or `invalid` cause stands, naming it and its release (a Ready move and
-  a human comment, both after it), but `releaseOnClaim` when that release holds; and when the body is over
+  an admin comment, both after it), but `releaseOnClaim` when that release holds; and when the body is over
   GitHub's 65,536-character limit.
   - `writeState` posts the caller's snapshot: it may append rounds, whose `at` core sets from `now()`, and add
     pushbacks, and changes no hold row; any other difference is refused (`checkTransition`).
@@ -470,7 +475,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 
 - **Decision**: `readKey(file, plugin)` is the one reader of `~/.config/codeworks/<file>`; `file` must be a bare
   file name. It refuses a file not owned by the current user or with any group or other permission bit. For
-  every read but reviewer's of `planner-app.pem`, made on the human machine, it first checks the managed settings
+  every read but planner's of `planner-app.pem`, made on the admin machine, it first checks the managed settings
   are in effect: `/etc/claude-code/managed-settings.json` exists, it and its folder are owned by root and writable
   by no one else, it holds each setting of contracts/key-files.md with `<plugin>@codeworks` enabled and no
   `enabledPlugins` entry set true that `SECURITY.md` §5 does not list, and it is the one source: neither
@@ -481,7 +486,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 - **Rationale**: root ADR-0008 d2, d4, d9; `SECURITY.md` §5. With one source, the file read is the policy in
   effect: Claude Code merges the drop-in folder and claude.ai's settings over it (§5), and either could undo what
   it holds (critique E9). A plugin §5 does not list would run its hooks under `allowManagedHooksOnly`. The
-  exemption is keyed by the file, `planner-app.pem`, which sits only on the human machine; every key of the agent
+  exemption is keyed by the file, `planner-app.pem`, which sits only on the admin machine; every key of the agent
   machine, `session-app.pem` included, is checked. The required settings copy every §5 entry but those standing
   for a per-environment path or the served repo's registries; a test parses §5's JSON block and fails when one of
   its entries is neither in core's table nor a named exception.
@@ -494,7 +499,7 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 
 - **Decision**: `mintToken(app, appId, keyFile, plugin, repo)`, `app` one of session, orchestrator, reviewer,
   planner; `appId` comes from the caller's own section, `[orchestrator]` for the session and orchestrator Apps,
-  `[reviewer]` for the reviewer and planner Apps (root ADR-0002 d2).
+  `[reviewer]` for the reviewer App, `[planner]` for the planner App (root ADR-0002 d1, d2).
   Reads the key through R23; signs an RS256 JWT with `node:crypto` (`iat` now − 60 s, `exp` now + 9 min, `iss`
   the App ID); `GET /repos/{o}/{r}/installation`; `POST /app/installations/{id}/access_tokens` with
   `repositories: [name]` and exactly that App's permissions, named by GitHub's API keys (`organization_projects`,
@@ -522,12 +527,12 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 
 ## R26: How the work lands
 
-- **Decision**: one PR per story, US1 → US2 → US3 → US5:
+- **Decision**: one PR per story, US1 → US2 → US3 → US5, and `tests.yml` in two admin PRs (R6):
   - US1: `core/` skeleton (`package.json`, lockfile, `tsconfig.json`), `guard.ts`, the GitHub client, `git.ts`
     and `Tree`, the branch grammar and identity, `SpecFacts` with its schema and the drift test, `values.ts` with
     the value-string test, the import and no-command tests, `check-carriers.ts` with its tests, the fixture
     carrier with a test that its pins and lockfile equal core's (the `*/plugin/core` glob does not reach it),
-    `tests.yml`, `.gitignore`.
+    `.gitignore`.
   - US2: `settings.ts` with the whole `Shared` schema, `Snapshot` and its schema, the state module with the
     release rule (R27), `attest.ts`, and the client's `now()`.
   - US3: the required checks' outcome mapping, `Finding` and its schema, the validator contract with the fixture
@@ -535,36 +540,36 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
     the key-gate tests of US5 AS4 and AS5, written before it, and the §5 drift test.
   - US5: `tokens.ts`.
 - **Rationale**: US1 builds the path every later module ships by (spec Clarifications). Each later story adds only
-  what it needs (Principle V); `values.ts` and its test land in US1, before the modules they grade (Principle
-  VI). No carrier exists, so no story bumps a plugin.
+  what it needs (Principle V); `values.ts` and its test land in US1 with the spec-facts enums, the first code
+  they grade (Principle VI; plan Complexity Tracking). No carrier exists, so no story bumps a plugin.
 - **Existing tools**: the repo's story-per-PR delivery (constitution, Delivery Workflow).
 - **Alternatives considered**: one PR for all of core.
 
 ## R27: The release rule (FR-019, FR-019a, FR-019b)
 
 - **Decision**: part of R15's pure function, over the working snapshot and the same comments and events, with the
-  terms of contracts/state-comment.md (Release). Every human-only input meets one rule: an actor that is a person
-  and no codeworks App, read from a board the reader sees (R15):
-  - a human comment: author none of the four App logins, `authorAssociation` OWNER, MEMBER or COLLABORATOR;
-  - a Ready move: a status-change event with `status` `Ready`, `project.url` equal to `[shared] board`,
-    `wasAutomated` false, and an actor that is a `User` and none of the four App logins; the newest counts;
+  terms of contracts/state-comment.md (Release). A comment counts only from an admin, a writer and no codeworks App;
+  a Ready move only on a board the reader sees, whoever made it (R15):
+  - an admin comment: author none of the four App logins, `authorAssociation` OWNER, MEMBER or COLLABORATOR;
+  - a Ready move: a status-change event with `status` `Ready`, `project.url` equal to `[shared] board`;
+    the newest counts;
   - an escalation hold's question: the oldest comment by the orchestrator App whose first line is
     `questionTag(hold)`, `<!-- codeworks:hold-question <id> <since> -->`;
-  - reset: the newest human comment whose trimmed body is `/codeworks reset`.
-  An OPEN hold is releasable when a reset is after its `since`, released by the reset; or when a Ready move and a
-  human comment are both after it, that comment also after the question for an escalation hold, released by the
-  newest such comment. A tamper cause is released when a Ready move and a human comment are both after the newest
+  - reset: the newest admin comment whose trimmed body is `/codeworks reset`.
+  An OPEN hold is releasable when a reset is after its `since`, released by the reset; or when a Ready move and an
+  admin comment are both after it, that comment also after the question for an escalation hold, released by the
+  newest such comment. A tamper cause is released when a Ready move and an admin comment are both after the newest
   of its edit, deletion or invalid comment. "After" a time is a later second; between two comments it is
   `databaseId` order. `startable` is true when every tamper cause is released and every open hold of the working
   snapshot is releasable. `readState` returns the answer, and `releaseOnClaim` acts on its own read's (R16).
 - **Rationale**: reviewer ADR-0013 d2, d3, ADR-0011 d2; orchestrator ADR-0002 d1, d3, ADR-0010 d2. The orchestrator
   needs the answer to stop a start and reviewer to release, so it lives once in core (SC-002), fed one fixture set
-  (critique X1). A move counts only on the board and only when a person made it (orchestrator ADR-0002 d1); the
-  event names its project, its actor and whether a workflow made it. A comment counts whether edited or not:
+  (critique X1). A move counts only on the board, whoever made it (orchestrator ADR-0002 d1; reviewer ADR-0013 d2):
+  the orchestrator never checks who moved a card, and the event names its project. A comment counts whether edited or not:
   no credential the agent uses can edit one, and a writer who edits one is trusted anyway. The releasing comment is returned because the new
   internal round is briefed with it (reviewer ADR-0013 d2). `since` is GitHub's time just before the placing
   comment's post, so "after the state comment that placed it" reads as a later second than `since`: a same-second
-  comment or move is not after, and the human acts again. The question's tag is a grammar core defines and the
+  comment or move is not after, and the admin acts again. The question's tag is a grammar core defines and the
   orchestrator writes, so the rule reads no wording (P7).
 - **Existing tools**: R15's read; `IssueComment.authorAssociation`.
 - **Alternatives considered**: each caller checking Ready and the comment itself (two copies of one rule, which

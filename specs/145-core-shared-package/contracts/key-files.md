@@ -8,7 +8,7 @@ R18, R23, R24; FR-022, FR-035 to FR-038.
 |---|---|---|---|
 | `session-app.pem` | the orchestrator's SessionStart hook | agent machine | yes |
 | `reviewer-app.pem` | reviewer's hook | agent machine | yes |
-| `planner-app.pem` | reviewer's hook | human machine | no: the one exempt read (root ADR-0008 d9) |
+| `planner-app.pem` | planner's hook | admin machine | no: the one exempt read (root ADR-0008 d2, d9) |
 | a validator package's token, named by its package | its module in a hook, through `deps.readKey` (R18) | agent machine | yes |
 | the orchestrator App's key | the orchestrator's hooks; its name is the orchestrator's spec | agent machine | yes |
 

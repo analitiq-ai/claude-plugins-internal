@@ -19,8 +19,8 @@ and count a Ready move only on the board, for both the orchestrator and reviewer
 own (root ADR-0003 d8).
 
 Keys core does not validate, named here so no one looks for them in `[shared]`: each App's ID is a key of the
-component whose hook mints its token, the session and orchestrator Apps' in `[orchestrator]`, the reviewer and
-planner Apps' in `[reviewer]` (root ADR-0002 d2); `review_timeout`, `max_turns` and `k_deaths` are
+component whose hook mints its token, the session and orchestrator Apps' in `[orchestrator]`, the reviewer App's in
+`[reviewer]`, the planner App's in `[planner]` (root ADR-0002 d1, d2); `review_timeout`, `max_turns` and `k_deaths` are
 `[orchestrator]` keys (orchestrator ADR-0001 d8); `k_topic` and `max_rounds` are `[reviewer]` keys. Their names are
 those components' specs'.
 

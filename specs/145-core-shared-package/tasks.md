@@ -38,9 +38,10 @@ test task below is run and seen red before the task that makes it pass.
   `allowImportingTsExtensions`, `verbatimModuleSyntax`, `module` and `moduleResolution` `nodenext`, covering
   `src`, `scripts` and `tests` (R1)
 - [ ] T004 [P] Add `node_modules/` to `.gitignore` (R2)
-- [ ] T005 Branch the `unittest` matrix run step in `.github/workflows/tests.yml`: for `core/tests` run `npm ci`
-  and `npm test` in `claude-plugins-internal/core`; every other suite keeps `python -m unittest -v` (R6). The PR
-  changes `.github/`, so it needs the exempt label (orchestrator ADR-0004 d4)
+- [ ] T005 In an admin's PR of its own, under the exempt label (orchestrator ADR-0004 d4), merged before US1's PR
+  (a story never changes `.github/`, reviewer ADR-0002 d4): branch the `unittest` matrix run step in
+  `.github/workflows/tests.yml`: for `core/tests` run `npm ci` and `npm test` in `claude-plugins-internal/core`;
+  every other suite keeps `python -m unittest -v` (R6)
 
 ---
 
@@ -122,7 +123,8 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   - `pickStoryPr` and `storyPr`: three same-repo PRs on `212-us2-retry-budget` and one fork PR of that head name
     → the newest same-repo PR; a body holding `Closes #212` is never read (FR-009, AS7)
   - `requirement`: `kind: feature` → the folder's `spec.md`; `kind: no_spec` → the issue body (FR-010, AS8)
-  - `doneFrom` and `isDone`: a merged PR → done; a `ClosedEvent` by a `User` → done; closed by a codeworks App
+  - `doneFrom` and `isDone`: a merged PR → done; a `ClosedEvent` by a `User` with `admin`, `maintain` or `write`
+    permission → done; by a `User` with any other permission or none → not done; closed by a codeworks App
     with the PR unmerged → not done; a reopened done issue → done; a merged PR found only from the timeline
     (`ClosedEvent.closer`, `CrossReferencedEvent`, `ConnectedEvent`) with its head branch deleted and a `Bot`
     closer → done; a timeline PR that is unmerged, cross-repo, or whose `headRefName` does not parse to
@@ -163,14 +165,16 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   contracts/carrying-core.md shows: `guard.ts` imported statically, `MissingDependency` caught and exit 2 naming
   the package on stderr, then `await import('../core/identity.ts')` and print
   `parseBranch('212-us2-retry-budget').story` (FR-002, FR-003; R3, R4)
-- [ ] T028 [US1] Add the `carriers` job to `.github/workflows/tests.yml`: on `pull_request` and push to `main`,
+- [ ] T028 [US1] In an admin's PR of its own, under the exempt label, after US1 merges and before any carrier
+  (reviewer ADR-0002 d4; R6), add the `carriers` job to `.github/workflows/tests.yml`: on `pull_request` and push to `main`,
   checkout with `fetch-depth: 0`, Node 22, `npm ci` in `core/`, then `node scripts/check-carriers.ts --base
   origin/<base>`, or `--base HEAD~1` on a push (R5, R6)
 - [ ] T029 [US1] Run quickstart.md US1 steps 1–5 (end-to-end install, update without and with a bump, missing
   `zod`, a throwaway carrier failing `check-carriers.ts`); try steps 1–4 on a CI runner (research Open 1); record
   what ran and its result in the PR (AS1–AS3, SC-007)
 
-**Checkpoint**: US1's PR passes `npm test` and the `carriers` job; the fixture carrier installs and imports core
+**Checkpoint**: US1's PR passes `npm test` and `check-carriers.ts` run by hand; the fixture carrier installs and
+imports core
 
 ---
 
@@ -202,7 +206,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
   `at`, `since`, `released` `YYYY-MM-DDTHH:MM:SSZ`; `head` 40-hex; `n` ≥ 1; each pushback's round exists; `v` is
   1 (FR-012; data-model.md, Snapshot)
 - [ ] T033 [P] [US2] Write `core/tests/state-read.test.ts` on `stateFrom(comments, deletions, moves, shared)`:
-  AS1 (the newest by the reviewer App among newer human and orchestrator App comments); AS2 (`tampered` on
+  AS1 (the newest by the reviewer App among newer admin and orchestrator App comments); AS2 (`tampered` on
   `lastEditedAt`; `deleted` when a reviewer App deletion's `createdAt` is at or after the state comment's, same
   second included, or with no reviewer App comment; `invalid` for an untagged newest beside an older tagged one,
   the older never read); AS3 (no reviewer App comment and no deletion → no state, not held); AS4; AS5 (contract
@@ -212,18 +216,19 @@ posted; attest in scratch git repos (quickstart.md, US2)
   `rebuilt` true, else empty (FR-015 to FR-017, SC-002; R15; contracts/state-comment.md, Read outcomes)
 - [ ] T034 [P] [US2] Write `core/tests/release.test.ts`, one fixture set, each fixture run through `stateFrom` and
   through `releaseOnClaim` on the fake client so both give one answer (SC-002, critique X1):
-  - AS12: hold `since` 10:00, human comment 10:30, Ready move 11:00 → releasable, released by the 10:30 comment
+  - AS12: hold `since` 10:00, admin comment 10:30, Ready move 11:00 → releasable, released by the 10:30 comment
     (`{id, url, at}`, `reset` false), edited or not; not releasable when the only later comment is by any of the
     four App logins or its `authorAssociation` is not OWNER, MEMBER or COLLABORATOR; nor when the
-    only later Ready move has `project.url` other than `[shared] board`, `wasAutomated` true, an actor that is a
-    `Bot` or one of the four App logins, or a `status` other than `Ready`; nor when the comment or the move is in
-    the same second as `since` or before it; the order of comment and move does not matter (Edge Cases)
+    only later Ready move has `project.url` other than `[shared] board` or a `status` other than `Ready`; nor when
+    the comment or the move is in the same second as `since` or before it; a Ready move on the board counts
+    whoever made it, a board workflow's or an App's included; the order of comment and move does
+    not matter (Edge Cases)
   - AS13: an escalation hold whose question, the oldest orchestrator App comment whose first line is
-    `questionTag(hold)`, is at 10:10: a human comment at 10:05 → not releasable; at 10:20 with Ready after →
+    `questionTag(hold)`, is at 10:10: an admin comment at 10:05 → not releasable; at 10:20 with Ready after →
     releasable; with no question posted → releasable only by a reset
-  - AS14: three open holds and a human's `/codeworks reset`, trimmed, after all three → all releasable,
+  - AS14: three open holds and an admin's `/codeworks reset`, trimmed, after all three → all releasable,
     `reset: true`, `reset` reported; a reset older than a hold leaves it; a reset by an App counts for nothing
-  - a tamper cause is released when a Ready move and a human comment both follow the newest of its edit,
+  - a tamper cause is released when a Ready move and an admin comment both follow the newest of its edit,
     deletion or invalid comment; `tamper_released` and `startable` (every tamper cause released, every open hold
     releasable)
   - `readState` throws `BoardNotVisible(board)` when no `projectItems` entry's `project.url` is `[shared] board`
@@ -272,9 +277,9 @@ posted; attest in scratch git repos (quickstart.md, US2)
   `readState(reader, repo, issue, shared)`, one paginated GraphQL read of comments (`databaseId`, `author {
   __typename login }`, `authorAssociation`, `body`, `createdAt`, `lastEditedAt`, `url`), `COMMENT_DELETED_EVENT`
   (`createdAt`, `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`,
-  `wasAutomated`, `actor { __typename login }`, `project { url }`) items and `projectItems { project { url } }`,
+  `project { url }`) items and `projectItems { project { url } }`,
   throwing `BoardNotVisible`, returning `StateReading` (data-model.md; R15)
-- [ ] T041 [US2] Add the release rule to `core/src/state.ts`: `questionTag(hold)`, the human comment, Ready move,
+- [ ] T041 [US2] Add the release rule to `core/src/state.ts`: `questionTag(hold)`, the admin comment, Ready move,
   question and reset terms, `releasable`, `tamper_released`, `startable` and `reset` in `stateFrom` (R27)
 - [ ] T042 [US2] Add the writes to `core/src/state.ts`: `renderState`, `checkTransition`, `writeState`,
   `placeHold`, `placeRescopeHold`, `releaseOnClaim`, with `StateWriteRefused(cause, release)`; REST `POST
@@ -314,7 +319,7 @@ required-checks reader's answers (quickstart.md, US3)
   or file writable by others, not JSON, any setting of contracts/key-files.md missing or different,
   `<plugin>@codeworks` not enabled, an `enabledPlugins` entry true that §5 does not list) → `KeyReadRefused`
   naming every reason (US5 AS4); a `managed-settings.d` folder or `~/.claude/remote-settings.json` present →
-  refused naming it, an `lstat` error other than ENOENT throws (US5 AS5); reviewer's read of `planner-app.pem`
+  refused naming it, an `lstat` error other than ENOENT throws (US5 AS5); planner's read of `planner-app.pem`
   skips the settings check, every read of `session-app.pem`, `reviewer-app.pem` or a package's token does not; a
   platform other than Linux is refused naming it (FR-036, FR-038; R23)
 - [ ] T048 [P] [US3] Write `core/tests/security-settings.test.ts`: parse `SECURITY.md` §5's JSON block and fail
@@ -426,7 +431,9 @@ list and permissions; try a write outside the set and to a second repo (quicksta
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)** → **Foundational (Phase 2)** → US1, all in US1's PR
+- T005, an admin's PR, merges first; then **Setup (Phase 1)** but T005 → **Foundational (Phase 2)** → US1, all in
+  US1's PR
+- T028, an admin's PR, after US1 merges and before any carrier
 - **US2** after US1 merges: uses `github.ts`, `git.ts`, `tree.ts`, `values.ts` and `write-schemas.ts`
 - **US3** after US2 merges: uses `settings.ts` (`Shared`: `validators`, `trusted_reviewers`, the App logins)
 - **US5** after US3 merges: uses `keys.ts`
@@ -473,8 +480,9 @@ Task: "Write core/tests/required-checks.test.ts"
 
 ### MVP First (User Story 1)
 
-1. Phases 1 and 2, then US1, in one PR with the exempt label
-2. Validate with quickstart.md US1 and the `carriers` job
+1. T005 in an admin's PR under the exempt label
+2. Phases 1 and 2 but T005, then US1, in one PR
+3. Validate with quickstart.md US1; then T028 in an admin's PR under the exempt label
 
 ### Incremental Delivery
 
@@ -487,3 +495,6 @@ US1 → US2 → US3 → US5, one PR each (R26). No carrier exists, so no story b
 - No task edits a component, and no task builds a provider package: both are follow-up work (spec Assumptions)
 - No task adds a command, `bin` or module that acts on import (T008 grades it)
 - T044, T060 and T064 need test Apps, a test board and their keys, which only the user holds
+- T029 runs `claude` and records its result in the PR, both refused to the model (reviewer ADR-0012): the user
+  runs it
+- T005 and T028 change `.github/`, so they are an admin's PRs, never a story's (reviewer ADR-0002 d4)
