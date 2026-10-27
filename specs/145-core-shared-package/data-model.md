@@ -18,10 +18,12 @@ Each set once, value → meaning, with a `z.enum` over its values (root ADR-0010
 | Hold kind | rescope, escalation, pushback, claim, shim, audit | Snapshot hold |
 | Hold state | OPEN, RELEASED | Snapshot hold |
 | Round stage | INTERNAL, AUDIT, GITHUB | Snapshot round, pushback |
-| Module name | codex, coderabbit, deepsource, threads, required-checks | Finding `source`; `validators` takes the first three |
 
-Hold kind and module name are lower case: a hold kind is a hold id's prefix, a module name a `codeworks.toml`
-entry and part of a check name (root ADR-0010 d2).
+Hold kinds are lower case: a hold kind is a hold id's prefix (root ADR-0010 d2).
+
+**Finding source** (root ADR-0010 d2): `threads` or `required-checks` (the enum `CoreSource`), or a `ModuleName`:
+`^[a-z][a-z0-9-]*$` and neither of those two. A `ModuleName` is a package's folder name, a `[shared] validators`
+entry and part of the check name `<module>-review`.
 
 ## Contracts
 
@@ -29,7 +31,7 @@ entry and part of a check name (root ADR-0010 d2).
 
 | Field | Type | Rule |
 |---|---|---|
-| `source` | module name | the module that returned it |
+| `source` | Finding source | the module that returned it |
 | `key` | string, non-empty | names one item across heads; below |
 | `author` | string | REST login (`name[bot]` for an App, GraphQL's bare `Bot` login gaining `[bot]`); for a required check, its App slug |
 | `file` | string or null | repo-relative path |
@@ -43,8 +45,7 @@ entry and part of a check name (root ADR-0010 d2).
 | Source | `key` |
 |---|---|
 | any thread | `thread:<thread_id>` |
-| CodeRabbit outside-diff item | `coderabbit:<cr-comment id>` (R19) |
-| DeepSource item with no thread | `deepsource:<path>:<issue code, else annotation title>:<SHA-256 of the message, hex>` (R20) |
+| a module's item with no thread | `<module>:<id>`, the id its package's spec fixes |
 | required check | `required-check:<check name>` (R22) |
 
 A thread's finding is identified across heads by its thread and `latest_trusted_comment_id` (reviewer ADR-0016
@@ -66,24 +67,38 @@ Round
   result: Round result
   verdict: Round verdict or null      # non-null exactly when result is DIRTY
   root_cause: Root cause or null      # reviewer ADR-0017 d2
+  at: time                 # when it was recorded, set by writeState
 
 Hold
   id: string               # "<kind>-<issue>", but "claim-<lineage id>" and "shim-<bug id>" (reviewer ADR-0013 d1)
   kind: Hold kind
   state: Hold state
-  spec_md_blob: 40-hex sha or null    # non-null exactly when kind is rescope
+  since: time              # GitHub's time just before the comment that placed it was posted
+  released: time or null   # non-null exactly when state is RELEASED
+  released_by: {comment: int, reset: bool} or null   # the releasing comment's databaseId; non-null exactly when RELEASED
+  question: string or null # non-null, non-empty exactly when kind is escalation (orchestrator ADR-0010 d1)
+  spec_pr: int ≥ 1 or null # the spec PR that placed it; null for every kind but rescope, and for a rescope placed by a verdict
 
 Pushback
   key: string              # a Finding key
   round: {stage, n}        # names a round in rounds
 ```
 
-Checked by the schema and its refinements: `(stage, n)` unique; hold `id` unique and starting `<kind>-`; the
-`verdict` and `spec_md_blob` rules above; each pushback's round exists.
+A `time` is `YYYY-MM-DDTHH:MM:SSZ`, UTC, whole seconds, from the client's `now()`; no caller supplies one.
 
-Transitions a write may make against the current snapshot (R16): append rounds; add hold rows; move a hold
-`OPEN → RELEASED` or `RELEASED → OPEN`; add pushbacks. Nothing else is removed or rewritten: a rescope row's
-`spec_md_blob` changes only with its `RELEASED → OPEN` move (R16).
+Checked by the schema and its refinements: `(stage, n)` unique; hold `id` unique and starting `<kind>-`; the
+`verdict`, `released`, `released_by`, `question` and `spec_pr` rules above; each pushback's round exists.
+
+Transitions against the current snapshot (R16), each by one call:
+
+| Call | May |
+|---|---|
+| `writeState` | append rounds, setting each one's `at`; add pushbacks; no hold row changes |
+| `placeHold` | add a row OPEN, or move one `RELEASED → OPEN`, setting `since` and `question`, clearing `released` and `released_by` |
+| `placeRescopeHold` | set `rescope-<issue>` OPEN when absent, RELEASED or recording another spec PR, setting `since` and `spec_pr`, clearing `released` and `released_by` |
+| `releaseOnClaim` | move releasable rows `OPEN → RELEASED`, setting `released` and `released_by` |
+
+Nothing else is removed or rewritten.
 
 ### SpecFacts (FR-010; planner ADR-0008 d1)
 
@@ -112,7 +127,6 @@ Missing, unparsable or refused → derivation fails naming the file.
 | `specIssue(reader, repo, s)` | number | parent in another repo |
 | `specFolder(tree, p)` | `specs/<p>-…` | none or several |
 | `storyPr(reader, repo, branch)` | `{number, head, merged}` or null | |
-| `storyBranch(reader, repo, s)` | string or null | several |
 | `requirement(tree, folder, issueBody)` | `{kind, text, source}` | facts missing or invalid |
 | `isDone(reader, repo, s)` | boolean | |
 
@@ -125,24 +139,39 @@ has none. `Shared` in contracts/codeworks-toml.md.
 
 | Field | Type |
 |---|---|
-| `snapshot` | Snapshot or null |
-| `comment_url` | string or null |
+| `snapshot` | the working snapshot (R15 step 3), or null when there is no state |
+| `comment_url` | the state comment's URL, or null |
+| `rebuilt` | true when `snapshot` is not the state comment's |
 | `held` | boolean |
 | `causes` | list of `{cause: "tampered"}`, `{cause: "deleted"}`, `{cause: "invalid", error}`, `{cause: "open_hold", id}` |
 | `newest_round` | Round or null |
 | `pushed_back` | map finding key → `{stage, n}` |
+| `releasable` | list of `{id, comment: {id, url, at}, reset}`: each open hold a start releases and the comment that releases it (contracts/state-comment.md, Release) |
+| `tamper_released` | true when a `tampered`, `deleted` or `invalid` cause stands and a Ready move and an admin comment release it |
+| `startable` | true when every tamper cause is released and every open hold is in `releasable` |
+| `reset` | `{url, at}` of the newest admin `/codeworks reset`, or null |
 
 `held` is true exactly when `causes` is not empty. No snapshot and no cause is "no state", not held. Causes are a
-`StateReading` field, not a value set: no component but core writes or compares them. `attests(reader, repo,
-reading, head)` is R16's predicate; `passingHeads(reading)` lists the commits of INTERNAL and AUDIT rounds that
-passed, newest first. The state comment's `createdAt` orders it against deletions (R15).
+`StateReading` field, not a value set: no component but core writes or compares them. The state comment's
+`createdAt` orders it against deletions (R15). Every field comes from one pure function over one read (R15, R27);
+reviewer and the orchestrator read the same answer.
 
-### Module answers (R17; FR-022 to FR-024)
+### Attestation (R16)
 
-- `status(...)` → `{outcome: Check outcome, reason: string | null}`; `reason` is set for SILENT, WAIVED and
-  COULD_NOT_RUN.
-- `findings(...)` → `Finding[]` or `{outcome: COULD_NOT_RUN, reason}`; never an empty list in place of the
-  latter.
+`attests(checkout, reading, head, base, specFolder)` → `{attested: boolean, reason: string | null}`; `reason`
+names the lapse (governing paths, the merge commit, the releasing hold), the holding cause, or "no passing round".
+
+### Validator package and modules (R18, R19; FR-022 to FR-025)
+
+- A package's `index.ts`: `logins: string[]`; `open(deps)` → `{trigger, status, findings}`, each `(repo, pr,
+  head)`. Its `status` answers `{outcome: PENDING | PASS | FAIL | WAIVED, head: sha | null, reason: string |
+  null}`; its `findings` a list of Findings.
+- `deps`: `{reader, writer, readKey(file), providerThreads(repo, pr)}`.
+- `Validators` from `loadValidators`: `{modules: Map<ModuleName, Module>, logins: Set<string>}`; a `Module` is
+  the package's three functions with the `deps` and `shared` it was loaded with.
+- Core's answers: `status(...)` → `{outcome: Check outcome, reason: string | null}`, `reason` set for SILENT,
+  WAIVED and COULD_NOT_RUN; `findings(...)` → `Finding[]` or `{outcome: COULD_NOT_RUN, reason}`, never an empty
+  list in place of the latter; `trigger(...)` → nothing or `{outcome: COULD_NOT_RUN, reason}`.
 
 ### UntrustedThread (FR-029)
 
@@ -153,12 +182,15 @@ passed, newest first. The state comment's `createdAt` orders it against deletion
 | Error | Thrown by | Meaning |
 |---|---|---|
 | `MissingDependency(name, root)` | `guard.ts` | a core dependency is not installed (FR-003) |
-| `GitHubUnanswered(reason)` | the client | no answer; modules turn it into COULD_NOT_RUN at their boundary (R12) |
+| `GitHubUnanswered(reason)` | the client | no answer (R12) |
 | `GitHubRefused(status, message)` | the client | GitHub answered 4xx |
+| `GitFailed(args, code, stderr)` | `git.ts` | git exited with a code its caller did not name as an answer |
 | `DerivationError(what, found)` | identity | names what was found |
 | `SettingsError(where, why)` | settings | file missing or `[shared]` refused |
-| `StateWriteRefused(cause, release)` | state | a write while held, one that drops a row, or one over the size limit |
-| `KeyReadRefused(path, reasons)` | keys | settings not in effect, file mode or owner, platform |
+| `BoardNotVisible(board)` | state | the issue has no item on `[shared] board` the reader sees |
+| `StateWriteRefused(cause, release)` | state | a write while a tampered, deleted or invalid cause stands, one that drops or rewrites a row or changes a hold outside its call, a `rescope` kind through `placeHold`, an escalation without a question, or one over the size limit |
+| `ValidatorLoadError(name, why)` | validation | a `validators` entry outside `ModuleName`, with no package, or a package missing a part of the contract |
+| `KeyReadRefused(path, reasons)` | keys | not a bare file name, settings not in effect or not the one source, file mode or owner, platform |
 | `MintError(cause)` | tokens | never falls back |
 
 ### Minted token (R24)
@@ -169,10 +201,12 @@ passed, newest first. The state comment's `createdAt` orders it against deletion
 
 | Shape | File |
 |---|---|
-| value sets | `core/src/values.ts` |
+| value sets, finding source | `core/src/values.ts` |
 | Finding, Snapshot, SpecFacts | `core/src/contracts/{finding,snapshot,spec-facts}.ts`; schemas in `core/schemas/` |
 | Shared | `core/src/settings.ts` |
 | Branch, identity | `core/src/identity.ts` |
-| StateReading | `core/src/state.ts` |
-| check-outcome mapping, module answers | `core/src/outcomes.ts` |
+| StateReading, the release rule | `core/src/state.ts` |
+| attestation | `core/src/attest.ts` |
+| required checks' outcome mapping | `core/src/outcomes.ts` |
+| validator contract, Validators, module answers | `core/src/validation/contract.ts` |
 | token | `core/src/tokens.ts` |

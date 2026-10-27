@@ -5,28 +5,36 @@ the component validates it (root ADR-0002 d2). No environment variable sets or o
 
 | Key | Type | Required | Rule |
 |---|---|---|---|
-| `validators` | list of module names `codex` · `coderabbit` · `deepsource` | yes | no duplicates; may be empty |
-| `trusted_reviewers` | list of logins | no | absent → the threads module refuses to run; an entry naming an enabled module's vendor (`chatgpt-codex-connector[bot]`, `coderabbitai[bot]`, `deepsource-io[bot]`) is refused (R21) |
-| `deepsource_source` | `api` · `github` | exactly when `validators` holds `deepsource` | refused otherwise |
-| `session_app_id` | integer | yes | |
+| `validators` | list of module names | yes | each a `ModuleName` (data-model.md), the folder of its package in `validators/`; no duplicates; may be empty |
+| `trusted_reviewers` | list of logins | no | absent → the threads module refuses to run; a login an enabled package lists as its provider's is that module's alone (R21) |
+| `board` | string | yes | the board project's URL, `https://github.com/orgs/<login>/projects/<n>` or `https://github.com/users/<login>/projects/<n>` (orchestrator ADR-0002 d1) |
 | `session_app_login` | string | yes | as REST writes it, `<slug>[bot]` |
-| `reviewer_app_id` | integer | yes | |
-| `reviewer_app_login` | string | yes | as REST writes it, `<slug>[bot]` |
+| `orchestrator_app_login` | string | yes | as above |
+| `reviewer_app_login` | string | yes | as above |
+| `planner_app_login` | string | yes | as above |
 
-Any other key in `[shared]` is refused naming it; a missing required key is refused naming it. The orchestrator
-App's ID and key file are the orchestrator's spec (FR-036). Module timeouts are `[orchestrator]` keys (FR-023).
+Any other key in `[shared]` is refused naming it; a missing required key is refused naming it. The four logins
+and `board` are `[shared]` because core's reads exclude every codeworks App from every trust (root ADR-0007 d5)
+and count a Ready move only on the board, for both the orchestrator and reviewer. No module has a setting of its
+own (root ADR-0003 d8).
+
+Keys core does not validate, named here so no one looks for them in `[shared]`: each App's ID is a key of the
+component whose hook mints its token, the session and orchestrator Apps' in `[orchestrator]`, the reviewer App's in
+`[reviewer]`, the planner App's in `[planner]` (root ADR-0002 d1, d2); `review_timeout`, `max_turns` and `k_deaths` are
+`[orchestrator]` keys (orchestrator ADR-0001 d8); `k_topic` and `max_rounds` are `[reviewer]` keys. Their names are
+those components' specs'.
 
 ## Example
 
 ```toml
 [shared]
-validators = ["codex", "deepsource"]
-deepsource_source = "github"
+validators = ["fixture"]
 trusted_reviewers = ["alice"]
-session_app_id = 1
+board = "https://github.com/orgs/example-org/projects/1"
 session_app_login = "codeworks-session[bot]"
-reviewer_app_id = 2
+orchestrator_app_login = "codeworks-orchestrator[bot]"
 reviewer_app_login = "codeworks-reviewer[bot]"
+planner_app_login = "codeworks-planner[bot]"
 
 [reviewer]
 # validated by reviewer

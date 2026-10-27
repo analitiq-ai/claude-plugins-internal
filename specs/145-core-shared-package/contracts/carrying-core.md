@@ -1,7 +1,9 @@
 # Contract: carrying core in a plugin
 
 R3–R6; FR-001 to FR-004; root ADR-0001 d2, ADR-0009. No plugin carries core in this spec; the fixture plugin in
-`core/tests/fixtures/` is the one carrier.
+`core/tests/fixtures/` is the one carrier. A plugin that runs a validator module also links `validators` →
+`../../validators` and pins its packages' dependencies (root ADR-0001 d2); checking that link is the first
+package's spec's.
 
 ## What a carrier holds
 
@@ -23,7 +25,7 @@ try { requireDependencies(); }
 catch (e) {
   if (!(e instanceof MissingDependency)) throw e;
   process.stderr.write(`core dependency ${e.name} is not installed in ${e.root}\n`);
-  process.exit(2);
+  process.exit(2);   // the Stop hook exits 1
 }
 const { parseBranch } = await import('../core/identity.ts');
 ```
@@ -31,7 +33,9 @@ const { parseBranch } = await import('../core/identity.ts');
 Only `guard.ts` is imported statically; it imports only `node:` modules. On `MissingDependency` the hook exits 2,
 which blocks the action, names the package and runs nothing that needs core (FR-003). Every hook that runs core
 is declared with `"onFailure": "block"` (Claude Code 2.1.295 or later), so a crash, a timeout or a Node that
-cannot run `.ts` also blocks; without it Claude Code lets the action go ahead (R4).
+cannot run `.ts` also blocks; without it Claude Code lets the action go ahead (R4). The Stop hook alone exits 1
+and has no `onFailure`: a refused or crashed Stop hook fails open and the session ends (orchestrator ADR-0001
+d5 and its Trade-offs).
 
 ## What CI checks (`core/scripts/check-carriers.ts`, on every pull request and push to `main`)
 

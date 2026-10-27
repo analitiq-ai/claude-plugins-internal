@@ -28,26 +28,62 @@ exactly:
 | newest has `lastEditedAt` | yes | `tampered` |
 | a reviewer App comment deleted at or after the newest's `createdAt`, same second included (or any, when there is none) | yes | `deleted` |
 | newest lacks the tag, or fails the format or the schema | yes | `invalid` (comment URL, error) |
-| open hold rows | yes | one `open_hold` (id) each |
+| open hold rows of the working snapshot | yes | one `open_hold` (id) each |
 | no reviewer App comment and no deletion, PR or not | no | none: "no state" |
 
-Causes combine; all are reported.
+Causes combine; all are reported. The working snapshot is the state comment's when no `tampered`, `deleted` or
+`invalid` cause stands; else the newest reviewer App comment that is unedited, tagged and valid; else an empty
+snapshot. Every answer below is over it. The issue having no item on `[shared] board` the reader can see throws
+`BoardNotVisible`, naming the board.
 
-## Attestation (R16)
+## Attestation (R16; FR-016)
 
-`attests(reader, repo, reading, head)` is true exactly when `held` is false and an INTERNAL or AUDIT round with
-result CLEAN, or result DIRTY with verdict CONVERGED_PUSHBACK, is at the PR head or at a commit in its history
-(GitHub's compare reads `ahead` or `identical`). This is stage 1; GITHUB rounds after it, stage 2, never undo
-it, and a rewritten history that drops the commit restarts it (orchestrator ADR-0004 d1). No state never
-attests.
+`attests(checkout, reading, head, base, specFolder)` is true exactly when `held` is false, an INTERNAL or AUDIT
+round with result CLEAN, or result DIRTY with verdict CONVERGED_PUSHBACK, is at the PR head or at a commit in its
+history, and the newest such round has not lapsed (orchestrator ADR-0004 d1). It lapses when, since it:
 
-## Write rules (R16; FR-019)
-
-| Write | Refused when |
+| Lapse | Read as |
 |---|---|
-| `writeState` | `tampered`, `deleted` or `invalid` stands; the new snapshot drops or rewrites a round, hold row or pushback; the body is over the size limit |
-| `placeRescopeHold` | as `writeState` |
-| `releaseState` | none of `tampered`, `deleted`, `invalid` stands |
+| governing documents changed | at `base` and at the round's commit, a different object, or one at only one of them, for `<specFolder>/spec.md`, any tree `docs/adr` at any depth, or `.specify/memory` |
+| a merge not git's clean one | a merge commit between the round's commit and the head whose tree differs from `git merge-tree --write-tree` of its parents, or which conflicts |
+| a comment release | a hold row with `released_by.reset` false and `released` after the round's `at` |
 
-`releaseState` posts again the newest reviewer App comment that is unedited, tagged and valid, or
-`{"holds": [], "pushbacks": [], "rounds": [], "v": 1}` when there is none.
+A `/codeworks reset` lapses nothing. GITHUB rounds, stage 2, never count for or against. A round commit the clone
+does not hold is not in the head's history. No state never attests.
+
+## Release (R27; FR-019, FR-019a, FR-019b)
+
+Read in the same pass as the state (R15). A hold's time is its row's `since`, GitHub's time just before the
+comment that placed it was posted. "After" a time is a `createdAt` in a later second, so a same-second pair is not
+after (GitHub's times are whole seconds); "after" between two comments is `databaseId` order.
+
+| Term | Read as |
+|---|---|
+| admin comment | an issue comment whose author is none of the four `[shared]` App logins and whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR (orchestrator ADR-0010 d2) |
+| Ready move | the newest status-change event on the issue's timeline whose `status` is `Ready`, whose `project.url` is `[shared] board`, whoever made it (orchestrator ADR-0002 d1; reviewer ADR-0013 d2) |
+| an escalation hold's question | the oldest comment by `orchestrator_app_login` whose first line is `<!-- codeworks:hold-question <id> <since> -->`, the hold's id and `since` |
+| reset | the newest admin comment whose body, trimmed, is `/codeworks reset` |
+
+An OPEN hold is **releasable** when a reset is after its `since`, released by the reset; or when a Ready move and
+an admin comment are both after its `since`, that comment also after the question for an escalation hold, released
+by the newest such comment. An escalation hold whose question is not posted is releasable only by a reset.
+
+A `tampered`, `deleted` or `invalid` cause is **released** when a Ready move and an admin comment are both after
+the newest of: the state comment's `lastEditedAt`, the newest reviewer App comment deletion, the invalid comment's
+`createdAt`.
+
+`startable` is true when every such cause is released and every open hold is releasable.
+
+`questionTag(hold)` renders the question's first line; the orchestrator posts its question with it.
+
+## Write rules (R16; FR-019, FR-020)
+
+| Write | Posts | Refused when |
+|---|---|---|
+| `writeState` | the caller's snapshot, each appended round's `at` set from `now()` | a cause above stands; the snapshot drops or rewrites a round or pushback, or changes any hold row; the body is over the size limit |
+| `placeHold` | the working snapshot with the row added OPEN, or moved RELEASED → OPEN, `since` set and `released`, `released_by` cleared; nothing when the row is OPEN | as `writeState`; the kind is `rescope`; an escalation without a question |
+| `placeRescopeHold` | the working snapshot with `rescope-<issue>` OPEN, `since` set, `released` and `released_by` cleared, recording `spec_pr`; nothing when the row already records that spec PR, open or released | as `writeState` |
+| `releaseOnClaim` | the working snapshot with every releasable hold moved OPEN → RELEASED, `released` and `released_by` set; nothing when it releases no hold and no tamper cause | a cause above stands and is not released |
+
+`since`, `released` and `at` are GitHub's time, `YYYY-MM-DDTHH:MM:SSZ`, from the client's `now()` read just before
+the post; no caller supplies them.
