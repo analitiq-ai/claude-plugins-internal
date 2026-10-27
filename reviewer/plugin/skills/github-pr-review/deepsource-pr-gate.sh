@@ -21,7 +21,7 @@ fi
 head=$(gh pr view "$pr" --repo "$repo" --json headRefOid | jq -r '.headRefOid')
 
 # The analyzer icon vocabulary DeepSource has been seen to use. Anything else
-# fails loud, so a new state is classified by a person, not guessed here.
+# fails loud, so a new state is classified by an admin, not guessed here.
 summary=$(gh api "repos/$repo/issues/$pr/comments" --paginate | jq -s --arg head "$head" '
   def grades:
     [scan("(?s)<strong>([^<]+)</strong>&nbsp;&nbsp;(?:<a [^>]*>)?<picture>(?:(?!</picture>).)*?light/grade_([a-z])\\.svg")

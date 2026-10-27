@@ -15,7 +15,7 @@ it never guesses a boundary.
 | `mode` | `delta` \| `unit` | `delta` audits a branch's changes; `unit` audits a standing slice of a tree. Only the fields below differ — the checks do not. |
 | `repo` | name + absolute root path | Where the agent reads. Never read outside it. |
 | `visibility` | `public` \| `private` | What may appear in the tree at all. |
-| `unit` | free text | Human label for the report — `"PR delta"`, `"packages/validator"`, `"repo-wide"`. |
+| `unit` | free text | Readable label for the report — `"PR delta"`, `"packages/validator"`, `"repo-wide"`. |
 | `files` | explicit list, or path globs with exclusions | The agent's boundary. Every file in it is the agent's responsibility. |
 | `regions` | `changed-hunks` \| `whole-file` | What counts as the subject. With `changed-hunks` the packet also carries the diff. |
 | `read_beyond` | `yes` \| `no` | Whether the agent must read past its regions to judge them. `yes` under `changed-hunks`: pre-existing code is context for the verdict, not itself a finding, except where an agent's own body says otherwise. |

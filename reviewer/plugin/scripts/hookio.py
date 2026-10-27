@@ -50,7 +50,7 @@ def max_review_files() -> int:
 
 
 def escalate_to() -> str:
-    """The GitHub account work the review hands back to a person is assigned to."""
+    """The GitHub account work the review hands back to an admin is assigned to."""
     account = config.load().get("escalate_to")
     if not isinstance(account, str) or not account.strip():
         raise ValueError(f"reviewer escalate_to must name a GitHub account, not {account!r}")
