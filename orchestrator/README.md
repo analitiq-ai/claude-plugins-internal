@@ -9,7 +9,7 @@ are in `docs/adr/`.
    ruleset bypass list: `codeworks-session`, read-only (root ADR-0007), `codeworks-orchestrator`
    (ADR-0001), `codeworks-reviewer` (reviewer ADR-0011) and `codeworks-planner` (root ADR-0007).
 2. Provision the agent machine (root ADR-0008), separate from the machine where you and planner work:
-   no human GitHub credential on it; Claude Code signed in with a claude.ai account; the managed
+   no admin GitHub credential on it; Claude Code signed in with a claude.ai account; the managed
    settings in `SECURITY.md` installed as the one managed source; the agent identity set once as the
    global git `user.name` and `user.email`; and the session, orchestrator and reviewer App keys, the
    validator modules' tokens and the classifier key in `~/.config/codeworks/`.
