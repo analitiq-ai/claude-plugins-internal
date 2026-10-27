@@ -104,10 +104,10 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
 ## Undo a rejected rescope that created a parent
 
 When a rescope gives a one-story issue `#n` a second story, it creates parent `#p` and opens its spec PR on
-`<p>-spec` (planner ADR-0010, decision 2). Write these steps into that PR's description, for the human who
+`<p>-spec` (planner ADR-0010, decision 2). Write these steps into that PR's description, for the admin who
 closes it unmerged; planner takes none of them:
 1. Close the story issue the rescope added as not planned.
 2. Remove `#n` from `#p`'s sub-issues, then close `#p` as not planned.
 3. Delete the branch `<p>-spec`.
-4. Type `unlock rescope-<n>` in a session: the default branch's spec.md did not change, so nothing else
-   releases the hold (reviewer ADR-0013).
+4. Comment on `#n` why its spec stands as it was, then move its card to Ready: that comment and Ready
+   release the rescope hold (reviewer ADR-0013).

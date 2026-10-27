@@ -1709,7 +1709,7 @@ class StoryBranchSpecEdit(Gate):
     def refusal(self, branch=STORY):
         return (f"[reviewer] `{self.SPEC_MD}` is the spec.md of spec folder `{self.FOLDER}`, and `{branch}` is a story branch: a "
                 "story branch never changes a spec.md. Next step: stop and raise the spec problem to the user. They "
-                "land the change in a spec-only PR on `123-spec`; once it merges, this branch rebases on it.")
+                "land the change in a spec-only PR on `123-spec`; once it merges, this branch merges the default branch.")
 
     def test_each_edit_tool_is_refused_naming_the_file_and_the_spec_branch(self):
         for tool in ("Edit", "Write", "NotebookEdit"):

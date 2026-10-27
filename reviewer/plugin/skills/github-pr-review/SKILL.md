@@ -1,6 +1,6 @@
 ---
 name: github-pr-review
-description: Use when a PR needs a Codex review requested (or re-requested after pushing fixes), when you must poll/wait for a review response, when review feedback needs to be triaged, answered, and resolved, and when checking that DeepSource graded the PR A. NEVER poll a PR for review feedback with ad-hoc gh loops (gh pr checks / gh api + sleep / for / while) — always this skill; a hand-rolled loop only sees the one reviewer you wrote it for and reports a PR clean while DeepSource, CodeRabbit or human threads sit unresolved.
+description: Use when a PR needs a Codex review requested (or re-requested after pushing fixes), when you must poll/wait for a review response, when review feedback needs to be triaged, answered, and resolved, and when checking that DeepSource graded the PR A. NEVER poll a PR for review feedback with ad-hoc gh loops (gh pr checks / gh api + sleep / for / while) — always this skill; a hand-rolled loop only sees the one reviewer you wrote it for and reports a PR clean while DeepSource, CodeRabbit or admin threads sit unresolved.
 colour: yellow
 ---
 
@@ -13,7 +13,7 @@ Codex (`chatgpt-codex-connector[bot]`) answers ~10–15 min later. Its verdict i
 
 **A 👍 on the PR description can be Codex's verdict.** When Codex reviews a PR unasked (opened ready for review, or marked ready) and finds nothing, it leaves a 👍 on the description. The gate counts it when it can tie it to the head, and otherwise says why in the `codex-review` title. A reaction triggers no workflow, so while the poller waits for `codex-review` to catch up with Codex's answer (see *settled* below), it dispatches one gate sweep.
 
-**Codex is not the only reviewer.** CodeRabbit, DeepSource and humans leave inline threads too, and an unresolved thread blocks the PR whoever left it. CodeRabbit also puts findings it cannot anchor to the diff ("Outside diff range comments") in its review body only; they have no thread to resolve and still need triage.
+**Codex is not the only reviewer.** CodeRabbit, DeepSource and admins leave inline threads too, and an unresolved thread blocks the PR whoever left it. CodeRabbit also puts findings it cannot anchor to the diff ("Outside diff range comments") in its review body only; they have no thread to resolve and still need triage.
 
 **Review threads are not the only blocker.** Checks (`DeepSource: Python`, `CodeRabbit`, and the gate's `codex-review` and `internal-review` check runs) block the PR too. The DeepSource *grade* blocks it as well, and no status carries that — see *DeepSource grade* below.
 
@@ -83,7 +83,7 @@ When the poller exits `2`, triage everything it printed:
 
 **Failing CI checks** — open the details URL to see what failed. Fix legitimate failures and push.
 
-**Unresolved findings** — the poller hands them to the `reviewer` gate as one review round, and code stays locked until that round is assessed. Run `Workflow(name='reviewer:assess-round', args={worktree: '<absolute worktree path>'})`; it rules on every reviewer's findings — CodeRabbit, DeepSource and human ones as well as Codex's. Then act on each as ruled:
+**Unresolved findings** — the poller hands them to the `reviewer` gate as one review round, and code stays locked until that round is assessed. Run `Workflow(name='reviewer:assess-round', args={worktree: '<absolute worktree path>'})`; it rules on every reviewer's findings — CodeRabbit, DeepSource and admin ones as well as Codex's. Then act on each as ruled:
 - PUSH_BACK → reply on the comment with the ruling's reason, resolve it.
 - FIX → fix it, reply with a fix summary, resolve the comment.
 - DEFER → reply naming the issue it moved to, resolve it.

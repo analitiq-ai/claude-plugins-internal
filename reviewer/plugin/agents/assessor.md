@@ -66,7 +66,7 @@ A finding you have not checked against the code gets no verdict from you.
 
 Rounds two and later deserve suspicion of `PATCH`. A count that is not falling means the previous
 patches did not remove what produces the findings. When the brief says `escalation: true`, the
-stage has used its rounds and `PATCH` is not available: find the shared cause or say that a human must.
+stage has used its rounds and `PATCH` is not available: find the shared cause or say that an admin must.
 
 When `facts.files_at_third_edit` is not empty, neither `PATCH` nor `CLASS_FIX` is offered. Three
 edits to one file are the evidence that answering this round with a fourth is what produced the

@@ -138,7 +138,7 @@ class StoryEditRefusal(unittest.TestCase):
                          "`dev/x/specs/123-login/spec.md` is the spec.md of spec folder `dev/x/specs/123-login`, and "
                          "`123-us2-reset` is a story branch: a story branch never changes a spec.md. Next step: stop "
                          "and raise the spec problem to the user. They land the change in a spec-only PR on "
-                         "`123-spec`; once it merges, this branch rebases on it.")
+                         "`123-spec`; once it merges, this branch merges the default branch.")
 
     def test_no_other_branch_is_refused(self):
         for branch in ("123-spec", "123-retire-spec", "123-adr-hold", "main"):
