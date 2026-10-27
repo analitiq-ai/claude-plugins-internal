@@ -49,5 +49,13 @@ jobs:
           node-version: '22'
       - run: npm install -g @adrkit/cli@0.20.0
       - name: Run suite
+        if: matrix.suite != 'core/tests'
         working-directory: claude-plugins-internal/${{ matrix.suite }}
         run: python -m unittest -v
+      # core is TypeScript run by Node; its suite is its package's npm test.
+      - name: Run core suite
+        if: matrix.suite == 'core/tests'
+        working-directory: claude-plugins-internal/core
+        run: |
+          npm ci
+          npm test
