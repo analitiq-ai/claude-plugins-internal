@@ -5,7 +5,7 @@ Sync Impact Report
   reviewer's `unlock` and pre-merge gate and cite reviewer ADR-0013 by its new name (decision 5); P5 names
   a check run, not a status or the assignee; P7's exception reads a provider's review text in that
   provider's module; Platform Constraints: the agent machine runs one session per issue, the model's token
-  is read-only and hooks make every write, planner needs reviewer installed beside it, and the reviewer
+  is read-only and hooks make every write, planner mints its own App token with no reviewer beside it, and the reviewer
   line drops the review-round `spec` check; "human" reads "admin" throughout.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
@@ -249,10 +249,9 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   (`reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`).
   Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision reviewer, which
   is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
-- planner has no hooks: it runs as the Spec Kit workflow its skill starts
-  (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and needs reviewer installed beside it,
-  whose hook mints its App token (root ADR-0007 d4); it writes no reviewer state, and runs outside the agent
-  machine.
+- planner runs as the Spec Kit workflow its skill starts (`planner/plugin/skills/issue-spec/`,
+  `planner/plugin/speckit/`), with one hook, which mints its App token (root ADR-0007 d4); it runs outside
+  the agent machine, with no other codeworks plugin beside it, and writes no reviewer state.
 - builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only on the agent
   machine; its review step is reviewer's internal round, which no install requires: its manifest
   declares no plugin dependency (`builder/plugin/skills/issue-tackle/SKILL.md`;

@@ -51,7 +51,7 @@ model's write from an admin's and a hook's.
    all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will have planner act on GitHub only as its own App, `codeworks-planner` (contents, pull requests
    and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists only where planner runs and whose
-   token reviewer's hook mints there as decision 2 does; and the admin only through their personal
+   token planner's own hook mints there as decision 2 does; and the admin only through their personal
    login.
 5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count no codeworks App
    (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor in any
