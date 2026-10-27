@@ -25,21 +25,21 @@ security change.
 
 ## 2. Where things run
 
-- **Agent machine.** One dedicated machine, separate from the one where the human and planner work. It
-  runs on its own OS, with no VM, container or separate OS user, holds no human GitHub credential, and
+- **Agent machine.** One dedicated machine, separate from the one where the admin and planner work. It
+  runs on its own OS, with no VM, container or separate OS user, holds no admin GitHub credential, and
   has Claude Code's managed settings (§5) installed. One session at a time runs there with the
-  orchestrator, builder and reviewer plugins. A person starts it and names the one issue it tackles,
+  orchestrator, builder and reviewer plugins. An admin starts it and names the one issue it tackles,
   `/codeworks <issue>`; the orchestrator's hooks drive it from there, and nothing picks an issue on its
   own. The session, orchestrator and reviewer App keys exist only here. builder runs nowhere else.
-- **Human machine.** The human's personal GitHub login and planner live here. Planner runs under human
+- **Admin machine.** The admin's personal GitHub login and planner live here. Planner runs under admin
   supervision, outside the managed settings, and acts on GitHub only as the planner App, through the
-  token reviewer's hook mints there from the planner App's key (root ADR-0007 d4), never with a person's
+  token reviewer's hook mints there from the planner App's key (root ADR-0007 d4), never with an admin's
   credentials.
 
 Accepted risks:
 
 - planner's agent works without managed settings: that it acts on GitHub only with the planner App on
-  its machine, never a person's credentials, rests on human supervision.
+  its machine, never an admin's credentials, rests on admin supervision.
 - A flaw in Claude Code's sandbox is a codeworks hole.
 - All hooks run as one OS user. Each App key is read only by its own plugin's hooks by convention; what
   enforces it is that plugin code is pinned and the model cannot write it.
@@ -48,26 +48,26 @@ Accepted risks:
 - A Stop hook that crashes fails open: the session ends, nothing is attested, and nothing else happens
   (orchestrator ADR-0001).
 - codeworks builds its own repo: a story PR can change the hooks and gates that review later stories,
-  once a person installs that version on the agent machine. Human review of such a PR is the only stop.
+  once an admin installs that version on the agent machine. Admin review of such a PR is the only stop.
 - Where Claude Code signs in with a Team or Enterprise claude.ai account, settings an admin adds on
   claude.ai apply mid-session; the hooks refuse at the next start (§5).
 
 ## 3. Identities
 
-Four GitHub Apps per served repo, none on a ruleset bypass list, and the human's personal login.
+Four GitHub Apps per served repo, none on a ruleset bypass list, and the admin's personal login.
 
 | App | Acts for | Repository permissions | Organization permissions | Key read by |
 |---|---|---|---|---|
 | `codeworks-session` | the model's commands, through a one-hour, one-repo installation token | metadata, contents, pull requests, issues, checks, statuses, actions: read; no write | projects: read | the orchestrator's SessionStart hook, agent machine only |
 | `codeworks-orchestrator` | the orchestrator's hooks: the claim, lanes, pushes, the draft PR and its body, the ready flip, `internal-review` and each module's `<module>-review` check runs, external review requests, thread replies and resolution, merge, Blocked reasons and moves, the status issue | contents, pull requests, issues, checks, workflows: write | projects: write | the orchestrator's hooks, agent machine only |
 | `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | issues: write | none | reviewer's hooks, agent machine only |
-| `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | reviewer's hook, human machine only |
+| `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | reviewer's hook, admin machine only |
 
 A hook mints the session token into a gh config folder the model can read but not write, outside
 `~/.claude` and the session's temp folder, and refreshes it before the hour runs out. No trust check
-counts a codeworks App as a human, writer, trusted or exempt actor. The App keys, the validator modules'
+counts a codeworks App as an admin, writer, trusted or exempt actor. The App keys, the validator modules'
 tokens (for example a DeepSource token) and the classifier key live in `~/.config/codeworks/`. The
-human's login is the ruleset's only bypass.
+admin's login is the ruleset's only bypass.
 
 ## 4. Boundaries per component
 
@@ -88,19 +88,19 @@ core.
 
 **Reviewer.** Hooks as the reviewer App, which can write only issues, so a record cannot touch code,
 checks or merges (GitHub). It runs the gate rule (§6).
-- Hook guardrail: it refuses from the model's tool calls every write the orchestrator or a human owns
+- Hook guardrail: it refuses from the model's tool calls every write the orchestrator or an admin owns
   (reviewer ADR-0012), naming who makes it.
 - It refuses builder and review work where the managed settings are not in effect, naming what is missing.
 
 **Builder.** The model, as the session App: it writes code in `.claude/worktrees/` and commits. The
 orchestrator's hooks push its commits and open the draft PR.
 - GitHub: its token writes nothing.
-- Managed settings (§5): no key or credential read, no write to plugin code, reviewer's state or Claude
-  Code config, listed hosts only for sandboxed commands (WebFetch stays allowed), no unlisted MCP server,
-  no Docker, no `TaskStop`.
+- Managed settings (§5): no key or credential read, no write to plugin code, reviewer's state or Claude Code
+  config, listed hosts only for sandboxed commands (WebFetch stays allowed), no unlisted MCP server, no
+  `TaskStop`.
 - Hook guardrails: commit gates, the lane fence and reviewer's write refusals.
 
-**Planner.** Under human supervision, without managed settings, as the planner App: it opens spec PRs
+**Planner.** Under admin supervision, without managed settings, as the planner App: it opens spec PRs
 and story issues, writes no lane and writes no reviewer state: reviewer's hook on the agent machine
 places a rescope hold when it sees the rescope's PR open.
 
@@ -172,7 +172,7 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   trusted.
 - `env`: package caches sit in the session's temp folder, which the sandbox lets commands write.
 
-A person starts each session with `claude --setting-sources "" --permission-mode bypassPermissions` and
+An admin starts each session with `claude --setting-sources "" --permission-mode bypassPermissions` and
 the prompt `/codeworks <issue>`, so no user, project or local settings file loads: a repo's `env` would
 otherwise reach every process Claude Code starts, the codeworks hooks included. Managed settings always
 load, and the plugins they enable still load (§7).
@@ -277,7 +277,7 @@ The other rows ran on 2.1.300 to 2.1.306.
   and the one-hour session token included, to any host through WebFetch. The token is read-only, so it
   leaks read access for at most an hour and writes nothing.
 - **E2:** whether the planner App, which writes issues, can delete a reviewer comment is untested; any
-  human writer can. If one does, the hold stays:
+  admin writer can. If one does, the hold stays:
   GitHub records the deletion of another account's comment on the issue timeline, which no token can
   remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
   GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer

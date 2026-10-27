@@ -36,7 +36,7 @@ review:
 Only reviewed code may merge: the ruleset requires CI, `internal-review` and each module's
 `<module>-review` from the orchestrator App (orchestrator ADR-0009). The model and the hooks share one
 session (ADR-0008), and a token reaches the API past any hook. Every trust predicate must tell the
-model's write from a human's and a hook's.
+model's write from an admin's and a hook's.
 
 ## Decision
 
@@ -51,10 +51,10 @@ model's write from a human's and a hook's.
    all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will have planner act on GitHub only as its own App, `codeworks-planner` (contents, pull requests
    and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists only where planner runs and whose
-   token reviewer's hook mints there as decision 2 does; and the human only through their personal
+   token reviewer's hook mints there as decision 2 does; and the admin only through their personal
    login.
 5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count no codeworks App
-   (session, orchestrator, reviewer, planner) as a human, WRITER, TRUSTED or EXEMPT actor in any
+   (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor in any
    predicate.
 6. We will count a review round only by its record: reviewer's hook writes it as the reviewer App from
    verdicts reviewer ADR-0021 counts, and the orchestrator's hook attests `internal-review` only from it
@@ -87,13 +87,13 @@ model merging. The user agreed the read-only token on 2026-10-24.
 
 ### Option F: planner on the session App
 
-Rejected: the session App's key would sit on the human's machine.
+Rejected: the session App's key would sit on the admin's machine.
 
 ## Trade-offs
 
 - Every GitHub write the loop needs is a hook's: a write a hook fails to make stays undone until a hook
   runs again.
-- Where planner runs, the planner App's key sits on the human's machine (ADR-0008).
+- Where planner runs, the planner App's key sits on the admin's machine (ADR-0008).
 
 ## Consequences
 

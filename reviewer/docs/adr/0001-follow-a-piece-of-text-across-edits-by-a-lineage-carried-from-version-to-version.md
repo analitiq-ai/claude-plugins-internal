@@ -36,13 +36,13 @@ other work moves it; kept per hunk, the hunk's claims share it (issue #17).
 
 1. We will mint a lineage at the first failed ruling of a piece of text and carry it from version to
    version, never recomputing it from later words.
-2. We will let a diff of blobs decide what descends from what: the file as the previous check saw it
-   against the file as staged now; nothing is keyed on `HEAD` or a commit. Text outside the changed ranges
-   keeps its lineage. Inside a rewritten range, `diff-match-patch` maps each sentence by character offset,
-   through a split or a merge; a claim inheriting several lineages carries the larger count. Words moved
-   unchanged are found by their claim id. A file moved to a new path starts its counts again. In the claim
-   check a lineage carries no line ranges and merges only when one claim inherits several; the shim check
-   carries a bug's line ranges by the same mapping and merges bugs by ADR-0008.
+2. We will let a diff of blobs decide what descends from what: the file as the previous check saw it against
+   the file at the commit now checked (ADR-0002); nothing is keyed on `HEAD` or a commit. Text outside the
+   changed ranges keeps its lineage. Inside a rewritten range, `diff-match-patch` maps each sentence by
+   character offset, through a split or a merge; a claim inheriting several lineages carries the larger count.
+   Words moved unchanged are found by their claim id. A file moved to a new path starts its counts again. In
+   the claim check a lineage carries no line ranges and merges only when one claim inherits several; the shim
+   check carries a bug's line ranges by the same mapping and merges bugs by ADR-0008.
 3. We will give the count to the lineage: the failed rulings in its chain of versions.
 4. We will let no model and no similarity threshold decide whether two texts are the same claim.
 

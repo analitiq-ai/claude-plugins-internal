@@ -71,7 +71,7 @@ carries with no code beside it either way.
 ## Trade-offs
 
 - Planning stops when the org log's remote does not answer, for no fault of the plan.
-- A checkout behind its remote stops the run until a human pulls it.
+- A checkout behind its remote stops the run until an admin pulls it.
 
 ## Consequences
 

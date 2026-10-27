@@ -17,8 +17,8 @@ dispatch `auditor`'s agents.
 ## Install
 
 The orchestrator, builder and reviewer run together in one session on a dedicated agent machine that
-holds no human GitHub credential, under Claude Code's managed settings
-([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md)).
+holds no admin GitHub credential, under Claude Code's managed settings
+([root ADR-0008](docs/adr/0008-run-the-agent-session-on-one-agent-machine-under-managed-settings-with-keys-only.md)).
 You start each session there naming one issue, `/codeworks <issue>`. planner runs where you work, under
 your supervision, and acts on GitHub as its own App, never with your credentials. Setting up that machine
 and a served repo:

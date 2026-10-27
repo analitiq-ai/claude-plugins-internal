@@ -59,7 +59,7 @@ works across branches and PRs of a repo, some from forks.
 
 ### Option A: One file, one section per component, read from the branch worked on (chosen)
 
-A human reads what runs in one place; every key has one owner.
+An admin reads what runs in one place; every key has one owner.
 
 ### Option B: A file per component
 
@@ -75,7 +75,7 @@ Rejected: a second read path guarding a file sessions already cannot write.
 
 ## Trade-offs
 
-- A branch's copy of the file is what runs on that branch; a human edit to it takes effect there before
+- A branch's copy of the file is what runs on that branch; an admin edit to it takes effect there before
   it merges.
 - A misspelled key stops the component that owns its section instead of being ignored.
 

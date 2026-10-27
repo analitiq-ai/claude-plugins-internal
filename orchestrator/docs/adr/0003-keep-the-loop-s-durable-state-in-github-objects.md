@@ -28,7 +28,7 @@ review:
 ## Context
 
 The orchestrator (ADR-0001) and reviewer act on the same facts; the agent machine is one dedicated
-machine, and planner and the humans work elsewhere (root ADR-0008).
+machine, and planner and the admins work elsewhere (root ADR-0008).
 
 ## Decision
 
@@ -61,8 +61,8 @@ Rejected: there is no PR before the first push, and every whole-body writer can 
 
 ### Option C: A ledger on the agent machine
 
-Rejected: it dies with the machine and is unreadable where planner and humans work; GitHub is what
-every session reads.
+Rejected: it is lost with the machine and is unreadable where planner and admins work; GitHub is what every
+session reads.
 
 ### Option D: A local handled flag
 

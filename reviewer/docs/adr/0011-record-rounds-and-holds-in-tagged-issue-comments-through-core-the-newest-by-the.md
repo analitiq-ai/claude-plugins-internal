@@ -31,9 +31,9 @@ review:
 
 ## Context
 
-A record beside the session is lost with the agent machine and unreadable where planner and humans
+A record beside the session is lost with the agent machine and unreadable where planner and admins
 work. A hold can exist before the story's PR, and a PR can be closed and reopened; the story issue
-outlives both. The model's token posts nothing (root ADR-0007), but planner's App and every human writer
+outlives both. The model's token posts nothing (root ADR-0007), but planner's App and every admin writer
 can comment, and a comment can be edited or deleted.
 
 ## Decision
@@ -43,10 +43,10 @@ can comment, and a comment can be edited or deleted.
    rescope hold the number of the spec PR that placed it (ADR-0013). The newest comment by the reviewer App,
    `codeworks-reviewer`, wins whatever its text; reviewer's hook alone posts as that App, whose key only
    hooks read (root ADR-0008), and only from verdicts ADR-0021 counts.
-2. We will fail closed: when the newest such comment lacks the tag or was edited, or the issue's
-   timeline shows a reviewer App comment deleted after it, the story is held. A story with no reviewer
-   App comment has no state. A human's Ready and comment release it (ADR-0013): reviewer then posts a
-   snapshot rebuilt from the newest unedited tagged one.
+2. We will fail closed: when the newest such comment lacks the tag or was edited, or the issue's timeline
+   shows a reviewer App comment deleted after it, the story is held. A story with no reviewer App comment has
+   no state. A Ready move and an admin's comment release it (ADR-0013): reviewer then posts a snapshot rebuilt
+   from the newest unedited tagged one.
 3. We will read and write the snapshot only through the state module in `core/` (root ADR-0003):
    reviewer's hook alone writes, and the orchestrator only reads ATTESTED and HOLD.
 4. We will have planner write no state: reviewer's hook places a rescope hold when it sees the rescope's
@@ -60,7 +60,7 @@ can comment, and a comment can be edited or deleted.
 
 ### Option B: A store beside the session as the record
 
-Rejected: lost with the environment.
+Rejected: lost with the agent machine.
 
 ### Option C: A section of the PR body
 
@@ -76,7 +76,7 @@ Rejected: editing, untagging or deleting the newest comment would drop the hold 
 
 ### Option F: Hold a story that has a PR and no snapshot
 
-Rejected: the draft PR precedes the first round (builder ADR-0003); every story would wait for a human.
+Rejected: the draft PR precedes the first round (builder ADR-0003); every story would wait for an admin.
 
 ### Option G: Post as the orchestrator's App
 
@@ -85,7 +85,7 @@ Rejected: the orchestrator would attest from a record it wrote itself.
 ## Trade-offs
 
 - Every state change notifies the issue's subscribers.
-- Tampered state holds the story until a human acts.
+- Tampered state holds the story until an admin acts.
 
 ## Consequences
 

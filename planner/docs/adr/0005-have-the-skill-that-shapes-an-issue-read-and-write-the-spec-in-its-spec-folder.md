@@ -38,8 +38,8 @@ externalRefs:
 
 An issue's spec lives in its spec folder (ADR-0001) and lands by a spec PR on `<p>-spec`, `<p>` the spec's
 issue (org ADR-0002, root ADR-0005). A rescope changes a spec that stories may be building against. Planning
-is run by a human where they work, outside the agent machine, so the managed settings (root
-ADR-0008) do not apply to it. Its grill and critique steps ask that human for verdicts.
+is run by an admin where they work, outside the agent machine, so the managed settings (root
+ADR-0008) do not apply to it. Its grill and critique steps ask that admin for verdicts.
 
 ## Decision
 
@@ -48,12 +48,12 @@ ADR-0008) do not apply to it. Its grill and critique steps ask that human for ve
    default branch makes the run a rescope; otherwise the run writes a new spec.
 2. We will make `<p>` the session's issue when the run starts, and commit only on `<p>-spec`, inside
    `specs/<p>-*/` and the decision-record folders; reviewer's fence admits exactly these commits while
-   `<p>` is in Backlog or Blocked (reviewer ADR-0015), a guardrail under the human's oversight.
+   `<p>` is in Backlog or Blocked (reviewer ADR-0015), a guardrail under the admin's oversight.
 3. We will enforce root ADR-0006 at the start of a run: a card outside Backlog or Blocked, or a closed
    spec's issue, stops the run before it writes anything, naming the cards to move.
 4. We will land a new spec and a rescope alike only through the spec PR (ADR-0010), a rescope with its
    rescope hold (reviewer ADR-0013). The run writes no lane and posts nothing on the issue.
-5. We will have the human drive every approval at grill and at critique; the critique's verdict is
+5. We will have the admin drive every approval at grill and at critique; the critique's verdict is
    advisory and no script reads it.
 
 ## Options considered
@@ -80,8 +80,8 @@ Rejected: nothing would then keep a planning session's commits off code and othe
 
 ## Trade-offs
 
-- A RETHINK the human goes past leaves no recorded reason.
-- A rescope cannot start until a human has moved the spec's running stories.
+- A RETHINK the admin goes past leaves no recorded reason.
+- A rescope cannot start until an admin has moved the spec's running stories.
 
 ## Consequences
 
@@ -89,7 +89,7 @@ Rejected: nothing would then keep a planning session's commits off code and othe
 - Harder: the skill reads the board and the default branch before it runs.
 - **How we would know this was wrong:** a rescope of the wrong folder, a new spec written for an issue
   that already had one, or a planning commit refused on `<p>-spec`.
-- Revisit if: planning runs without a human.
+- Revisit if: planning runs without an admin.
 
 ## Action items
 

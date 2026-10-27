@@ -83,8 +83,8 @@ Rejected: one source parsed per consumer, with as many answers.
 
 ### Option D: An override label for an external reviewer's fail, or a release detected from a version-only change
 
-Rejected: a named human on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
-is a human's decision.
+Rejected: a named admin on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
+is an admin's decision.
 
 ### Option E: An advisory module, or settings per module
 
@@ -97,7 +97,7 @@ for a review it never ran.
 
 ## Trade-offs
 
-- A thread from someone outside `trusted_reviewers` is resolved unread, a human writer's included.
+- A thread from someone outside `trusted_reviewers` is resolved unread, an admin writer's included.
 - A provider that does not read a head, one that skips the agent's commits for example, leaves it SILENT,
   and the card goes to Blocked at `review_timeout`.
 - A head merged on WAIVED had no external reading.

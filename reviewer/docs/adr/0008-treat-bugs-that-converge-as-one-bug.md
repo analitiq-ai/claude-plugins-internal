@@ -27,13 +27,13 @@ review:
 
 ## Context
 
-The shim check keeps one record per bug, with the bug's line ranges (ADR-0001) and its count of refusals.
-One staged change can overlap two bugs that have a record each. The deep sweep, the hold and the override
-each belong to one bug, so a change that overlaps two has to say which bug they then belong to.
+The shim check keeps one record per bug, with the bug's line ranges (ADR-0001) and its count of refusals. One
+checked change (ADR-0002) can overlap two bugs that have a record each. The deep sweep, the hold and the
+override each belong to one bug, so a change that overlaps two has to say which bug they then belong to.
 
 ## Decision
 
-1. We will treat two tracked bugs as one bug from the moment one staged change overlaps both. Every later
+1. We will treat two tracked bugs as one bug from the moment one checked change overlaps both. Every later
    step applies to them together.
 2. We will give the merged bug the higher of the two counts of refusals.
 

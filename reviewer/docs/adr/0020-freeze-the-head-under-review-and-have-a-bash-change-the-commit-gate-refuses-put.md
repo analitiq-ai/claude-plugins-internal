@@ -29,16 +29,15 @@ review:
 
 ## Context
 
-A round grades the head it was launched on. An edit, a commit, a push or a reply on the PR while its
-reviewers run, or before its assessment, acts on a head no ruling covers. A hold that refuses commits is
-checked at `git commit`, but a Bash command can write files or move the branch tip by any other route: a
-script, `cp`, `git reset`.
+A round grades the head it was launched on. An edit or a commit while its reviewers run, or before its
+assessment, acts on a head no ruling covers. A hold that refuses commits is checked at `git commit`, but a
+Bash command can write files or move the branch tip by any other route: a script, `cp`, `git reset`.
 
 ## Decision
 
 1. We will freeze the head under review: while a reviewer subagent of the session runs, while its round
-   collects reports, and while a round awaits assessment, the session's `Edit`, `Write`, `git commit`,
-   `git push` and replies on the PR are refused.
+   collects reports, and while a round awaits assessment, the session's `Edit`, `Write` and `git commit` are
+   refused.
 2. We will bracket every Bash command of a session with an issue. After it, a new commit names the checks
    it needs (ADR-0002); while the head is frozen, a moved branch tip blocks the command's result and tells
    the agent to put the branch back. A hold that refuses commits (ADR-0013) is enforced by the check of
@@ -53,7 +52,7 @@ Any Bash route is caught by what changed, with no list of commands to maintain.
 
 ### Option B: Refuse only `git commit` while a round runs
 
-Rejected: an edit, push or reply mid-round still acts on a head no ruling covers.
+Rejected: an edit mid-round still acts on a head no ruling covers.
 
 ### Option C: Parse each Bash command for what it could write
 
@@ -74,8 +73,7 @@ Rejected: a held branch moves by `git reset` or a script, out from under its hol
 
 - Easier: the head a round ruled on is the head that is pushed and answered for.
 - Harder: an agent waits for its round and the assessment before it edits again.
-- **How we would know this was wrong:** a commit, push or reply lands between a round's launch and its
-  assessment.
+- **How we would know this was wrong:** a commit lands between a round's launch and its assessment.
 - Revisit if: Claude Code can confine a session's writes by path or branch.
 
 ## Action items

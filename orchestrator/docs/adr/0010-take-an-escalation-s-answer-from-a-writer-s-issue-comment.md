@@ -38,10 +38,9 @@ comment.
 
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
    escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
-2. We will take as the answer an issue comment created after that question by a writer
-   (author_association OWNER, MEMBER or COLLABORATOR) other than a codeworks App (root ADR-0007); the
-   model's token posts no comment. That comment, with the human's Ready, releases the hold (reviewer
-   ADR-0013).
+2. We will take as the answer an issue comment created after that question by a writer (author_association
+   OWNER, MEMBER or COLLABORATOR) other than a codeworks App (root ADR-0007); the model's token posts no
+   comment. That comment, with a Ready move, releases the hold (reviewer ADR-0013).
 
 ## Options considered
 

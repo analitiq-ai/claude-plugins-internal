@@ -34,10 +34,11 @@ only outside Blocked and Backlog, planning only inside (root ADR-0006).
 
 ## Decision
 
-1. We will key the fence on the session's issue, recorded when `builder:issue-tackle <s>` or
-   `planner:issue-spec` starts; issue-spec may re-record it once, to the parent it created (planner
-   ADR-0005, planner ADR-0010). A commit lands only on a branch starting `<s>-us`, or on `<s>-spec` while
-   the issue is in Backlog or Blocked and only inside `specs/<s>-*/` and the decision-record folders.
+1. We will key the fence on the session's issue: the one its `/codeworks <s>` prompt names, recorded by the
+   orchestrator (orchestrator ADR-0002), or, where planner runs, the one `planner:issue-spec` records when it
+   starts, which it may re-record once, to the parent it created (planner ADR-0005, planner ADR-0010). A
+   commit lands only on a branch starting `<s>-us`, or on `<s>-spec` while the issue is in Backlog or Blocked
+   and only inside `specs/<s>-*/` and the decision-record folders.
 2. We will refuse, while reviewer is on, every commit of a session with no recorded issue, naming the ways
    forward: name the issue, or switch reviewer off (ADR-0006). Ad-hoc work runs with reviewer off; its PR
    merges once a writer other than a codeworks App applies the exempt label (orchestrator ADR-0005).

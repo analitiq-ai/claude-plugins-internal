@@ -36,9 +36,11 @@ never reaches the default branch. reviewer records each round's verdict at the h
 
 1. We will resolve a conflict on a story branch by merging the default branch into it, and never rebase or
    force-push the branch.
-2. We will merge the default branch into a story branch at its next step after a spec PR of its spec's
-   issue merged, so the story is built and reviewed against the spec and records in force. The merge
-   runs before the spec-folder check (ADR-0002), which then finds the folder the new spec names.
+2. We will merge the default branch into a story branch at its next step after a spec PR of its spec's issue
+   merged, or once the default branch's `spec.md` of the story's spec, `**/docs/adr/` or `.specify/memory/`
+   differ from the head's (orchestrator ADR-0004 d1), so the story is built and reviewed against the spec and
+   records in force. The merge runs before the spec-folder check (ADR-0002), which then finds the folder the
+   new spec names.
 
 ## Options considered
 

@@ -28,7 +28,7 @@ review:
 ## Context
 
 Once a story's card is In review, something must merge its PR and hold the merge condition. The
-model's token is read-only (root ADR-0007): only the orchestrator's App and the humans can merge.
+model's token is read-only (root ADR-0007): only the orchestrator's App and the admins can merge.
 
 ## Decision
 
@@ -39,7 +39,7 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
    classic branch protection: they require the check runs `internal-review` and each module's
    `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
-   humans only, the only override.
+   admins only, the only override.
 3. We will never update a branch that is only behind main; a conflict stays a finding.
 4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the
    orchestrator (builder ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
@@ -49,7 +49,7 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
    the default message the PR body, which the orchestrator's hooks write: `Closes #s` at creation
    (builder ADR-0003), and each session's id trailer as that session first pushes, so no
    model-written commit message reaches main; head branches deleted on merge; no
-   required human approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
+   required admin approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
    sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off.
 
 ## Options considered
@@ -62,7 +62,7 @@ A repo without the ruleset never merges unreviewed, since the orchestrator requi
 
 Rejected: it could merge while a card sat Blocked or a hold was open.
 
-### Option C: Required human approval
+### Option C: Required admin approval
 
 Rejected: the attestation and the external verdicts are the merge condition.
 
@@ -73,7 +73,8 @@ Rejected: conflicts are resolved, never staleness.
 ## Trade-offs
 
 - A PR refused on a rule outside the contract stays In review silently.
-- A branch behind main without conflicts merges as it is.
+- A branch behind main without conflicts merges as it is, unless main's spec, ADRs or constitution changed
+  since its round (ADR-0004).
 
 ## Consequences
 

@@ -46,27 +46,27 @@ built against the old one.
 
 ### Option A: The spec-PR rule on start, the rescope hold on merge (chosen)
 
-Each move is held by the fact that bears on it: a start by the spec PR, a merge by the rescope hold a
-human releases.
+Each move is held by the fact that bears on it: a start by the spec PR, a merge by the rescope hold an
+admin releases.
 
 ### Option B: The same rule on merge as well
 
-Rejected: the rescope hold already refuses the merge of every open story under the spec until a human
+Rejected: the rescope hold already refuses the merge of every open story under the spec until an admin
 releases it (root ADR-0006).
 
 ### Option C: Leave a held Ready card in Ready
 
-Rejected: the card would show no reason, and a human could not tell it from one waiting on a blocker.
+Rejected: the card would show no reason, and an admin could not tell it from one waiting on a blocker.
 
 ## Trade-offs
 
 - An open spec PR stalls every story under its issue, even ones the rescope does not touch.
-- A card the rule moved to Blocked needs a human's Ready once the spec PR merges.
+- A card the rule moved to Blocked needs a move to Ready once the spec PR merges.
 
 ## Consequences
 
 - Easier: every story starts from a merged spec and merged records.
-- Harder: every spec and rescope waits on a human to merge it.
+- Harder: every spec and rescope waits on an admin to merge it.
 - **How we would know this was wrong:** spec PRs merged unread to unblock stories; a story started
   while its spec's issue had an open spec PR.
 - Revisit if: a round can grade a branch against a spec still in review.

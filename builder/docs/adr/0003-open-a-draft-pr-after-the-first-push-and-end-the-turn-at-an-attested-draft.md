@@ -29,10 +29,10 @@ review:
 
 builder runs in one session with the orchestrator and reviewer (root ADR-0008). The orchestrator's hooks drive
 the GitHub loop there (orchestrator ADR-0001): at each turn's end its Stop hook reads GitHub and names the
-next step or lets the session stop. builder owns the other half: when the PR opens and what it says,
-where the turn ends, and which GitHub moves it never makes. The model's token writes nothing on GitHub
-(root ADR-0007). Each of a story's steps has to know what
-the last one left.
+next step or lets the session stop. This record decides when the story PR opens and what it says, which the
+orchestrator's hooks carry out, where builder's turn ends, and which GitHub moves builder never makes. The
+model's token writes nothing on GitHub (root ADR-0007). Each of a story's steps has to know what the last one
+left.
 
 ## Decision
 
@@ -73,18 +73,17 @@ Rejected: every story PR closes its own issue.
 ## Trade-offs
 
 - The next step waits for the turn to end.
-- A turn that pushes and ends before attesting costs a continuation; REPEAT, or two unattested ends in a
-  row, moves the story to Blocked (orchestrator ADR-0001).
+- A turn that ends at a pushed, unattested head costs another turn; REPEAT, or two unattested ends in a row,
+  moves the story to Blocked (orchestrator ADR-0001).
 - Context carried between steps may be stale; decision 3 re-reads GitHub.
 
 ## Consequences
 
 - Easier: builder holds no loop state; what outlives a turn is on GitHub (orchestrator ADR-0003).
-- Harder: a pre-PR stop reaches a human only through the orchestrator's Blocked reason.
+- Harder: a pre-PR stop reaches an admin only through the orchestrator's Blocked reason.
 - **How we would know this was wrong:** attested drafts the Stop hook leaves stalled, or REPEAT because a
   step could not re-derive from GitHub what the last one knew.
-- Revisit if: the orchestrator's hooks stop driving the loop, or builder runs outside the agent
-  environment.
+- Revisit if: the orchestrator's hooks stop driving the loop, or builder runs outside the agent machine.
 
 ## Action items
 

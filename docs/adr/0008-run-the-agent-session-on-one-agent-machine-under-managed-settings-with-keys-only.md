@@ -1,11 +1,11 @@
 ---
 schemaVersion: 0.2.0
 id: "0008"
-title: "Run the agent session in one environment under managed settings, with keys only hooks read"
+title: "Run the agent session on one agent machine under managed settings, with keys only hooks read"
 status: draft
 date: 2026-10-21
 deciders: []
-tags: [security, sandbox, managed-settings, environment, credentials, sessions, trust]
+tags: [security, sandbox, managed-settings, agent-machine, credentials, sessions, trust]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -33,11 +33,11 @@ review:
   tier: async
 ---
 
-# ADR-0008: Run the agent session in one environment under managed settings, with keys only hooks read
+# ADR-0008: Run the agent session on one agent machine under managed settings, with keys only hooks read
 
 ## Context
 
-The model's commands can read every credential on their machine: App keys (ADR-0007), a human's
+The model's commands can read every credential on their machine: App keys (ADR-0007), an admin's
 GitHub login. Claude Code's sandbox confines Bash at OS level, not hooks, WebFetch or WebSearch. A
 repo's settings can add unsandboxed hooks and environment. Only managed settings cannot be loosened
 from a session.
@@ -45,13 +45,13 @@ from a session.
 ## Decision
 
 1. We will run the orchestrator, builder and reviewer in one session at a time per board, on one
-   dedicated agent machine, separate from the machine where the human and planner work. It runs on its
-   own OS, with no VM, container or separate OS user, holds no human GitHub credential, and runs under
-   managed settings. A person starts each session there and names the one issue it tackles with
+   dedicated agent machine, separate from the machine where the admin and planner work. It runs on its
+   own OS, with no VM, container or separate OS user, holds no admin GitHub credential, and runs under
+   managed settings. An admin starts each session there and names the one issue it tackles with
    `/codeworks <issue>` (orchestrator ADR-0001); nothing picks an issue on its own. builder runs nowhere
    else.
-2. We will run planner where its human works, outside those settings, under human supervision; its
-   agent acts on GitHub only as the planner App (ADR-0007), never with a person's credentials.
+2. We will run planner where its admin works, outside those settings, under admin supervision; its
+   agent acts on GitHub only as the planner App (ADR-0007), never with an admin's credentials.
 3. We will require the sandbox (fail if unavailable, nothing unsandboxed or excluded) and unix sockets
    blocked.
 4. We will keep the session, orchestrator and reviewer App keys, the validator modules' tokens and the
@@ -63,7 +63,7 @@ from a session.
    repo's `.claude/settings*.json`, `.claude/{workflows,agents,skills,commands,hooks}/`, `.mcp.json` and
    `.git/{config,hooks}`.
 7. We will allow sandboxed commands network only to GitHub and the repo's package registries, caches in
-   the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers; run no Docker.
+   the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers.
 8. We will run only the codeworks plugins' hooks, load no user, project or local settings file, and
    have hooks run git with no global or system config, no credential helper, and `core.fsmonitor` and
    `core.hooksPath` off.
@@ -76,11 +76,11 @@ from a session.
 
 ### Option A: One agent machine under managed settings (chosen)
 
-No human credential to reach; the OS denies the read.
+No admin credential to reach; the OS denies the read.
 
-### Option B: Sessions on the human's machine
+### Option B: Sessions on the admin's machine
 
-Rejected: one missed deny hands the model the human's login.
+Rejected: one missed deny hands the model the admin's login.
 
 ### Option C: An outside script launching a session per story
 
@@ -104,8 +104,7 @@ Rejected by the user on 2026-10-26: managed settings are recorded in one place.
 - An injected prompt can make WebFetch send what the model reads, the session token included,
   anywhere; the token is read-only.
 - A sandbox flaw is a codeworks hole.
-- Docker-based tests run only in CI.
-- No session runs until a person starts one.
+- No session runs until an admin starts one.
 - Where Claude Code signs in with a Team or Enterprise claude.ai account, settings an admin adds on
   claude.ai apply mid-session; the next start refuses.
 

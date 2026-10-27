@@ -44,10 +44,10 @@ The merge waits on each external reviewer's verdict, which counts only for the h
    its App, from that module's `status`: PASS is success, WAIVED success marked so, FAIL failure, PENDING
    pending. Every module listed in `validators` is required alike (root ADR-0003).
    No other service writes it, so while no agent session runs no PR has a verdict and none merges.
-4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past
-   `review_timeout` (ADR-0001), timed from its request where it posted one, or a required check
-   (ADR-0007) is missing or pending past it. Until then the session waits, polling (ADR-0001). We never ask twice for one head; the second ask is
-   a human's.
+4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past `review_timeout`
+   (ADR-0001), timed from its request where it posted one, or a required check (ADR-0007) is missing or
+   pending past it. Until then the session waits (ADR-0001). We never ask twice for one head; the second ask
+   is an admin's.
 
 ## Options considered
 
@@ -70,7 +70,7 @@ modules already read.
 
 ### Option E: The orchestrator re-asks a silent reviewer itself
 
-Rejected: the second ask is a human's.
+Rejected: the second ask is an admin's.
 
 ## Trade-offs
 
@@ -82,7 +82,7 @@ Rejected: the second ask is a human's.
 ## Consequences
 
 - Easier: every reporter's silence has one bound and one exit; the merge fails safe.
-- Harder: a silent reviewer waits for a human.
+- Harder: a silent reviewer waits for an admin.
 - **How we would know this was wrong:** heads with two reviews from one provider, or requests that
   routinely time out without a verdict.
 - Revisit if: a provider we trigger re-reviews on push, or stops taking a request from the App.

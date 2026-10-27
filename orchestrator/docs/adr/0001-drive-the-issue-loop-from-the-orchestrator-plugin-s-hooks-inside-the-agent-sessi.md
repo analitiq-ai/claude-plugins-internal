@@ -60,10 +60,10 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
 5. We will have a hook that crashes or times out attest, flip, push and merge nothing.
 6. We will have builder and planner poll nothing on their own: each ends its turn at its draft PR or a
    stop before one (builder ADR-0003, planner ADR-0010); the wait is the Stop hook's step.
-7. We will move a story's card to Blocked, naming the bound, on REPEAT (a turn that had work, an
-   unattested head or findings, ended with both unchanged and still needing work), on two turns in a
-   row from a working lane each ending with an unattested head, or when a count below reaches its
-   threshold. A human's Ready resets every count.
+7. We will move a story's card to Blocked, naming the bound, on REPEAT (a turn that had work, an unattested
+   head or findings, ended with both unchanged and still needing work), on two turns in a row from a working
+   lane each ending with an unattested head, or when a count below reaches its threshold. A Ready move resets
+   every count.
 8. We will count a story's turns toward `max_turns`, and the sessions on it that ended without their
    Stop hook toward `k_deaths`, which the next session on the issue infers from a start its hooks
    recorded with no end; nothing outside the session watches how one ends. These and `review_timeout`
@@ -91,7 +91,7 @@ Rejected: its other users would pass the trust filters.
 
 ### Option F: SessionStart claims the next Ready story
 
-Rejected by the user on 2026-10-26: a person names the issue each session tackles.
+Rejected by the user on 2026-10-26: an admin names the issue each session tackles.
 
 ### Option G: A launcher that watches how each session ends, and a session time limit
 
@@ -109,7 +109,7 @@ component added.
 - Easier: no launcher, host or lock; the model holds no privileged key.
 - Harder: diagnosis spans GitHub and the session transcript; a CI check keeps `orchestrator/` importing
   no other plugin.
-- **How we would know this was wrong:** a human moving a card for the orchestrator, or a push of a
+- **How we would know this was wrong:** an admin moving a card for the orchestrator, or a push of a
   commit the agent identity did not make.
 - Revisit if: the hook loop fails its tests, or a board needs a second session.
 

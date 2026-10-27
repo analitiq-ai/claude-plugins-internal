@@ -27,36 +27,35 @@ review:
 
 ## Context
 
-Humans and the orchestrator share the board; the orchestrator never checks who moved a card.
+Admins and the orchestrator share the board; the orchestrator never checks who moved a card.
 
 ## Decision
 
 1. We will keep six lanes on the Status field of one project, the board, which `board` in the `[shared]`
    section of `codeworks.toml` names (root ADR-0002); issues are its cards, each lane with at most one
-   automated writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and
-   Blocked; none for Ready, a human's alone. A move to Ready counts only on the board and only when a
-   person made it, not a board workflow. The model's token cannot write a lane (root ADR-0007), and
-   planner writes none (planner ADR-0005).
+   automated writer: GitHub for Backlog and Done; the orchestrator for In progress, In review and Blocked;
+   none for Ready. A move to Ready counts only on the board. The model's token cannot write a lane (root
+   ADR-0007), and planner writes none (planner ADR-0005).
 2. We will claim a story only on the prompt that names it (ADR-0001): the orchestrator's App moves its card
    from Ready to In progress and records it as the session's issue (reviewer ADR-0015). It re-derives a
    claimed card's In progress and In review from the story's PR at every hook run.
-3. We will start a story only from Ready (root ADR-0006), once every issue in its `blockedBy` is done
-   (root ADR-0005) and the spec-PR rule allows it (ADR-0006); a merge starts nothing. We will resume,
-   without Ready, a story whose card is In progress or In review, so a session that died is counted
-   (ADR-0001); a resume releases no hold. The start releases holds as reviewer ADR-0013 decides. An open
-   hold stops a resume, and on a start an open hold that no human comment newer than it answers stops it,
-   with or without an open PR, either sending the card back to Blocked with no new comment. A prompt
-   naming a card these rules refuse claims nothing; the refusal names the reason. A Ready card whose PR
-   closed unmerged restarts on its branch.
+3. We will start a story only from Ready (root ADR-0006), once every issue in its `blockedBy` is done (root
+   ADR-0005) and the spec-PR rule allows it (ADR-0006); a merge starts nothing. We will resume, without Ready,
+   a story whose card is In progress or In review, so a session that ended without its Stop hook is counted
+   (ADR-0001); a resume releases no hold. The start releases holds as reviewer ADR-0013 decides. An open hold
+   stops a resume, and on a start an open hold that no admin comment newer than it answers stops it, with or
+   without an open PR, either sending the card back to Blocked with no new comment. A prompt naming a card
+   these rules refuse claims nothing; the refusal names the reason. A Ready card whose PR closed unmerged
+   restarts on its branch.
 4. We will never start a parent issue (one with sub-issues): named from Ready, it goes to Blocked, naming
-   the sub-issues to name instead; its other lanes are the human's.
-5. We will make Blocked the one sink for what needs a human, each cause decided in its own record
+   the sub-issues to name instead; its other lanes are the admin's.
+5. We will make Blocked the one sink for what needs an admin, each cause decided in its own record
    (ADR-0001, ADR-0004 to ADR-0010). This record's causes: a turn that opened no PR, or a PR closed
    unmerged (reason: that turn's final message); an In review PR whose `<module>-review` failed with no
    findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
    the lane write is the commit point; these moves fall between turns. At every hook run, the
    orchestrator posts any missing keyed reason for every open hold, in any lane.
-6. We will read a human's drag to Backlog, Blocked or Done as a stop: no further step is named, nothing
+6. We will read an admin's drag to Backlog, Blocked or Done as a stop: no further step is named, nothing
    merges. A drag into a working lane starts nothing; a claimed card dragged there is re-derived (d2), or
    bounced to Blocked under an open hold.
 7. We will start nothing on a done story (root ADR-0005).
@@ -77,12 +76,12 @@ Lost: `blockedBy` carries the order.
 
 ### Option D: The claim as the story issue's assignee
 
-Rejected: the account that held the claim, Analitiq-Bot, left the loop on 2026-10-24, and the person
+Rejected: the account that held the claim, Analitiq-Bot, left the loop on 2026-10-24, and the admin
 names the issue a session claims.
 
 ## Trade-offs
 
-- A Ready card waits for a person to name it; a prompt naming one held by a blocker is refused.
+- A Ready card waits for an admin to name it; a prompt naming one held by a blocker is refused.
 
 ## Consequences
 

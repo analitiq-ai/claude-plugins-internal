@@ -67,7 +67,7 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 ## Trade-offs
 
 - A folder with no requirements sits beside real specs, told apart by one front-matter key.
-- A `no spec needed` pick still costs a spec PR a human merges before the story starts (org ADR-0002).
+- A `no spec needed` pick still costs a spec PR an admin merges before the story starts (org ADR-0002).
 
 ## Consequences
 

@@ -1,7 +1,7 @@
 ---
 schemaVersion: 0.2.0
 id: "0012"
-title: "Refuse from the model's tool calls every GitHub write the orchestrator or a human owns"
+title: "Refuse from the model's tool calls every GitHub write the orchestrator or an admin owns"
 status: draft
 date: 2026-10-20
 deciders: []
@@ -25,7 +25,7 @@ review:
   tier: async
 ---
 
-# ADR-0012: Refuse from the model's tool calls every GitHub write the orchestrator or a human owns
+# ADR-0012: Refuse from the model's tool calls every GitHub write the orchestrator or an admin owns
 
 ## Context
 
@@ -83,7 +83,7 @@ Rejected: the copy drifts.
 ## Consequences
 
 - Easier: the plugin holds no copy of GitHub's rules or exempt labels, and reads one check.
-- Harder: a flip, external review request or merge waits for orchestrator hooks or a human.
+- Harder: a flip, external review request or merge waits for orchestrator hooks or an admin.
 - **How we would know this was wrong:** a refusal names no owner or next step, or a PR needs an
   exemption no writer can label.
 - Revisit if: the model needs one of these writes.

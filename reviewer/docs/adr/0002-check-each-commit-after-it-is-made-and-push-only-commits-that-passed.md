@@ -44,7 +44,7 @@ the check reads (ADR-0021).
 3. We will check a merge on its conflict resolution, as its round reviews it (ADR-0010).
 4. We will fail a check whose change, as d1 and d3 grade it, touches a `.github/` folder, matched as
    orchestrator ADR-0004 d4 matches one: a workflow on the branch runs on the push, before any review.
-   Such a change is a human's, merged under an exempt label (orchestrator ADR-0005).
+   Such a change is an admin's, merged under an exempt label (orchestrator ADR-0005).
 
 ## Options considered
 
@@ -70,7 +70,7 @@ Rejected: the model can change the checkout under the check.
 
 - Easier: every commit takes one command, and a commit made by any route is checked.
 - Harder: a failed check is answered by a new commit, not by restaging.
-- Harder: a story never changes `.github/`; a human does, in a PR of their own.
+- Harder: a story never changes `.github/`; an admin does, in a PR of their own.
 - **How we would know this was wrong:** a pushed commit that no check passed, or a range that passed while
   one of its commits alone would have been refused.
 - Revisit if: something other than the orchestrator's hooks pushes a story branch.

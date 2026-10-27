@@ -27,23 +27,23 @@ review:
 
 ## Context
 
-A reviewer check can judge a staged change with an outside classifier, a model outside the org that
-answers a choice question with one of its fixed answers; the shim check does (ADR-0004). To judge a change,
-the classifier has to read it, so source code leaves the org, to the provider that carries the request and
-to the company that runs the model. The shim check sends the staged diff and, for a fix, the sites the sweep
-found, each with a short description an agent wrote. It runs on every repo the plugin is installed in.
+A reviewer check can judge a checked change (ADR-0002) with an outside classifier, a model outside the org
+that answers a choice question with one of its fixed answers; the shim check does (ADR-0004). To judge a
+change, the classifier has to read it, so source code leaves the org, to the provider that carries the request
+and to the company that runs the model. The shim check sends the checked diff and, for a fix, the sites the
+sweep found, each with a short description an agent wrote. It runs on every repo the plugin is installed in.
 
 ## Decision
 
-1. We will let a reviewer check that judges a staged change send it to an outside classifier, from
+1. We will let a reviewer check that judges a checked change send it to an outside classifier, from
    every repo the plugin is installed in, private repos included.
-2. We will send only the staged change and what the plugin's agents wrote about the code.
+2. We will send only the checked change and what the plugin's agents wrote about the code.
 
 ## Options considered
 
-### Option A: Any reviewer check may send a staged change to the outside classifier (chosen)
+### Option A: Any reviewer check may send a checked change to the outside classifier (chosen)
 
-One permission for every check that judges a staged change, on every repo, bounded by point 2.
+One permission for every check that judges a checked change, on every repo, bounded by point 2.
 
 ### Option B: Leave the permission inside ADR-0004
 
@@ -70,7 +70,7 @@ No alternative to sending private source was weighed.
 
 ## Consequences
 
-- Easier: a new check that judges a staged change with the classifier needs no new permission.
+- Easier: a new check that judges a checked change with the classifier needs no new permission.
 - Harder: every new check has to be read against points 1 and 2, because nothing in code holds it to them.
 - **How we would know this was wrong:** a provider changes its terms for private source; source sent to the
   classifier turns up outside the org; or a check is found sending content outside point 2.

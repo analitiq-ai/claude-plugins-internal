@@ -51,7 +51,7 @@ behind a barrier, or which plugins a round depends on.
    Each report is validated against its typed verdict first.
 2. We will refuse any reviewer type dispatched from the main thread, outside a round, on a story
    branch or on a branch inside the grammar with an open PR: on a story branch naming review-round, on
-   `<p>-spec`, where no round runs (ADR-0014), naming the human's review of the spec PR. main and branches
+   `<p>-spec`, where no round runs (ADR-0014), naming the admin's review of the spec PR. main and branches
    outside the grammar keep main-thread dispatch.
 3. We will have reviewer's decision-reviewer join every internal round; with no governing
    record, it flags a decision made in the diff with no record.
@@ -60,9 +60,9 @@ behind a barrier, or which plugins a round depends on.
    (root ADR-0002), refuse a round's launch when an
    expected agent type is missing, and read auditor's dispatch as data at launch.
 5. We will cap the rounds of each stage at `max_rounds`, a `[reviewer]` key. Past it, the next
-   round runs the audit stage on the whole PR. Only a human resets the count, by Ready and a comment
+   round runs the audit stage on the whole PR. Only an admin resets the count, by Ready and a comment
    (ADR-0013), or by `/codeworks reset` on the story issue. The cap switches the stage, locking
-   nothing; a human comes in only through the audit hold (ADR-0013).
+   nothing; an admin comes in only through the audit hold (ADR-0013).
 
 ## Options considered
 
@@ -84,9 +84,9 @@ Rejected: an unrecorded decision in the diff would go unflagged.
 
 Rejected: a second copy of auditor's published dispatch.
 
-### Option F: Past the cap, hold the PR for a human
+### Option F: Past the cap, hold the PR for an admin
 
-Rejected: the whole-PR audit can end the churn alone; its hold brings a human in.
+Rejected: the whole-PR audit can end the churn alone; its hold brings an admin in.
 
 ## Trade-offs
 

@@ -31,9 +31,9 @@ review:
 
 ## Context
 
-A check of a commit needs agents, which take minutes. The place that can refuse a commit is a Claude Code
-command hook, and a hook that reaches its timeout is cancelled and, on most events, renders no decision. So the slow check cannot run where the refusal is made, and every
-commit-time check needs the same way from the refusal to the check and back.
+A check of a commit needs agents, which take minutes. A Claude Code command hook is what sees a new commit,
+and a hook that reaches its timeout is cancelled and, on most events, renders no decision. So the slow check
+cannot run in the hook, and every commit-time check needs the same way from the hook to the check and back.
 
 ## Decision
 
@@ -45,13 +45,14 @@ commit-time check needs the same way from the refusal to the check and back.
    prompts and schemas at launch, and a hook validates each answer before it is recorded. Which launches
    and answers count is ADR-0021's gate rule.
 3. We will make a model call inside a hook only where a decision record names it; ADR-0004 names the shim
-   check's classifier, whose verdict has to exist before the author commits.
+   check's classifier, whose key only hooks read (root ADR-0008).
 
 ## Options considered
 
-### Option A: Refuse in the session hook, check in a workflow (chosen)
+### Option A: Gate in the session hook, check in a workflow (chosen)
 
-The hook refuses before the Bash tool runs; the workflow runs many agents; no repo needs wiring.
+The hook sees every commit after the command that made it; the workflow runs many agents; no repo needs
+wiring.
 
 ### Option B: A git `pre-commit` hook, or the `pre-commit` framework
 
