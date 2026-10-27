@@ -33,4 +33,11 @@
 
 - The "users" are the components that import core, so the spec names the contract shapes, function
   signatures (`trigger`/`status`/`findings`), the generated JSON Schemas and the comment tag: each is fixed by
-  a cited decision record, not chosen here. No language, library or install command is chosen.
+  a cited decision record, not chosen here. The language (TypeScript on Node, Zod schemas) is root
+  ADR-0009's, not chosen here.
+- Re-validated 2026-10-26 after the session-design update (release rule, four Apps, review_timeout):
+  every item still passes.
+- Re-validated 2026-10-26 after the rulings at ab83f33 (validator packages out of core, attestation lapses,
+  Ready move on the board, rescope by spec PR, one managed-settings source): every item still passes.
+- Re-validated 2026-10-26 after dropping the "unedited" condition on a release comment, the question and a
+  reset: every item still passes.
