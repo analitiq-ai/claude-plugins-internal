@@ -40,7 +40,8 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
    `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
    admins only, the only override.
-3. We will never update a branch that is only behind main; a conflict stays a finding.
+3. We will never update a branch only because it is behind main: a conflict stays a finding, and builder
+   merges main only to resolve one or once main's spec, ADRs or constitution changed (builder ADR-0004).
 4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the
    orchestrator (builder ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
    sub-issue is done (root ADR-0005), its only issue-close write.
@@ -68,7 +69,8 @@ Rejected: the attestation and the external verdicts are the merge condition.
 
 ### Option D: An up-to-date-branch rule or a stale-branch update
 
-Rejected: conflicts are resolved, never staleness.
+Rejected: a branch takes main for a conflict or a changed spec, ADR or constitution (builder ADR-0004),
+never for staleness alone.
 
 ## Trade-offs
 
