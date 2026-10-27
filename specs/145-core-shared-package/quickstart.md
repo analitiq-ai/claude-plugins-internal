@@ -27,9 +27,10 @@ scripts/write-schemas.ts` and commit the result.
    Bump `version`, commit, update: the new copy holds the change (AS2).
 4. Delete `node_modules/zod` from the cached copy and send a prompt: the hook exits 2 naming `zod`, the prompt
    is blocked, and nothing else runs (AS3).
-5. On a throwaway branch of this repo, add a carrier (`x/plugin/core` → `../../core/src`, its `package.json`,
-   lockfile and `plugin.json`) and edit `core/src` without bumping it: `node scripts/check-carriers.ts --base
-   origin/main` fails naming the carrier. This repo has no carrier of its own.
+5. On a throwaway branch of this repo, commit a carrier (`x/plugin/core` → `../../core/src`, its `package.json`,
+   lockfile and `plugin.json`), then commit an edit to `core/src` without bumping it: `node scripts/check-carriers.ts
+   --base HEAD~1` fails naming the carrier. Against `origin/main` it passes: a carrier new since the base has no base
+   version to equal. This repo has no carrier of its own.
 6. Branch grammar, from `core/`:
 
    ```ts
