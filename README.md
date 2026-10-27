@@ -16,22 +16,26 @@ dispatch `auditor`'s agents.
 
 ## Install
 
-The orchestrator, builder and reviewer run together in one session in a dedicated agent environment that
-holds no human GitHub credential, under Claude Code's managed settings
-([root ADR-0008](docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md));
-planner runs where you work, under your supervision, and acts on GitHub with the agent credentials there,
-never yours. Setting up that environment and a served repo:
+The orchestrator, builder and reviewer run together in one session on a dedicated agent machine that
+holds no admin GitHub credential, under Claude Code's managed settings
+([root ADR-0008](docs/adr/0008-run-the-agent-session-on-one-agent-machine-under-managed-settings-with-keys-only.md)).
+You start each session there naming one issue, `/codeworks <issue>`. planner runs where you work, under
+your supervision, and acts on GitHub as its own App, never with your credentials. Setting up that machine
+and a served repo:
 [`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
 `SECURITY.md`.
 
-In the agent environment:
+On the agent machine, from a shell, with a read-only deploy key of this repo loaded for SSH and kept
+with the credentials the model is denied (`SECURITY.md` §5):
 
 ```
-claude plugin marketplace add analitiq-ai/claude-plugins-internal
+claude plugin marketplace add git@github.com:analitiq-ai/claude-plugins-internal.git
+claude plugin marketplace add anthropics/claude-plugins-official
 claude plugin install orchestrator@codeworks
 claude plugin install builder@codeworks
 claude plugin install reviewer@codeworks
 claude plugin install auditor@codeworks
+claude plugin install pr-review-toolkit@claude-plugins-official
 ```
 
 `orchestrator` installs once its plugin ships.
@@ -44,8 +48,8 @@ claude plugin install planner@codeworks
 claude plugin install reviewer@codeworks
 ```
 
-The repo is private: on your machine the clone uses your git credentials for github.com. How the agent
-environment, which holds none, fetches it is open; it is moot once the repo is public.
+The repo is private: on your machine the clone uses your git credentials for github.com; the agent
+machine, which holds none, uses the deploy key.
 
 ## Layout
 

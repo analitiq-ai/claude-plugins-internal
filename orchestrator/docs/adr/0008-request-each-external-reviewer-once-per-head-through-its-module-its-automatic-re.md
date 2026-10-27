@@ -40,17 +40,18 @@ The merge waits on each external reviewer's verdict, which counts only for the h
    attested, GREEN and without findings; on an exempt PR once ready. REQUESTED counts only a request
    posted by the orchestrator's App (ADR-0003); reviewer's hook refuses the request from the model's
    commands (reviewer ADR-0012).
-3. We will have the orchestrator write each module's `<module>-review` at the head with its App, from
-   that module's `status`: PASS is success, WAIVED success marked so, FAIL failure, PENDING pending.
+3. We will have the orchestrator write each module's `<module>-review` as a check run at the head with
+   its App, from that module's `status`: PASS is success, WAIVED success marked so, FAIL failure, PENDING
+   pending. Every module listed in `validators` is required alike (root ADR-0003).
    No other service writes it, so while no agent session runs no PR has a verdict and none merges.
-4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past its
-   timeout from config, timed from its request where it posted one, or a required check (ADR-0007) is
-   missing or pending past the configured timeout. We never ask twice for one head; the second ask is
-   a human's.
+4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past `review_timeout`
+   (ADR-0001), timed from its request where it posted one, or a required check (ADR-0007) is missing or
+   pending past it. Until then the session waits (ADR-0001). We never ask twice for one head; the second ask
+   is an admin's.
 
 ## Options considered
 
-### Option A: The orchestrator's request and status, automatic review off (chosen)
+### Option A: The orchestrator's request and check run, automatic review off (chosen)
 
 One trigger and one writer per module for every PR to main, story or exempt; nothing stored.
 
@@ -69,7 +70,7 @@ modules already read.
 
 ### Option E: The orchestrator re-asks a silent reviewer itself
 
-Rejected: the second ask is a human's.
+Rejected: the second ask is an admin's.
 
 ## Trade-offs
 
@@ -81,7 +82,7 @@ Rejected: the second ask is a human's.
 ## Consequences
 
 - Easier: every reporter's silence has one bound and one exit; the merge fails safe.
-- Harder: a silent reviewer waits for a human.
+- Harder: a silent reviewer waits for an admin.
 - **How we would know this was wrong:** heads with two reviews from one provider, or requests that
   routinely time out without a verdict.
 - Revisit if: a provider we trigger re-reviews on push, or stops taking a request from the App.

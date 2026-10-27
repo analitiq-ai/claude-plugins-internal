@@ -14,6 +14,8 @@ affects:
   - type: path
     pattern: "core/**"
   - type: path
+    pattern: "validators/**"
+  - type: path
     pattern: "reviewer/plugin/scripts/codexstate.py"
   - type: path
     pattern: "orchestrator/**"
@@ -37,10 +39,12 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
 
 ## Decision
 
-1. We will put one validator module per external reviewer behind one contract: `trigger(pr, head)`, a
-   no-op for a self-triggering provider; `status(pr, head)` → PENDING · PASS · FAIL · SILENT, SILENT once
-   the module's timeout passes; `findings(pr, head)` → a list in the Findings schema (source, author,
-   file, line, text, thread id if any, resolvable on GitHub).
+1. We will put one validator module per external reviewer behind one contract, defined in `core/`:
+   `trigger(pr, head)`, a no-op for a self-triggering provider; `status(pr, head)` → PENDING · PASS ·
+   FAIL · WAIVED · SILENT; `findings(pr, head)` → a list in the Findings schema (source, author, file,
+   line, text, thread id if any, resolvable on GitHub). PASS and FAIL come only from the provider's
+   reading of that head; until one exists, a head the provider skipped included, the status is PENDING,
+   and SILENT once `review_timeout` (orchestrator ADR-0001) passes.
 2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
    thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
    (ADR-0002).
@@ -52,11 +56,18 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
    `trigger` and `status` (orchestrator ADR-0008) and reads `findings` (orchestrator ADR-0007); reviewer's
    github stage reads `findings` (reviewer ADR-0016). The orchestrator alone closes threads no trusted
    reviewer started (orchestrator ADR-0007).
-6. We will have a module whose provider publishes its verdict only in review text read it there, in
-   `core/` alone. A provider out of credits with no verdict is WAIVED, which counts as a pass: the one
+6. We will keep each validator module in a package of its own (ADR-0001), which
+   owns how it reaches its provider and reads and interprets the provider's results, its token if it
+   needs one included; `core/` holds only the contract, the threads module and the read of required
+   checks. A module whose provider publishes its verdict only in review text reads it there, in that
+   module alone. A provider out of credits with no verdict is WAIVED, which counts as a pass: the one
    exception to ADR-0004's fail-closed rule.
 7. We will have a module return items its provider publishes outside any thread as findings with no
    thread, closed by a fix or by a pushback recorded in reviewer's state.
+8. We will treat every module listed in `validators` (a `[shared]` key) alike: each is required, with one
+   `<module>-review` (orchestrator ADR-0008), its name its folder's, and no module has a `codeworks.toml`
+   key of its own. A module reads its provider's verdict only from objects GitHub shows that provider
+   authored, or from the provider's API, never from a commit status, whose creator GitHub leaves empty.
 
 ## Options considered
 
@@ -72,16 +83,28 @@ Rejected: one source parsed per consumer, with as many answers.
 
 ### Option D: An override label for an external reviewer's fail, or a release detected from a version-only change
 
-Rejected: a named human on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
-is a human's decision.
+Rejected: a named admin on the ruleset bypass list merges past a fail (orchestrator ADR-0009); a release
+is an admin's decision.
+
+### Option E: An advisory module, or settings per module
+
+Rejected by the user on 2026-10-25: every module is treated the same.
+
+### Option F: A verdict from the provider's commit status
+
+Rejected: a commit status names no creator, so any writer could post it; CodeRabbit posted `success`
+for a review it never ran.
 
 ## Trade-offs
 
-- A thread from someone outside `trusted_reviewers` is resolved unread, a human writer's included.
+- A thread from someone outside `trusted_reviewers` is resolved unread, an admin writer's included.
+- A provider that does not read a head, one that skips the agent's commits for example, leaves it SILENT,
+  and the card goes to Blocked at `review_timeout`.
+- A head merged on WAIVED had no external reading.
 
 ## Consequences
 
-- Easier: a new reviewer is one module; every consumer reads one answer.
+- Easier: a new reviewer is one folder in `validators/`; every consumer reads one answer.
 - Harder: a contract change reaches every plugin that carries `core/`.
 - **How we would know this was wrong:** two components disagree on a status, finding or hold at one head.
 - Revisit if: a component must run without `core/`.

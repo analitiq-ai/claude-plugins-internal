@@ -29,10 +29,10 @@ review:
 
 ## Context
 
-The shim check needs three judgements of a staged change: is it a fix, where does the fix act, and does it
-reach the other sites with the same defect. A model has to give them, within two limits:
+The shim check needs three judgements of a checked change (ADR-0002): is it a fix, where does the fix act, and
+does it reach the other sites with the same defect. A model has to give them, within two limits:
 
-- The verdict has to exist before the author commits, so the answers are needed inside a hook, within
+- Only hooks read the classifier's key (root ADR-0008), so the answers are needed inside a hook, within
   seconds.
 - A refusal has to follow from a rule that can be tested. Asked for the overall verdict, the classifier
   answers differently from its own two answers.

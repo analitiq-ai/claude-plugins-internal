@@ -28,7 +28,7 @@ review:
 ## Context
 
 Once a story's card is In review, something must merge its PR and hold the merge condition. The
-model's token can call GitHub's merge endpoint (root ADR-0007).
+model's token is read-only (root ADR-0007): only the orchestrator's App and the admins can merge.
 
 ## Decision
 
@@ -36,18 +36,21 @@ model's token can call GitHub's merge endpoint (root ADR-0007).
    once no hold is open on its story issue (reviewer ADR-0013), every module's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
 2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
-   classic branch protection: they require `internal-review` and each module's `<module>-review`,
-   pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
+   classic branch protection: they require the check runs `internal-review` and each module's
+   `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
-   humans only, the only override.
-3. We will never update a branch that is only behind main; a conflict stays a finding.
-4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation (builder
-   ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
+   admins only, the only override.
+3. We will never update a branch only because it is behind main: a conflict stays a finding, and builder
+   merges main only to resolve one or once main's spec, ADRs or constitution changed (builder ADR-0004).
+4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the
+   orchestrator (builder ADR-0003), so its merge closes the story issue. The orchestrator closes a parent issue once every
    sub-issue is done (root ADR-0005), its only issue-close write.
 5. We will leave a PR refused on a rule outside this contract In review.
-6. We will require of every served repo: squash merging with the default squash message set to
-   "commit messages", so every session-id trailer reaches main; head branches deleted on merge; no
-   required human approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
+6. We will require of every served repo: squash merging with the default commit title the PR title and
+   the default message the PR body, which the orchestrator's hooks write: `Closes #s` at creation
+   (builder ADR-0003), and each session's id trailer as that session first pushes, so no
+   model-written commit message reaches main; head branches deleted on merge; no
+   required admin approval; no up-to-date rule; board workflows auto-add issues to Backlog, auto-add
    sub-issues, item closed to Done and Done to close the issue on, PR-linked, PR-merged and reopen off.
 
 ## Options considered
@@ -60,18 +63,20 @@ A repo without the ruleset never merges unreviewed, since the orchestrator requi
 
 Rejected: it could merge while a card sat Blocked or a hold was open.
 
-### Option C: Required human approval
+### Option C: Required admin approval
 
 Rejected: the attestation and the external verdicts are the merge condition.
 
 ### Option D: An up-to-date-branch rule or a stale-branch update
 
-Rejected: conflicts are resolved, never staleness.
+Rejected: a branch takes main for a conflict or a changed spec, ADR or constitution (builder ADR-0004),
+never for staleness alone.
 
 ## Trade-offs
 
 - A PR refused on a rule outside the contract stays In review silently.
-- A branch behind main without conflicts merges as it is.
+- A branch behind main without conflicts merges as it is, unless main's spec, ADRs or constitution changed
+  since its round (ADR-0004).
 
 ## Consequences
 

@@ -5,7 +5,7 @@ title: "Have the build skills derive the spec folder from the issue number, neve
 status: draft
 date: 2026-10-20
 deciders: []
-tags: [spec, spec-folder, skills, issue-tackle, root-cause-check, story, lanes, agent-environment]
+tags: [spec, spec-folder, skills, issue-tackle, root-cause-check, story, lanes, agent-machine]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -51,8 +51,7 @@ a parent issue with one sub-issue per story (org ADR-0003, planner ADR-0010).
    the state and any open PR.
 4. We will enforce root ADR-0006 at the start of each step: `issue-tackle` stops on an issue in Backlog
    or Blocked, building nothing.
-5. We will run `issue-tackle` only in the agent environment, one story at a time (root ADR-0008);
-   tests that need Docker run in CI only.
+5. We will run `issue-tackle` only on the agent machine, each session on one issue (root ADR-0008).
 6. We will retire the `root-cause-check` skill: the round's root-cause reviewer verifies the cause
    (reviewer ADR-0017).
 
@@ -78,20 +77,19 @@ Rejected: the skill stops with a message naming the state, never a planning comm
 
 Rejected: it reads nothing from the round; the round's root-cause reviewer does its job.
 
-### Option F: `issue-tackle` in a human's session outside the agent environment
+### Option F: `issue-tackle` in an admin's session outside the agent machine
 
-Rejected: the reviewer App key, and so review, exists only in the agent environment.
+Rejected: the reviewer App key, and so review, exists only on the agent machine.
 
 ## Trade-offs
 
-- The skill repairs nothing; a missing or inconsistent folder costs a Blocked card and a human.
-- A human cannot build a story by hand outside the agent environment.
-- A build step cannot run a test that needs Docker; CI runs it after the push.
+- The skill repairs nothing; a missing or inconsistent folder costs a Blocked card and an admin.
+- An admin cannot build a story by hand outside the agent machine.
 
 ## Consequences
 
 - Easier: the orchestrator's hook names the step with the issue number alone.
-- Harder: a story out of order needs a human to change its `blockedBy`.
+- Harder: a story out of order needs an admin to change its `blockedBy`.
 - **How we would know this was wrong:** a caller that must pass more than `<s>`, or repeated Blocked
   moves for a missing or inconsistent folder.
 - Revisit if: a spec needs two spec folders.

@@ -33,23 +33,23 @@ review:
 
 ## Context
 
-Each user story has its own issue, branch and PR, under a parent issue when a spec has several (org
-ADR-0003). builder, reviewer and the orchestrator each need a story's spec, branch or PR, starting from a
-branch name or an issue number; three parsers of one grammar give three answers at its edges. A session writes the PR body, where `Closes #s` sits. Whether a story is done gates
+Each user story has its own issue, branch and PR, under a parent issue when a spec has several (org ADR-0003).
+builder, reviewer and the orchestrator each need a story's spec, branch or PR, starting from a branch name or
+an issue number; three parsers of one grammar give three answers at its edges. Whether a story is done gates
 the stories `blockedBy` it and its parent's close, and a merged story's issue can be reopened.
 
 ## Decision
 
 1. We will name a story's branch `<s>-us<k>-<slug>`, `<s>` its story issue, and a spec PR's branch
    `<p>-spec`, and parse both only in `core/` (ADR-0001); reviewer, builder and the orchestrator call it.
-   `<k>` is a label for humans, never checked.
+   `<k>` is a label for readers, never checked.
 2. We will take the spec's issue `<p>` as `<s>`'s parent when it has one, else `<s>`, and the spec folder as
    the one `specs/<p>-*/`.
 3. We will take a story's PR as the newest PR whose head is its branch in the same repo, never by its
    body; fork PRs are orchestrator ADR-0004's.
 4. We will build and grade a story against one requirement: its spec folder's `spec.md`, or the story
    issue's body when that `spec.md` has `codeworks.kind: no_spec` (planner ADR-0008).
-5. We will decide in `core/` alone when a story is done: its PR merged, or a human closed its issue.
+5. We will decide in `core/` alone when a story is done: its PR merged, or an admin closed its issue.
    Reopening a done story's issue starts nothing; new work goes in a new issue.
 
 ## Options considered
@@ -64,7 +64,7 @@ Rejected: three parsers drift at the edges, and no plugin imports another's code
 
 ### Option C: Link a PR by `Closes #s` or `closingIssuesReferences`
 
-Rejected: a session writes the PR body.
+Rejected: any writer can edit the body or the linked issues, and the branch already names the story.
 
 ### Option D: Check `<k>` against the story's position in `tasks.md`
 

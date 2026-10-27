@@ -38,9 +38,9 @@ comment.
 
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
    escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
-2. We will take as the answer an issue comment created after that question by a writer
-   (author_association OWNER, MEMBER or COLLABORATOR) other than the session App; no comment from
-   the agent session counts, since it acts on GitHub only as Apps (root ADR-0007).
+2. We will take as the answer an issue comment created after that question by a writer (author_association
+   OWNER, MEMBER or COLLABORATOR) other than a codeworks App (root ADR-0007); the model's token posts no
+   comment. That comment, with a Ready move, releases the hold (reviewer ADR-0013).
 
 ## Options considered
 
@@ -48,7 +48,7 @@ comment.
 
 Write permission is GitHub's own fact on the comment.
 
-### Option B: Any author except the session App
+### Option B: Any author except a codeworks App
 
 Rejected: on a public repo a stranger's comment would count as the
 answer and reach the next round's briefs.
