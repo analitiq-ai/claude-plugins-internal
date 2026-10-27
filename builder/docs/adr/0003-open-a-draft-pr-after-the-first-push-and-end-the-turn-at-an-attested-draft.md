@@ -29,15 +29,17 @@ review:
 
 builder runs in one session with the orchestrator and reviewer (root ADR-0008). The orchestrator's hooks drive
 the GitHub loop there (orchestrator ADR-0001): at each turn's end its Stop hook reads GitHub and names the
-next step or lets the session stop. builder owns the other half: what a build turn writes when it opens
-the PR, where the turn ends, and which GitHub moves it never makes. Each of a story's steps has to know what
-the last one left.
+next step or lets the session stop. This record decides when the story PR opens and what it says, which the
+orchestrator's hooks carry out, where builder's turn ends, and which GitHub moves builder never makes. The
+model's token writes nothing on GitHub (root ADR-0007). Each of a story's steps has to know what the last one
+left.
 
 ## Decision
 
-1. We will open the story PR as a draft after the first push, and a new one on the same branch after a
-   PR closed unmerged. builder writes its description once, at creation, with `Closes #s` for the story
-   issue, so the merge closes it.
+1. We will have the story PR open as a draft after the first push, and a new one on the same branch
+   after a PR closed unmerged; the orchestrator's hooks push builder's commits and open it (orchestrator
+   ADR-0001). Its description, which the squash merge takes as its message (orchestrator ADR-0009),
+   carries `Closes #s` for the story issue from creation, so the merge closes it.
 2. We will end the turn at an attested draft, or at a stop with a message naming why: a pre-PR stop, or the
    folder or lane stop of ADR-0002. The Stop hook then names the next step in this session or lets it stop
    (orchestrator ADR-0001).
@@ -71,18 +73,17 @@ Rejected: every story PR closes its own issue.
 ## Trade-offs
 
 - The next step waits for the turn to end.
-- A turn that pushes and ends before attesting costs a continuation; REPEAT, or two unattested ends in a
-  row, moves the story to Blocked (orchestrator ADR-0001).
+- A turn that ends at a pushed, unattested head costs another turn; REPEAT, or two unattested ends in a row,
+  moves the story to Blocked (orchestrator ADR-0001).
 - Context carried between steps may be stale; decision 3 re-reads GitHub.
 
 ## Consequences
 
 - Easier: builder holds no loop state; what outlives a turn is on GitHub (orchestrator ADR-0003).
-- Harder: a pre-PR stop reaches a human only through the orchestrator's Blocked reason.
+- Harder: a pre-PR stop reaches an admin only through the orchestrator's Blocked reason.
 - **How we would know this was wrong:** attested drafts the Stop hook leaves stalled, or REPEAT because a
   step could not re-derive from GitHub what the last one knew.
-- Revisit if: the orchestrator's hooks stop driving the loop, or builder runs outside the agent
-  environment.
+- Revisit if: the orchestrator's hooks stop driving the loop, or builder runs outside the agent machine.
 
 ## Action items
 

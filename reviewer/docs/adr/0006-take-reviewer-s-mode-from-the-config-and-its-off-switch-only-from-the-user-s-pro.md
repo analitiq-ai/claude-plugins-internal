@@ -52,7 +52,7 @@ cannot type the user's prompt.
 
 ### Option A: Mode from the config, off from the user's prompt (chosen)
 
-Only a human editing `codeworks.toml`, or the user's typed prompt, loosens a gate, for one session.
+Only an admin editing `codeworks.toml`, or the user's typed prompt, loosens a gate, for one session.
 
 ### Option B: An off switch in the config
 
@@ -68,14 +68,14 @@ Rejected: a round run with its gates lifted would record a verdict the orchestra
 
 ### Option E: Off lifts every rule
 
-Rejected: a session switched off could make every write the orchestrator or a human owns.
+Rejected: a session switched off could make every write the orchestrator or an admin owns.
 
 ## Trade-offs
 
-- Only the user can switch reviewer off, so an unattended session stuck behind a broken gate waits for a
-  human.
-- A session switched off commits with no check; only the exempt label lets its PR merge (orchestrator
-  ADR-0005).
+- Only the user can switch reviewer off, so an unattended session stuck behind a broken gate waits for an
+  admin.
+- A session switched off commits with no check: on the agent machine the orchestrator pushes none of those
+  commits (ADR-0002); elsewhere only the exempt label lets their PR merge (orchestrator ADR-0005).
 
 ## Consequences
 

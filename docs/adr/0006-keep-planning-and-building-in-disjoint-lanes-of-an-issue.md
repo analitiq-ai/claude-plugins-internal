@@ -36,17 +36,18 @@ review:
 reviewer's state comment on a story issue is a full snapshot, the newest winning (reviewer ADR-0011).
 reviewer's hook writes it while a story is built, and again when a rescope places holds (reviewer
 ADR-0013); two writes at once would lose one snapshot. A spec that changes under a running story is built
-against the old one. The board already says what runs: the orchestrator claims only from Ready, and a
-human stops a story by dragging it to Blocked (orchestrator ADR-0002).
+against the old one. The board already says what runs: the orchestrator claims only from Ready, resumes
+only a story In progress or In review, and an admin stops a story by dragging it to Blocked (orchestrator
+ADR-0002).
 
 ## Decision
 
 1. We will let planner work on an issue only while its card is in Blocked or Backlog, and builder and
    reviewer never while it is there.
 2. We will start a rescope only when the spec's issue and every open story issue under it are in Blocked
-   or Backlog. planner opens the rescope's spec PR from where its human works; reviewer's hook in the
-   agent environment (ADR-0008) places the rescope hold (reviewer ADR-0013) on each of them when it sees
-   that PR open. A human moves an in-flight story there, which stops it.
+   or Backlog. planner opens the rescope's spec PR from where its admin works; reviewer's hook on the
+   agent machine (ADR-0008) places the rescope hold (reviewer ADR-0013) on each of them when it sees
+   that PR open. An admin moves an in-flight story there, which stops it.
 3. We will refuse work on a closed issue; new work goes in a new issue.
 
 ## Options considered
@@ -69,8 +70,8 @@ Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 ## Trade-offs
 
-- A rescope stops every claimed story under the spec until a human returns it to Ready.
-- A human moves every open story under the spec to Blocked or Backlog before a rescope can start, a
+- A rescope stops every claimed story under the spec until an admin returns it to Ready.
+- An admin moves every open story under the spec to Blocked or Backlog before a rescope can start, a
   claimed story not yet pushed included.
 
 ## Consequences
@@ -81,7 +82,7 @@ Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
   planner ADR-0005, builder ADR-0002, reviewer ADR-0015, orchestrator ADR-0002.
 - **How we would know this was wrong:** a rescope hold lost to another state write, or a story built
   under a spec a rescope was changing.
-- Revisit if: planning runs without a human, or state moves out of a single snapshot.
+- Revisit if: planning runs without an admin, or state moves out of a single snapshot.
 
 ## Action items
 

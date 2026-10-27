@@ -51,18 +51,18 @@ ADR-0006).
 1. We will make each story a sub-issue of the spec's issue, `blockedBy` the one before, or, for a one-story
    spec, the spec's issue itself; a rescope adds stories alike. A story issue's number never changes and
    labels its task block (ADR-0008).
-2. We will, when a rescope gives a one-story issue `#n` a second story, after the human approves: create
-   parent `#p` with `#n`'s title and body, add under it `#n` and the new story blocked by `#n`, make `#p`
-   the session's issue (ADR-0005), and rename `specs/<n>-*` to `specs/<p>-*`. `#n` keeps its branch and PR.
+2. We will, when a rescope gives a one-story issue `#n` a second story, after the admin approves: create
+   parent `#p` with `#n`'s title and body, add under it `#n` and the new story blocked by `#n`, carry on
+   the run with `#p` as its `<p>` (ADR-0005), and rename `specs/<n>-*` to `specs/<p>-*`. `#n` keeps its branch and PR.
 3. We will push the spec folder and its records (ADR-0009), and no code, to `<p>-spec`: to its open PR if
    there is one, else to a branch cut from the default branch and opened as a draft PR, the spec PR. A
-   `<p>-spec` whose PR closed unmerged stops the run, naming the branch for a human to delete.
-4. We will write no state: reviewer's hook in the agent environment, on seeing a rescope's spec PR open,
+   `<p>-spec` whose PR closed unmerged stops the run, naming the branch for an admin to delete.
+4. We will write no state: reviewer's hook on the agent machine, on seeing a rescope's spec PR open,
    places the rescope hold on the story issues root ADR-0006 names (reviewer ADR-0013).
-5. We will name, in a rescope's spec PR description, each story issue whose task block it drops, for a
-   human to close. A rescope that edits or drops a merged story's task block stops before it pushes.
-6. We will write into the description of decision 2's spec PR the steps that undo its issue writes if a
-   human closes it unmerged; the skill holds the steps.
+5. We will name, in a rescope's spec PR description, each story issue whose task block it drops, for an
+   admin to close. A rescope that edits or drops a merged story's task block stops before it pushes.
+6. We will write into the description of decision 2's spec PR the steps that undo its issue writes if an
+   admin closes it unmerged; the skill holds the steps.
 
 ## Options considered
 
@@ -74,22 +74,23 @@ Rejected: a script computes order from ticks.
 
 ### Option C: planner opens the spec PR ready for review
 
-Rejected: no model action makes the ready flip (reviewer ADR-0012).
+Rejected: the admin marks it ready once they have reviewed the spec.
 
 ### Option D: planner closes dropped stories and undoes a rejected rescope
 
-Rejected: closing an issue and releasing a hold are a human's acts (reviewer ADR-0012, ADR-0013).
+Rejected: the admin decides what a rejected rescope undoes, from the steps decision 6 writes, and a hold
+releases only on a Ready move and an admin's comment (reviewer ADR-0013).
 
 ## Trade-offs
 
-- planner writes issues, links and a draft PR as the session App (root ADR-0007); a rescope's holds wait
-  until the agent environment sees its PR.
-- Renaming `specs/<n>-*` breaks path links; a rejected spec PR leaves cleanup to a human.
+- planner writes issues, links and a draft PR as the planner App (root ADR-0007 d4); a rescope's holds wait
+  until the agent machine sees its PR.
+- Renaming `specs/<n>-*` breaks path links; a rejected spec PR leaves cleanup to an admin.
 
 ## Consequences
 
 - Easier: done (root ADR-0005) and order are GitHub fields, never read from `tasks.md`.
-- Harder: reordering stories is a human edit of `blockedBy`.
+- Harder: reordering stories is an admin edit of `blockedBy`.
 - **How we would know this was wrong:** stories built out of order, or story issues out of step with
   spec.md after a rescope.
 - Revisit if: GitHub drops sub-issues or issue dependencies.

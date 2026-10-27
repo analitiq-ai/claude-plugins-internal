@@ -1,8 +1,12 @@
 <!--
 Sync Impact Report
-- Version: 1.2.0 -> 1.2.1 (PATCH: P2's list of tampered state follows reviewer ADR-0011 d2)
-- Changed: P2 no longer holds a story with a PR and no snapshot; an untagged newest reviewer App
-  comment reads as held.
+- Version: 1.2.1 -> 1.2.2 (PATCH: wording follows the 2026-10-24..26 session design records)
+- Changed: the scope and the repo shape name the validator packages in `validators/`; P2's sources drop
+  reviewer's `unlock` and pre-merge gate and cite reviewer ADR-0013 by its new name (decision 5); P5 names
+  a check run, not a status or the assignee; P7's exception reads a provider's review text in that
+  provider's module; Platform Constraints: the agent machine runs one session per issue, the model's token
+  is read-only and hooks make every write, planner mints its own App token with no reviewer beside it, and the reviewer
+  line drops the review-round `spec` check; "human" reads "admin" throughout.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -10,9 +14,10 @@ Sync Impact Report
 # Codeworks Constitution
 
 Constitution for building the components of `analitiq-ai/claude-plugins-internal`: the `reviewer`,
-`planner`, `builder`, `auditor` and `orchestrator` plugins, and the shared `core/` package. Each
-component is a top-level folder; a plugin's `plugin/` is what an install copies, `core/` included
-through a symlink in each plugin that runs it; nothing else in the repo is installed. Paths are relative to the
+`planner`, `builder`, `auditor` and `orchestrator` plugins, the shared `core/` package, and the
+validator packages in `validators/`. Each component is a top-level folder; a plugin's `plugin/` is what
+an install copies, `core/` and `validators/` included through a symlink in each plugin that runs them;
+nothing else in the repo is installed. Paths are relative to the
 repo root unless they name another repo. Each principle is a plan-time gate: a plan passes only if it
 answers the gate question for the components it applies to. The files named in each
 Source line are the source of truth; this document indexes them and never restates their text.
@@ -78,7 +83,7 @@ code it governs in the same PR).
 
 A principle carries one number across the repo and names the components it applies to. Where its gate
 differs by component, each component's gate is given. P6's refusals are reviewer's hook's for every
-component (`reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`,
+component (`reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`,
 decision 1).
 
 ### P1. Code Decides, Not Prose
@@ -107,14 +112,13 @@ no named approver, or with a way out no decision record names, fails the gate. S
 tampered with reads as held: a newest reviewer App comment that was edited or lacks the state tag, or a
 reviewer App comment deleted after it.
 
-Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7; State: `unlock`; Layout:
-`scripts/pre_merge_gate.py`); how the user's action is recognised:
-`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`;
+Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7); how the user's action is recognised:
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-ready-move-and-an-admin-s-commen.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
 Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
 (decision 2). Only reviewer's hook writes state, the rescope hold included:
-`reviewer/docs/adr/0013-give-every-hold-one-id-and-a-human-release-a-changed-spec-releases-a-rescope-hol.md`
-(decision 4).
+`reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-ready-move-and-an-admin-s-commen.md`
+(decision 5).
 
 ### P3. Rules Are Pure; Handlers and Workflows Carry None
 
@@ -159,12 +163,12 @@ settled-design step).
 
 Applies to: reviewer, planner, builder, orchestrator.
 
-Gate: for every state the plan reads or writes (a lane, a label, a status, the assignee, a state
+Gate: for every state the plan reads or writes (a lane, a label, a check run, a state
 comment, a hold, a commit), does the plan name its one writer, and does the component write only the
 state it owns and refuse, from the model's tool calls, every write it does not own?
 
 Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
-(decision 3); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`
+(decision 3); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
 (decision 1). planner: `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
@@ -178,7 +182,7 @@ Applies to: reviewer, planner, orchestrator.
 Gate: does every fact the plan reads come from a key, a field, a status or a name with a grammar,
 never from a heading, a comment's wording or free text; and does every fact the plan writes for
 another reader land in such a form? The one exception is a verdict a provider publishes only in its
-review text, which that provider's validator module reads there, in `core/` alone.
+review text, which that provider's validator module reads there, in that module alone.
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
@@ -198,7 +202,7 @@ own objects, with every per-repository value in `codeworks.toml` and no reposito
 setting special-cased?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
-(decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-a-huma.md`
+(decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
 (decision 3). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
 (decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-from-the-orchestrator-plugin-s-hooks-inside-the-agent-sessi.md`
 (decision 2). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`;
@@ -210,7 +214,7 @@ Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-eac
 
 Applies to: reviewer, planner, builder, orchestrator.
 
-Gate: does every predicate the plan adds that trusts an actor (a human, a WRITER, TRUSTED or EXEMPT
+Gate: does every predicate the plan adds that trusts an actor (an admin, a WRITER, TRUSTED or EXEMPT
 actor, a trusted reviewer) read that actor's GitHub identity; count no command the model runs, which
 acts on GitHub only as the `codeworks-session` App, as any of them; and count a review thread as a
 finding only when a trusted reviewer started it?
@@ -225,8 +229,8 @@ Source: All: `docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-
 Facts a plan can get wrong. Each is owned by the file named; consult it rather than this summary.
 
 - Repo shape: one top-level folder per component; a plugin's `plugin/` is what an install copies,
-  listed in `.claude-plugin/marketplace.json`; `core/` reaches each plugin that runs its code through a
-  symlink an install copies; `tests/` and `docs/adr/` are never installed
+  listed in `.claude-plugin/marketplace.json`; `core/` and `validators/` reach each plugin that runs
+  their code through a symlink an install copies; `tests/` and `docs/adr/` are never installed
   (`README.md`; `docs/adr/0001-keep-each-component-in-one-top-level-folder-with-one-spec-kit-project-at-the-roo.md`).
 - Tests: CI runs every `<component>/tests/` folder (`.github/workflows/tests.yml`).
 - Language: `core/` is TypeScript on Node, its contracts Zod schemas; no Python code calls core, and a
@@ -234,22 +238,22 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   (`docs/adr/0009-build-core-in-typescript-and-move-a-plugin-s-scripts-to-typescript-when-they-fi.md`).
 - Value sets: every verdict, ruling, outcome and hold kind is an enum defined once; code never repeats
   a value's string (`docs/adr/0010-name-every-verdict-ruling-and-outcome-once-as-an-enum-in-core-s-contracts.md`).
-- Agent environment: the orchestrator, builder and reviewer run in one session in a dedicated
-  environment with no human GitHub credential, under Claude Code's managed settings; only hooks read a
-  key, and no session runs Docker; planner runs outside it, where its human works
-  (`docs/adr/0008-run-the-agent-session-in-one-environment-under-managed-settings-with-keys-only-h.md`).
-- reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the
-  plugin's mode; the review-round `spec` check follows the plugin's mode alone
+- Agent machine: the orchestrator, builder and reviewer run in one session on a dedicated machine with no
+  admin GitHub credential, under Claude Code's managed settings; an admin starts each session naming one
+  issue; only hooks read a key; planner runs outside it, where its admin works, as its own App
+  (`docs/adr/0008-run-the-agent-session-on-one-agent-machine-under-managed-settings-with-keys-only.md`). The
+  model's GitHub token is read-only; hooks make every write
+  (`docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`).
+- reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the plugin's mode
   (`reviewer/plugin/README.md`: Mode). Where it keeps its state: tagged comments on the story issue
   (`reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`).
-  Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision
-  reviewer, which is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
-- planner has no hooks: it runs as the Spec Kit workflow its skill starts
-  (`planner/plugin/skills/issue-spec/`, `planner/plugin/speckit/`), and requires no other plugin:
-  its manifest has no `dependencies` field (`planner/plugin/.claude-plugin/plugin.json`); it writes
-  no reviewer state, and runs outside the agent environment.
-- builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only in the agent
-  environment; its review step is reviewer's internal round, which no install requires: its manifest
+  Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision reviewer, which
+  is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
+- planner runs as the Spec Kit workflow its skill starts (`planner/plugin/skills/issue-spec/`,
+  `planner/plugin/speckit/`), with one hook, which mints its App token (root ADR-0007 d4); it runs outside
+  the agent machine, with no other codeworks plugin beside it, and writes no reviewer state.
+- builder is two skills, with no scripts and no hooks (`builder/plugin/`), run only on the agent
+  machine; its review step is reviewer's internal round, which no install requires: its manifest
   declares no plugin dependency (`builder/plugin/skills/issue-tackle/SKILL.md`;
   `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`,
   decisions 1, 5).
@@ -262,7 +266,7 @@ Not gates — context so `/speckit-tasks` shapes tasks to fit: one issue per use
 under the spec's issue when a spec has several), a story branch `<s>-us<k>-<slug>` with its worktree at
 `.claude/worktrees/<branch>`, a draft PR closing its story issue, then the review loops and the
 pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.md` and
-`.claude/rules/pr-review-loop.md`. A story is done when its PR merged or a human closed its issue
+`.claude/rules/pr-review-loop.md`. A story is done when its PR merged or an admin closed its issue
 (`docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`, decision 5). The spec and
 its decision records land first by a spec PR on
 `<p>-spec`, in `specs/<p>-<slug>/`, `<p>` being the spec's issue; decision records go in the
@@ -284,4 +288,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.2.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-23
+**Version**: 1.2.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-27

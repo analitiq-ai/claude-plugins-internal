@@ -69,7 +69,7 @@ Lost: a plugin write outside the State table.
 
 - Easier: neither stop pick writes to the issue.
 - Harder: a `no spec needed` outcome is read from the branch, never from the issue.
-- **How we would know this was wrong:** `not worth doing` issues left open; humans checking out a branch to learn
+- **How we would know this was wrong:** `not worth doing` issues left open; admins checking out a branch to learn
   that an issue needs no spec.
 - Revisit if: anything needs the `no spec needed` outcome from the issue rather than from the spec folder.
 

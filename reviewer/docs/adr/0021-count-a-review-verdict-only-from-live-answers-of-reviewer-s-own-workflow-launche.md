@@ -50,6 +50,9 @@ read from. A verdict read from any of those can be forged.
 4. We will rule a round INCOMPLETE when an expected agent is silent, else DIRTY when one found
    something, else CLEAN.
 5. We will let every other workflow run untouched, counting none of its results.
+6. We will have reviewer agents read only an export of the committed head, made by the hook from a bare
+   copy the hooks own, never the model's working tree. Hooks take the session's commits into that copy
+   only by a fetch from the model's clone, and run no other git command in the clone (`SECURITY.md`).
 
 ## Options considered
 
@@ -71,12 +74,18 @@ Rejected: tested bypassed by a launch naming the workflow and a `scriptPath`.
 
 Rejected by the user in favour of one session running every component.
 
+### Option F: Reviewer agents read the model's working tree
+
+Rejected: the model can change the files a running round reads, and a repository the model wrote can run
+its own code inside git.
+
 ## Trade-offs
 
 - The rule rests on hook fields Claude Code does not promise to keep (`tool_response.scriptPath`,
   `agent_transcript_path`, the `StructuredOutput` event); if one changes, no verdict counts and every
   story stalls.
 - Every reviewer agent must answer through `StructuredOutput`; an answer given any other way is lost.
+- Each round costs an export of the head; an uncommitted change is never reviewed.
 
 ## Consequences
 
@@ -89,5 +98,5 @@ Rejected by the user in favour of one session running every component.
 
 ## Action items
 
-1. [ ] Reviewer's gate tests cover every decision here, Decision 5 included.
+1. [ ] Reviewer's gate tests cover every decision here, Decisions 5 and 6 included.
 2. [ ] The ratifier ratifies this record, or sends it back.

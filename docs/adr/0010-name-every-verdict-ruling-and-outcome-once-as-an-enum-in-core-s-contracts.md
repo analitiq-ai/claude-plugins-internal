@@ -43,7 +43,9 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
    reviewer's. Code, JSON Schemas and agents' answer schemas take values only from there; a Python
    script reads them from the generated JSON Schemas until it moves to TypeScript (ADR-0009).
 2. We will spell every value in upper snake case, except a value also written as a name elsewhere: a
-   hold kind, in a hold id, and a module name, in `codeworks.toml` and in check names.
+   hold kind, in a hold id, and a finding's source, in `codeworks.toml` and in check names. A validator
+   module's name is its folder's in `validators/` (ADR-0003), checked against a grammar, not an enum, so
+   adding a module changes no set.
 3. We will define each value's meaning beside its enum, and add or rename a value only with the record
    that owns its set.
 
@@ -57,7 +59,7 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 | Hold kind | rescope, escalation, pushback, claim, shim, audit | core; reviewer ADR-0013 |
 | Hold state | OPEN, RELEASED | core; reviewer ADR-0011, ADR-0013 |
 | Round stage | INTERNAL, AUDIT, GITHUB | core; reviewer ADR-0019 |
-| Module name, a finding's source | codex, coderabbit, deepsource, threads, required-checks | core; ADR-0003 |
+| Finding source | threads, required-checks, or a validator module's name | core; ADR-0003 |
 | Finding kind | DEFECT, FIX_INDUCED, CLASS_SIBLING, DUPLICATE, SPEC_GAP, BIKESHED, GOLD_PLATING, NOT_REAL | reviewer |
 | Claim verdict | CORRECT, WRONG, UNSURE | reviewer |
 | Shim ruling | SHARES, NOT_SHARED, DEFERRED | reviewer |

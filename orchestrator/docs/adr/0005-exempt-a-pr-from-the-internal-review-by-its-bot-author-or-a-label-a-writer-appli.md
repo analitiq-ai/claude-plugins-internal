@@ -33,25 +33,27 @@ decision.
 
 ## Decision
 
-1. We will exempt a PR whose author is a GitHub App other than the session App (root ADR-0007) and
+1. We will exempt a PR whose author is a GitHub App other than a codeworks App (root ADR-0007) and
    which changes no path ADR-0004 protects, or which carries a label from `exempt_labels` applied
-   after the head's push by an account with write permission other than the session App. A push after
+   after the head's push by an account with write permission other than a codeworks App. The
+   orchestrator's App opens every story PR and planner's App every spec PR, so neither authorship
+   exempts. A push after
    the label voids it until it is labelled again. `exempt_labels` is a key of the orchestrator's
    section of `codeworks.toml` (root ADR-0002).
 2. We will have the orchestrator alone decide EXEMPT and write `internal-review` "exempt"; reviewer and
-   every other component read that status, never the list.
+   every other component read that check, never the list.
 3. We will name no builder step on an exempt PR. An exempt story PR's card goes to Blocked, the reason
-   "exempt: a human merges", adding "push a fix" when it has findings; a push after the label sends it
+   "exempt: an admin merges", adding "push a fix" when it has findings; a push after the label sends it
    to Blocked naming the re-label.
 4. We will make exemption the only way a PR to main goes without the internal review: spec, revert,
    retire-spec and release PRs are labelled or Bot-authored; no branch-name kinds, no list of exempt
    diff shapes. A spec PR's label is its approval (planner ADR-0010).
-5. We will let any writer but the session App create or apply an exempt label; reviewer's hook
-   refuses that write from the model's commands, which act as the session App (reviewer ADR-0012).
+5. We will let any writer but a codeworks App create or apply an exempt label. The model's token
+   cannot write a label (root ADR-0007), and reviewer's hook refuses the attempt (reviewer ADR-0012).
 
 ## Options considered
 
-### Option A: Bot author, or a listed label from any writer but the session App (chosen)
+### Option A: Bot author, or a listed label from any writer but a codeworks App (chosen)
 
 Covers spec PRs, retire-spec, reverts and releases; the labeled event's sender is GitHub's own evidence.
 
@@ -65,12 +67,16 @@ Rejected: the label or a Bot author exempts the PR, so a branch name does no wor
 
 ### Option D: Each component reads `exempt_labels` and decides EXEMPT itself
 
-Rejected: two readers of one list can disagree; the status is the one answer.
+Rejected: two readers of one list can disagree; the check is the one answer.
+
+### Option E: Exempt every PR another App authored, codeworks Apps included
+
+Rejected: every story PR and spec PR would reach main with no round and no admin's label.
 
 ## Trade-offs
 
 - A writer creates the label in each repo and applies it to each exempt PR no Bot opened.
-- A Bot author exempts with no human act: its PRs reach main without a round.
+- A Bot author exempts with no admin act: its PRs reach main without a round.
 
 ## Consequences
 
