@@ -265,6 +265,16 @@ describe("AS6: a failed required check is one finding naming the check and its c
     assert.deepEqual(findings.map((finding) => finding.key), ["required-check:ci", "required-check:lint"]);
   });
 
+  it("one finding for a check two rulesets require with different pins, its failed run matching both", async () => {
+    const { status, findings } = await answers({
+      rules: [requiring({ context: "ci" }), requiring({ context: "ci", integration_id: ACTIONS.id })],
+      runs: { ci: [run("ci", "failure")] },
+    });
+    assert.equal(status.outcome, "FAIL");
+    assert.ok(Array.isArray(findings));
+    assert.deepEqual(findings.map((finding) => finding.key), ["required-check:ci"]);
+  });
+
   it("findings are COULD_NOT_RUN naming the checks when any check could not run, a failure beside it", async () => {
     const { findings } = await answers({
       rules: [requiring({ context: "ci" }, { context: "lint" })],
