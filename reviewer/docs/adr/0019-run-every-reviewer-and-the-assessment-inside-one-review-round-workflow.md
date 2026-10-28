@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0019"
 title: "Run every reviewer and the assessment inside one review-round workflow"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [review-round, reviewers, assessment, launch-gate, dependencies, round-cap]
 scope: component
 reversibility: two-way-door
@@ -27,8 +27,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:54Z
 externalRefs:
   - type: doc
     url: "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit"
@@ -104,4 +106,4 @@ Rejected: the whole-PR audit can end the churn alone; its hold brings an admin i
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0015"
 title: "Fence a session on its issue's branch prefix and lane; a session needs an issue"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [commit-gate, fence, branch-grammar, session-state, lanes, hooks]
 scope: component
 reversibility: two-way-door
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:53Z
 ---
 
 # ADR-0015: Fence a session on its issue's branch prefix and lane; a session needs an issue
@@ -78,4 +80,4 @@ Rejected: a story dragged to Blocked would keep committing beside planner.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

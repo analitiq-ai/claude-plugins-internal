@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0009"
 title: "The orchestrator squash-merges on GitHub's gate and the external reviewers' verdicts"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [orchestrator, merge, ruleset, github, pull-requests]
 scope: component
 reversibility: two-way-door
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:49Z
 ---
 
 # ADR-0009: The orchestrator squash-merges on GitHub's gate and the external reviewers' verdicts
@@ -88,4 +90,4 @@ never for staleness alone.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

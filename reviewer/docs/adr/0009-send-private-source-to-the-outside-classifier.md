@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0009"
 title: "Send private source to the outside classifier"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [classifier, private-source]
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: arb
+  decidedAt: 2026-10-28T14:35:51Z
 ---
 
 # ADR-0009: Send private source to the outside classifier
@@ -79,4 +81,4 @@ No alternative to sending private source was weighed.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

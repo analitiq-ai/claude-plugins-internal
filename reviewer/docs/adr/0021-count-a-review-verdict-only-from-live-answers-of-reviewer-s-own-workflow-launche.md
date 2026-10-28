@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0021"
 title: "Count a review verdict only from live answers of reviewer's own workflow, launched by the gate"
-status: draft
+status: accepted
 date: 2026-10-22
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [review-round, claim-check, shim-check, launch-gate, verdict, hooks]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/145"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:54Z
 ---
 
 # ADR-0021: Count a review verdict only from live answers of reviewer's own workflow, launched by the gate
@@ -99,4 +101,4 @@ its own code inside git.
 ## Action items
 
 1. [ ] Reviewer's gate tests cover every decision here, Decisions 5 and 6 included.
-2. [ ] The ratifier ratifies this record, or sends it back.
+2. [x] The ratifier ratifies this record, or sends it back.

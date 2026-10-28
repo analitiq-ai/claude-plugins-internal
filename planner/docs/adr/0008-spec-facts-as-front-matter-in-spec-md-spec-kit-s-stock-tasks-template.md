@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0008"
 title: "Spec facts as front matter in spec.md; Spec Kit's stock tasks template"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, front-matter, tasks, spec-kit, presets]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:55Z
 ---
 
 # ADR-0008: Spec facts as front matter in spec.md; Spec Kit's stock tasks template
@@ -87,4 +89,4 @@ Rejected: a script would derive at every step what planner knows when it plans.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

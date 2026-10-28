@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0003"
 title: "Gate commits from the session hook and run each check as a workflow"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, commit-gate, hooks]
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:50Z
 ---
 
 # ADR-0003: Gate commits from the session hook and run each check as a workflow
@@ -84,4 +86,4 @@ blocking on its verdict needs Option A anyway.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

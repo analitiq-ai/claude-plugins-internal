@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0016"
 title: "Read a PR's findings only through core's modules, and brief only trusted reviewers' text"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [threads, trust, findings, validators, prompt-injection, gate]
 scope: component
 reversibility: two-way-door
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:53Z
 ---
 
 # ADR-0016: Read a PR's findings only through core's modules, and brief only trusted reviewers' text
@@ -84,4 +86,4 @@ Rejected: the text still reaches the assessor.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

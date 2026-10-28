@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0006"
 title: "Take reviewer's mode from the config and its off switch only from the user's prompt"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [mode, switch, config, hooks]
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:51Z
 ---
 
 # ADR-0006: Take reviewer's mode from the config and its off switch only from the user's prompt
@@ -87,4 +89,4 @@ Rejected: a session switched off could make every write the orchestrator or an a
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

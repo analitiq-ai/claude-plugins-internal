@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0010"
 title: "Keep a story branch off its spec folder but ticks in its issue's task block; grade each round at the reviewed commit"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, review-round, tasks, merge-main]
 scope: component
 reversibility: two-way-door
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/pull/108"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:52Z
 externalRefs:
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
@@ -87,4 +89,4 @@ Rejected: a session could mark another story's tasks done.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.
