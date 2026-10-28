@@ -1,5 +1,7 @@
 import type { GitHubClient } from "../../src/github.ts";
 
+const EDITS = new Set(["PATCH", "DELETE"]);
+
 export type FakeCall =
   | { kind: "rest"; method: string; path: string; body: unknown }
   | { kind: "restPages"; path: string }
@@ -20,7 +22,10 @@ export type GraphQLRoute = {
 };
 
 export type FakeRoutes = {
-  /** Keyed `"<METHOD> <path>"`, the path exactly as the caller passes it, query string included. */
+  /**
+   * Keyed `"<METHOD> <path>"`, the path exactly as the caller passes it, query string included. A PATCH or DELETE
+   * route is never answered.
+   */
   rest?: Record<string, FakeAnswer>;
   /** Keyed by path; the answer is the whole list, every page read. */
   restPages?: Record<string, FakeAnswer>;
@@ -28,17 +33,20 @@ export type FakeRoutes = {
   graphql?: GraphQLRoute[];
   /** The first route whose `when` holds answers; the answer is the whole node list, every page read. */
   graphqlPages?: GraphQLRoute[];
-  /** GitHub's time, `YYYY-MM-DDTHH:MM:SSZ`. */
+  /** GitHub's time, `YYYY-MM-DDTHH:MM:SSZ`; a function answer lets a test move the clock between calls. */
   now?: FakeAnswer;
 };
 
 export type FakeGitHub = GitHubClient & {
-  now(): Promise<string>;
   /** Every call received, in order, answered or not. */
   calls: FakeCall[];
 };
 
-/** A client that answers only from `routes`; a call no route answers throws, naming the call. */
+/**
+ * A client that answers only from `routes`; a call no route answers throws, naming the call. A PATCH or DELETE
+ * through `rest` throws even when routed: state is only ever posted, never edited or deleted (FR-018), so a test
+ * cannot route one into passing.
+ */
 export function fakeGitHub(routes: FakeRoutes): FakeGitHub {
   const calls: FakeCall[] = [];
 
@@ -69,7 +77,13 @@ export function fakeGitHub(routes: FakeRoutes): FakeGitHub {
   return {
     calls,
     async rest(method, path, body) {
-      return byKey(routes.rest, `${method} ${path}`, { kind: "rest", method, path, body });
+      const call: FakeCall = { kind: "rest", method, path, body };
+      // fetch sends `delete` as DELETE, so a method's case does not get it past the refusal.
+      if (EDITS.has(method.toUpperCase())) {
+        calls.push(call);
+        throw new Error(`fake GitHub refuses every PATCH and DELETE: ${JSON.stringify(call)}`);
+      }
+      return byKey(routes.rest, `${method} ${path}`, call);
     },
     async restPages(path) {
       const call: FakeCall = { kind: "restPages", path };
