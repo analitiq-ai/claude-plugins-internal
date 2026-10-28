@@ -59,3 +59,21 @@ jobs:
         run: |
           npm ci
           npm test
+
+  # Every plugin carrying core pins core's dependencies and bumps its version when core changes. On main it runs
+  # again against the previous commit: two PRs that each passed on a stale base can bump a carrier to one version.
+  carriers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - working-directory: core
+        run: npm ci
+      - working-directory: core
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+        run: node scripts/check-carriers.ts --base "$BASE"
