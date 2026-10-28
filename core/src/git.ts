@@ -61,12 +61,27 @@ export function runGit(
   });
 }
 
+export class PushRefused extends Error {
+  readonly keys: readonly string[];
+
+  constructor(keys: readonly string[]) {
+    super(`the checkout's git config sets ${keys.join(", ")}, which would send a credential beside gh's token; remove it to push`);
+    this.name = "PushRefused";
+    this.keys = keys;
+  }
+}
+
 /**
  * Pushes `refspec` to `repo`'s https URL, whatever the checkout's origin is, with the token gh holds in
  * `ghConfigDir` as the only credential: runGit's empty `credential.helper` comes first, so gh's is the one helper.
  * The environment is set here, not inherited, so the push is right whatever the caller's shell holds.
+ * A checkout whose config sets an http extra header is refused rather than reset: a URL-specific entry outranks
+ * any reset that is less specific, so no `-c` can be sure to clear it.
  */
 export async function pushWithGhCredential(checkout: string, ghConfigDir: string, repo: Repository, refspec: string): Promise<void> {
+  // git exits 1 when no key matches.
+  const headers = await runGit(checkout, ["config", "--name-only", "--get-regexp", "^http\\..*extraheader$"], [1]);
+  if (headers.code === 0) throw new PushRefused(headers.stdout.trim().split("\n"));
   const env = {
     GH_CONFIG_DIR: ghConfigDir,
     GIT_TERMINAL_PROMPT: "0",
