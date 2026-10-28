@@ -29,6 +29,8 @@
 5. `<folder>` is `ghFolder(repo)` (R6). When `needsMint`: `mintToken("planner", app_id, "planner-app.pem",
    "planner", repo)`, then `writeGhToken`.
    `KeyReadRefused` / `MintError` / `GitHubRefused` / `GitHubUnanswered`: stderr with core's message, exit 2.
+   Any other error is re-thrown, so the hook exits 1, and `"onFailure": "block"` blocks the Bash call on it
+   (R5). A missing key is one: core lets the key read's error through, naming its path.
 6. On `SessionStart` only: append to `$CLAUDE_ENV_FILE` (unset: stderr names it, exit 2):
    `export GH_CONFIG_DIR='<folder>'` and `unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN`,
    then write the session's record (R5). Exit 0, stdout empty.

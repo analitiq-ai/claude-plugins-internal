@@ -79,7 +79,8 @@ code but not executed; the story that relies on it starts with a red test that r
   `GH_TOKEN`. A `PreToolUse` hook gets no `CLAUDE_ENV_FILE`, so it cannot write the environment itself. Hence the
   record: a failed start refuses every Bash call (root ADR-0004 d1, US2 #8). `SessionStart` and `PreToolUse` get
   the same `session_id`, and a resumed session keeps it and runs `SessionStart` again, so deleting the record
-  first refuses a failed resume too. Rejected: putting the unset and export in front of each Bash command through
+  first refuses a failed resume too. A `PreToolUse` hook that exits 1 with `"onFailure": "block"` does block
+  the Bash call (run 2026-10-28), so an error the hook does not name fails closed too. Rejected: putting the unset and export in front of each Bash command through
   `PreToolUse`'s `updatedInput` (rewrites the command the admin approves; R9).
 
 ## R6: The token in planner's gh config folder
