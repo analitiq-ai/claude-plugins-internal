@@ -59,7 +59,7 @@ comment with `writer`, the reviewer App's client; refusals throw `StateWriteRefu
 The orchestrator reads `StateReading.startable` to stop a start (orchestrator ADR-0002 d3); reviewer releases with
 `releaseOnClaim`. Both get their answer from one pure function, `stateFrom(...)`.
 
-Pure: `stateFrom(comments, deletions, moves, shared)`, `renderState(snapshot)`, `checkTransition(old, new)`,
+Pure: `stateFrom(comments, deletions, moves, writers, shared)`, `renderState(snapshot)`, `checkTransition(old, new)`,
 `questionTag(hold)`. Format and rules in contracts/state-comment.md.
 
 ## `attest.ts` (US2)
