@@ -1,0 +1,10 @@
+[shared]
+board = "https://github.com/orgs/analitiq-ai/projects/5"
+validators = []
+session_app_login = "codeworks-session[bot]"
+orchestrator_app_login = "codeworks-orchestrator[bot]"
+reviewer_app_login = "codeworks-reviewer[bot]"
+planner_app_login = "codeworks-planner[bot]"
+
+[planner]
+app_id = 5510825
