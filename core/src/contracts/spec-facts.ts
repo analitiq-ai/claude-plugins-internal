@@ -19,7 +19,7 @@ function refused(reason: string, cause?: unknown): Error {
   return new Error(`spec.md front matter: ${reason}`, { cause });
 }
 
-// A missing block fails rather than reading as any kind: a reader must never guess the requirement (R9).
+// A missing block fails rather than reading as any kind: a reader must never guess the requirement.
 export function readSpecFacts(text: string): SpecFacts {
   const lines = text.split("\n");
   const end = lines.indexOf("---", 1);

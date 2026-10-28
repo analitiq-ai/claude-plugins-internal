@@ -1,5 +1,5 @@
-// A second provider beside `fixture`, so a test can see each provider's thread given by its own module alone
-// (SC-005). Its findings are its provider's threads and nothing else.
+// A second provider beside `fixture`, so a test can see each provider's thread given by its own module alone.
+// Its findings are its provider's threads and nothing else.
 import type { Deps, OpenedPackage } from "../../../../src/validation/contract.ts";
 
 export const logins = ["second-bot[bot]"];

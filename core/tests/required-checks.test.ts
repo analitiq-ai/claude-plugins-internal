@@ -129,7 +129,7 @@ describe("the required checks come from the rules of the PR's base branch", () =
     assert.deepEqual(findings.map((finding) => finding.key), ["required-check:lint"]);
   });
 
-  it("AS6: leaves out internal-review and a loaded module's <module>-review, reading neither", async () => {
+  it("leaves out internal-review and a loaded module's <module>-review, reading neither", async () => {
     const { status, client } = await answers({
       rules: [requiring({ context: "internal-review" }, { context: "fixture-review" }, { context: "ci" })],
       runs: { ci: [run("ci", "success")] },
@@ -149,7 +149,7 @@ describe("the required checks come from the rules of the PR's base branch", () =
     ["no rule at all", []],
   ];
   for (const [what, rules] of nothingElse) {
-    it(`AS9: with ${what}, status and findings are COULD_NOT_RUN, and no check is read`, async () => {
+    it(`with ${what}, status and findings are COULD_NOT_RUN, and no check is read`, async () => {
       const { status, findings, client } = await answers({ rules });
       assertCouldNotRun(status, /main/);
       assertCouldNotRun(findings, /main/);
@@ -214,7 +214,7 @@ describe("a required check is matched at the head asked", () => {
   });
 });
 
-describe("AS6: a failed required check is one finding naming the check and its conclusion", () => {
+describe("a failed required check is one finding naming the check and its conclusion", () => {
   it("a check run concluded failure", async () => {
     const { findings } = await answers({ rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "failure")] } });
     assert.ok(Array.isArray(findings));

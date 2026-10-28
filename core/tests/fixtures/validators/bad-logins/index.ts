@@ -1,4 +1,4 @@
-// Meets the contract but for `logins`, a string where a list belongs, so loading must refuse it (R18).
+// Meets the contract but for `logins`, a string where a list belongs, so loading must refuse it.
 import type { Deps, OpenedPackage } from "../../../../src/validation/contract.ts";
 
 export const logins = "bad-logins-bot[bot]";

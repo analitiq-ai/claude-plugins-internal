@@ -38,7 +38,7 @@ import {
   type Issue,
 } from "./fixtures/state/issue.ts";
 
-// GitHub refuses a comment over this many characters (contracts/state-comment.md).
+// GitHub refuses a comment over this many characters.
 const COMMENT_LIMIT = 65_536;
 
 function current(state: Snapshot, more: IssueComment[] = []): Issue {
@@ -70,7 +70,7 @@ function assertSortedTwoSpace(body: string): void {
 }
 
 describe("writeState", () => {
-  it("posts one comment, the tag line then the snapshot in a json fence, sorted keys, two-space indent (AS6)", async () => {
+  it("posts one comment, the tag line then the snapshot in a json fence, sorted keys, two-space indent", async () => {
     const out = writer();
     const first = snapshot({ rounds: [round(1, { at: at("09:00") })] });
     await writeState(reader({ comments: [] }), out, REPO, ISSUE, SHARED, first);
@@ -204,7 +204,7 @@ describe("checkTransition", () => {
   }
 });
 
-describe("every write but the release path is refused while a tamper cause stands (AS7)", () => {
+describe("every write but the release path is refused while a tamper cause stands", () => {
   const old = snapshot();
   const causes: Array<[string, Issue, RegExp]> = [
     ["tampered", { comments: [stateComment(100, old, { lastEditedAt: at("10:30") })] }, /tampered/],
@@ -317,7 +317,7 @@ describe("placeHold", () => {
   });
 });
 
-describe("placeRescopeHold (AS8)", () => {
+describe("placeRescopeHold", () => {
   function rescope(fields: Partial<Hold>): Hold {
     return hold("rescope-212", fields);
   }
@@ -359,7 +359,7 @@ describe("placeRescopeHold (AS8)", () => {
   });
 });
 
-describe("releaseOnClaim (AS15)", () => {
+describe("releaseOnClaim", () => {
   const holds = [
     hold("pushback-212", { since: at("10:00") }),
     hold("escalation-212", { since: at("10:00") }),

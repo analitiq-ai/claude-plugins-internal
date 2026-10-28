@@ -5,7 +5,6 @@ import { isDeepStrictEqual } from "node:util";
 const MANAGED_FOLDER = "/etc/claude-code";
 const MANAGED_FILE = `${MANAGED_FOLDER}/managed-settings.json`;
 
-// contracts/key-files.md's `<K>` and `<S>`, under the home folder.
 const HOME_FOLDERS = { "<K>": ".config/codeworks", "<S>": ".local/state/codeworks/reviewer" };
 
 // The one read made where no managed settings exist: planner's own key, on the admin machine (root ADR-0008 d2, d9).
@@ -116,7 +115,7 @@ function thisMachine(): Machine {
   };
 }
 
-/** The one reader of `~/.config/codeworks/<file>` (R23; contracts/key-files.md). */
+/** The one reader of `~/.config/codeworks/<file>`. */
 export function readKey(file: string, plugin: string, machine: Machine = thisMachine()): Buffer {
   const path = `${machine.home}/${HOME_FOLDERS["<K>"]}/${file}`;
   if (file === "" || file === "." || file === ".." || /[/\0]/.test(file)) {

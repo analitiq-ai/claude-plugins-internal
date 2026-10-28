@@ -18,7 +18,7 @@ import { fakeGitHub, type FakeAnswer } from "./support/fake-github.ts";
 const REPO = "acme/widgets";
 const ISSUE = 212;
 const BOARD = "https://github.com/orgs/example-org/projects/1";
-// contracts/state-comment.md, spelt out here so the reader is graded against the contract, not its own constant.
+// The state comment contract's tag, spelt out here so the reader is graded against the contract, not its own constant.
 const TAG = "<!-- codeworks:reviewer-state -->";
 
 const SHARED: Shared = {
@@ -109,7 +109,7 @@ function invalidError(reading: StateReading): string {
 const EMPTY: Snapshot = { v: 1, rounds: [], holds: [], pushbacks: [] };
 
 describe("stateFrom: which comment is the state comment", () => {
-  it("is the newest by the reviewer App, among newer admin and orchestrator App comments (AS1)", () => {
+  it("is the newest by the reviewer App, among newer admin and orchestrator App comments", () => {
     const newest = snapshot(3);
     const reading = read([
       stateComment(101, snapshot(1), { createdAt: at("10:01") }),
@@ -147,7 +147,7 @@ describe("stateFrom: which comment is the state comment", () => {
     assert.equal(reading.comment_url, url(202));
   });
 
-  it("is no state, not held, with no reviewer App comment and no deletion, whoever else wrote (AS3)", () => {
+  it("is no state, not held, with no reviewer App comment and no deletion, whoever else wrote", () => {
     const reading = read(
       [
         comment(104, ADMIN, "Opened the PR."),
@@ -163,7 +163,7 @@ describe("stateFrom: which comment is the state comment", () => {
   });
 });
 
-describe("stateFrom: tampered, deleted and invalid state (AS2)", () => {
+describe("stateFrom: tampered, deleted and invalid state", () => {
   it("holds as tampered when the state comment was edited", () => {
     const reading = read([stateComment(101, snapshot(1)), stateComment(102, snapshot(2), { lastEditedAt: at("10:20") })]);
     assert.equal(reading.held, true);
@@ -262,7 +262,7 @@ describe("stateFrom: tampered, deleted and invalid state (AS2)", () => {
     }
   });
 
-  it("names the comment URL and the contract error when the snapshot breaks its contract (AS5)", () => {
+  it("names the comment URL and the contract error when the snapshot breaks its contract", () => {
     const dirtyWithoutVerdict = snapshot(1, { rounds: [round(1, { result: "DIRTY", verdict: null })] });
     const reading = read([stateComment(101, snapshot(1)), stateComment(102, dirtyWithoutVerdict)]);
     assert.equal(reading.held, true);
@@ -330,7 +330,7 @@ describe("stateFrom: the working snapshot", () => {
 });
 
 describe("stateFrom: what the working snapshot says", () => {
-  it("holds on one open hold, naming it, and keeps the released hold's row (AS4)", () => {
+  it("holds on one open hold, naming it, and keeps the released hold's row", () => {
     const released: Hold = openHold("escalation-212", {
       question: "Which reading of FR-3 holds?",
       state: "RELEASED",
@@ -344,7 +344,7 @@ describe("stateFrom: what the working snapshot says", () => {
     assert.deepEqual(reading.snapshot?.holds, state.holds);
   });
 
-  it("reports a pushed-back finding key with the round that pushed it back (AS10)", () => {
+  it("reports a pushed-back finding key with the round that pushed it back", () => {
     const state = snapshot(3, {
       pushbacks: [
         { key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } },
@@ -366,7 +366,7 @@ describe("stateFrom: what the working snapshot says", () => {
     assert.deepEqual(read([stateComment(101, state)]).pushed_back.get("thread:PRRT_K"), { stage: "INTERNAL", n: 2 });
   });
 
-  it("gives the newest round, the last of the list (FR-017)", () => {
+  it("gives the newest round, the last of the list", () => {
     const newest = round(1, { stage: "GITHUB", result: "DIRTY", verdict: "PATCH", head: sha(99) });
     const state = snapshot(2, { rounds: [round(1), round(2), newest] });
     assert.deepEqual(read([stateComment(101, state)]).newest_round, newest);
@@ -424,7 +424,7 @@ describe("readState", () => {
     assert.deepEqual(roleReads.map((call) => call.kind === "rest" && `${call.method} ${call.path}`), [ROLE_PATH]);
   });
 
-  it("counts an org member's comment by its role, though GitHub tells the App CONTRIBUTOR (T044)", async () => {
+  it("counts an org member's comment by its role, though GitHub tells the App CONTRIBUTOR", async () => {
     const asTheAppSeesIt = comments.map((node) => ({ ...node, authorAssociation: node.author === ADMIN ? "CONTRIBUTOR" : "NONE" }));
     const reading = await readState(reader([{ project: { url: BOARD } }], asTheAppSeesIt, { role_name: "write" }), REPO, ISSUE, SHARED);
     assert.deepEqual(reading.releasable.map((release) => [release.id, release.comment.id]), [["pushback-212", 103]]);

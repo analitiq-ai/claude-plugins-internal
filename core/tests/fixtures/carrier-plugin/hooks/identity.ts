@@ -1,5 +1,5 @@
 // Only guard.ts is imported statically: a static import of any other core module would be evaluated, and fail on
-// a missing package, before the guard could name it (contracts/carrying-core.md).
+// a missing package, before the guard could name it.
 import { MissingDependency, requireDependencies } from "../core/guard.ts";
 
 try {

@@ -9,7 +9,7 @@ const core = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = join(core, "tests", "fixtures", "boundary");
 
 // The folders Claude Code reads as a plugin's components: core ships inside a plugin, so one would add a
-// command or hook to every carrier (FR-021).
+// command or hook to every carrier.
 const PLUGIN_COMPONENT_FOLDERS = new Set(["commands", "skills", "agents", "hooks", "bin", ".claude-plugin"]);
 
 function readPackage(root: string): {bin?: unknown; dependencies?: Record<string, string>} {

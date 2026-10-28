@@ -22,25 +22,25 @@ const Head = Round.shape.head;
 // could-not-run.
 const PackageStatus = z.strictObject({
   outcome: CheckOutcome.schema.extract([PENDING, PASS, FAIL, WAIVED]),
-  // The commit its provider read, so a verdict on another head is refused in one place for every package (R19).
+  // The commit its provider read, so a verdict on another head is refused in one place for every package.
   head: Head.nullable(),
   reason: z.string().nullable(),
 });
 export type PackageStatus = z.infer<typeof PackageStatus>;
 
-/** What a package's `open` is handed (R18): it resolves no path to core and holds no credential but `readKey`'s. */
+/** What a package's `open` is handed: it resolves no path to core and holds no credential but `readKey`'s. */
 export type Deps = {
   reader: GitHubClient;
   writer: GitHubClient;
-  /** core's key read for the calling plugin (R23). */
+  /** core's key read for the calling plugin. */
   readKey(file: string): Buffer;
-  /** The PR's unresolved threads the package's own logins started, as findings of its name (R21). */
+  /** The PR's unresolved threads the package's own logins started, as findings of its name. */
   providerThreads(repo: string, pr: number): Promise<Finding[]>;
 };
 
 /** What a package's `open` returns. No caller calls it directly: core's `trigger`, `status` and `findings` do. */
 export type OpenedPackage = {
-  /** Safe to call more than once for one head (FR-022). */
+  /** Safe to call more than once for one head. */
   trigger(repo: string, pr: number, head: string): Promise<void>;
   status(repo: string, pr: number, head: string): Promise<PackageStatus>;
   findings(repo: string, pr: number, head: string): Promise<Finding[]>;
@@ -117,7 +117,7 @@ function openPackage(name: string, validatorPackage: ValidatorPackage, deps: Dep
   return opened as OpenedPackage;
 }
 
-/** Imports `<dir>/<name>/index.ts` for each `shared.validators` entry, in order, and opens it (R18). */
+/** Imports `<dir>/<name>/index.ts` for each `shared.validators` entry, in order, and opens it. */
 export async function loadValidators(shared: Shared, dir: string, { reader, writer, plugin, machine }: LoadDeps): Promise<Validators> {
   const modules = new Map<string, Module>();
   const logins = new Set<string>();
@@ -130,7 +130,7 @@ export async function loadValidators(shared: Shared, dir: string, { reader, writ
       writer,
       readKey: (file) => readKey(file, plugin, machine),
       // Read when called, `validators.logins` is every package's by then: another provider's reply in this
-      // provider's thread is trusted too (R21).
+      // provider's thread is trusted too.
       providerThreads: async (repo, pr) =>
         providerThreadFindings(await reviewThreads(reader, repo, pr), name, own, shared, validators),
     };
@@ -154,9 +154,10 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Every throw from a package is COULD_NOT_RUN: a package's errors are its own, while R12's classes are core's.
+// Every throw from a package is COULD_NOT_RUN: a package's errors are its own, while `GitHubUnanswered` and
+// `GitHubRefused` are core's.
 
-/** Nothing, or COULD_NOT_RUN when the package's `trigger` throws (R19). */
+/** Nothing, or COULD_NOT_RUN when the package's `trigger` throws. */
 export async function trigger(module: Module, repo: string, pr: number, head: string): Promise<CouldNotRun | undefined> {
   assertAsked(repo, pr, head);
   try {
@@ -167,10 +168,10 @@ export async function trigger(module: Module, repo: string, pr: number, head: st
   return undefined;
 }
 
-/** `since` is the caller's start of the count, in GitHub's time; when it starts is the caller's spec (FR-023). */
+/** `since` is the caller's start of the count, in GitHub's time; when it starts is the caller's spec. */
 export type StatusWindow = { timeoutSeconds: number; since: string };
 
-/** PASS or FAIL only for the head asked; PENDING turns SILENT once `timeoutSeconds` has run from `since` (R19). */
+/** PASS or FAIL only for the head asked; PENDING turns SILENT once `timeoutSeconds` has run from `since`. */
 export async function status(
   module: Module,
   repo: string,
@@ -194,7 +195,7 @@ export async function status(
   if (!parsed.success) return couldNotRun(module.name, `its status answer is refused: ${z.prettifyError(parsed.error)}`);
   const answer = parsed.data;
 
-  // A package may waive without saying why; core's WAIVED always names whose it is (data-model.md).
+  // A package may waive without saying why; core's WAIVED always names whose it is.
   if (answer.outcome === WAIVED) return { outcome: WAIVED, reason: answer.reason ?? `${module.name} waived` };
   if ((answer.outcome === PASS || answer.outcome === FAIL) && answer.head === head) {
     return { outcome: answer.outcome, reason: answer.reason };
@@ -220,7 +221,7 @@ export async function status(
   return { outcome: PENDING, reason: pending };
 }
 
-/** The package's findings, its provider's threads among them, or COULD_NOT_RUN; never an empty list in its place (R19). */
+/** The package's findings, its provider's threads among them, or COULD_NOT_RUN; never an empty list in its place. */
 export async function findings(module: Module, repo: string, pr: number, head: string): Promise<Finding[] | CouldNotRun> {
   assertAsked(repo, pr, head);
   let answered: unknown;

@@ -35,7 +35,7 @@ function entries(node: Record<string, unknown>, prefix = ""): Entry[] {
   });
 }
 
-// contracts/key-files.md: §5's `<V>/keys` and `<V>/state` read as `<K>` and `<S>`, `/<V>` being a permission
+// §5's `<V>/keys` and `<V>/state` read as `<K>` and `<S>`, `/<V>` being a permission
 // rule's absolute form of the same folder.
 function asTableWrites(value: unknown): unknown {
   if (typeof value !== "string") return value;

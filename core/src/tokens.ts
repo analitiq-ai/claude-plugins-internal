@@ -6,7 +6,7 @@ import { type Machine, readKey } from "./keys.ts";
 
 export type Permissions = Readonly<Record<string, "read" | "write">>;
 
-// contracts/key-files.md's sets, under GitHub's API keys; a test pins them to SECURITY.md §3.
+// Each App's permission set, under GitHub's API keys; a test pins them to SECURITY.md §3.
 export const APP_PERMISSIONS = {
   session: {
     metadata: "read",
@@ -32,7 +32,7 @@ export const APP_PERMISSIONS = {
 
 export type App = keyof typeof APP_PERMISSIONS;
 
-// Every App holds metadata read, which GitHub may list in a token's permissions unasked (R24).
+// Every App holds metadata read, which GitHub may list in a token's permissions unasked.
 const UNASKED = { name: "metadata", level: "read" };
 
 // GitHub refuses an App JWT living over ten minutes; `iat` sits back a minute for a machine clock ahead of GitHub's.
@@ -40,7 +40,7 @@ const JWT_BACKDATE_SECONDS = 60;
 const JWT_LIFETIME_SECONDS = 9 * 60;
 const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
 
-/** No token was handed out, and no other credential was tried (FR-037). */
+/** No token was handed out, and no other credential was tried. */
 export class MintError extends Error {
   declare readonly cause: string;
 
@@ -72,7 +72,7 @@ const TokenAnswer = z.object({
   repositories: z.array(z.object({ full_name: z.string() })),
 });
 
-/** A one-hour installation token of `app` for `repo` alone, with exactly that App's permissions (R24). */
+/** A one-hour installation token of `app` for `repo` alone, with exactly that App's permissions. */
 export async function mintToken(
   app: App,
   appId: number,
@@ -141,14 +141,14 @@ function repositoryReasons(named: readonly { full_name: string }[], repo: string
   return [`it names ${names.length === 0 ? "no repository" : names.join(", ")}, not ${repo} alone`];
 }
 
-// GitHub writes expires_at by its own clock, which the machine's may trail by more than the exchange takes (R12).
+// GitHub writes expires_at by its own clock, which the machine's may trail by more than the exchange takes.
 // `gitHubNow` is read after the token was issued, so the time between counts toward the hour rather than against it.
 function expiryReasons(expiresAt: string, gitHubNow: string): string[] {
   if (Date.parse(expiresAt) - Date.parse(gitHubNow) <= TOKEN_LIFETIME_MS) return [];
   return [`expires_at ${expiresAt} is more than one hour away`];
 }
 
-// Exactly the set asked for: a raised level is refused as a lowered one is (AS1).
+// Exactly the set asked for: a raised level is refused as a lowered one is.
 function permissionReasons(asked: Permissions, granted: Readonly<Record<string, string>>): string[] {
   const reasons: string[] = [];
   for (const [name, level] of Object.entries(asked)) {

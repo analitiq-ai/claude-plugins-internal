@@ -246,7 +246,7 @@ describe("mintToken's request", () => {
     assert.equal((await mint("reviewer", api)).repo, REPO);
   });
 
-  it("caches nothing: a second mint is a second exchange and a fresh token (AS3)", async (t) => {
+  it("caches nothing: a second mint is a second exchange and a fresh token", async (t) => {
     let n = 0;
     const { api, seen } = await serve(t, {
       token: (asked) => ({ ...granted(asked), token: `${TOKEN_VALUE}${++n}` }),
@@ -329,7 +329,7 @@ describe("mintToken refuses an answer", () => {
     await refusal(mint("orchestrator", api), seen, /workflows: read, not write/);
   });
 
-  it("raising a requested permission: the token carries exactly the App's set (AS1)", async (t) => {
+  it("raising a requested permission: the token carries exactly the App's set", async (t) => {
     const { api, seen } = await serve(t, {
       token: (asked) => ({ ...granted(asked), permissions: { ...asked.permissions, contents: "write" } }),
     });

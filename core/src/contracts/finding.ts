@@ -11,7 +11,7 @@ export const Finding = z
     source: FindingSource,
     // Stable across heads, so a pushback recorded at one head names the same item at the next.
     key: z.string().min(1),
-    // REST form, `<slug>[bot]` for an App, so one login compares equal however GitHub gave it (R21).
+    // REST form, `<slug>[bot]` for an App, so one login compares equal however GitHub gave it.
     author: z.string(),
     file: z.string().nullable(),
     line: z.int().min(1).nullable(),
