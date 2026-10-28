@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0010"
 title: "Name every verdict, ruling and outcome once, as an enum in core's contracts"
-status: draft
+status: accepted
 date: 2026-10-22
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [contracts, verdicts, enums, state-comment, core, reviewer]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/145"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:47Z
 ---
 
 # ADR-0010: Name every verdict, ruling and outcome once, as an enum in core's contracts
@@ -93,4 +95,4 @@ Rejected: a record does not stop a misspelt string in code.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

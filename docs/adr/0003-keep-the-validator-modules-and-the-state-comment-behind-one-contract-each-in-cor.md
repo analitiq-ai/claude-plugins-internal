@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0003"
 title: "Keep the validator modules and the state comment behind one contract each, in core/"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [validators, findings, contract, state-comment, core]
 scope: component
 reversibility: two-way-door
@@ -25,8 +25,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:46Z
 ---
 
 # ADR-0003: Keep the validator modules and the state comment behind one contract each, in core/
@@ -111,4 +113,4 @@ for a review it never ran.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

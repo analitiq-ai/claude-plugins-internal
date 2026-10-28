@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0004"
 title: "Attest the internal review as a check run written by the orchestrator's App"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [attestation, check-run, merge-gate, github-app, orchestrator]
 scope: component
 reversibility: two-way-door
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:48Z
 ---
 
 # ADR-0004: Attest the internal review as a check run written by the orchestrator's App
@@ -100,4 +102,4 @@ Rejected: each stage 2 fix would return to stage 1; external reviewers grade eve
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

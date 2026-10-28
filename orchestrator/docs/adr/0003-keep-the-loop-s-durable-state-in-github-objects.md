@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0003"
 title: "Keep the loop's durable state in GitHub objects"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [orchestrator, state, github, pull-requests, issues]
 scope: component
 reversibility: two-way-door
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:48Z
 ---
 
 # ADR-0003: Keep the loop's durable state in GitHub objects
@@ -82,4 +84,4 @@ Rejected: the comment's key is the record; a restart re-reads the issue.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

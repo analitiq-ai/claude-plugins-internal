@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0005"
 title: "Exempt a PR from the internal review by its Bot author or a label a writer applied"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [review, exemption, labels, pull-requests, trust]
 scope: component
 reversibility: two-way-door
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:49Z
 ---
 
 # ADR-0005: Exempt a PR from the internal review by its Bot author or a label a writer applied
@@ -89,4 +91,4 @@ Rejected: every story PR and spec PR would reach main with no round and no admin
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

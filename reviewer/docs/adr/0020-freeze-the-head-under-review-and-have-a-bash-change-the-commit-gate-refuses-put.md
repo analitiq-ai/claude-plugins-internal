@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0020"
 title: "Freeze the head under review, and have a Bash change the commit gate refuses put back"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [hooks, mutation-gate, holds, review-round]
 scope: component
 reversibility: two-way-door
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:54Z
 ---
 
 # ADR-0020: Freeze the head under review, and have a Bash change the commit gate refuses put back
@@ -78,4 +80,4 @@ Rejected: a held branch moves by `git reset` or a script, out from under its hol
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

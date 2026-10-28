@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0007"
 title: "Give an issue that needs no spec a spec folder that says so"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [premise, spec-folder, front-matter, issue, workflow]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/79"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:55Z
 externalRefs:
   - type: doc
     id: "org ADR-0002"
@@ -79,4 +81,4 @@ the outcome has nothing for a spec to decide; a mark on the issue is read by not
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

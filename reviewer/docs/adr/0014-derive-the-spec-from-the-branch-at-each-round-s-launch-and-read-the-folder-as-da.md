@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0014"
 title: "Derive the spec from the branch at each round's launch and read the folder as data"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, spec-folder, review-round, branch-grammar, front-matter]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:53Z
 externalRefs:
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
@@ -80,4 +82,4 @@ Rejected: a template change breaks every reader.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

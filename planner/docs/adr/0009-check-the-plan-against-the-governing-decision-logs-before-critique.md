@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0009"
 title: "Check the plan against the governing decision logs before critique"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [adr, alignment, planning, decision-log, workflow]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:55Z
 ---
 
 # ADR-0009: Check the plan against the governing decision logs before critique
@@ -83,4 +85,4 @@ carries with no code beside it either way.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

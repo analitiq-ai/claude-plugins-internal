@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0008"
 title: "Treat bugs that converge as one bug"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [shim-check, holds]
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:51Z
 ---
 
 # ADR-0008: Treat bugs that converge as one bug
@@ -79,4 +81,4 @@ Rejected: a commit that touches two bugs would wipe both counts.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

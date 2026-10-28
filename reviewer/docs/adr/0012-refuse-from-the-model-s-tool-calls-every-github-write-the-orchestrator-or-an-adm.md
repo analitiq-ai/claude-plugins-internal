@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0012"
 title: "Refuse from the model's tool calls every GitHub write the orchestrator or an admin owns"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [hooks, mutation-gate, ownership, orchestrator, merge-gate]
 scope: component
 reversibility: two-way-door
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:52Z
 ---
 
 # ADR-0012: Refuse from the model's tool calls every GitHub write the orchestrator or an admin owns
@@ -90,4 +92,4 @@ Rejected: the copy drifts.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.
