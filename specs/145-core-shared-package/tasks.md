@@ -169,7 +169,7 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   (reviewer ADR-0002 d4; R6), add the `carriers` job to `.github/workflows/tests.yml`: on `pull_request` and push to `main`,
   checkout with `fetch-depth: 0`, Node 22, `npm ci` in `core/`, then `node scripts/check-carriers.ts --base
   origin/<base>`, or `--base HEAD~1` on a push (R5, R6)
-- [ ] T029 [US1] Run quickstart.md US1 steps 1–5 (end-to-end install, update without and with a bump, missing
+- [x] T029 [US1] Run quickstart.md US1 steps 1–5 (end-to-end install, update without and with a bump, missing
   `zod`, a throwaway carrier failing `check-carriers.ts`); try steps 1–4 on a CI runner (research Open 1); record
   what ran and its result in the PR (AS1–AS3, SC-007)
 
