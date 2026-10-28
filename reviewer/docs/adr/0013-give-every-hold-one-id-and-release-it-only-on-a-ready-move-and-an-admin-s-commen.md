@@ -42,7 +42,9 @@ loop only through GitHub: the board and issue comments.
 1. We will give every hold an id and a row in the state snapshot (ADR-0011), keyed by the story issue's
    number but `claim-<id>` (its lineage) and `shim-<id>` (its bug). While one is open the story merges
    nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
-2. We will release holds by one function, only on the orchestrator's claim from Ready (orchestrator ADR-0002).
+2. We will release holds by one function in `core/`, only on the orchestrator's claim from Ready (orchestrator
+   ADR-0002): the orchestrator runs it before it claims, and reviewer's hook writes its releases at its first
+   run after the claim, since the two plugins' hooks on one prompt run in parallel.
    reviewer releases each open hold of the story issue for which both a move of the card to Ready on the board
    `[shared] board` names and an admin's comment on the story issue are newer than the state comment that
    placed the hold. An admin is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one;
