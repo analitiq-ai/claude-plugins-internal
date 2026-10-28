@@ -4,7 +4,7 @@ import re
 import subprocess
 import unittest
 
-from paths import PLUGIN, REPO
+from paths import PLUGIN, REPO, tracked_text
 
 GATE = PLUGIN / "scripts" / "gate.py"
 # Every plugin and every plugin's tests: planning and building left this plugin with names it once held.
@@ -17,12 +17,6 @@ DELETED_SKILL = "alq-" + "shape"
 # settled-design rule's term and stays.
 OLD_SKILL_NAME = re.compile("design[-_]" + "doc(?!ument)", re.I)
 OLD_HOME_PHRASES = ("spec lives on the issue", "spec lives **on the issue**", "its only home")
-
-
-def tracked_text(path: str) -> str:
-    """What git holds for a tracked path: a link's target (a carrier's `core` link is one), else the file's text."""
-    file = REPO / path
-    return str(file.readlink()) if file.is_symlink() else file.read_text(errors="ignore")
 
 
 class OldNames(unittest.TestCase):
@@ -43,7 +37,7 @@ class OldNames(unittest.TestCase):
         # Tracked files only: a Spec Kit run leaves ignored state in the dev project, named after the workflow it ran.
         tracked = subprocess.run(["git", "ls-files", "-z", *ROOTS, ".specify", ".github"],
                                  cwd=REPO, capture_output=True, text=True, check=True).stdout
-        named = [path for path in tracked.split("\0") if path and OLD_SKILL_NAME.search(path + tracked_text(path))]
+        named = [path for path in tracked.split("\0") if path and OLD_SKILL_NAME.search(path + tracked_text(REPO / path, errors="ignore"))]
         self.assertEqual(named, [])
 
     def test_the_gate_holds_none_of_the_old_home_phrases(self):

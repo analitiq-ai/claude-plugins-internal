@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from paths import PLUGIN, REPO
+from paths import PLUGIN, REPO, tracked_text
 
 # A command as a skill, workflow or agent of one of these plugins is called: `<plugin>:<name>`.
 COMMAND = re.compile(r"\balq-(?:review|plan|build):[\w-]+")
@@ -34,7 +34,7 @@ def unshipped_commands(allowed: dict[str, set[str]]) -> dict[str, set[str]]:
     """Per file, each command it names that this plugin does not ship and `allowed` does not grant that file."""
     files = shipped()
     own = commands(files)
-    named = {f: set(COMMAND.findall((PLUGIN / f).read_text())) - own - allowed.get(f, set()) for f in files}
+    named = {f: set(COMMAND.findall(tracked_text(PLUGIN / f))) - own - allowed.get(f, set()) for f in files}
     return {f: found for f, found in named.items() if found}
 
 

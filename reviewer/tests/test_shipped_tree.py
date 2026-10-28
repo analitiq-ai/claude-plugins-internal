@@ -7,7 +7,7 @@ import unittest
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 
-from paths import PLUGIN, REPO
+from paths import PLUGIN, REPO, tracked_text
 
 # A command as a skill, workflow or agent of one of these plugins is called: `<plugin>:<name>`.
 COMMAND = re.compile(r"\b(?:reviewer|planner|builder):[\w-]+")
@@ -76,5 +76,5 @@ class ShippedTree(unittest.TestCase):
         files = shipped()
         own = commands(files)
         self.assertIn("reviewer:review-round", own)
-        named = {f: set(COMMAND.findall((PLUGIN / f).read_text())) - own for f in files}
+        named = {f: set(COMMAND.findall(tracked_text(PLUGIN / f))) - own for f in files}
         self.assertEqual({f: found for f, found in named.items() if found}, {})
