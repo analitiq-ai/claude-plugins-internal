@@ -71,7 +71,7 @@ Rejected: the text still reaches the assessor.
 ## Trade-offs
 
 - A defect reported from off the list is closed unread until a trusted reviewer re-raises it.
-- Two trust rules coexist: `trusted_reviewers` for findings, WRITER (author_association) for an escalation
+- Two trust rules coexist: `trusted_reviewers` for findings, a writer's repository role for an escalation
   answer (orchestrator ADR-0010).
 
 ## Consequences
