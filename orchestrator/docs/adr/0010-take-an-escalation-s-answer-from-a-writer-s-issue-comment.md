@@ -38,9 +38,11 @@ comment.
 
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
    escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
-2. We will take as the answer an issue comment created after that question by a writer: a `User` whose
-   `role_name` on the repository, from GitHub's collaborator-permission endpoint, is admin, maintain or
-   write. A codeworks App is never one (root ADR-0007); the model's token posts no comment. That comment,
+2. We will take as the answer an issue comment created after that question by a writer: its author a
+   `User` whose `role_name` on the repository, from GitHub's collaborator-permission endpoint, is admin,
+   maintain or write. A comment an App posts as itself has the App as its author, which names no person,
+   so it never counts, a codeworks App's included (root ADR-0007 d5). An admin who posts through an App
+   acting for them is the comment's author, and counts. The model's token posts no comment. That comment,
    with a Ready move, releases the hold (reviewer ADR-0013).
 
 ## Options considered
