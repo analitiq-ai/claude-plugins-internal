@@ -16,6 +16,9 @@ COMMAND = re.compile(r"\b(?:reviewer|planner|builder):[\w-]+")
 # workflow lives under. The overlap guard below covers only the paths planner and builder ship today.
 NEVER_IN_REVIEW = ("skills/issue-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/",
                    "scripts/speclocation.py", "speckit/")
+# Paths whose place is fixed rather than chosen by the plugin: the plugin format's hook config, and a core carrier's
+# link and pinned packages (root ADR-0001). Two plugins sharing one is not one shipping the other's file.
+FIXED_PATHS = ("hooks/hooks.json", "core", "package.json", "package-lock.json")
 
 
 def shipped(plugin: Path = PLUGIN) -> list[str]:
@@ -26,8 +29,8 @@ def shipped(plugin: Path = PLUGIN) -> list[str]:
 
 
 def content(files: list[str]) -> set[str]:
-    """The plugin's files without its manifest, which every plugin ships at the same path."""
-    return {f for f in files if Path(f).parts[0] != ".claude-plugin"}
+    """The plugin's files without its manifest and the other paths fixed for it."""
+    return {f for f in files if Path(f).parts[0] != ".claude-plugin" and f not in FIXED_PATHS}
 
 
 def commands(files: list[str]) -> set[str]:
