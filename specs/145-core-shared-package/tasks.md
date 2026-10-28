@@ -414,7 +414,7 @@ list and permissions; try a write outside the set and to a second repo (quicksta
 - [x] T063 [US5] Create `core/src/tokens.ts`: `mintToken(app, appId, keyFile, plugin, repo)` with the session,
   orchestrator, reviewer and planner permission sets of contracts/key-files.md, the key read through `readKey`,
   signing with `node:crypto`, and `MintError(cause)` (R24)
-- [ ] T064 [US5] Mint a real token of each App for a test repo (quickstart.md, US5): expiry within one hour,
+- [x] T064 [US5] Mint a real token of each App for a test repo (quickstart.md, US5): expiry within one hour,
   scoped to that repo, the answer's permissions as T061 expects (confirming whether GitHub adds `metadata:
   read`); a comment on another repo and a write outside the set refused; record the results in the PR (AS1,
   SC-008)
