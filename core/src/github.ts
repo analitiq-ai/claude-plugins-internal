@@ -207,6 +207,21 @@ function nextPage(link: string | null): string | null {
 
 // GitHub's type for a person; an App acts as a `Bot`, so it is never a writer (P9).
 export const USER_TYPE = "User";
+const BOT_TYPE = "Bot";
+
+/** A GraphQL author or actor, asked for as `{ __typename login }`. */
+export const Actor = z.object({ __typename: z.string(), login: z.string() });
+export type Actor = z.infer<typeof Actor>;
+
+/**
+ * `actor`'s login in REST form, null for a deleted account. GraphQL names an App as a `Bot` by its bare login,
+ * while `[shared]`, a package's `logins` and REST hold `<slug>[bot]`, so every login is compared in that form.
+ */
+export function restLogin(actor: Actor | null): string | null {
+  if (actor === null) return null;
+  return actor.__typename === BOT_TYPE ? `${actor.login}[bot]` : actor.login;
+}
+
 // `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.
 const WRITER_ROLES: ReadonlySet<string> = new Set(["admin", "maintain", "write"]);
 
