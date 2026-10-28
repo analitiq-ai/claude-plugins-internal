@@ -277,12 +277,16 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 ## R15: Reading the state comment (FR-014 to FR-017)
 
 - **Decision**: one GraphQL read of the story issue: its comments (`databaseId`, `author { __typename login }`,
-  `authorAssociation`, `body`, `createdAt`, `lastEditedAt`, `url`); its `COMMENT_DELETED_EVENT` (`createdAt`,
+  `body`, `createdAt`, `lastEditedAt`, `url`); its `COMMENT_DELETED_EVENT` (`createdAt`,
   `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`,
   `project { url }`) timeline items; and its `projectItems` (`project { url }`),
   each paginated to the end. When no project item's URL is `[shared] board`, the read throws
-  `BoardNotVisible(board)`: a reader that cannot see the board never reads as "no Ready". One pure function,
-  `stateFrom(comments, deletions, moves, shared)`, then:
+  `BoardNotVisible(board)`: a reader that cannot see the board never reads as "no Ready". Then each distinct
+  `User` comment author's `role_name`, from `GET /repos/{o}/{r}/collaborators/{login}/permission`, through the one
+  role read R13's `isDone` uses, so an admin is decided one way everywhere; `stateFrom` takes the writer logins and
+  stays pure. The endpoint needs only `metadata: read`. A non-collaborator answers `read` on a public repo, and
+  `none` with an empty `role_name` on a private one; it never answers 404 (all run 2026-10-28). One pure function,
+  `stateFrom(comments, deletions, moves, writers, shared)`, `writers` the logins that role read names, then:
   1. keeps comments whose author is the reviewer App (a `Bot` whose login plus `[bot]` equals `[shared]
      reviewer_app_login`), whatever the body; the highest `databaseId` is the state comment;
   2. adds causes: `tampered` when it has `lastEditedAt`; `deleted` when a reviewer App comment deletion's
@@ -304,7 +308,8 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   judged (critique E1). The orchestrator opens the draft PR after the first push (builder ADR-0003 d1), so a PR
   without state is not held. The reader needs issues read and the board's read: the session App's or the
   orchestrator App's token (`SECURITY.md` §3).
-- **Existing tools**: GraphQL `IssueComment.lastEditedAt`, `IssueComment.authorAssociation`,
+- **Existing tools**: GraphQL `IssueComment.lastEditedAt`; the collaborator-permission endpoint (R13; run
+  2026-10-28 with all three App tokens);
   `CommentDeletedEvent.deletedCommentAuthor`, `ProjectV2ItemStatusChangedEvent` (its `project` seen in the
   2026-10-26 critique's run), `Issue.projectItems` (not run); the `[bot]` login form in
   `pr-gate.js`.
@@ -548,9 +553,10 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 ## R27: The release rule (FR-019, FR-019a, FR-019b)
 
 - **Decision**: part of R15's pure function, over the working snapshot and the same comments and events, with the
-  terms of contracts/state-comment.md (Release). A comment counts only from an admin, a writer and no codeworks App;
+  terms of contracts/state-comment.md (Release). A comment counts only from an admin, a writer and never an App posting as itself;
   a Ready move only on a board the reader sees, whoever made it (R15):
-  - an admin comment: author none of the four App logins, `authorAssociation` OWNER, MEMBER or COLLABORATOR;
+  - an admin comment: author a `User` (an App posting as itself is a `Bot`; an admin posting through an App acting for them is the `User`), whose `role_name` on the repository is admin,
+    maintain or write (R15);
   - a Ready move: a status-change event with `status` `Ready`, `project.url` equal to `[shared] board`;
     the newest counts;
   - an escalation hold's question: the oldest comment by the orchestrator App whose first line is
@@ -571,11 +577,14 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
   comment's post, so "after the state comment that placed it" reads as a later second than `since`: a same-second
   comment or move is not after, and the admin acts again. The question's tag is a grammar core defines and the
   orchestrator writes, so the rule reads no wording (P7).
-- **Existing tools**: R15's read; `IssueComment.authorAssociation`.
+- **Existing tools**: R15's read, with its role read.
 - **Alternatives considered**: each caller checking Ready and the comment itself (two copies of one rule, which
   FR-019a forbids); a move to Ready on any project (rejected by orchestrator ADR-0002 d1); the Status field
   value's `updatedAt` (changes on any move, so it cannot say the last move was to Ready); an answer counted from
-  the hold's placement, not its question (orchestrator ADR-0010 d2 rules it out).
+  the hold's placement, not its question (orchestrator ADR-0010 d2 rules it out); an admin by `authorAssociation`
+  OWNER, MEMBER or COLLABORATOR (rejected by orchestrator ADR-0010 d2, amended). GitHub computes it for the reader,
+  and an App's token sees a private org member as CONTRIBUTOR, so on playground no admin comment counted (T044).
+  MEMBER also covers a member who can only read.
 
 ## Open
 
