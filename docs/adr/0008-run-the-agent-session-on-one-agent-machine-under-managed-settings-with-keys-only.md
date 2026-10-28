@@ -67,7 +67,8 @@ from a session.
    the session's temp folder; keep WebFetch and WebSearch; load only listed MCP servers.
 8. We will run only the codeworks plugins' hooks, load no user, project or local settings file, and
    have hooks run git with no global or system config, no credential helper, and `core.fsmonitor` and
-   `core.hooksPath` off.
+   `core.hooksPath` off. A hook reads the agent identity (`SECURITY.md` §4) from `~/.gitconfig` as data,
+   with `git config --file`, which follows no include.
 9. We will have every key-reading hook, and reviewer for builder and review work, refuse unless
    managed settings are in effect (`SECURITY.md`); reading the planner App's key where planner runs is
    exempt (d2). The managed settings file is their one source: any other source of managed

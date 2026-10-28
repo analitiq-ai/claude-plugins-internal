@@ -47,7 +47,7 @@ decision.
    to Blocked naming the re-label.
 4. We will make exemption the only way a PR to main goes without the internal review: spec, revert,
    retire-spec and release PRs are labelled or Bot-authored; no branch-name kinds, no list of exempt
-   diff shapes. A spec PR's label is its approval (planner ADR-0010).
+   diff shapes. A spec PR's label is its approval.
 5. We will let any writer but a codeworks App create or apply an exempt label. The model's token
    cannot write a label (root ADR-0007), and reviewer's hook refuses the attempt (reviewer ADR-0012).
 

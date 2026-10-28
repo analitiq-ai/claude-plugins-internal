@@ -44,8 +44,8 @@ model's write from an admin's and a hook's.
    `codeworks-session`, read-only: metadata, contents, pull requests, issues, checks, statuses and
    actions read; organization projects read; no write of any kind.
 2. We will have the orchestrator's SessionStart hook mint that token into a gh config folder the model
-   can read but not write, outside `~/.claude` and the session's temp folder, and refresh it before it
-   expires.
+   can read but not write, outside `~/.claude` and the session's temp folder, and its PreToolUse hook
+   mint a new one before it expires (orchestrator ADR-0001 d3).
 3. We will have hooks alone act as `codeworks-orchestrator` (every write the orchestrator's records
    give it) and `codeworks-reviewer` (rounds, holds), each App's key read only by its plugin's hooks:
    all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).

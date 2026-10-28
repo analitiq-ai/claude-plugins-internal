@@ -48,7 +48,8 @@ can comment, and a comment can be edited or deleted.
    no state. A Ready move and an admin's comment release it (ADR-0013): reviewer then posts a snapshot rebuilt
    from the newest unedited tagged one.
 3. We will read and write the snapshot only through the state module in `core/` (root ADR-0003):
-   reviewer's hook alone writes, and the orchestrator only reads ATTESTED and HOLD.
+   reviewer's hook alone writes, and the orchestrator reads all of it: attestation, holds, pushbacks and
+   rulings (orchestrator ADR-0007).
 4. We will have planner write no state: reviewer's hook places a rescope hold when it sees the rescope's
    spec PR open (ADR-0013).
 5. We will keep a ledger beside the session as a cache, rebuilt from the state at the session's
