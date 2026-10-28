@@ -10,7 +10,7 @@ const { PENDING, PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 /** Every `status` answer; `reason` is set for SILENT, WAIVED and COULD_NOT_RUN. */
 export type StatusAnswer = { outcome: Outcome; reason: string | null };
 
-/** What a `findings` returns in place of its list: never an empty list, which would read as nothing found (FR-024). */
+/** What a `findings` returns in place of its list: never an empty list, which would read as nothing found. */
 export type CouldNotRun = { outcome: typeof CheckOutcome.schema.enum.COULD_NOT_RUN; reason: string };
 
 /** The reason names `source` first, so a caller reading several checks can tell whose it is. */
@@ -18,7 +18,7 @@ export function couldNotRun(source: string, why: string): CouldNotRun {
   return { outcome: COULD_NOT_RUN, reason: `${source}: ${why}` };
 }
 
-/** GitHub's no-answer as `source`'s COULD_NOT_RUN, the outcome of a check that could not read (R12). */
+/** GitHub's no-answer as `source`'s COULD_NOT_RUN, the outcome of a check that could not read. */
 export function couldNotRunIfUnanswered(source: string, error: unknown): CouldNotRun {
   // Any other error is core's own, not the check's outcome.
   if (!(error instanceof GitHubUnanswered)) throw error;
@@ -46,7 +46,7 @@ const OUTCOME_OF_STATE: ReadonlyMap<string, Outcome> = new Map([
 
 const COMPLETED = "completed";
 
-/** A required check at the head, `undefined` when GitHub has neither a check run nor a status for it (R17). */
+/** A required check at the head, `undefined` when GitHub has neither a check run nor a status for it. */
 export function outcomeOf(checkRunOrStatus: CheckRun | CommitStatus | undefined): Outcome {
   if (checkRunOrStatus === undefined) return PENDING;
   let state: string | null;

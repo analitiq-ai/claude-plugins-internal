@@ -58,7 +58,7 @@ export type RequiredChecks = {
 /** The loaded modules, by name; `Validators` from `loadValidators` is one. */
 export type LoadedModules = { modules: ReadonlyMap<string, unknown> };
 
-// R22's order, for one check's readings and for the reader's checks alike: any FAIL, else any COULD_NOT_RUN, else
+// One order, for one check's readings and for the reader's checks alike: any FAIL, else any COULD_NOT_RUN, else
 // any PENDING; PASS only when every one passed.
 const PRECEDENCE: readonly Outcome[] = [FAIL, COULD_NOT_RUN, PENDING];
 
@@ -127,7 +127,7 @@ async function newestStatuses(reader: GitHubClient, at: string, head: string): P
   return newest;
 }
 
-/** The required-checks reader (R22): no `trigger`, never SILENT; the orchestrator times a missing or pending check. */
+/** The required-checks reader: no `trigger`, never SILENT; the orchestrator times a missing or pending check. */
 export function requiredChecks(_shared: Shared, reader: GitHubClient, validators: LoadedModules): RequiredChecks {
   const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map((name) => `${name}-review`)]);
 
@@ -159,7 +159,7 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
     return [atHead(first), ...rest.map(atHead)];
   }
 
-  // GitHub's no-answer is this reader's check outcome at its own boundary (R12, R22).
+  // GitHub's no-answer is this reader's check outcome at its own boundary.
   async function read(repo: string, pr: number, head: string): Promise<readonly [CheckReading, ...CheckReading[]] | CouldNotRun> {
     assertAsked(repo, pr, head);
     try {

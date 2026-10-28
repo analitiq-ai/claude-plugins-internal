@@ -44,7 +44,7 @@ export type FakeGitHub = GitHubClient & {
 
 /**
  * A client that answers only from `routes`; a call no route answers throws, naming the call. A PATCH or DELETE
- * through `rest` throws even when routed: state is only ever posted, never edited or deleted (FR-018), so a test
+ * through `rest` throws even when routed: state is only ever posted, never edited or deleted, so a test
  * cannot route one into passing.
  */
 export function fakeGitHub(routes: FakeRoutes): FakeGitHub {

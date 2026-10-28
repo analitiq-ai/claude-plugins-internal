@@ -6,7 +6,6 @@ import { NotInTree, type Tree } from "../src/tree.ts";
 
 const REF = "212-us2-retry-budget";
 
-// contracts/codeworks-toml.md's example, verbatim.
 const EXAMPLE = `[shared]
 validators = ["fixture"]
 trusted_reviewers = ["alice"]
@@ -87,7 +86,7 @@ function plain(value: unknown): unknown {
 }
 
 describe("readSettings", () => {
-  it("reads contracts/codeworks-toml.md's example", async () => {
+  it("reads every [shared] key and an empty [reviewer] section", async () => {
     const settings = await settingsOf(EXAMPLE);
     assert.deepEqual(settings.shared, EXAMPLE_SHARED);
     assert.deepEqual(plain(settings.section("reviewer")), {});

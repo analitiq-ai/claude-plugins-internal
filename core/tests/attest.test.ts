@@ -192,7 +192,7 @@ describe("releasedByComment", () => {
   });
 });
 
-describe("attests, in a scratch repository (AS11)", () => {
+describe("attests, in a scratch repository", () => {
   const savedEnv = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME };
   let scratch: string;
   let repo: string;

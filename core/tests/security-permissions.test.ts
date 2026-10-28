@@ -8,8 +8,8 @@ import { APP_PERMISSIONS } from "../src/tokens.ts";
 
 const SECURITY = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "SECURITY.md");
 
-// §3 names a permission as GitHub's settings page does; a token request names it by GitHub's API key
-// (contracts/key-files.md). A name missing here fails the read, so §3 cannot grant one the table does not map.
+// §3 names a permission as GitHub's settings page does; a token request names it by GitHub's API key.
+// A name missing here fails the read, so §3 cannot grant one the table does not map.
 const API_KEYS: Record<string, Record<string, string>> = {
   "Repository permissions": {
     metadata: "metadata",

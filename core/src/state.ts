@@ -7,15 +7,15 @@ import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLog
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState } from "./values.ts";
 
-// contracts/state-comment.md: the comment's first line, byte for byte, then one json fence that ends the body.
+// The state comment's first line, byte for byte, then one json fence that ends the body.
 const STATE_TAG = "<!-- codeworks:reviewer-state -->";
 const OPENING_FENCE = "```json";
 const CLOSING_FENCE = "```";
 
-// GitHub refuses a longer comment, and trimming history to fit would drop rows, which no write may do (R16).
+// GitHub refuses a longer comment, and trimming history to fit would drop rows, which no write may do.
 const COMMENT_LIMIT = 65_536;
 
-// contracts/state-comment.md, Release: the board's status name, and the one command an admin resets with.
+// For the release rule: the board's status name, and the one command an admin resets with.
 const READY_STATUS = "Ready";
 const RESET_COMMAND = "/codeworks reset";
 
@@ -52,7 +52,7 @@ const TimelineItem = z.discriminatedUnion("__typename", [
 
 const ProjectItem = z.object({ project: z.object({ url: z.string() }) });
 
-/** Why a story is held. Not a value set: no component but core writes or compares one (data-model.md). */
+/** Why a story is held. Not a value set: no component but core writes or compares one. */
 export type StateCause =
   | { cause: "tampered" }
   | { cause: "deleted" }
@@ -153,12 +153,12 @@ function firstLine(body: string): string {
   return body.split("\n", 1)[0];
 }
 
-/** The first line of the comment the orchestrator App asks an escalation hold's question with (R27). */
+/** The first line of the comment the orchestrator App asks an escalation hold's question with. */
 export function questionTag(hold: Pick<Hold, "id" | "since">): string {
   return `<!-- codeworks:hold-question ${hold.id} ${hold.since} -->`;
 }
 
-// The comments and moves the release rule reads, picked once per read (contracts/state-comment.md, Release).
+// The comments and moves the release rule reads, picked once per read.
 type ReleaseTerms = {
   /** Newest first. */
   adminComments: IssueComment[];
@@ -292,7 +292,7 @@ function judge(
   if (!rebuilt && stateRead?.ok) {
     snapshot = stateRead.snapshot;
   } else {
-    // FR-019's release path posts this snapshot, so it is never one that could have been tampered with.
+    // The release path posts this snapshot, so it is never one that could have been tampered with.
     const fallback = reviewerComments
       .filter((comment) => comment.lastEditedAt === null)
       .map(snapshotOf)
@@ -302,7 +302,7 @@ function judge(
 
   const openHolds = snapshot.holds.filter((hold) => hold.state === HoldState.schema.enum.OPEN);
   for (const hold of openHolds) causes.push({ cause: "open_hold", id: hold.id });
-  // The start is decided and the release written over this one snapshot (FR-019a), so neither acts on rows the
+  // The start is decided and the release written over this one snapshot, so neither acts on rows the
   // other did not judge.
   const releasable = openHolds.map((hold) => releaseOf(hold, terms)).filter((release) => release !== null);
   const tamperReleased =
@@ -326,7 +326,7 @@ function judge(
 }
 
 /**
- * The one answer every reader and writer of a story's state acts on (R15, R27). Pure: GitHub is read by the caller,
+ * The one answer every reader and writer of a story's state acts on. Pure: GitHub is read by the caller,
  * `writers` included, the logins whose role on the repository is a writer's.
  */
 export function stateFrom(
@@ -406,7 +406,7 @@ async function judgeIssue(reader: GitHubClient, repo: string, issue: number, sha
   return judge(comments, deletions, moves, writers, shared);
 }
 
-/** `reader` reads issues and the board: the session App's or the orchestrator App's client (R15). */
+/** `reader` reads issues and the board: the session App's or the orchestrator App's client. */
 export async function readState(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<StateReading> {
   return (await judgeIssue(reader, repo, issue, shared)).reading;
 }
@@ -418,12 +418,12 @@ function sortedKeys(_key: string, value: unknown): unknown {
   return Object.fromEntries(Object.keys(object).toSorted().map((key) => [key, object[key]]));
 }
 
-/** The state comment's body for `snapshot` (contracts/state-comment.md). */
+/** The state comment's body for `snapshot`. */
 export function renderState(snapshot: Snapshot): string {
   return `${STATE_TAG}\n${OPENING_FENCE}\n${JSON.stringify(snapshot, sortedKeys, 2)}\n${CLOSING_FENCE}\n`;
 }
 
-/** `writeState`'s transition: rounds and pushbacks only appended, every hold row as it was (R16). */
+/** `writeState`'s transition: rounds and pushbacks only appended, every hold row as it was. */
 export function checkTransition(old: Snapshot, next: Snapshot): void {
   const rewrittenRound = old.rounds.find((round, i) => !isDeepStrictEqual(round, next.rounds[i]));
   if (rewrittenRound !== undefined) {
@@ -461,7 +461,7 @@ function tamperRefusal({ reading, tamperedAt }: Judgement, shared: Shared): Stat
   );
 }
 
-// Every write but the release path: none may build on state that could have been tampered with (FR-019).
+// Every write but the release path: none may build on state that could have been tampered with.
 async function untamperedSnapshot(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<Snapshot> {
   const judgement = await judgeIssue(reader, repo, issue, shared);
   const refusal = tamperRefusal(judgement, shared);
@@ -469,7 +469,7 @@ async function untamperedSnapshot(reader: GitHubClient, repo: string, issue: num
   return judgement.reading.snapshot ?? emptySnapshot();
 }
 
-// The one place a state comment is posted: never one a reader would take as invalid, never an edit (FR-018).
+// The one place a state comment is posted: never one a reader would take as invalid, never an edit.
 async function post(writer: GitHubClient, repo: string, issue: number, snapshot: Snapshot): Promise<void> {
   const parsed = Snapshot.safeParse(snapshot);
   if (!parsed.success) {
@@ -565,7 +565,7 @@ export type ClaimRelease = { released: Releasable[]; rebuilt: boolean; reset: Co
 
 /**
  * On the orchestrator's claim: releases every releasable hold and a released tamper cause, deciding and writing
- * over one read (FR-019a). `writer` is the reviewer App's client.
+ * over one read. `writer` is the reviewer App's client.
  */
 export async function releaseOnClaim(
   reader: GitHubClient,

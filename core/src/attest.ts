@@ -79,7 +79,7 @@ async function commitOf(checkout: string, revision: string): Promise<string> {
 }
 
 // Exit 1 is "not an ancestor"; 128 is a round commit the clone does not hold, which is not in the head's history
-// either (R16; critique E5).
+// either.
 async function newestInHistory(checkout: string, rounds: readonly Round[], head: string): Promise<Round | null> {
   for (const round of rounds) {
     const { code } = await runGit(checkout, ["merge-base", "--is-ancestor", round.head, head], [1, 128]);
@@ -105,7 +105,7 @@ async function governingLapse(
   return `governing documents differ between ${base} and ${roundName(round)}: ${changed.join(", ")}`;
 }
 
-// GitHub has no clean-merge API: a merge counts only when its tree is the one git makes of its parents (R16).
+// GitHub has no clean-merge API: a merge counts only when its tree is the one git makes of its parents.
 async function mergeLapse(checkout: string, round: Round, head: string): Promise<string | null> {
   const { stdout } = await runGit(checkout, ["rev-list", "--merges", "--parents", `${round.head}..${head}`]);
   for (const line of stdout.split("\n").filter((text) => text !== "")) {
@@ -128,7 +128,7 @@ function commentLapse(snapshot: Snapshot, round: Round): string | null {
 }
 
 /**
- * Whether a passing round vouches for `head` (contracts/state-comment.md, Attestation). `checkout` is a clone the
+ * Whether a passing round vouches for `head`. `checkout` is a clone the
  * caller has fetched to `head` and to `base`, the default branch's ref.
  */
 export async function attests(

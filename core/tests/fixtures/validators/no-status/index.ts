@@ -1,4 +1,4 @@
-// Meets the contract but for `status`, so loading must refuse it (R18).
+// Meets the contract but for `status`, so loading must refuse it.
 import type { Deps, OpenedPackage } from "../../../../src/validation/contract.ts";
 
 export const logins = ["no-status-bot[bot]"];

@@ -63,7 +63,7 @@ export type ReviewThread = {
   comments: ThreadComment[];
 };
 
-/** A thread neither a trusted reviewer nor an enabled module's provider started, for the orchestrator to close (FR-029). */
+/** A thread neither a trusted reviewer nor an enabled module's provider started, for the orchestrator to close. */
 export type UntrustedThread = { thread_id: string; url: string; author: string | null };
 
 /** The loaded validators' provider logins, REST form; `Validators` from `loadValidators` is one. */
@@ -110,7 +110,7 @@ export function appLogins(shared: Shared): ReadonlySet<string> {
 
 type Trust = { apps: ReadonlySet<string>; providers: ReadonlySet<string>; reviewers: ReadonlySet<string> };
 
-// One trust for starters and replies alike: enabling a module trusts its provider (R21), and an App is trusted
+// One trust for starters and replies alike: enabling a module trusts its provider, and an App is trusted
 // whatever `trusted_reviewers` or a package lists.
 function trustOf(shared: Shared, validators: ProviderLogins): Trust {
   return { apps: appLogins(shared), providers: validators.logins, reviewers: new Set(shared.trusted_reviewers ?? []) };
@@ -159,7 +159,7 @@ export function providerThreadFindings(
   );
 }
 
-/** `validators.logins` is read at each call; a provider's thread is its module's finding alone (SC-005). */
+/** `validators.logins` is read at each call; a provider's thread is its module's finding alone. */
 export function threadsModule(shared: Shared, reader: GitHubClient, validators: ProviderLogins): ThreadsModule {
   // Absent is not empty: read as empty, every reviewer's thread would be closed unread.
   if (shared.trusted_reviewers === undefined) {
@@ -172,7 +172,7 @@ export function threadsModule(shared: Shared, reader: GitHubClient, validators: 
       try {
         threads = await reviewThreads(reader, repo, pr);
       } catch (error) {
-        // Findings are a check, so no answer is its outcome (FR-024).
+        // Findings are a check, so no answer is its outcome.
         return couldNotRunIfUnanswered(CoreSource.enum.threads, error);
       }
       const trust = trustOf(shared, validators);
@@ -183,7 +183,7 @@ export function threadsModule(shared: Shared, reader: GitHubClient, validators: 
       );
     },
 
-    // No check, so it has no outcome to answer with; a no-answer stops its caller (critique E14).
+    // No check, so it has no outcome to answer with; a no-answer stops its caller.
     async untrusted(repo, pr) {
       const trust = trustOf(shared, validators);
       return (await reviewThreads(reader, repo, pr)).flatMap((thread) =>

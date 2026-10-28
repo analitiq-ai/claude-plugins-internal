@@ -1,10 +1,10 @@
 // Imports only node: modules: a carrier's hook imports this file statically, before any module that needs a
-// dependency this file checks for (R4).
+// dependency this file checks for.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// `name` holds the package, not the class name, so a hook can print it as it stands (contracts/carrying-core.md).
+// `name` holds the package, not the class name, so a hook can print it as it stands.
 export class MissingDependency extends Error {
   readonly root: string;
 

@@ -6,7 +6,7 @@ import { CheckOutcome } from "../src/values.ts";
 
 const { PENDING, PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 
-// R17's table: a concluded check run's conclusion and a commit status's state share one mapping.
+// A concluded check run's conclusion and a commit status's state share one mapping.
 const CONCLUDED = [
   { state: "success", outcome: PASS },
   { state: "neutral", outcome: PASS },
@@ -35,7 +35,7 @@ describe("outcomeOf", () => {
     });
   }
 
-  // GitHub's statuses of a check run with no conclusion yet; R17 names queued, in progress and pending.
+  // GitHub's statuses of a check run with no conclusion yet.
   for (const status of ["queued", "in_progress", "pending", "waiting", "requested"]) {
     it(`a check run ${status} is PENDING`, () => {
       assert.equal(outcomeOf({ status, conclusion: null }), PENDING);

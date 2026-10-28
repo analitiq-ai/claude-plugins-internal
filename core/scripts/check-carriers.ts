@@ -1,4 +1,4 @@
-// CI's check on every plugin carrying core (contracts/carrying-core.md, R5). With `version` pinned, a plugin
+// CI's check on every plugin carrying core. With `version` pinned, a plugin
 // update delivers nothing until the version changes, so a change to what a carrier ships without a bump never
 // reaches users, and two carriers in one session would run different cores.
 import { lstatSync, readdirSync, readFileSync, readlinkSync, type Stats } from "node:fs";
@@ -81,7 +81,7 @@ function samePins(base: Pins | null, head: Pins): boolean {
   return Object.keys(base).length === names.length && names.every((name) => base[name] === head[name]);
 }
 
-// Only core/src and core's runtime pins reach a plugin, so only they need a release; a test edit does not (R5).
+// Only core/src and core's runtime pins reach a plugin, so only they need a release; a test edit does not.
 function shipsCoreChange(change: CarriersChange): boolean {
   return (
     change.changedPaths.some((path) => path.startsWith(CORE_SRC)) ||
@@ -119,7 +119,7 @@ export function checkCarriers(change: CarriersChange): CarrierFailure[] {
     const pluginJson = readJson(head.pluginJson);
     const headVersion = versionOf(pluginJson);
     const baseVersion = versionOf(readJson(basePluginJson));
-    // No version at all is no bump: without one, nothing says the carrier released this change (FR-004).
+    // No version at all is no bump: without one, nothing says the carrier released this change.
     if (headVersion !== null && headVersion !== baseVersion) continue;
     const expected = baseVersion === null ? "a version" : `version other than ${JSON.stringify(baseVersion)}`;
     fail(PLUGIN_JSON, expected, found(pluginJson, ["version"]));

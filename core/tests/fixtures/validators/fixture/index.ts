@@ -1,5 +1,5 @@
 // A package meeting the validator contract with no provider behind it: each function answers what the test sets
-// in `script` (R20). The test imports this file by the URL the loader imports it by, so both share one `script`.
+// in `script`. The test imports this file by the URL the loader imports it by, so both share one `script`.
 import type { Finding } from "../../../../src/contracts/finding.ts";
 import type { Deps, OpenedPackage, PackageStatus } from "../../../../src/validation/contract.ts";
 

@@ -33,7 +33,7 @@ export class DerivationError extends Error {
   }
 }
 
-// Issue numbers have no leading zero, so `0212-…` is no story (R10).
+// Issue numbers have no leading zero, so `0212-…` is no story.
 const STORY_BRANCH = /^([1-9][0-9]*)-us([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const SPEC_BRANCH = /^([1-9][0-9]*)-spec$/;
 

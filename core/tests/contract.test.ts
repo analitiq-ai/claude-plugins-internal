@@ -87,7 +87,7 @@ const PROVIDER_FINDING: Finding = {
   latest_trusted_comment_id: "PRRC_fixture_1",
 };
 
-// A provider's item that is no thread, keyed `<module>:<id>` (data-model.md, Finding).
+// A provider's item that is no thread, keyed `<module>:<id>`.
 const ITEM: Finding = {
   source: "fixture",
   key: "fixture:issue-7",
@@ -153,7 +153,7 @@ beforeEach(() => {
   reset();
 });
 
-describe("AS1: loading the packages [shared] validators lists", () => {
+describe("loading the packages [shared] validators lists", () => {
   it("loads the fixture as the one module, its provider's logins among the validators' logins", async () => {
     const validators = await load(["fixture"]);
     assert.deepEqual([...validators.modules.keys()], ["fixture"]);
@@ -270,7 +270,7 @@ describe("AS1: loading the packages [shared] validators lists", () => {
   });
 });
 
-describe("AS2: a status is PASS or FAIL only for the head asked", () => {
+describe("a status is PASS or FAIL only for the head asked", () => {
   for (const outcome of ["PASS", "FAIL"]) {
     it(`gives ${outcome} naming the head asked as ${outcome}, with the package's reason`, async () => {
       script.status = { answer: { outcome, head: HEAD, reason: "read at the head" } };
@@ -308,7 +308,7 @@ describe("AS2: a status is PASS or FAIL only for the head asked", () => {
   });
 });
 
-describe("AS3: a PENDING module is SILENT once the timeout has run from the caller's start", () => {
+describe("a PENDING module is SILENT once the timeout has run from the caller's start", () => {
   it("is SILENT when now − since reaches timeoutSeconds", async () => {
     script.status = { answer: { outcome: "PENDING", head: null, reason: null } };
     const answer = await status(await fixtureModule({ reader: reader({ now: AT_TIMEOUT }) }), REPO, PR, HEAD, WINDOW);
@@ -339,7 +339,7 @@ describe("AS3: a PENDING module is SILENT once the timeout has run from the call
   });
 });
 
-describe("AS4, AS5: no answer, a throw or a refused answer is COULD_NOT_RUN, naming the module and the error", () => {
+describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the module and the error", () => {
   const throws: [string, unknown, RegExp][] = [
     ["an Error", new Error("the provider is down"), /the provider is down/],
     ["GitHubUnanswered", new GitHubUnanswered("GET /repos/acme/widgets: no answer"), /no answer/],
@@ -431,7 +431,7 @@ describe("findings: the package's items and its provider's threads", () => {
     assert.deepEqual(await findings(await fixtureModule(), REPO, PR, HEAD), []);
   });
 
-  it("gives each provider's thread by its own module alone, another provider's reply carried as trusted (SC-005)", async () => {
+  it("gives each provider's thread by its own module alone, another provider's reply carried as trusted", async () => {
     const secondBot: Author = { __typename: "Bot", login: "second-bot" };
     const answered = threadNode("fixture", FIXTURE_BOT, "the retry budget is never reset");
     answered.comments.nodes.push({ id: "PRRC_fixture_2", author: secondBot, body: "confirmed", url: "https://example.test/2" });
@@ -450,7 +450,7 @@ describe("findings: the package's items and its provider's threads", () => {
   });
 });
 
-describe("AS8: a finding on a thread a codeworks App started is dropped", () => {
+describe("a finding on a thread a codeworks App started is dropped", () => {
   for (const app of APP_LOGINS) {
     it(`drops the thread ${app} started and keeps the rest`, async () => {
       const appThread: Finding = {

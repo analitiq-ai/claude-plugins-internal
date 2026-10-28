@@ -2,7 +2,7 @@ import { z } from "zod";
 import { HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
 
 // Whole seconds, as GitHub's clock gives them: core stamps every time from the client's `now()`, so no caller's
-// clock or precision ever reaches a snapshot (R16).
+// clock or precision ever reaches a snapshot.
 export const Time = z.iso.datetime({ precision: 0 });
 
 // The pair that names a round, so a pushback names its round by the same fields the round carries.

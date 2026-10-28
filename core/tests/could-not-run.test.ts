@@ -13,8 +13,8 @@ import { requiredChecks } from "../src/validation/required-checks.ts";
 import { reset, script } from "./fixtures/validators/fixture/index.ts";
 import { fakeGitHub, type FakeAnswer } from "./support/fake-github.ts";
 
-// SC-004: every "did not answer", `error` or throwing-module input gives COULD_NOT_RUN from both status and
-// findings, never PASS, FAIL or an empty list (FR-024; R17).
+// Every "did not answer", `error` or throwing-module input gives COULD_NOT_RUN from both status and
+// findings, never PASS, FAIL or an empty list.
 
 const DIR = fileURLToPath(new URL("./fixtures/validators/", import.meta.url));
 
@@ -162,7 +162,7 @@ beforeEach(() => {
   reset();
 });
 
-describe("SC-004: could not run is COULD_NOT_RUN from both status and findings", () => {
+describe("could not run is COULD_NOT_RUN from both status and findings", () => {
   for (const [what, answers] of TABLE) {
     it(what, async (t) => {
       const answered = await answers(t);

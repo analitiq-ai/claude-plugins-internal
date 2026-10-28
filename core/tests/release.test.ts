@@ -33,8 +33,7 @@ import {
   type Issue,
 } from "./fixtures/state/issue.ts";
 
-// One fixture set for the orchestrator's read and reviewer's release alike, so the two can never answer apart
-// (SC-002, critique X1).
+// One fixture set for the orchestrator's read and reviewer's release alike, so the two can never answer apart.
 type Fixture = {
   name: string;
   issue: Issue;
@@ -56,7 +55,7 @@ function placedBy(...holds: Hold[]): IssueComment {
 
 const APPS = { session: SESSION_APP, orchestrator: ORCHESTRATOR_APP, reviewer: REVIEWER_APP, planner: PLANNER_APP };
 
-const AS12: Fixture[] = [
+const READY_AND_COMMENT: Fixture[] = [
   {
     name: "a hold of 10:00, an admin's comment at 10:30 and a Ready move at 11:00: released by that comment",
     issue: { comments: [placedBy(PUSHBACK), adminComment(201, "10:30")], moves: [move("11:00")] },
@@ -176,7 +175,7 @@ const AS12: Fixture[] = [
 
 const QUESTION = questionComment(150, ESCALATION, "10:10");
 
-const AS13: Fixture[] = [
+const ESCALATION_QUESTION: Fixture[] = [
   {
     name: "an escalation hold's admin comment at 10:05, before its question at 10:10",
     issue: { comments: [placedBy(ESCALATION), adminComment(140, "10:05"), QUESTION], moves: [move("11:00")] },
@@ -269,7 +268,7 @@ const THREE = [
 ];
 const PLACED_THREE = stateComment(100, snapshot({ holds: THREE }), { createdAt: at("09:50") });
 
-const AS14: Fixture[] = [
+const ADMIN_RESET: Fixture[] = [
   {
     name: "an admin's /codeworks reset, trimmed, after three holds releases all three and is reported",
     issue: { comments: [PLACED_THREE, adminComment(300, "10:00", "  /codeworks reset\n")] },
@@ -514,9 +513,9 @@ async function bothGiveOneAnswer(fixture: Fixture): Promise<void> {
 }
 
 const SETS: Array<[string, Fixture[]]> = [
-  ["AS12: a Ready move and an admin's comment after the hold", AS12],
-  ["AS13: an escalation hold's question", AS13],
-  ["AS14: /codeworks reset", AS14],
+  ["a Ready move and an admin's comment after the hold", READY_AND_COMMENT],
+  ["an escalation hold's question", ESCALATION_QUESTION],
+  ["/codeworks reset", ADMIN_RESET],
   ["a tamper cause's release", TAMPER],
   ["nothing held", NOTHING_HELD],
 ];

@@ -117,21 +117,21 @@ describe("specIssue", () => {
 
 describe("pickSpecFolder", () => {
   it("is the one folder named <p>-*", () => {
-    const names = ["145-core-shared-package", "20-short", "200-retry-budget", "2000-other"];
+    const names = ["300-cache-warmup", "20-short", "200-retry-budget", "2000-other"];
     assert.equal(pickSpecFolder(names, 200), "specs/200-retry-budget");
   });
 
   it("fails naming the folders found when none is named <p>-*", () => {
-    assert.throws(() => pickSpecFolder(["145-core-shared-package", "2000-other", "200"], 200), derivationError(
+    assert.throws(() => pickSpecFolder(["300-cache-warmup", "2000-other", "200"], 200), derivationError(
       "200",
-      "145-core-shared-package",
+      "300-cache-warmup",
       "2000-other",
     ));
   });
 
   it("fails naming each folder when several are named <p>-*", () => {
     assert.throws(
-      () => pickSpecFolder(["145-core-shared-package", "200-retry", "200-retry-budget"], 200),
+      () => pickSpecFolder(["300-cache-warmup", "200-retry", "200-retry-budget"], 200),
       derivationError("specs/200-retry", "specs/200-retry-budget"),
     );
   });
@@ -140,7 +140,7 @@ describe("pickSpecFolder", () => {
 describe("specFolder", () => {
   it("picks among the folders of specs/ at the ref; a file is no folder", async () => {
     const tree = memoryTree({
-      "specs/145-core-shared-package/spec.md": "x",
+      "specs/300-cache-warmup/spec.md": "x",
       "specs/200-retry-budget/spec.md": "x",
       "specs/200-retry-notes.md": "x",
     });

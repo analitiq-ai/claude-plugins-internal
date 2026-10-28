@@ -66,7 +66,7 @@ a question is write permission, which GitHub answers for the author.
 
 Rejected: GitHub computes the association for the reader, and hides a private org membership from an App's
 token. On 2026-10-28, an org admin's comments read as CONTRIBUTOR to all three codeworks Apps, so no answer
-ever counted (PR #164, T044). It is also not write permission: MEMBER covers an org member who can only read.
+ever counted (PR #164). It is also not write permission: MEMBER covers an org member who can only read.
 
 ## Trade-offs
 

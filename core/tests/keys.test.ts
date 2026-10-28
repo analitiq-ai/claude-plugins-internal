@@ -15,7 +15,7 @@ const KEY_BYTES = Buffer.from("-----BEGIN DUMMY KEY-----\n");
 const FILE = 0o100000;
 const DIRECTORY = 0o040000;
 
-// contracts/key-files.md's required settings, with `<K>` and `<S>` written from `~`, around entries the gate
+// The required settings, with `<K>` and `<S>` written from `~`, around entries the gate
 // leaves alone: a credential folder, a host, a cache.
 function inEffect(): Record<string, unknown> {
   return {

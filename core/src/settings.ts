@@ -29,7 +29,7 @@ const LOGIN = "[A-Za-z0-9][A-Za-z0-9_-]*";
 // Every read compares an App's login in REST form, so a login without `[bot]` would match no comment or thread.
 const AppLogin = z.string().regex(new RegExp(`^${LOGIN}\\[bot\\]$`));
 
-// GraphQL's `ProjectV2.url` has exactly this form, and the release rule compares it to `board` as text (R27).
+// GraphQL's `ProjectV2.url` has exactly this form, and the release rule compares it to `board` as text.
 const BOARD = new RegExp(`^https://github\\.com/(?:orgs|users)/${LOGIN}/projects/[1-9][0-9]*$`);
 
 export const Shared = z.strictObject({
@@ -40,7 +40,7 @@ export const Shared = z.strictObject({
       }
     });
   }),
-  // Absent, not empty, is what makes the threads module refuse to run (R21).
+  // Absent, not empty, is what makes the threads module refuse to run.
   trusted_reviewers: z.array(z.string().regex(new RegExp(`^${LOGIN}(?:\\[bot\\])?$`))).optional(),
   board: z.string().regex(BOARD),
   session_app_login: AppLogin,

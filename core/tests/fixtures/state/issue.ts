@@ -10,7 +10,7 @@ export const ISSUE = 212;
 export const COMMENTS_PATH = "/repos/acme/widgets/issues/212/comments";
 export const BOARD = "https://github.com/orgs/example-org/projects/1";
 export const OTHER_PROJECT = "https://github.com/orgs/example-org/projects/7";
-// contracts/state-comment.md, spelt out here so core is graded against the contract, not its own constants.
+// The state comment contract's tag, spelt out here so core is graded against the contract, not its own constants.
 export const TAG = "<!-- codeworks:reviewer-state -->";
 
 export const SHARED: Shared = {
@@ -89,7 +89,7 @@ export function adminComment(databaseId: number, clock: string, body = "Go ahead
   return comment(databaseId, ADMIN, body, { createdAt: at(clock), ...fields });
 }
 
-/** contracts/state-comment.md's question tag, spelt out, as the orchestrator App posts it. */
+/** The state comment contract's question tag, spelt out, as the orchestrator App posts it. */
 export function questionComment(databaseId: number, of: Hold, clock: string, fields: Partial<IssueComment> = {}): IssueComment {
   const body = `<!-- codeworks:hold-question ${of.id} ${of.since} -->\n\n${of.question ?? ""}\n`;
   return comment(databaseId, ORCHESTRATOR_APP, body, { createdAt: at(clock), ...fields });
@@ -118,7 +118,7 @@ export type Issue = {
 
 const ADMIN_ROLES: Record<string, string> = { [ADMIN.login]: "admin" };
 
-// contracts/state-comment.md's writer roles, spelt out here so core is graded against the contract.
+// The state comment contract's writer roles, spelt out here so core is graded against the contract.
 const WRITER_ROLES = ["admin", "maintain", "write"];
 
 /** The logins `stateFrom` takes as writers: those whose role is a writer's. */
@@ -167,7 +167,7 @@ export function posts(client: FakeGitHub): string[] {
   });
 }
 
-/** The snapshot of a posted body, read as contracts/state-comment.md writes it. */
+/** The snapshot of a posted body, read as the state comment contract writes it. */
 export function postedSnapshot(body: string): Snapshot {
   const opening = `${TAG}\n\`\`\`json\n`;
   const closing = "\n```\n";
