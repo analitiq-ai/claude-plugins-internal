@@ -32,6 +32,42 @@ export function ownerAndName(repo: string): Repository {
   return { owner: parts[0], name: parts[1] };
 }
 
+/** A git remote that is not a repository on github.com, so no planner token is minted for it or pushed to it. */
+export class RemoteRefused extends Error {
+  constructor(url: string, why: string) {
+    super(`remote ${JSON.stringify(withoutUserinfo(url))} is not a github.com repository: ${why}`);
+    this.name = "RemoteRefused";
+  }
+}
+
+// A URL's userinfo may hold the admin's token, and planner's hook writes this refusal to stderr, which reaches the
+// session. The greedy match ends at the last `@` before the path, so a password holding a stray `@` goes whole.
+function withoutUserinfo(url: string): string {
+  return url.replace(/^([^:/?#]+:\/\/)[^/?#]*@/, "$1***@");
+}
+
+// GitHub's own characters for an owner and a repository name. The parsed pair is written into the session's
+// environment file, which the shell sources, so nothing wider may pass.
+const REMOTE = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/;
+
+export function repositoryOfRemote(url: string): Repository {
+  const parts = REMOTE.exec(url);
+  if (parts === null) {
+    throw new RemoteRefused(url, "not https://github.com/<owner>/<name>, git@github.com:<owner>/<name> or ssh://git@github.com/<owner>/<name>");
+  }
+  try {
+    return ownerAndName(`${parts[1]}/${parts[2]}`);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    throw new RemoteRefused(url, error.message);
+  }
+}
+
+export function httpsUrl(repo: Repository): string {
+  const { owner, name } = ownerAndName(`${repo.owner}/${repo.name}`);
+  return `https://github.com/${owner}/${name}.git`;
+}
+
 export function assertIssueNumber(n: number): void {
   if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
 }
