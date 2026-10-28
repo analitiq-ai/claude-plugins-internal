@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "author": {
+      "type": "string"
+    },
+    "file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "key": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "latest_trusted_comment_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "line": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resolvable": {
+      "type": "boolean"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "enum": [
+            "threads",
+            "required-checks"
+          ],
+          "type": "string"
+        },
+        {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "type": "string"
+        }
+      ]
+    },
+    "text": {
+      "type": "string"
+    },
+    "thread_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "trusted_comments": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "body"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "source",
+    "key",
+    "author",
+    "file",
+    "line",
+    "text",
+    "thread_id",
+    "resolvable",
+    "trusted_comments",
+    "latest_trusted_comment_id"
+  ],
+  "type": "object"
+}
