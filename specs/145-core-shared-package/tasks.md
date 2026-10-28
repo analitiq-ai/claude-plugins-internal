@@ -310,13 +310,13 @@ required-checks reader's answers (quickstart.md, US3)
 
 ### Tests for User Story 3 ⚠️ (write first, see each fail)
 
-- [ ] T045 [P] [US3] Write `core/tests/outcomes.test.ts`: `outcomeOf` maps `success`, `neutral`, `skipped` →
+- [x] T045 [P] [US3] Write `core/tests/outcomes.test.ts`: `outcomeOf` maps `success`, `neutral`, `skipped` →
   PASS; `failure` → FAIL; `error`, `cancelled`, `timed_out`, `action_required`, `startup_failure`, `stale` →
   COULD_NOT_RUN; queued, in progress, pending or absent → PENDING (R17)
-- [ ] T046 [P] [US3] Write `core/tests/finding.test.ts`: `source` a `FindingSource`; `key` non-empty; `line` ≥ 1
+- [x] T046 [P] [US3] Write `core/tests/finding.test.ts`: `source` a `FindingSource`; `key` non-empty; `line` ≥ 1
   or null; `resolvable` true exactly when `thread_id` is set; `latest_trusted_comment_id` set exactly when
   `thread_id` is set; `trusted_comments` empty without a thread (FR-012; data-model.md, Finding)
-- [ ] T047 [P] [US3] Write `core/tests/keys.test.ts` on pure checks with injected stats, `lstat` answers and file
+- [x] T047 [P] [US3] Write `core/tests/keys.test.ts` on pure checks with injected stats, `lstat` answers and file
   text: a `file` that is not a bare file name is refused; a key not owned by the current user, or with any group
   or other bit, is refused naming the mode; managed settings not in effect (file missing, not root-owned, folder
   or file writable by others, not JSON, any setting of contracts/key-files.md missing or different,
@@ -325,16 +325,16 @@ required-checks reader's answers (quickstart.md, US3)
   refused naming it, an `lstat` error other than ENOENT throws (US5 AS5); planner's read of `planner-app.pem`
   skips the settings check, every read of `session-app.pem`, `reviewer-app.pem` or a package's token does not; a
   platform other than Linux is refused naming it (FR-036, FR-038; R23)
-- [ ] T048 [P] [US3] Write `core/tests/security-settings.test.ts`: parse `SECURITY.md` §5's JSON block and fail
+- [x] T048 [P] [US3] Write `core/tests/security-settings.test.ts`: parse `SECURITY.md` §5's JSON block and fail
   when an entry is in neither the required-settings table of `keys.ts` nor its named exceptions (`<V>/ghcreds`,
   `<V>/plugin/gaterev`, the session's gh config folder, `<C>` and its `env` entries, `allowedDomains`), or when
   §5's `enabledPlugins` list differs from the list `keys.ts` allows (R23)
-- [ ] T049 [P] [US3] Create the fixture packages under `core/tests/fixtures/validators/`: `fixture/index.ts`
+- [x] T049 [P] [US3] Create the fixture packages under `core/tests/fixtures/validators/`: `fixture/index.ts`
   exporting `logins = ["fixture-bot[bot]"]` and `open(deps)` whose `trigger`, `status` and `findings` answer what
   the test sets (an answer, a throw, a call count) and whose `findings` includes `deps.providerThreads(repo, pr)`;
   `no-status/index.ts` lacking `status`; `bad-logins/index.ts` exporting `logins` as a string; each imports core
   with `import type` only (R20)
-- [ ] T050 [P] [US3] Write `core/tests/contract.test.ts` over the fixture packages and the fake client:
+- [x] T050 [P] [US3] Write `core/tests/contract.test.ts` over the fixture packages and the fake client:
   - AS1: `validators = ["fixture"]` loads one module and `logins` holds `fixture-bot[bot]`; `["nope"]` (no
     folder), `["Bad_Name"]`, `["threads"]`, `["required-checks"]`, `["no-status"]`, `["bad-logins"]` throw
     `ValidatorLoadError` naming the name and why; the package's `open` gets `reader`, `writer`, a `readKey` bound
@@ -346,42 +346,42 @@ required-checks reader's answers (quickstart.md, US3)
     refuses or whose `source` is not `fixture` → COULD_NOT_RUN naming the module and the error
   - AS8: a finding whose thread's `author` is one of `[shared]`'s four App logins is dropped
   (FR-022 to FR-025, FR-028; R18, R19)
-- [ ] T051 [P] [US3] Write `core/tests/threads.test.ts`: AS7 (fixture enabled, `trusted_reviewers = ["alice"]`:
+- [x] T051 [P] [US3] Write `core/tests/threads.test.ts`: AS7 (fixture enabled, `trusted_reviewers = ["alice"]`:
   the `fixture-bot` thread a fixture finding only, through `providerThreads`, with `source` `fixture`; the
   `alice` thread a threads finding only; the `bob` thread no finding and listed by `untrusted`); AS8 (a thread
   started by any of the four Apps is never a finding and is in `untrusted`); a GraphQL `Bot` author's bare login
   matched with `[bot]` appended and carried so in `author`; `trusted_comments` and `latest_trusted_comment_id`
   from trusted authors only; key `thread:<thread_id>`; a missing `trusted_reviewers` throws `SettingsError`;
   `untrusted` lets `GitHubUnanswered` propagate (FR-028, FR-029, SC-005; R21)
-- [ ] T052 [P] [US3] Write `core/tests/required-checks.test.ts`: the base read from the PR, then checks from
+- [x] T052 [P] [US3] Write `core/tests/required-checks.test.ts`: the base read from the PR, then checks from
   `rules/branches/{base}` `required_status_checks`, dropping `internal-review` and `fixture-review` with the
   fixture loaded (AS6); none left → COULD_NOT_RUN for status and findings (AS9); matched among check runs by
   name, and App id when the rule pins `integration_id`, and among statuses by context; a `failure` → one finding
   `required-check:<name>` naming the check and its conclusion (AS6); status any FAIL → FAIL, else any
   COULD_NOT_RUN → COULD_NOT_RUN, all PASS → PASS, else PENDING; never SILENT; no `trigger` (FR-027; R22)
-- [ ] T053 [P] [US3] Write `core/tests/could-not-run.test.ts`, one table: the required-checks reader with a check
+- [x] T053 [P] [US3] Write `core/tests/could-not-run.test.ts`, one table: the required-checks reader with a check
   run in `error`, `cancelled` or `timed_out`, a `GitHubUnanswered`, a GraphQL `RATE_LIMITED`; core's answers over
   the fixture package throwing `GitHubUnanswered` or an `Error` → COULD_NOT_RUN from both `status` and
   `findings`, never PASS, FAIL or `[]` (FR-024, AS4, SC-004; R17)
 
 ### Implementation for User Story 3
 
-- [ ] T054 [US3] Create `core/src/outcomes.ts`: `outcomeOf`, `StatusAnswer`, `CouldNotRun` (R17)
-- [ ] T055 [US3] Create `core/src/contracts/finding.ts`; add it to `write-schemas.ts`'s list, see
+- [x] T054 [US3] Create `core/src/outcomes.ts`: `outcomeOf`, `StatusAnswer`, `CouldNotRun` (R17)
+- [x] T055 [US3] Create `core/src/contracts/finding.ts`; add it to `write-schemas.ts`'s list, see
   `core/tests/schemas.test.ts` fail naming the missing file, then run the script to write
   `core/schemas/finding.schema.json` (R8)
-- [ ] T056 [US3] Create `core/src/keys.ts`: `readKey(file, plugin)`, the pure file and settings checks, the
+- [x] T056 [US3] Create `core/src/keys.ts`: `readKey(file, plugin)`, the pure file and settings checks, the
   one-source check, the required-settings table, the allowed `enabledPlugins` list and the exceptions, and
   `KeyReadRefused(path, reasons)` (R23; contracts/key-files.md)
-- [ ] T057 [US3] Create `core/src/validation/threads.ts`: the paginated `reviewThreads(reader, repo, pr)` read,
+- [x] T057 [US3] Create `core/src/validation/threads.ts`: the paginated `reviewThreads(reader, repo, pr)` read,
   login normalisation, the provider-thread finding builder `providerThreads` uses, `threadsModule(shared, reader,
   validators)` with `findings` and `untrusted` (R21)
-- [ ] T058 [US3] Create `core/src/validation/contract.ts`: `loadValidators(shared, dir, {reader, writer, plugin})`
+- [x] T058 [US3] Create `core/src/validation/contract.ts`: `loadValidators(shared, dir, {reader, writer, plugin})`
   importing `<dir>/<name>/index.ts` per `validators` entry, handing each `open({reader, writer, readKey: file =>
   readKey(file, plugin), providerThreads})`, each module carrying those `deps` and `shared`;
   `ValidatorLoadError(name, why)`; core's `trigger`, `status` and `findings` over a module (R18, R19;
   contracts/core-api.md)
-- [ ] T059 [US3] Create `core/src/validation/required-checks.ts`: `requiredChecks(shared, reader, validators)`,
+- [x] T059 [US3] Create `core/src/validation/required-checks.ts`: `requiredChecks(shared, reader, validators)`,
   `GitHubUnanswered` turned into COULD_NOT_RUN at its boundary (R22)
 - [ ] T060 [US3] Run quickstart.md US3 against a test repo; record what ran and its result in the PR
 
