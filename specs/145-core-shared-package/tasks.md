@@ -287,7 +287,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
 - [x] T043 [US2] Create `core/src/attest.ts`: `passingRounds`, `governingDiff`, `releasedByComment` and `attests`,
   git through `runGit` (`merge-base --is-ancestor` with answers 1 and 128, `ls-tree -r -t`, `rev-list --merges`,
   `merge-tree --write-tree` with answer 1, `rev-parse <commit>^{tree}`) (R16)
-- [ ] T044 [US2] Run quickstart.md US2 against a test repo with the reviewer App installed and its issues on a
+- [x] T044 [US2] Run quickstart.md US2 against a test repo with the reviewer App installed and its issues on a
   test board; record what ran and its result in the PR
 
 **Checkpoint**: US2's PR passes `npm test`; every tampered, deleted, untagged or invalid fixture reads as held,
