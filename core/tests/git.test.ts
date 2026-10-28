@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { writeGhToken } from "../src/gh-config.ts";
-import { GitFailed, pushWithGhCredential, runGit } from "../src/git.ts";
+import { GitFailed, PushRefused, pushWithGhCredential, runGit } from "../src/git.ts";
 
 const COMMITTER = ["-c", "user.name=Dummy Author", "-c", "user.email=dummy@example.invalid"];
 
@@ -134,7 +135,7 @@ describe("runGit", () => {
     const folder = join(scratch, "gh-fill");
     writeGhToken(folder, dummyToken("ghs_dummy0000000000000000000000000011"), LOGIN);
     // gh reads a token from GH_TOKEN before its config folder: this one must not be the one that answers.
-    process.env.GH_TOKEN = "dummy-ambient-gh-token";
+    process.env.GH_TOKEN = randomUUID();
     const { stdout } = await runGit(
       repo,
       ["-c", "credential.helper=!gh auth git-credential", ...credentialFill("github.com")],
@@ -160,6 +161,32 @@ describe("pushWithGhCredential", () => {
     const pushed = await runGit(remote, ["rev-parse", "refs/heads/dummy"]);
     assert.equal(pushed.stdout, (await runGit(checkout, ["rev-parse", "HEAD"])).stdout);
   });
+
+  // An extra header goes out beside whatever the credential helper answers, so it could carry another credential.
+  for (const key of ["http.extraHeader", "http.https://github.com/.extraHeader"]) {
+    it(`refuses a checkout whose config sets ${key}, naming the key and not its value, and pushes nothing`, async () => {
+      const checkout = mkdtempSync(join(scratch, "push-header-"));
+      const remote = join(checkout, "..", `${checkout.split("/").pop()}-remote.git`);
+      await runGit(checkout, ["init", "-q"]);
+      await runGit(checkout, [...COMMITTER, "commit", "-q", "--allow-empty", "-m", "dummy"]);
+      await runGit(scratch, ["init", "-q", "--bare", remote]);
+      await runGit(checkout, ["config", `url.${remote}.insteadOf`, "https://github.com/acme/widgets.git"]);
+      const secret = randomUUID();
+      await runGit(checkout, ["config", key, `Authorization: Basic ${secret}`]);
+
+      await assert.rejects(
+        pushWithGhCredential(checkout, join(scratch, "gh-push"), { owner: "acme", name: "widgets" }, "HEAD:refs/heads/dummy"),
+        (error: unknown) => {
+          assert.ok(error instanceof PushRefused);
+          assert.ok(error.message.toLowerCase().includes(key.toLowerCase()), error.message);
+          assert.ok(!error.message.includes(secret), error.message);
+          return true;
+        },
+      );
+      const pushed = await runGit(remote, ["rev-parse", "--verify", "--quiet", "refs/heads/dummy"], [1]);
+      assert.equal(pushed.code, 1, "the branch was pushed");
+    });
+  }
 });
 
 const LOGIN = "codeworks-planner[bot]";

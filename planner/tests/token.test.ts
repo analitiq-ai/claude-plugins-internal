@@ -325,7 +325,7 @@ describe("a refused start exits 2 naming the cause, mints nothing and leaves no 
   }
 
   it("an origin holding a credential, named without it", async (t) => {
-    const secret = "ghp_dummySECRET123";
+    const secret = randomUUID();
     const w = await world(t, { origin: `https://x-access-token:${secret}@github.com/${OWNER}/${NAME}.git` });
     const session = randomUUID();
     const run = await w.run("SessionStart", session);

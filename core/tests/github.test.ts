@@ -1,5 +1,6 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { inspect } from "node:util";
@@ -364,7 +365,7 @@ test("repositoryOfRemote refuses an owner or name holding a character GitHub doe
 
 // The hook writes the refusal to stderr, which Claude Code hands to the session.
 test("repositoryOfRemote refuses a remote holding a credential, naming its host and path but not the credential", () => {
-  const secret = "ghp_dummySECRET123";
+  const secret = randomUUID();
   for (const url of [`https://x-access-token:${secret}@github.com/o/n.git`, `https://${secret}@github.com/o/n.git`]) {
     assert.throws(
       () => repositoryOfRemote(url),
