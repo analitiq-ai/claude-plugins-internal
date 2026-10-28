@@ -138,7 +138,7 @@ No gate violation.
 - Planner's `core` link, pinned package, v3 lockfile and pinned version: R2
 - One guarded entry module for the hook and every TypeScript script: R3
 - `planner/package.json` test harness and `tests.yml` running every component's npm and Python suites: R4
-- The hook on SessionStart and PreToolUse(Bash), minting under 10 minutes left: R5
+- The hook on SessionStart and PreToolUse(Bash), minting under 10 minutes left, refusing Bash after a failed start: R5
 - The token in planner's gh config folder, per repository, written and read by core: R6
 - `[planner] app_id` read through `readSettings` and this repo's `codeworks.toml`: R7
 - The repository and its https URL parsed from origin by core: R8

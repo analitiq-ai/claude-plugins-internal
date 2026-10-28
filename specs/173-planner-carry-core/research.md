@@ -66,13 +66,22 @@ code but not executed; the story that relies on it starts with a red test that r
   10 minutes (R6). `SessionStart` also writes the session environment (R9). A failure exits 2 with core's reason
   on stderr, so the Bash call does not run. It acts in every session where planner is enabled: planner's machine
   runs planner sessions only, with planner enabled per project (spec Assumptions; root ADR-0008 d2).
+  `SessionStart` first deletes the session's record, `~/.local/state/codeworks/planner/sessions/<session_id>`,
+  and writes it last, after the session environment (R9). `PreToolUse` exits 2 when its session has no record,
+  saying the session's start failed and a new session is needed. `session_id` comes from stdin and must be a UUID.
 - **Rationale**: Root ADR-0007 d2/d4 and orchestrator ADR-0001 d3: mint at session start and before a token
   expires. Every GitHub call planner makes leaves through a Bash call (the skill's `gh`, `drive_workflow.py`,
   the landing script), so a `PreToolUse` on Bash runs before each. 10 minutes exceeds the longest GitHub-calling
   Bash call: the landing script and the run's first step each make their calls within a minute of starting.
 - **Existing tools**: `mintToken` in `core/src/tokens.ts` (used as is, `"planner"` App); the fixture's
-  `hooks.json` shape. Not run: what `"onFailure": "block"` does on `SessionStart`; US2's first task runs it.
-  The `PreToolUse` exit-2 block is what FR-003/US2 #3 rest on either way.
+  `hooks.json` shape. Run on 2026-10-28 (T015, Claude Code 2.1.312, `claude -p`): a `SessionStart` hook that
+  exits 2, or exits 1 with `"onFailure": "block"`, does not stop the session, and a later Bash call still sees
+  `GH_TOKEN`. A `PreToolUse` hook gets no `CLAUDE_ENV_FILE`, so it cannot write the environment itself. Hence the
+  record: a failed start refuses every Bash call (root ADR-0004 d1, US2 #8). `SessionStart` and `PreToolUse` get
+  the same `session_id`, and a resumed session keeps it and runs `SessionStart` again, so deleting the record
+  first refuses a failed resume too. A `PreToolUse` hook that exits 1 with `"onFailure": "block"` does block
+  the Bash call (run 2026-10-28), so an error the hook does not name fails closed too. Rejected: putting the unset and export in front of each Bash command through
+  `PreToolUse`'s `updatedInput` (rewrites the command the admin approves; R9).
 
 ## R6: The token in planner's gh config folder
 
@@ -126,7 +135,8 @@ code but not executed; the story that relies on it starts with a red test that r
 - **Rationale**: US2 #7: the skill's `gh` calls and `new_issue.py` run in the session's shell; gh reads a token
   from those variables before its config folder, so leaving any set would let the admin's token act.
 - **Existing tools**: Claude Code's `CLAUDE_ENV_FILE`, sourced before each Bash command for variables a
-  SessionStart hook persists (docs; not run: US2's first task checks an `unset` line takes effect).
+  SessionStart hook persists. Run on 2026-10-28 (T015): with `GH_TOKEN` exported, a Bash call after a
+  `SessionStart` hook appended `unset GH_TOKEN` and `export GH_CONFIG_DIR=/tmp/x` printed `unset /tmp/x`.
   Rejected: rewriting each Bash command in `PreToolUse` (parses shell text); wrapping only planner's scripts
   (misses the skill's own `gh issue view`).
 
