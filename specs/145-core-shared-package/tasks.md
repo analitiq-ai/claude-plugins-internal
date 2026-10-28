@@ -165,7 +165,7 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   contracts/carrying-core.md shows: `guard.ts` imported statically, `MissingDependency` caught and exit 2 naming
   the package on stderr, then `await import('../core/identity.ts')` and print
   `parseBranch('212-us2-retry-budget').story` (FR-002, FR-003; R3, R4)
-- [ ] T028 [US1] In an admin's PR of its own, under the exempt label, after US1 merges and before any carrier
+- [x] T028 [US1] In an admin's PR of its own, under the exempt label, after US1 merges and before any carrier
   (reviewer ADR-0002 d4; R6), add the `carriers` job to `.github/workflows/tests.yml`: on `pull_request` and push to `main`,
   checkout with `fetch-depth: 0`, Node 22, `npm ci` in `core/`, then `node scripts/check-carriers.ts --base
   origin/<base>`, or `--base HEAD~1` on a push (R5, R6)
