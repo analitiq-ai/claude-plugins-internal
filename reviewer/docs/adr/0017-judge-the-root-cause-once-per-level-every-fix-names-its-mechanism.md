@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0017"
 title: "Judge the root cause once per level; every FIX names its mechanism"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [root-cause, assessment, policy, shim-check, reviewer-set]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:53Z
 ---
 
 # ADR-0017: Judge the root cause once per level; every FIX names its mechanism
@@ -92,4 +94,4 @@ Rejected: a hypothesised cause is the one most in need of a check against the di
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

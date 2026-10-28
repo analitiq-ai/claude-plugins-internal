@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0001"
 title: "Publish the audit dispatch as data; find, never rule or fix"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [audit, dispatch, findings, reviewer]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:57Z
 ---
 
 # ADR-0001: Publish the audit dispatch as data; find, never rule or fix
@@ -70,4 +72,4 @@ Rejected: the copy drifts from the skills.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

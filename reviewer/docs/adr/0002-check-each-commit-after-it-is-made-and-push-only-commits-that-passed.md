@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0002"
 title: "Check each commit after it is made, and push only commits that passed"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, commit-gate]
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:50Z
 ---
 
 # ADR-0002: Check each commit after it is made, and push only commits that passed
@@ -77,4 +79,4 @@ Rejected: the model can change the checkout under the check.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

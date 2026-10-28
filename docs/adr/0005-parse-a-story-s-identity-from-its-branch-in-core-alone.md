@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0005"
 title: "Parse a story's identity from its branch in core/ alone"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [story, branch, spec-folder, pull-request, core]
 scope: component
 reversibility: two-way-door
@@ -25,8 +25,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:46Z
 ---
 
 # ADR-0005: Parse a story's identity from its branch in core/ alone
@@ -90,4 +92,4 @@ Rejected: that file states no requirement.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

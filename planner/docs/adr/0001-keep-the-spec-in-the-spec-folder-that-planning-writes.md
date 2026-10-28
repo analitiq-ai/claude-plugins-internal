@@ -2,9 +2,9 @@
 schemaVersion: 0.1.0
 id: "0001"
 title: "Keep the spec in the spec folder that planning writes"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, spec-folder, skills]
 scope: component
 reversibility: two-way-door
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:54Z
 ---
 
 # ADR-0001: Keep the spec in the spec folder that planning writes
@@ -87,4 +89,4 @@ Rejected: the copy drifts from the one it copies.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this ADR, or sends it back.
+1. [x] The ratifier ratifies this ADR, or sends it back.

@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0009"
 title: "Build core in TypeScript, and move a plugin's scripts to TypeScript when they first call core"
-status: draft
+status: accepted
 date: 2026-10-22
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [core, language, typescript, packaging, contracts, dependencies]
 scope: component
 reversibility: two-way-door
@@ -25,12 +25,14 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/145"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 externalRefs:
   - type: doc
     url: "https://code.claude.com/docs/en/plugins/loading"
     label: "Claude Code: plugin loading and dependency install"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:47Z
 ---
 
 # ADR-0009: Build core in TypeScript, and move a plugin's scripts to TypeScript when they first call core
@@ -88,4 +90,4 @@ Rejected: it rewrites working code that gains nothing until it calls core.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

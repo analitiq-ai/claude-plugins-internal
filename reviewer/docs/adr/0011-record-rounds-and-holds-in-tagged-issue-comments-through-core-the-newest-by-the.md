@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0011"
 title: "Record rounds and holds in tagged issue comments through core/; the newest by the reviewer App wins"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [state, ledger, holds, issue-comments, orchestrator, fail-closed]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/133"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:52Z
 ---
 
 # ADR-0011: Record rounds and holds in tagged issue comments through core/; the newest by the reviewer App wins
@@ -97,4 +99,4 @@ Rejected: the orchestrator would attest from a record it wrote itself.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

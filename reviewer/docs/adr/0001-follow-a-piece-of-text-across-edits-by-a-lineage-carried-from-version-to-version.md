@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0001"
 title: "Follow a piece of text across edits by a lineage carried from version to version"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [claim-check, shim-check, holds]
@@ -19,8 +19,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/17"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:50Z
 ---
 
 # ADR-0001: Follow a piece of text across edits by a lineage carried from version to version
@@ -81,4 +83,4 @@ similarity threshold (git pairs moves by one).
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

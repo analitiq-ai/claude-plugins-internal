@@ -2,7 +2,7 @@
 schemaVersion: 0.1.0
 id: "0004"
 title: "Judge a fix with an outside classifier and compose the verdict in code"
-status: draft
+status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [shim-check, classifier, verdict]
@@ -21,8 +21,10 @@ provenance:
     name: Claude Code
     model: claude-fable-5-1
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/30"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:51Z
 ---
 
 # ADR-0004: Judge a fix with an outside classifier and compose the verdict in code
@@ -89,4 +91,4 @@ Rejected: an agent cannot answer within the hook's time.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.

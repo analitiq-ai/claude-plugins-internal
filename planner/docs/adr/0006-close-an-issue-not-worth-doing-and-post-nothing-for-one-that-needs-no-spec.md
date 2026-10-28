@@ -2,9 +2,9 @@
 schemaVersion: 0.2.0
 id: "0006"
 title: "Close an issue not worth doing and post nothing for one that needs no spec"
-status: draft
+status: accepted
 date: 2026-10-20
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [premise, issue, workflow]
 scope: component
 reversibility: two-way-door
@@ -23,8 +23,10 @@ provenance:
     name: Claude Code
     model: claude-opus-5-5
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/63"
+  ratifiedBy: "@Analitiq-Bot-Wonka"
 review:
   tier: async
+  decidedAt: 2026-10-28T14:35:55Z
 ---
 
 # ADR-0006: Close an issue not worth doing and post nothing for one that needs no spec
@@ -75,4 +77,4 @@ Lost: a plugin write outside the State table.
 
 ## Action items
 
-1. [ ] The ratifier ratifies this record, or sends it back.
+1. [x] The ratifier ratifies this record, or sends it back.
