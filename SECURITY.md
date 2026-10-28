@@ -248,6 +248,7 @@ The other rows ran on 2.1.300 to 2.1.306.
 | The tool name a deny rule or hook matcher needs for subagents | `Task` (and `Agent` on newer builds) |
 | `--setting-sources ""` with an installed plugin enabled by `--settings` (2.1.310) | The plugin loaded; not enabled, it did not |
 | Read, Bash and Write deny rules under `bypassPermissions` with `--setting-sources ""` (2.1.310) | All denied |
+| `claude plugin install` of a plugin with a `package-lock.json`, no managed file (2.1.312) | The locked dependency versions installed into the plugin's `node_modules` |
 
 ## 8. Known limits and open items
 
@@ -282,9 +283,13 @@ The other rows ran on 2.1.300 to 2.1.306.
   remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
   GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer
   never deletes its own.
-- **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); whether Claude Code's
-  install of a plugin's npm dependencies reaches the registry under the managed settings; how the
+- **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the
   decision-reviewer reads a private org log with a one-repo token.
+- **Plugin npm dependencies under the managed file:** `claude plugin install` fetches a plugin's locked
+  dependencies (§7); whether it reaches the npm registry with the managed file installed, whose
+  `allowedDomains` lists none, is untested. The admin installs each plugin outside a session and checks
+  its `node_modules` at setup; while one is missing, every hook that runs core code refuses, naming the
+  package (root ADR-0009 d4).
 - **Claude Code upgrades:** every result in §7 holds only for the versions tested. Pin the version on the
   agent machine and re-run these tests before moving to a new one.
 
