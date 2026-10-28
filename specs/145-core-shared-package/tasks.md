@@ -425,7 +425,7 @@ list and permissions; try a write outside the set and to a second repo (quicksta
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T065 On US5's branch, run `npm test` and `node scripts/check-carriers.ts --base origin/main` in `core/`,
+- [x] T065 On US5's branch, run `npm test` and `node scripts/check-carriers.ts --base origin/main` in `core/`,
   and check every acceptance scenario of US1, US2, US3 and US5 has a passing test or a recorded run
 
 ---
