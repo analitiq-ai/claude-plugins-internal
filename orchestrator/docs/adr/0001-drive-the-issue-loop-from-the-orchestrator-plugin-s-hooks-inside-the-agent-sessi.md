@@ -46,7 +46,8 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
    each PR's base branch (ADR-0009); the session's commits; its own section and `[shared]` of
    `codeworks.toml` (root ADR-0002); its hook's event. It parses no prose except through `core/`'s
    modules (root ADR-0003) and runs no LLM.
-3. We will drive the loop from three hooks. SessionStart mints the session's token (root ADR-0007).
+3. We will drive the loop from four hooks. SessionStart mints the session's token (root ADR-0007), and
+   PreToolUse mints a new one before it expires, so a turn longer than the token's hour keeps one.
    The prompt `/codeworks <issue>` claims or resumes that issue when ADR-0002 lets it, refusing any other
    with the reason, and names `builder:issue-tackle <s>`; nothing picks an issue on its own. Stop refuses
    the stop with the next step until none is left. It ignores a Stop while a workflow runs and takes no
