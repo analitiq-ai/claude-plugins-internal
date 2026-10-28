@@ -399,22 +399,22 @@ list and permissions; try a write outside the set and to a second repo (quicksta
 
 ### Tests for User Story 5 ⚠️ (write first, see each fail)
 
-- [ ] T061 [P] [US5] Write `core/tests/tokens.test.ts` against a local `node:http` server and a key the test
+- [x] T061 [P] [US5] Write `core/tests/tokens.test.ts` against a local `node:http` server and a key the test
   generates: the JWT is RS256 with `iat` now − 60 s, `exp` now + 9 min, `iss` the App ID; the request names
   `repositories: [name]` and exactly the App's permissions under GitHub's API keys; an answer naming another
   repository, with `expires_at` over one hour away, lacking or lowering a requested permission, or adding any but
   `metadata: read` is refused; a 404 names "not installed on <repo>"; a missing key names its path; no other
   credential is tried; the token value is in no error message (FR-035 to FR-037, AS2, AS3; R24)
-- [ ] T062 [P] [US5] Write `core/tests/security-permissions.test.ts`: each of the four Apps' permission sets in
+- [x] T062 [P] [US5] Write `core/tests/security-permissions.test.ts`: each of the four Apps' permission sets in
   `tokens.ts` equals `SECURITY.md` §3, mapping §3's names to API keys ("projects" → `organization_projects`); the
   orchestrator's holds `workflows: write` (contracts/key-files.md)
 
 ### Implementation for User Story 5
 
-- [ ] T063 [US5] Create `core/src/tokens.ts`: `mintToken(app, appId, keyFile, plugin, repo)` with the session,
+- [x] T063 [US5] Create `core/src/tokens.ts`: `mintToken(app, appId, keyFile, plugin, repo)` with the session,
   orchestrator, reviewer and planner permission sets of contracts/key-files.md, the key read through `readKey`,
   signing with `node:crypto`, and `MintError(cause)` (R24)
-- [ ] T064 [US5] Mint a real token of each App for a test repo (quickstart.md, US5): expiry within one hour,
+- [x] T064 [US5] Mint a real token of each App for a test repo (quickstart.md, US5): expiry within one hour,
   scoped to that repo, the answer's permissions as T061 expects (confirming whether GitHub adds `metadata:
   read`); a comment on another repo and a write outside the set refused; record the results in the PR (AS1,
   SC-008)
@@ -425,7 +425,7 @@ list and permissions; try a write outside the set and to a second repo (quicksta
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T065 On US5's branch, run `npm test` and `node scripts/check-carriers.ts --base origin/main` in `core/`,
+- [x] T065 On US5's branch, run `npm test` and `node scripts/check-carriers.ts --base origin/main` in `core/`,
   and check every acceptance scenario of US1, US2, US3 and US5 has a passing test or a recorded run
 
 ---
