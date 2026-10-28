@@ -42,7 +42,7 @@ export class RemoteRefused extends Error {
 
 // A URL's userinfo may hold the admin's token, and planner's hook writes this refusal to stderr, which reaches the
 // session. The greedy match ends at the last `@` before the path, so a password holding a stray `@` goes whole.
-function withoutUserinfo(url: string): string {
+export function withoutUserinfo(url: string): string {
   return url.replace(/^([^:/?#]+:\/\/)[^/?#]*@/, "$1***@");
 }
 
