@@ -4,13 +4,10 @@ import type { Finding } from "../contracts/finding.ts";
 import { answerOf, ownerAndName, type GitHubClient } from "../github.ts";
 import { couldNotRun, couldNotRunIfUnanswered, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
-import { CheckOutcome, CoreSource } from "../values.ts";
+import { CheckOutcome, REQUIRED_CHECKS_SOURCE as SOURCE } from "../values.ts";
 import { assertAsked } from "./contract.ts";
 
 const { PENDING, PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
-// The core source that is not threads: a hyphenated value has no `.enum` property name, and quoted outside
-// values.ts it is refused (R7).
-const [SOURCE] = CoreSource.exclude([CoreSource.enum.threads]).options;
 
 type Outcome = StatusAnswer["outcome"];
 
