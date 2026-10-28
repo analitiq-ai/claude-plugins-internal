@@ -383,7 +383,7 @@ required-checks reader's answers (quickstart.md, US3)
   contracts/core-api.md)
 - [x] T059 [US3] Create `core/src/validation/required-checks.ts`: `requiredChecks(shared, reader, validators)`,
   `GitHubUnanswered` turned into COULD_NOT_RUN at its boundary (R22)
-- [ ] T060 [US3] Run quickstart.md US3 against a test repo; record what ran and its result in the PR
+- [x] T060 [US3] Run quickstart.md US3 against a test repo; record what ran and its result in the PR
 
 **Checkpoint**: US3's PR passes `npm test`; every could-not-run fixture yields COULD_NOT_RUN from core's answers
 over the fixture package and from the required-checks reader
