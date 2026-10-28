@@ -59,7 +59,7 @@ after (GitHub's times are whole seconds); "after" between two comments is `datab
 
 | Term | Read as |
 |---|---|
-| admin comment | an issue comment whose author is none of the four `[shared]` App logins and whose `authorAssociation` is OWNER, MEMBER or COLLABORATOR (orchestrator ADR-0010 d2) |
+| admin comment | an issue comment whose author is a `User` (an App posting as itself is a `Bot`; an admin posting through an App acting for them is the `User`), whose `role_name` on the repository, from the collaborator-permission endpoint, is admin, maintain or write (orchestrator ADR-0010 d2) |
 | Ready move | the newest status-change event on the issue's timeline whose `status` is `Ready`, whose `project.url` is `[shared] board`, whoever made it (orchestrator ADR-0002 d1; reviewer ADR-0013 d2) |
 | an escalation hold's question | the oldest comment by `orchestrator_app_login` whose first line is `<!-- codeworks:hold-question <id> <since> -->`, the hold's id and `since` |
 | reset | the newest admin comment whose body, trimmed, is `/codeworks reset` |

@@ -60,7 +60,7 @@
 - Q: How does the DeepSource module pick its source? → A: superseded by Session 2026-10-26 (rulings): the DeepSource package's spec settles it.
 - Q: How long does the orchestrator wait before a module is SILENT? → A: `review_timeout`, one `[orchestrator]` key (default 30 minutes) for every module and required check (orchestrator ADR-0001 d8, ADR-0008 d4).
 - Q: Whose threads are never findings? → A: any codeworks App's: session, orchestrator, reviewer or planner (root ADR-0007 d5).
-- Q: How is a hold released? → A: by one rule, on the orchestrator's claim from Ready: an open hold is releasable when the card's newest move to Ready and an admin's comment on the story issue are both newer than the state comment that placed it; for an escalation hold, that comment must also follow the orchestrator's question. An admin is a writer, OWNER, MEMBER or COLLABORATOR, other than a codeworks App. An admin's `/codeworks reset` comment makes every hold placed before it releasable and restarts every count. The orchestrator reads the rule to stop a start, reviewer to release, so the rule lives in core's state module (reviewer ADR-0013 d2, d3; orchestrator ADR-0002 d3, ADR-0010 d2). A hold for tampered, deleted or invalid state releases by the same rule, counted from the tampering (reviewer ADR-0011 d2). Which Ready counts, amended by Session 2026-10-27 (records of #153).
+- Q: How is a hold released? → A: by one rule, on the orchestrator's claim from Ready: an open hold is releasable when the card's newest move to Ready and an admin's comment on the story issue are both newer than the state comment that placed it; for an escalation hold, that comment must also follow the orchestrator's question. An admin is a writer, a `User` whose role on the repository is admin, maintain or write; a comment an App posts as itself is the App's, never an admin's, while one an admin posts through an App acting for them is the admin's. An admin's `/codeworks reset` comment makes every hold placed before it releasable and restarts every count. The orchestrator reads the rule to stop a start, reviewer to release, so the rule lives in core's state module (reviewer ADR-0013 d2, d3; orchestrator ADR-0002 d3, ADR-0010 d2). A hold for tampered, deleted or invalid state releases by the same rule, counted from the tampering (reviewer ADR-0011 d2). Which Ready counts, amended by Session 2026-10-27 (records of #153); how an admin is read, amended by Session 2026-10-28 (T044, records of #165).
 - Q: Where do the attestation and the module verdicts land? → A: as check runs by the orchestrator App, `internal-review` and each `<module>-review` (orchestrator ADR-0004, ADR-0008 d3). Core's reads feed them; core writes neither.
 
 ### Session 2026-10-26 (rulings, records at ab83f33)
@@ -75,11 +75,15 @@
 
 ### Session 2026-10-27 (records of #153)
 
-- Q: Who is the actor this spec called "human"? → A: an admin: a writer, OWNER, MEMBER or COLLABORATOR, other than a codeworks App (reviewer ADR-0013 d2). The human machine is the admin machine.
+- Q: Who is the actor this spec called "human"? → A: an admin: a writer, a `User` whose role on the repository is admin, maintain or write, never an App posting as itself (reviewer ADR-0013 d2). The human machine is the admin machine. How an admin is read, amended by Session 2026-10-28 (T044, records of #165).
 - Q: Which Ready counts toward a release? → A: any move of the card to Ready on the board `[shared] board` names, whoever made it; a move on another project does not (orchestrator ADR-0002 d1; reviewer ADR-0013 d2).
 - Q: Which hook mints the planner App's token, and where is its ID? → A: planner's own hook, on the admin machine, where no other codeworks plugin runs; its read of `planner-app.pem` is the only one exempt from the managed-settings check. The planner App's ID is a `[planner]` key (root ADR-0002 d1, d2; root ADR-0007 d4; root ADR-0008 d2, d9).
 - Q: Whose close of a story's issue makes it done? → A: an admin's; otherwise only its PR's merge (root ADR-0005 d5).
 - Q: Who opens a story's draft PR? → A: the orchestrator's hooks, after the first push (builder ADR-0003 d1; reviewer ADR-0012).
+
+### Session 2026-10-28 (T044, records of #165)
+
+- Q: How is an admin read? → A: by the author's repository role, the same read that decides an admin's close (FR-011). GitHub computes `author_association` for the reader and hides a private org membership from an App's token. On playground, an org admin's comments read as CONTRIBUTOR to all three Apps, and no release, answer or reset counted (T044, PR #164). MEMBER also covers an org member who can only read (orchestrator ADR-0010 d2, amended).
 
 ## Terms
 
@@ -106,8 +110,8 @@
   d4).
 - **Codeworks App**: any of those four. None is ever an admin, writer, trusted or exempt actor (root
   ADR-0007 d5).
-- **Admin**: a writer, author association OWNER, MEMBER or COLLABORATOR, other than a codeworks App
-  (orchestrator ADR-0010 d2; reviewer ADR-0013 d2).
+- **Admin**: a writer, a `User` whose role on the repository is admin, maintain or write, never an App
+  posting as itself (orchestrator ADR-0010 d2; reviewer ADR-0013 d2).
 - **Claim**: the orchestrator's move of a story's card from Ready to In progress on the prompt that names
   it; holds are released only then (orchestrator ADR-0002 d2; reviewer ADR-0013 d2).
 - **Ready move**: a move of a story's card to Ready on the board `[shared] board` names, whoever made it

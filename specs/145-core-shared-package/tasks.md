@@ -205,7 +205,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
   non-empty exactly when `kind` is escalation; `spec_pr` an int ≥ 1 or null, null for every kind but rescope;
   `at`, `since`, `released` `YYYY-MM-DDTHH:MM:SSZ`; `head` 40-hex; `n` ≥ 1; each pushback's round exists; `v` is
   1 (FR-012; data-model.md, Snapshot)
-- [x] T033 [P] [US2] Write `core/tests/state-read.test.ts` on `stateFrom(comments, deletions, moves, shared)`:
+- [x] T033 [P] [US2] Write `core/tests/state-read.test.ts` on `stateFrom(comments, deletions, moves, writers, shared)`:
   AS1 (the newest by the reviewer App among newer admin and orchestrator App comments); AS2 (`tampered` on
   `lastEditedAt`; `deleted` when a reviewer App deletion's `createdAt` is at or after the state comment's, same
   second included, or with no reviewer App comment; `invalid` for an untagged newest beside an older tagged one,
@@ -218,11 +218,12 @@ posted; attest in scratch git repos (quickstart.md, US2)
   through `releaseOnClaim` on the fake client so both give one answer (SC-002, critique X1):
   - AS12: hold `since` 10:00, admin comment 10:30, Ready move 11:00 → releasable, released by the 10:30 comment
     (`{id, url, at}`, `reset` false), edited or not; not releasable when the only later comment is by any of the
-    four App logins or its `authorAssociation` is not OWNER, MEMBER or COLLABORATOR; nor when the
+    four App logins or its author is not a `User` in `writers`; nor when the
     only later Ready move has `project.url` other than `[shared] board` or a `status` other than `Ready`; nor when
     the comment or the move is in the same second as `since` or before it; a Ready move on the board counts
     whoever made it, a board workflow's or an App's included; the order of comment and move does
-    not matter (Edge Cases)
+    not matter (Edge Cases); an org member whose comment reads as `authorAssociation` CONTRIBUTOR but whose role
+    is write counts (T044)
   - AS13: an escalation hold whose question, the oldest orchestrator App comment whose first line is
     `questionTag(hold)`, is at 10:10: an admin comment at 10:05 → not releasable; at 10:20 with Ready after →
     releasable; with no question posted → releasable only by a reset
@@ -275,10 +276,12 @@ posted; attest in scratch git repos (quickstart.md, US2)
   `core/schemas/snapshot.schema.json` (R8)
 - [x] T040 [US2] Create the read half of `core/src/state.ts`: `stateFrom` up to the working snapshot and
   `readState(reader, repo, issue, shared)`, one paginated GraphQL read of comments (`databaseId`, `author {
-  __typename login }`, `authorAssociation`, `body`, `createdAt`, `lastEditedAt`, `url`), `COMMENT_DELETED_EVENT`
+  __typename login }`, `body`, `createdAt`, `lastEditedAt`, `url`), `COMMENT_DELETED_EVENT`
   (`createdAt`, `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`,
   `project { url }`) items and `projectItems { project { url } }`,
-  throwing `BoardNotVisible`, returning `StateReading` (data-model.md; R15)
+  throwing `BoardNotVisible`; then each distinct `User` comment author's `role_name`, read once through the one
+  role read `isDone` uses, moved from `core/src/identity.ts` to `core/src/github.ts` so both call it, handing
+  `stateFrom` the writer logins; returning `StateReading` (data-model.md; R15)
 - [x] T041 [US2] Add the release rule to `core/src/state.ts`: `questionTag(hold)`, the admin comment, Ready move,
   question and reset terms, `releasable`, `tamper_released`, `startable` and `reset` in `stateFrom` (R27)
 - [x] T042 [US2] Add the writes to `core/src/state.ts`: `renderState`, `checkTransition`, `writeState`,
