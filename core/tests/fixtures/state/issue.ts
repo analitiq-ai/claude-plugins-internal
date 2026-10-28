@@ -73,7 +73,6 @@ export function comment(databaseId: number, author: IssueComment["author"], body
   return {
     databaseId,
     author,
-    authorAssociation: "NONE",
     body,
     createdAt: at("10:00"),
     lastEditedAt: null,
@@ -87,7 +86,7 @@ export function stateComment(databaseId: number, state: Snapshot, fields: Partia
 }
 
 export function adminComment(databaseId: number, clock: string, body = "Go ahead.", fields: Partial<IssueComment> = {}): IssueComment {
-  return comment(databaseId, ADMIN, body, { authorAssociation: "MEMBER", createdAt: at(clock), ...fields });
+  return comment(databaseId, ADMIN, body, { createdAt: at(clock), ...fields });
 }
 
 /** contracts/state-comment.md's question tag, spelt out, as the orchestrator App posts it. */
@@ -113,14 +112,26 @@ export type Issue = {
   moves?: Move[];
   /** The issue's project items' URLs; the board alone unless a test says otherwise. */
   items?: string[];
+  /** Each commenter's `role_name` on the repository; ADMIN's alone unless a test says otherwise. */
+  roles?: Record<string, string>;
 };
+
+const ADMIN_ROLES: Record<string, string> = { [ADMIN.login]: "admin" };
+
+// contracts/state-comment.md's writer roles, spelt out here so core is graded against the contract.
+const WRITER_ROLES = ["admin", "maintain", "write"];
+
+/** The logins `stateFrom` takes as writers: those whose role is a writer's. */
+export function writersOf({ roles = ADMIN_ROLES }: Issue): Set<string> {
+  return new Set(Object.entries(roles).flatMap(([login, role]) => (WRITER_ROLES.includes(role) ? [login] : [])));
+}
 
 function onIssue(vars: Record<string, unknown>): boolean {
   return vars.owner === "acme" && vars.name === "widgets" && vars.number === ISSUE;
 }
 
-/** The session App's client: it reads the issue and the board, and answers nothing else. */
-export function reader({ comments, deletions = [], moves = [], items = [BOARD] }: Issue): FakeGitHub {
+/** The session App's client: it reads the issue, the board and each commenter's role, and answers nothing else. */
+export function reader({ comments, deletions = [], moves = [], items = [BOARD], roles = ADMIN_ROLES }: Issue): FakeGitHub {
   const timeline = [
     ...deletions.map((event) => ({ __typename: "CommentDeletedEvent", ...event })),
     ...moves.map((event) => ({ __typename: "ProjectV2ItemStatusChangedEvent", ...event })),
@@ -134,6 +145,9 @@ export function reader({ comments, deletions = [], moves = [], items = [BOARD] }
         answer: items.map((project) => ({ project: { url: project } })),
       },
     ],
+    rest: Object.fromEntries(
+      Object.entries(roles).map(([login, role]) => [`GET /repos/acme/widgets/collaborators/${login}/permission`, { role_name: role }]),
+    ),
   });
 }
 

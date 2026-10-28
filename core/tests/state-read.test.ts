@@ -12,7 +12,8 @@ import {
   type StateReading,
   type StatusChange,
 } from "../src/state.ts";
-import { fakeGitHub } from "./support/fake-github.ts";
+import { GitHubRefused } from "../src/github.ts";
+import { fakeGitHub, type FakeAnswer } from "./support/fake-github.ts";
 
 const REPO = "acme/widgets";
 const ISSUE = 212;
@@ -34,6 +35,7 @@ const SHARED: Shared = {
 const REVIEWER_APP = { __typename: "Bot", login: "codeworks-reviewer" };
 const ORCHESTRATOR_APP = { __typename: "Bot", login: "codeworks-orchestrator" };
 const ADMIN = { __typename: "User", login: "alice" };
+const WRITERS: ReadonlySet<string> = new Set([ADMIN.login]);
 
 function at(clock: string): string {
   return `2026-10-28T${clock.length === 5 ? `${clock}:00` : clock}Z`;
@@ -74,7 +76,6 @@ function comment(databaseId: number, author: IssueComment["author"], body: strin
   return {
     databaseId,
     author,
-    authorAssociation: "NONE",
     body,
     createdAt: at("10:00"),
     lastEditedAt: null,
@@ -92,7 +93,7 @@ function deletion(clock: string, deletedCommentAuthor: CommentDeletion["deletedC
 }
 
 function read(comments: IssueComment[], deletions: CommentDeletion[] = [], moves: StatusChange[] = []): StateReading {
-  return stateFrom(comments, deletions, moves, SHARED);
+  return stateFrom(comments, deletions, moves, WRITERS, SHARED);
 }
 
 function causesOf(reading: StateReading): string[] {
@@ -114,7 +115,7 @@ describe("stateFrom: which comment is the state comment", () => {
       stateComment(101, snapshot(1), { createdAt: at("10:01") }),
       stateComment(102, snapshot(2), { createdAt: at("10:02") }),
       stateComment(103, newest, { createdAt: at("10:03") }),
-      comment(104, ADMIN, "Looks right to me.", { createdAt: at("10:04"), authorAssociation: "MEMBER" }),
+      comment(104, ADMIN, "Looks right to me.", { createdAt: at("10:04") }),
       comment(105, ORCHESTRATOR_APP, stateBody(snapshot(9)), { createdAt: at("10:05") }),
     ]);
     assert.deepEqual(reading.snapshot, newest);
@@ -149,7 +150,7 @@ describe("stateFrom: which comment is the state comment", () => {
   it("is no state, not held, with no reviewer App comment and no deletion, whoever else wrote (AS3)", () => {
     const reading = read(
       [
-        comment(104, ADMIN, "Opened the PR.", { authorAssociation: "OWNER" }),
+        comment(104, ADMIN, "Opened the PR."),
         comment(105, ORCHESTRATOR_APP, "Claimed."),
       ],
       [deletion("10:30", ADMIN)],
@@ -198,7 +199,7 @@ describe("stateFrom: tampered, deleted and invalid state (AS2)", () => {
   });
 
   it("holds as deleted when a reviewer App comment was deleted and none is left", () => {
-    const reading = read([comment(104, ADMIN, "Hm.", { authorAssociation: "OWNER" })], [deletion("10:30")]);
+    const reading = read([comment(104, ADMIN, "Hm.")], [deletion("10:30")]);
     assert.equal(reading.held, true);
     assert.deepEqual(reading.causes, [{ cause: "deleted" }]);
     assert.equal(reading.comment_url, null);
@@ -376,7 +377,7 @@ describe("readState", () => {
   const comments = [
     stateComment(101, snapshot(1), { createdAt: at("10:00") }),
     stateComment(102, snapshot(2, { holds: [openHold("pushback-212")] }), { createdAt: at("10:05") }),
-    comment(103, ADMIN, "Go.", { createdAt: at("10:30"), authorAssociation: "OWNER" }),
+    comment(103, ADMIN, "Go.", { createdAt: at("10:30") }),
   ];
   const deletions = [deletion("09:58")];
   const moves: StatusChange[] = [{ createdAt: at("11:00"), status: "Ready", project: { url: BOARD } }];
@@ -389,8 +390,11 @@ describe("readState", () => {
     return vars.owner === "acme" && vars.name === "widgets" && vars.number === ISSUE;
   }
 
-  function reader(projectItems: unknown[], commentNodes: unknown[] = comments) {
+  const ROLE_PATH = "GET /repos/acme/widgets/collaborators/alice/permission";
+
+  function reader(projectItems: unknown[], commentNodes: unknown[] = comments, role: FakeAnswer = { role_name: "admin" }) {
     return fakeGitHub({
+      rest: { [ROLE_PATH]: role },
       graphqlPages: [
         { when: (query, vars) => /\bcomments\(/.test(query) && onIssue(vars), answer: commentNodes },
         {
@@ -409,8 +413,26 @@ describe("readState", () => {
   it("gives stateFrom's answer over the issue's comments, deletions and status changes", async () => {
     const items = [{ project: { url: "https://github.com/orgs/example-org/projects/7" } }, { project: { url: BOARD } }];
     const reading = await readState(reader(items), REPO, ISSUE, SHARED);
-    assert.deepEqual(reading, stateFrom(comments, deletions, moves, SHARED));
+    assert.deepEqual(reading, stateFrom(comments, deletions, moves, WRITERS, SHARED));
     assert.deepEqual(reading.causes, [{ cause: "open_hold", id: "pushback-212" }]);
+  });
+
+  it("reads each User commenter's role once, and no App's", async () => {
+    const client = reader([{ project: { url: BOARD } }], [...comments, comment(104, ADMIN, "Still go.", { createdAt: at("10:40") })]);
+    await readState(client, REPO, ISSUE, SHARED);
+    const roleReads = client.calls.filter((call) => call.kind === "rest");
+    assert.deepEqual(roleReads.map((call) => call.kind === "rest" && `${call.method} ${call.path}`), [ROLE_PATH]);
+  });
+
+  it("counts an org member's comment by its role, though GitHub tells the App CONTRIBUTOR (T044)", async () => {
+    const asTheAppSeesIt = comments.map((node) => ({ ...node, authorAssociation: node.author === ADMIN ? "CONTRIBUTOR" : "NONE" }));
+    const reading = await readState(reader([{ project: { url: BOARD } }], asTheAppSeesIt, { role_name: "write" }), REPO, ISSUE, SHARED);
+    assert.deepEqual(reading.releasable.map((release) => [release.id, release.comment.id]), [["pushback-212", 103]]);
+  });
+
+  it("fails the read when a commenter's role cannot be read", async () => {
+    const refused = new GitHubRefused(403, "Resource not accessible by integration");
+    await assert.rejects(readState(reader([{ project: { url: BOARD } }], comments, refused), REPO, ISSUE, SHARED), GitHubRefused);
   });
 
   it("throws BoardNotVisible naming the board when no item of the issue is on it", async () => {

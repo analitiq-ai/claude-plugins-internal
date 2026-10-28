@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
 import { Snapshot, Time, type Hold, type Round, type RoundId } from "./contracts/snapshot.ts";
-import { answerOf, assertIssueNumber, ownerAndName, type GitHubClient } from "./github.ts";
+import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState } from "./values.ts";
 
@@ -18,9 +18,7 @@ const COMMENT_LIMIT = 65_536;
 // GraphQL names an App as a `Bot` by its bare login; `[shared]` holds REST's `<slug>[bot]` form.
 const BOT_TYPE = "Bot";
 
-// contracts/state-comment.md, Release: GitHub's own record of a writer (orchestrator ADR-0010 d2), the board's
-// status name, and the one command an admin resets with.
-const ADMIN_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+// contracts/state-comment.md, Release: the board's status name, and the one command an admin resets with.
 const READY_STATUS = "Ready";
 const RESET_COMMAND = "/codeworks reset";
 
@@ -32,7 +30,6 @@ type Actor = z.infer<typeof Actor>;
 const IssueCommentNode = z.object({
   databaseId: z.int().min(1),
   author: Actor.nullable(),
-  authorAssociation: z.string(),
   body: z.string(),
   createdAt: Time,
   lastEditedAt: Time.nullable(),
@@ -154,9 +151,8 @@ function emptySnapshot(): Snapshot {
   return { v: 1, rounds: [], holds: [], pushbacks: [] };
 }
 
-function isCodeworksApp(actor: Actor | null, shared: Shared): boolean {
-  const apps = [shared.session_app_login, shared.orchestrator_app_login, shared.reviewer_app_login, shared.planner_app_login];
-  return apps.some((login) => isApp(actor, login));
+function isWriter(actor: Actor | null, writers: ReadonlySet<string>): boolean {
+  return actor !== null && actor.__typename === USER_TYPE && writers.has(actor.login);
 }
 
 function firstLine(body: string): string {
@@ -178,9 +174,14 @@ type ReleaseTerms = {
   reset: IssueComment | null;
 };
 
-function releaseTerms(comments: readonly IssueComment[], moves: readonly StatusChange[], shared: Shared): ReleaseTerms {
+function releaseTerms(
+  comments: readonly IssueComment[],
+  moves: readonly StatusChange[],
+  writers: ReadonlySet<string>,
+  shared: Shared,
+): ReleaseTerms {
   const adminComments = comments
-    .filter((comment) => ADMIN_ASSOCIATIONS.has(comment.authorAssociation) && !isCodeworksApp(comment.author, shared))
+    .filter((comment) => isWriter(comment.author, writers))
     .toSorted((a, b) => b.databaseId - a.databaseId);
   const readySeconds = moves
     .filter((move) => move.status === READY_STATUS && move.project?.url === shared.board)
@@ -240,6 +241,7 @@ function judge(
   comments: readonly IssueComment[],
   deletions: readonly CommentDeletion[],
   moves: readonly StatusChange[],
+  writers: ReadonlySet<string>,
   shared: Shared,
 ): Judgement {
   // Every reviewer App comment, whatever its body: an edit that removes the tag must hold the story, not hand
@@ -249,7 +251,7 @@ function judge(
     .toSorted((a, b) => b.databaseId - a.databaseId);
   const reviewerDeletions = deletions.filter((deletion) => isApp(deletion.deletedCommentAuthor, shared.reviewer_app_login));
   const stateComment = reviewerComments.at(0) ?? null;
-  const terms = releaseTerms(comments, moves, shared);
+  const terms = releaseTerms(comments, moves, writers, shared);
   const reset = terms.reset === null ? null : { url: terms.reset.url, at: terms.reset.createdAt };
 
   if (stateComment === null && reviewerDeletions.length === 0) {
@@ -329,21 +331,25 @@ function judge(
   return { reading, tamperedAt };
 }
 
-/** The one answer every reader and writer of a story's state acts on (R15, R27). Pure: GitHub is read by the caller. */
+/**
+ * The one answer every reader and writer of a story's state acts on (R15, R27). Pure: GitHub is read by the caller,
+ * `writers` included, the logins whose role on the repository is a writer's.
+ */
 export function stateFrom(
   comments: readonly IssueComment[],
   deletions: readonly CommentDeletion[],
   moves: readonly StatusChange[],
+  writers: ReadonlySet<string>,
   shared: Shared,
 ): StateReading {
-  return judge(comments, deletions, moves, shared).reading;
+  return judge(comments, deletions, moves, writers, shared).reading;
 }
 
 const COMMENTS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
       comments(first: 100, after: $cursor) {
-        nodes { databaseId author { __typename login } authorAssociation body createdAt lastEditedAt url }
+        nodes { databaseId author { __typename login } body createdAt lastEditedAt url }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -391,13 +397,19 @@ async function judgeIssue(reader: GitHubClient, repo: string, issue: number, sha
 
   if (!items.some((item) => item.project.url === shared.board)) throw new BoardNotVisible(shared.board);
 
+  // The role, not `authorAssociation`: GitHub hides a private org membership from an App's token, so a member's
+  // comment reads as CONTRIBUTOR to it (orchestrator ADR-0010 d2).
+  const commenters = new Set(comments.flatMap((comment) => (comment.author?.__typename === USER_TYPE ? [comment.author.login] : [])));
+  const roles = await Promise.all([...commenters].map(async (login) => [login, await roleOf(reader, where, login)] as const));
+  const writers = new Set(roles.flatMap(([login, role]) => (isWriterRole(role) ? [login] : [])));
+
   const deletions: CommentDeletion[] = [];
   const moves: StatusChange[] = [];
   for (const item of timeline) {
     if (item.__typename === DELETED_EVENT) deletions.push(item);
     else moves.push(item);
   }
-  return judge(comments, deletions, moves, shared);
+  return judge(comments, deletions, moves, writers, shared);
 }
 
 /** `reader` reads issues and the board: the session App's or the orchestrator App's client (R15). */

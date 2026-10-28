@@ -29,6 +29,7 @@ import {
   stateComment,
   url,
   writer,
+  writersOf,
   type Issue,
 } from "./fixtures/state/issue.ts";
 
@@ -69,26 +70,33 @@ const AS12: Fixture[] = [
     startable: true,
   },
   ...Object.entries(APPS).map(([name, app]): Fixture => ({
-    name: `the only later comment is the ${name} App's, an owner's association or not`,
+    name: `the only later comment is the ${name} App's, whatever role its login has`,
     issue: {
-      comments: [placedBy(PUSHBACK), comment(201, app, "Go ahead.", { authorAssociation: "OWNER", createdAt: at("10:30") })],
+      comments: [placedBy(PUSHBACK), comment(201, app, "Go ahead.", { createdAt: at("10:30") })],
       moves: [move("11:00")],
+      roles: { [app.login]: "admin" },
     },
     releasable: [],
     startable: false,
   })),
-  ...["CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", "NONE"].map((association): Fixture => ({
-    name: `the only later comment's authorAssociation is ${association}`,
-    issue: { comments: [placedBy(PUSHBACK), adminComment(201, "10:30", "Go.", { authorAssociation: association })], moves: [move("11:00")] },
+  ...["triage", "read", "none", ""].map((role): Fixture => ({
+    name: `the only later comment's author has the role ${JSON.stringify(role)}`,
+    issue: { comments: [placedBy(PUSHBACK), adminComment(201, "10:30")], moves: [move("11:00")], roles: { [ADMIN.login]: role } },
     releasable: [],
     startable: false,
   })),
-  ...["OWNER", "COLLABORATOR"].map((association): Fixture => ({
-    name: `an ${association}'s comment counts as an admin's`,
-    issue: { comments: [placedBy(PUSHBACK), adminComment(201, "10:30", "Go.", { authorAssociation: association })], moves: [move("11:00")] },
+  ...["admin", "maintain", "write"].map((role): Fixture => ({
+    name: `the comment of a User with the role ${role} counts as an admin's`,
+    issue: { comments: [placedBy(PUSHBACK), adminComment(201, "10:30")], moves: [move("11:00")], roles: { [ADMIN.login]: role } },
     releasable: [["pushback-212", 201, false]],
     startable: true,
   })),
+  {
+    name: "the only later comment is a deleted account's",
+    issue: { comments: [placedBy(PUSHBACK), comment(201, null, "Go.", { createdAt: at("10:30") })], moves: [move("11:00")] },
+    releasable: [],
+    startable: false,
+  },
   ...[
     ["on another project", move("11:00", { project: { url: OTHER_PROJECT } })],
     ["on a project the reader cannot see", move("11:00", { project: null })],
@@ -197,7 +205,7 @@ const AS13: Fixture[] = [
   {
     name: "the question's tag posted by an admin is no question",
     issue: {
-      comments: [placedBy(ESCALATION), questionComment(150, ESCALATION, "10:10", { author: ADMIN, authorAssociation: "OWNER" }), adminComment(160, "10:20")],
+      comments: [placedBy(ESCALATION), questionComment(150, ESCALATION, "10:10", { author: ADMIN }), adminComment(160, "10:20")],
       moves: [move("11:00")],
     },
     releasable: [],
@@ -292,13 +300,13 @@ const AS14: Fixture[] = [
   },
   {
     name: "a reset by an App counts for nothing",
-    issue: { comments: [PLACED_THREE, comment(300, ORCHESTRATOR_APP, "/codeworks reset", { authorAssociation: "MEMBER", createdAt: at("10:00") })] },
+    issue: { comments: [PLACED_THREE, comment(300, ORCHESTRATOR_APP, "/codeworks reset", { createdAt: at("10:00") })] },
     releasable: [],
     startable: false,
   },
   {
     name: "a reset by a commenter who is no writer counts for nothing",
-    issue: { comments: [PLACED_THREE, adminComment(300, "10:00", "/codeworks reset", { authorAssociation: "CONTRIBUTOR" })] },
+    issue: { comments: [PLACED_THREE, adminComment(300, "10:00", "/codeworks reset")], roles: { [ADMIN.login]: "read" } },
     releasable: [],
     startable: false,
   },
@@ -474,7 +482,7 @@ async function bothGiveOneAnswer(fixture: Fixture): Promise<void> {
     return { id: databaseId, url: found.url, at: found.createdAt };
   };
 
-  const reading = stateFrom(comments, deletions, moves, SHARED);
+  const reading = stateFrom(comments, deletions, moves, writersOf(fixture.issue), SHARED);
   assert.deepEqual(
     reading.releasable,
     fixture.releasable.map(([id, databaseId, reset]) => ({ id, comment: commentRef(databaseId), reset })),

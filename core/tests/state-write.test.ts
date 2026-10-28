@@ -444,7 +444,8 @@ describe("releaseOnClaim (AS15)", () => {
     await releaseOnClaim(read, out, REPO, ISSUE, SHARED);
     assert.deepEqual(
       read.calls.map((call) => call.kind),
-      ["graphqlPages", "graphqlPages", "graphqlPages"],
+      ["graphqlPages", "graphqlPages", "graphqlPages", "rest"],
+      "the issue's three reads, then the one commenter's role",
     );
     assert.deepEqual(
       out.calls.map((call) => call.kind),

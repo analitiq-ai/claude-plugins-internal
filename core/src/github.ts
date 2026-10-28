@@ -204,3 +204,22 @@ function nextPage(link: string | null): string | null {
   }
   return null;
 }
+
+// GitHub's type for a person; an App acts as a `Bot`, so it is never a writer (P9).
+export const USER_TYPE = "User";
+// `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.
+const WRITER_ROLES: ReadonlySet<string> = new Set(["admin", "maintain", "write"]);
+
+/** A writer's role, as a done close and an admin's comment both read it (orchestrator ADR-0010 d2). */
+export function isWriterRole(role: string): boolean {
+  return WRITER_ROLES.has(role);
+}
+
+const PermissionAnswer = z.object({ role_name: z.string() });
+
+/** `login`'s role on `repo`; a non-collaborator's is `read` on a public repo and empty on a private one. */
+export async function roleOf(reader: GitHubClient, repo: Repository, login: string): Promise<string> {
+  const collaborator = [repo.owner, repo.name, "collaborators", login].map(encodeURIComponent).join("/");
+  const answer = await reader.rest("GET", `/repos/${collaborator}/permission`);
+  return answerOf(PermissionAnswer, answer, `${login}'s role on ${repo.owner}/${repo.name}`).role_name;
+}
