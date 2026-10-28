@@ -32,12 +32,26 @@ export function ownerAndName(repo: string): Repository {
   return { owner: parts[0], name: parts[1] };
 }
 
+export function assertIssueNumber(n: number): void {
+  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
+}
+
+export function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {
+  const parsed = schema.safeParse(answer);
+  if (!parsed.success) {
+    throw new Error(`GitHub's answer for ${what} is not the shape asked for: ${z.prettifyError(parsed.error)}`);
+  }
+  return parsed.data;
+}
+
 export type GitHubClient = {
   rest(method: string, path: string, body?: unknown): Promise<unknown>;
   restPages(path: string): Promise<unknown[]>;
   graphql(query: string, vars: Record<string, unknown>): Promise<unknown>;
   /** `query` declares `$cursor: String`; the nodes of the connection at `connectionPath` under `data`, every page. */
   graphqlPages(query: string, vars: Record<string, unknown>, connectionPath: readonly string[]): Promise<unknown[]>;
+  /** GitHub's clock, not the machine's: what core stamps is compared with GitHub's `createdAt` values. */
+  now(): Promise<string>;
 };
 
 const GitHubMessage = z.object({ message: z.string() });
@@ -144,7 +158,24 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
       } while (cursor !== null);
       return nodes;
     },
+
+    // Any token may read /rate_limit, and the read does not count against the limit.
+    async now() {
+      const { headers } = await request("GET", `${api}/rate_limit`);
+      return gitHubTime(headers.get("date"));
+    },
   };
+}
+
+// Only IMF-fixdate is taken: it names GMT, while `Date` reads a zoneless form, such as asctime's, in the machine's
+// zone, which would stamp a time that is not GitHub's.
+function gitHubTime(date: string | null): string {
+  if (date === null) throw new Error("GET /rate_limit: the answer has no Date header");
+  const time = Date.parse(date);
+  if (Number.isNaN(time) || new Date(time).toUTCString() !== date) {
+    throw new Error(`GET /rate_limit: the Date header ${JSON.stringify(date)} is not an HTTP date in GMT`);
+  }
+  return `${new Date(time).toISOString().slice(0, 19)}Z`;
 }
 
 function failure(what: string, answer: Exchange): GitHubUnanswered | GitHubRefused {
