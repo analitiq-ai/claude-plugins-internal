@@ -100,6 +100,9 @@ carries it. Remove the key: the hook blocks, naming the key file.
 7. **Given** the admin is signed in to gh on planner's machine, or `GH_TOKEN` or `GITHUB_TOKEN` is set in the
    admin's environment, **When** planner's scripts or the skill call gh or push, **Then** they read only
    planner's gh config folder and act as the planner App.
+8. **Given** the hook failed when the session started, **When** any Bash call is about to run in that session,
+   **Then** the hook blocks it, saying the session's start failed and a new session is needed, so no gh call
+   runs with the admin's credentials.
 
 ---
 
@@ -205,6 +208,8 @@ made, and the run's last output names the issue, the close to do and the reason.
   duplicated (US3 #4).
 - **The spec folder lookup finds several `specs/<p>-*` folders**: the run stops naming them; it never picks one.
 - **A rescope run**: it stops before it pushes, naming #178 (US4 #8); landing a rescope is #178's.
+- **The hook fails at session start**: Claude Code goes on with the session, so the hook refuses every Bash call
+  in it until a new session starts (US2 #8). A resumed session runs the start again.
 
 ## Requirements *(mandatory)*
 
@@ -224,7 +229,8 @@ made, and the run's last output names the issue, the close to do and the reason.
   expires.
 - **FR-006**: Planner's hook MUST put the token in planner's own gh config folder on planner's machine, apart
   from the admin's gh login, and planner's scripts and the skill's `gh` calls MUST read only that folder and act
-  with no other GitHub credential, the admin's login and any `GH_TOKEN` or `GITHUB_TOKEN` included. Planner's landing script MUST make every GitHub
+  with no other GitHub credential, the admin's login and any `GH_TOKEN` or `GITHUB_TOKEN` included. In a session
+  whose start the hook failed, the hook MUST refuse every Bash call. Planner's landing script MUST make every GitHub
   write of the landing (push, spec PR, story issues); its push goes through core's git runner to the
   repository's https URL, with git reading the token from gh (`gh auth git-credential`).
 - **FR-007**: Planner MUST read its settings, the App's ID among them, from `codeworks.toml` through core's
