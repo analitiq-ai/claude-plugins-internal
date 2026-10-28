@@ -48,17 +48,18 @@ jobs:
         with:
           node-version: '22'
       - run: npm install -g @adrkit/cli@0.20.0
+      # A suite runs what its component holds. A carrier's code resolves core's imports from core's own
+      # node_modules (Node follows the plugin's core link), so core's packages go in for every suite.
       - name: Run suite
-        if: matrix.suite != 'core/tests'
-        working-directory: claude-plugins-internal/${{ matrix.suite }}
-        run: python -m unittest -v
-      # core is TypeScript run by Node; its suite is its package's npm test.
-      - name: Run core suite
-        if: matrix.suite == 'core/tests'
-        working-directory: claude-plugins-internal/core
+        working-directory: claude-plugins-internal
+        env:
+          SUITE: ${{ matrix.suite }}
         run: |
-          npm ci
-          npm test
+          component="${SUITE%/tests}"
+          if [ "$component" != core ]; then (cd core && npm ci); fi
+          if [ -f "$component/plugin/package-lock.json" ]; then (cd "$component/plugin" && npm ci); fi
+          if [ -f "$component/package.json" ]; then (cd "$component" && npm ci && npm test); fi
+          if compgen -G "$SUITE/test_*.py" > /dev/null; then (cd "$SUITE" && python -m unittest -v); fi
 
   # Every plugin carrying core pins core's dependencies and bumps its version when core changes. On main it runs
   # again against the previous commit: two PRs that each passed on a stale base can bump a carrier to one version.
