@@ -553,9 +553,9 @@ merge-base --is-ancestor` of an unknown commit exits 128. Nothing else below was
 ## R27: The release rule (FR-019, FR-019a, FR-019b)
 
 - **Decision**: part of R15's pure function, over the working snapshot and the same comments and events, with the
-  terms of contracts/state-comment.md (Release). A comment counts only from an admin, a writer and no codeworks App;
+  terms of contracts/state-comment.md (Release). A comment counts only from an admin, a writer and never an App posting as itself;
   a Ready move only on a board the reader sees, whoever made it (R15):
-  - an admin comment: author a `User`, none of the four App logins, whose `role_name` on the repository is admin,
+  - an admin comment: author a `User` (an App posting as itself is a `Bot`; an admin posting through an App acting for them is the `User`), whose `role_name` on the repository is admin,
     maintain or write (R15);
   - a Ready move: a status-change event with `status` `Ready`, `project.url` equal to `[shared] board`;
     the newest counts;
