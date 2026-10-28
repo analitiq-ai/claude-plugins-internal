@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "bin": {
+    "fixture": "src/outside.ts"
+  }
+}

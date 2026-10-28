@@ -29,15 +29,15 @@ test task below is run and seen red before the task that makes it pass.
 
 **Purpose**: the `core/` package skeleton and CI running its suite
 
-- [ ] T001 Create `core/package.json`: `"private": true`, `"type": "module"`, `"engines": {"node": ">=22.18"}`,
+- [x] T001 Create `core/package.json`: `"private": true`, `"type": "module"`, `"engines": {"node": ">=22.18"}`,
   `dependencies` exactly `zod` 4.6.7, `smol-toml` 1.9.1, `yaml` 2.9.1, `devDependencies` exactly `typescript`
   7.0.2 and `@types/node` 22.20.5, `scripts.test` = `tsc -p . && node --test 'tests/**/*.test.ts'`, no `bin`
   (R2, R25)
-- [ ] T002 Run `npm install` in `core/` to write `core/package-lock.json` (lockfile v3) (R2)
-- [ ] T003 [P] Create `core/tsconfig.json`: `strict`, `noEmit`, `erasableSyntaxOnly`,
+- [x] T002 Run `npm install` in `core/` to write `core/package-lock.json` (lockfile v3) (R2)
+- [x] T003 [P] Create `core/tsconfig.json`: `strict`, `noEmit`, `erasableSyntaxOnly`,
   `allowImportingTsExtensions`, `verbatimModuleSyntax`, `module` and `moduleResolution` `nodenext`, covering
   `src`, `scripts` and `tests` (R1)
-- [ ] T004 [P] Add `node_modules/` to `.gitignore` (R2)
+- [x] T004 [P] Add `node_modules/` to `.gitignore` (R2)
 - [ ] T005 In an admin's PR of its own, under the exempt label (orchestrator ADR-0004 d4), merged before US1's PR
   (a story never changes `.github/`, reviewer ADR-0002 d4): branch the `unittest` matrix run step in
   `.github/workflows/tests.yml`: for `core/tests` run `npm ci` and `npm test` in `claude-plugins-internal/core`;
@@ -52,7 +52,7 @@ that grade all of `core/src`
 
 **⚠️ CRITICAL**: no story module can be written before this phase is done
 
-- [ ] T006 [P] Write `core/tests/values.test.ts`: each set holds exactly these values, each with a meaning — round
+- [x] T006 [P] Write `core/tests/values.test.ts`: each set holds exactly these values, each with a meaning — round
   result CLEAN, DIRTY, INCOMPLETE; round verdict PATCH, CLASS_FIX, REDESIGN, RESCOPE, CONVERGED_PUSHBACK,
   ESCALATE; finding ruling FIX, PUSH_BACK, DEFER; root cause AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL,
   NOT_APPLICABLE; check outcome PENDING, PASS, FAIL, SILENT, COULD_NOT_RUN, WAIVED; hold kind rescope,
@@ -62,32 +62,32 @@ that grade all of `core/src`
   and `required-checks`; `FindingSource` accepts `threads`, `required-checks` and `fixture`. Plus the value-string
   scan: every file in `core/src`, a quoted string equal to a value of any enum core exports, outside the file that
   defines it, fails naming file and line; the scan is seen red on an in-memory file holding `'CLEAN'` (R7, SC-009)
-- [ ] T007 Create `core/src/values.ts`: each set of T006 as `{schema: z.enum([...]), meaning: Record<value,
+- [x] T007 Create `core/src/values.ts`: each set of T006 as `{schema: z.enum([...]), meaning: Record<value,
   string>}`, plus `CoreSource`, `ModuleName` and `FindingSource`; no TS `enum`, no list of module names (R1, R7)
-- [ ] T008 [P] Write `core/tests/boundary.test.ts`: every import specifier in `core/src` is `node:*`, a relative
+- [x] T008 [P] Write `core/tests/boundary.test.ts`: every import specifier in `core/src` is `node:*`, a relative
   path inside `core/src`, or `zod`, `smol-toml` or `yaml` (FR-005); `core/package.json` has no `bin` and
   `core/src` holds no `commands/`, `skills/`, `agents/`, `hooks/`, `bin/` or `.claude-plugin/` (FR-021, SC-003,
   US2 AS9). Each check seen red on a fixture under `core/tests/fixtures/boundary/` (an import of
   `../../reviewer/x.ts`, a `commands/` folder) (R25)
-- [ ] T009 [P] Write `core/tests/github.test.ts` against a local `node:http` server: REST `Link` pagination read
+- [x] T009 [P] Write `core/tests/github.test.ts` against a local `node:http` server: REST `Link` pagination read
   to the end; GraphQL cursor pagination read to the end; a request timeout; a network error, timeout, 5xx, 429,
   403 with `x-ratelimit-remaining: 0`, and 403 or 429 with `retry-after` throw `GitHubUnanswered`; any other 4xx
   throws `GitHubRefused(status, message)`; a GraphQL `200` with non-empty `errors` never returns `data`: type
   `RATE_LIMITED` throws `GitHubUnanswered`, any other `GitHubRefused`; no token, no client (R12; FR-037)
-- [ ] T010 Create `core/src/github.ts`: `gitHub(token, api = "https://api.github.com")` →
+- [x] T010 Create `core/src/github.ts`: `gitHub(token, api = "https://api.github.com")` →
   `{rest, restPages, graphql, graphqlPages}` over Node's `fetch`, with `GitHubUnanswered` and `GitHubRefused`
   (contracts/core-api.md) (R12)
-- [ ] T011 [P] Write `core/tests/git.test.ts` on a temp repo: `runGit(checkout, args, answers)` returns `{code,
+- [x] T011 [P] Write `core/tests/git.test.ts` on a temp repo: `runGit(checkout, args, answers)` returns `{code,
   stdout}` for exit 0 and for a code in `answers`, and throws `GitFailed(args, code, stderr)` for any other;
   with `HOME` pointed at a temp folder whose `.gitconfig` sets `user.name` and `core.hooksPath`, `runGit(...,
   ['config', 'user.name'], [1])` answers code 1, and a commit runs no hook from that path; the child sees
   `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, `-c credential.helper=`, `-c core.fsmonitor=false` and
   `-c core.hooksPath=/dev/null` (R11)
-- [ ] T012 Create `core/src/git.ts`: `runGit` through `node:child_process` `execFile` with the flags and
+- [x] T012 Create `core/src/git.ts`: `runGit` through `node:child_process` `execFile` with the flags and
   environment of T011, and `GitFailed` (R11)
-- [ ] T013 [P] Write `core/tests/tree.test.ts`: `gitTree` on a temp repo (`listDir`, `readText` at a ref, run
+- [x] T013 [P] Write `core/tests/tree.test.ts`: `gitTree` on a temp repo (`listDir`, `readText` at a ref, run
   through `runGit`); `gitHubTree` through the fake client over the contents API (R11)
-- [ ] T014 Create `core/src/tree.ts`: `Tree`, `gitTree(checkout, ref)`, `gitHubTree(client, repo, ref)` (R11)
+- [x] T014 Create `core/src/tree.ts`: `Tree`, `gitTree(checkout, ref)`, `gitHubTree(client, repo, ref)` (R11)
 
 **Checkpoint**: `npm test` in `core/` passes; the value-string, boundary, client, git and tree tests grade every
 later module unchanged
@@ -104,18 +104,18 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
 
 ### Tests for User Story 1 ⚠️ (write first, see each fail)
 
-- [ ] T015 [P] [US1] Write `core/tests/guard.test.ts`: `requireDependencies()` reads the nearest `package.json`
+- [x] T015 [P] [US1] Write `core/tests/guard.test.ts`: `requireDependencies()` reads the nearest `package.json`
   above its own file and throws `MissingDependency(name, root)` for the first dependency `import.meta.resolve`
   cannot find; run on copies of `core/src/guard.ts` in temp folders, one with all three dependencies resolvable
   and one without `zod` (FR-003, AS3; R4)
-- [ ] T016 [P] [US1] Write `core/tests/branch.test.ts`: `parseBranch('212-us2-retry-budget')` →
+- [x] T016 [P] [US1] Write `core/tests/branch.test.ts`: `parseBranch('212-us2-retry-budget')` →
   `{story: 212, k: 2, slug: 'retry-budget'}`; `'145-spec'` → `{spec: 145}`; `'main'`, `'feature/x'`,
   `'212-us-retry'`, `'0212-us2-x'`, `'212-us2-'`, `'212-spec-x'` → `null` (FR-007, AS4, Edge Cases; R10)
-- [ ] T017 [P] [US1] Write `core/tests/spec-facts.test.ts`: `readSpecFacts` accepts `codeworks: {v: 1, kind,
+- [x] T017 [P] [US1] Write `core/tests/spec-facts.test.ts`: `readSpecFacts` accepts `codeworks: {v: 1, kind,
   root_cause: {observed}}` with `kind` one of `feature`, `defect`, `no_spec` and `observed` one of `anchored`,
   `hypothesis`, `none`; no front matter, no `codeworks` key, an unknown key or a value outside `SpecKind` or
   `RootCauseObserved` fails naming the file and the error (FR-010; R9)
-- [ ] T018 [P] [US1] Write `core/tests/identity.test.ts` on fixture data and the fake client:
+- [x] T018 [P] [US1] Write `core/tests/identity.test.ts` on fixture data and the fake client:
   - `specIssue`: parent 200 → 200; no parent → 145; a parent in another repo fails naming it; only the immediate
     parent is read (FR-008, AS5, Edge Cases)
   - `pickSpecFolder` and `specFolder`: exactly one `specs/200-*/` → it; none or several fail naming what was
@@ -129,36 +129,36 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
     (`ClosedEvent.closer`, `CrossReferencedEvent`, `ConnectedEvent`) with its head branch deleted and a `Bot`
     closer → done; a timeline PR that is unmerged, cross-repo, or whose `headRefName` does not parse to
     `{story: 212}` never counts (FR-011, AS9; R13)
-- [ ] T019 [P] [US1] Write `core/tests/carriers.test.ts` on the pure decision of `check-carriers.ts` over fixture
+- [x] T019 [P] [US1] Write `core/tests/carriers.test.ts` on the pure decision of `check-carriers.ts` over fixture
   carriers: symlink not `../../core/src`; `package.json` without `"type": "module"`; a core pin missing or at
   another version; lockfile missing, not v3, or pinning another version; a change to `core/src/**` or to
   `core/package.json` `dependencies` with a carrier's `plugin.json` `version` equal to the base's; a test-only
   change needs no bump; each failure names the carrier, the file and the expected value. Plus the thin git reader
   on a temp repo, against a base ref and against `HEAD~1` (FR-004, AS2; R5; contracts/carrying-core.md)
-- [ ] T020 [P] [US1] Write `core/tests/fixture-carrier.test.ts`: the fixture plugin's `package.json`
+- [x] T020 [P] [US1] Write `core/tests/fixture-carrier.test.ts`: the fixture plugin's `package.json`
   dependencies and `package-lock.json` versions equal `core/package.json`'s runtime pins, and its `core` link is
   `../../../src` (the `*/plugin/core` glob does not reach it; R26)
-- [ ] T021 [P] [US1] Write `core/tests/schemas.test.ts`: regenerates in memory every `{schema, file}` of the list
+- [x] T021 [P] [US1] Write `core/tests/schemas.test.ts`: regenerates in memory every `{schema, file}` of the list
   `core/scripts/write-schemas.ts` exports and fails naming the file and `node scripts/write-schemas.ts` when a
   file differs or is missing; seen red with the SpecFacts entry and no file (FR-013; R8)
 
 ### Implementation for User Story 1
 
-- [ ] T022 [US1] Create `core/src/guard.ts`, importing only `node:` modules: `requireDependencies()` and
+- [x] T022 [US1] Create `core/src/guard.ts`, importing only `node:` modules: `requireDependencies()` and
   `MissingDependency(name, root)` (R4)
-- [ ] T023 [US1] Create `core/src/contracts/spec-facts.ts`: `SpecKind`, `RootCauseObserved` as named `z.enum`s
+- [x] T023 [US1] Create `core/src/contracts/spec-facts.ts`: `SpecKind`, `RootCauseObserved` as named `z.enum`s
   spelt as planner ADR-0008 d1 fixes them, `SpecFacts` as a `z.strictObject`, `readSpecFacts(text)` reading the
   front matter between the first `---` line and the next with `yaml`'s `parse` (R7, R9)
-- [ ] T024 [US1] Create `core/src/identity.ts`: `parseBranch` with story
+- [x] T024 [US1] Create `core/src/identity.ts`: `parseBranch` with story
   `^([1-9][0-9]*)-us([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$` and spec `^([1-9][0-9]*)-spec$`; pure
   `pickStoryPr`, `pickSpecFolder`, `doneFrom`; readers `specIssue`, `specFolder`, `storyPr`, `requirement`,
   `isDone` with `DerivationError(what, found)` (data-model.md, Story identity; R10, R13)
-- [ ] T025 [US1] Create `core/scripts/write-schemas.ts`: one exported list of `{schema, file}`, holding
+- [x] T025 [US1] Create `core/scripts/write-schemas.ts`: one exported list of `{schema, file}`, holding
   SpecFacts; writes `z.toJSONSchema` output, keys sorted, two-space indent; run it to write
   `core/schemas/spec-facts.schema.json` (R8)
-- [ ] T026 [US1] Create `core/scripts/check-carriers.ts`: the pure decision of T019 and a git reader (`diff
+- [x] T026 [US1] Create `core/scripts/check-carriers.ts`: the pure decision of T019 and a git reader (`diff
   --name-only <base>...HEAD`, `show <base>:<path>`) through `runGit`, `--base <ref>` (R5)
-- [ ] T027 [US1] Create the fixture carrier `core/tests/fixtures/carrier-plugin/`: `core` → `../../../src`,
+- [x] T027 [US1] Create the fixture carrier `core/tests/fixtures/carrier-plugin/`: `core` → `../../../src`,
   `package.json` (`"type": "module"`, core's three pins), `package-lock.json` from `npm install`,
   `.claude-plugin/plugin.json` with a pinned `version`, `hooks/hooks.json` declaring a `UserPromptSubmit` hook
   with `"onFailure": "block"` that runs `node ${CLAUDE_PLUGIN_ROOT}/hooks/identity.ts`, and that file as
@@ -169,7 +169,7 @@ functions on fixture branch names, issue trees, spec folders and PR lists (quick
   (reviewer ADR-0002 d4; R6), add the `carriers` job to `.github/workflows/tests.yml`: on `pull_request` and push to `main`,
   checkout with `fetch-depth: 0`, Node 22, `npm ci` in `core/`, then `node scripts/check-carriers.ts --base
   origin/<base>`, or `--base HEAD~1` on a push (R5, R6)
-- [ ] T029 [US1] Run quickstart.md US1 steps 1–5 (end-to-end install, update without and with a bump, missing
+- [x] T029 [US1] Run quickstart.md US1 steps 1–5 (end-to-end install, update without and with a bump, missing
   `zod`, a throwaway carrier failing `check-carriers.ts`); try steps 1–4 on a CI runner (research Open 1); record
   what ran and its result in the PR (AS1–AS3, SC-007)
 

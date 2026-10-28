@@ -1,0 +1,5 @@
+{
+  "name": "carrier",
+  "description": "Test fixture: a plugin carrying core, whose prompt hook imports it.",
+  "version": "0.1.0"
+}
