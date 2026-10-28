@@ -6,3 +6,8 @@ REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "planner" / "plugin"
 SCRIPTS = PLUGIN / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+
+def tracked_text(file: Path, errors: str | None = None) -> str:
+    """What git holds for a tracked path: a link's target (a carrier's `core` link is one), else the file's text."""
+    return str(file.readlink()) if file.is_symlink() else file.read_text(errors=errors)
