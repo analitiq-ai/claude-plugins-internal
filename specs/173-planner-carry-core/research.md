@@ -161,7 +161,9 @@ code but not executed; the story that relies on it starts with a red test that r
   rewrite is graded, then the block is rewritten. Per ADR-0008 d1 the settled-design preset's
   `templates/spec-template.md` opens with the block, its values ones `SpecFacts` refuses, so a spec the writer
   never filled fails core's reader; the writer sets the key there. A no-spec spec.md does not come from the
-  template (`no_spec.py` writes it), so the writer prepends the block to it.
+  template (`no_spec.py` writes it), so the writer prepends the block to it. `no_spec.is_no_spec` then reads the
+  first line after a leading front matter block, so a no-spec folder still routes a rescope to `premise`
+  (`spec_folder.starts_at`); `spec_facts.ts`'s no-report check applies the same rule.
 - **Existing tools**: `readSpecFacts`, `SpecFacts` (core, reused); `yaml` (a core pin); `rootcause.py` and
   `premise_report.py` (they grade the same lines and stay Python, FR-017; they do not call core).
 
