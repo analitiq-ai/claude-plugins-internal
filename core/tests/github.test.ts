@@ -58,6 +58,7 @@ const CALLS: Array<[string, (client: GitHubClient) => Promise<unknown>]> = [
   ["restPages", (client) => client.restPages("/repos/o/r/issues")],
   ["graphql", (client) => client.graphql(QUERY, {})],
   ["graphqlPages", (client) => client.graphqlPages(QUERY, {}, CONNECTION_PATH)],
+  ["now", (client) => client.now()],
 ];
 
 test("no token, no client", () => {
@@ -162,6 +163,47 @@ test("graphqlPages never returns part of the list when a later page fails", asyn
   });
   await assert.rejects(gitHub(TOKEN, api).graphqlPages(QUERY, {}, CONNECTION_PATH), GitHubUnanswered);
 });
+
+const RATE_LIMIT = { resources: { core: { limit: 5000, remaining: 4999, reset: 1793228400, used: 1 } } };
+
+test("now returns the Date of GET /rate_limit as YYYY-MM-DDTHH:MM:SSZ in UTC, whatever the machine's zone", async (t) => {
+  const zone = process.env.TZ;
+  // A zone ahead of UTC that crosses midnight here, so a local-time reading differs in the date as well as the hour.
+  process.env.TZ = "Asia/Kathmandu";
+  t.after(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  });
+  const { api, seen } = await serve(t, (_seen, res) =>
+    reply(res, 200, RATE_LIMIT, { date: "Wed, 28 Oct 2026 23:05:07 GMT" }),
+  );
+  assert.equal(await gitHub(TOKEN, api).now(), "2026-10-28T23:05:07Z");
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]!.method, "GET");
+  assert.equal(seen[0]!.url, "/rate_limit");
+  assert.equal(seen[0]!.authorization, `Bearer ${TOKEN}`);
+});
+
+test("now refuses an answer with no Date header", async (t) => {
+  const { api } = await serve(t, (_seen, res) => {
+    res.sendDate = false;
+    reply(res, 200, RATE_LIMIT);
+  });
+  await assert.rejects(gitHub(TOKEN, api).now(), /Date/);
+});
+
+// asctime's form names no zone, so `Date` would read it in the machine's zone: a wrong time, not GitHub's.
+for (const date of ["Wed Oct 28 23:05:07 2026", "soon"]) {
+  test(`now refuses a Date header that is not an HTTP date in GMT: ${date}`, async (t) => {
+    const { api } = await serve(t, (_seen, res) => reply(res, 200, RATE_LIMIT, { date }));
+    await assert.rejects(gitHub(TOKEN, api).now(), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /Date/);
+      assert.ok(error.message.includes(date), error.message);
+      return true;
+    });
+  });
+}
 
 for (const [name, call] of CALLS) {
   test(`${name}: a request that gets no answer in time throws GitHubUnanswered`, async (t) => {

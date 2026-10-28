@@ -190,22 +190,22 @@ posted; attest in scratch git repos (quickstart.md, US2)
 
 ### Tests for User Story 2 ⚠️ (write first, see each fail)
 
-- [ ] T030 [P] [US2] Add to `core/tests/github.test.ts`: `now()` returns the `Date` header of `GET /rate_limit` as
+- [x] T030 [P] [US2] Add to `core/tests/github.test.ts`: `now()` returns the `Date` header of `GET /rate_limit` as
   `YYYY-MM-DDTHH:MM:SSZ`, UTC, whole seconds (R12)
-- [ ] T031 [P] [US2] Write `core/tests/settings.test.ts` through a fixture `Tree`: contracts/codeworks-toml.md's
+- [x] T031 [P] [US2] Write `core/tests/settings.test.ts` through a fixture `Tree`: contracts/codeworks-toml.md's
   example is valid; an unknown `[shared]` key is refused naming it; a missing `validators`, `board`,
   `session_app_login`, `orchestrator_app_login`, `reviewer_app_login` or `planner_app_login` is refused naming
   it; `trusted_reviewers` may be absent; a `validators` entry outside `ModuleName` or a duplicate is refused;
   `board` not `https://github.com/orgs/<login>/projects/<n>` or `https://github.com/users/<login>/projects/<n>`
   is refused; a missing file fails naming the ref; another section comes back parsed and unvalidated, `{}` when
   absent; an environment variable named like a key changes nothing (FR-006, Edge Cases; R14)
-- [ ] T032 [P] [US2] Write `core/tests/snapshot.test.ts`: `(stage, n)` unique; hold `id` unique and starting
+- [x] T032 [P] [US2] Write `core/tests/snapshot.test.ts`: `(stage, n)` unique; hold `id` unique and starting
   `<kind>-`; `verdict` non-null exactly when `result` is DIRTY; `released` non-null exactly when `state` is
   RELEASED; `released_by` `{comment: int, reset: bool}` non-null exactly when RELEASED; `question` non-null,
   non-empty exactly when `kind` is escalation; `spec_pr` an int ≥ 1 or null, null for every kind but rescope;
   `at`, `since`, `released` `YYYY-MM-DDTHH:MM:SSZ`; `head` 40-hex; `n` ≥ 1; each pushback's round exists; `v` is
   1 (FR-012; data-model.md, Snapshot)
-- [ ] T033 [P] [US2] Write `core/tests/state-read.test.ts` on `stateFrom(comments, deletions, moves, writers, shared)`:
+- [x] T033 [P] [US2] Write `core/tests/state-read.test.ts` on `stateFrom(comments, deletions, moves, writers, shared)`:
   AS1 (the newest by the reviewer App among newer admin and orchestrator App comments); AS2 (`tampered` on
   `lastEditedAt`; `deleted` when a reviewer App deletion's `createdAt` is at or after the state comment's, same
   second included, or with no reviewer App comment; `invalid` for an untagged newest beside an older tagged one,
@@ -214,7 +214,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
   reply → `invalid`; two comments in one second settled by `databaseId`; causes combine; the working snapshot is
   the state comment's with no tamper cause, else the newest unedited, tagged, valid reviewer App comment's with
   `rebuilt` true, else empty (FR-015 to FR-017, SC-002; R15; contracts/state-comment.md, Read outcomes)
-- [ ] T034 [P] [US2] Write `core/tests/release.test.ts`, one fixture set, each fixture run through `stateFrom` and
+- [x] T034 [P] [US2] Write `core/tests/release.test.ts`, one fixture set, each fixture run through `stateFrom` and
   through `releaseOnClaim` on the fake client so both give one answer (SC-002, critique X1):
   - AS12: hold `since` 10:00, admin comment 10:30, Ready move 11:00 → releasable, released by the 10:30 comment
     (`{id, url, at}`, `reset` false), edited or not; not releasable when the only later comment is by any of the
@@ -234,7 +234,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
     releasable)
   - `readState` throws `BoardNotVisible(board)` when no `projectItems` entry's `project.url` is `[shared] board`
     (FR-019, FR-019a, FR-019b; R27; contracts/state-comment.md, Release)
-- [ ] T035 [P] [US2] Write `core/tests/state-write.test.ts` against the fake client, which fails any PATCH or
+- [x] T035 [P] [US2] Write `core/tests/state-write.test.ts` against the fake client, which fails any PATCH or
   DELETE and serves `now()`:
   - `writeState` posts one comment, the tag line then the snapshot in a `json` fence, sorted keys, two-space
     indent (AS6); each appended round's `at` is `now()`, whatever the caller gave; refused while `tampered`,
@@ -252,7 +252,7 @@ posted; attest in scratch git repos (quickstart.md, US2)
     with a released tamper cause and no open hold, posts the rebuilt working snapshot; posts nothing when it
     releases no hold and no tamper cause; refused while a tamper cause stands unreleased; decides and writes over
     one read (FR-018 to FR-020; R16; contracts/state-comment.md, Write rules)
-- [ ] T036 [P] [US2] Write `core/tests/attest.test.ts`. Pure, on fixtures: `passingRounds` lists INTERNAL and AUDIT
+- [x] T036 [P] [US2] Write `core/tests/attest.test.ts`. Pure, on fixtures: `passingRounds` lists INTERNAL and AUDIT
   rounds CLEAN, or DIRTY with CONVERGED_PUSHBACK, newest first, never GITHUB; `governingDiff(atBase, atRound,
   specFolder)` over `ls-tree -r -t` listings names a different or one-sided object at `<specFolder>/spec.md`, a
   tree `docs/adr` or ending `/docs/adr`, or `.specify/memory`, and nothing for any other path;
@@ -268,13 +268,13 @@ posted; attest in scratch git repos (quickstart.md, US2)
 
 ### Implementation for User Story 2
 
-- [ ] T037 [US2] Add `now()` to `core/src/github.ts` (R12)
-- [ ] T038 [US2] Create `core/src/settings.ts`: `readSettings(tree)` with `smol-toml`, the `Shared` strict schema
+- [x] T037 [US2] Add `now()` to `core/src/github.ts` (R12)
+- [x] T038 [US2] Create `core/src/settings.ts`: `readSettings(tree)` with `smol-toml`, the `Shared` strict schema
   of contracts/codeworks-toml.md, `validators` entries by `ModuleName`, `SettingsError(where, why)` (R14)
-- [ ] T039 [US2] Create `core/src/contracts/snapshot.ts` with its refinements; add it to `write-schemas.ts`'s
+- [x] T039 [US2] Create `core/src/contracts/snapshot.ts` with its refinements; add it to `write-schemas.ts`'s
   list, see `core/tests/schemas.test.ts` fail naming the missing file, then run the script to write
   `core/schemas/snapshot.schema.json` (R8)
-- [ ] T040 [US2] Create the read half of `core/src/state.ts`: `stateFrom` up to the working snapshot and
+- [x] T040 [US2] Create the read half of `core/src/state.ts`: `stateFrom` up to the working snapshot and
   `readState(reader, repo, issue, shared)`, one paginated GraphQL read of comments (`databaseId`, `author {
   __typename login }`, `body`, `createdAt`, `lastEditedAt`, `url`), `COMMENT_DELETED_EVENT`
   (`createdAt`, `deletedCommentAuthor`) and `PROJECT_V2_ITEM_STATUS_CHANGED_EVENT` (`createdAt`, `status`,
@@ -282,15 +282,15 @@ posted; attest in scratch git repos (quickstart.md, US2)
   throwing `BoardNotVisible`; then each distinct `User` comment author's `role_name`, read once through the one
   role read `isDone` uses, moved from `core/src/identity.ts` to `core/src/github.ts` so both call it, handing
   `stateFrom` the writer logins; returning `StateReading` (data-model.md; R15)
-- [ ] T041 [US2] Add the release rule to `core/src/state.ts`: `questionTag(hold)`, the admin comment, Ready move,
+- [x] T041 [US2] Add the release rule to `core/src/state.ts`: `questionTag(hold)`, the admin comment, Ready move,
   question and reset terms, `releasable`, `tamper_released`, `startable` and `reset` in `stateFrom` (R27)
-- [ ] T042 [US2] Add the writes to `core/src/state.ts`: `renderState`, `checkTransition`, `writeState`,
+- [x] T042 [US2] Add the writes to `core/src/state.ts`: `renderState`, `checkTransition`, `writeState`,
   `placeHold`, `placeRescopeHold`, `releaseOnClaim`, with `StateWriteRefused(cause, release)`; REST `POST
   /repos/{o}/{r}/issues/{n}/comments` only (R16)
-- [ ] T043 [US2] Create `core/src/attest.ts`: `passingRounds`, `governingDiff`, `releasedByComment` and `attests`,
+- [x] T043 [US2] Create `core/src/attest.ts`: `passingRounds`, `governingDiff`, `releasedByComment` and `attests`,
   git through `runGit` (`merge-base --is-ancestor` with answers 1 and 128, `ls-tree -r -t`, `rev-list --merges`,
   `merge-tree --write-tree` with answer 1, `rev-parse <commit>^{tree}`) (R16)
-- [ ] T044 [US2] Run quickstart.md US2 against a test repo with the reviewer App installed and its issues on a
+- [x] T044 [US2] Run quickstart.md US2 against a test repo with the reviewer App installed and its issues on a
   test board; record what ran and its result in the PR
 
 **Checkpoint**: US2's PR passes `npm test`; every tampered, deleted, untagged or invalid fixture reads as held,

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { z } from "zod";
+import { Snapshot } from "../src/contracts/snapshot.ts";
 import { SpecFacts } from "../src/contracts/spec-facts.ts";
 
 export const schemasDir = new URL("../schemas/", import.meta.url);
@@ -7,6 +8,7 @@ export const schemasDir = new URL("../schemas/", import.meta.url);
 // The drift test regenerates from this same list, so a schema added here is checked without touching the test.
 export const schemaFiles: ReadonlyArray<{ schema: z.ZodType; file: string }> = [
   { schema: SpecFacts, file: "spec-facts.schema.json" },
+  { schema: Snapshot, file: "snapshot.schema.json" },
 ];
 
 function withSortedKeys(value: unknown): unknown {

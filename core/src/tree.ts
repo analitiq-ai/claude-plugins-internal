@@ -32,7 +32,7 @@ export class NotInTree extends Error {
   }
 }
 
-function isPlainPath(text: string): boolean {
+export function isPlainPath(text: string): boolean {
   return text.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
@@ -52,13 +52,14 @@ function byName(entries: TreeEntry[]): TreeEntry[] {
   return entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-type LsTreeRecord = { mode: string; type: string; object: string; name: string };
+export type LsTreeRecord = { mode: string; type: string; object: string; name: string };
 
 const LS_TREE_RECORD = /^([0-7]{6}) ([a-z]+) ([0-9a-f]+)\t(.+)$/s;
 // A symlink is a blob too, whose text is its target's path.
 const SYMLINK_MODE = "120000";
 
-function lsTreeRecords(stdout: string): LsTreeRecord[] {
+// `-z` output only: without it git C-quotes a name with a quote or a non-ASCII byte, which would then match no path.
+export function lsTreeRecords(stdout: string): LsTreeRecord[] {
   return stdout
     .split("\0")
     .filter((record) => record !== "")

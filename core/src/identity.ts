@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
-import { ownerAndName, type GitHubClient, type Repository } from "./github.ts";
+import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 
 export type StoryBranch = { story: number; k: number; slug: string };
@@ -48,18 +48,6 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
 function storyOf(branch: string): number | null {
   const parsed = parseBranch(branch);
   return parsed !== null && "story" in parsed ? parsed.story : null;
-}
-
-function assertIssueNumber(n: number): void {
-  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
-}
-
-function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {
-  const parsed = schema.safeParse(answer);
-  if (!parsed.success) {
-    throw new Error(`GitHub's answer for ${what} is not the shape asked for: ${z.prettifyError(parsed.error)}`);
-  }
-  return parsed.data;
 }
 
 const IssueNumber = z.number().int().positive();
@@ -177,16 +165,11 @@ export async function requirement(tree: Tree, folder: string, issueBody: string)
   return { kind: facts.kind, text, source: path };
 }
 
-// GitHub's type for a person; an App acts as a `Bot`, so its close never counts (P9).
-const USER_TYPE = "User";
-// `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.
-const WRITER_ROLES: ReadonlySet<string> = new Set(["admin", "maintain", "write"]);
-
 /** Done from history: a reopened issue keeps the merge or the admin close that made it done. */
 export function doneFrom(prs: readonly { merged: boolean }[], closes: readonly IssueClose[]): boolean {
   return (
     prs.some((pr) => pr.merged) ||
-    closes.some((close) => close.actorType === USER_TYPE && close.role !== null && WRITER_ROLES.has(close.role))
+    closes.some((close) => close.actorType === USER_TYPE && close.role !== null && isWriterRole(close.role))
   );
 }
 
@@ -244,8 +227,6 @@ const TimelineItem = z.discriminatedUnion("__typename", [
 ]);
 type TimelineItem = z.infer<typeof TimelineItem>;
 
-const PermissionAnswer = z.object({ role_name: z.string() });
-
 function candidateOf(item: TimelineItem): CandidatePr | null {
   switch (item.__typename) {
     case "ClosedEvent":
@@ -255,12 +236,6 @@ function candidateOf(item: TimelineItem): CandidatePr | null {
     case "ConnectedEvent":
       return item.subject;
   }
-}
-
-async function roleOf(reader: GitHubClient, repo: Repository, login: string): Promise<string> {
-  const collaborator = [repo.owner, repo.name, "collaborators", login].map(encodeURIComponent).join("/");
-  const answer = await reader.rest("GET", `/repos/${collaborator}/permission`);
-  return answerOf(PermissionAnswer, answer, `${login}'s role on ${repo.owner}/${repo.name}`).role_name;
 }
 
 export async function isDone(reader: GitHubClient, repo: string, s: number): Promise<boolean> {
