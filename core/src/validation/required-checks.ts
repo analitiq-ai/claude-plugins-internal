@@ -79,15 +79,9 @@ function described(checks: readonly CheckReading[]): string {
 }
 
 function requiredOf(rules: z.infer<typeof Rules>, where: string): RequiredCheck[] {
-  const checks = new Map<string, RequiredCheck>();
-  for (const rule of rules) {
-    if (rule.type !== REQUIRED_STATUS_CHECKS) continue;
-    for (const check of answerOf(RequiredStatusChecks, rule.parameters, where).required_status_checks) {
-      // Two rulesets may require one check; it is one item, with one finding key.
-      checks.set(JSON.stringify([check.context, check.integration_id ?? null]), check);
-    }
-  }
-  return [...checks.values()];
+  return rules.flatMap((rule) =>
+    rule.type === REQUIRED_STATUS_CHECKS ? answerOf(RequiredStatusChecks, rule.parameters, where).required_status_checks : [],
+  );
 }
 
 function runReading(run: CheckRun): Reading {
@@ -154,8 +148,14 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
       newestStatuses(reader, at, head),
     ]);
     const allRuns = runs.flat();
-    const atHead = (check: RequiredCheck): CheckReading => checkReading(check, allRuns, newest);
-    const [first, ...rest] = required;
+    const pinRead = (check: RequiredCheck): CheckReading => checkReading(check, allRuns, newest);
+    // Rulesets may require one name more than once, pinned to different Apps or none: every pin must hold, and the
+    // name is still one check, with one finding key.
+    const atHead = (name: string): CheckReading => {
+      const [pin, ...more] = required.filter((check) => check.context === name);
+      return worst([pinRead(pin), ...more.map(pinRead)]);
+    };
+    const [first, ...rest] = names;
     return [atHead(first), ...rest.map(atHead)];
   }
 
