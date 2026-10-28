@@ -18,7 +18,7 @@ const corePins = readJson<Manifest>(CORE_PACKAGE).dependencies ?? {};
 it("links core to ../../core/src as a symlink, not a copy", () => {
   const link = `${PLUGIN}core`;
   assert.ok(lstatSync(link).isSymbolicLink(), `${link} is not a symlink`);
-  assert.equal(readlinkSync(link), "../../core/src");
+  assert.equal(readlinkSync(link), "../../core/src-T014");
 });
 
 // An install fetches every package the lockfile holds into the plugin, so a development package would ship.
