@@ -53,9 +53,11 @@ function runHook(root: string) {
   });
 }
 
-it("with every package installed: token.ts exits 0 and prints nothing", (t) => {
+// The hook loads every module it needs before it reads its input, so a refusal of the input shows each one was found.
+it("with every package installed: token.ts gets past the guard and refuses an input that is no hook event", (t) => {
   const hook = runHook(installedCopy(t));
-  assert.equal(hook.status, 0, hook.stderr);
+  assert.equal(hook.status, 2, hook.stderr);
+  assert.match(hook.stderr, /^planner: the hook's input is refused: /);
   assert.equal(hook.stdout, "");
 });
 

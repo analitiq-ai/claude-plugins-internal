@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
-import { GitFailed, runGit } from "../src/git.ts";
+import { writeGhToken } from "../src/gh-config.ts";
+import { GitFailed, pushWithGhCredential, runGit } from "../src/git.ts";
 
 const COMMITTER = ["-c", "user.name=Dummy Author", "-c", "user.email=dummy@example.invalid"];
 
@@ -13,7 +14,15 @@ let scratch: string;
 let repo: string;
 let home: string;
 let hookRan: string;
-const savedEnv = { HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME };
+const savedEnv = {
+  HOME: process.env.HOME,
+  XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+  XDG_STATE_HOME: process.env.XDG_STATE_HOME,
+  XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+  XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+  PROBE_X: process.env.PROBE_X,
+  GH_TOKEN: process.env.GH_TOKEN,
+};
 
 function restoreEnv(name: keyof typeof savedEnv): void {
   const value = savedEnv[name];
@@ -36,12 +45,15 @@ before(async () => {
   // runGit passes its own environment on to git, so this is how a user's global config reaches the child.
   process.env.HOME = home;
   process.env.XDG_CONFIG_HOME = join(home, ".config");
+  // gh, run as a credential helper below, writes state of its own under these.
+  process.env.XDG_STATE_HOME = join(home, ".local", "state");
+  process.env.XDG_DATA_HOME = join(home, ".local", "share");
+  process.env.XDG_CACHE_HOME = join(home, ".cache");
   await runGit(repo, ["init", "-q"]);
 });
 
 after(() => {
-  restoreEnv("HOME");
-  restoreEnv("XDG_CONFIG_HOME");
+  for (const name of Object.keys(savedEnv) as (keyof typeof savedEnv)[]) restoreEnv(name);
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -102,4 +114,67 @@ describe("runGit", () => {
       assert.ok(fromCommandLine.includes(`command\t${setting}`), `missing -c ${setting} in ${stdout}`);
     }
   });
+
+  it("passes env on to git and the helpers it runs, and removes a variable env maps to undefined", async () => {
+    process.env.PROBE_X = "dummy-from-parent";
+    const helper = "credential.helper=!f(){ echo username=dummy; echo password=${PROBE_X-unset}; }; f";
+    const set = await runGit(repo, ["-c", helper, ...credentialFill("example.invalid")], [], {
+      PROBE_X: "dummy-from-env",
+      GIT_TERMINAL_PROMPT: "0",
+    });
+    assert.match(set.stdout, /^password=dummy-from-env$/m);
+    const removed = await runGit(repo, ["-c", helper, ...credentialFill("example.invalid")], [], {
+      PROBE_X: undefined,
+      GIT_TERMINAL_PROMPT: "0",
+    });
+    assert.match(removed.stdout, /^password=unset$/m);
+  });
+
+  it("with the real gh, gh's credential helper answers the login and token of a folder writeGhToken wrote", async () => {
+    const folder = join(scratch, "gh-fill");
+    writeGhToken(folder, dummyToken("ghs_dummy0000000000000000000000000011"), LOGIN);
+    // gh reads a token from GH_TOKEN before its config folder: this one must not be the one that answers.
+    process.env.GH_TOKEN = "dummy-ambient-gh-token";
+    const { stdout } = await runGit(
+      repo,
+      ["-c", "credential.helper=!gh auth git-credential", ...credentialFill("github.com")],
+      [],
+      { GH_CONFIG_DIR: folder, GIT_TERMINAL_PROMPT: "0", ...NO_TOKEN_VARIABLES },
+    );
+    assert.match(stdout, /^username=codeworks-planner\[bot\]$/m);
+    assert.match(stdout, /^password=ghs_dummy0000000000000000000000000011$/m);
+  });
 });
+
+describe("pushWithGhCredential", () => {
+  it("pushes the refspec to the repository's https URL", async () => {
+    const checkout = mkdtempSync(join(scratch, "push-"));
+    const remote = join(scratch, "remote.git");
+    await runGit(checkout, ["init", "-q"]);
+    await runGit(checkout, [...COMMITTER, "commit", "-q", "--allow-empty", "-m", "dummy"]);
+    await runGit(scratch, ["init", "-q", "--bare", remote]);
+    // The checkout's own config sends github.com's URL to a local repository, so the push needs no network.
+    await runGit(checkout, ["config", `url.${remote}.insteadOf`, "https://github.com/acme/widgets.git"]);
+
+    await pushWithGhCredential(checkout, join(scratch, "gh-push"), { owner: "acme", name: "widgets" }, "HEAD:refs/heads/dummy");
+    const pushed = await runGit(remote, ["rev-parse", "refs/heads/dummy"]);
+    assert.equal(pushed.stdout, (await runGit(checkout, ["rev-parse", "HEAD"])).stdout);
+  });
+});
+
+const LOGIN = "codeworks-planner[bot]";
+const NO_TOKEN_VARIABLES = {
+  GH_TOKEN: undefined,
+  GITHUB_TOKEN: undefined,
+  GH_ENTERPRISE_TOKEN: undefined,
+  GITHUB_ENTERPRISE_TOKEN: undefined,
+};
+
+function dummyToken(value: string) {
+  return { value, app: "planner", repo: "acme/widgets", expires_at: "2026-10-28T12:00:00Z", permissions: {} } as const;
+}
+
+// runGit hands git no stdin, so the request `git credential fill` reads comes from an alias's shell.
+function credentialFill(host: string): string[] {
+  return ["-c", `alias.fill=!printf 'protocol=https\\nhost=${host}\\n\\n' | git credential fill`, "fill"];
+}

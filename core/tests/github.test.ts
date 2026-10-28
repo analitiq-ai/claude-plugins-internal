@@ -2,7 +2,16 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { gitHub, GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
+import { inspect } from "node:util";
+import {
+  gitHub,
+  GitHubRefused,
+  GitHubUnanswered,
+  httpsUrl,
+  RemoteRefused,
+  repositoryOfRemote,
+  type GitHubClient,
+} from "../src/github.ts";
 
 const TOKEN = "dummy-token-0000";
 
@@ -318,3 +327,57 @@ for (const [name, call] of GRAPHQL_CALLS) {
     });
   });
 }
+
+test("repositoryOfRemote reads owner and name from a github.com remote in https, scp-like and ssh:// form", () => {
+  for (const url of [
+    "https://github.com/o/n",
+    "https://github.com/o/n.git",
+    "git@github.com:o/n.git",
+    "ssh://git@github.com/o/n.git",
+  ]) {
+    assert.deepEqual(repositoryOfRemote(url), { owner: "o", name: "n" }, url);
+  }
+});
+
+test("repositoryOfRemote refuses another host, a path of more or fewer segments and an empty string", () => {
+  for (const url of [
+    "https://gitlab.com/o/n.git",
+    "git@gitlab.com:o/n.git",
+    "ssh://git@example.com/o/n.git",
+    "https://github.com/o",
+    "git@github.com:o.git",
+    "https://github.com/o/n/x",
+    "ssh://git@github.com/o/n/x.git",
+    "https://github.com/o/..",
+    "",
+  ]) {
+    assert.throws(() => repositoryOfRemote(url), RemoteRefused, JSON.stringify(url));
+  }
+});
+
+// A remote's text is written into the session's environment file, so a shell character must never pass the parse.
+test("repositoryOfRemote refuses an owner or name holding a character GitHub does not allow", () => {
+  for (const url of ["https://github.com/o/n';x;'", "git@github.com:o$(x)/n.git", "https://github.com/o/n%20x"]) {
+    assert.throws(() => repositoryOfRemote(url), RemoteRefused, url);
+  }
+});
+
+// The hook writes the refusal to stderr, which Claude Code hands to the session.
+test("repositoryOfRemote refuses a remote holding a credential, naming its host and path but not the credential", () => {
+  const secret = "ghp_dummySECRET123";
+  for (const url of [`https://x-access-token:${secret}@github.com/o/n.git`, `https://${secret}@github.com/o/n.git`]) {
+    assert.throws(
+      () => repositoryOfRemote(url),
+      (error: unknown) => {
+        assert.ok(error instanceof RemoteRefused);
+        assert.ok(error.message.includes("github.com/o/n.git"), error.message);
+        assert.ok(!inspect(error).includes(secret), `the refusal holds the credential of ${url}`);
+        return true;
+      },
+    );
+  }
+});
+
+test("httpsUrl gives a repository's https URL on github.com", () => {
+  assert.equal(httpsUrl({ owner: "o", name: "n" }), "https://github.com/o/n.git");
+});
