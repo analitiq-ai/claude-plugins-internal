@@ -74,6 +74,8 @@ export const RoundStage = valueSet({
 });
 
 export const CoreSource = z.enum(["threads", "required-checks"]);
+// Not an identifier, so `CoreSource.enum` cannot name it with a dot, and the value scan refuses it quoted elsewhere.
+export const REQUIRED_CHECKS_SOURCE = CoreSource.enum["required-checks"];
 
 // A module name is also a folder in validators/, a `[shared] validators` entry and part of the check name
 // `<module>-review`, so one grammar keeps it fit for all three; no list of modules exists (root ADR-0010 d2).

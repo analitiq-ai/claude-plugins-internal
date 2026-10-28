@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
 import { Snapshot, Time, type Hold, type Round, type RoundId } from "./contracts/snapshot.ts";
-import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
+import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState } from "./values.ts";
 
@@ -15,15 +15,9 @@ const CLOSING_FENCE = "```";
 // GitHub refuses a longer comment, and trimming history to fit would drop rows, which no write may do (R16).
 const COMMENT_LIMIT = 65_536;
 
-// GraphQL names an App as a `Bot` by its bare login; `[shared]` holds REST's `<slug>[bot]` form.
-const BOT_TYPE = "Bot";
-
 // contracts/state-comment.md, Release: the board's status name, and the one command an admin resets with.
 const READY_STATUS = "Ready";
 const RESET_COMMAND = "/codeworks reset";
-
-const Actor = z.object({ __typename: z.string(), login: z.string() });
-type Actor = z.infer<typeof Actor>;
 
 // Times are read as `Time`, whole seconds in UTC, as GitHub writes them and core stamps them, so a snapshot's
 // `since` and a comment's `createdAt` are compared on one scale.
@@ -113,7 +107,7 @@ export class StateWriteRefused extends Error {
 }
 
 function isApp(actor: Actor | null, appLogin: string): boolean {
-  return actor !== null && actor.__typename === BOT_TYPE && `${actor.login}[bot]` === appLogin;
+  return restLogin(actor) === appLogin;
 }
 
 // GitHub's times are whole seconds, so two in one second have no order between them; callers compare seconds.

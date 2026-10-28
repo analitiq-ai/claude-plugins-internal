@@ -9,7 +9,7 @@ export const Time = z.iso.datetime({ precision: 0 });
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
 
-function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
+export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
   if ((value !== null) !== condition) {
     ctx.addIssue({ code: "custom", path: [field], message: `${field} is set exactly when ${when}` });
   }

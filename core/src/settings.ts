@@ -6,6 +6,9 @@ import { ModuleName } from "./values.ts";
 
 const SETTINGS_FILE = "codeworks.toml";
 
+/** The `where` of a `SettingsError` that refuses the `[shared]` section. */
+export const SHARED_SECTION = `${SETTINGS_FILE} [shared]`;
+
 /** `codeworks.toml` is missing or unparsable, or its `[shared]` section is refused; `where` names which. */
 export class SettingsError extends Error {
   readonly where: string;
@@ -76,7 +79,7 @@ export async function readSettings(tree: Tree): Promise<Settings> {
   const tableAt = (name: string): unknown => (Object.hasOwn(document, name) ? document[name] : undefined);
   const shared = Shared.safeParse(tableAt("shared"));
   if (!shared.success) {
-    throw new SettingsError(`${SETTINGS_FILE} [shared]`, z.prettifyError(shared.error), { cause: shared.error });
+    throw new SettingsError(SHARED_SECTION, z.prettifyError(shared.error), { cause: shared.error });
   }
   return { shared: shared.data, section: (name) => tableAt(name) ?? {} };
 }

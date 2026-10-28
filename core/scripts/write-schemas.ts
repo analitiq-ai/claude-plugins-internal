@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { z } from "zod";
+import { Finding } from "../src/contracts/finding.ts";
 import { Snapshot } from "../src/contracts/snapshot.ts";
 import { SpecFacts } from "../src/contracts/spec-facts.ts";
 
@@ -9,6 +10,7 @@ export const schemasDir = new URL("../schemas/", import.meta.url);
 export const schemaFiles: ReadonlyArray<{ schema: z.ZodType; file: string }> = [
   { schema: SpecFacts, file: "spec-facts.schema.json" },
   { schema: Snapshot, file: "snapshot.schema.json" },
+  { schema: Finding, file: "finding.schema.json" },
 ];
 
 function withSortedKeys(value: unknown): unknown {
