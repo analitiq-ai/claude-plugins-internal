@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
-import { ownerAndName, type GitHubClient, type Repository } from "./github.ts";
+import { answerOf, assertIssueNumber, ownerAndName, type GitHubClient, type Repository } from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 
 export type StoryBranch = { story: number; k: number; slug: string };
@@ -48,18 +48,6 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
 function storyOf(branch: string): number | null {
   const parsed = parseBranch(branch);
   return parsed !== null && "story" in parsed ? parsed.story : null;
-}
-
-function assertIssueNumber(n: number): void {
-  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
-}
-
-function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {
-  const parsed = schema.safeParse(answer);
-  if (!parsed.success) {
-    throw new Error(`GitHub's answer for ${what} is not the shape asked for: ${z.prettifyError(parsed.error)}`);
-  }
-  return parsed.data;
 }
 
 const IssueNumber = z.number().int().positive();
