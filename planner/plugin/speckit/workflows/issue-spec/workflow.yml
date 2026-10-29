@@ -97,6 +97,9 @@ steps:
           - id: write-no-spec
             type: shell
             run: python3 "$PLANNER_ROOT/scripts/no_spec.py" write "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
+          - id: spec-facts-no-spec
+            type: shell
+            run: node "$PLANNER_ROOT/scripts/spec_facts.ts" write "$SPECIFY_FEATURE_DIRECTORY"
 
   # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
   # top-level and skips itself on a stop pick, instead of all of them sharing one block.
@@ -200,6 +203,11 @@ steps:
             run: |
               set -eu
               python3 "$PLANNER_ROOT/scripts/premise_report.py" spec "$SPECIFY_FEATURE_DIRECTORY"
+          # After the last grading step, so the block says what grill's rewrite settled. A rescope's facts are
+          # written where it lands, not here.
+          - id: spec-facts
+            type: shell
+            run: node "$PLANNER_ROOT/scripts/spec_facts.ts" write "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}/premise-report.md"
 
   - id: to-plan
     type: if

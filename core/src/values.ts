@@ -2,7 +2,7 @@ import * as z from "zod";
 
 // The meaning record is the one list of a set's values: the enum is built from its keys, so neither can name a
 // value the other lacks (root ADR-0010 d3).
-function valueSet<const Meaning extends Record<string, string>>(meaning: Meaning) {
+export function valueSet<const Meaning extends Record<string, string>>(meaning: Meaning) {
   type Value = keyof Meaning & string;
   return {schema: z.enum(Object.keys(meaning) as [Value, ...Value[]]), meaning};
 }

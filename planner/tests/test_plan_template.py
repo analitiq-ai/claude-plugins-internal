@@ -71,6 +71,13 @@ class SpecTemplate(unittest.TestCase):
         self.assertEqual(headings[-2:], ["## Why this is worth doing", rootcause.HEADING])
         self.assertIn("## Requirements *(mandatory)*", headings)
 
+    def test_the_composed_spec_template_opens_with_the_codeworks_block_planners_writer_sets(self):
+        """spec.md starts as a copy of the composed template, so only a block at its top is spec.md's front matter
+        (planner ADR-0008 d1)."""
+        lines = composed_spec_template().splitlines()
+        self.assertEqual(lines[0], "---", lines[:3])
+        self.assertIn("codeworks:", lines[1:lines.index("---", 1)])
+
     def test_the_template_asks_for_the_reports_questions_under_its_headings(self):
         asked = [line[4:] for line in composed_spec_template().splitlines() if line.startswith("### ")
                  and line[4:] in premise_report.QUESTIONS]
@@ -86,8 +93,12 @@ class SpecTemplate(unittest.TestCase):
         self.assertEqual(premise_report.spec_problems(filled), [])
         self.assertEqual(rootcause.problems(filled, None), [])
 
-    def test_the_template_spells_the_no_defect_sentence_as_the_check_reads_it(self):
-        self.assertIn(f"`{rootcause.NOT_A_DEFECT}`", composed_spec_template())
+    def test_the_template_spells_the_root_cause_sentences_as_their_readers_read_them(self):
+        """spec_facts.ts reads `hypothesis` only from the sentence the vocabulary spells, so a template teaching
+        another wording would have every guessed trace read `anchored`."""
+        for sentence in (rootcause.NOT_A_DEFECT, rootcause.HYPOTHESIS):
+            with self.subTest(sentence=sentence):
+                self.assertIn(f"`{sentence}`", composed_spec_template())
 
     def test_the_installed_specify_command_says_where_the_premise_answers_come_from(self):
         self.assertTrue(installed_skill_carries("speckit.specify"), "speckit-specify lacks the settled-design preset")

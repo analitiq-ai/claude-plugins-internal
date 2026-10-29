@@ -1,3 +1,13 @@
+---
+# planner's spec_facts.ts sets this block once the spec passes planner's checks; leave it as it is.
+codeworks:
+  v: 1
+  kind: "[set by planner]"
+  root_cause:
+    observed: "[set by planner]"
+---
+{CORE_TEMPLATE}
+
 ## Why this is worth doing
 
 <!--

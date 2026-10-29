@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from paths import SCRIPTS
-from test_premise_report import report, spec_section
+from test_premise_report import patched_vocabulary, plugin_with_vocabulary, report, spec_section
 
 import rootcause
 
@@ -84,7 +84,7 @@ class Cli(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "rootcause.py"), "check", str(self.folder), *args],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_a_labelled_section_passes_with_and_without_a_report(self):
         (self.folder / "spec.md").write_text(SPEC.format(section="Observed: a KeyError."))
@@ -109,6 +109,37 @@ class Cli(unittest.TestCase):
         done = self.run_cli(str(self.report))
         self.assertEqual(done.returncode, 2)
         self.assertIn("Reports wrong behaviour:", done.stderr)
+
+
+class Vocabulary(unittest.TestCase):
+    """The words of the section are core's, read from the premise.json beside the plugin's scripts."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+        self.folder = self.root / "specs" / "7-demo"
+        self.folder.mkdir(parents=True)
+        (self.folder / "spec.md").write_text(SPEC.format(section="The ledger drops the verdict."))
+
+    def check(self, scripts):
+        return subprocess.run([sys.executable, str(scripts / "rootcause.py"), "check", str(self.folder)],
+                              capture_output=True, text=True, check=False)
+
+    def test_the_next_step_gives_the_hypothesis_sentence_premise_json_holds(self):
+        sentence = "Observed: dummy, a hypothesis sentence."
+        done = self.check(plugin_with_vocabulary(self.root, patched_vocabulary(root_cause={"hypothesis": sentence})))
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn(f"`{sentence}`", done.stderr)
+
+    def test_a_premise_json_that_is_no_json_cannot_run_naming_its_path(self):
+        scripts = plugin_with_vocabulary(self.root, None)
+        premise_json = self.root / "plugin" / "core" / "generated" / "premise.json"
+        premise_json.parent.mkdir(parents=True)
+        premise_json.write_text("{not json")
+        done = self.check(scripts)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn(str(premise_json), done.stderr)
 
 
 if __name__ == "__main__":

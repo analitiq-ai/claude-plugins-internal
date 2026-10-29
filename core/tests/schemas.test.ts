@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { jsonSchemaText, schemaFiles, schemasDir } from "../scripts/write-schemas.ts";
+import { generatedDir, generatedFiles, jsonSchemaText, schemaFiles, schemasDir } from "../scripts/write-schemas.ts";
 
-async function committedText(file: string): Promise<string | null> {
+async function committedText(file: string, dir: URL = schemasDir): Promise<string | null> {
   try {
-    return await readFile(new URL(file, schemasDir), "utf8");
+    return await readFile(new URL(file, dir), "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
@@ -23,3 +23,18 @@ for (const { schema, file } of schemaFiles) {
     );
   });
 }
+
+for (const { file, text } of generatedFiles) {
+  test(`src/generated/${file} is what write-schemas.ts generates`, async () => {
+    const committed = await committedText(file, generatedDir);
+    if (committed === null) assert.fail(`src/generated/${file} is missing; run node scripts/write-schemas.ts`);
+    assert.equal(committed, text(), `src/generated/${file} differs from its source; run node scripts/write-schemas.ts`);
+  });
+}
+
+test("the generated files include premise.json", () => {
+  assert.deepEqual(
+    generatedFiles.map(({ file }) => file),
+    ["premise.json"],
+  );
+});

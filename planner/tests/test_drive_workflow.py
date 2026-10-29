@@ -63,7 +63,8 @@ if not os.environ.get("CLAUDE_NO_FEATURE_JSON"):
 
 
 def drive(root, env, *args):
-    proc = subprocess.run([sys.executable, str(DRIVER), *args], cwd=root, env=env, capture_output=True, text=True)
+    proc = subprocess.run([sys.executable, str(DRIVER), *args], cwd=root, env=env, capture_output=True, text=True,
+                          check=False)
     return proc, json.loads(proc.stdout) if proc.returncode == 0 else None
 
 
@@ -507,6 +508,17 @@ class Premise(unittest.TestCase):
         self.assertTrue(no_spec.is_no_spec(text), text)
         for line in ("Rests on: needs-spec", f"Reason: {self.REASON}"):
             self.assertIn(line, text.splitlines())
+
+    def test_no_spec_needed_writes_its_spec_facts_and_a_rescope_of_the_folder_still_starts_at_the_premise(self):
+        report = self.stop(NO_SPEC)
+        self.assertEqual(report["status"], "completed", report)
+        lines = (self.project.root / NEW / "spec.md").read_text().splitlines()
+        self.assertEqual(lines[0], "---", lines)
+        self.assertEqual(yaml.safe_load("\n".join(lines[1:lines.index("---", 1)])),
+                         {"codeworks": {"v": 1, "kind": "no_spec", "root_cause": {"observed": "none"}}})
+        proc, rescoped = self.project.drive("rescope", self.project.spec_file(RESCOPE), ISSUE, NEW)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((rescoped["status"], rescoped["step"]), ("paused", "premise"), rescoped)
 
     def test_an_unwritable_no_spec_folder_stops_at_its_step_with_a_next_step_and_resumes_once_cleared(self):
         blocker = self.project.root / "specs"

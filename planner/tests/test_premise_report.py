@@ -1,11 +1,13 @@
 """premise_report.py: the premise report's form, its check, and the reason a not-worth-doing issue is closed with."""
+import json
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from paths import SCRIPTS
+from paths import PLUGIN, SCRIPTS
 
 import premise_report
 from premise_report import NO_SPEC, NOT_WORTH_DOING, WRITE
@@ -19,6 +21,32 @@ ANSWERS = {
     "inherited": ("no", "user: it is a new report"),
     "needs-spec": ("yes, where the verdict lives is undecided", "user: asked in the session"),
 }
+
+
+VOCABULARY = PLUGIN / "core" / "generated" / "premise.json"
+
+
+def patched_vocabulary(**sections):
+    """premise.json as core generates it, with each of `sections` merged over its own: a list replaces, a mapping's
+    keys replace those keys."""
+    vocabulary = json.loads(VOCABULARY.read_text())
+    for name, value in sections.items():
+        vocabulary[name] = value if isinstance(value, list) else {**vocabulary[name], **value}
+    return vocabulary
+
+
+def plugin_with_vocabulary(root, vocabulary):
+    """A plugin folder under `root` holding premise_report.py and rootcause.py, with `vocabulary` as its
+    core/generated/premise.json, or no such file when it is None; returns its scripts folder."""
+    scripts = root / "plugin" / "scripts"
+    scripts.mkdir(parents=True)
+    for name in ("premise_report.py", "rootcause.py"):
+        shutil.copy(SCRIPTS / name, scripts / name)
+    if vocabulary is not None:
+        generated = root / "plugin" / "core" / "generated"
+        generated.mkdir(parents=True)
+        (generated / "premise.json").write_text(json.dumps(vocabulary))
+    return scripts
 
 
 def report(pick=WRITE, recommendation=None, rests_on="", reason="", wrong="yes", answers=ANSWERS, drop=()):
@@ -242,7 +270,7 @@ class Cli(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "premise_report.py"), *args], cwd=self.root,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_form_prints_the_form(self):
         done = self.run_cli("form")
@@ -295,6 +323,37 @@ class Cli(unittest.TestCase):
                 done = self.run_cli("reason", str(self.path))
                 self.assertEqual((done.returncode, done.stdout), (1, ""), done.stderr)
                 self.assertIn("Reason:", done.stderr)
+
+
+class Vocabulary(unittest.TestCase):
+    """The words of the report are core's, read from the premise.json beside the plugin's scripts."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+
+    def form(self, vocabulary):
+        scripts = plugin_with_vocabulary(self.root, vocabulary)
+        return subprocess.run([sys.executable, str(scripts / "premise_report.py"), "form"], capture_output=True,
+                              text=True, check=False)
+
+    def test_the_form_is_written_in_the_label_answers_and_picks_premise_json_holds(self):
+        done = self.form(patched_vocabulary(
+            picks=["dummy write", "dummy no spec", "dummy not worth"],
+            reports_wrong_behaviour={"label": "Dummy wrong", "yes": "dummy-yes", "no": "dummy-no"}))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        lines = done.stdout.splitlines()
+        self.assertEqual(lines[0], "Dummy wrong:")
+        self.assertIn("- Dummy wrong is dummy-yes or dummy-no.", lines)
+        self.assertIn("- Recommendation and Pick are each one of: dummy write, dummy no spec, dummy not worth.", lines)
+        for word in ("Reports wrong behaviour", WRITE, NO_SPEC, NOT_WORTH_DOING):
+            self.assertNotIn(word, done.stdout)
+
+    def test_a_missing_premise_json_cannot_run_naming_its_path(self):
+        done = self.form(None)
+        self.assertEqual((done.returncode, done.stdout), (2, ""))
+        self.assertIn(str(self.root / "plugin" / "core" / "generated" / "premise.json"), done.stderr)
 
 
 if __name__ == "__main__":
