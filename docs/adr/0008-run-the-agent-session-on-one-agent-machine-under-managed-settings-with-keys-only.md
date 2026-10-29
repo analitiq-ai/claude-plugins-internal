@@ -53,8 +53,8 @@ from a session.
    `/codeworks <issue>` (orchestrator ADR-0001); nothing picks an issue on its own. builder runs nowhere
    else.
 2. We will run planner where its admin works, outside those settings, under admin supervision, with no
-   other codeworks plugin there; its agent acts on GitHub only as the planner App (ADR-0007), never with
-   an admin's credentials.
+   other codeworks plugin there; planner's scripts act on GitHub only as the planner App, and the agent's
+   other commands with the admin's own login, under the admin's approval (ADR-0007).
 3. We will require the sandbox (fail if unavailable, nothing unsandboxed or excluded) and unix sockets
    blocked.
 4. We will keep the session, orchestrator and reviewer App keys, the validator modules' tokens and the
