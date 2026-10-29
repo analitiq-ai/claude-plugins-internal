@@ -57,18 +57,20 @@ Set up once, and merged to the repository's default branch before the first `/pl
 planner reads `codeworks.toml` at `HEAD`, and landing stops on any committed path outside the spec
 folder that the default branch lacks.
 
-1. Install the Spec Kit CLI, `specify` 1.0.7 or later. Initialise the repository and add the two community
-   extensions the `issue-spec` workflow runs. The catalog lists them as discovery-only, so add them from this
-   repo's vetted copies:
+1. Install the Spec Kit CLI, `specify` 1.0.7 or later, and initialise the repository:
+   `specify init --here --integration claude`.
 
-   ```
-   specify init --here --integration claude
-   specify extension add --dev <clone of this repo>/.specify/extensions/grill
-   specify extension add --dev <clone of this repo>/.specify/extensions/critique
-   ```
+   The `issue-spec` workflow's grill and critique steps run two third-party Spec Kit community extensions,
+   part of neither Spec Kit nor planner. Spec Kit's catalog lists both as discovery-only, not vetted, so
+   `specify` will not install them from it. Vet each yourself, then install it with
+   `specify extension add <id> --from <archive-url>`, or `--dev <folder>` from a local copy:
 
-   Commit `.specify/` and the `speckit-*` skills it writes under `.claude/skills/`, `speckit-grill-me` and
-   `speckit-critique-run` among them: the workflow's grill and critique steps run them.
+   | Extension | Author | Skill it adds |
+   |---|---|---|
+   | `grill` | [yoshi1220/speckit-grill-me](https://github.com/yoshi1220/speckit-grill-me) | `speckit-grill-me` |
+   | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
+
+   Commit `.specify/` and the `speckit-*` skills under `.claude/skills/`.
 2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
    `https://github.com/orgs/<org>/projects/<n>`.
 3. Make the board an organization project in the org where the planner App is installed. Spell its Status
