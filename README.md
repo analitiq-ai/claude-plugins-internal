@@ -51,6 +51,33 @@ claude plugin install reviewer@codeworks
 The repo is private: on your machine the clone uses your git credentials for github.com; the agent
 machine, which holds none, uses the deploy key.
 
+## A repository planner scopes in
+
+Set up once, and merged to the repository's default branch before the first `/planner:issue-spec`:
+planner reads `codeworks.toml` at `HEAD`, and landing stops on any committed path outside the spec
+folder that the default branch lacks.
+
+1. Install the Spec Kit CLI, `specify` 1.0.7 or later. Initialise the repository and add the two community
+   extensions the `issue-spec` workflow runs. The catalog lists them as discovery-only, so add them from this
+   repo's vetted copies:
+
+   ```
+   specify init --here --integration claude
+   specify extension add --dev <clone of this repo>/.specify/extensions/grill
+   specify extension add --dev <clone of this repo>/.specify/extensions/critique
+   ```
+
+   Commit `.specify/` and the `speckit-*` skills it writes under `.claude/skills/`.
+2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
+   `https://github.com/orgs/<org>/projects/<n>`.
+3. Make the board an organization project in the org where the planner App is installed. Spell its Status
+   options Backlog, Ready, In progress, In review, Blocked, Done. Planner scopes an issue only from
+   Backlog or Blocked: turn on the project's workflows that add the repository's new issues in Backlog, or
+   add each card by hand.
+4. Install the planner App on the repository, and keep its key at `~/.config/codeworks/planner-app.pem`,
+   mode 0600, owned by you.
+5. Commit and merge to the default branch.
+
 ## Layout
 
 `<component>/plugin/` holds what an install copies. Beside it, never installed: `tests/` and the component's
