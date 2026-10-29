@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { it } from "node:test";
 
-const HOOKS = new URL("../plugin/hooks/hooks.json", import.meta.url);
-const TOKEN = { type: "command", command: "node ${CLAUDE_PLUGIN_ROOT}/hooks/token.ts", onFailure: "block" };
+const PLUGIN = new URL("../plugin/", import.meta.url);
 
-it("runs token.ts on SessionStart and before every Bash call, blocking on its failure", () => {
-  assert.deepEqual(JSON.parse(readFileSync(HOOKS, "utf8")), {
-    hooks: {
-      SessionStart: [{ hooks: [TOKEN] }],
-      PreToolUse: [{ matcher: "Bash", hooks: [TOKEN] }],
-    },
-  });
+// Planner keeps out of the session's environment: its scripts mint the token they need (root ADR-0007 d4).
+it("declares no hook", () => {
+  assert.equal(existsSync(new URL("hooks", PLUGIN)), false, "planner/plugin/hooks exists");
+  const manifest = JSON.parse(readFileSync(new URL(".claude-plugin/plugin.json", PLUGIN), "utf8")) as Record<string, unknown>;
+  assert.equal(Object.hasOwn(manifest, "hooks"), false, "plugin.json declares hooks");
 });

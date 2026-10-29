@@ -1,16 +1,18 @@
 """new_issue.py: the issue an `untracked` change gets, created in the repo origin names, its text through a file.
 
-No test reaches GitHub: `gh` is a stand-in that keeps each call, with what it read on stdin.
+No test reaches GitHub: `node`, which new_issue.py runs gh.ts with, is a stand-in that keeps each call, with what it
+read on stdin. No `gh` is on PATH, so a call that skips gh.ts, and with it the planner App's token, fails.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from paths import PLUGIN
+from paths import PLUGIN, SCRIPTS
 
 SCRIPT = PLUGIN / "skills" / "issue-spec" / "scripts" / "new_issue.py"
 ORIGIN = "https://github.test/acme/demo.git"
@@ -21,7 +23,7 @@ URL = "https://github.test/acme/demo/issues/81"
 
 
 class Checkout:
-    """A git checkout whose origin is ORIGIN, beside a stand-in `gh`."""
+    """A git checkout whose origin is ORIGIN, beside a stand-in `node` running gh.ts."""
 
     def __init__(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -34,25 +36,28 @@ class Checkout:
             subprocess.run(["git", "-C", str(self.root), "remote", "add", name, url], check=True)
         # GH_FAILS fails every call and GH_CREATE_FAILS the create, the way gh does when GitHub refuses one.
         # GH_DROPS_TYPE creates the issue with no type, as GitHub does for a user without push access.
-        gh = bin_dir / "gh"
-        gh.write_text(f"#!{sys.executable}\nimport json, os, sys\n"
-                      "args = sys.argv[1:]\n"
-                      "stdin = sys.stdin.read() if args[-2:] == ['--input', '-'] else None\n"
-                      f"with open({str(self.log)!r}, 'a') as log:\n"
-                      "    log.write(json.dumps({'args': args, 'stdin': stdin}) + '\\n')\n"
-                      "if os.environ.get('GH_FAILS'):\n"
-                      "    sys.exit('HTTP 502: Bad Gateway')\n"
-                      "if args[:2] == ['repo', 'view']:\n"
-                      "    print('acme/demo')\n"
-                      "elif args[:2] == ['api', 'graphql']:\n"
-                      f"    print({chr(10).join(TYPES)!r})\n"
-                      "elif os.environ.get('GH_CREATE_FAILS'):\n"
-                      "    sys.exit('HTTP 422: Validation Failed')\n"
-                      "else:\n"
-                      "    kind = None if os.environ.get('GH_DROPS_TYPE') else {'name': json.loads(stdin)['type']}\n"
-                      f"    print(json.dumps({{'number': 81, 'html_url': {URL!r}, 'type': kind}}))\n")
-        gh.chmod(0o755)
-        self.env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+        node = bin_dir / "node"
+        node.write_text(f"#!{sys.executable}\nimport json, os, sys\n"
+                        f"if sys.argv[1] != {str(SCRIPTS / 'gh.ts')!r}:\n"
+                        "    sys.exit(f'node ran {sys.argv[1]}, not planner/plugin/scripts/gh.ts')\n"
+                        "args = sys.argv[2:]\n"
+                        "stdin = sys.stdin.read() if args[-2:] == ['--input', '-'] else None\n"
+                        f"with open({str(self.log)!r}, 'a') as log:\n"
+                        "    log.write(json.dumps({'args': args, 'stdin': stdin}) + '\\n')\n"
+                        "if os.environ.get('GH_FAILS'):\n"
+                        "    sys.exit('HTTP 502: Bad Gateway')\n"
+                        "if args[:2] == ['repo', 'view']:\n"
+                        "    print('acme/demo')\n"
+                        "elif args[:2] == ['api', 'graphql']:\n"
+                        f"    print({chr(10).join(TYPES)!r})\n"
+                        "elif os.environ.get('GH_CREATE_FAILS'):\n"
+                        "    sys.exit('HTTP 422: Validation Failed')\n"
+                        "else:\n"
+                        "    kind = None if os.environ.get('GH_DROPS_TYPE') else {'name': json.loads(stdin)['type']}\n"
+                        f"    print(json.dumps({{'number': 81, 'html_url': {URL!r}, 'type': kind}}))\n")
+        node.chmod(0o755)
+        (bin_dir / "git").symlink_to(shutil.which("git"))
+        self.env = {**os.environ, "PATH": str(bin_dir)}
 
     def run(self, *args):
         return subprocess.run([sys.executable, str(SCRIPT), *args], cwd=self.root, env=self.env,
