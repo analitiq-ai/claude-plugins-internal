@@ -45,27 +45,24 @@ function installedCopy(t: TestContext): string {
   return root;
 }
 
-function runHook(root: string) {
-  return spawnSync(process.execPath, [join(root, "hooks", "token.ts")], {
-    input: "{}",
-    env: isolatedEnv(),
-    encoding: "utf8",
-  });
+// With no argument: preflight.ts refuses it without reaching git or GitHub.
+function runPreflight(root: string) {
+  return spawnSync(process.execPath, [join(root, "scripts", "preflight.ts")], { env: isolatedEnv(), encoding: "utf8" });
 }
 
-// The hook loads every module it needs before it reads its input, so a refusal of the input shows each one was found.
-it("with every package installed: token.ts gets past the guard and refuses an input that is no hook event", (t) => {
-  const hook = runHook(installedCopy(t));
-  assert.equal(hook.status, 2, hook.stderr);
-  assert.match(hook.stderr, /^planner: the hook's input is refused: /);
-  assert.equal(hook.stdout, "");
+// preflight.ts loads every module it needs before it reads its arguments, so a refusal of them shows each one was found.
+it("with every package installed: preflight.ts gets past the guard and refuses a missing argument", (t) => {
+  const run = runPreflight(installedCopy(t));
+  assert.equal(run.status, 2, run.stderr);
+  assert.match(run.stderr, /^planner: preflight\.ts takes one argument, /);
+  assert.equal(run.stdout, "");
 });
 
-it("with zod removed: token.ts exits 2 naming zod and the plugin folder, and prints nothing on stdout", (t) => {
+it("with zod removed: preflight.ts exits 2 naming zod and the plugin folder, and prints nothing on stdout", (t) => {
   const root = installedCopy(t);
   rmSync(join(root, "node_modules", "zod"), { recursive: true });
-  const hook = runHook(root);
-  assert.equal(hook.status, 2, hook.stderr);
-  assert.equal(hook.stderr, `core dependency zod is not installed in ${root}\n`);
-  assert.equal(hook.stdout, "");
+  const run = runPreflight(root);
+  assert.equal(run.status, 2, run.stderr);
+  assert.equal(run.stderr, `core dependency zod is not installed in ${root}\n`);
+  assert.equal(run.stdout, "");
 });

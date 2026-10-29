@@ -15,12 +15,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# gh as the planner App, so the issue is created by the App and never with the admin's login (R9).
+GH = Path(__file__).resolve().parents[3] / "scripts" / "gh.ts"
 TYPES_QUERY = ("query($owner: String!, $name: String!) "
                "{ repository(owner: $owner, name: $name) { issueTypes(first: 100) { nodes { name } } } }")
 
 
 def _gh(args, failed, stdin=None):
-    proc = subprocess.run(["gh", *args], input=stdin, capture_output=True, text=True)
+    proc = subprocess.run(["node", str(GH), *args], input=stdin, capture_output=True, text=True)
     if proc.returncode != 0:
         sys.exit(f"{failed}: {proc.stderr.strip()}\nNext step: fix what GitHub says, then run this again.")
     return proc.stdout

@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import type { MintedToken } from "./tokens.ts";
 
-// Longer than any Bash call that calls GitHub runs, so a token checked before the call outlives it (planner R5).
+// Longer than any planner script runs, so a token checked as one starts outlives its GitHub calls (planner R5).
 export const REFRESH_MARGIN_MS = 10 * 60 * 1000;
 
 const HOST = "github.com";
