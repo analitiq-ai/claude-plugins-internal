@@ -27,7 +27,7 @@ class Folder(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "no_spec.py"), *args], cwd=self.root,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_write_creates_the_folder_with_a_spec_md_that_says_no_spec_is_needed_and_nothing_else(self):
         done = self.run_cli("write", str(self.folder), str(self.report))
@@ -43,6 +43,12 @@ class Folder(unittest.TestCase):
         for spec in (SPEC.format(section="Not a defect report."), "", "# Demo\n\nRests on: needs-spec\n"):
             with self.subTest(spec=spec[:20]):
                 self.assertFalse(no_spec.is_no_spec(spec))
+
+    def test_a_leading_front_matter_block_does_not_hide_which_one_it_is(self):
+        """spec_facts.ts writes the `codeworks` block at the top of both."""
+        front_matter = "---\ncodeworks:\n  v: 1\n  kind: no_spec\n  root_cause:\n    observed: none\n---\n"
+        self.assertTrue(no_spec.is_no_spec(front_matter + no_spec.text(NO_SPEC_REPORT)))
+        self.assertFalse(no_spec.is_no_spec(front_matter + SPEC.format(section="Not a defect report.")))
 
     def test_a_second_no_spec_pick_writes_the_spec_md_again_from_its_own_report(self):
         """A rescope of a no-spec folder that picks `no spec needed` again."""
