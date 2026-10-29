@@ -70,9 +70,10 @@ folder that the default branch lacks.
    | `grill` | [yoshi1220/speckit-grill-me](https://github.com/yoshi1220/speckit-grill-me) | `speckit-grill-me` |
    | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
 
-   No other extension is needed. The workflow's other steps, `speckit.specify`, `speckit.plan` and
-   `speckit.tasks`, come with `specify init`, and planner installs its own preset (`settled-design`) and
-   workflow (`issue-spec`) at each start. This repo's `adrkit` and `assess` extensions are not planner's.
+   The workflow's other steps, `speckit.specify`, `speckit.plan` and `speckit.tasks`, come with
+   `specify init`, and planner installs its own preset (`settled-design`) and workflow (`issue-spec`) at each
+   start. Planner's ADR check of the plan, after plan and before critique (planner ADR-0009), will also need
+   ADR Kit; it is not built yet (#177).
 
    Commit `.specify/` and the `speckit-*` skills under `.claude/skills/`.
 2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
