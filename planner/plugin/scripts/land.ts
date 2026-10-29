@@ -137,6 +137,8 @@ export function landsWith(specFolder: string): (path: string) => boolean {
 
 const StoryIssue = z.object({ id: z.number().int().positive(), number: z.number().int().positive() });
 type StoryIssue = ReturnType<typeof StoryIssue.parse>;
+// GitHub lets a sub-issue come from another repository, whose number would name a different issue in tasks.md.
+const SubIssue = StoryIssue.extend({ repository_url: z.string() });
 
 /** Each sub-issue at position i whose number is not the one tasks.md labels US<i+1> with, as the line naming both. */
 export function misplacedSubIssues(subIssues: readonly StoryIssue[], stories: readonly Story[], labels: ReadonlyMap<string, number>): string[] {
@@ -171,7 +173,7 @@ async function landing(args: readonly string[], checkout: string): Promise<Landi
   return { p: Number(issue), specDir, kind };
 }
 
-const RepositoryAnswer = z.object({ default_branch: z.string().min(1) });
+const RepositoryAnswer = z.object({ url: z.string(), default_branch: z.string().min(1) });
 const UserAnswer = z.object({ id: z.number().int().positive() });
 const OpenedPr = z.object({ html_url: z.string() });
 
@@ -219,7 +221,7 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   const github = plannerGitHub(repo, io.connect, new Date());
   const name = `${repo.owner}/${repo.name}`;
   const api = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
-  const base = answerOf(RepositoryAnswer, await github.rest("GET", api), name).default_branch;
+  const { url, default_branch: base } = answerOf(RepositoryAnswer, await github.rest("GET", api), name);
   const tracking = `refs/remotes/origin/${base}`;
   await io.fetch(repo, [`+refs/heads/${base}:${tracking}`]);
 
@@ -269,20 +271,26 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   const tasks = readFileSync(join(checkout, specDir, "tasks.md"), "utf8");
   const stories = storyPlan(tasks);
   const labels = readTaskBlockLabels(tasks);
-  let subIssues: StoryIssue[] = [];
-  if (stories.length > 1) {
-    subIssues = answerOf(z.array(StoryIssue), await github.restPages(`${api}/issues/${p}/sub_issues`), `the sub-issues of ${name}#${p}`);
-    const extra = subIssues.slice(stories.length);
-    if (extra.length > 0) {
-      stop(
-        `#${p} has ${subIssues.length} sub-issues for ${stories.length} stories; the extra: ${extra.map((one) => `#${one.number}`).join(", ")}. ` +
-          `Next step: remove them from #${p}'s sub-issues, or add their stories to tasks.md.`,
-      );
-    }
-    const misplaced = misplacedSubIssues(subIssues, stories, labels);
-    if (misplaced.length > 0) {
-      stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: make tasks.md's label and #${p}'s sub-issue name the same issue.`));
-    }
+  const subIssues = answerOf(z.array(SubIssue), await github.restPages(`${api}/issues/${p}/sub_issues`), `the sub-issues of ${name}#${p}`);
+  // A one-story spec's story is #p itself, so none of its sub-issues is a story issue.
+  const extra = subIssues.slice(stories.length > 1 ? stories.length : 0);
+  if (extra.length > 0) {
+    stop(
+      `#${p} has ${subIssues.length} sub-issues for ${stories.length} stories; the extra: ${extra.map((one) => `#${one.number}`).join(", ")}. ` +
+        `Next step: remove them from #${p}'s sub-issues, or add their stories to tasks.md.`,
+    );
+  }
+  const foreign = subIssues.filter((one) => one.repository_url !== url);
+  if (foreign.length > 0) {
+    stop(
+      ...foreign.map(
+        (one) => `#${p}'s sub-issue ${one.repository_url.split("/repos/").at(-1)}#${one.number} is in another repository. Next step: remove it from #${p}'s sub-issues.`,
+      ),
+    );
+  }
+  const misplaced = misplacedSubIssues(subIssues, stories, labels);
+  if (misplaced.length > 0) {
+    stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: make tasks.md's label and #${p}'s sub-issue name the same issue.`));
   }
 
   const login = shared.planner_app_login;
