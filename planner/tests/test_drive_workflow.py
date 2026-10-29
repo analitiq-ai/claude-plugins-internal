@@ -83,14 +83,13 @@ class Project:
         self.gh_log = Path(self._tmp.name) / "gh.log"
         # Stands in for the agent `plan` dispatches to: keeps its prompt, writes no plan.
         self.stand_in("claude", f'#!/bin/sh\nprintf "%s\\n" "$2" >> "{self.prompts}"\n')
-        # GH_FAILS makes it fail the way gh does when GitHub refuses a call; GH_ISSUE_STATE is the issue's state.
-        self.stand_in("gh", f"#!{sys.executable}\nimport json, os, sys\n"
+        # The issue is open, so a step that checked its state before closing it would go on to close it: every
+        # call such a step makes is kept, not just the first.
+        self.stand_in("gh", f"#!{sys.executable}\nimport json, sys\n"
                             f"with open({str(self.gh_log)!r}, 'a') as log:\n"
                             "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
-                            "if os.environ.get('GH_FAILS'):\n"
-                            "    sys.exit('HTTP 502: Bad Gateway')\n"
                             "if sys.argv[1:3] == ['issue', 'view']:\n"
-                            "    print(os.environ.get('GH_ISSUE_STATE', 'OPEN'))\n")
+                            "    print('OPEN')\n")
         self.env = {**os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
         (self.root / ".specify" / "workflows").mkdir(parents=True)
         if spec_text is not None:
@@ -460,7 +459,8 @@ class Premise(unittest.TestCase):
     def setUp(self):
         self.project = Project(spec_text=None)
         self.addCleanup(self.project.close)
-        # The issue is closed in the repo origin names, whichever repo gh would pick on its own.
+        # Like the checkouts planner runs in, it has an origin: a step that named the issue's repo by it would
+        # reach gh, and the call would be kept, rather than fail on reading the remote.
         subprocess.run(["git", "-C", str(self.project.root), "remote", "add", "origin", self.ORIGIN], check=True)
         self.project.with_specify()
         proc, self.started = self.project.drive("start", self.project.spec_file(ISSUE_TEXT), ISSUE, NEW)
@@ -488,40 +488,13 @@ class Premise(unittest.TestCase):
         self.assertIn("issue", proc.stderr)
         self.assertEqual(len(self.project.runs()), 1)
 
-    def test_not_worth_doing_closes_the_issue_as_not_planned_with_the_reason_and_writes_no_spec(self):
+    def test_not_worth_doing_names_the_close_for_the_admin_calls_github_for_nothing_and_writes_no_spec(self):
         report = self.stop(NOT_WORTH_DOING)
         self.assertEqual(report["status"], "completed", report)
-        self.assertEqual(self.project.gh_calls(),
-                         [self.state_read(),
-                          ["issue", "close", ISSUE, "--repo", self.ORIGIN, "--reason", "not planned", "--comment",
-                           self.REASON]])
+        self.assertEqual(self.project.gh_calls(), [])
+        self.assertEqual(report.get("close"), f"Close #{ISSUE} as not planned: {self.REASON}", report)
         self.assertEqual(self.project.prompts.read_text(), "")
         self.assertFalse((self.project.root / "specs").exists())
-
-    def state_read(self):
-        return ["issue", "view", ISSUE, "--repo", self.ORIGIN, "--json", "state", "--jq", ".state"]
-
-    def test_an_issue_closed_since_the_run_started_fails_the_run_and_is_not_closed_again(self):
-        """gh exits 0 on an issue that is already closed, without its reason or comment: the run would say it closed
-        the issue with the reason when it did neither."""
-        self.project.env["GH_ISSUE_STATE"] = "CLOSED"
-        report = self.stop(NOT_WORTH_DOING)
-        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
-        self.assertIn(f"Issue #{ISSUE} is CLOSED", report["stderr"])
-        self.assertEqual(self.project.gh_calls(), [self.state_read()])
-
-    def test_a_checkout_with_no_origin_closes_nothing_and_fails_the_run(self):
-        """gh given an empty --repo picks a repo from the other remotes: the issue it closed would be another repo's."""
-        subprocess.run(["git", "-C", str(self.project.root), "remote", "remove", "origin"], check=True)
-        report = self.stop(NOT_WORTH_DOING)
-        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
-        self.assertEqual(self.project.gh_calls(), [])
-
-    def test_a_close_that_github_refuses_fails_the_run(self):
-        self.project.env["GH_FAILS"] = "1"
-        report = self.stop(NOT_WORTH_DOING)
-        self.assertEqual((report["status"], report["step"]), ("failed", "close-not-worth-doing"), report)
-        self.assertIn("HTTP 502", report["stderr"])
 
     def test_no_spec_needed_writes_the_folder_with_only_a_no_spec_spec_md_and_calls_github_for_nothing(self):
         report = self.stop(NO_SPEC)
