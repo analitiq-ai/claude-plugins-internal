@@ -93,10 +93,27 @@ class IssueSpecSkill(unittest.TestCase):
         self.assertIn("A title with no such word: stop before writing anything, and tell the user to retitle the "
                       "issue.", self.new_scope())
 
-    def test_a_completed_run_ends_with_the_spec_folder_and_branch_lines(self):
+    def test_a_completed_run_is_landed_by_land_ts_from_the_checkout_and_never_by_the_skills_own_git(self):
+        """land.ts commits, pushes and opens the spec PR as the planner App; a commit or push in the session would
+        be the admin's."""
         text = squashed(ISSUE_SPEC)
-        self.assertIn("End with two lines and nothing after them: `Spec folder: <path>`", text)
-        self.assertIn("`Branch: <branch>`", text)
+        self.assertIn("`LAND` is `../../scripts/land.ts` from this skill's base directory.", text)
+        self.assertTrue((ISSUE_SPEC.parent / "../../scripts/land.ts").resolve().is_file())
+        self.assertIn("When the report says `completed`, run `node LAND <ISSUE> <SPEC_PATH> <KIND>` from `CHECKOUT`",
+                      text)
+        self.assertNotRegex(text, r"git (commit|push)")
+
+    def test_a_completed_run_ends_with_land_ts_last_three_lines_or_stops_on_its_non_zero_exit(self):
+        text = squashed(ISSUE_SPEC)
+        self.assertIn("End with its last three lines and nothing after them: `Spec folder: <path>`, "
+                      "`Branch: <ISSUE>-spec` and `Spec PR: <url>`.", text)
+        self.assertIn("If it exits non-zero, show the user its message and stop: each line names the next step.", text)
+
+    def test_a_preflight_stop_is_the_users_to_clear_and_resumes(self):
+        """The card's lane and the issue's state are an admin's to change; planner never moves a card."""
+        stops = re.sub(r"\s+", " ", ISSUE_SPEC.read_text().split("## Stops", 1)[1])
+        self.assertIn("- `step: preflight`, with `stderr` lines that each name a Next step: show them to the user. "
+                      "The user takes each step, not you; resume only once they say it is done.", stops)
 
     def test_a_rescope_runs_in_the_issues_existing_worktree_and_never_creates_one(self):
         """A fresh branch would take the re-scoped spec away from the PR it was held for."""

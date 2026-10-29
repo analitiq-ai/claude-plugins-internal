@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { writeGhToken } from "../src/gh-config.ts";
-import { GitFailed, PushRefused, pushWithGhCredential, runGit } from "../src/git.ts";
+import { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } from "../src/git.ts";
 
 const COMMITTER = ["-c", "user.name=Dummy Author", "-c", "user.email=dummy@example.invalid"];
 
@@ -150,93 +150,110 @@ describe("runGit", () => {
   });
 });
 
-describe("pushWithGhCredential", () => {
-  const ACME = { owner: "acme", name: "widgets" } as const;
-  let proxy: Server;
-  let proxyUrl: string;
+const ACME = { owner: "acme", name: "widgets" } as const;
 
-  // Every push the guard lets through stops at this proxy, so no test reaches github.com. The user in its URL
-  // makes git ask for a password gh has no answer for, which is where git turns to an askpass.
-  before(async () => {
-    delete process.env.GIT_ASKPASS;
-    delete process.env.SSH_ASKPASS;
-    proxy = createServer((socket) => socket.destroy());
-    await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
-    proxyUrl = `http://dummy@127.0.0.1:${(proxy.address() as AddressInfo).port}`;
+// The push and the fetch reach GitHub through one guard and one environment, so each case runs on both. `moved`
+// is whether the call got through to a remote that holds `refs/heads/seed`.
+const transports = [
+  {
+    name: "pushWithGhCredential",
+    run: (dir: string) => pushWithGhCredential(dir, join(scratch, "gh-transport"), ACME, "HEAD:refs/heads/dummy"),
+    moved: async (_dir: string, remote: string) =>
+      (await runGit(remote, ["rev-parse", "--verify", "--quiet", "refs/heads/dummy"], [1])).code === 0,
+  },
+  {
+    name: "fetchWithGhCredential",
+    run: (dir: string) =>
+      fetchWithGhCredential(dir, join(scratch, "gh-transport"), ACME, ["+refs/heads/seed:refs/remotes/origin/seed"]),
+    moved: async (dir: string, _remote: string) =>
+      (await runGit(dir, ["rev-parse", "--verify", "--quiet", "refs/remotes/origin/seed"], [1])).code === 0,
+  },
+] as const;
+
+for (const transport of transports) {
+  describe(transport.name, () => {
+    let proxy: Server;
+    let proxyUrl: string;
+
+    // Every call the guard lets through stops at this proxy, so no test reaches github.com. The user in its URL
+    // makes git ask for a password gh has no answer for, which is where git turns to an askpass.
+    before(async () => {
+      delete process.env.GIT_ASKPASS;
+      delete process.env.SSH_ASKPASS;
+      proxy = createServer((socket) => socket.destroy());
+      await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+      proxyUrl = `http://dummy@127.0.0.1:${(proxy.address() as AddressInfo).port}`;
+    });
+
+    after(() => proxy.close());
+
+    async function checkout(): Promise<string> {
+      const dir = mkdtempSync(join(scratch, "transport-"));
+      await runGit(dir, ["init", "-q"]);
+      await runGit(dir, [...COMMITTER, "commit", "-q", "--allow-empty", "-m", "dummy"]);
+      await runGit(dir, ["config", "http.proxy", proxyUrl]);
+      return dir;
+    }
+
+    function refusedNaming(named: string, secret: string) {
+      return (error: unknown) => {
+        assert.ok(error instanceof GhCredentialRefused, String(error));
+        assert.ok(error.message.includes(named), error.message);
+        assert.ok(!error.message.includes(secret), error.message);
+        return true;
+      };
+    }
+
+    // An extra header goes out beside whatever the credential helper answers, so it could carry another credential.
+    for (const template of ["http.extraHeader", "http.https://github.com/.extraHeader", "http.https://dummy:<secret>@github.com/.extraHeader"]) {
+      it(`refuses a checkout whose config sets ${template}, naming the key without a credential`, async () => {
+        const dir = await checkout();
+        const secret = randomUUID();
+        const key = template.replace("<secret>", secret);
+        await runGit(dir, ["config", key, `Authorization: Basic ${secret}`]);
+
+        await assert.rejects(transport.run(dir), refusedNaming(key.toLowerCase().replace(`dummy:${secret}`, "***"), secret));
+      });
+    }
+
+    // A rewrite moves the call off https://github.com, where gh answers, onto a transport that carries another
+    // credential: git@github.com: would reach GitHub with the admin's ssh key.
+    for (const kind of ["insteadOf", "pushInsteadOf"]) {
+      it(`refuses a checkout whose config rewrites the URL with url.<base>.${kind}, naming the URL and not the base, and moves nothing`, async () => {
+        const dir = await checkout();
+        const secret = randomUUID();
+        const remote = join(scratch, `${secret}.git`);
+        await runGit(scratch, ["init", "-q", "--bare", remote]);
+        await runGit(dir, ["push", "-q", remote, "HEAD:refs/heads/seed"]);
+        await runGit(dir, ["config", `url.${remote}.${kind}`, "https://github.com/acme/widgets.git"]);
+
+        await assert.rejects(transport.run(dir), refusedNaming("https://github.com/acme/widgets.git", secret));
+        assert.equal(await transport.moved(dir, remote), false, "the branch moved");
+      });
+    }
+
+    // Where gh has no answer git asks an askpass before it gives up, and an IDE's askpass answers with the admin's
+    // own credential.
+    for (const source of ["GIT_ASKPASS", "SSH_ASKPASS", "core.askPass"] as const) {
+      it(`runs no askpass that ${source} names, and fails`, async () => {
+        const dir = await checkout();
+        const ran = join(dir, "askpass-ran");
+        const askpass = join(dir, "askpass");
+        writeFileSync(askpass, `#!/bin/sh\ntouch '${ran}'\necho dummy\n`);
+        chmodSync(askpass, 0o755);
+        if (source === "core.askPass") await runGit(dir, ["config", source, askpass]);
+        else process.env[source] = askpass;
+        try {
+          await assert.rejects(transport.run(dir), GitFailed);
+        } finally {
+          delete process.env.GIT_ASKPASS;
+          delete process.env.SSH_ASKPASS;
+        }
+        assert.equal(existsSync(ran), false, "the askpass ran");
+      });
+    }
   });
-
-  after(() => proxy.close());
-
-  async function checkout(): Promise<string> {
-    const dir = mkdtempSync(join(scratch, "push-"));
-    await runGit(dir, ["init", "-q"]);
-    await runGit(dir, [...COMMITTER, "commit", "-q", "--allow-empty", "-m", "dummy"]);
-    await runGit(dir, ["config", "http.proxy", proxyUrl]);
-    return dir;
-  }
-
-  function push(dir: string): Promise<void> {
-    return pushWithGhCredential(dir, join(scratch, "gh-push"), ACME, "HEAD:refs/heads/dummy");
-  }
-
-  function refusedNaming(named: string, secret: string) {
-    return (error: unknown) => {
-      assert.ok(error instanceof PushRefused, String(error));
-      assert.ok(error.message.includes(named), error.message);
-      assert.ok(!error.message.includes(secret), error.message);
-      return true;
-    };
-  }
-
-  // An extra header goes out beside whatever the credential helper answers, so it could carry another credential.
-  for (const template of ["http.extraHeader", "http.https://github.com/.extraHeader", "http.https://dummy:<secret>@github.com/.extraHeader"]) {
-    it(`refuses a checkout whose config sets ${template}, naming the key without a credential`, async () => {
-      const dir = await checkout();
-      const secret = randomUUID();
-      const key = template.replace("<secret>", secret);
-      await runGit(dir, ["config", key, `Authorization: Basic ${secret}`]);
-
-      await assert.rejects(push(dir), refusedNaming(key.toLowerCase().replace(`dummy:${secret}`, "***"), secret));
-    });
-  }
-
-  // A rewrite moves the push off https://github.com, where gh answers, onto a transport that carries another
-  // credential: git@github.com: would push with the admin's ssh key.
-  for (const kind of ["insteadOf", "pushInsteadOf"]) {
-    it(`refuses a checkout whose config rewrites the URL with url.<base>.${kind}, naming the URL and not the base, and pushes nothing`, async () => {
-      const dir = await checkout();
-      const secret = randomUUID();
-      const remote = join(scratch, `${secret}.git`);
-      await runGit(scratch, ["init", "-q", "--bare", remote]);
-      await runGit(dir, ["config", `url.${remote}.${kind}`, "https://github.com/acme/widgets.git"]);
-
-      await assert.rejects(push(dir), refusedNaming("https://github.com/acme/widgets.git", secret));
-      const pushed = await runGit(remote, ["rev-parse", "--verify", "--quiet", "refs/heads/dummy"], [1]);
-      assert.equal(pushed.code, 1, "the branch was pushed");
-    });
-  }
-
-  // Where gh has no answer git asks an askpass before it gives up, and an IDE's askpass answers with the admin's
-  // own credential.
-  for (const source of ["GIT_ASKPASS", "SSH_ASKPASS", "core.askPass"] as const) {
-    it(`runs no askpass that ${source} names, and fails`, async () => {
-      const dir = await checkout();
-      const ran = join(dir, "askpass-ran");
-      const askpass = join(dir, "askpass");
-      writeFileSync(askpass, `#!/bin/sh\ntouch '${ran}'\necho dummy\n`);
-      chmodSync(askpass, 0o755);
-      if (source === "core.askPass") await runGit(dir, ["config", source, askpass]);
-      else process.env[source] = askpass;
-      try {
-        await assert.rejects(push(dir), GitFailed);
-      } finally {
-        delete process.env.GIT_ASKPASS;
-        delete process.env.SSH_ASKPASS;
-      }
-      assert.equal(existsSync(ran), false, "the askpass ran");
-    });
-  }
-});
+}
 
 const LOGIN = "codeworks-planner[bot]";
 const NO_TOKEN_VARIABLES = {

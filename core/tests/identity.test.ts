@@ -9,14 +9,20 @@ import {
   DerivationError,
   doneFrom,
   isDone,
+  parseBranch,
   pickSpecFolder,
+  pickSpecPr,
   pickStoryPr,
   requirement,
+  specBranch,
   specFolder,
+  specFolderAnswer,
   specIssue,
+  specPr,
   storyPr,
   type IssueClose,
   type PullRequestHead,
+  type PullRequestState,
 } from "../src/identity.ts";
 import { gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
 import { fakeGitHub, type FakeCall, type FakeRoutes } from "./support/fake-github.ts";
@@ -134,6 +140,88 @@ describe("pickSpecFolder", () => {
       () => pickSpecFolder(["300-cache-warmup", "200-retry", "200-retry-budget"], 200),
       derivationError("specs/200-retry", "specs/200-retry-budget"),
     );
+  });
+});
+
+describe("specFolderAnswer", () => {
+  it("is the one folder named <p>-*", () => {
+    assert.deepEqual(specFolderAnswer(["300-cache-warmup", "20-short", "200-retry-budget", "2000-other"], 200), {
+      one: "specs/200-retry-budget",
+    });
+  });
+
+  it("is none when no folder is named <p>-*", () => {
+    assert.deepEqual(specFolderAnswer(["300-cache-warmup", "2000-other", "200"], 200), { none: true });
+    assert.deepEqual(specFolderAnswer([], 200), { none: true });
+  });
+
+  it("is several, naming each, when more than one folder is named <p>-*", () => {
+    assert.deepEqual(specFolderAnswer(["300-cache-warmup", "200-retry", "200-retry-budget"], 200), {
+      several: ["specs/200-retry", "specs/200-retry-budget"],
+    });
+  });
+});
+
+describe("specBranch", () => {
+  for (const p of [1, 145, 9007199254740991]) {
+    it(`parses back to the spec of #${p}`, () => {
+      assert.deepEqual(parseBranch(specBranch(p)), { spec: p });
+    });
+  }
+
+  for (const p of [0, -1, 1.5]) {
+    it(`refuses ${p}, which is no issue number`, () => {
+      assert.throws(() => specBranch(p), TypeError);
+    });
+  }
+});
+
+describe("pickSpecPr", () => {
+  function pr(number: number, headRefName: string, over: Partial<PullRequestState> = {}): PullRequestState {
+    return { number, headRefName, isCrossRepository: false, closed: false, merged: false, ...over };
+  }
+
+  it("is the newest same-repository PR headed <p>-spec; a fork's or another head's is not the spec's", () => {
+    const prs = [
+      pr(150, "145-spec", { closed: true }),
+      pr(170, "145-spec"),
+      pr(180, "145-spec", { isCrossRepository: true }),
+      pr(190, "145-us1-retry"),
+      pr(195, "1450-spec"),
+    ];
+    assert.deepEqual(pickSpecPr(prs, 145), { number: 170, state: "open" });
+  });
+
+  for (const [state, over] of [
+    ["open", {}],
+    ["closed", { closed: true }],
+    ["merged", { closed: true, merged: true }],
+  ] as const) {
+    it(`maps a PR that is ${state} to ${state}`, () => {
+      assert.deepEqual(pickSpecPr([pr(170, "145-spec", over)], 145), { number: 170, state });
+    });
+  }
+
+  it("is null when no same-repository PR is headed <p>-spec", () => {
+    assert.equal(pickSpecPr([], 145), null);
+    assert.equal(pickSpecPr([pr(180, "145-spec", { isCrossRepository: true }), pr(190, "146-spec")], 145), null);
+  });
+});
+
+describe("specPr", () => {
+  const nodes = [
+    { number: 150, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: true },
+    { number: 160, headRefName: "145-spec", isCrossRepository: true, closed: false, merged: false },
+  ];
+
+  it("reads the PRs headed <p>-spec and picks the newest same-repository one", async () => {
+    const reader = fakeGitHub({
+      graphqlPages: [
+        { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === "145-spec", answer: nodes },
+      ],
+    });
+    assert.deepEqual(await specPr(reader, REPO, 145), { number: 150, state: "merged" });
+    assert.equal(reader.calls.length, 1);
   });
 });
 

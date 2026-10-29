@@ -1,11 +1,13 @@
 """drive_workflow.py against the real specify CLI, in a throwaway project.
 
 No test runs the real agent or reaches GitHub: `plan` on a rescope gets a stand-in `claude` that writes no plan,
-`specify` on a new spec gets one that writes the spec the test names where the test names, and `gh` is a stand-in
-that keeps each call.
+`specify` on a new spec gets one that writes the spec the test names where the test names, `gh` is a stand-in
+that keeps each call, and `node` is a stand-in for the preflight step that keeps each call and passes the issue
+unless the test makes it stop the run; any other script it hands to the real node.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -91,6 +93,17 @@ class Project:
                             "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
                             "if sys.argv[1:3] == ['issue', 'view']:\n"
                             "    print('OPEN')\n")
+        self.node_log = Path(self._tmp.name) / "node.log"
+        # Preflight reads GitHub, so it is kept and passes unless PREFLIGHT_STOP names the stop to print. The
+        # spec-facts steps read and write only the folder, so the real node runs them.
+        real_node = shutil.which("node")
+        self.stand_in("node", f"#!{sys.executable}\nimport json, os, sys\n"
+                              "if not sys.argv[1].endswith('/scripts/preflight.ts'):\n"
+                              f"    os.execv({real_node!r}, [{real_node!r}, *sys.argv[1:]])\n"
+                              f"with open({str(self.node_log)!r}, 'a') as log:\n"
+                              "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                              "if os.environ.get('PREFLIGHT_STOP'):\n"
+                              "    sys.exit(os.environ['PREFLIGHT_STOP'])\n")
         self.env = {**os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
         (self.root / ".specify" / "workflows").mkdir(parents=True)
         if spec_text is not None:
@@ -135,6 +148,9 @@ class Project:
 
     def inputs(self, run_id):
         return json.loads((self.root / ".specify" / "workflows" / "runs" / run_id / "inputs.json").read_text())["inputs"]
+
+    def node_calls(self):
+        return [json.loads(line) for line in self.node_log.read_text().splitlines()] if self.node_log.exists() else []
 
     def gh_calls(self):
         return [json.loads(line) for line in self.gh_log.read_text().splitlines()] if self.gh_log.exists() else []
@@ -283,6 +299,46 @@ class Scope(unittest.TestCase):
         for folder in ("specs/70-x", "specs/17-y", "specs/007-old"):
             self.project.add_folder(folder)
         self.assertEqual(self.start()["step"], "premise")
+
+
+class Preflight(unittest.TestCase):
+    """The run's first step reads the issue and its card before any step writes (FR-012)."""
+
+    def setUp(self):
+        self.project = Project(spec_text=None)
+        self.addCleanup(self.project.close)
+        self.project.with_specify()
+
+    def start(self):
+        proc, report = self.project.drive("start", self.project.spec_file(ISSUE_TEXT), ISSUE, NEW)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return report
+
+    def test_the_first_step_runs_the_plugins_preflight_on_the_issue(self):
+        self.assertEqual(list(workflow_steps())[0]["id"], "preflight")
+        report = self.start()
+        self.assertEqual((report["status"], report["step"]), ("paused", "premise"), report)
+        [(script, *args)] = self.project.node_calls()
+        self.assertEqual((Path(script).resolve(), args), ((PLUGIN / "scripts" / "preflight.ts").resolve(), [ISSUE]))
+
+    def test_a_preflight_stop_fails_the_run_at_preflight_before_anything_is_written(self):
+        stop = "#7's card is in Ready. Next step: move #7 from Ready to Backlog or Blocked."
+        self.project.env["PREFLIGHT_STOP"] = stop
+        report = self.start()
+        self.assertEqual((report["status"], report["step"]), ("failed", "preflight"), report)
+        self.assertIn(stop, report["stderr"])
+        self.assertEqual(self.project.prompts.read_text(), "")
+        self.assertEqual(self.project.folders(), [])
+        self.assertFalse((self.project.root / ".specify" / "feature.json").exists())
+
+    def test_a_resume_once_the_stop_is_cleared_runs_preflight_again_and_goes_on(self):
+        self.project.env["PREFLIGHT_STOP"] = "#7 has no card on the board. Next step: add #7 to the board."
+        failed = self.start()
+        del self.project.env["PREFLIGHT_STOP"]
+        proc, report = self.project.drive("resume", failed["run_id"])
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual((report["status"], report["step"]), ("paused", "premise"), report)
+        self.assertEqual(len(self.project.node_calls()), 2)
 
 
 class Specify(unittest.TestCase):

@@ -6,11 +6,11 @@ const { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSy
 const { dirname, isAbsolute } = await import("node:path");
 const { z } = await import("zod");
 const { GH_TOKEN_VARIABLES, needsMint, readGhToken, writeGhToken } = await import("../core/gh-config.ts");
-const { runGit } = await import("../core/git.ts");
-const { GitHubRefused, GitHubUnanswered, RemoteRefused, repositoryOfRemote } = await import("../core/github.ts");
+const { GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError, mintToken } = await import("../core/tokens.ts");
+const { NoOrigin, originRepository } = await import("../lib/github.ts");
 const { ghFolder, readPlannerSettings, sessionRecord } = await import("../lib/settings.ts");
 
 // Claude Code sends more fields than these; the hook acts on these alone.
@@ -47,13 +47,6 @@ function sessionEnvFile(): string {
   return file;
 }
 
-async function originOf(checkout: string): Promise<string> {
-  // git exits 2 for a remote the checkout does not have.
-  const { code, stdout } = await runGit(checkout, ["remote", "get-url", "origin"], [2]);
-  if (code === 2) refuse(`planner: ${checkout} has no remote origin, so there is no repository to mint a token for`);
-  return stdout.trim();
-}
-
 // The repository's part of the folder is GitHub's characters only; the home folder is the admin's, and may hold a quote.
 function shellQuoted(text: string): string {
   return `'${text.replaceAll("'", `'\\''`)}'`;
@@ -70,7 +63,7 @@ const envFile = input.hook_event_name === "SessionStart" ? sessionEnvFile() : nu
 
 try {
   const { shared, planner } = await readPlannerSettings(input.cwd);
-  const repository = repositoryOfRemote(await originOf(input.cwd));
+  const repository = await originRepository(input.cwd);
   const repo = `${repository.owner}/${repository.name}`;
   const folder = ghFolder(repository);
   if (needsMint(readGhToken(folder), repo, new Date())) {
@@ -90,7 +83,8 @@ try {
       error instanceof GitHubRefused ||
       error instanceof GitHubUnanswered ||
       error instanceof SettingsError ||
-      error instanceof RemoteRefused
+      error instanceof RemoteRefused ||
+      error instanceof NoOrigin
     )
   ) {
     throw error;

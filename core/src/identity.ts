@@ -1,11 +1,16 @@
 import { z } from "zod";
 
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
-import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
+import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient, type Repository } from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 
 export type StoryBranch = { story: number; k: number; slug: string };
 export type SpecBranch = { spec: number };
+
+/** The newest same-repository PR on `<p>-spec`; a merged PR is closed too, and reads `merged`. */
+export type SpecPr = { number: number; state: "open" | "closed" | "merged" };
+
+export type SpecFolderAnswer = { one: string } | { none: true } | { several: readonly string[] };
 
 /** The story's PR: `head` is its head commit. */
 export type StoryPr = { number: number; head: string; merged: boolean };
@@ -43,6 +48,11 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
   const spec = SPEC_BRANCH.exec(name);
   if (spec !== null) return { spec: Number(spec[1]) };
   return null;
+}
+
+export function specBranch(p: number): string {
+  assertIssueNumber(p);
+  return `${p}-spec`;
 }
 
 function storyOf(branch: string): number | null {
@@ -87,14 +97,22 @@ export async function specIssue(reader: GitHubClient, repo: string, s: number): 
   return parent.number;
 }
 
-export function pickSpecFolder(names: readonly string[], p: number): string {
+/** The folders of `specs/` named `<p>-*`, as paths from the root: none, one, or several to choose between. */
+export function specFolderAnswer(names: readonly string[], p: number): SpecFolderAnswer {
   assertIssueNumber(p);
-  const matching = names.filter((name) => name.startsWith(`${p}-`));
-  if (matching.length === 1) return `specs/${matching[0]}`;
+  const matching = names.filter((name) => name.startsWith(`${p}-`)).map((name) => `specs/${name}`);
+  if (matching.length === 0) return { none: true };
+  if (matching.length === 1) return { one: matching[0] };
+  return { several: matching };
+}
+
+export function pickSpecFolder(names: readonly string[], p: number): string {
+  const answer = specFolderAnswer(names, p);
+  if ("one" in answer) return answer.one;
   const found =
-    matching.length === 0
-      ? `no specs/${p}-*/ among ${names.length === 0 ? "no folders" : names.join(", ")}`
-      : matching.map((name) => `specs/${name}/`).join(", ");
+    "several" in answer
+      ? answer.several.map((path) => `${path}/`).join(", ")
+      : `no specs/${p}-*/ among ${names.length === 0 ? "no folders" : names.join(", ")}`;
   throw new DerivationError(`the spec folder of #${p}`, found);
 }
 
@@ -122,31 +140,66 @@ const PullRequestHeadAnswer = z.object({
 });
 export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
 
+const PullRequestStateAnswer = z.object({
+  number: IssueNumber,
+  headRefName: z.string(),
+  isCrossRepository: z.boolean(),
+  closed: z.boolean(),
+  merged: z.boolean(),
+});
+export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
+
 // Bodies and closing references are not asked for: any writer can edit them, and the branch names the story
-// (root ADR-0005 d3).
-const STORY_PRS_QUERY = `query($owner: String!, $name: String!, $branch: String!, $cursor: String) {
+// (root ADR-0005 d3). One query serves a story's PR and a spec's, each reading the fields it needs.
+const PRS_ON_BRANCH_QUERY = `query($owner: String!, $name: String!, $branch: String!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequests(headRefName: $branch, first: 100, after: $cursor) {
-      nodes { number headRefName headRefOid isCrossRepository merged }
+      nodes { number headRefName headRefOid isCrossRepository closed merged }
       pageInfo { hasNextPage endCursor }
     }
   }
 }`;
 
-export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
-  if (storyOf(branch) === null) return null;
+function prsOnBranch(reader: GitHubClient, where: Repository, branch: string): Promise<unknown[]> {
+  return reader.graphqlPages(PRS_ON_BRANCH_QUERY, { ...where, branch }, ["repository", "pullRequests"]);
+}
+
+// A fork's PR may share the branch name; it is never the repository's own.
+function newestSameRepo<Pr extends { number: number; headRefName: string; isCrossRepository: boolean }>(
+  prs: readonly Pr[],
+  branch: string,
+): Pr | null {
   const sameRepo = prs.filter((pr) => pr.headRefName === branch && !pr.isCrossRepository);
   if (sameRepo.length === 0) return null;
-  const newest = sameRepo.reduce((a, b) => (b.number > a.number ? b : a));
-  return { number: newest.number, head: newest.headRefOid, merged: newest.merged };
+  return sameRepo.reduce((a, b) => (b.number > a.number ? b : a));
+}
+
+export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
+  if (storyOf(branch) === null) return null;
+  const newest = newestSameRepo(prs, branch);
+  return newest === null ? null : { number: newest.number, head: newest.headRefOid, merged: newest.merged };
 }
 
 export async function storyPr(reader: GitHubClient, repo: string, branch: string): Promise<StoryPr | null> {
   const where = ownerAndName(repo);
   // A branch that is no story has no story PR, so GitHub is not asked.
   if (storyOf(branch) === null) return null;
-  const nodes = await reader.graphqlPages(STORY_PRS_QUERY, { ...where, branch }, ["repository", "pullRequests"]);
+  const nodes = await prsOnBranch(reader, where, branch);
   return pickStoryPr(answerOf(z.array(PullRequestHeadAnswer), nodes, `the PRs on ${repo} ${branch}`), branch);
+}
+
+export function pickSpecPr(prs: readonly PullRequestState[], p: number): SpecPr | null {
+  const newest = newestSameRepo(prs, specBranch(p));
+  if (newest === null) return null;
+  if (newest.merged) return { number: newest.number, state: "merged" };
+  if (newest.closed) return { number: newest.number, state: "closed" };
+  return { number: newest.number, state: "open" };
+}
+
+export async function specPr(reader: GitHubClient, repo: string, p: number): Promise<SpecPr | null> {
+  const branch = specBranch(p);
+  const nodes = await prsOnBranch(reader, ownerAndName(repo), branch);
+  return pickSpecPr(answerOf(z.array(PullRequestStateAnswer), nodes, `the PRs on ${repo} ${branch}`), p);
 }
 
 const ISSUE_BODY_SOURCE = "story issue body";
