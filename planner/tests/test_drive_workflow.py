@@ -63,7 +63,8 @@ if not os.environ.get("CLAUDE_NO_FEATURE_JSON"):
 
 
 def drive(root, env, *args):
-    proc = subprocess.run([sys.executable, str(DRIVER), *args], cwd=root, env=env, capture_output=True, text=True)
+    proc = subprocess.run([sys.executable, str(DRIVER), *args], cwd=root, env=env, capture_output=True, text=True,
+                          check=False)
     return proc, json.loads(proc.stdout) if proc.returncode == 0 else None
 
 

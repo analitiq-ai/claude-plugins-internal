@@ -84,7 +84,7 @@ class Cli(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "rootcause.py"), "check", str(self.folder), *args],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_a_labelled_section_passes_with_and_without_a_report(self):
         (self.folder / "spec.md").write_text(SPEC.format(section="Observed: a KeyError."))
@@ -124,7 +124,7 @@ class Vocabulary(unittest.TestCase):
 
     def check(self, scripts):
         return subprocess.run([sys.executable, str(scripts / "rootcause.py"), "check", str(self.folder)],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_the_next_step_gives_the_hypothesis_sentence_premise_json_holds(self):
         sentence = "Observed: dummy, a hypothesis sentence."

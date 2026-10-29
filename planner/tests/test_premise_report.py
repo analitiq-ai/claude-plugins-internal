@@ -270,7 +270,7 @@ class Cli(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "premise_report.py"), *args], cwd=self.root,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_form_prints_the_form(self):
         done = self.run_cli("form")
@@ -336,7 +336,7 @@ class Vocabulary(unittest.TestCase):
     def form(self, vocabulary):
         scripts = plugin_with_vocabulary(self.root, vocabulary)
         return subprocess.run([sys.executable, str(scripts / "premise_report.py"), "form"], capture_output=True,
-                              text=True)
+                              text=True, check=False)
 
     def test_the_form_is_written_in_the_label_answers_and_picks_premise_json_holds(self):
         done = self.form(patched_vocabulary(

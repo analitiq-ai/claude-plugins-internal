@@ -27,7 +27,7 @@ class Folder(unittest.TestCase):
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "no_spec.py"), *args], cwd=self.root,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
 
     def test_write_creates_the_folder_with_a_spec_md_that_says_no_spec_is_needed_and_nothing_else(self):
         done = self.run_cli("write", str(self.folder), str(self.report))
