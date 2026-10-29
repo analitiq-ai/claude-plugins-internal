@@ -29,6 +29,13 @@ tests. Done when the carrier check lists planner and CI runs planner's tests."
 - Q: Where do the core capabilities planner needs land? → A: Each inside the planner story that first uses it, in
   that story's one PR (org ADR-0003); one #174 lands first is reused.
 
+### Session 2026-10-29
+
+- Q: Does planner's token replace the admin's gh credentials for the whole session? → A: No. Planner's scripts
+  mint the planner App's token when they need it and act with it; every other command in the session keeps the
+  admin's gh login. Planner has no session hook. This replaces the 2026-10-28 answers that planner's hook mints
+  the token and that the planner session's gh and git read only planner's folder.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The actor is the admin who runs `/planner:issue-spec` on their own machine (root ADR-0008 d2). The other
@@ -40,15 +47,15 @@ matter, the story issues and the spec PR.
 Planner carries core the way root ADR-0001 d2 and ADR-0009 d3–d4 say a carrier does, modelled on
 `core/tests/fixtures/carrier-plugin`: a `core` link to `../../core/src`, a module package that pins core's
 runtime packages exactly with a v3 lockfile, and a pinned plugin version that is bumped on every change to
-`core/src` or the pins. Its hook starts by checking those packages are installed and refuses to run when one is
-missing, naming it. CI's carrier check lists planner, and CI runs planner's TypeScript tests.
+`core/src` or the pins. Each of its TypeScript scripts starts by checking those packages are installed and
+refuses to run when one is missing, naming it. CI's carrier check lists planner, and CI runs planner's TypeScript tests.
 
 **Why this priority**: Every other story runs core code inside planner. Until planner carries core, none of
 them can be built, and the carrier check grades nothing.
 
 **Independent Test**: On a branch with only this story, run the carrier check against `main`: it reports one
-carrier, planner, with zero failures. Remove one of planner's installed packages and start a session: the hook
-blocks with the missing package's name.
+carrier, planner, with zero failures. Remove one of planner's installed packages and run one of its scripts: it
+exits 2 naming the missing package.
 
 **Acceptance Scenarios**:
 
@@ -58,8 +65,8 @@ blocks with the missing package's name.
    **When** CI runs the carrier check, **Then** it fails naming planner's `plugin.json`.
 3. **Given** planner's package pins one of core's packages at a version other than core's, **When** CI runs the
    carrier check, **Then** it fails naming the package and both versions.
-4. **Given** one of core's packages is not installed in planner, **When** planner's hook runs, **Then** it exits
-   with the blocking code, names the package and the folder it is missing from, and the session does not go on.
+4. **Given** one of core's packages is not installed in planner, **When** a planner TypeScript script runs,
+   **Then** it exits 2, names the package and the folder it is missing from, and does nothing else.
 5. **Given** a PR that changes a planner TypeScript test, **When** CI runs, **Then** planner's TypeScript tests
    run and a failing one fails the build.
 
@@ -67,42 +74,42 @@ blocks with the missing package's name.
 
 ### User Story 2 - Planner acts on GitHub only as its own App (Priority: P1)
 
-Planner's hook mints a one-hour token of the `codeworks-planner` App for the checkout's repository, from
+Planner's scripts mint a one-hour token of the `codeworks-planner` App for the checkout's repository, from
 `planner-app.pem`, the one key read core allows where no managed settings are in effect (root ADR-0007 d4,
-ADR-0008 d9). It mints at session start and mints a new one before the current one expires (root ADR-0007 d2).
-The hook puts the token in planner's own gh config folder, apart from the admin's gh login on the same machine,
-and planner's scripts, the landing script's push among them, and the skill's `gh` calls act with it and with no
-other credential. Planner's settings, the App's ID among them, are read from `codeworks.toml` through
-core's settings reader (root ADR-0002).
+ADR-0008 d9), each before its first GitHub call when the stored token is missing, is another repository's, or
+expires within 10 minutes. The token is kept in planner's own gh config folder, apart from the admin's gh login on
+the same machine, and every GitHub call planner's scripts make, the landing script's push among them, acts with it
+and with no other credential. The session's other commands keep the admin's gh login. Planner's settings, the
+App's ID among them, are read from `codeworks.toml` through core's settings reader (root ADR-0002).
 
 **Why this priority**: Story 4's issue and PR writes need a credential planner is allowed to use; today the
 skill pushes and calls `gh` with whatever the admin's machine has.
 
-**Independent Test**: Against a fake GitHub, start a session with a planner key and settings: the hook mints a
-token with exactly the planner App's permissions for the one repository, and a `gh` call made by the skill
-carries it. Remove the key: the hook blocks, naming the key file.
+**Independent Test**: Against a fake GitHub, with a planner key and settings: a planner script mints a token
+with exactly the planner App's permissions for the one repository and calls GitHub with it. Remove the key: the
+script fails naming the key file and makes no GitHub call.
 
 **Acceptance Scenarios**:
 
-1. **Given** `planner-app.pem` and planner's settings are present, **When** a session starts, **Then** the hook
-   mints a token of the planner App for the checkout's repository alone, with contents, pull requests and issues
-   write and organization projects read, and nothing else.
-2. **Given** a token that expires before the next GitHub call, **When** that call is about to run, **Then** the
-   hook mints a new token first.
-3. **Given** the key file is missing or unreadable, or GitHub refuses the mint, **When** the hook runs, **Then**
-   it blocks with the reason core gives, and no GitHub call is made with another credential.
+1. **Given** `planner-app.pem` and planner's settings are present, **When** a planner script is about to make
+   its first GitHub call, **Then** it mints a token of the planner App for the checkout's repository alone, with
+   contents, pull requests and issues write and organization projects read, and nothing else.
+2. **Given** a token that expires before the next GitHub call, **When** a planner script is about to make that
+   call, **Then** it mints a new token first.
+3. **Given** the key file is missing or unreadable, or GitHub refuses the mint, **When** a planner script runs,
+   **Then** it fails with the reason core gives, and no GitHub call is made with another credential.
 4. **Given** `codeworks.toml` is missing at the checkout's ref, or planner's section fails validation, **When**
-   the hook runs, **Then** it blocks naming the file and the key at fault.
+   a planner script runs, **Then** it exits 2 naming the file and the key at fault.
 5. **Given** the run completed, **When** the landing script pushes the branch and opens the spec PR, **Then**
    both act as the planner App: the push carries the planner App's token, and the PR's author is the planner App.
 6. **Given** the checkout's `origin` is an SSH remote, **When** the landing script pushes, **Then** it pushes to
    the repository's https URL, so no SSH key carries the push.
 7. **Given** the admin is signed in to gh on planner's machine, or `GH_TOKEN` or `GITHUB_TOKEN` is set in the
-   admin's environment, **When** planner's scripts or the skill call gh or push, **Then** they read only
+   admin's environment, **When** planner's scripts call GitHub or push, **Then** they read only
    planner's gh config folder and act as the planner App.
-8. **Given** the hook failed when the session started, **When** any Bash call is about to run in that session,
-   **Then** the hook blocks it, saying the session's start failed and a new session is needed, so no gh call
-   runs with the admin's credentials.
+8. **Given** planner is enabled in a session and the admin's `GH_TOKEN` is exported, **When** a command other
+   than planner's scripts runs in it, **Then** it sees the session's environment as the admin left it, `GH_TOKEN`
+   included, and planner blocks nothing.
 
 ---
 
@@ -193,6 +200,33 @@ made, and the run's last output names the issue, the close to do and the reason.
 2. **Given** a `no spec needed` pick, **When** the run completes, **Then** nothing is posted on the issue
    (unchanged).
 
+
+---
+
+### User Story 6 - Planner keeps out of the session's credentials (Priority: P2)
+
+Planner has no session hook. Its scripts mint the planner App's token themselves (Story 2), so the admin keeps
+their own gh login for every other command in the session, and a mint that fails fails only the script that
+needed it. The issue an `untracked` run creates is created as the planner App, through planner's gh.
+
+**Why this priority**: The hook swapped the admin's gh credentials out of every planner session and refused every
+Bash call when GitHub or the key failed (admin's ruling, 2026-10-29).
+
+**Independent Test**: Start a session with planner installed and `GH_TOKEN` exported: no planner hook runs,
+`GH_TOKEN` is unchanged, and preflight and the landing script still act as the planner App.
+
+**Acceptance Scenarios**:
+
+1. **Given** planner is installed, **When** its plugin is loaded, **Then** it declares no hook.
+2. **Given** `planner-app.pem` is missing, **When** a Bash command other than planner's scripts runs in the
+   session, **Then** it runs as usual; **When** a planner script that calls GitHub runs, **Then** it fails
+   naming the key file.
+3. **Given** an `untracked` run, **When** it creates the issue, **Then** it calls GitHub with the planner App's
+   token read from planner's gh config folder, never the admin's login, and the issue's author is
+   `codeworks-planner[bot]`.
+4. **Given** `GH_TOKEN` is exported in the session, **When** planner's scripts call GitHub, **Then** they act as
+   the planner App.
+
 ---
 
 ### Edge Cases
@@ -208,8 +242,8 @@ made, and the run's last output names the issue, the close to do and the reason.
   duplicated (US3 #4).
 - **The spec folder lookup finds several `specs/<p>-*` folders**: the run stops naming them; it never picks one.
 - **A rescope run**: it stops before it pushes, naming #178 (US4 #8); landing a rescope is #178's.
-- **The hook fails at session start**: Claude Code goes on with the session, so the hook refuses every Bash call
-  in it until a new session starts (US2 #8). A resumed session runs the start again.
+- **A mint fails**: the planner script that needed the token fails with core's reason; nothing else in the
+  session is blocked (US6 #2).
 
 ## Requirements *(mandatory)*
 
@@ -220,19 +254,19 @@ made, and the run's last output names the issue, the close to do and the reason.
   yaml 2.9.1, zod 4.6.7) with a v3 lockfile; a pinned `plugin.json` version.
 - **FR-002**: Every PR that changes `core/src` or core's pins MUST bump planner's plugin version; the carrier
   check enforces it.
-- **FR-003**: Planner's hook MUST load only core's dependency guard before the guard runs, MUST exit with the
-  blocking code naming the missing package on a missing dependency, and MUST be declared to block on failure.
+- **FR-003**: Every planner TypeScript entry point MUST load only core's dependency guard before the guard runs,
+  and MUST exit 2 naming the missing package on a missing dependency.
 - **FR-004**: CI MUST run every carrier's TypeScript tests, not only core's, and a failing test MUST fail the
   build.
-- **FR-005**: Planner's hook MUST mint the `codeworks-planner` App token for the checkout's repository alone,
-  from `planner-app.pem`, through core, at session start, and MUST mint a new one before the current one
-  expires.
-- **FR-006**: Planner's hook MUST put the token in planner's own gh config folder on planner's machine, apart
-  from the admin's gh login, and planner's scripts and the skill's `gh` calls MUST read only that folder and act
-  with no other GitHub credential, the admin's login and any `GH_TOKEN` or `GITHUB_TOKEN` included. In a session
-  whose start the hook failed, the hook MUST refuse every Bash call. Planner's landing script MUST make every GitHub
-  write of the landing (push, spec PR, story issues); its push goes through core's git runner to the
-  repository's https URL, with git reading the token from gh (`gh auth git-credential`).
+- **FR-005**: Planner's scripts MUST mint the `codeworks-planner` App token for the checkout's repository alone,
+  from `planner-app.pem`, through core, before a GitHub call when no token is stored for that repository or it
+  expires within 10 minutes.
+- **FR-006**: Planner's scripts MUST keep the token in planner's own gh config folder on planner's machine, apart
+  from the admin's gh login, and MUST read only that folder and act with no other GitHub credential, the admin's
+  login and any `GH_TOKEN` or `GITHUB_TOKEN` included. Planner MUST NOT change the session's environment or block
+  a command it does not run. Planner's landing script MUST make every GitHub write of the landing (push, spec PR,
+  story issues); its push goes through core's git runner to the repository's https URL, with git reading the
+  token from gh (`gh auth git-credential`).
 - **FR-007**: Planner MUST read its settings, the App's ID among them, from `codeworks.toml` through core's
   settings reader, and MUST block naming the file and key when they are missing or invalid. This repository has
   no `codeworks.toml` today, so US2 MUST add it, or planner stops running here once it reads one.
@@ -273,7 +307,7 @@ made, and the run's last output names the issue, the close to do and the reason.
 - **Carrier**: a plugin with a `core` link, a pinned package and lockfile, and a pinned version; graded by the
   carrier check.
 - **Planner token**: a one-hour, one-repository installation token of `codeworks-planner`, minted by planner's
-  hook and kept in planner's own gh config folder, which planner's gh calls and push read.
+  scripts and kept in planner's own gh config folder, which planner's scripts and their push read.
 - **Spec facts**: the `codeworks` front matter of spec.md: `v`, `kind`, `root_cause.observed`.
 - **Story issue**: a sub-issue of `<p>` per story, chained by `blockedBy`, whose number labels its task block.
 - **Spec PR**: the draft PR from `<p>-spec` that carries the spec folder and its records.
@@ -302,10 +336,8 @@ made, and the run's last output names the issue, the close to do and the reason.
   `codeworks-planner[bot]`. `[planner]` holds the planner App's ID, 5510825; core finds the installation from
   the repository, so no installation key is needed. Every other repo planner runs in carries its own file.
 - The key sits only on the admin's machine where planner runs, with no managed settings there (root ADR-0008 d2).
-- Planner's machine runs planner sessions only, and planner is enabled per project, in the repos it scopes. Its
-  hook acts in every session there; a session there that is not a planner run gets planner's gh by design, since
-  the agent there acts on GitHub only as the planner App (root ADR-0008 d2). The admin's other Claude work runs
-  elsewhere.
+- Planner changes nothing in a session it is enabled in: a command other than its scripts acts with the admin's
+  own gh login, under the admin's approval (root ADR-0007 d4, ADR-0008 d2).
 - The planner App is installed on every repository planner runs in, with the permissions core's permission set
   names for it.
 - The board adds each new issue as a card in Backlog, as this repo's board (project 5) does, so the issue an
@@ -317,7 +349,7 @@ made, and the run's last output names the issue, the close to do and the reason.
 - Rescope landing (root ADR-0006 d2; planner ADR-0010 d2, d5, d6) is not in scope; it is #178. This spec lands
   new specs only.
 - Story order follows what each story needs: Story 1 first, Story 2 before Story 4; Story 3 needs only Story 1,
-  and Story 5 needs nothing.
+  and Story 5 needs nothing. Story 6 needs Stories 2 and 4.
 
 ## Why this is worth doing
 

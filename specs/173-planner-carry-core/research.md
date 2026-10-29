@@ -33,11 +33,11 @@ code but not executed; the story that relies on it starts with a red test that r
 
 - **Decision**: `planner/plugin/lib/guarded.ts` statically imports only `../core/guard.ts`, runs
   `requireDependencies()`, and on `MissingDependency` writes `core dependency <name> is not installed in <root>`
-  to stderr and exits 2. The hook and every TypeScript script import it first, statically, then load everything
-  else with `await import(...)`.
+  to stderr and exits 2. Every TypeScript script imports it first, statically, then loads everything else with
+  `await import(...)`.
 - **Rationale**: Root ADR-0009 d4 and FR-003. A static import of any other module would be evaluated, and fail on
-  the missing package, before the guard ran. One module, so the hook and the scripts cannot word or code the
-  refusal differently.
+  the missing package, before the guard ran. One module, so no two scripts can word or code the refusal
+  differently.
 - **Existing tools**: `core/src/guard.ts` (used as is); the fixture's `hooks/identity.ts` shows the pattern,
   which this lifts into one module instead of repeating it per entry.
 
@@ -57,31 +57,27 @@ code but not executed; the story that relies on it starts with a red test that r
 - **Existing tools**: core's `package.json`/`tsconfig.json` (copied); `node:test` and `tsc` as core uses them;
   the existing matrix in `tests.yml` (kept, its two `if:` steps replaced by the two conditions above).
 
-## R5: Planner's hook and when it mints
+## R5: Planner's scripts mint when they need the token
 
-- **Decision**: `planner/plugin/hooks/hooks.json` declares one command,
-  `node ${CLAUDE_PLUGIN_ROOT}/hooks/token.ts`, with `"onFailure": "block"`, on `SessionStart` and on
-  `PreToolUse` matching `Bash`. Both run the same entry: guard (R3), read settings (R7), find the repository
-  (R8), then mint through core when the stored token is absent, for another repository, or expires within
-  10 minutes (R6). `SessionStart` also writes the session environment (R9). A failure exits 2 with core's reason
-  on stderr, so the Bash call does not run. It acts in every session where planner is enabled: planner's machine
-  runs planner sessions only, with planner enabled per project (spec Assumptions; root ADR-0008 d2).
-  `SessionStart` first deletes the session's record, `~/.local/state/codeworks/planner/sessions/<session_id>`,
-  and writes it last, after the session environment (R9). `PreToolUse` exits 2 when its session has no record,
-  saying the session's start failed and a new session is needed. `session_id` comes from stdin and must be a UUID.
-- **Rationale**: Root ADR-0007 d2/d4 and orchestrator ADR-0001 d3: mint at session start and before a token
-  expires. Every GitHub call planner makes leaves through a Bash call (the skill's `gh`, `drive_workflow.py`,
-  the landing script), so a `PreToolUse` on Bash runs before each. 10 minutes exceeds the longest GitHub-calling
-  Bash call: the landing script and the run's first step each make their calls within a minute of starting.
-- **Existing tools**: `mintToken` in `core/src/tokens.ts` (used as is, `"planner"` App); the fixture's
-  `hooks.json` shape. Run on 2026-10-28 (T015, Claude Code 2.1.312, `claude -p`): a `SessionStart` hook that
-  exits 2, or exits 1 with `"onFailure": "block"`, does not stop the session, and a later Bash call still sees
-  `GH_TOKEN`. A `PreToolUse` hook gets no `CLAUDE_ENV_FILE`, so it cannot write the environment itself. Hence the
-  record: a failed start refuses every Bash call (root ADR-0004 d1, US2 #8). `SessionStart` and `PreToolUse` get
-  the same `session_id`, and a resumed session keeps it and runs `SessionStart` again, so deleting the record
-  first refuses a failed resume too. A `PreToolUse` hook that exits 1 with `"onFailure": "block"` does block
-  the Bash call (run 2026-10-28), so an error the hook does not name fails closed too. Rejected: putting the unset and export in front of each Bash command through
-  `PreToolUse`'s `updatedInput` (rewrites the command the admin approves; R9).
+- **Decision**: Planner declares no hook: no `hooks/hooks.json`, no `hooks/token.ts`, no session record.
+  `plannerToken(repo, appId, now, mint)` in `planner/plugin/lib/github.ts` reads the stored token from
+  `ghFolder(repo)` (R6) and, when `needsMint` reports it missing, another repository's, or under 10 minutes left,
+  mints with `mint`, core's `mintToken("planner", appId, "planner-app.pem", "planner", repo)` in production, and
+  stores it with `writeGhToken`; it returns the token. `plannerGitHub` connects with it, and `StaleToken` goes.
+  Every script reads settings (R7) and the repository (R8), then calls one of them before its first GitHub call;
+  `mint` is injected, so tests use a fake. `KeyReadRefused`, `MintError`, `GitHubRefused`, `GitHubUnanswered`,
+  `SettingsError`, `RemoteRefused` and `NoOrigin` exit 2 with core's message (root ADR-0004 d1); a missing key's
+  read error, which core lets through naming its path, is re-thrown.
+- **Rationale**: The admin's ruling of 2026-10-29 (spec Clarifications) and root ADR-0007 d4 and ADR-0008 d2 as
+  amended with it: planner's token acts only in planner's own GitHub calls, and the session's other commands keep
+  the admin's gh login. 10 minutes exceeds any script's run: each makes its calls within a minute of starting.
+- **Existing tools**: `mintToken` in `core/src/tokens.ts`; `needsMint`, `readGhToken`, `writeGhToken` in
+  `core/src/gh-config.ts` (all used as is). Rejected: the session hook this spec first chose, on `SessionStart`
+  and on `PreToolUse` matching `Bash`, with a session record and the session's environment (R9): it swapped the
+  admin's gh credentials out of every command in the session, and refused every Bash call when a mint failed. Its
+  run on 2026-10-28 (T015, Claude Code 2.1.312, `claude -p`) stays as the record of what Claude Code does: a
+  `SessionStart` hook that exits 2, or exits 1 with `"onFailure": "block"`, does not stop the session; a
+  `PreToolUse` hook gets no `CLAUDE_ENV_FILE`.
 
 ## R6: The token in planner's gh config folder
 
@@ -91,10 +87,9 @@ code but not executed; the story that relies on it starts with a red test that r
   `readGhToken(folder)` returns `{value, repo, expires_at}` or null when absent, refusing a half-written folder.
   `needsMint(stored, repo, now)` is pure: true when null, another repo, or under `REFRESH_MARGIN_MS` (10 min)
   left. Planner's folder is `~/.local/state/codeworks/planner/<owner>/<name>/gh`, one per repository, from one
-  function, `ghFolder(repo)` in `planner/plugin/lib/settings.ts`, which the hook and the scripts call. Only the
-  hook mints (root ADR-0007 d2, d4); a script reads the token with `readGhToken`, and when `needsMint` is true it
-  exits 2 (could not run, root ADR-0004 d1) naming the hook.
-- **Rationale**: FR-005/FR-006 and the clarifications: gh and git on planner's machine read only this folder. A
+  function, `ghFolder(repo)` in `planner/plugin/lib/settings.ts`, which the scripts call. A script mints through
+  `plannerToken` (R5) when `needsMint` is true.
+- **Rationale**: FR-005/FR-006 and the clarifications: planner's gh and git read only this folder. A
   folder per repository keeps two planner sessions in two repositories from overwriting each other's one-repo
   token. The orchestrator's hook needs the same write and refresh (root ADR-0007 d2), so it is core's.
 - **Existing tools**: gh's own `hosts.yml` (used, so `gh` and `gh auth git-credential` read the token with no
@@ -105,9 +100,9 @@ code but not executed; the story that relies on it starts with a red test that r
 
 ## R7: Planner's settings
 
-- **Decision**: The hook reads settings with `readSettings(gitTree(checkout, "HEAD"))` and validates
+- **Decision**: `plannerToken`'s callers read settings with `readSettings(gitTree(checkout, "HEAD"))` and validates
   `section("planner")` with `PlannerSettings = z.strictObject({ app_id: z.number().int().positive() })` in
-  `planner/plugin/lib/settings.ts`. A `SettingsError` or a refused section blocks with
+  `planner/plugin/lib/settings.ts`. A `SettingsError` or a refused section exits 2 with
   `codeworks.toml [planner]: <why>`. US2 adds this repo's `codeworks.toml` with the values the spec's
   Assumptions list.
 - **Rationale**: Root ADR-0002 d2–d4: one file at the ref the component works on, its own section validated by
@@ -120,37 +115,38 @@ code but not executed; the story that relies on it starts with a red test that r
 - **Decision**: New core function `repositoryOfRemote(url)` in `core/src/github.ts` takes an origin URL
   (`https://github.com/o/n(.git)`, `git@github.com:o/n(.git)`, `ssh://git@github.com/o/n(.git)`) and returns
   `{owner, name}`, refusing any other host or shape; `httpsUrl(repo)` returns
-  `https://github.com/<owner>/<name>.git`. The hook and the landing script read origin with
+  `https://github.com/<owner>/<name>.git`. The scripts read origin with
   `runGit(checkout, ["remote", "get-url", "origin"])`.
-- **Rationale**: US2 #6: the push goes to the https URL whatever origin is, so no SSH key carries it. The hook
+- **Rationale**: US2 #6: the push goes to the https URL whatever origin is, so no SSH key carries it. `plannerToken`
   needs the repository to mint for, the landing script to push to. One parser for both.
 - **Existing tools**: `ownerAndName` in core (takes `owner/name` only, reused for validation after the parse);
   `new_issue.py` and the workflow pass origin's URL to `gh --repo` (gh parses it; not reachable from TypeScript).
 
-## R9: The session's gh and git read only planner's folder
+## R9: Planner's gh for a script that is not TypeScript
 
-- **Decision**: On `SessionStart` the hook appends to `$CLAUDE_ENV_FILE`:
-  `export GH_CONFIG_DIR=<folder>` and `unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN`.
-  Without `CLAUDE_ENV_FILE` set, the hook blocks naming it.
-- **Rationale**: US2 #7: the skill's `gh` calls and `new_issue.py` run in the session's shell; gh reads a token
-  from those variables before its config folder, so leaving any set would let the admin's token act.
-- **Existing tools**: Claude Code's `CLAUDE_ENV_FILE`, sourced before each Bash command for variables a
-  SessionStart hook persists. Run on 2026-10-28 (T015): with `GH_TOKEN` exported, a Bash call after a
-  `SessionStart` hook appended `unset GH_TOKEN` and `export GH_CONFIG_DIR=/tmp/x` printed `unset /tmp/x`.
-  Rejected: rewriting each Bash command in `PreToolUse` (parses shell text); wrapping only planner's scripts
-  (misses the skill's own `gh issue view`).
+- **Decision**: `planner/plugin/scripts/gh.ts <gh args…>`, guarded (R3), reads settings (R7) and origin's
+  repository (R8), gets the token through `plannerToken` (R5), then runs `gh` with those arguments, stdin, stdout
+  and stderr passed through, `GH_CONFIG_DIR` set to `ghFolder(repo)` and core's `GH_TOKEN_VARIABLES` removed from
+  its environment, and exits with gh's code. `new_issue.py` runs its `gh` calls through it. Planner writes nothing
+  to the session's environment.
+- **Rationale**: US6 #3: the issue `new_issue.py` creates is a write, so it is the planner App's (SC-005).
+  FR-017 keeps `new_issue.py` in Python, since it calls no core. gh reads a token from those variables before its
+  config folder, so one left set would let the admin's token act. The skill's `gh issue view` is a read and runs
+  with the admin's login (spec Assumptions).
+- **Existing tools**: core's `GH_TOKEN_VARIABLES` (used as is). Rejected: the session's environment through
+  `CLAUDE_ENV_FILE` (R5's rejected hook); porting `new_issue.py` to TypeScript (a rewrite for one call site).
 
 ## R10: The push carries the token from gh
 
 - **Decision**: `runGit` gains an optional `env` argument merged after its own. New core
   `pushWithGhCredential(checkout, ghConfigDir, repo, refspec)` runs
   `runGit(checkout, ["-c", "credential.helper=!gh auth git-credential", "push", "--porcelain", "--end-of-options", httpsUrl(repo), refspec], [], env)`
-  with `GH_CONFIG_DIR=ghConfigDir`, `GIT_TERMINAL_PROMPT=0`, and the four token variables of R9 removed.
+  with `GH_CONFIG_DIR=ghConfigDir`, `GIT_TERMINAL_PROMPT=0`, and core's four `GH_TOKEN_VARIABLES` removed.
   `runGit`'s own `credential.helper=` comes first, so the helper list is exactly gh's.
 - **Rationale**: The clarification rules git reads the token from gh. runGit's arguments follow its
   `NO_CONFIGURED_CODE`, so a later `-c credential.helper` adds one helper to an emptied list; the global and
-  system config stay unread. The env is passed, not inherited, so the push is right even if the caller's
-  environment was not set by R9.
+  system config stay unread. The env is passed, not inherited, so the push is right whatever the caller's
+  environment holds.
 - **Existing tools**: `runGit` (extended, not copied); `gh auth git-credential` (gh's documented helper). Not
   run: the helper's answer for a `hosts.yml` written by R6; US2's test runs `git credential fill` through the
   same config with the real gh and checks `username`/`password`.

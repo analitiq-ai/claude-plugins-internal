@@ -1,13 +1,13 @@
 # Quickstart: validating "Planner carries core"
 
-Run from the repository root of a story's worktree. Contracts: [hook](contracts/hook.md),
-[core API](contracts/core-api.md), [scripts](contracts/scripts.md), [settings](contracts/codeworks-toml.md).
+Run from the repository root of a story's worktree. Contracts: [core API](contracts/core-api.md),
+[scripts](contracts/scripts.md), [settings](contracts/codeworks-toml.md).
 
 ## Prerequisites
 
 - Node ≥ 22.18, Python 3.13, `git`, `gh`, Spec Kit CLI ≥ 1.0.7.
 - `npm ci` in `core`, `planner/plugin` and `planner`.
-- For the live checks (US2, US4): `~/.config/codeworks/planner-app.pem` (0600, owned by you), no
+- For the live checks (US4, US6): `~/.config/codeworks/planner-app.pem` (0600, owned by you), no
   `/etc/claude-code/managed-settings.json`, the planner App installed on a scratch repository.
 
 ## US1: carrier and CI
@@ -18,12 +18,12 @@ node core/scripts/check-carriers.ts --base origin/main   # "1 carriers checked a
 (cd planner/tests && python -m unittest -v)               # unchanged Python suite passes
 ```
 
-Missing-dependency block, on an installed-shaped copy (the link dereferenced, as an install copies it):
+Missing dependency, on an installed-shaped copy (the link dereferenced, as an install copies it):
 
 ```sh
 tmp=$(mktemp -d); cp -rL planner/plugin "$tmp/planner"; (cd "$tmp/planner" && npm ci)
 rm -rf "$tmp/planner/node_modules/zod"
-echo '{}' | node "$tmp/planner/hooks/token.ts"; echo "exit $?"
+node "$tmp/planner/scripts/preflight.ts" 1; echo "exit $?"
 # stderr: core dependency zod is not installed in <tmp>/planner ; exit 2
 ```
 
@@ -31,8 +31,9 @@ CI: a PR that breaks one planner `*.test.ts` fails the `unittest (planner/tests)
 
 ## US2: token
 
-Automated: `planner/tests/token.test.ts` against `fakeGitHub` (scopes, refresh under 10 min, blocks on a missing
-key, file, section); `core/tests/gh-config.test.ts` with the real `gh`:
+Automated: `planner/tests/token.test.ts` against `fakeGitHub` and a fake mint (scopes, a mint under 10 minutes
+left, a failure naming a missing key, exit 2 on a missing file or section); `core/tests/gh-config.test.ts` with
+the real `gh`:
 
 ```sh
 GH_CONFIG_DIR=<written folder> gh auth token        # prints the written token
@@ -40,10 +41,6 @@ printf 'protocol=https\nhost=github.com\n\n' | GH_CONFIG_DIR=<folder> \
   git -c credential.helper= -c 'credential.helper=!gh auth git-credential' credential fill
 # username=<planner_app_login>, password=<the token>
 ```
-
-Live, in a Claude Code session in the scratch repository with `GH_TOKEN` exported beforehand:
-`echo $GH_CONFIG_DIR; gh api /installation/repositories --jq '.repositories[].full_name'` prints planner's
-folder and the scratch repository alone.
 
 ## US3: spec facts
 
@@ -68,3 +65,12 @@ passes, or stops naming the card to add and passes on a re-run (spec Assumptions
 
 `planner/tests/test_drive_workflow.py` with a fake `gh` on `PATH` that records calls: a `not worth doing` pick
 completes with no `gh` call and stdout `Close #<issue> as not planned: <reason>`.
+
+## US6: no hook
+
+Automated: `planner/tests/token.test.ts` and `planner/tests/test_new_issue.py`: the installed plugin has no
+`hooks/`; `gh.ts` runs gh with planner's folder and no token variable; `new_issue.py create` goes through it.
+
+Live, once, on the scratch repository, in a Claude Code session started with `GH_TOKEN` exported:
+`echo ${GH_TOKEN:+set}` prints `set`; `/planner:issue-spec untracked "<change>"` creates an issue whose author is
+`codeworks-planner[bot]`.

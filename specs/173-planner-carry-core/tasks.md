@@ -14,7 +14,7 @@ description: "Task list for Planner carries core"
 test run red, failing for the reason named in the task, before the code that makes it pass.
 
 **Organization**: One phase per story, one PR per story (research R1), merged in the order US1 → US2 →
-(US3, US5 in either order) → US4. Every story's PR bumps `planner/plugin/.claude-plugin/plugin.json`'s `version`
+(US3, US5 in either order) → US4 → US6. Every story's PR bumps `planner/plugin/.claude-plugin/plugin.json`'s `version`
 to the next minor version above the one on `main` when the PR opens.
 
 ## Format: `[ID] [P?] [Story] Description`
@@ -43,8 +43,8 @@ US1's carrier, guard and test harness. No user story work starts before US1 is m
 
 ## Phase 3: User Story 1 - Planner ships core, pinned and checked (Priority: P1) 🎯 MVP
 
-**Goal**: Planner is a carrier (`core` link, exact pins, v3 lockfile, pinned version), its hook refuses on a
-missing package, and CI runs every carrier's TypeScript tests (FR-001–FR-004; R2, R3, R4).
+**Goal**: Planner is a carrier (`core` link, exact pins, v3 lockfile, pinned version), its TypeScript entry points
+refuse on a missing package, and CI runs every carrier's TypeScript tests (FR-001–FR-004; R2, R3, R4).
 
 **Independent Test**: `node core/scripts/check-carriers.ts --base origin/main` prints
 `1 carriers checked against origin/main, 0 failures`; the quickstart's installed-shaped copy with
@@ -80,8 +80,9 @@ missing package, and CI runs every carrier's TypeScript tests (FR-001–FR-004; 
 
 ## Phase 4: User Story 2 - Planner acts on GitHub only as its own App (Priority: P1)
 
-**Goal**: The hook mints the planner App's token into planner's own gh config folder and points the session's gh
-at it; scripts read it and never mint; the push reads it from gh (FR-005–FR-007; R5–R10).
+**Goal**: The planner App's token is minted into planner's own gh config folder; planner's GitHub calls and its
+push read it from gh (FR-005–FR-007; R6–R10). This story shipped it through a session hook, which US6 replaces with
+scripts that mint (spec Session 2026-10-29).
 
 **Independent Test**: `planner/tests/token.test.ts` against `fakeGitHub`: a session start with key and settings
 mints one token for the one repository with exactly the planner App's permissions and writes the folder; removing
@@ -114,9 +115,9 @@ the key blocks naming it.
 - [x] T026 [US2] Confirm `https://github.com/orgs/analitiq-ai/projects/5` is this repository's board (`gh project view 5 --owner analitiq-ai`), then add `codeworks.toml` at the repository root exactly as `specs/173-planner-carry-core/contracts/codeworks-toml.md` gives it; run `node -e` through core's `readSettings` on it to confirm `[shared]` parses (FR-007)
 - [x] T027 [US2] Bump `planner/plugin/.claude-plugin/plugin.json` `version` to the next minor version (this PR changes `core/src`)
 - [x] T028 [US2] Run `(cd core && npm test)` and `(cd planner && npm test)` (T016–T020 pass), `node core/scripts/check-carriers.ts --base origin/main` (0 failures)
-- [ ] T029 [US2] Live, per quickstart "US2": in a Claude Code session in the scratch repository with `GH_TOKEN` exported beforehand and the admin signed in to gh, `echo $GH_CONFIG_DIR; gh api /installation/repositories --jq '.repositories[].full_name'` prints planner's folder and the scratch repository alone (US2 #7); record the output in the PR description
+- [x] T029 [US2] Withdrawn by spec Session 2026-10-29: the session environment it checked is gone; T074 checks the planner App's token live
 
-**Checkpoint**: Every gh and git call in a planner session acts as the planner App, or the hook blocks.
+**Checkpoint**: Every GitHub call planner's scripts make acts as the planner App.
 
 ---
 
@@ -211,7 +212,36 @@ the spec folder and records; a re-run creates nothing.
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 8: User Story 6 - Planner keeps out of the session's credentials (Priority: P2)
+
+**Goal**: Planner declares no hook; preflight, the landing script and `gh.ts` mint the planner App's token when
+they need it, and the session's other commands keep the admin's gh login (FR-005, FR-006; R5, R9).
+
+**Independent Test**: `planner/tests/token.test.ts` runs `scripts/gh.ts` with `GH_TOKEN` exported and a stand-in
+`gh`: it mints once for the one repository and runs gh with planner's folder and no token variable; removing the
+key fails it naming the key file, with no gh run.
+
+### Tests for User Story 6 ⚠️
+
+- [ ] T065 [P] [US6] Rewrite `planner/tests/hooks.test.ts` to assert `planner/plugin/hooks` does not exist and `planner/plugin/.claude-plugin/plugin.json` has no `hooks` key (US6 #1). Expected red reason: `hooks/hooks.json` exists
+- [ ] T066 [US6] Rewrite `planner/tests/token.test.ts` to run `planner/plugin/scripts/gh.ts <args>` as a child process in the same temp checkout, temp `HOME` with `planner-app.pem` and local GitHub (`tests/support/github-at.ts`), with a stand-in `gh` first on `PATH` that records its argv, stdin, `GH_CONFIG_DIR` and which of core's `GH_TOKEN_VARIABLES` it sees, and exits with a given code; `GH_TOKEN` is exported to `gh.ts`. Cases: no stored token mints once (`MINT_CALLS`, exactly `PLANNER_PERMISSIONS`, the one repository), writes `ghFolder(repo)`, and gh sees that folder and no token variable (US2 #1, #7; US6 #4); 11 minutes left mints nothing, 9 minutes mints (US2 #2); no key fails naming `planner-app.pem`, with no gh run and no GitHub call (US2 #3; US6 #2); no `codeworks.toml` or a bad `[planner]` exits 2 naming the file and key (US2 #4); gh's stdout, stdin and exit code pass through. Expected red reason: `scripts/gh.ts` does not exist
+- [ ] T067 [P] [US6] In `planner/tests/preflight.test.ts` and `planner/tests/land.test.ts`, replace each stale-token case ("naming planner's hook") with: no stored token, or under 10 minutes left, calls the injected `mint` once for the repository and the run goes on connected with the minted token; a fresh stored token calls `mint` never (FR-005). Expected red reason: the scripts' `io` has no `mint`, and they exit 2 with `StaleToken`
+- [ ] T068 [P] [US6] In `planner/tests/test_new_issue.py`, the stand-in becomes `node` instead of `gh`: it asserts its first argument is `planner/plugin/scripts/gh.ts` and otherwise answers as the stand-in `gh` did; no `gh` is on `PATH` (US6 #3). Expected red reason: `new_issue.py` runs `gh`, which is not found
+
+### Implementation for User Story 6
+
+- [ ] T069 [US6] In `planner/plugin/lib/github.ts` add `plannerToken(repo, appId, now, mint)` per research R5 (read `ghFolder(repo)`, mint and `writeGhToken` when `needsMint`, return the token); `plannerGitHub` becomes async, takes `appId` and `mint`, and connects with `plannerToken`'s token; delete `StaleToken`. Callers: `scripts/preflight.ts`, `scripts/land.ts` (R5)
+- [ ] T070 [US6] In `planner/plugin/scripts/preflight.ts` and `planner/plugin/scripts/land.ts`: `io.mint`, in production core's `mintToken("planner", appId, "planner-app.pem", "planner", repo)`; pass `planner.app_id` from `readPlannerSettings`; drop `StaleToken` from the exit-2 errors and add `KeyReadRefused` and `MintError` (R5)
+- [ ] T071 [US6] Create `planner/plugin/scripts/gh.ts` per `contracts/scripts.md` "gh.ts" (R9): guarded; settings, origin's repository, `plannerToken`; run `gh` with the arguments, stdio inherited, `GH_CONFIG_DIR=ghFolder(repo)` and `GH_TOKEN_VARIABLES` removed; exit with gh's code; the same exit-2 errors as preflight
+- [ ] T072 [US6] In `planner/plugin/skills/issue-spec/scripts/new_issue.py`, `_gh` runs `node <plugin>/scripts/gh.ts <args>` instead of `gh <args>`, the path from the script's own location (R9)
+- [ ] T073 [US6] Delete `planner/plugin/hooks/` (`hooks.json`, `token.ts`) and `sessionRecord` in `planner/plugin/lib/settings.ts`; reword `ghFolder`'s comment, the comment at `core/src/github.ts:43` and the comment at `planner/plugin/speckit/workflows/issue-spec/workflow.yml:53` and its copy in `.specify/workflows/issue-spec/workflow.yml` to say planner's scripts write and read the token; bump `planner/plugin/.claude-plugin/plugin.json`'s `version` to the next minor version. Then run `(cd planner/tests && python3 -m unittest -v)`, `(cd planner && npm test)`, `(cd core && npm test)` and the carrier check; all pass
+- [ ] T074 [US6] Live, per quickstart "US6", in a Claude Code session in the scratch repository started with `GH_TOKEN` exported and the admin signed in to gh: `echo ${GH_TOKEN:+set}` prints `set`, and `/planner:issue-spec untracked "<change>"` creates an issue whose author is `codeworks-planner[bot]`; record both in the PR description
+
+**Checkpoint**: Planner changes nothing in the session's environment and blocks no command it does not run (SC-005).
+
+---
+
+## Phase 9: Polish & Cross-Cutting Concerns
 
 **Purpose**: Checks over the whole feature, after the last story's PR.
 
@@ -233,7 +263,8 @@ the spec folder and records; a re-run creates nothing.
 - **US4 (Phase 6)**: after US2 merges (its writes need the token; R1). US3 not required, but merge order puts US3
   first so both PRs do not bump the same version.
 - **US5 (Phase 7)**: needs nothing from other stories; its PR may open at any time, merged before or after US3.
-- **Polish (Phase 8)**: T062 per PR; T063–T064 after the last merge.
+- **US6 (Phase 8)**: after US2 and US4 merge (it changes how their scripts get the token).
+- **Polish (Phase 9)**: T062 per PR; T063–T064 after the last merge.
 
 Every story's PR changes `plugin.json`'s version, so two stories' PRs open at once conflict there; rebase and
 re-bump on the later one.
@@ -250,6 +281,7 @@ re-bump on the later one.
 - US2: T016–T019 in parallel; T021 and T022 in parallel.
 - US3: T030–T034 in parallel; T035 and T036 in parallel.
 - US4: T043–T046 in parallel; T048, T049, T050 in parallel.
+- US6: T065, T067, T068 in parallel.
 - Across stories: US3 and US5 in parallel once US1 merges; US2 alongside them.
 
 ---
@@ -284,7 +316,8 @@ Task: "taskBlockLabel, readTaskBlockLabels in core/src/contracts/tasks.ts"
 1. US1 → merge (carrier, CI).
 2. US2 → merge (planner acts only as its App).
 3. US3 and US5 → merge, either order (spec facts; no close).
-4. US4 → merge (landing). Then Phase 8.
+4. US4 → merge (landing).
+5. US6 → merge (no hook). Then Phase 9.
 
 Each PR runs the internal review loop and the Codex loop of `.claude/rules/pr-review-loop.md` before merge.
 
@@ -295,5 +328,5 @@ Each PR runs the internal review loop and the Codex loop of `.claude/rules/pr-re
 - [P] tasks touch different files and depend on no incomplete task.
 - A red test must fail for the reason its task names; a test that fails for another reason, or passes, is fixed
   before the code is written.
-- Name a function's callers in the PR description before editing it (T023, T049).
+- Name a function's callers in the PR description before editing it (T023, T049, T069).
 - Every stop exits before the first GitHub write; a test asserts zero write calls for each.
