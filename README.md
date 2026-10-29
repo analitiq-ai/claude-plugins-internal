@@ -67,7 +67,8 @@ folder that the default branch lacks.
    specify extension add --dev <clone of this repo>/.specify/extensions/critique
    ```
 
-   Commit `.specify/` and the `speckit-*` skills it writes under `.claude/skills/`.
+   Commit `.specify/` and the `speckit-*` skills it writes under `.claude/skills/`, `speckit-grill-me` and
+   `speckit-critique-run` among them: the workflow's grill and critique steps run them.
 2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
    `https://github.com/orgs/<org>/projects/<n>`.
 3. Make the board an organization project in the org where the planner App is installed. Spell its Status
@@ -76,7 +77,10 @@ folder that the default branch lacks.
    add each card by hand.
 4. Install the planner App on the repository, and keep its key at `~/.config/codeworks/planner-app.pem`,
    mode 0600, owned by you.
-5. Commit and merge to the default branch.
+5. Planner scopes each issue in a worktree it creates per the repository's branch rules. Name the place in
+   the repository's `CLAUDE.md`, for example `.claude/worktrees/<branch>`, and add that folder to
+   `.gitignore`. Never under `.git/`: Claude Code protects it, and the run cannot write there.
+6. Commit and merge to the default branch.
 
 ## Layout
 
