@@ -129,9 +129,10 @@ function isSystemError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).syscall === "string";
 }
 
+// Python's read_text turns \r\n and \r into \n, so planner's graders and this reader see the same lines.
 function read(path: string): string {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(path, "utf8").replace(/\r\n?/g, "\n");
   } catch (error) {
     if (!isSystemError(error)) throw error;
     cannotRun(`spec_facts.ts could not read ${path}: ${error.message}`);
