@@ -199,13 +199,13 @@ the spec folder and records; a re-run creates nothing.
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T058 [US5] In `planner/tests/test_drive_workflow.py` add a case driving a run to a `not worth doing` pick with a fake `gh` first on `PATH` that appends its argv to a file: the run completes, the file is empty, and the output holds `Close #<issue> as not planned: <reason>` with the premise report's reason; a `no spec needed` run likewise records no `gh` call (US5 #1, #2). Expected red reason: `close-not-worth-doing` calls `gh issue view` and `gh issue close`
+- [x] T058 [US5] In `planner/tests/test_drive_workflow.py` add a case driving a run to a `not worth doing` pick with a fake `gh` first on `PATH` that appends its argv to a file: the run completes, the file is empty, and the output holds `Close #<issue> as not planned: <reason>` with the premise report's reason; a `no spec needed` run likewise records no `gh` call (US5 #1, #2). Expected red reason: `close-not-worth-doing` calls `gh issue view` and `gh issue close`
 
 ### Implementation for User Story 5
 
-- [ ] T059 [US5] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` replace step `close-not-worth-doing` (and its comment) with `name-close`: `set -eu`, read the reason with `premise_report.py reason`, print `Close #$ISSUE as not planned: <reason>`; no `gh`, no `git remote` call (R18)
-- [ ] T060 [US5] In `planner/plugin/skills/issue-spec/SKILL.md` step 3, replace "the workflow has closed the issue as not planned with the reason" with: the run names the close; tell the user to close the issue as not planned with that reason, and stop; in `planner/plugin/.claude-plugin/plugin.json` change the description's "a not-worth-doing issue is closed as not planned" to say the admin closes it, and bump `version` to the next minor version (R18)
-- [ ] T061 [US5] Run `(cd planner/tests && python -m unittest -v)` and `(cd planner && npm test)`; all pass
+- [x] T059 [US5] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` replace step `close-not-worth-doing` (and its comment) with `name-close`: `set -eu`, read the reason with `premise_report.py reason`, print `Close #$ISSUE as not planned: <reason>`; no `gh`, no `git remote` call (R18)
+- [x] T060 [US5] In `planner/plugin/skills/issue-spec/SKILL.md` step 3, replace "the workflow has closed the issue as not planned with the reason" with: the run names the close; tell the user to close the issue as not planned with that reason, and stop; in `planner/plugin/.claude-plugin/plugin.json` change the description's "a not-worth-doing issue is closed as not planned" to say the admin closes it, and bump `version` to the next minor version (R18)
+- [x] T061 [US5] Run `(cd planner/tests && python -m unittest -v)` and `(cd planner && npm test)`; all pass
 
 **Checkpoint**: Planner makes no close or comment on any pick (SC-006).
 
