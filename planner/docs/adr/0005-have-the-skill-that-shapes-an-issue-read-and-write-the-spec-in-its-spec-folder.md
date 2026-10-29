@@ -17,6 +17,8 @@ affects:
     pattern: "planner/plugin/speckit/workflows/**"
   - type: path
     pattern: "planner/plugin/scripts/spec_folder.py"
+  - type: path
+    pattern: "planner/plugin/scripts/premise_report.py"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -41,7 +43,8 @@ externalRefs:
 An issue's spec lives in its spec folder (ADR-0001) and lands by a spec PR on `<p>-spec`, `<p>` the spec's
 issue (org ADR-0002, root ADR-0005). A rescope changes a spec that stories may be building against. Planning
 is run by an admin where they work, outside the agent machine, so the managed settings (root
-ADR-0008) do not apply to it. Its grill and critique steps ask that admin for verdicts.
+ADR-0008) do not apply to it. Its grill and critique steps ask that admin for verdicts. Its premise step
+answers whether the issue is worth a spec, from the issue and the code.
 
 ## Decision
 
@@ -55,7 +58,10 @@ ADR-0008) do not apply to it. Its grill and critique steps ask that admin for ve
 4. We will land a new spec and a rescope alike only through the spec PR (ADR-0010), a rescope with its
    rescope hold (reviewer ADR-0013). The run writes no lane and posts nothing on the issue.
 5. We will have the admin drive every approval at grill and at critique; the critique's verdict is
-   advisory and no script reads it.
+   advisory and no script reads it. The agent makes the premise pick itself, from its own answers, and
+   asks the admin only what the issue and the code cannot answer. Its pick goes through the premise gate's
+   one input and equals its recommendation, and a reported defect is never `no spec needed`: a defect's fix
+   is sized only once it is traced.
 
 ## Options considered
 
@@ -79,10 +85,21 @@ Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 Rejected: reviewer runs only on the agent machine (root ADR-0008); the admin oversees planning's commits.
 
+### Option F: The admin makes the premise pick
+
+Rejected by the admin on 2026-10-29 (#112): the agent's answers already settle the pick, and the admin
+still sees every outcome at the spec PR or the issue close.
+
+### Option G: A minor mechanical defect may be `no spec needed`
+
+Rejected by the admin on 2026-10-29: whether a defect is minor is known only once it is traced.
+
 ## Trade-offs
 
 - A RETHINK the admin goes past leaves no recorded reason.
 - A rescope cannot start until an admin has moved the spec's running stories.
+- A wrong premise pick is caught only at the spec PR, for `no spec needed`, or at the issue close, for
+  `not worth doing`.
 
 ## Consequences
 
