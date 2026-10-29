@@ -147,6 +147,21 @@ describe("spec_facts.ts write", () => {
     });
   });
 
+  it("writes the facts of a CRLF spec.md and report rootcause.py passes", (t) => {
+    const where = specFolder(t);
+    writeFileSync(where.spec, specMd(ANCHORED).replaceAll("\n", "\r\n"));
+    writeFileSync(where.report, "Reports wrong behaviour: yes\r\n");
+    const graded = spawnSync("python3", [ROOTCAUSE, "check", where.folder, where.report], { encoding: "utf8" });
+    assert.equal(graded.status, 0, graded.stderr);
+    const done = run("write", where.folder, where.report);
+    assert.equal(done.status, 0, done.stderr);
+    assert.deepEqual(readSpecFacts(readFileSync(where.spec, "utf8")), {
+      v: 1,
+      kind: "defect",
+      root_cause: { observed: "anchored" },
+    });
+  });
+
   it("rewrites the block when the root cause goes from hypothesis to anchored, leaving one", (t) => {
     const where = specFolder(t);
     writeFileSync(where.report, "Reports wrong behaviour: yes\n");
