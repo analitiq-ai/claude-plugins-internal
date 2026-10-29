@@ -57,22 +57,27 @@ Set up once, and merged to the repository's default branch before the first `/pl
 planner reads `codeworks.toml` at `HEAD`, and landing stops on any committed path outside the spec
 folder that the default branch lacks.
 
-1. Install the Spec Kit CLI, `specify` 1.0.7 or later, and initialise the repository:
-   `specify init --here --integration claude`.
+1. Install the Spec Kit CLI, `specify` 1.0.7 or later and below 1.2.0 (ADR Kit's limit), and initialise the
+   repository: `specify init --here --integration claude`.
 
-   The `issue-spec` workflow's grill and critique steps run two third-party Spec Kit community extensions,
-   part of neither Spec Kit nor planner. Spec Kit's catalog lists both as discovery-only, not vetted, so
-   `specify` will not install them from it. Vet each yourself, then install it with
+   Planning uses three third-party Spec Kit community extensions, part of neither Spec Kit nor planner: grill
+   and critique in the `issue-spec` workflow's steps of those names, and ADR Kit for the plan's ADR check, after
+   plan and before critique (planner ADR-0009, #177). Spec Kit's catalog lists all three as discovery-only, not
+   vetted, so `specify` will not install them from it. Vet each yourself, then install it with
    `specify extension add <id> --from <archive-url>`, or `--dev <folder>` from a local copy:
 
-   | Extension | Author | Skill it adds |
+   | Extension | Author | Skills it adds |
    |---|---|---|
    | `grill` | [yoshi1220/speckit-grill-me](https://github.com/yoshi1220/speckit-grill-me) | `speckit-grill-me` |
    | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
+   | `adrkit` | [mbeacom/adrkit](https://github.com/mbeacom/adrkit) | `speckit-adrkit-check`, `speckit-adrkit-context`, `speckit-adrkit-draft` |
 
-   No other extension is needed. The workflow's other steps, `speckit.specify`, `speckit.plan` and
-   `speckit.tasks`, come with `specify init`, and planner installs its own preset (`settled-design`) and
-   workflow (`issue-spec`) at each start. This repo's `adrkit` and `assess` extensions are not planner's.
+   ADR Kit also needs the `adr` CLI 0.3.0 or later (`npm install -g @adrkit/cli`) and the repository's ADR
+   folder, `docs/adr` by default.
+
+   The workflow's other steps, `speckit.specify`, `speckit.plan` and `speckit.tasks`, come with
+   `specify init`, and planner installs its own preset (`settled-design`) and workflow (`issue-spec`) at each
+   start.
 
    Commit `.specify/` and the `speckit-*` skills under `.claude/skills/`.
 2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
