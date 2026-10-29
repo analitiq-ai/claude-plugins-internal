@@ -312,7 +312,7 @@ class Preflight(unittest.TestCase):
         return report
 
     def test_the_first_step_runs_the_plugins_preflight_on_the_issue(self):
-        self.assertEqual(next(workflow_steps())["id"], "preflight")
+        self.assertEqual(list(workflow_steps())[0]["id"], "preflight")
         report = self.start()
         self.assertEqual((report["status"], report["step"]), ("paused", "premise"), report)
         [(script, *args)] = self.project.node_calls()

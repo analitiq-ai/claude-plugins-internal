@@ -27,6 +27,7 @@ const BRANCH = "7-spec";
 const BOT_ID = 4242;
 const EMAIL = `${BOT_ID}+${LOGIN}@users.noreply.github.com`;
 const API_REPO = "/repos/acme/widgets";
+const REPO_URL = "https://api.github.com/repos/acme/widgets";
 
 const STORIES = [
   "User Story 1 - Retry an upload (Priority: P1)",
@@ -71,7 +72,7 @@ describe("labelTasks", () => {
   });
 });
 
-type Issue = { id: number; number: number; title: string };
+type Issue = { id: number; number: number; title: string; repository_url: string };
 type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean };
 
 /** What GitHub holds across runs: each run gets a fresh fake recording its own calls over this one state. */
@@ -81,8 +82,8 @@ function gitHubState(over: Partial<GitHubState> = {}): GitHubState {
   return { issues: [], subIssues: [], blockedBy: [], prs: [], next: 101, ...over };
 }
 
-function issue(number: number, title = `US: #${number}`): Issue {
-  return { id: 9000 + number, number, title };
+function issue(number: number, title = `US: #${number}`, repositoryUrl = REPO_URL): Issue {
+  return { id: 9000 + number, number, title, repository_url: repositoryUrl };
 }
 
 function pr(number: number, over: Partial<Pr> = {}): Pr {
@@ -97,7 +98,7 @@ function bodyOf(call: FakeCall): Record<string, unknown> {
 // The bare repository stands in for github.com, so the branches GitHub answers for are the ones it holds.
 function githubOf(state: GitHubState, bare: string): FakeGitHub {
   const rest: Record<string, unknown> = {
-    [`GET ${API_REPO}`]: { full_name: "acme/widgets", default_branch: "main" },
+    [`GET ${API_REPO}`]: { full_name: "acme/widgets", url: REPO_URL, default_branch: "main" },
     [`GET /users/${encodeURIComponent(LOGIN)}`]: { login: LOGIN, id: BOT_ID },
     [`POST ${API_REPO}/issues`]: (call: FakeCall) => {
       const created = issue(state.next++, String(bodyOf(call).title));
@@ -138,7 +139,7 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
       },
     ],
     restPages: {
-      [`${API_REPO}/issues/${P}/sub_issues`]: () => state.subIssues.map(({ id, number, title }) => ({ id, number, title })),
+      [`${API_REPO}/issues/${P}/sub_issues`]: () => state.subIssues.map(({ id, number, title, repository_url }) => ({ id, number, title, repository_url })),
     },
     graphqlPages: [
       {
@@ -405,6 +406,19 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     const w = world(t);
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102), issue(103), issue(104), issue(105)] }));
     assertStops(w, run, ["#104", "#105"]);
+  });
+
+  it("for a one-story spec whose #p has sub-issues, naming them", async (t) => {
+    const w = world(t, tasksMd(1));
+    const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102)] }));
+    assertStops(w, run, ["#101", "#102"]);
+  });
+
+  it("for a sub-issue in another repository, naming it", async (t) => {
+    const w = world(t);
+    const foreign = issue(102, "US: elsewhere", "https://api.github.com/repos/acme/gadgets");
+    const run = await land(w, gitHubState({ subIssues: [issue(101), foreign] }));
+    assertStops(w, run, ["acme/gadgets#102"]);
   });
 
   it("for a sub-issue at position i other than the issue tasks.md labels US<i+1> with, naming both", async (t) => {
