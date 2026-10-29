@@ -298,15 +298,47 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   return { repo, api, github, base, open, tasks, stories, subIssues, login, email: `${id}+${login}@users.noreply.github.com` };
 }
 
+// A re-run finds a story issue only among #p's sub-issues and never adds a missing blocked_by, since an admin may
+// have unchained the story on purpose (planner ADR-0010). So a story whose writes stopped partway is the admin's to
+// finish, and the error names what is missing.
+export class LandingIncomplete extends Error {
+  constructor(said: string, reason: Error) {
+    super(`${reason.message}. ${said}.`, { cause: reason });
+    this.name = "LandingIncomplete";
+  }
+}
+
+async function storyLink(github: GitHubClient, path: string, body: object, missing: string): Promise<void> {
+  try {
+    await github.rest("POST", path, body);
+  } catch (error) {
+    if (!(error instanceof GitHubUnanswered || error instanceof GitHubRefused)) throw error;
+    throw new LandingIncomplete(missing, error);
+  }
+}
+
 async function storyIssues({ p, specDir }: Landing, { api, github, stories, subIssues }: Read): Promise<number[]> {
   if (stories.length === 1) return [p];
   const known = [...subIssues];
   for (const story of stories.slice(known.length)) {
     const body = { title: `US${story.k}: ${story.title}`, body: `Story ${story.k} of #${p}; its tasks are in ${specDir}/tasks.md.` };
     const created = answerOf(StoryIssue, await github.rest("POST", `${api}/issues`, body), `the issue of US${story.k}`);
-    await github.rest("POST", `${api}/issues/${p}/sub_issues`, { sub_issue_id: created.id });
     const previous = known.at(-1);
-    if (previous !== undefined) await github.rest("POST", `${api}/issues/${created.number}/dependencies/blocked_by`, { issue_id: previous.id });
+    const after = previous === undefined ? "" : ` and mark it blocked by #${previous.number}`;
+    await storyLink(
+      github,
+      `${api}/issues/${p}/sub_issues`,
+      { sub_issue_id: created.id },
+      `#${created.number} (US${story.k}) was created but is not among #${p}'s sub-issues. Next step: add it to #${p}'s sub-issues${after}, then land again`,
+    );
+    if (previous !== undefined) {
+      await storyLink(
+        github,
+        `${api}/issues/${created.number}/dependencies/blocked_by`,
+        { issue_id: previous.id },
+        `#${created.number} (US${story.k}) is not blocked by #${previous.number}. Next step: mark it blocked by #${previous.number}, then land again`,
+      );
+    }
     known.push(created);
   }
   return known.map((one) => one.number);
@@ -368,6 +400,7 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
       !(
         error instanceof GitHubUnanswered ||
         error instanceof GitHubRefused ||
+        error instanceof LandingIncomplete ||
         error instanceof SettingsError ||
         error instanceof RemoteRefused ||
         error instanceof NoOrigin ||
