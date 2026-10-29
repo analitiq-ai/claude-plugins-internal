@@ -302,7 +302,7 @@ class Scope(unittest.TestCase):
 
 
 class Preflight(unittest.TestCase):
-    """The run's first step reads the issue and its card before any step writes (FR-012)."""
+    """The run's first step reads the issue and its card before any step writes."""
 
     def setUp(self):
         self.project = Project(spec_text=None)

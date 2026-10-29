@@ -62,7 +62,7 @@ const PHASE_TITLE = /^## Phase [^:]*: (.+)$/;
 
 type Phase = { line: number; heading: string; story: number | null };
 
-// A story's phases are told apart by their tasks' tags, never by heading words (R16). A section that is no phase
+// A story's phases are told apart by their tasks' tags, never by heading words. A section that is no phase
 // ends the one before it, so its lines are no phase's.
 function phasesOf(lines: readonly string[]): Phase[] {
   const phases: Phase[] = [];
@@ -93,7 +93,7 @@ function phasesOf(lines: readonly string[]): Phase[] {
 
 export type Story = { k: number; title: string; heading: string };
 
-/** The stories of tasks.md, US1 first, each named by the heading of its first phase (R15). */
+/** The stories of tasks.md, US1 first, each named by the heading of its first phase. */
 export function storyPlan(text: string): Story[] {
   const phases = phasesOf(text.split("\n"));
   const stories: Story[] = [];
@@ -108,7 +108,7 @@ export function storyPlan(text: string): Story[] {
 
 /**
  * `text` with `Story issue: #<n>` directly under each phase heading, `issues[k - 1]` being story k's: a story's
- * phases get its own, phases before the first story's get US1's, and any other its last story phase's (R16). An
+ * phases get its own, phases before the first story's get US1's, and any other its last story phase's. An
  * existing label is replaced.
  */
 export function labelTasks(text: string, issues: readonly number[]): string {
@@ -370,7 +370,7 @@ async function write(landing: Landing, read: Read, io: LandIo): Promise<void> {
   await commitLanding(io.checkout, landing, read);
   const branch = specBranch(p);
   await io.push(repo, `HEAD:refs/heads/${branch}`);
-  // A draft, with no label: an exempt label counts only from a writer who is no codeworks App (FR-014).
+  // A draft, with no label: an exempt label counts only from a writer who is no codeworks App.
   const body = { title: `Spec of #${p}`, head: branch, base, draft: true, body: `The spec of #${p}, in \`${specDir}\`, with its decision records.` };
   const url =
     open === null

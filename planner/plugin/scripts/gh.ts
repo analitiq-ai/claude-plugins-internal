@@ -1,4 +1,4 @@
-// gh as the planner App, for a planner script that is not TypeScript (R9): new_issue.py runs its gh calls through
+// gh as the planner App, for a planner script that is not TypeScript: new_issue.py runs its gh calls through
 // this. Anything it needs past the guard is loaded with `await import(...)`: a static import would be evaluated
 // before the guard runs.
 import "../lib/guarded.ts";
