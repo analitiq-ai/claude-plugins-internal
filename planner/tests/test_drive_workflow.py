@@ -3,10 +3,11 @@
 No test runs the real agent or reaches GitHub: `plan` on a rescope gets a stand-in `claude` that writes no plan,
 `specify` on a new spec gets one that writes the spec the test names where the test names, `gh` is a stand-in
 that keeps each call, and `node` is a stand-in for the preflight step that keeps each call and passes the issue
-unless the test makes it stop the run.
+unless the test makes it stop the run; any other script it hands to the real node.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -93,11 +94,12 @@ class Project:
                             "if sys.argv[1:3] == ['issue', 'view']:\n"
                             "    print('OPEN')\n")
         self.node_log = Path(self._tmp.name) / "node.log"
-        # Preflight is the one step that runs node; it reads GitHub, so it is kept and passes unless PREFLIGHT_STOP
-        # names the stop to print.
+        # Preflight reads GitHub, so it is kept and passes unless PREFLIGHT_STOP names the stop to print. The
+        # spec-facts steps read and write only the folder, so the real node runs them.
+        real_node = shutil.which("node")
         self.stand_in("node", f"#!{sys.executable}\nimport json, os, sys\n"
                               "if not sys.argv[1].endswith('/scripts/preflight.ts'):\n"
-                              "    sys.exit(f'the stand-in node runs preflight.ts alone, not {sys.argv[1:]}')\n"
+                              f"    os.execv({real_node!r}, [{real_node!r}, *sys.argv[1:]])\n"
                               f"with open({str(self.node_log)!r}, 'a') as log:\n"
                               "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
                               "if os.environ.get('PREFLIGHT_STOP'):\n"
