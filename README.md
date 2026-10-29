@@ -51,6 +51,43 @@ claude plugin install reviewer@codeworks
 The repo is private: on your machine the clone uses your git credentials for github.com; the agent
 machine, which holds none, uses the deploy key.
 
+## A repository planner scopes in
+
+Set up once, and merged to the repository's default branch before the first `/planner:issue-spec`:
+planner reads `codeworks.toml` at `HEAD`, and landing stops on any committed path outside the spec
+folder that the default branch lacks.
+
+1. Install the Spec Kit CLI, `specify` 1.0.7 or later, and initialise the repository:
+   `specify init --here --integration claude`.
+
+   The `issue-spec` workflow's grill and critique steps run two third-party Spec Kit community extensions,
+   part of neither Spec Kit nor planner. Spec Kit's catalog lists both as discovery-only, not vetted, so
+   `specify` will not install them from it. Vet each yourself, then install it with
+   `specify extension add <id> --from <archive-url>`, or `--dev <folder>` from a local copy:
+
+   | Extension | Author | Skill it adds |
+   |---|---|---|
+   | `grill` | [yoshi1220/speckit-grill-me](https://github.com/yoshi1220/speckit-grill-me) | `speckit-grill-me` |
+   | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
+
+   No other extension is needed. The workflow's other steps, `speckit.specify`, `speckit.plan` and
+   `speckit.tasks`, come with `specify init`, and planner installs its own preset (`settled-design`) and
+   workflow (`issue-spec`) at each start. This repo's `adrkit` and `assess` extensions are not planner's.
+
+   Commit `.specify/` and the `speckit-*` skills under `.claude/skills/`.
+2. Copy this repo's `codeworks.toml` to the repository's root and set `board` to the repository's board,
+   `https://github.com/orgs/<org>/projects/<n>`.
+3. Make the board an organization project in the org where the planner App is installed. Spell its Status
+   options Backlog, Ready, In progress, In review, Blocked, Done. Planner scopes an issue only from
+   Backlog or Blocked: turn on the project's workflows that add the repository's new issues in Backlog, or
+   add each card by hand.
+4. Install the planner App on the repository, and keep its key at `~/.config/codeworks/planner-app.pem`,
+   mode 0600, owned by you.
+5. Planner scopes each issue in a worktree it creates per the repository's branch rules. Name the place in
+   the repository's `CLAUDE.md`, for example `.claude/worktrees/<branch>`, and add that folder to
+   `.gitignore`. Never under `.git/`: Claude Code protects it, and the run cannot write there.
+6. Commit and merge to the default branch.
+
 ## Layout
 
 `<component>/plugin/` holds what an install copies. Beside it, never installed: `tests/` and the component's
