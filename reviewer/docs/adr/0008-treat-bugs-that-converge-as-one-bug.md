@@ -31,7 +31,8 @@ review:
 
 The shim check keeps one record per bug, with the bug's line ranges (ADR-0001) and its count of refusals. One
 checked change (ADR-0002) can overlap two bugs that have a record each. The deep sweep, the hold and the
-override each belong to one bug, so a change that overlaps two has to say which bug they then belong to.
+hold's release (ADR-0013) each belong to one bug, so a change that overlaps two has to say which bug they
+then belong to.
 
 ## Decision
 
@@ -51,7 +52,7 @@ override each belong to one bug, so a change that overlaps two has to say which 
 
 ### Option B: Count toward both, and say nothing more
 
-Leaves the deep sweep, the hold and the override of each bug undecided.
+Leaves the deep sweep, the hold and the hold's release of each bug undecided.
 
 ### Option C: Keep the bugs apart and treat each as if it were alone
 
@@ -75,8 +76,8 @@ Rejected: a commit that touches two bugs would wipe both counts.
 
 - Easier: one check of one change gives one verdict to one bug.
 - Harder: the shim check records how two bugs became one.
-- **How we would know this was wrong:** users who override a merged bug and say its two halves had nothing to
-  do with each other.
+- **How we would know this was wrong:** admins who release a merged bug's hold and say its two halves had
+  nothing to do with each other.
 - Revisit if: such reports come in.
 
 ## Action items
