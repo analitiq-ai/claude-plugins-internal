@@ -20,8 +20,8 @@ The orchestrator, builder and reviewer run together in one session on a dedicate
 holds no admin GitHub credential, under Claude Code's managed settings
 ([root ADR-0008](docs/adr/0008-run-the-agent-session-on-one-agent-machine-under-managed-settings-with-keys-only.md)).
 You start each session there naming one issue, `/codeworks <issue>`. planner runs where you work, under
-your supervision, and acts on GitHub as its own App, never with your credentials. Setting up that machine
-and a served repo:
+your supervision; its scripts act on GitHub as its own App, and the rest of the session keeps your gh login.
+Setting up that machine and a served repo:
 [`orchestrator/README.md`](orchestrator/README.md). The exact managed settings and their tests:
 `SECURITY.md`.
 

@@ -17,4 +17,5 @@ app_id = 5510825
 ```
 
 `[shared]` is core's `Shared`; `[planner]` is `z.strictObject({ app_id: z.number().int().positive() })`. A
-missing file, a refused section or an unknown key blocks the hook naming `codeworks.toml` and the key.
+missing file, a refused section or an unknown key makes a planner script exit 2 naming `codeworks.toml` and the
+key.

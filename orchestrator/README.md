@@ -14,7 +14,7 @@ are in `docs/adr/`.
    global git `user.name` and `user.email`; and the session, orchestrator and reviewer App keys, the
    validator modules' tokens and the classifier key in `~/.config/codeworks/`.
 3. Install the plugins on the agent machine as the root `README.md` shows. Where planner runs, keep the
-   planner App's key for planner's hook (root ADR-0007).
+   planner App's key for planner's scripts (root ADR-0007).
 4. Delete the `PR_GATE_APP_KEY` Actions secret; the orchestrator writes each module's
    `<module>-review` check run, for example `codex-review` (ADR-0008).
 5. Add the ruleset and the repo settings ADR-0009 requires.
