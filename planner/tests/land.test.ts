@@ -5,7 +5,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { runGit } from "../plugin/core/git.ts";
-import type { Repository } from "../plugin/core/github.ts";
+import { GitHubUnanswered, type Repository } from "../plugin/core/github.ts";
 import { labelTasks, main } from "../plugin/scripts/land.ts";
 import {
   git,
@@ -76,7 +76,15 @@ type Issue = { id: number; number: number; title: string; repository_url: string
 type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean };
 
 /** What GitHub holds across runs: each run gets a fresh fake recording its own calls over this one state. */
-type GitHubState = { issues: Issue[]; subIssues: Issue[]; blockedBy: { issue: number; blocker: number }[]; prs: Pr[]; next: number };
+type GitHubState = {
+  issues: Issue[];
+  subIssues: Issue[];
+  blockedBy: { issue: number; blocker: number }[];
+  prs: Pr[];
+  next: number;
+  /** The error a sub_issues or blocked_by write meets, for a landing GitHub stops answering partway through. */
+  unanswered?: (call: FakeCall) => GitHubUnanswered | undefined;
+};
 
 function gitHubState(over: Partial<GitHubState> = {}): GitHubState {
   return { issues: [], subIssues: [], blockedBy: [], prs: [], next: 101, ...over };
@@ -106,6 +114,8 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
       return { id: created.id, number: created.number, html_url: `https://github.com/acme/widgets/issues/${created.number}` };
     },
     [`POST ${API_REPO}/issues/${P}/sub_issues`]: (call: FakeCall) => {
+      const unanswered = state.unanswered?.(call);
+      if (unanswered !== undefined) throw unanswered;
       const child = state.issues.find((one) => one.id === bodyOf(call).sub_issue_id);
       assert.ok(child, `sub_issue_id ${String(bodyOf(call).sub_issue_id)} is no issue`);
       state.subIssues.push(child);
@@ -119,6 +129,8 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
   };
   for (let number = 101; number < 110; number++) {
     rest[`POST ${API_REPO}/issues/${number}/dependencies/blocked_by`] = (call: FakeCall) => {
+      const unanswered = state.unanswered?.(call);
+      if (unanswered !== undefined) throw unanswered;
       const blocker = [...state.issues, ...state.subIssues].find((one) => one.id === bodyOf(call).issue_id);
       assert.ok(blocker, `issue_id ${String(bodyOf(call).issue_id)} is no issue`);
       state.blockedBy.push({ issue: number, blocker: blocker.number });
@@ -429,6 +441,35 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
 });
 
 describe("land.ts could not run, exiting 2", () => {
+  it("when a story issue was created but not added to #p's sub-issues, naming the issue and both links to make", async (t) => {
+    const w = world(t);
+    const state = gitHubState({ unanswered: (call) => (bodyOf(call).sub_issue_id === 9102 ? new GitHubUnanswered("dummy: the connection closed") : undefined) });
+    const run = await land(w, state);
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.deepEqual(state.issues.map((one) => one.number), [101, 102]);
+    assert.deepEqual(state.subIssues.map((one) => one.number), [101]);
+    const said = run.stderr.join("\n");
+    for (const part of ["#102", "US2", "#7's sub-issues", "blocked by #101", "dummy: the connection closed", "Next step:"]) {
+      assert.ok(said.includes(part), `stderr does not name ${part}: ${said}`);
+    }
+    assert.deepEqual(run.pushes, []);
+  });
+
+  it("when a story issue is #p's sub-issue but not blocked by the story before it, naming both", async (t) => {
+    const w = world(t);
+    const state = gitHubState({ unanswered: (call) => (call.kind === "rest" && call.path === `${API_REPO}/issues/102/dependencies/blocked_by` ? new GitHubUnanswered("dummy: the connection closed") : undefined) });
+    const run = await land(w, state);
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.deepEqual(state.subIssues.map((one) => one.number), [101, 102]);
+    assert.deepEqual(state.blockedBy, []);
+    const said = run.stderr.join("\n");
+    for (const part of ["#102", "US2", "blocked by #101", "dummy: the connection closed", "Next step:"]) {
+      assert.ok(said.includes(part), `stderr does not name ${part}: ${said}`);
+    }
+    assert.ok(!said.includes("sub-issues"), said);
+    assert.deepEqual(run.pushes, []);
+  });
+
   it("with a stale token, naming planner's hook and calling no GitHub", async (t) => {
     const w = world(t);
     storeToken(5);
