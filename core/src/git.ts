@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
 
+import { GH_TOKEN_VARIABLES } from "./gh-config.ts";
+import { httpsUrl, withoutUserinfo, type Repository } from "./github.ts";
+
 export type GitAnswer = { code: number; stdout: string };
 
 export class GitFailed extends Error {
@@ -21,12 +24,23 @@ export class GitFailed extends Error {
 const NO_CONFIGURED_CODE = ["-c", "credential.helper=", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"];
 const NO_GLOBAL_OR_SYSTEM_CONFIG = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
 
-export function runGit(checkout: string, args: readonly string[], answers: readonly number[] = []): Promise<GitAnswer> {
+/** `env` is merged over git's own environment; a variable it maps to undefined is removed from the child's. */
+export function runGit(
+  checkout: string,
+  args: readonly string[],
+  answers: readonly number[] = [],
+  env: Readonly<Record<string, string | undefined>> = {},
+): Promise<GitAnswer> {
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...NO_GLOBAL_OR_SYSTEM_CONFIG };
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) delete childEnv[name];
+    else childEnv[name] = value;
+  }
   return new Promise((resolve, reject) => {
     execFile(
       "git",
       ["-C", checkout, ...NO_CONFIGURED_CODE, ...args],
-      { encoding: "utf8", env: { ...process.env, ...NO_GLOBAL_OR_SYSTEM_CONFIG } },
+      { encoding: "utf8", env: childEnv },
       (error, stdout, stderr) => {
         if (error === null) {
           resolve({ code: 0, stdout });
@@ -45,4 +59,46 @@ export function runGit(checkout: string, args: readonly string[], answers: reado
       },
     );
   });
+}
+
+export class PushRefused extends Error {
+  constructor(setting: string) {
+    super(`the checkout's git config ${setting}; remove it to push`);
+    this.name = "PushRefused";
+  }
+}
+
+/**
+ * Pushes `refspec` to `repo`'s https URL, whatever the checkout's origin is, with the token gh holds in
+ * `ghConfigDir` as the only credential: runGit's empty `credential.helper` comes first, so gh's is the one helper,
+ * and no askpass is left for git to ask where gh has no answer. The environment is set here, not inherited, so the
+ * push is right whatever the caller's shell holds.
+ * A checkout whose config sets an http extra header or rewrites the URL is refused rather than reset: a
+ * URL-specific header outranks any less specific reset, and no setting switches rewriting off.
+ */
+export async function pushWithGhCredential(checkout: string, ghConfigDir: string, repo: Repository, refspec: string): Promise<void> {
+  const url = httpsUrl(repo);
+  // git exits 1 when no key matches.
+  const headers = await runGit(checkout, ["config", "--name-only", "--get-regexp", "^http\\..*extraheader$"], [1]);
+  if (headers.code === 0) {
+    const keys = headers.stdout.trim().split("\n").map(withoutUserinfo);
+    throw new PushRefused(`sets ${keys.join(", ")}, a header sent beside gh's token`);
+  }
+  // git rewrites a URL that starts with an insteadOf value. -z, as a base may hold a space or a newline: each entry
+  // is the key, a newline, then the value.
+  const rewrites = await runGit(checkout, ["config", "-z", "--get-regexp", "^url\\..*\\.(push)?insteadof$"], [1]);
+  const prefixes = rewrites.stdout.split("\0").filter(Boolean).map((entry) => entry.slice(entry.indexOf("\n") + 1));
+  // The base is left out of the message: it may hold a credential of its own.
+  if (prefixes.some((prefix) => url.startsWith(prefix))) {
+    throw new PushRefused(`rewrites ${url} with a url.<base>.insteadOf or pushInsteadOf, which takes the push off gh's token`);
+  }
+  const env = {
+    GH_CONFIG_DIR: ghConfigDir,
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_ASKPASS: undefined,
+    SSH_ASKPASS: undefined,
+    ...Object.fromEntries(GH_TOKEN_VARIABLES.map((name) => [name, undefined])),
+  };
+  const args = ["-c", "credential.helper=!gh auth git-credential", "-c", "core.askPass=", "push", "--porcelain", "--end-of-options", url, refspec];
+  await runGit(checkout, args, [], env);
 }

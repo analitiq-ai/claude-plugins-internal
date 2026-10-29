@@ -4,7 +4,7 @@ import { z } from "zod";
 import { NotInTree, type Tree } from "./tree.ts";
 import { ModuleName } from "./values.ts";
 
-const SETTINGS_FILE = "codeworks.toml";
+export const SETTINGS_FILE = "codeworks.toml";
 
 /** The `where` of a `SettingsError` that refuses the `[shared]` section. */
 export const SHARED_SECTION = `${SETTINGS_FILE} [shared]`;
