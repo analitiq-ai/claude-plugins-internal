@@ -14,6 +14,8 @@ import {
   pushFromElsewhere,
   REPO,
   scratchCheckout,
+  fakeMint,
+  storedToken,
   storeToken,
   tempHome,
   writeCalls,
@@ -162,7 +164,7 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
   });
 }
 
-type World = Scratch & { token: string; tasks: string };
+type World = Scratch & { tasks: string };
 
 /**
  * A checkout as a completed run leaves it: the spec folder and two decision records written and unstaged, beside
@@ -197,22 +199,32 @@ function world(t: TestContext, tasks = tasksMd(3), onMain: Readonly<Record<strin
     "README.md": "widgets, edited\n",
     "notes.txt": "a stray file\n",
   });
-  return { ...scratch, token: storeToken(60), tasks };
+  storeToken(60);
+  return { ...scratch, tasks };
 }
 
-type Run = { code: number; stdout: string[]; stderr: string[]; calls: FakeCall[]; pushes: { repo: Repository; refspec: string }[] };
+type Run = {
+  code: number;
+  stdout: string[];
+  stderr: string[];
+  calls: FakeCall[];
+  pushes: { repo: Repository; refspec: string }[];
+  mints: string[];
+};
 
 async function land(w: World, state: GitHubState, args: string[] = [String(P), SPEC, "new"]): Promise<Run> {
   const github = githubOf(state, w.bare);
   const stdout = output();
   const stderr = output();
   const pushes: Run["pushes"] = [];
+  const minting = fakeMint();
   const code = await main(args, {
     checkout: w.checkout,
     connect: (given) => {
-      assert.equal(given, w.token, "connected with a token other than planner's");
+      assert.equal(given, storedToken(), "connected with a token other than the one in planner's folder");
       return github;
     },
+    mint: minting.mint,
     // The bare repository stands in for github.com, which the real fetch and push reach with gh's token.
     fetch: async (repo, refspecs) => {
       assert.deepEqual(repo, REPO);
@@ -225,7 +237,7 @@ async function land(w: World, state: GitHubState, args: string[] = [String(P), S
     stdout: stdout.write,
     stderr: stderr.write,
   });
-  return { code, stdout: stdout.lines, stderr: stderr.lines, calls: github.calls, pushes };
+  return { code, stdout: stdout.lines, stderr: stderr.lines, calls: github.calls, pushes, mints: minting.calls };
 }
 
 const head = (dir: string) => git(dir, "rev-parse", "HEAD").trim();
@@ -345,6 +357,24 @@ describe("land.ts <issue> <spec dir> <kind>: a landing", () => {
       { issue: 102, blocker: 101 },
       { issue: 103, blocker: 102 },
     ]);
+  });
+});
+
+describe("land.ts mints planner's token", () => {
+  it("once when the stored token has 9 minutes left, and lands with the new one", async (t) => {
+    const w = world(t, tasksMd(1));
+    storeToken(9);
+    const run = await land(w, gitHubState());
+    assert.equal(run.code, 0, run.stderr.join("\n"));
+    assert.deepEqual(run.mints, ["424242 acme/widgets"]);
+  });
+
+  it("never while the stored token has 11 minutes left", async (t) => {
+    const w = world(t, tasksMd(1));
+    storeToken(11);
+    const run = await land(w, gitHubState());
+    assert.equal(run.code, 0, run.stderr.join("\n"));
+    assert.deepEqual(run.mints, []);
   });
 });
 
@@ -470,15 +500,6 @@ describe("land.ts could not run, exiting 2", () => {
     assert.deepEqual(run.pushes, []);
   });
 
-  it("with a stale token, naming planner's hook and calling no GitHub", async (t) => {
-    const w = world(t);
-    storeToken(5);
-    const run = await land(w, gitHubState());
-    assert.equal(run.code, 2, run.stderr.join("\n"));
-    assert.match(run.stderr.join("\n"), /hooks\/token\.ts/);
-    assert.deepEqual(run.calls, []);
-    assert.deepEqual(run.pushes, []);
-  });
 
   for (const args of [["7", SPEC], ["7", SPEC, "fresh"], ["0", SPEC, "new"], ["7", "specs/8-other", "new"], ["7", "docs/7-retry-budget", "new"], ["7", "specs/7-absent", "new"]]) {
     it(`for the arguments ${JSON.stringify(args)}, calling no GitHub`, async (t) => {

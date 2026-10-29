@@ -4,6 +4,7 @@ import "../lib/guarded.ts";
 
 import type { GitHubClient, Repository } from "../core/github.ts";
 import type { SpecPr } from "../core/identity.ts";
+import type { Mint } from "../lib/github.ts";
 
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const { join, posix } = await import("node:path");
@@ -13,9 +14,11 @@ const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
 const { answerOf, gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
 const { specBranch, specFolderAnswer, specPr } = await import("../core/identity.ts");
+const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
+const { MintError } = await import("../core/tokens.ts");
 const { gitTree, isPlainPath, NotInTree } = await import("../core/tree.ts");
-const { NoOrigin, originRepository, plannerGitHub, StaleToken } = await import("../lib/github.ts");
+const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub } = await import("../lib/github.ts");
 const { ghFolder, readPlannerSettings } = await import("../lib/settings.ts");
 
 export type LandIo = {
@@ -25,6 +28,7 @@ export type LandIo = {
   /** Fetches each refspec from `repo` into the remote-tracking ref it names. */
   fetch: (repo: Repository, refspecs: readonly string[]) => Promise<void>;
   push: (repo: Repository, refspec: string) => Promise<void>;
+  mint: Mint;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
 };
@@ -217,8 +221,8 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   if (kind === RESCOPE) stop(`#${p} is a rescope, which land.ts does not land. Next step: land it by hand; ${LANDING_A_RESCOPE}.`);
   const { checkout } = io;
   const repo = await originRepository(checkout);
-  const { shared } = await readPlannerSettings(checkout);
-  const github = plannerGitHub(repo, io.connect, new Date());
+  const settings = await readPlannerSettings(checkout);
+  const github = await plannerGitHub(repo, settings, io.connect, new Date(), io.mint);
   const name = `${repo.owner}/${repo.name}`;
   const api = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
   const { url, default_branch: base } = answerOf(RepositoryAnswer, await github.rest("GET", api), name);
@@ -293,7 +297,7 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
     stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: make tasks.md's label and #${p}'s sub-issue name the same issue.`));
   }
 
-  const login = shared.planner_app_login;
+  const login = settings.shared.planner_app_login;
   const { id } = answerOf(UserAnswer, await github.rest("GET", `/users/${encodeURIComponent(login)}`), `the user ${login}`);
   return { repo, api, github, base, open, tasks, stories, subIssues, login, email: `${id}+${login}@users.noreply.github.com` };
 }
@@ -405,7 +409,8 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
         error instanceof RemoteRefused ||
         error instanceof NoOrigin ||
         error instanceof GhFolderRefused ||
-        error instanceof StaleToken ||
+        error instanceof KeyReadRefused ||
+        error instanceof MintError ||
         error instanceof GhCredentialRefused ||
         error instanceof GitFailed
       )
@@ -424,6 +429,7 @@ if (import.meta.main) {
     connect: (token) => gitHub(token),
     fetch: (repo, refspecs) => fetchWithGhCredential(checkout, ghFolder(repo), repo, refspecs),
     push: (repo, refspec) => pushWithGhCredential(checkout, ghFolder(repo), repo, refspec),
+    mint: mintPlannerToken,
     stdout: (line) => process.stdout.write(`${line}\n`),
     stderr: (line) => process.stderr.write(`${line}\n`),
   });

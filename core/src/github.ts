@@ -40,14 +40,14 @@ export class RemoteRefused extends Error {
   }
 }
 
-// A URL's userinfo may hold the admin's token, and planner's hook writes this refusal to stderr, which reaches the
+// A URL's userinfo may hold the admin's token, and planner's scripts write this refusal to stderr, which reaches the
 // session. The greedy match ends at the last `@` before the path, so a password holding a stray `@` goes whole.
 export function withoutUserinfo(url: string): string {
   return url.replace(/^([^:/?#]+:\/\/)[^/?#]*@/, "$1***@");
 }
 
-// GitHub's own characters for an owner and a repository name. The parsed pair is written into the session's
-// environment file, which the shell sources, so nothing wider may pass.
+// GitHub's own characters for an owner and a repository name. The parsed pair names a folder below planner's state
+// folder, so nothing wider may pass.
 const REMOTE = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/;
 
 export function repositoryOfRemote(url: string): Repository {

@@ -50,7 +50,7 @@ inputs:
 
 steps:
   # The run's one step that calls GitHub, and its first: an issue planner may not work on stops the run before any
-  # step writes. Its token is the one planner's hook stored for this Bash call.
+  # step writes. It mints planner's token first when the one stored will not do.
   - id: preflight
     type: shell
     run: node "$PLANNER_ROOT/scripts/preflight.ts" "$ISSUE"

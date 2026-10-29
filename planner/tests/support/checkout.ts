@@ -6,7 +6,8 @@ import { dirname, join } from "node:path";
 import type { TestContext } from "node:test";
 
 import type { FakeCall } from "../../../core/tests/support/fake-github.ts";
-import { writeGhToken } from "../../plugin/core/gh-config.ts";
+import { readGhToken, writeGhToken } from "../../plugin/core/gh-config.ts";
+import type { MintedToken } from "../../plugin/core/tokens.ts";
 import { ghFolder } from "../../plugin/lib/settings.ts";
 
 export const REPO = { owner: "acme", name: "widgets" } as const;
@@ -94,12 +95,39 @@ export function pushFromElsewhere(scratch: Scratch, from: string, branch: string
   git(other, "push", "-q", scratch.bare, `HEAD:refs/heads/${branch}`);
 }
 
-/** Planner's token for acme/widgets in its gh folder, as the hook writes it, expiring `minutesLeft` from now. */
+// GitHub writes `expires_at` in whole seconds.
+function expiringIn(minutes: number): string {
+  return new Date(Date.now() + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** Planner's token for acme/widgets in its gh folder, as a script writes it, expiring `minutesLeft` from now. */
 export function storeToken(minutesLeft: number): string {
   const value = randomUUID();
-  const expiresAt = new Date(Date.now() + minutesLeft * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
-  writeGhToken(ghFolder(REPO), { value, app: "planner", repo: `${REPO.owner}/${REPO.name}`, expires_at: expiresAt, permissions: {} }, LOGIN);
+  writeGhToken(ghFolder(REPO), { value, app: "planner", repo: `${REPO.owner}/${REPO.name}`, expires_at: expiringIn(minutesLeft), permissions: {} }, LOGIN);
   return value;
+}
+
+/** The token planner's gh folder holds for acme/widgets, or null. */
+export function storedToken(): string | null {
+  return readGhToken(ghFolder(REPO))?.value ?? null;
+}
+
+export type FakeMint = {
+  mint: (appId: number, repo: string) => Promise<MintedToken>;
+  /** One `<app id> <repo>` per call. */
+  calls: string[];
+};
+
+/** Stands in for core's mintToken: each call answers a new one-hour token for its repository. */
+export function fakeMint(): FakeMint {
+  const calls: string[] = [];
+  return {
+    calls,
+    mint: async (appId, repo) => {
+      calls.push(`${appId} ${repo}`);
+      return { value: randomUUID(), app: "planner", repo, expires_at: expiringIn(60), permissions: {} };
+    },
+  };
 }
 
 /** The calls that write: every REST call but a GET, and every GraphQL mutation. */

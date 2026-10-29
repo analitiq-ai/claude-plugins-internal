@@ -3,8 +3,9 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { GitHubUnanswered } from "../plugin/core/github.ts";
+import { MintError } from "../plugin/core/tokens.ts";
 import { main } from "../plugin/scripts/preflight.ts";
-import { BOARD, output, scratchCheckout, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
+import { BOARD, fakeMint, output, scratchCheckout, storedToken, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
 
 const OTHER_BOARD = "https://github.com/orgs/acme/projects/2";
 
@@ -26,25 +27,30 @@ function answered({ state, cards }: Issue): FakeGitHub {
   return githubOf({ number: 7, state }, cards.map(({ url, status }) => ({ project: { url }, status: { name: status } })));
 }
 
-type Run = { code: number; stderr: string[]; github: FakeGitHub; connected: boolean };
+type Run = { code: number; stderr: string[]; github: FakeGitHub; connected: boolean; mints: string[] };
 
-async function preflight(t: TestContext, github: FakeGitHub, options: { minutesLeft?: number; args?: string[] } = {}): Promise<Run> {
+type Options = { minutesLeft?: number | null; args?: string[]; mint?: (appId: number, repo: string) => never };
+
+/** `minutesLeft` null stores no token. */
+async function preflight(t: TestContext, github: FakeGitHub, options: Options = {}): Promise<Run> {
   tempHome(t);
   const { checkout } = scratchCheckout(t);
-  const token = storeToken(options.minutesLeft ?? 60);
+  if (options.minutesLeft !== null) storeToken(options.minutesLeft ?? 60);
+  const minting = fakeMint();
   const stderr = output();
   let connected = false;
   const code = await main(options.args ?? ["7"], {
     checkout,
     connect: (given) => {
-      assert.equal(given, token, "connected with a token other than planner's");
+      assert.equal(given, storedToken(), "connected with a token other than the one in planner's folder");
       connected = true;
       return github;
     },
+    mint: options.mint ?? minting.mint,
     stderr: stderr.write,
   });
   assert.deepEqual(writeCalls(github.calls), [], "preflight wrote to GitHub");
-  return { code, stderr: stderr.lines, github, connected };
+  return { code, stderr: stderr.lines, github, connected, mints: minting.calls };
 }
 
 function assertStops(run: Run, ...named: string[]): void {
@@ -92,10 +98,28 @@ describe("preflight.ts <issue>", () => {
     assert.match(run.stderr.join("\n"), /dummy: no answer/);
   });
 
-  it("exits 2 naming planner's hook when the stored token is stale, and calls no GitHub", async (t) => {
-    const run = await preflight(t, answered({ state: "open", cards: [{ url: BOARD, status: "Backlog" }] }), { minutesLeft: 5 });
+  for (const [what, minutesLeft] of [["no token is stored", null], ["the stored token has 9 minutes left", 9]] as const) {
+    it(`mints the planner App's token once when ${what}, and checks the issue with it`, async (t) => {
+      const run = await preflight(t, answered({ state: "open", cards: [{ url: BOARD, status: "Backlog" }] }), { minutesLeft });
+      assert.equal(run.code, 0, run.stderr.join("\n"));
+      assert.deepEqual(run.mints, ["424242 acme/widgets"]);
+      assert.equal(run.connected, true);
+    });
+  }
+
+  it("mints nothing while the stored token has 11 minutes left", async (t) => {
+    const run = await preflight(t, answered({ state: "open", cards: [{ url: BOARD, status: "Backlog" }] }), { minutesLeft: 11 });
+    assert.equal(run.code, 0, run.stderr.join("\n"));
+    assert.deepEqual(run.mints, []);
+  });
+
+  it("exits 2 with core's reason when the mint is refused, and calls no GitHub", async (t) => {
+    const refused = () => {
+      throw new MintError("dummy refusal");
+    };
+    const run = await preflight(t, answered({ state: "open", cards: [{ url: BOARD, status: "Backlog" }] }), { minutesLeft: null, mint: refused });
     assert.equal(run.code, 2, run.stderr.join("\n"));
-    assert.match(run.stderr.join("\n"), /hooks\/token\.ts/);
+    assert.match(run.stderr.join("\n"), /mint failed: dummy refusal/);
     assert.equal(run.connected, false);
     assert.deepEqual(run.github.calls, []);
   });

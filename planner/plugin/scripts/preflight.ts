@@ -3,20 +3,24 @@
 import "../lib/guarded.ts";
 
 import type { GitHubClient } from "../core/github.ts";
+import type { Mint } from "../lib/github.ts";
 
 const { z } = await import("zod");
 const { laneOf, LaneRefused } = await import("../core/board.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { answerOf, gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
+const { MintError } = await import("../core/tokens.ts");
 const { Lane } = await import("../core/values.ts");
-const { NoOrigin, originRepository, plannerGitHub, StaleToken } = await import("../lib/github.ts");
+const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub } = await import("../lib/github.ts");
 const { readPlannerSettings } = await import("../lib/settings.ts");
 
 export type PreflightIo = {
   /** Any folder of the checkout: the workflow runs its steps in the project, which may be one below the root. */
   checkout: string;
   connect: (token: string) => GitHubClient;
+  mint: Mint;
   stderr: (line: string) => void;
 };
 
@@ -34,8 +38,9 @@ export async function main(args: readonly string[], io: PreflightIo): Promise<nu
   const issue = Number(args[0]);
   try {
     const repo = await originRepository(io.checkout);
-    const { shared } = await readPlannerSettings(io.checkout);
-    const github = plannerGitHub(repo, io.connect, new Date());
+    const settings = await readPlannerSettings(io.checkout);
+    const { shared } = settings;
+    const github = await plannerGitHub(repo, settings, io.connect, new Date(), io.mint);
     const name = `${repo.owner}/${repo.name}`;
     const path = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/issues/${issue}`;
     const { state } = answerOf(IssueState, await github.rest("GET", path), `${name}#${issue}`);
@@ -59,7 +64,8 @@ export async function main(args: readonly string[], io: PreflightIo): Promise<nu
         error instanceof RemoteRefused ||
         error instanceof NoOrigin ||
         error instanceof GhFolderRefused ||
-        error instanceof StaleToken ||
+        error instanceof KeyReadRefused ||
+        error instanceof MintError ||
         error instanceof LaneRefused
       )
     ) {
@@ -74,6 +80,7 @@ if (import.meta.main) {
   process.exitCode = await main(process.argv.slice(2), {
     checkout: process.cwd(),
     connect: (token) => gitHub(token),
+    mint: mintPlannerToken,
     stderr: (line) => process.stderr.write(`${line}\n`),
   });
 }
