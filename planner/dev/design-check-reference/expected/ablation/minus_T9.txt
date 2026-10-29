@@ -1,0 +1,38 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,UNL,WV   literal grid: False
+
+################ scenario new[dis=0]
+states: 102345   transitions: 502342
+
+== VIOLATION planner_commit_refused
+   planner session: no session issue / <p>-spec fails FENCE / lane rule refuses Backlog-Blocked
+  s0: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=none landed=0 main r0/v0  planner: running reviewer-on
+
+== VIOLATION progress s0: T9 planner commit refused: rescope/new spec never opens its spec PR  (16 states; no path to merge or close using design-named human actions)
+  s0: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=none landed=0 main r0/v0  planner: running reviewer-on
+
+== VIOLATION progress s1: T9 planner commit refused: rescope/new spec never opens its spec PR  (16 states; no path to merge or close using design-named human actions)
+  s0: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=none landed=0 main r0/v0  planner: running reviewer-on
+
+== VIOLATION progress parent: T9 planner commit refused: rescope/new spec never opens its spec PR  (16 states)
+  s0: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=none landed=0 main r0/v0  planner: running reviewer-on
+
+== VIOLATION progress planner: spec PR never opens  (16 states)
+  s0: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=none landed=0 main r0/v0  planner: running reviewer-on
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,UNL,WV)
+  planner_commit_refused                                                                                         new[dis=0]
+  progress parent: T9 planner commit refused: rescope/new spec never opens its spec PR                           new[dis=0]
+  progress planner: spec PR never opens                                                                          new[dis=0]
+  progress s0: T9 planner commit refused: rescope/new spec never opens its spec PR                               new[dis=0]
+  progress s1: T9 planner commit refused: rescope/new spec never opens its spec PR                               new[dis=0]
+  total distinct: 5

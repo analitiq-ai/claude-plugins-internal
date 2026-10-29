@@ -1,0 +1,21 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[resc=1]
+states: 384917   transitions: 2053337
+
+== VIOLATION two_state_writers
+   planner places rescope-0 while a session runs on it
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. human: drag s0 -> Blocked before a rescope
+    7. human: runs issue-spec (rescope)
+  s0: Blocked(h) pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=1 log=run br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  two_state_writers                                                                                              one[resc=1]
+  total distinct: 1

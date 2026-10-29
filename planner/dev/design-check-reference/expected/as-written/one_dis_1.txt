@@ -1,0 +1,766 @@
+fixes: none   literal grid: False
+
+################ scenario one[dis=1]
+states: 1606842   transitions: 11035301
+
+== VIOLATION hold_released_by_non_owner
+   esc released by deleting the newest state comment (design l.71: "holds only block more")
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. human: deletes newest state comment on s0
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION merge_codex_waived
+   codex-review success marked WAIVED: no Codex review at the head
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI green on s0
+    7. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    8. Codex out of credits (WAIVED) on s0
+    9. tick s0 [InReview x ready]: squash merge
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=waived fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:REPEAT)
+   block:REPEAT; a bare Ready then goes working:in-review
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: runs issue-tackle s0 interactively
+    7. session start
+    8. CI failure on s0
+    9. github round FIX -> push; turn ends
+   10. tick s0 [InProgress x ready]: launch
+   11. session start
+   12. internal round CLEAN; turn ends
+   13. CI green on s0
+   14. tick s0 [InProgress x ready]: codex request, post:launch, lane:Blocked
+  s0: InProgress pr=ready(rfr) att=1 ci=green cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)
+   block:launch; a bare Ready then goes working:flip
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. human: runs issue-tackle s0 interactively
+    6. session start
+    7. builder first push + draft PR, internal round CLEAN; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: InProgress pr=draft att=1 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:REPEAT)
+   working:block:REPEAT; a bare Ready then goes working:in-review
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI green on s0
+    7. CodeRabbit thread on s0
+    8. tick s0 [InProgress x ready]: launch
+    9. human: drag s0 -> Blocked (stop)
+   10. tick s0 [Blocked x ready]: stop launch
+   11. human: resolve thread on s0
+   12. human: s0 -> Ready
+   13. tick s0 [Ready x ready]: codex request, post:launch, lane:Blocked
+  s0: Ready(h) pr=ready(rfr) att=1 ci=green cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:launch)
+   working:block:launch; a bare Ready then goes working:flip
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round CLEAN; turn ends
+    8. human: drag s0 -> Blocked (stop)
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: post:launch, lane:Blocked
+  s0: Ready(h) pr=draft att=1 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION two_sessions
+   interactive issue-tackle beside the launch
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. human: runs issue-tackle s0 beside a running launch
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=1 log=run br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x draft (log=exit handled=False exempt=True att=False)
+   InProgress x draft (log=exit handled=False exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. human: exempt label on s0 story PR
+    6. tick s0 [InProgress x draft] no defined action
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x none (log=exit handled=True exempt=False att=False)
+   InProgress x none (log=exit handled=True exempt=False att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0 [InProgress x none]: post:launch, lane:Blocked
+    6. human: drag s0 -> InProgress
+    7. tick s0 [InProgress x none] no defined action
+  s0: InProgress(h) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x ready (log=exit handled=False exempt=True att=False)
+   InProgress x ready (log=exit handled=False exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. github round FIX -> push; turn ends
+   10. human: exempt label on s0 story PR
+   11. tick s0 [InProgress x ready] no defined action
+  s0: InProgress pr=ready(rfr) att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x ready (log=exit handled=False exempt=True att=True)
+   InProgress x ready (log=exit handled=False exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: exempt label on s0 story PR
+    7. CI failure on s0
+    8. tick s0 [InProgress x ready] no defined action
+  s0: InProgress pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x ready (log=exit handled=True exempt=True att=True)
+   InProgress x ready (log=exit handled=True exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round CLEAN; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: ready flip, lane:InProgress
+   11. human: exempt label on s0 story PR
+   12. CI failure on s0
+   13. tick s0 [InProgress x ready] no defined action
+  s0: InProgress pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InReview x none (log=exit handled=True exempt=False att=False)
+   InReview x none (log=exit handled=True exempt=False att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0 [InProgress x none]: post:launch, lane:Blocked
+    6. human: drag s0 -> InReview
+    7. tick s0 [InReview x none] no defined action
+  s0: InReview(h) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InReview x ready (log=exit handled=False exempt=True att=True)
+   InReview x ready (log=exit handled=False exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: exempt label on s0 story PR
+    7. CI green on s0
+    8. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    9. Codex fail + threads on s0
+   10. tick s0 [InReview x ready] no defined action
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=bot ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InReview x ready (log=exit handled=True exempt=True att=True)
+   InReview x ready (log=exit handled=True exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round CLEAN; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: ready flip, lane:InProgress
+   11. human: exempt label on s0 story PR
+   12. CI green on s0
+   13. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+   14. Codex fail + threads on s0
+   15. tick s0 [InReview x ready] no defined action
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=bot ex=1 holds=[] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x draft (log=exit handled=False exempt=True att=False)
+   Ready x draft (log=exit handled=False exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. tick s0 [InProgress x draft]: post:esc, lane:Blocked
+    6. human: s0 -> Ready
+    7. human: writer answers the escalation on s0
+    8. human: exempt label on s0 story PR
+    9. tick s0 [Ready x draft] no defined action
+  s0: Ready(h) pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[esc] rr=[esc] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x draft (log=exit handled=False exempt=True att=True)
+   Ready x draft (log=exit handled=False exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   11. session start
+   12. CI failure on s0
+   13. internal round CLEAN; turn ends
+   14. tick s0 [InProgress x draft]: post:rsc, lane:Blocked
+   15. human: s0 -> Ready
+   16. human: exempt label on s0 story PR
+   17. tick s0 [Ready x draft] no defined action
+  s0: Ready(h) pr=draft att=1 ci=fail cx=none fnd=None ex=1 holds=[rsc(rec v0)] rr=[rsc] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x draft (log=exit handled=True exempt=True att=False)
+   Ready x draft (log=exit handled=True exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. session ends turn
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. human: exempt label on s0 story PR
+   11. tick s0 [Ready x draft] no defined action
+  s0: Ready(h) pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x draft (log=exit handled=True exempt=True att=True)
+   Ready x draft (log=exit handled=True exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   11. session start
+   12. internal round CLEAN; turn ends
+   13. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+   14. human: s0 -> Ready
+   15. human: exempt label on s0 story PR
+   16. tick s0 [Ready x draft] no defined action
+  s0: Ready(h) pr=draft att=1 ci=pend cx=none fnd=None ex=1 holds=[rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x ready (log=exit handled=False exempt=True att=False)
+   Ready x ready (log=exit handled=False exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. github round FIX -> push; turn ends
+   10. human: exempt label on s0 story PR
+   11. CI pending past review_timeout on s0
+   12. tick s0 [InProgress x ready]: codex request, post:sil, lane:Blocked
+   13. human: s0 -> Ready
+   14. tick s0 [Ready x ready] no defined action
+  s0: Ready(h) pr=ready(rfr) att=0 ci=slow cx=pend fnd=None ex=1 holds=[] rr=[sil] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x ready (log=exit handled=False exempt=True att=True)
+   Ready x ready (log=exit handled=False exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: exempt label on s0 story PR
+    7. CI pending past review_timeout on s0
+    8. tick s0 [InProgress x ready]: codex request, post:sil, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x ready] no defined action
+  s0: Ready(h) pr=ready(rfr) att=1 ci=slow cx=pend fnd=None ex=1 holds=[] rr=[sil] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x ready (log=exit handled=True exempt=True att=False)
+   Ready x ready (log=exit handled=True exempt=True att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. session ends turn
+   10. tick s0 [InProgress x ready]: post:launch, lane:Blocked
+   11. human: push to s0 branch (REPEAT release)
+   12. human: s0 -> Ready
+   13. human: exempt label on s0 story PR
+   14. tick s0 [Ready x ready] no defined action
+  s0: Ready(h) pr=ready(rfr) att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: Ready x ready (log=exit handled=True exempt=True att=True)
+   Ready x ready (log=exit handled=True exempt=True att=True)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. session ends turn
+   10. tick s0 [InProgress x ready]: post:launch, lane:Blocked
+   11. human: s0 -> Ready
+   12. human: exempt label on s0 story PR
+   13. tick s0 [Ready x ready] no defined action
+  s0: Ready(h) pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell)  (75950 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. human: exempt label on s0 story PR
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell  (2 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0 [InProgress x none]: post:launch, lane:Blocked
+    6. human: drag s0 -> InProgress
+  s0: InProgress(h) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s0: S9 codex-review failure with no findings and no hold: no cell, no named release  (6486 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. human: drag s0 -> Blocked (stop)
+    6. Codex module timeout passes unrequested on s0
+    7. human: re-request silent Codex on s0
+    8. Codex fail + threads on s0
+    9. human: resolve thread on s0
+  s0: Blocked(h) pr=draft att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Blocked, reason of open hold(s) esc never posted]  (738 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round ESCALATE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: exempt label on s0 story PR
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[esc] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Blocked, reason of open hold(s) esc,rsc never posted]  (369 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   11. session start
+   12. internal round ESCALATE; turn ends
+   13. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+   14. human: exempt label on s0 story PR
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[esc,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Blocked, reason of open hold(s) pb never posted]  (592 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. CI failure on s0
+    6. tick s0 [InProgress x draft]: launch
+    7. session start
+    8. github round PUSH_BACK all; turn ends
+    9. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+   10. human: exempt label on s0 story PR
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=1 holds=[pb] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Blocked, reason of open hold(s) pb,rsc never posted]  (296 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. CI failure on s0
+   11. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. github round PUSH_BACK all; turn ends
+   14. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+   15. human: exempt label on s0 story PR
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=1 holds=[pb,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Blocked, reason of open hold(s) rsc never posted]  (687 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: exempt label on s0 story PR
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card in InProgress with nothing posted]  (2500 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. human: exempt label on s0 story PR
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card in InReview with nothing posted]  (348 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: exempt label on s0 story PR
+    7. CI green on s0
+    8. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    9. Codex fail + threads on s0
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=bot ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card in Ready with nothing posted]  (41090 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. tick s0 [InProgress x draft]: post:esc, lane:Blocked
+    6. human: s0 -> Ready
+    7. human: writer answers the escalation on s0
+    8. human: exempt label on s0 story PR
+  s0: Ready(h) pr=draft att=0 ci=pend cx=none fnd=None ex=1 holds=[esc] rr=[esc] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb never posted]  (10474 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. CI failure on s0
+    6. tick s0 [InProgress x draft]: launch
+    7. session start
+    8. github round PUSH_BACK all; turn ends
+    9. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb,rsc never posted]  (540 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. human: runs issue-tackle s0 interactively
+    9. session start
+   10. CI failure on s0
+   11. github round PUSH_BACK all; turn ends
+   12. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc never posted]  (5314 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never posted]  (19376 states)
+    1. human: s0 -> Ready
+    2. human: runs issue-tackle s0 interactively
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. tick s0 [Ready x draft]: lane:Blocked
+  s0: Blocked(unclaimed) pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc] rr=[] sess=0 log=None br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never posted]  (1175 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. human: runs issue-tackle s0 interactively
+    9. session start
+   10. internal round ESCALATE; turn ends
+   11. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [card in InProgress with nothing posted]  (1 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0 [InProgress x none]: post:launch, lane:Blocked
+    6. human: drag s0 -> InProgress
+  s0: InProgress(h) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [card in InReview with nothing posted]  (1 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0 [InProgress x none]: post:launch, lane:Blocked
+    6. human: drag s0 -> InReview
+  s0: InReview(h) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]  (129 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. tick s0 [InProgress x ready]: post:sil, lane:Blocked
+    8. human: re-request silent Codex on s0
+    9. Codex fail + threads on s0
+   10. human: resolve thread on s0
+   11. human: drag s0 -> InProgress
+  s0: InProgress(h) pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]  (246 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. human: drag s0 -> Blocked (stop)
+    7. CI green on s0
+    8. tick s0 [Blocked x ready]: codex request
+    9. Codex fail + threads on s0
+   10. human: resolve thread on s0
+   11. human: s0 -> Ready
+   12. tick s0 [Ready x ready]: lane:InReview
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+  s0: InProgress pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x ready]: launch
+      -> session start
+      -> github round FIX -> push -> internal round CLEAN; turn ends
+      -> CI failure on s0
+
+== VIOLATION unbounded automated launch loop: CI failure / internal round FIX / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. CI failure on s0
+    8. github round ESCALATE; turn ends
+    9. tick s0 [InProgress x draft]: post:esc, lane:Blocked
+   10. human: unlock esc-s0
+   11. human: drag s0 -> InProgress
+  s0: InProgress(h) pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x draft]: launch
+      -> session start
+      -> internal round FIX -> push; turn ends
+      -> CI failure on s0
+
+== VIOLATION unbounded automated launch loop: internal round FIX / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x draft]: launch
+      -> session start
+      -> internal round FIX -> push; turn ends
+
+################ SUMMARY (spec as written)
+  hold_released_by_non_owner                                                                                     one[dis=1]
+  merge_codex_waived                                                                                             one[dis=1]
+  progress s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell)            one[dis=1]
+  progress s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell         one[dis=1]
+  progress s0: S9 codex-review failure with no findings and no hold: no cell, no named release                   one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Block one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Block one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Block one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Block one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [Block one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card  one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card  one[dis=1]
+  silent stall s0: K12 exempt story PR: grid never tests EXEMPT (launch -> REPEAT -> Blocked, or no cell) [card  one[dis=1]
+  silent stall s0: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb neve one[dis=1]
+  silent stall s0: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb, one[dis=1]
+  silent stall s0: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc ne one[dis=1]
+  silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never pos one[dis=1]
+  silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never one[dis=1]
+  silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [ca one[dis=1]
+  silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [ca one[dis=1]
+  silent stall s0: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]        one[dis=1]
+  silent stall s0: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]          one[dis=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:REPEAT)                              one[dis=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)                              one[dis=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:REPEAT)                      one[dis=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:launch)                      one[dis=1]
+  two_sessions                                                                                                   one[dis=1]
+  unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch                 one[dis=1]
+  unbounded automated launch loop: CI failure / internal round FIX / launch                                      one[dis=1]
+  unbounded automated launch loop: internal round FIX / launch                                                   one[dis=1]
+  undefined_cell: InProgress x draft (log=exit handled=False exempt=True att=False)                              one[dis=1]
+  undefined_cell: InProgress x none (log=exit handled=True exempt=False att=False)                               one[dis=1]
+  undefined_cell: InProgress x ready (log=exit handled=False exempt=True att=False)                              one[dis=1]
+  undefined_cell: InProgress x ready (log=exit handled=False exempt=True att=True)                               one[dis=1]
+  undefined_cell: InProgress x ready (log=exit handled=True exempt=True att=True)                                one[dis=1]
+  undefined_cell: InReview x none (log=exit handled=True exempt=False att=False)                                 one[dis=1]
+  undefined_cell: InReview x ready (log=exit handled=False exempt=True att=True)                                 one[dis=1]
+  undefined_cell: InReview x ready (log=exit handled=True exempt=True att=True)                                  one[dis=1]
+  undefined_cell: Ready x draft (log=exit handled=False exempt=True att=False)                                   one[dis=1]
+  undefined_cell: Ready x draft (log=exit handled=False exempt=True att=True)                                    one[dis=1]
+  undefined_cell: Ready x draft (log=exit handled=True exempt=True att=False)                                    one[dis=1]
+  undefined_cell: Ready x draft (log=exit handled=True exempt=True att=True)                                     one[dis=1]
+  undefined_cell: Ready x ready (log=exit handled=False exempt=True att=False)                                   one[dis=1]
+  undefined_cell: Ready x ready (log=exit handled=False exempt=True att=True)                                    one[dis=1]
+  undefined_cell: Ready x ready (log=exit handled=True exempt=True att=False)                                    one[dis=1]
+  undefined_cell: Ready x ready (log=exit handled=True exempt=True att=True)                                     one[dis=1]
+  total distinct: 46

@@ -1,0 +1,17 @@
+fixes: GHR,K1,K12,L4,L6,LB,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=1]
+states: 409730   transitions: 2436294
+
+== VIOLATION two_sessions
+   interactive issue-tackle beside the launch
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. human: runs issue-tackle s0 beside a running launch
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=1 log=run br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  two_sessions                                                                                                   one[dis=1]
+  total distinct: 1

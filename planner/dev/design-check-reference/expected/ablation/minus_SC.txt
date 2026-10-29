@@ -1,0 +1,19 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=1]
+states: 404115   transitions: 2397301
+
+== VIOLATION hold_released_by_non_owner
+   esc released by deleting the newest state comment (design l.71: "holds only block more")
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. human: deletes newest state comment on s0
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SIL,T7,T9,UNL,WV)
+  hold_released_by_non_owner                                                                                     one[dis=1]
+  total distinct: 1

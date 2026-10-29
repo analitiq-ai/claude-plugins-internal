@@ -1,0 +1,7 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,WV   literal grid: False
+
+################ scenario one[resc=1]
+states: 269147   transitions: 1382691
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,WV)
+  total distinct: 0

@@ -1,0 +1,21 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,WV   literal grid: False
+
+################ scenario one[resc=1]
+states: 497723   transitions: 2882604
+
+== VIOLATION two_state_writers
+   unlock esc writes the state comment while planner runs
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round ESCALATE; turn ends
+    5. tick s0 [InProgress x draft]: lane:Blocked, post:esc
+    6. human: runs issue-spec (rescope)
+    7. human: unlock esc-s0
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc,rsc(rec v0)] rr=[esc] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=draft landed=1 main r0/v0 (rescope)  planner: running reviewer-on
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,WV)
+  two_state_writers                                                                                              one[resc=1]
+  total distinct: 1

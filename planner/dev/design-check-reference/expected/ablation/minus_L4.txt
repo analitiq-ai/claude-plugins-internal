@@ -1,0 +1,45 @@
+fixes: GHR,K1,K12,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[resc=1]
+states: 516633   transitions: 2668298
+
+== VIOLATION launch_during_rescope_run
+   a story launches while planner runs a rescope of its spec
+    1. human: runs issue-spec (rescope)
+    2. human: s0 -> Ready
+    3. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+  s0: Ready(h)(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: running reviewer-on
+
+== VIOLATION merge_during_rescope
+   story merges while a rescope of its spec is in progress
+    1. human: runs issue-spec (rescope)
+    2. human: s0 -> Ready
+    3. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    4. session start
+    5. builder first push + draft PR, internal round CLEAN; turn ends
+    6. tick s0 [InProgress x draft]: ready flip
+    7. CI green on s0
+    8. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    9. Codex pass on s0
+   10. tick s0 [InReview x ready]: squash merge
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=pass fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: running reviewer-on
+
+== VIOLATION two_state_writers
+   planner places rescope-0 while a session runs on it
+    1. human: runs issue-spec (rescope)
+    2. human: s0 -> Ready
+    3. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    4. planner pushes <p>-spec, opens draft spec PR
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=1 log=run br=no
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: running reviewer-on
+
+################ SUMMARY (GHR,K1,K12,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  launch_during_rescope_run                                                                                      one[resc=1]
+  merge_during_rescope                                                                                           one[resc=1]
+  two_state_writers                                                                                              one[resc=1]
+  total distinct: 3

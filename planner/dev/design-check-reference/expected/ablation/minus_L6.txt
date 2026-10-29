@@ -1,0 +1,56 @@
+fixes: GHR,K1,K12,L4,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario two[reo=1]
+states: 122694   transitions: 601885
+
+== VIOLATION progress s1: L6 reopened merged blocker freezes the blockedBy chain  (14526 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. CI failure on s0
+    8. github round PUSH_BACK all; turn ends
+    9. human: bypass merge s0
+   10. human: reopen s0 issue
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: L6 reopened merged blocker freezes the blockedBy chain [card in Ready with nothing posted]  (12814 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. human: reopen s0 issue
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0
+  s1: Ready(h)(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress parent: L6 reopened merged story keeps the parent open  (40898 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. CI failure on s0
+    8. github round PUSH_BACK all; turn ends
+    9. human: bypass merge s0
+   10. human: reopen s0 issue
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  progress parent: L6 reopened merged story keeps the parent open                                                two[reo=1]
+  progress s1: L6 reopened merged blocker freezes the blockedBy chain                                            two[reo=1]
+  silent stall s1: L6 reopened merged blocker freezes the blockedBy chain [card in Ready with nothing posted]    two[reo=1]
+  total distinct: 3
