@@ -52,9 +52,10 @@ model's write from an admin's and a hook's.
    give it) and `codeworks-reviewer` (rounds, holds), each App's key read only by its plugin's hooks:
    all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will have planner act on GitHub only as its own App, `codeworks-planner` (contents, pull requests
-   and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists only where planner runs and whose
-   token planner's own hook mints there as decision 2 does; and the admin only through their personal
-   login.
+   and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists
+   only where planner runs and whose token planner's own scripts mint there for their own GitHub calls
+   alone; and the session's other commands there, like the admin, act only through the admin's personal
+   login, under admin supervision.
 5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count no codeworks App
    (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor in any
    predicate.
@@ -91,11 +92,18 @@ model merging. The user agreed the read-only token on 2026-10-24.
 
 Rejected: the session App's key would sit on the admin's machine.
 
+### Option G: planner's hook points the whole session's gh at the planner App's token
+
+Rejected by the user on 2026-10-29: it unset the admin's own tokens for every command in the session,
+and refused every Bash call when a mint failed.
+
 ## Trade-offs
 
 - Every GitHub write the loop needs is a hook's: a write a hook fails to make stays undone until a hook
   runs again.
 - Where planner runs, the planner App's key sits on the admin's machine (ADR-0008).
+- Where planner runs, the session's commands other than planner's scripts act with the admin's gh login:
+  admin supervision, not a token's permissions, bounds what they write.
 
 ## Consequences
 

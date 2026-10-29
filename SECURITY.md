@@ -32,14 +32,14 @@ security change.
   `/codeworks <issue>`; the orchestrator's hooks drive it from there, and nothing picks an issue on its
   own. The session, orchestrator and reviewer App keys exist only here. builder runs nowhere else.
 - **Admin machine.** The admin's personal GitHub login and planner live here; no other codeworks plugin does. Planner runs under admin
-  supervision, outside the managed settings, and acts on GitHub only as the planner App, through the
-  token planner's hook mints there from the planner App's key (root ADR-0007 d4), never with an admin's
-  credentials.
+  supervision, outside the managed settings. Its scripts act on GitHub only as the planner App, through
+  the token they mint there from the planner App's key (root ADR-0007 d4); the session's other commands
+  act with the admin's own login.
 
 Accepted risks:
 
-- planner's agent works without managed settings: that it acts on GitHub only with the planner App on
-  its machine, never an admin's credentials, rests on admin supervision.
+- planner's agent works without managed settings, and its commands other than planner's scripts act with
+  the admin's own gh login: what they write on GitHub rests on admin supervision.
 - A flaw in Claude Code's sandbox is a codeworks hole.
 - All hooks run as one OS user. Each App key is read only by its own plugin's hooks by convention; what
   enforces it is that plugin code is pinned and the model cannot write it.
@@ -61,7 +61,7 @@ Four GitHub Apps per served repo, none on a ruleset bypass list, and the admin's
 | `codeworks-session` | the model's commands, through a one-hour, one-repo installation token | metadata, contents, pull requests, issues, checks, statuses, actions: read; no write | projects: read | the orchestrator's SessionStart hook, agent machine only |
 | `codeworks-orchestrator` | the orchestrator's hooks: the claim, lanes, pushes, the draft PR and its body, the ready flip, `internal-review` and each module's `<module>-review` check runs, external review requests, thread replies and resolution, merge, Blocked reasons and moves, the status issue | contents, pull requests, issues, checks, workflows: write | projects: write | the orchestrator's hooks, agent machine only |
 | `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | issues: write | none | reviewer's hooks, agent machine only |
-| `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | planner's hook, admin machine only |
+| `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | planner's scripts, admin machine only |
 
 A hook mints the session token into a gh config folder the model can read but not write, outside
 `~/.claude` and the session's temp folder, and refreshes it before the hour runs out. No trust check
@@ -184,7 +184,7 @@ exists. The machine's Claude Code signs in with a claude.ai account.
 
 Two rules live in hooks, not in the file: hooks run git with no global or system config, no credential
 helper, and `core.fsmonitor` and `core.hooksPath` off; and every hook that reads a key refuses unless the
-managed settings are present and in effect. The one exception is planner's hook reading the planner
+managed settings are present and in effect. The one exception is planner's scripts reading the planner
 App's key where planner runs, which has no managed settings (§2).
 
 ## 6. The review gate rule
