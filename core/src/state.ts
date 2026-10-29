@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Snapshot, Time, type Hold, type Round, type RoundId } from "./contracts/snapshot.ts";
 import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
-import { HoldKind, HoldState } from "./values.ts";
+import { HoldKind, HoldState, Lane } from "./values.ts";
 
 // The state comment's first line, byte for byte, then one json fence that ends the body.
 const STATE_TAG = "<!-- codeworks:reviewer-state -->";
@@ -15,8 +15,7 @@ const CLOSING_FENCE = "```";
 // GitHub refuses a longer comment, and trimming history to fit would drop rows, which no write may do.
 const COMMENT_LIMIT = 65_536;
 
-// For the release rule: the board's status name, and the one command an admin resets with.
-const READY_STATUS = "Ready";
+// For the release rule: the one command an admin resets with.
 const RESET_COMMAND = "/codeworks reset";
 
 // Times are read as `Time`, whole seconds in UTC, as GitHub writes them and core stamps them, so a snapshot's
@@ -178,7 +177,7 @@ function releaseTerms(
     .filter((comment) => isWriter(comment.author, writers))
     .toSorted((a, b) => b.databaseId - a.databaseId);
   const readySeconds = moves
-    .filter((move) => move.status === READY_STATUS && move.project?.url === shared.board)
+    .filter((move) => move.status === Lane.schema.enum.Ready && move.project?.url === shared.board)
     .map((move) => secondOf(move.createdAt));
   return {
     adminComments,

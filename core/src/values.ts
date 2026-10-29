@@ -73,6 +73,17 @@ export const RoundStage = valueSet({
   GITHUB: "the PR's findings from external reviewers and threads, read through core's modules",
 });
 
+// The board's Status options, as GitHub names them; orchestrator ADR-0002 d1 gives each lane its one writer.
+export const Lane = valueSet({
+  Backlog: "not started; GitHub puts a new issue here",
+  Ready: "an admin's move: the story may start",
+  "In progress": "the orchestrator claimed the story",
+  "In review": "the story's PR is open for review",
+  Blocked: "the story waits on an admin; the orchestrator moves it here naming why",
+  Done: "the story is done; GitHub moves it here",
+});
+export type Lane = z.infer<typeof Lane.schema>;
+
 export const CoreSource = z.enum(["threads", "required-checks"]);
 // Not an identifier, so `CoreSource.enum` cannot name it with a dot, and the value scan refuses it quoted elsewhere.
 export const REQUIRED_CHECKS_SOURCE = CoreSource.enum["required-checks"];

@@ -9,7 +9,8 @@ start installs into the checkout with the settled-design preset). The workflow o
 the step order and the checks; this skill picks the checkout and the inputs, runs the three interactive steps
 in this session, and passes the user's verdicts on resume. Never reimplement a workflow step here.
 
-`PREMISE` is `../../scripts/premise_report.py` from this skill's base directory.
+`PREMISE` is `../../scripts/premise_report.py` from this skill's base directory. `LAND` is `../../scripts/land.ts` from
+this skill's base directory.
 
 ## 1. Resolve the entry point
 
@@ -78,10 +79,13 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    spec.md/plan.md only the findings the user accepts.
 7. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
    (or `reject`). Expect `completed`.
-8. When the report says `completed`, in `CHECKOUT`: stage the spec folder, `git commit` it and `git push` the
-   branch. End with two lines and nothing after them: `Spec folder: <path>`, the folder relative to
-   `CHECKOUT`, and `Branch: <branch>`, the output of `git rev-parse --abbrev-ref HEAD` in `CHECKOUT`. Name no
-   other plugin's command. A run that is rejected or fails commits nothing and pushes nothing.
+8. When the report says `completed`, run `node LAND <ISSUE> <SPEC_PATH> <KIND>` from `CHECKOUT`. `SPEC_PATH` is
+   `SPEC_DIR` relative to `CHECKOUT` (`<p>/specs/<feature>` when `PROJECT` is `<p>`); `KIND` is `rescope` on a
+   rescope and `new` otherwise. It creates the story issues, labels tasks.md, commits the spec folder and its
+   decision records as the planner App, pushes `<ISSUE>-spec` and opens the draft spec PR; commit and push nothing
+   yourself. End with its last three lines and nothing after them: `Spec folder: <path>`, `Branch: <ISSUE>-spec`
+   and `Spec PR: <url>`. If it exits non-zero, show the user its message and stop: each line names the next step.
+   Name no other plugin's command. A run that is rejected or fails commits nothing and pushes nothing.
 
 A verdict is the user's decision. Never pass `approve`, or a premise pick, without the user saying so in this session.
 
@@ -89,6 +93,8 @@ A verdict is the user's decision. Never pass `approve`, or a premise pick, witho
 
 `DRIVE` exiting non-zero, or a report other than the one the step expects: show the user the message or the
 report (`stderr` included) and stop. The exceptions, each resumed with `python3 DRIVE resume <run_id>`:
+- `step: preflight`, with `stderr` lines that each name a Next step: show them to the user. The user takes each
+  step, not you; resume only once they say it is done.
 - `step: premise-report`, with `stderr` lines that each name a Next step: complete the report as they say. An
   answer only the user has is the user's to give.
 - `step: root-cause`, `root-cause-after-grill` or `root-cause-of-rescope`, with a `stderr` line that names a

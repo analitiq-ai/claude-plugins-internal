@@ -49,6 +49,12 @@ inputs:
     default: ""
 
 steps:
+  # The run's one step that calls GitHub, and its first: an issue planner may not work on stops the run before any
+  # step writes. Its token is the one planner's hook stored for this Bash call.
+  - id: preflight
+    type: shell
+    run: node "$PLANNER_ROOT/scripts/preflight.ts" "$ISSUE"
+
   # The kind is one of its enum by now, never text the user typed. Where the run starts is decided here, once.
   - id: check-folder
     type: shell
