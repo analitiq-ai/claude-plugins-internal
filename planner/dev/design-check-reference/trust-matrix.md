@@ -1,7 +1,7 @@
 # Codeworks trust boundary matrix
 
-Sources: the Codeworks design text of 2026-10-20; ADRs (reviewer, orchestrator, planner, builder, root docs/adr) on
-the codeworks-layout branch (PR #142); reviewer/plugin hook code; Claude Code and GitHub docs read on 2026-10-20 (see
+Sources: the Codeworks design text of 2026-10-20; ADRs (reviewer, orchestrator, planner, builder, root docs/adr) at
+commit 68b0fbe2e8 (PR #142); reviewer/plugin hook code; Claude Code and GitHub docs read on 2026-10-20 (see
 Citations); read-only `gh` calls on 2026-10-20.
 
 ## Actors

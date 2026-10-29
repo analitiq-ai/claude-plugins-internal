@@ -2,8 +2,8 @@
 """Explicit-state model of the Codeworks state machine, checked by exhaustive BFS.
 
 Spec modelled: the Codeworks design text of 2026-10-20 (State, Transitions, tick grid, The PR, Holds,
-Predicates; "design l.N" cites its lines) and the decision records of the codeworks-layout branch
-(PR #142) on that day. Where they disagree the record is modelled; every such place is listed in
+Predicates; "design l.N" cites its lines) and the decision records at commit 68b0fbe2e8
+(PR #142). Where they disagree the record is modelled; every such place is listed in
 DISAGREEMENTS and printed with --notes.
 
 Abstractions (kept small enough to enumerate):

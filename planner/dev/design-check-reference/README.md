@@ -20,7 +20,7 @@ It lives outside `planner/plugin/`, so it does not ship with the plugin.
 | `expected/ablation/` | "All fixes minus X" outputs, plus the extra runs listed under "Other runs". |
 
 The model and the matrix cite the Codeworks design text of 2026-10-20 by line ("design l.N"), and the
-decision records on the codeworks-layout branch (PR #142) by number ("reviewer 0020 d2"). That design text
+decision records at commit 68b0fbe2e8 (PR #142) by number ("reviewer 0020 d2"). That design text
 is not in this folder.
 
 ## Scenarios
