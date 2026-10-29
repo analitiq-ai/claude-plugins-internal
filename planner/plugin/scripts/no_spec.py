@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""The no-spec spec.md: what a `no spec needed` pick leaves in its spec folder, so that a later scope of the issue
+"""The no-spec spec.md: what the no-spec pick leaves in its spec folder, so that a later scope of the issue
 sees it was judged (planner ADR-0007).
 
 It says no spec is needed and carries the question the pick rests on and the reason, as the premise report records
-them. This module is the one writer of it and the one place that tells it apart from a spec: by its first line.
+them. This module is the one writer of it. It tells it apart from a spec by its first line after any leading front
+matter block, where spec_facts.ts writes the spec facts; spec_facts.ts applies the same rule when it is given no
+premise report, and planner's spec-facts test, whose no-spec spec.md this module writes, fails when the two part.
 
 Usage: no_spec.py write <spec folder> <premise report>. Writes the folder's spec.md and nothing else, and exits 2
 when it could not.
@@ -27,7 +29,11 @@ def text(report: str) -> str:
 
 def is_no_spec(spec: str) -> bool:
     """Whether `spec`, a spec.md, is a no-spec spec.md."""
-    return spec.splitlines()[:1] == [TITLE]
+    lines = spec.splitlines()
+    # core's frontMatter rule: a block opens on the first line and closes at the next `---` line.
+    if lines[:1] == ["---"] and "---" in lines[1:]:
+        lines = lines[lines.index("---", 1) + 1:]
+    return lines[:1] == [TITLE]
 
 
 def write(folder: Path, spec: str) -> None:

@@ -1,0 +1,18 @@
+{
+  "picks": [
+    "write the spec",
+    "no spec needed",
+    "not worth doing"
+  ],
+  "reports_wrong_behaviour": {
+    "label": "Reports wrong behaviour",
+    "no": "no",
+    "yes": "yes"
+  },
+  "root_cause": {
+    "heading": "## Root cause",
+    "hypothesis": "Observed: nothing; this trace is a hypothesis from reading the code.",
+    "not_a_defect": "Not a defect report.",
+    "observed": "Observed:"
+  }
+}

@@ -6,20 +6,40 @@ The form below is the one place the questions are worded. A report is graded on 
 a source, not on whether the answer is right: the user's pick is the judgement. spec.md has an answer
 and a source per question under `## Why this is worth doing`, graded on the same form and not against the report.
 A heading that is there twice, or a label that is twice in the lines it is read from, is refused: no one line is
-then what the document says.
+then what the document says. The labels, the picks and the root cause's words are core's, read from the plugin's
+`core/generated/premise.json`, so this module and planner's TypeScript read one spelling of them.
 
 Usage: premise_report.py form | check <report> <pick> | spec <spec folder> | reason <report>. `check` and `spec`
 print one problem per line and exit 1 when there are any, 2 when they could not run. `reason` prints the report's
-`Reason:` text, and exits 1 when the report has none.
+`Reason:` text, and exits 1 when the report has none. Every command exits 2 when premise.json cannot be read.
 """
 from __future__ import annotations
 
 import functools
+import json
 import re
 import sys
 from pathlib import Path
 
-WRITE, NO_SPEC, NOT_WORTH_DOING = "write the spec", "no spec needed", "not worth doing"
+VOCABULARY = Path(__file__).resolve().parent.parent / "core" / "generated" / "premise.json"
+
+
+def _vocabulary(path: Path) -> tuple[tuple[str, str, str], tuple[str, str, str], tuple[str, str, str, str]]:
+    """premise.json's words: the three picks; the wrong-behaviour label and its two answers; the root cause heading,
+    its observed label, the no-defect sentence and the hypothesis sentence. Exits 2 naming `path` when the file
+    cannot be read as core writes it."""
+    try:
+        document = json.loads(path.read_text())
+        wrong, root_cause = document["reports_wrong_behaviour"], document["root_cause"]
+        write, no_spec, not_worth_doing = document["picks"]
+        return ((write, no_spec, not_worth_doing), (wrong["label"], wrong["yes"], wrong["no"]),
+                (root_cause["heading"], root_cause["observed"], root_cause["not_a_defect"], root_cause["hypothesis"]))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"The premise vocabulary could not be read from {path}: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+(WRITE, NO_SPEC, NOT_WORTH_DOING), (WRONG, YES, NO), ROOT_CAUSE = _vocabulary(VOCABULARY)
 OUTCOMES = (WRITE, NO_SPEC, NOT_WORTH_DOING)
 QUESTIONS = {
     "harm": "What goes wrong if this issue is never done? Name the state or input and the wrong outcome.",
@@ -31,17 +51,16 @@ QUESTIONS = {
     "needs-spec": "Does the work have decisions in it, or does the request fix the outcome?",
 }
 SOURCES = ("code:", "reproduction:", "user:")
-WRONG, RECOMMENDATION, PICK, RESTS_ON, REASON = ("Reports wrong behaviour", "Recommendation", "Pick", "Rests on",
-                                                 "Reason")
+RECOMMENDATION, PICK, RESTS_ON, REASON = "Recommendation", "Pick", "Rests on", "Reason"
 SPEC_HEADING = "## Why this is worth doing"
-_STOP_ONLY = "required unless the pick is write the spec"
+_STOP_ONLY = f"required unless the pick is {WRITE}"
 _REASON_GOES_TO = {NOT_WORTH_DOING: "the issue's closing comment", NO_SPEC: "the folder's spec.md"}
 
 
 def form() -> str:
     questions = "".join(f"## {name}\nQuestion: {asked}\nAnswer:\nSource:\n\n" for name, asked in QUESTIONS.items())
     return (f"{WRONG}:\n\n{questions}{RECOMMENDATION}:\n{PICK}:\n{RESTS_ON}:\n{REASON}:\n\n"
-            f"<!--\n- {WRONG} is yes or no.\n- A source is {' <what>, '.join(SOURCES)} <what>.\n"
+            f"<!--\n- {WRONG} is {YES} or {NO}.\n- A source is {' <what>, '.join(SOURCES)} <what>.\n"
             f"- {RECOMMENDATION} and {PICK} are each one of: {', '.join(OUTCOMES)}.\n"
             f"- {RESTS_ON} is the heading of the question a stop pick rests on; {_STOP_ONLY}.\n"
             f"- {REASON} is one line; {_STOP_ONLY}.\n-->\n")
@@ -123,9 +142,9 @@ def rested_on(text: str) -> str:
 
 def reports_wrong_behaviour(text: str) -> bool:
     said = _field(_lines(text), WRONG, "the premise report")
-    if said not in ("yes", "no"):
-        raise ValueError(f"the premise report's `{WRONG}:` is `{said}`, not `yes` or `no`")
-    return said == "yes"
+    if said not in (YES, NO):
+        raise ValueError(f"the premise report's `{WRONG}:` is `{said}`, not `{YES}` or `{NO}`")
+    return said == YES
 
 
 def _graded(pick: str, rests_on: str) -> list[str]:
@@ -164,8 +183,8 @@ def problems(text: str, pick: str) -> list[str]:
     if found:
         # The lines of a question with no heading sit under the heading before it, whose answer is then not its own.
         return found
-    if wrong not in ("yes", "no"):
-        found.append(f"`{WRONG}:` is `{wrong}`. Next step: make it `yes` or `no`.")
+    if wrong not in (YES, NO):
+        found.append(f"`{WRONG}:` is `{wrong}`. Next step: make it `{YES}` or `{NO}`.")
     for field, value in ((RECOMMENDATION, recommended), (PICK, written)):
         if value not in OUTCOMES:
             found.append(f"`{field}:` is `{value}`. Next step: make it one of {', '.join(OUTCOMES)}.")
@@ -180,8 +199,8 @@ def problems(text: str, pick: str) -> list[str]:
                          "the reason in one line.")
     for name in _graded(pick, rests_on):
         found += _answer_problems(f"## {name}", name, sections[name])
-    if wrong == "yes" and recommended == NO_SPEC:
-        found.append(f"`{WRONG}: yes` and the recommendation is `{NO_SPEC}`: the size of a defect's fix is known "
+    if wrong == YES and recommended == NO_SPEC:
+        found.append(f"`{WRONG}: {YES}` and the recommendation is `{NO_SPEC}`: the size of a defect's fix is known "
                      f"only once it is traced. Next step: recommend `{WRITE}` or `{NOT_WORTH_DOING}`.")
     return found
 
