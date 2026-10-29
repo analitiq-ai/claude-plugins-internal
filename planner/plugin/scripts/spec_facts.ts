@@ -73,7 +73,7 @@ function isNoSpec(spec: string): boolean {
 const { heading, observed, not_a_defect: notADefect, hypothesis } = ROOT_CAUSE;
 const TRACED_OPENING = `\`${observed}\` and what was seen, or with \`${hypothesis}\``;
 
-/** `opening` is rootCauseOpeningOf's; the report's answer plays no part (R11). */
+/** `opening` is rootCauseOpeningOf's; the report's answer plays no part. */
 function observedOf(opening: string | null): SpecFacts["root_cause"]["observed"] {
   const expected = `${TRACED_OPENING}; for an issue that reports no defect, with \`${notADefect}\``;
   if (opening === null) {

@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-# gh as the planner App, so the issue is created by the App and never with the admin's login (R9).
+# gh as the planner App, so the issue is created by the App and never with the admin's login.
 GH = Path(__file__).resolve().parents[3] / "scripts" / "gh.ts"
 TYPES_QUERY = ("query($owner: String!, $name: String!) "
                "{ repository(owner: $owner, name: $name) { issueTypes(first: 100) { nodes { name } } } }")
