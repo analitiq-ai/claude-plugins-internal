@@ -125,8 +125,8 @@ class IssueSpecSkill(unittest.TestCase):
                       "whose spec.md says no spec is needed, `paused` at `premise`.", squashed(ISSUE_SPEC))
 
     def test_every_issue_view_names_the_repo_by_origins_url(self):
-        """The same repo the workflow closes a not-worth-doing issue in. origin is read before gh runs: a failed read
-        inside gh's arguments leaves `--repo ""`, and gh picks a repo from the other remotes."""
+        """origin is read before gh runs: a failed read inside gh's arguments leaves `--repo ""`, and gh picks a repo
+        from the other remotes."""
         calls = re.findall(r"`([^`]*gh issue view [^`]*)`", ISSUE_SPEC.read_text())
         self.assertTrue(calls)
         for call in calls:

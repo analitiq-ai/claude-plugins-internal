@@ -49,7 +49,8 @@ Anything else, a folder whose parent is not named `specs` included: tell the use
 
 `DRIVE` is `scripts/drive_workflow.py` in this skill's base directory. It passes the inputs to
 `specify workflow`, and prints one JSON report: `run_id`, `status`, `step`; on a failed step also `stderr`
-and `open_markers`; paused at `review-critique` also `critique`. `specify` takes the directory it runs in as its
+and `open_markers`; paused at `review-critique` also `critique`; completed after `not worth doing` also `close`,
+the close to do and its reason. `specify` takes the directory it runs in as its
 project (it must hold `.specify/`; a parent's does not count), so the spec folder lands in its `specs/`. Run every `DRIVE` call from `PROJECT` with
 `run_in_background: true` (headless steps take up to ~10 min each).
 
@@ -65,10 +66,10 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
    of the three by name. Never ask for approve or reject at this step. Write the user's pick in `Pick:`, and
    for either of the two stop picks the question it rests on and the reason, as the form says.
 3. **Resume past premise.** `python3 DRIVE resume <run_id> "premise_verdict=<pick>"`. After `write the spec`,
-   expect `paused` at `grill`. After either stop pick, expect `completed`. After `not worth doing`, the workflow
-   has closed the issue as not planned with the reason: tell the user so and stop. After `no spec needed`, the
-   workflow has written `SPEC_DIR` with a spec.md that says no spec is needed, and nothing was posted: tell the
-   user to pass `spec: null` when the work is reviewed, and stop.
+   expect `paused` at `grill`. After either stop pick, expect `completed`. After `not worth doing`, the run
+   names the close: tell the user to close the issue as not planned with that reason, and stop. After
+   `no spec needed`, the workflow has written `SPEC_DIR` with a spec.md that says no spec is needed, and nothing
+   was posted: tell the user to pass `spec: null` when the work is reviewed, and stop.
 4. **Grill.** Invoke `/speckit-grill-me` in this session, from `PROJECT`. On a rescope, give grill the open
    decision first: it is the first question. The user answers every question. Do not answer for the user.
 5. **Resume past grill.** Only after grill finished: `python3 DRIVE resume <run_id> grill_verdict=approve`.

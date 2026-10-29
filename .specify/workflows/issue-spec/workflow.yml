@@ -79,18 +79,15 @@ steps:
         type: if
         condition: "{{ steps.premise.output.choice == 'not worth doing' }}"
         then:
-          # The reason and the repo are read before gh runs: inside gh's argument list a failure would not stop
-          # the shell, and gh given an empty --repo picks a repo from the other remotes. gh exits 0 on an issue
-          # already closed without closing it or posting the reason, so an issue that is not open fails the step.
-          - id: close-not-worth-doing
+          # Planner closes no issue and posts nothing on it (planner ADR-0006, decisions 1 and 2): the close is the
+          # admin's, so the run names it. The reason is read before it is printed: inside printf's argument list a
+          # failure would not stop the shell.
+          - id: name-close
             type: shell
             run: |
               set -eu
               reason=$(python3 "$PLANNER_ROOT/scripts/premise_report.py" reason ".specify/workflows/runs/{{ context.run_id }}/premise-report.md")
-              repo=$(git remote get-url origin)
-              state=$(gh issue view "$ISSUE" --repo "$repo" --json state --jq .state)
-              [ "$state" = OPEN ] || { echo "Issue #$ISSUE is $state: it was not closed and the reason was not posted." >&2; exit 1; }
-              gh issue close "$ISSUE" --repo "$repo" --reason "not planned" --comment "$reason"
+              printf 'Close #%s as not planned: %s\n' "$ISSUE" "$reason"
 
       # The folder lets a later scope of the issue see it was judged.
       - id: no-spec-needed

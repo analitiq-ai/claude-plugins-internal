@@ -42,6 +42,11 @@ def report(state):
         out["open_markers"] = step == "no-open-markers" and OPEN_MARKERS in out["stderr"]
     if state["status"] == "paused" and record is not None and record["output"].get("show_file"):
         out["critique"] = record["output"]["show_file"]
+    # The close is the admin's to make (planner ADR-0006 d1), and the session reads nothing of the run but this
+    # report, so the line the run names it with travels here.
+    named = state["step_results"].get("name-close")
+    if state["status"] == "completed" and named is not None:
+        out["close"] = named["output"]["stdout"].strip()
     return out
 
 
