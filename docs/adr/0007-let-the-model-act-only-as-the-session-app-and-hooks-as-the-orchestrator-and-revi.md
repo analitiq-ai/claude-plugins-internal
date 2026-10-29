@@ -55,7 +55,7 @@ model's write from an admin's and a hook's.
    and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists
    only where planner runs and whose token planner's own scripts mint there for their own GitHub calls
    alone; and the session's other commands there, like the admin, act only through the admin's personal
-   login, under the admin's approval.
+   login, under admin supervision.
 5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count no codeworks App
    (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor in any
    predicate.
@@ -103,7 +103,7 @@ and refused every Bash call when a mint failed.
   runs again.
 - Where planner runs, the planner App's key sits on the admin's machine (ADR-0008).
 - Where planner runs, the session's commands other than planner's scripts act with the admin's gh login:
-  the admin's approval of each command, not a token's permissions, bounds what they write.
+  admin supervision, not a token's permissions, bounds what they write.
 
 ## Consequences
 

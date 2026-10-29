@@ -31,8 +31,9 @@ CI: a PR that breaks one planner `*.test.ts` fails the `unittest (planner/tests)
 
 ## US2: token
 
-Automated: `planner/tests/token.test.ts` against `fakeGitHub` and a fake mint (scopes, a mint under 10 minutes
-left, a failure naming a missing key, exit 2 on a missing file or section); `core/tests/gh-config.test.ts` with
+Automated: `planner/tests/token.test.ts` against a local GitHub (scopes, a mint under 10 minutes left, a failure
+naming a missing key, exit 2 on a missing file or section); `preflight.test.ts` and `land.test.ts` with a fake
+mint; `core/tests/gh-config.test.ts` with
 the real `gh`:
 
 ```sh
@@ -68,8 +69,8 @@ completes with no `gh` call and stdout `Close #<issue> as not planned: <reason>`
 
 ## US6: no hook
 
-Automated: `planner/tests/token.test.ts` and `planner/tests/test_new_issue.py`: the installed plugin has no
-`hooks/`; `gh.ts` runs gh with planner's folder and no token variable; `new_issue.py create` goes through it.
+Automated: `planner/tests/hooks.test.ts`: the plugin has no `hooks/`; `token.test.ts`: `gh.ts` runs gh with
+planner's folder and no token variable; `test_new_issue.py`: `new_issue.py` runs its gh calls through `gh.ts`.
 
 Live, once, on the scratch repository, in a Claude Code session started with `GH_TOKEN` exported:
 `echo ${GH_TOKEN:+set}` prints `set`; `/planner:issue-spec untracked "<change>"` creates an issue whose author is

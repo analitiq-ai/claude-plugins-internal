@@ -34,12 +34,12 @@ security change.
 - **Admin machine.** The admin's personal GitHub login and planner live here; no other codeworks plugin does. Planner runs under admin
   supervision, outside the managed settings. Its scripts act on GitHub only as the planner App, through
   the token they mint there from the planner App's key (root ADR-0007 d4); the session's other commands
-  act with the admin's own login, under the admin's approval.
+  act with the admin's own login.
 
 Accepted risks:
 
 - planner's agent works without managed settings, and its commands other than planner's scripts act with
-  the admin's own gh login: what they write on GitHub rests on the admin's approval of each command.
+  the admin's own gh login: what they write on GitHub rests on admin supervision.
 - A flaw in Claude Code's sandbox is a codeworks hole.
 - All hooks run as one OS user. Each App key is read only by its own plugin's hooks by convention; what
   enforces it is that plugin code is pinned and the model cannot write it.

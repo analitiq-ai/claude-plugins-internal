@@ -60,7 +60,7 @@ lane written; no exempt label; no Python calls core (root ADR-0009 d2).
 | P3 Pure rules | Pass. `needsMint`, `specFactsOf`, `labelTasks`, `pickSpecPr`, `specFolderAnswer`, the landing's checks are pure; scripts do I/O only. |
 | P4 Could not run | Pass. GitHub unanswered in preflight or landing stops the run as could-not-verify; a refused mint exits 2 with core's reason. |
 | P5 Settled design | Pass. Every mechanism below cites a research decision. |
-| P6 One writer per state | Pass. Planner writes: story issues, sub-issue and `blockedBy` links, tasks.md labels, spec-facts block, the spec PR and its branch (planner ADR-0008, ADR-0010 d1, d3), and its own gh folder. It reads lanes and writes none; closes no issue. Refusing the model's writes planner does not own is reviewer's hook's (reviewer ADR-0012 d1), which does not run where planner runs (root ADR-0008 d2); there the model acts with the admin's own gh login, under the admin's approval, and planner's scripts as the planner App (root ADR-0007 d4), and the merge boundary does not rest on a refusal (root ADR-0007 d5, d7). |
+| P6 One writer per state | Pass. Planner writes: story issues, sub-issue and `blockedBy` links, tasks.md labels, spec-facts block, the spec PR and its branch (planner ADR-0008, ADR-0010 d1, d3), and its own gh folder. It reads lanes and writes none; closes no issue. Refusing the model's writes planner does not own is reviewer's hook's (reviewer ADR-0012 d1), which does not run where planner runs (root ADR-0008 d2); there the model acts with the admin's own gh login, under admin supervision, and planner's scripts as the planner App (root ADR-0007 d4), and the merge boundary does not rest on a refusal (root ADR-0007 d5, d7). |
 | P7 Facts as data | Pass. Lane, PR state, sub-issue order and tags are fields; facts written as front matter and label lines with a grammar. The premise report's `Reports wrong behaviour:` and the `Observed:` opening are labelled fields the template defines (FR-008). |
 | P8 Generic | Pass. Repository from origin, every value from `codeworks.toml`; the gh folder is keyed by repository. |
 | P9 Named identities | Pass. No trust predicate added; planner acts only as `codeworks-planner`. |
@@ -111,7 +111,7 @@ planner/
 │   ├── .claude-plugin/plugin.json  # version bumped by every story
 │   ├── lib/guarded.ts              # US1
 │   ├── lib/settings.ts             # US2: settings, ghFolder
-│   ├── lib/github.ts               # US2 token, US6 mint
+│   ├── lib/github.ts               # US4; US6 mint
 │   ├── scripts/spec_facts.ts       # US3
 │   ├── scripts/preflight.ts        # US4
 │   ├── scripts/land.ts             # US4

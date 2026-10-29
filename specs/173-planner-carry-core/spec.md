@@ -107,9 +107,6 @@ script fails naming the key file and makes no GitHub call.
 7. **Given** the admin is signed in to gh on planner's machine, or `GH_TOKEN` or `GITHUB_TOKEN` is set in the
    admin's environment, **When** planner's scripts call GitHub or push, **Then** they read only
    planner's gh config folder and act as the planner App.
-8. **Given** planner is enabled in a session and the admin's `GH_TOKEN` is exported, **When** a command other
-   than planner's scripts runs in it, **Then** it sees the session's environment as the admin left it, `GH_TOKEN`
-   included, and planner blocks nothing.
 
 ---
 
@@ -224,8 +221,9 @@ Bash call when GitHub or the key failed (admin's ruling, 2026-10-29).
 3. **Given** an `untracked` run, **When** it creates the issue, **Then** it calls GitHub with the planner App's
    token read from planner's gh config folder, never the admin's login, and the issue's author is
    `codeworks-planner[bot]`.
-4. **Given** `GH_TOKEN` is exported in the session, **When** planner's scripts call GitHub, **Then** they act as
-   the planner App.
+4. **Given** planner is enabled in a session and the admin's `GH_TOKEN` is exported, **When** a command other
+   than planner's scripts runs in it, **Then** it sees the session's environment as the admin left it, `GH_TOKEN`
+   included, and planner blocks nothing.
 
 ---
 
@@ -337,7 +335,7 @@ Bash call when GitHub or the key failed (admin's ruling, 2026-10-29).
   the repository, so no installation key is needed. Every other repo planner runs in carries its own file.
 - The key sits only on the admin's machine where planner runs, with no managed settings there (root ADR-0008 d2).
 - Planner changes nothing in a session it is enabled in: a command other than its scripts acts with the admin's
-  own gh login, under the admin's approval (root ADR-0007 d4, ADR-0008 d2).
+  own gh login, under admin supervision (root ADR-0007 d4, ADR-0008 d2).
 - The planner App is installed on every repository planner runs in, with the permissions core's permission set
   names for it.
 - The board adds each new issue as a card in Backlog, as this repo's board (project 5) does, so the issue an

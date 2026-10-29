@@ -54,7 +54,7 @@ from a session.
    else.
 2. We will run planner where its admin works, outside those settings, under admin supervision, with no
    other codeworks plugin there; planner's scripts act on GitHub only as the planner App, and the agent's
-   other commands with the admin's own login, under the admin's approval (ADR-0007).
+   other commands with the admin's own login (ADR-0007).
 3. We will require the sandbox (fail if unavailable, nothing unsandboxed or excluded) and unix sockets
    blocked.
 4. We will keep the session, orchestrator and reviewer App keys, the validator modules' tokens and the

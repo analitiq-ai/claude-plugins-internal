@@ -60,12 +60,10 @@ code but not executed; the story that relies on it starts with a red test that r
 ## R5: Planner's scripts mint when they need the token
 
 - **Decision**: Planner declares no hook: no `hooks/hooks.json`, no `hooks/token.ts`, no session record.
-  `plannerToken(repo, settings, now, mint)` in `planner/plugin/lib/github.ts`, `settings` being what
-  `readPlannerSettings` returns (R7), reads the stored token from `ghFolder(repo)` (R6) and, when `needsMint`
-  reports it missing, another repository's, or under 10 minutes left, mints with `mint(app_id, repo)`,
-  `mintPlannerToken` in production (core's `mintToken("planner", appId, "planner-app.pem", "planner", repo)`), and
-  stores it with `writeGhToken` under `planner_app_login`, the login gh's `hosts.yml` names; it returns the token.
-  `plannerGitHub` connects with it, and `StaleToken` goes.
+  One function, `plannerToken` in `planner/plugin/lib/github.ts`, reads the stored token from `ghFolder(repo)`
+  (R6) and, when `needsMint` reports it missing, another repository's, or under 10 minutes left, mints through
+  core's `mintToken("planner", app_id, "planner-app.pem", "planner", repo)` and stores it with `writeGhToken`; it
+  returns the token. `plannerGitHub` connects with it, and `StaleToken` goes.
   Every script reads settings (R7) and the repository (R8), then calls one of them before its first GitHub call;
   `mint` is injected, so tests use a fake. `KeyReadRefused`, `MintError`, `GitHubRefused`, `GitHubUnanswered`,
   `SettingsError`, `RemoteRefused` and `NoOrigin` exit 2 with core's message (root ADR-0004 d1); a missing key's
