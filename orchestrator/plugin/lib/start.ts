@@ -1,6 +1,6 @@
 import { laneOf, moveCard } from "../core/board.ts";
 import type { GitHubClient } from "../core/github.ts";
-import { isDone, specIssue, specPr, type SpecPr } from "../core/identity.ts";
+import { isDone, specIssue, specPrs, type SpecPr } from "../core/identity.ts";
 import { blockedBy, subIssues } from "../core/issue-graph.ts";
 import { writeSessionRecord } from "../core/session-record.ts";
 import type { Shared } from "../core/settings.ts";
@@ -12,7 +12,7 @@ export type CardFacts = {
   lane: Lane;
   blockers: { issue: number; done: boolean }[];
   specIssue: number;
-  specPr: SpecPr | null;
+  specPrs: SpecPr[];
   subIssues: number[];
   done: boolean;
   state: StateReading;
@@ -39,7 +39,7 @@ export async function gatherStartFacts(client: GitHubClient, repo: string, issue
     lane,
     blockers,
     specIssue: p,
-    specPr: await specPr(client, repo, p),
+    specPrs: await specPrs(client, repo, p),
     subIssues: await subIssues(client, repo, issue),
     done: await isDone(client, repo, issue),
     state: await readState(client, repo, issue, shared),
@@ -92,11 +92,12 @@ export function decideStart(issue: number, facts: StartFacts): StartDecision {
     return refuse(`${s} has sub-issues ${issues(facts.subIssues)}: name one of them in /codeworks instead`, `parent-${issue}`, true);
   }
   const p = `#${facts.specIssue}`;
-  if (facts.specPr?.state === "open") {
+  const open = facts.specPrs.find((pr) => pr.state === "open");
+  if (open !== undefined) {
     const step = `merge or close it, then an admin moves ${s} to Ready`;
-    return refuse(`${p}'s spec PR #${facts.specPr.number} is open: ${step}`, `spec-pr-open-${facts.specIssue}`, true);
+    return refuse(`${p}'s spec PR #${open.number} is open: ${step}`, `spec-pr-open-${facts.specIssue}`, true);
   }
-  if (facts.specPr?.state !== "merged") {
+  if (!facts.specPrs.some((pr) => pr.state === "merged")) {
     const step = `merge one, then an admin moves ${s} to Ready`;
     return refuse(`${p} has no merged spec PR: ${step}`, `spec-pr-unmerged-${facts.specIssue}`, true);
   }
