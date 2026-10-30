@@ -71,6 +71,17 @@ function strays(block: Record<string, unknown>): string[] {
     .map(({ setting, value }) => `§5 ${setting}: ${JSON.stringify(value)} is in neither keys.ts's table nor its exceptions`);
 }
 
+// An exception no §5 entry falls under excuses nothing today, and would let an entry §5 adds under it later in
+// unchecked.
+function unused(block: Record<string, unknown>): string[] {
+  const all = entries(block);
+  const settings = Object.keys(UNCHECKED_SETTINGS).filter((parent) => !all.some(({ setting }) => under(setting, parent)));
+  const folders = Object.keys(UNCHECKED_FOLDERS).filter(
+    (folder) => !all.some(({ value }) => typeof value === "string" && value.includes(folder)),
+  );
+  return [...settings, ...folders].map((exception) => `keys.ts's exception ${JSON.stringify(exception)} matches no entry of §5`);
+}
+
 function enabled(block: Record<string, unknown>): string[] {
   const plugins = (block.enabledPlugins ?? {}) as Record<string, unknown>;
   return Object.entries(plugins)
@@ -84,6 +95,16 @@ describe("keys.ts against SECURITY.md §5", () => {
 
   it("holds every entry of §5's JSON block in its required settings or its named exceptions", () => {
     assert.deepEqual(strays(block), []);
+  });
+
+  it("uses every exception it names", () => {
+    assert.deepEqual(unused(block), []);
+  });
+
+  it("names an exception no entry of §5 falls under", () => {
+    const changed = structuredClone(block) as { sandbox: { network: Record<string, unknown> } };
+    delete changed.sandbox.network.allowedDomains;
+    assert.deepEqual(unused(changed), [`keys.ts's exception "sandbox.network.allowedDomains" matches no entry of §5`]);
   });
 
   it("allows exactly the plugins §5's enabledPlugins enables", () => {

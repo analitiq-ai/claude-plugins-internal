@@ -95,9 +95,9 @@ checks or merges (GitHub). It runs the gate rule (§6).
 **Builder.** The model, as the session App: it writes code in `../<repo>.worktrees/` and commits. The
 orchestrator's hooks push its commits and open the draft PR.
 - GitHub: its token writes nothing.
-- Managed settings (§5): no key or credential read, no write to plugin code, reviewer's state or Claude Code
-  config, listed hosts only for sandboxed commands (WebFetch stays allowed), no unlisted MCP server, no
-  `TaskStop`.
+- Managed settings (§5): no key or credential read, no write to plugin code, reviewer's or the
+  orchestrator's state or Claude Code config, listed hosts only for sandboxed commands (WebFetch stays
+  allowed), no unlisted MCP server, no `TaskStop`.
 - Hook guardrails: commit gates, the lane fence and reviewer's write refusals.
 
 **Planner.** Under admin supervision, without managed settings, as the planner App: it opens spec PRs
@@ -111,28 +111,30 @@ their answers count only through the gate rule.
 
 The block below is the target setup. It differs from the tested one (§7) in the ways listed in §8.
 `<V>` stands for the test folder and `<C>` for the session's package cache folder. On the agent machine: `<V>/keys`
-is `~/.config/codeworks/`; `<V>/ghcreds` stands for every other credential (gh, git, SSH, cloud); `/tmp/verify-b-ghsess` is the session's gh config folder;
+is `~/.config/codeworks/`; `<V>/ghcreds` stands for every other credential (gh, git, SSH, cloud);
 `<V>/plugin/gaterev` is the installed plugin code and data; `<V>/state` is reviewer's state folder
-(`~/.local/state/codeworks/reviewer`); `allowedDomains` lists GitHub plus the registries the served repo
-needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
+(`~/.local/state/codeworks/reviewer`); `<V>/orchestrator` is the orchestrator's state folder
+(`~/.local/state/codeworks/orchestrator`) and `<V>/orchestrator/gh` the session's gh config folder;
+`allowedDomains` lists GitHub plus the registries the served repo needs. On Linux the file is
+`/etc/claude-code/managed-settings.json`.
 
 ```json
 {"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"excludedCommands":[],
  "filesystem":{"denyRead":["<V>/keys","<V>/ghcreds","~/.claude/.credentials.json"],
-  "denyWrite":["<V>/keys","<V>/ghcreds","<V>/plugin/gaterev","<V>/state","/tmp/verify-b-ghsess","~/.claude","~/.gitconfig"],
+  "denyWrite":["<V>/keys","<V>/ghcreds","<V>/plugin/gaterev","<V>/state","<V>/orchestrator","~/.claude","~/.gitconfig"],
   "allowManagedReadPathsOnly":true,"disabled":false},
  "allowNestedUserNamespaces":false,
  "network":{"allowedDomains":["github.com","api.github.com","*.githubusercontent.com","pypi.org","files.pythonhosted.org"],
   "allowManagedDomainsOnly":true,"strictAllowlist":true,"allowAllUnixSockets":false}},
 "permissions":{"deny":["TaskStop","Read(/<V>/keys/**)","Edit(/<V>/keys/**)","Read(/<V>/ghcreds/**)","Edit(/<V>/ghcreds/**)",
- "Read(~/.claude/.credentials.json)","Edit(/<V>/plugin/gaterev/**)","Edit(/<V>/state/**)","Edit(//tmp/verify-b-ghsess/**)",
+ "Read(~/.claude/.credentials.json)","Edit(/<V>/plugin/gaterev/**)","Edit(/<V>/state/**)","Edit(/<V>/orchestrator/**)",
  "Edit(~/.claude/**)","Edit(~/.gitconfig)","Edit(//**/.claude/settings.json)","Edit(//**/.claude/settings.local.json)","Edit(//**/.claude/workflows/**)",
  "Edit(//**/.claude/agents/**)","Edit(//**/.claude/skills/**)","Edit(//**/.claude/commands/**)","Edit(//**/.claude/hooks/**)",
  "Edit(//**/.mcp.json)","Edit(//**/.git/config)","Edit(//**/.git/hooks/**)"]},
 "allowedMcpServers":[],"allowManagedMcpServersOnly":true,
 "allowManagedHooksOnly":true,"enabledPlugins":{"orchestrator@codeworks":true,"builder@codeworks":true,
  "reviewer@codeworks":true,"auditor@codeworks":true,"pr-review-toolkit@claude-plugins-official":true},
-"env":{"PIP_CACHE_DIR":"<C>/pip","npm_config_cache":"<C>/npm"}}
+"env":{"PIP_CACHE_DIR":"<C>/pip","npm_config_cache":"<C>/npm","GH_CONFIG_DIR":"<V>/orchestrator/gh"}}
 ```
 
 `/<V>` yields `//tmp/...`, the absolute-path form permission rules need.
@@ -144,7 +146,8 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 - `sandbox.filesystem.denyRead`: sandboxed commands cannot read the keys, other credentials or Claude
   Code's own login.
 - `sandbox.filesystem.denyWrite`: sandboxed commands cannot write the keys, credentials, plugin code,
-  reviewer's state, the session's gh config, `~/.claude` or the agent identity in `~/.gitconfig`.
+  reviewer's state, the orchestrator's state with the session's gh config in it, `~/.claude` or the agent
+  identity in `~/.gitconfig`.
 - `sandbox.filesystem.allowManagedReadPathsOnly`: user, project and repo settings cannot reopen a denied
   path.
 - `sandbox.filesystem.disabled: false`: filesystem isolation stays on, and with it the sandbox's built-in
@@ -167,10 +170,10 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 - `permissions.deny` `Read(...)`: Claude's Read and Grep tools, which ignore the sandbox, cannot read the
   keys or credentials.
 - `permissions.deny` `Edit(...)`: Claude's Edit and Write tools, which ignore the sandbox, cannot write
-  those paths, plugin code, reviewer's state, `~/.claude` or a repo's Claude Code config. The repo-config
-  rules start with `//**/`, so they hold in builder's worktrees beside the checkout too: `**/` matches
-  only under the folder the session started in (§7). Edit rules cover Write; `Write(...)` path rules are
-  accepted but never checked, so the block has none.
+  those paths, plugin code, reviewer's and the orchestrator's state, `~/.claude` or a repo's Claude Code
+  config. The repo-config rules start with `//**/`, so they hold in builder's worktrees beside the
+  checkout too: `**/` matches only under the folder the session started in (§7). Edit rules cover Write;
+  `Write(...)` path rules are accepted but never checked, so the block has none.
 - `allowedMcpServers: []` with `allowManagedMcpServersOnly`: no MCP server loads unless the managed file
   lists it.
 - `allowManagedHooksOnly` with the codeworks plugins and reviewer's dependency pr-review-toolkit in
@@ -179,6 +182,8 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   user's full access, even in a folder never trusted, because a `-p` session treats every folder as
   trusted.
 - `env`: package caches sit in the session's temp folder, which the sandbox lets commands write.
+  `GH_CONFIG_DIR` points gh at the session's gh config folder. It is written as an absolute path (e.g.
+  `/home/<user>/.local/state/codeworks/orchestrator/gh`), because gh does not expand `~`.
 
 An admin starts each session from the served repo's main checkout, after `mkdir -p ../<repo>.worktrees`,
 with `claude --setting-sources "" --permission-mode bypassPermissions --add-dir ../<repo>.worktrees` and

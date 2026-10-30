@@ -1,7 +1,7 @@
 {
   "name": "planner",
   "description": "Scope a change before it is built — a Spec Kit workflow that writes the spec folder, each step gated by a script: the premise is answered, the root cause is traced, the design is settled; a not-worth-doing issue is left for the admin to close as not planned.",
-  "version": "0.8.5",
+  "version": "0.8.11",
   "keywords": [
     "planning",
     "spec-kit",
