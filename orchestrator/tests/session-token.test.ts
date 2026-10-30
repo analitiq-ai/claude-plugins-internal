@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
-import { GhFolderRefused, readGhToken, writeGhToken } from "../plugin/core/gh-config.ts";
+import { GhFolderRefused, readGhToken } from "../plugin/core/gh-config.ts";
 import { GitFailed } from "../plugin/core/git.ts";
 import { RemoteRefused } from "../plugin/core/github.ts";
 import { MintError } from "../plugin/core/tokens.ts";
@@ -23,9 +23,8 @@ import {
   SETTINGS,
   tempHome,
 } from "./support/checkout.ts";
+import { NOW, storeSessionToken } from "./support/hook-run.ts";
 
-const NOW = new Date("2026-10-30T12:00:00Z");
-const MINUTE = 60 * 1000;
 
 async function settled(): Promise<OnGitHub> {
   const client = fakeGitHub({ rest: { "GET /repos/acme/widgets/contents/codeworks.toml?ref=main": contentsAnswer(SETTINGS) } });
@@ -42,14 +41,6 @@ function harness(t: TestContext, failure?: Error) {
     onGitHub: () => ((asked += 1), settled()),
   };
   return { home, folder: ghFolder(home), mint, deps, asked: () => asked };
-}
-
-/** Stores a session token for `repo` expiring `minutes` after NOW. */
-function store(folder: string, repo: string, minutes: number): string {
-  const value = crypto.randomUUID();
-  const expires_at = new Date(NOW.getTime() + minutes * MINUTE).toISOString().replace(/\.\d{3}Z$/, "Z");
-  writeGhToken(folder, { value, app: "session", repo, expires_at, permissions: {} }, SESSION_LOGIN);
-  return value;
 }
 
 describe("originRepository", () => {
@@ -86,8 +77,8 @@ describe("ensureSessionToken", () => {
   });
 
   it("with the stored token for the repository and 10 minutes or more left, calls GitHub and reads settings not at all", async (t) => {
-    const { folder, mint, deps, asked } = harness(t);
-    const value = store(folder, REPO, 10);
+    const { home, folder, mint, deps, asked } = harness(t);
+    const value = storeSessionToken(home, 10);
     await ensureSessionToken(REPO, NOW, deps);
     assert.equal(asked(), 0);
     assert.deepEqual(mint.calls, []);
@@ -99,8 +90,8 @@ describe("ensureSessionToken", () => {
     ["a token for another repository", "acme/gadgets", 60],
   ] as const) {
     it(`mints again over ${why}`, async (t) => {
-      const { folder, mint, deps } = harness(t);
-      const value = store(folder, repo, minutes);
+      const { home, folder, mint, deps } = harness(t);
+      const value = storeSessionToken(home, minutes, repo);
       await ensureSessionToken(REPO, NOW, deps);
       assert.equal(mint.calls.length, 1);
       assert.notEqual(readGhToken(folder)?.value, value);
@@ -109,8 +100,8 @@ describe("ensureSessionToken", () => {
   }
 
   it("lets a failed mint through with core's cause, writing nothing and trying no other credential", async (t) => {
-    const { folder, mint, deps } = harness(t, new MintError("dummy cause"));
-    const value = store(folder, REPO, 5);
+    const { home, folder, mint, deps } = harness(t, new MintError("dummy cause"));
+    const value = storeSessionToken(home, 5);
     await assert.rejects(ensureSessionToken(REPO, NOW, deps), /mint failed: dummy cause/);
     assert.equal(mint.calls.length, 1);
     assert.equal(readGhToken(folder)?.value, value);
