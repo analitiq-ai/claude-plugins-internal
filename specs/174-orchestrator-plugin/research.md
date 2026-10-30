@@ -140,7 +140,8 @@ plan has not executed, and names the task that runs it first.
 
 - **Decision**: Stop fetches the story branch from the model's clone into a bare repository at
   `~/.local/state/codeworks/orchestrator/push/<owner>/<name>.git` with `--no-tags` through `runGit`, checks each
-  new commit with `decidePush` against reviewer's passed-commit record and the agent identity, and pushes the
+  new commit with `decidePush` against the pushed branch's passes in the commit-check pass record (core's
+  `readCommitPasses`, #209), or none while its `off` is true, and the agent identity, and pushes the
   branch only when every commit passes. Core gains a push that hands an in-memory token to
   `gh auth git-credential` through the child's `GH_TOKEN` alone (C7).
 - **Rationale**: FR-016; ADR-0001 d4, SECURITY.md §6.6, §8. `pushWithGhCredential` reads a gh config folder,
@@ -191,7 +192,7 @@ plan has not executed, and names the task that runs it first.
   `requiredChecks`, `threadsModule`, `trigger`/`status`/`findings` answers; the writes are REST check runs,
   `markPullRequestReadyForReview`, review-thread replies/resolve and the squash merge naming `sha`.
 - **Rationale**: FR-019–FR-020; ADR-0004, ADR-0005, ADR-0007–ADR-0009.
-- **Existing tools**: core `attest.ts`, `validation/*` (fit); missing pieces are listed as C8–C12.
+- **Existing tools**: core `attest.ts`, `validation/*` (fit); missing pieces are listed as C8–C11.
 
 ## R19: builder stops pushing and marking ready (Story 2)
 

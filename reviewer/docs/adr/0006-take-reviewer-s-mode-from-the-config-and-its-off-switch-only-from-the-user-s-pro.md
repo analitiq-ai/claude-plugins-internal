@@ -72,12 +72,17 @@ Rejected: a round run with its gates lifted would record a verdict the orchestra
 
 Rejected: a session switched off could make every write the orchestrator or an admin owns.
 
+### Option F: The orchestrator pushes none of a switched-off session's commits
+
+Rejected by the user on 2026-10-30: a switched-off session on the agent machine could never push, so its work
+never reached a PR (#209).
+
 ## Trade-offs
 
 - Only the user can switch reviewer off, so an unattended session stuck behind a broken gate waits for an
   admin.
-- A session switched off commits with no check: on the agent machine the orchestrator pushes none of those
-  commits (ADR-0002); elsewhere only the exempt label lets their PR merge (orchestrator ADR-0005).
+- A session switched off commits with no check, and the orchestrator pushes those commits unchecked, but none
+  touching a `.github/` folder (ADR-0002 d2); only the exempt label lets their PR merge (orchestrator ADR-0005).
 
 ## Consequences
 

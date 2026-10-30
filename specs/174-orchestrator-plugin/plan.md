@@ -10,7 +10,8 @@ Create `orchestrator/plugin` as a core carrier (link, exact pins, v3 lock, pinne
 points), list it in the marketplace, and give it hooks. Story 1: SessionStart, UserPromptSubmit and PreToolUse mint
 the read-only session token into `~/.local/state/codeworks/orchestrator/gh/`, and UserPromptSubmit claims or
 resumes the issue `/codeworks <s>` names, writing the session's issue record after the lane write. Story 2: the
-Stop hook pushes passed commits by the agent identity from a hook-owned copy and opens the draft PR. Story 3:
+Stop hook pushes the agent identity's passed commits, or all of them while reviewer is off, from a hook-owned
+copy and opens the draft PR. Story 3:
 attest and flip. Story 4: request modules, reply, merge, and wait up to `review_timeout` inside the Stop run. Story
 5: bound counts in tagged orchestrator App comments. Each decision is a pure function; entry files only read, call
 and write.
@@ -47,7 +48,7 @@ token never touches disk; no Python; imports only core
 | Gate | Answer |
 |---|---|
 | I. Contract-first | New shapes are core contracts: the session's issue record (C1, contracts/session-record.md) and the counts snapshot (C6, contracts/counts-comment.md). `[orchestrator]` is the orchestrator's own section, validated by it (root ADR-0002 d2). The gh folder reuses core's format. No second validator. **Pass** |
-| II. Ownership & trust | Plugin code in `orchestrator/`; shared reads and writes in `core/` by their own PRs. Hook input, settings, GitHub answers and the model's commits are validated where they enter (R3, R5, R13). Keys only through `readKey`; no secret in code. **Pass** |
+| II. Ownership & trust | Plugin code in `orchestrator/`; shared reads and writes in `core/`, no later than the story PR that first calls them. Hook input, settings, GitHub answers and the model's commits are validated where they enter (R3, R5, R13). Keys only through `readKey`; no secret in code. **Pass** |
 | III. Fail loud | Every mint, settings, GitHub or record failure refuses naming its cause; Stop's crash fails open by record (ADR-0001 d5), not by catch. A crash between lane write and record fails closed (R9). **Pass** |
 | IV. Test-first | Each task starts from a failing node:test against the fake GitHub or a recorded hook input; decisions are pure (R3). R13 and R20 name the behaviour not yet run and the task that runs it first. **Pass** |
 | V. Smallest complete change | Each story adds the keys it reads (FR-007). No validators link (spec: Not here). **Pass** |
@@ -117,7 +118,7 @@ orchestrator/
     ├── start.test.ts
     ├── prompt-hook.test.ts
     └── …                         # US2–US5 suites
-core/src/                         # C1–C12, each its own PR
+core/src/                         # C1–C11, each no later than the story PR that first calls it
 .claude-plugin/marketplace.json   # + orchestrator
 builder/plugin/skills/issue-tackle/SKILL.md   # US2, R19
 ```
@@ -127,10 +128,10 @@ existing `tests.yml` runs `orchestrator/tests/` and the carrier check with no ch
 
 ## Delivery order and core needs
 
-Each core PR lands before the story PR that first calls it (spec Assumptions). Rows marked † are needs this plan
+Each core need lands no later than the story PR that first calls it (spec Assumptions); C6 and C7 land in it. Rows marked † are needs this plan
 found that the spec's list does not name.
 
-| # | PR | Before | Holds |
+| # | PR | Before (or in) | Holds |
 |---|---|---|---|
 | M | Managed settings | US1 | SECURITY.md §5 and `keys.ts`: `~/.local/state/codeworks/orchestrator` write-denied, `GH_CONFIG_DIR` in `env`, replacing `/tmp/verify-b-ghsess` |
 | C1 | Session's issue record | US1 | `contracts/session-record.ts`, `session-record.ts`, `files.ts` (R8) |
@@ -138,14 +139,14 @@ found that the spec's list does not name.
 | C3 † | Issue graph | US1 | `blockedBy` and sub-issues of an issue (R9) |
 | C4 † | Lane write | US1 | `moveCard` beside `laneOf` in `board.ts`; only the orchestrator App holds projects write |
 | — | **US1** | | plugin, marketplace, three hooks, claim |
-| C7 † | Push with an in-memory token | US2 | R13 |
-| C12 | Passed-commit record | US2 | spec Assumptions |
+| C7 † | Push with an in-memory token | in US2 | R13 |
+| #209 | Commit-check pass record | US2 | #209's core PR: `readCommitPasses`, passes by branch, `off` |
 | — | **US2** | | Stop hook: push, draft PR, running workflow; builder skill change |
 | C10 | Protected-path matcher | US3 | spec Assumptions |
 | — | **US3** | | attest, exempt, ready |
 | C8, C9, C11 | Rulings/replies/FIX commits in the snapshot; conflict-with-main finding; validator request time | US4 | spec Assumptions |
 | — | **US4** | | In review, modules, replies, stage-2 push, merge, Stop's wait |
-| C6 † | Tagged-snapshot channel | US5 | `state.ts` read/post parameterised by tag, App and schema (R17) |
+| C6 † | Tagged-snapshot channel | in US5 | `state.ts` read/post parameterised by tag, App and schema (R17) |
 | — | **US5** | | bound counts |
 | — | reviewer #209 | US2–US5 live | reviewer on core; reads the record; writes releases |
 

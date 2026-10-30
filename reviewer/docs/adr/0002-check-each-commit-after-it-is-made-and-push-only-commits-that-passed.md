@@ -42,7 +42,8 @@ the check reads (ADR-0021).
    (ADR-0021), never the checkout. A check grades the diff from the newest commit that passed to the
    commit it names, and passes every commit in that range.
 2. We will push only commits that passed: the orchestrator's push goes up to the newest passed commit
-   (orchestrator ADR-0001).
+   (orchestrator ADR-0001). While reviewer is off for the session (ADR-0006), it pushes the session's commits
+   unchecked, but none that d4 would fail.
 3. We will check a merge on its conflict resolution, as its round reviews it (ADR-0010).
 4. We will fail a check whose change, as d1 and d3 grade it, touches a `.github/` folder, matched as
    orchestrator ADR-0004 d4 matches one: a workflow on the branch runs on the push, before any review.

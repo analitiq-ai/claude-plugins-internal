@@ -31,6 +31,9 @@ the carrier check lists orchestrator."
 - Q: What shape does the bound-count comment take? → A: reviewer's state shape (reviewer ADR-0011): a new tagged
   full snapshot whenever a count changes, the orchestrator App's newest wins, and an edit, a missing tag or a
   deletion fails closed.
+- Q: What does the Stop hook push while reviewer is off for the session? → A: The session's commits by the agent
+  identity, without consulting the passes. It reads `off` from the commit-check pass record, which keys passes by
+  branch (#209).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -98,21 +101,24 @@ progress by the orchestrator App, and the session's issue record names `<s>` as 
 
 ### User Story 2 - Push and open the draft PR (Priority: P2)
 
-Between turns the Stop hook pushes the session's passed commits by the agent identity from a copy the hooks own,
-with the orchestrator App's token held in memory, and after the first push opens the story PR as a draft carrying
+Between turns the Stop hook pushes the session's commits by the agent identity from a copy the hooks own, with the
+orchestrator App's token held in memory: those the commit-check pass record names under the pushed branch, or all
+of them while reviewer is off for the session. After the first push it opens the story PR as a draft carrying
 `Closes #s` (orchestrator ADR-0001 d4; ADR-0009 d6). builder's `issue-tackle` stops pushing and opening the PR
 itself, leaving both to the Stop hook (builder ADR-0003 d1).
 
 **Why this priority**: Without it the loop stops at a claimed card: the model's token cannot push. It needs
-reviewer's passed-commit record in core first.
+the commit-check pass record's contract in core first, which #209 adds.
 
-**Independent Test**: Against a fake GitHub, with reviewer's passed-commit record naming two commits by the agent
-identity, end a turn: both are pushed from the hooks' copy and a draft PR with `Closes #s` exists. Add a commit by
-another author: nothing is pushed and the stop is refused naming it.
+**Independent Test**: Against a fake GitHub, with a commit-check pass record naming two commits by the agent identity
+under the story branch, end a turn: both are pushed from the hooks' copy and a draft PR with `Closes #s` exists. Add
+a commit the record names only under a second branch of the same session, or a commit by another author: nothing is
+pushed and the stop is refused naming it. Set the record's `off`: the session's commits by the agent identity are
+pushed without a pass.
 
 **Acceptance Scenarios**:
 
-1. **Given** commits on the story branch that reviewer's commit check passed, each authored and committed by the
+1. **Given** commits on the story branch that the commit-check pass record names under that branch, each authored and committed by the
    agent identity, **When** the Stop hook runs, **Then** it pushes them, and after the first push opens the
    story PR as a draft whose body carries `Closes #s`.
 2. **Given** a new commit that did not pass, or whose author or committer is not the agent identity, **When** the
@@ -123,6 +129,9 @@ another author: nothing is pushed and the stop is refused naming it.
    it pushes nothing and names no step; with no `background_tasks` field, the card goes to Blocked naming it.
 5. **Given** builder's `issue-tackle` has committed a story's work, **When** it ends its step, **Then** it has
    pushed nothing and opened no PR; the Stop hook does both.
+6. **Given** the commit-check pass record's `off` is true, **When** the Stop hook runs, **Then** it pushes the
+   session's commits by the agent identity without consulting the passes, and pushes nothing when one is by another
+   identity or its change touches a `.github/` folder, refusing the stop naming the commit and the cause.
 
 ---
 
@@ -301,9 +310,12 @@ next one finds not marked ended counts toward `k_deaths`.
 
 - **FR-016** *(decides which hook pushes, ADR-0001 d4, SECURITY.md §8)*: The Stop hook MUST push, at the end of
   each turn and before it attests or names a step, from a copy the hooks own, fetched from the model's clone with
-  `--no-tags` (SECURITY.md §6.6), with the orchestrator App's token. It MUST push only commits reviewer's
-  passed-commit record names whose author and committer are the agent identity, and at stage 2 FR-020b's
-  commits alone. One commit failing a condition MUST push nothing. Stop is the
+  `--no-tags` (SECURITY.md §6.6), with the orchestrator App's token. It MUST push only commits whose author and
+  committer are the agent identity and that the commit-check pass record (#209) names under the pushed branch, and
+  at stage 2 FR-020b's commits alone. While the record's `off` is true (reviewer ADR-0006), it MUST push those
+  commits without consulting the passes, refusing any whose change touches a `.github/` folder as reviewer ADR-0002
+  d4 grades it: the App's workflows write is for merges of the default branch alone (ADR-0001 d1). One commit
+  failing a condition MUST push nothing. Stop is the
   one hook sure to see each pass: reviewer's check workflow records it later in the turn (reviewer ADR-0002 d2,
   ADR-0003 d2), Stop ignores a stop while a workflow runs (orchestrator ADR-0001 d3), and builder ends the turn at
   an attested draft (builder ADR-0003 d2).
@@ -391,9 +403,9 @@ next one finds not marked ended counts toward `k_deaths`.
 - Core already provides, on `main`: the token mint and its permission sets (`tokens.ts`), the gh-config write,
   read and refresh rule (`gh-config.ts`), the key reader, the lane read (`board.ts`), the spec-PR and story-PR
   lookups and `isDone` (`identity.ts`), `readState` with `startable` and `releaseOnClaim` (`state.ts`), `attests`
-  (`attest.ts`), and the push through gh's credential (`git.ts`). Each missing capability lands in core in its own
-  PR before the story that first uses it. Story 1 needs: the session's issue record, and an issue number to its
-  story branch and PR. Story 2: the passed-commit record. Story 3: the protected-path matcher. Story 4: rulings,
+  (`attest.ts`), and the push through gh's credential (`git.ts`). Each missing capability lands in core no later
+  than the story PR that first uses it. Story 1 needs: the session's issue record, and an issue number to its
+  story branch and PR. Story 2: the commit-check pass record, which #209's core PR adds. Story 3: the protected-path matcher. Story 4: rulings,
   replies and FIX commits in the snapshot; the conflict-with-main finding; the validator request time.
 - SECURITY.md §5's managed settings, and core's managed-settings check, gain the folder
   `~/.local/state/codeworks/orchestrator` (write-denied to the model) and `GH_CONFIG_DIR` in `env`, replacing
