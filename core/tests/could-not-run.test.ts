@@ -33,7 +33,7 @@ const SHARED: Shared = {
   planner_app_login: "codeworks-planner[bot]",
 };
 
-const BASE_ANSWER = { repository: { pullRequest: { baseRefName: "main" } } };
+const BASE_ANSWER = { repository: { pullRequest: { baseRefName: "main", headRefOid: HEAD, mergeable: "MERGEABLE" } } };
 const RULES_PATH = "/repos/acme/widgets/rules/branches/main?per_page=100";
 const RUNS_PATH = `/repos/acme/widgets/commits/${HEAD}/check-runs?check_name=ci&filter=latest&per_page=100`;
 const STATUSES_PATH = `/repos/acme/widgets/commits/${HEAD}/statuses?per_page=100`;
