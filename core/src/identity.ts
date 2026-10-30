@@ -7,7 +7,7 @@ import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 export type StoryBranch = { story: number; k: number; slug: string };
 export type SpecBranch = { spec: number };
 
-/** The newest same-repository PR on `<p>-spec`; a merged PR is closed too, and reads `merged`. */
+/** A same-repository PR on `<p>-spec`; a merged PR is closed too, and reads `merged`. */
 export type SpecPr = { number: number; state: "open" | "closed" | "merged" };
 
 export type SpecFolderAnswer = { one: string } | { none: true } | { several: readonly string[] };
@@ -165,19 +165,17 @@ function prsOnBranch(reader: GitHubClient, where: Repository, branch: string): P
 }
 
 // A fork's PR may share the branch name; it is never the repository's own.
-function newestSameRepo<Pr extends { number: number; headRefName: string; isCrossRepository: boolean }>(
+function sameRepoNewestFirst<Pr extends { number: number; headRefName: string; isCrossRepository: boolean }>(
   prs: readonly Pr[],
   branch: string,
-): Pr | null {
-  const sameRepo = prs.filter((pr) => pr.headRefName === branch && !pr.isCrossRepository);
-  if (sameRepo.length === 0) return null;
-  return sameRepo.reduce((a, b) => (b.number > a.number ? b : a));
+): Pr[] {
+  return prs.filter((pr) => pr.headRefName === branch && !pr.isCrossRepository).sort((a, b) => b.number - a.number);
 }
 
 export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
   if (storyOf(branch) === null) return null;
-  const newest = newestSameRepo(prs, branch);
-  return newest === null ? null : { number: newest.number, head: newest.headRefOid, merged: newest.merged };
+  const [newest] = sameRepoNewestFirst(prs, branch);
+  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, merged: newest.merged };
 }
 
 export async function storyPr(reader: GitHubClient, repo: string, branch: string): Promise<StoryPr | null> {
@@ -215,18 +213,22 @@ export async function issueStory(reader: GitHubClient, repo: string, s: number):
   return { branch, pr: await storyPr(reader, repo, branch) };
 }
 
-export function pickSpecPr(prs: readonly PullRequestState[], p: number): SpecPr | null {
-  const newest = newestSameRepo(prs, specBranch(p));
-  if (newest === null) return null;
-  if (newest.merged) return { number: newest.number, state: "merged" };
-  if (newest.closed) return { number: newest.number, state: "closed" };
-  return { number: newest.number, state: "open" };
+export function pickSpecPrs(prs: readonly PullRequestState[], p: number): SpecPr[] {
+  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, merged }) => ({
+    number,
+    state: merged ? "merged" : closed ? "closed" : "open",
+  }));
+}
+
+/** Every spec PR of `p`, newest first. */
+export async function specPrs(reader: GitHubClient, repo: string, p: number): Promise<SpecPr[]> {
+  const branch = specBranch(p);
+  const nodes = await prsOnBranch(reader, ownerAndName(repo), branch);
+  return pickSpecPrs(answerOf(z.array(PullRequestStateAnswer), nodes, `the PRs on ${repo} ${branch}`), p);
 }
 
 export async function specPr(reader: GitHubClient, repo: string, p: number): Promise<SpecPr | null> {
-  const branch = specBranch(p);
-  const nodes = await prsOnBranch(reader, ownerAndName(repo), branch);
-  return pickSpecPr(answerOf(z.array(PullRequestStateAnswer), nodes, `the PRs on ${repo} ${branch}`), p);
+  return (await specPrs(reader, repo, p))[0] ?? null;
 }
 
 const ISSUE_BODY_SOURCE = "story issue body";
