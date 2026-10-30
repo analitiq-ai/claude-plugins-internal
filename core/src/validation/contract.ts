@@ -40,8 +40,11 @@ export type Deps = {
 
 /** What a package's `open` returns. No caller calls it directly: core's `trigger`, `status` and `findings` do. */
 export type OpenedPackage = {
-  /** Safe to call more than once for one head. */
-  trigger(repo: string, pr: number, head: string): Promise<void>;
+  /**
+   * The time GitHub shows on its provider's request for the head, posted now or found, so a second call for one head
+   * posts nothing; null for a provider that reviews on its own and takes no request.
+   */
+  trigger(repo: string, pr: number, head: string): Promise<string | null>;
   status(repo: string, pr: number, head: string): Promise<PackageStatus>;
   findings(repo: string, pr: number, head: string): Promise<Finding[]>;
 };
@@ -157,15 +160,21 @@ function messageOf(error: unknown): string {
 // Every throw from a package is COULD_NOT_RUN: a package's errors are its own, while `GitHubUnanswered` and
 // `GitHubRefused` are core's.
 
-/** Nothing, or COULD_NOT_RUN when the package's `trigger` throws. */
-export async function trigger(module: Module, repo: string, pr: number, head: string): Promise<CouldNotRun | undefined> {
+/**
+ * The time of the module's request for the head, null for a provider that takes none, or COULD_NOT_RUN: the `since`
+ * a caller times the module's SILENT from (orchestrator ADR-0008 d4).
+ */
+export async function trigger(module: Module, repo: string, pr: number, head: string): Promise<string | null | CouldNotRun> {
   assertAsked(repo, pr, head);
+  let answered: unknown;
   try {
-    await module.opened.trigger(repo, pr, head);
+    answered = await module.opened.trigger(repo, pr, head);
   } catch (error) {
     return couldNotRun(module.name, messageOf(error));
   }
-  return undefined;
+  const parsed = Time.nullable().safeParse(answered);
+  if (!parsed.success) return couldNotRun(module.name, `its trigger answer is refused: ${z.prettifyError(parsed.error)}`);
+  return parsed.data;
 }
 
 /** `since` is the caller's start of the count, in GitHub's time; when it starts is the caller's spec. */
