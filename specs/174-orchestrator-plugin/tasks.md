@@ -83,7 +83,7 @@ a merged spec PR leaves a session App token in the gh folder, the card In progre
 
 ### Unrun behaviour first (R20)
 
-- [ ] T018 [US1] On the agent machine, install a throwaway plugin whose UserPromptSubmit hook writes its stdin to a file, plus `commands/codeworks.md`, and run `claude --setting-sources "" -p "/codeworks 212"`. Record whether the hook's `prompt` is the raw `/codeworks 212` or the expanded command, and whether `-p` accepts the command. Save the recorded input as `orchestrator/tests/fixtures/hooks/user-prompt-submit.json` and the result under R20 in `specs/174-orchestrator-plugin/research.md`. **If the raw text is not seen, stop: R20 is reopened before T034**
+- [x] T018 [US1] On the agent machine, install a throwaway plugin whose UserPromptSubmit hook writes its stdin to a file, plus `commands/codeworks.md`, and run `claude --setting-sources "" -p "/codeworks 212"`. Record whether the hook's `prompt` is the raw `/codeworks 212` or the expanded command, and whether `-p` accepts the command. Save the recorded input as `orchestrator/tests/fixtures/hooks/user-prompt-submit.json` and the result under R20 in `specs/174-orchestrator-plugin/research.md`. **If the raw text is not seen, stop: R20 is reopened before T034**
 
 ### Core PRs for Story 1 (each its own PR, merged before T034)
 
