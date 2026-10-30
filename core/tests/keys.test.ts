@@ -269,12 +269,15 @@ describe("readKey", () => {
     });
   }
 
-  it("lets a missing key's error through, naming its path", () => {
-    assert.throws(() => readKey("absent.pem", "reviewer", machine()), (error: NodeJS.ErrnoException) => {
-      assert.equal(error.code, "ENOENT");
-      assert.match(error.message, /\/home\/dummy\/\.config\/codeworks\/absent\.pem/);
-      return true;
-    });
+  it("refuses a missing key, naming its path", () => {
+    const refused = refusal(() => readKey("absent.pem", "reviewer", machine()));
+    assertReasons(refused, "does not exist");
+    assert.equal(refused.path, `${KEYS}/absent.pem`);
+  });
+
+  it("lets a key stat error other than ENOENT through", () => {
+    const denied = errno("EACCES", `${KEYS}/reviewer-app.pem`);
+    assert.throws(() => readKey("reviewer-app.pem", "reviewer", machine({ answers: { [`${KEYS}/reviewer-app.pem`]: denied } })), denied);
   });
 
   it("refuses on a platform whose processes have no user id, naming it", () => {

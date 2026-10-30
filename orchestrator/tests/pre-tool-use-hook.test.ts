@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { readGhToken } from "../plugin/core/gh-config.ts";
+import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { run } from "../plugin/hooks/pre-tool-use.ts";
 import { PASS } from "../plugin/lib/hook-io.ts";
@@ -40,5 +41,12 @@ describe("the PreToolUse hook on Bash", () => {
     const value = storeSessionToken(home, 9);
     assert.deepEqual(await run(bashCall(scratchCheckout(t)), deps), { code: 2, stdout: "", stderr: "orchestrator: mint failed: dummy cause\n" });
     assert.equal(readGhToken(ghFolder(home))?.value, value);
+  });
+
+  // US1 #6: core's refusal of a missing key, as readKey answers it.
+  it("refuses the call naming the key's path when there is no key", async (t) => {
+    const key = "/home/dummy/.config/codeworks/session-app.pem";
+    const { deps } = hookDeps(t, storyGitHub(READY_STORY), { session: new KeyReadRefused(key, ["does not exist"]) });
+    assert.deepEqual(await run(bashCall(scratchCheckout(t)), deps), { code: 2, stdout: "", stderr: `orchestrator: ${key}: does not exist\n` });
   });
 });
