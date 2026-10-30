@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -66,6 +67,13 @@ describe("writeGhToken and readGhToken", () => {
       expires_at: "2026-10-28T13:00:00Z",
     });
     assert.deepEqual(readdirSync(folder).sort(), [STORED, HOSTS]);
+  });
+
+  it("leave no temp file when a replace cannot land", (t) => {
+    const folder = join(scratch(t), "gh");
+    mkdirSync(join(folder, HOSTS), { recursive: true });
+    assert.throws(() => writeGhToken(folder, minted(randomUUID()), LOGIN));
+    assert.deepEqual(readdirSync(folder), [HOSTS]);
   });
 
   it("read an absent folder as null", (t) => {
