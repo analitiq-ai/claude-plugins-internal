@@ -230,6 +230,12 @@ const REPOSITORY_ID_QUERY = `query($owner: String!, $name: String!) { repository
 
 const RepositoryIdAnswer = z.object({ repository: z.object({ id: z.string() }) });
 
+/** What a node's `repository { id }` is compared with: a name can differ in case or follow a rename, an id cannot. */
+export async function repositoryId(reader: GitHubClient, repo: string): Promise<string> {
+  const answer = await reader.graphql(REPOSITORY_ID_QUERY, ownerAndName(repo));
+  return answerOf(RepositoryIdAnswer, answer, `the id of ${repo}`).repository.id;
+}
+
 // The head branch is deleted on merge (orchestrator ADR-0009 d6), so a story's PRs are found from the issue's
 // timeline; the branch grammar, not the reference, decides which of them are the story's.
 const TIMELINE_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
@@ -294,8 +300,7 @@ function candidateOf(item: TimelineItem): CandidatePr | null {
 export async function isDone(reader: GitHubClient, repo: string, s: number): Promise<boolean> {
   assertIssueNumber(s);
   const where = ownerAndName(repo);
-  const idAnswer = await reader.graphql(REPOSITORY_ID_QUERY, where);
-  const repositoryId = answerOf(RepositoryIdAnswer, idAnswer, `the id of ${repo}`).repository.id;
+  const ownId = await repositoryId(reader, repo);
   const timeline = ["repository", "issue", "timelineItems"];
   const nodes = await reader.graphqlPages(TIMELINE_QUERY, { ...where, number: s }, timeline);
   const items = answerOf(z.array(TimelineItem), nodes, `the timeline of ${repo}#${s}`);
@@ -304,7 +309,7 @@ export async function isDone(reader: GitHubClient, repo: string, s: number): Pro
     .map(candidateOf)
     .filter(
       (pr): pr is CandidatePr =>
-        pr !== null && pr.repository.id === repositoryId && !pr.isCrossRepository && storyOf(pr.headRefName) === s,
+        pr !== null && pr.repository.id === ownId && !pr.isCrossRepository && storyOf(pr.headRefName) === s,
     );
   const closes = await Promise.all(
     items.flatMap((item) => (item.__typename === "ClosedEvent" ? [item.actor] : [])).map(
