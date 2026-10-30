@@ -2,6 +2,7 @@ import { isAbsolute } from "node:path";
 import { z } from "zod";
 
 import { GhFolderRefused } from "../core/gh-config.ts";
+import { GitFailed } from "../core/git.ts";
 import { GitHubRefused, GitHubUnanswered, RemoteRefused } from "../core/github.ts";
 import { KeyReadRefused } from "../core/keys.ts";
 import { SettingsError } from "../core/settings.ts";
@@ -74,6 +75,7 @@ const NAMED_FAILURES = [
   GitHubUnanswered,
   SettingsError,
   RemoteRefused,
+  GitFailed,
 ];
 
 /** The message of a failure core names a cause for, which a hook refuses with; null for one it crashes on. */
