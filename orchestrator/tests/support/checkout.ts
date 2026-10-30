@@ -68,14 +68,15 @@ export type FakeMintToken = { mintToken: typeof mintToken; calls: MintCall[] };
 
 /**
  * Stands in for core's mintToken: each call answers a new token for its repository expiring an hour after `now()`,
- * or throws `failure` when one is given.
+ * or throws the failure `failures` gives its App.
  */
-export function fakeMintToken(now: () => Date, failure?: Error): FakeMintToken {
+export function fakeMintToken(now: () => Date, failures: Partial<Record<App, Error>> = {}): FakeMintToken {
   const calls: MintCall[] = [];
   return {
     calls,
     mintToken: async (app, appId, keyFile, plugin, repo): Promise<MintedToken> => {
       calls.push({ app, appId, keyFile, plugin, repo });
+      const failure = failures[app];
       if (failure !== undefined) throw failure;
       const expires_at = new Date(now().getTime() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
       return { value: randomUUID(), app, repo, expires_at, permissions: {} };

@@ -13,7 +13,7 @@ const COMMENTS = "/repos/acme/widgets/issues/7/comments";
 function harness(failure?: Error) {
   let clock = new Date("2026-10-30T12:00:00Z");
   const now = () => clock;
-  const mint = fakeMintToken(now, failure);
+  const mint = fakeMintToken(now, failure === undefined ? {} : { orchestrator: failure });
   const github = fakeGitHub({ rest: { [`POST ${COMMENTS}`]: {} } });
   // The token each write went out with, in order.
   const usedTokens: string[] = [];

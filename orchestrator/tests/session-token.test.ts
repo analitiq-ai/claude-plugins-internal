@@ -34,7 +34,7 @@ async function settled(): Promise<OnGitHub> {
 
 function harness(t: TestContext, failure?: Error) {
   const home = tempHome(t);
-  const mint = fakeMintToken(() => NOW, failure);
+  const mint = fakeMintToken(() => NOW, failure === undefined ? {} : { session: failure });
   let asked = 0;
   const deps = {
     home,

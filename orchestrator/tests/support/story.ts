@@ -2,7 +2,7 @@ import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../../core/tests/
 import type { Shared } from "../../plugin/core/settings.ts";
 import type { IssueComment } from "../../plugin/core/state.ts";
 import { Lane } from "../../plugin/core/values.ts";
-import { BOARD, ORCHESTRATOR_LOGIN, SESSION_LOGIN } from "./checkout.ts";
+import { BOARD, contentsAnswer, ORCHESTRATOR_LOGIN, SESSION_LOGIN, SETTINGS } from "./checkout.ts";
 
 export const SHARED: Shared = {
   board: BOARD,
@@ -69,10 +69,10 @@ const isStory = (story: Story) => (vars: Record<string, unknown>) =>
   vars.owner === "acme" && vars.name === "widgets" && vars.number === story.story;
 
 /**
- * A fake GitHub answering every read the start makes of `story`, the card move and the reason post. Calls to any
- * other issue or query throw, naming the call.
+ * A fake GitHub answering the settings read at the default branch `main`, every read the start makes of `story`,
+ * the card move and the reason post. Calls to any other issue or query throw, naming the call.
  */
-export function storyGitHub(story: Story, overrides: { moveCard?: unknown; postComment?: unknown } = {}): FakeGitHub {
+export function storyGitHub(story: Story, overrides: { moveCard?: unknown } = {}): FakeGitHub {
   const ofStory = isStory(story);
   const p = story.parent ?? story.story;
   return fakeGitHub({
@@ -120,7 +120,11 @@ export function storyGitHub(story: Story, overrides: { moveCard?: unknown; postC
         answer: story.specPrs.map((pr) => ({ ...pr, headRefName: `${p}-spec`, headRefOid: "a".repeat(40), isCrossRepository: false })),
       },
     ],
-    rest: { [`POST /repos/acme/widgets/issues/${story.story}/comments`]: overrides.postComment ?? {} },
+    rest: {
+      "GET /repos/acme/widgets": { default_branch: "main" },
+      "GET /repos/acme/widgets/contents/codeworks.toml?ref=main": contentsAnswer(SETTINGS),
+      [`POST /repos/acme/widgets/issues/${story.story}/comments`]: {},
+    },
     now: GITHUB_NOW,
   });
 }
