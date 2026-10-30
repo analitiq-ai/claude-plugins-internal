@@ -8,8 +8,10 @@ could-not-run outcomes for writes, which still record nothing.
 | commit with no session record, reviewer on | `/codeworks <issue>`, or `reviewer off` |
 | commit on a branch not starting `<s>-us` | session issue `#<s>`, allowed prefix `<s>-us` |
 | session record unreadable | could not run; the record's path; re-run after the orchestrator rewrites it |
-| state or gates tampered | held; release = Ready move + admin comment on `#<s>` |
+| state tampered | held; release = Ready move + admin comment on `#<s>` |
 | state write over comment limit | could not run; the snapshot size and limit |
+| gates write leaving no room to release every open hold and add a round | could not run; the snapshot size, the reserve and the limit |
+| write whose `gates` differs from the one it read | could not run; stale reading, retry the step |
 | GitHub unanswered | could not run; retry the step |
 | `releaseOnClaim` failed | could not run; the next hook run retries the release |
 | range touches a protected path | the path; an admin's PR under an exempt label |

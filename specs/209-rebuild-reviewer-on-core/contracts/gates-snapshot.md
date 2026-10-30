@@ -1,7 +1,11 @@
-# Contract: gates snapshot (core, PR B)
+# Contract: gates section of the state snapshot (core, PR B)
 
-Owner: `core/src/contracts/gates.ts` (Zod); read/written only through `core/src/state.ts`. Writer: reviewer's hook
-as the reviewer App (P6). Reader: reviewer's hook.
+Owner: `core/src/contracts/gates.ts` (Zod), the `gates` field of core's `Snapshot`
+(`core/src/contracts/snapshot.ts`); written only by `recordGates` in `core/src/state.ts`. Writer: reviewer's hook as
+the reviewer App (P6). Reader: reviewer's hook, through `readState`.
+
+The counts live in the state comment, not a second comment, so a WRONG ruling or bug member and the hold its
+count places land in one post: there is no window in which a count is on GitHub and its hold is not.
 
 ## Shape
 
@@ -10,7 +14,8 @@ Every field below is one the Python gates read again in a later run; each cites 
 sg `shimgate.py`). Open items only: an ended or merged item is absent.
 
 ```
-Gates   { v: 1, branch, anchor: sha40, lineages: Lineage[], bugs: Bug[] }
+Snapshot.gates: Gates | null    (null until the story's first check; v is the snapshot's)
+Gates   { branch, anchor: sha40, lineages: Lineage[], bugs: Bug[] }
 Lineage { id, file, places: {start, end, claim}[], chain: {ref, claim, line, words, ruling, at}[] }
 Bug     { id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, old_start, old_count}[],
           deep: {same_operation: Site[], callers: Site[]} | null,
@@ -20,7 +25,7 @@ Site    { file, line, function, does }
 
 | field | why it is kept (reader) |
 |---|---|
-| `branch` | a story issue has one branch (root ADR-0005, reviewer ADR-0015 context), so the comment on the story issue holds that branch's items; lineages, bugs and their text are per branch today (cg:67-70, sg:48, ledger PKs). A check on another branch stops with an error naming both, never mixing two branches' items under one hold id |
+| `branch` | a story issue has one branch (root ADR-0005, reviewer ADR-0015 context), so the story's snapshot holds that branch's items; lineages, bugs and their text are per branch today (cg:67-70, sg:48, ledger PKs). A check on another branch stops with an error naming both, never mixing two branches' items under one hold id |
 | `anchor` | the commit whose file texts `places` and `ranges` index into; replaces the stored text (cg:67-70, sg:51-54), which is `git show <anchor>:<file>`. Both gates carry to the same commit: the head of the newest completed check on the branch |
 | `places[].claim` | a CORRECT removes its places and ends the lineage when none is left (cc:260); words moved unchanged are inherited by claim id (ln:185, ADR-0001 d2) |
 | `chain[].ref` | count = distinct checks ruling WRONG (cc:267); one entry per (ref, claim) (cc:250); a contest is its own ref (cc:394-396) |
@@ -45,7 +50,7 @@ Validation: ids unique within each list; times are core `Time`; shas 40 hex.
   places `shim-<id>`. A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
   hold again ("one such commit", ADR-0013 d4).
 - A `claim-<id>` hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the
-  hold row when it is placed, never into the gates comment. Core's snapshot contract allows a question only on
+  hold row in the post that records that WRONG, never into `gates`. Core's snapshot contract allows a question only on
   `escalation-` holds today (`core/src/contracts/snapshot.ts:53`); PR B extends it to `claim-` holds.
 
 ## Not carried from the ledger
@@ -61,26 +66,30 @@ A check reads the anchor from the hooks' bare copy; when it is absent (a new ses
 When GitHub does not have it, the check stops with an error naming the branch and the anchor commit: nothing is
 graded and nothing is recorded as passed.
 
-## Comment form
-
-```
-<!-- codeworks:reviewer-gates -->
-```json
-{ "v": 1, "branch": "42-us1-login", "anchor": "...", "lineages": [], "bugs": [] }
-```
-```
-
-Same frame as the state comment (`snapshotOf`), different tag.
-
 ## Functions
 
-- `readGates(reader, repo, issue, shared): Promise<GatesReading>` — `{gates, comment_url, rebuilt, held, causes}`.
-- `writeGates(reader, writer, repo, issue, shared, gates): Promise<void>` — refuses with `StateWriteRefused` on
-  tamper, contract break, or over `COMMENT_LIMIT`.
+- Read: `readState(...)` → `snapshot.gates`; one reading per run (FR-004).
+- `recordGates(reader, writer, repo, issue, shared, read: StateReading, gates: Gates, openings: Opening[]): Promise<void>`
+  with `Opening {id: "claim-<id>" | "shim-<id>", question: string | null}`: one post of the snapshot `read` holds,
+  with `gates` replaced and each opening placed (a hold with no row, or a new row after a RELEASED one). A hold
+  already OPEN is left as it is; the `gates` change is posted regardless. Refuses with `StateWriteRefused`, posting
+  nothing, on tamper, contract break, a `gates` on GitHub differing from `read`'s (a stale reading), or the size rule.
+- `writeState`, `placeHold`, `placeRescopeHold` and `releaseOnClaim` refuse a snapshot whose `gates` differs from
+  the one they read (`checkTransition`): only `recordGates` changes `gates`, so no write built from an older
+  reading drops a count.
 
-## Tag rules (apply to state and gates alike)
+## Size rule
 
-- Each reviewer App comment is classed by its first-line tag; the newest per tag wins.
-- The story is held when any reviewer App comment was edited, carries no known tag, or a reviewer App comment
-  was deleted after the newest of either tag. Release: Ready move + admin comment (ADR-0011 d2).
-- When held-and-released, each tag's snapshot is rebuilt from its newest unedited comment.
+All writers share the state comment's `COMMENT_LIMIT` (65 536). `recordGates` refuses unless the snapshot it would
+post still fits after every OPEN hold is released and one more round of the largest size the snapshot contract
+allows is appended. A count can therefore never take the room a release needs: an admin's release and the next
+round always fit. The refusal names the snapshot's size, that reserve and the limit; nothing is dropped to fit.
+
+## Comment form
+
+The state comment (`STATE_TAG`, `snapshotOf`'s frame), its snapshot carrying `gates`:
+
+```json
+{ "v": 1, "rounds": [], "holds": [], "pushbacks": [],
+  "gates": { "branch": "42-us1-login", "anchor": "...", "lineages": [], "bugs": [] } }
+```

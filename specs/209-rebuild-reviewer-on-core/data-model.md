@@ -21,9 +21,9 @@ removed.
 | lineage WRONG count ≥ 3 | `placeHold` | `claim-<lineage>` |
 | bug count ≥ 4 | `placeHold` | `shim-<bug>` |
 
-## Gates snapshot (core, new — PR B)
+## Gates section (core snapshot, new — PR B)
 
-Tag `codeworks:reviewer-gates`; full snapshot, newest wins; same fail-closed rules. See
+The state snapshot's `gates: Gates | null`, written only by `recordGates` together with the holds it places. See
 [contracts/gates-snapshot.md](contracts/gates-snapshot.md).
 
 Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-snapshot.md), the one definition. The story's one `branch`, its `anchor`, open `lineages`
@@ -51,7 +51,7 @@ per branch, newest pass = `head`, set on every pass, even of a sha already in `p
 | `check.json` (running range, step, workflow run ids) | hook | until the range passes or fails |
 | `memos/*.json` (claim reads, verdicts) | hook | session (FR-017) |
 | `released-<issue>-<claimed_at>` | hook after `releaseOnClaim` | session |
-| `write.lock` | hook, held read→post for each state/gates write and the claim step (FR-020) | one write |
+| `write.lock` | hook, held read→post for each state write and the claim step (FR-020) | one write |
 | `gate.log` | hook | session |
 
 ## After-commit check state machine

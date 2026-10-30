@@ -28,7 +28,7 @@ ADR-0013 d2); record each commit that passed its check (reviewer ADR-0002 d2)."
 - Q: Where does the passed-commit record live? → A: Locally, session-scoped, beside the hooks' own copy, through a core contract; not on GitHub. → Superseded by the record's baseline and name: the session's first check grades from the story branch's head on GitHub; the record is renamed the commit-check pass record.
 - Q: What does a new session grade from, and what is the record called? → A: Locally kept record plus the pushed head as baseline (the branch head on GitHub means every commit up to it passed the commit check); renamed "commit-check pass record", defined as the pre-push gate only, not a review verdict.
 - Q: Should reviewer keep a local copy of rounds and holds between hook runs? → A: No: each deciding hook run reads from GitHub through core and reuses the reading only within that run; ADR-0011 d5 is amended in its own PR.
-- Q: Where do the lineage and bug counts that place claim and shim holds live? → A: A second tagged reviewer App comment on the story issue (`reviewer-gates`), open items only, counts derived from times; core reads per tag and holds on any edited reviewer App comment.
+- Q: Where do the lineage and bug counts that place claim and shim holds live? → A: A `gates` section of the reviewer state snapshot on the story issue, open items only, counts derived from times; a count and the hold it places land in one post.
 - Q: Do the claim and shim check memos persist? → A: No: a running check's state and its memos live in session-scoped files only; reviewer keeps no database.
 - Q: What happens to today's ledger data at cutover? → A: Nothing migrates; the ledger is deleted, and a PR open at cutover gets a fresh internal round before it can be attested.
 
@@ -68,9 +68,9 @@ head.
 4. **Given** a hold placed in one session, **When** a new session on another machine reads `#42`, **Then**
    the hold is still open: nothing about it lived only beside the old session.
 5. **Given** a lineage with 2 WRONG rulings recorded in an ended session, **When** a new session's check rules
-   it WRONG again, **Then** the gates comment records the third, and `claim-<id>` is placed (FR-015).
-6. **Given** the gates comment was edited, **When** any hook run decides, **Then** the story is held as for an
-   edited state comment (FR-016).
+   it WRONG again, **Then** the snapshot's gates section records the third and `claim-<id>` is placed in the same post (FR-015).
+6. **Given** a check whose gates write would leave no room to release every open hold and record one more round,
+   **When** it records, **Then** the write is refused naming the sizes and nothing is recorded (FR-016).
 
 ---
 
@@ -222,18 +222,20 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   session, read and written only through a core contract this spec adds; nothing of it is written to GitHub. Passes are kept per branch, so a session's second story branch or second claim keeps its own newest pass; a branch's newest pass is the head it most recently passed, even one that had passed before.
   A session's first check MUST grade from the story branch's head on GitHub, which only commit-check passes
   reach; commits a dead session passed but never pushed are graded again.
-- **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a second tagged
-  reviewer App comment on the story issue (`reviewer-gates`), full snapshot, newest wins, read and written
-  through core with the same fail-closed rules as the state (ADR-0011 d2). It holds the story's one branch, the anchor commit
+- **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a `gates` section of
+  the state snapshot on the story issue, read and written through core with the state's fail-closed rules
+  (ADR-0011 d2); a count and the hold it places MUST land in one post. It holds the story's one branch, the anchor commit
   the stored positions index into and the open items only: per lineage its places and its chain of rulings,
   each with its check, claim, words, ruling and time; per bug its counted and absorbed trees with times, its
   ranges, its deep-sweep lists and its site rulings. Counts and release floors MUST be derived from those
   times against the reset and the hold row's release, never stored; a check counts once; a merged bug carries
   the higher of its bugs' counts, never their sum (ADR-0008 d2). An anchor GitHub does not have MUST stop the
   check with an error naming it.
-- **FR-016**: Core's state module MUST read and write each tagged reviewer App comment by its tag, and hold the
-  story when any reviewer App comment was edited or deleted; this core change and the amendments to reviewer
-  ADR-0001 d2, ADR-0008, ADR-0011 d1–d2 and ADR-0013 d4 land in their own PRs before this spec's code.
+- **FR-016**: Core's snapshot contract MUST gain `gates: Gates | null`, changed only by one call that posts the
+  gates change and the holds it places together; every other write MUST refuse a `gates` differing from the one it
+  read, and the gates call MUST refuse a snapshot that would not fit with every open hold released and one more
+  round recorded. This core change and the amendments to reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1 and
+  ADR-0013 d4 land in their own PRs before this spec's code.
 - **FR-017**: The state of a running commit check and its read and verdict memos MUST live only in
   session-scoped files beside the commit-check pass record; reviewer MUST keep no database, and nothing of
   these persists across sessions. ADR-0004 d4's "ledger" is amended to the check's record in its own PR.
@@ -244,7 +246,7 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   written to the commit-check pass record (`off`), so the orchestrator reads it through the same core contract.
   An off session records no internal round, so nothing attests its PR: it merges only under an admin's exempt
   label (ADR-0015 d2), never by the switch alone.
-- **FR-020**: Two hook runs of one session MUST NOT write reviewer state or gates from the same reading: each
+- **FR-020**: Two hook runs of one session MUST NOT write reviewer state from the same reading: each
   write, and the release on claim, is serialised per session from its read to its post.
 - **FR-021**: The after-commit check MUST grade only from a base that is an ancestor of the commit checked:
   the branch's newest commit-check pass, else the branch's head on GitHub; when neither is an ancestor, pushed
@@ -262,7 +264,7 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   review verdict.
 - **Claim release**: core's `releaseOnClaim` answer: the holds released, whether the snapshot was rebuilt,
   and the reset that released any.
-- **Gates snapshot**: the `reviewer-gates` comment: the open lineages and bugs whose counts place `claim-<id>`
+- **Gates section**: the state snapshot's `gates`: the open lineages and bugs whose counts place `claim-<id>`
   and `shim-<id>` holds; ended items are dropped.
 
 ## Success Criteria *(mandatory)*

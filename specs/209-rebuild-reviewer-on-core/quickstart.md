@@ -22,7 +22,7 @@ node core/scripts/check-carriers.ts --base origin/main
 | 3 | US1-3 | newest state comment `lastEditedAt` set | no POST; refusal names Ready move + admin comment |
 | 4 | US1-4, SC-002 | hold placed; new session dir | hold still OPEN; no reviewer file holds rounds/holds |
 | 5 | US1-5 | gates with WRONG rulings from 2 checks; a third check rules WRONG; then the same tree re-checked in a new session | `claim-<id>` OPEN; the re-check adds no count |
-| 6 | US1-6 | older gates comment edited | held, as scenario 3 |
+| 6 | US1-6 | snapshot near the limit; a check's gates write would leave no room to release every open hold and add a round | refused naming the sizes; nothing posted |
 | 7 | US3-1..2, SC-003 | commits on `42-us2-logout`, `43-us1-other`, `main` | first proceeds to checks; others refused naming `#42`, `42-us`; none recorded |
 | 8 | US3-3..5 | no record / switch off / unreadable record | refuse naming both ways / fence skipped / could not run |
 | 9 | US4-1..2, SC-004 | OPEN `claim-7`, Ready move + admin comment after; record = claim; run hook twice | one release POST, first run only |
@@ -35,5 +35,5 @@ node core/scripts/check-carriers.ts --base origin/main
 | 16 | FR-021 | pass at C; amend C→C'; then reset below GitHub head | C' graded from GitHub head; then refused naming it |
 | 17 | FR-014 | passes on `42-us1-login` then `42-us2-logout` in one session | each branch keeps its own newest pass |
 | 18 | FR-019 | reviewer off; commit | no check runs; nothing recorded |
-| 19 | FR-015 | run dies after the gates post with the 3rd WRONG check, before `placeHold` | next deciding run places `claim-<id>` |
+| 19 | FR-016 | a round written from a reading older than a gates post | refused as stale; the gates post's count kept |
 | 20 | FR-014, FR-021 | GitHub at A; pass B; amend to B′, pass; restore B, pass | newest pass (`head`) B, not B′ |

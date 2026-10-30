@@ -7,8 +7,8 @@
 ## Summary
 
 reviewer's hook path is rebuilt in TypeScript on core (root ADR-0009 d2). It records rounds and holds on the
-story issue through core's state module as the reviewer App, and the claim/shim counts in a second tagged
-`reviewer-gates` comment; reads the session's issue from the orchestrator's record and fences commits on it;
+story issue through core's state module as the reviewer App, with the claim/shim counts in the same
+snapshot's gates section; reads the session's issue from the orchestrator's record and fences commits on it;
 calls `releaseOnClaim` once per claim, first thing in a run; and grades each new commit after it is made, from a
 hooks-owned bare copy, recording passes in a session-scoped commit-check pass record that core owns. The SQLite
 ledger, `unlock`/`override` prompts and `pre_merge_gate.py` are deleted.
@@ -16,7 +16,7 @@ ledger, `unlock`/`override` prompts and `pre_merge_gate.py` are deleted.
 Three things land before reviewer's code, each in its own PR (Principle VI, FR-004, FR-016, FR-017):
 1. ADR amendments: reviewer ADR-0011 d1, d2, d5; ADR-0001 d2; ADR-0008; ADR-0013 d4; ADR-0004 d4 and
    ADR-0003 d1 ("ledger" → the check's session files).
-2. Core: tag-keyed state, any-edited-reviewer-comment hold, gates contract (R5).
+2. Core: the snapshot's gates section and its one-post write (R5).
 3. Core: commit-check pass record and the protected-path matcher (R11).
 
 External dependency: #174's core PR adding the session issue record (VP-001, PR #216). US3 and US4 cannot start
@@ -30,7 +30,7 @@ before it merges.
 `identity.ts`, `outcomes.ts`); `zod 4.6.7`, `smol-toml 1.9.1`, `yaml 2.9.1` (core's pins); `diff-match-patch`
 (npm) for lineages
 
-**Storage**: GitHub issue comments (state, gates) through core; session-scoped files under
+**Storage**: the GitHub state comment (gates section included) through core; session-scoped files under
 `~/.local/state/codeworks/reviewer/sessions/<session>/` (bare copy, pass record, running check, memos, claim
 markers, `gate.log`); no database
 
@@ -54,7 +54,7 @@ the session folder (`HOME_FOLDERS` deny path)
 
 | Gate | Answer | Pass |
 |---|---|---|
-| I Contract-first | Snapshot stays core's. The gates snapshot, session record reader and commit-check pass record are core contracts (Zod), each with one owner; reviewer is an adapter. No second validator over the state. | ✅ |
+| I Contract-first | Snapshot stays core's. The gates section, session record reader and commit-check pass record are core contracts (Zod), each with one owner; reviewer is an adapter. No second validator over the state. | ✅ |
 | II Ownership | Core changes land in `core/`; reviewer code in `reviewer/`; the orchestrator's record is read, not written. No secrets in code: `app_id` in `codeworks.toml`, key read by `readKey`. Private repo. | ✅ |
 | III Fail loud | Every unanswered read refuses as could not run; tampered state refuses naming its release; no fallback to local state; ledger deleted, no compatibility path (FR-018). | ✅ |
 | IV Test-first | Each task starts from a red `node:test`; quickstart scenarios are the spec's acceptance scenarios against the recorder. | ✅ |
@@ -65,7 +65,7 @@ the session folder (`HOME_FOLDERS` deny path)
 | P3 Pure rules | `lib/rules/*` (fence, claim step, round→snapshot, counts, range, protected paths) are pure; `hooks/*.ts` do I/O only. | ✅ |
 | P4 Could not run | GitHub unanswered, record unreadable, bare-copy fetch failure, workflow not answering → `COULD_NOT_RUN`, never a pass; commit not recorded. | ✅ |
 | P5 Settled design | Planner-only; complied with anyway: every mechanism cites research.md. | n/a |
-| P6 One writer | State + gates comments: reviewer hook (reviewer App). Session record: orchestrator. Pass record: reviewer hook. Lanes, pushes, check runs: orchestrator. | ✅ |
+| P6 One writer | State comment (gates section included): reviewer hook (reviewer App). Session record: orchestrator. Pass record: reviewer hook. Lanes, pushes, check runs: orchestrator. | ✅ |
 | P7 Facts as data | Tags, Zod JSON, branch grammar, `session_id`; no prose parsed. | ✅ |
 | P8 Generic | Branch grammar, `codeworks.toml [reviewer]`, GitHub objects only. | ✅ |
 | P9 Named identities | Admin/writer from `roleOf`; reviewer App comments by `reviewer_app_login`; model's commands never count as a writer. | ✅ |
@@ -78,8 +78,8 @@ Post-design re-check: unchanged, all pass.
 - Reader from the session token, writer minted as the reviewer App, `[reviewer]` settings: R2
 - One state reading per hook run, no local copy: R3
 - Round results, verdicts and hold kinds mapped onto core's value sets: R4
-- Core reads/writes reviewer App comments by tag; any edited reviewer comment holds; gates contract: R5
-- Claim/shim counts derived from times in the gates snapshot: R6
+- Gates section of core's snapshot, written with the holds it places in one post: R5
+- Claim/shim counts derived from times in the gates section: R6
 - Session issue record read through #174's core reader: R7
 - Commit fence as a pure rule applied in the after-commit check: R8
 - Release on claim once per claim, first in the run, marker file: R9
@@ -113,7 +113,7 @@ specs/209-rebuild-reviewer-on-core/
 reviewer/docs/adr/                 # PR A: amendments 0001, 0003, 0004, 0008, 0011, 0013
 
 core/src/
-├── state.ts                       # PR B: tag-keyed reading, any-edited hold, readGates/writeGates
+├── state.ts                       # PR B: recordGates, gates guard in checkTransition, size rule
 ├── contracts/gates.ts             # PR B
 ├── contracts/commit-pass.ts       # PR C
 ├── commit-pass.ts                 # PR C: read/record, atomic session file
@@ -145,11 +145,11 @@ codeworks.toml                     # [reviewer] section
 | # | PR | Blocks |
 |---|---|---|
 | A | reviewer ADR amendments (FR-004, FR-016, FR-017) | B, all reviewer code |
-| B | core: tag-keyed state + gates contract (R5) | US1 gates part |
+| B | core: gates section of the snapshot (R5) | US1 gates part |
 | C | core: commit-check pass record + protected paths (R11) | US2, #174 Story 2 |
 | — | #174 core: session issue record (external) | US3, US4 |
 | S | carrier, hook skeleton, session folder, `write.lock` (FR-020) | all stories |
-| US1 | settings, round/hold recording through core, gates comment, ledger deleted | — |
+| US1 | settings, round/hold recording through core, gates section, ledger deleted | — |
 | US2 | bare copy, after-commit check, ancestry base (FR-021), per-branch pass record writes | US3 |
 | US3 | fence in the after-commit check | — |
 | US4 | release on claim | — |

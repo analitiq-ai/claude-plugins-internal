@@ -47,7 +47,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 - **Decision**: A hook run that decides on rounds or holds calls `readState` at most once, through a
   run-scoped `RunState` object passed down explicitly; writes go through core's write functions, which
   re-read inside core. Nothing of the reading is written to disk.
-  Every state or gates write, and the claim step (R9), holds an exclusive `write.lock` in the session folder
+  Every state write, and the claim step (R9), holds an exclusive `write.lock` in the session folder
   from core's read to its post, so two hook runs of one session never post from the same reading (FR-020).
 - **Rationale**: FR-004 and orchestrator ADR-0003 d5 (store nothing readable on GitHub). Core's writes re-read
   before posting, but nothing serialises two concurrent read→post sequences: Claude Code runs hooks of parallel
@@ -69,30 +69,30 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 - **Existing tools**: `core/src/values.ts` value sets, `core/src/contracts/snapshot.ts`, `core/src/attest.ts`
   `passingRounds` (what the orchestrator will count).
 
-## R5: Core reads and writes reviewer App comments by tag (prerequisite core PR)
+## R5: The gates section of core's snapshot (prerequisite core PR)
 
-- **Decision**: Before this spec's code, a core PR changes `core/src/state.ts` so that (a) each reviewer App
-  comment is classed by its first-line tag (`codeworks:reviewer-state`, `codeworks:reviewer-gates`), the
-  newest per tag winning; (b) any reviewer App comment that was edited, lacks a known tag, or was deleted
-  after the newest of a tag holds the story; (c) a `readGates` / `writeGates` pair over a new
-  `core/src/contracts/gates.ts` Zod schema applies the same fail-closed rules. The ADR amendments FR-016
-  names (reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1–d2, ADR-0013 d4) land first, in their own PR.
-- **Rationale**: Today `judge()` takes the newest reviewer App comment of any body as state, so a second
-  comment would make the state `invalid`; and only the newest comment's edit holds. Principle VI: the
-  governing ADRs and core's rule ship apart from reviewer's code.
-- **Existing tools**: `core/src/state.ts` `judge`, `snapshotOf`, `STATE_TAG`; the rebuild-from-newest-unedited
-  path is reused per tag. A second store (local DB, issue body) was rejected in the spec's clarifications.
+- **Decision**: Before this spec's code, a core PR adds `gates: Gates | null` to `Snapshot` and a `recordGates`
+  call that posts the gates change and the `claim-`/`shim-` holds it places in one post; every other writer
+  refuses a `gates` differing from the one it read; `recordGates` refuses a snapshot that would not fit with
+  every open hold released and one more round recorded ([contracts/gates-snapshot.md](contracts/gates-snapshot.md)).
+  The ADR amendments FR-016 names (reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1, ADR-0013 d4) land first.
+- **Rationale**: One comment means one post: a count and its hold land together, so no run can die between them,
+  and the newest-unedited rebuild restores counts and holds from the same moment. `judge()` already takes the
+  newest reviewer App comment as state, so tamper and release rules apply unchanged. The size rule keeps a
+  growing gates section from blocking an admin's release, which shares the comment. Principle VI: the governing
+  ADRs and core's rule ship apart from reviewer's code.
+- **Existing tools**: `core/src/state.ts` `judge`, `snapshotOf`, `checkTransition`, `untamperedSnapshot`,
+  `COMMENT_LIMIT`. A second tagged comment was rejected: two posts leave a crash gap and need tag-classing.
 
-## R6: Gate counts derive from times in the gates snapshot
+## R6: Gate counts derive from times in the gates section
 
-- **Decision**: The gates snapshot is written once, field by field, from what today's claim and shim gates read
+- **Decision**: The gates section is written once, field by field, from what today's claim and shim gates read
   again in a later run (every field cites its reader): [contracts/gates-snapshot.md](contracts/gates-snapshot.md). It holds the
-  story's one branch (root ADR-0005) and its anchor commit; lineage counts are distinct WRONG check refs after the reset, bug
-  counts are members after the reset, and a merge keeps the higher count (ADR-0008 d2). The gates evidence is
-  posted first; every deciding run then places a hold whose count reached its threshold and has no OPEN row, so
-  a run that dies between the two posts is repaired by the next.
-- **Rationale**: FR-015: counts never stored, so a reset or a release needs no write to the gates comment
-  to take effect, and no count can drift from its evidence.
+  story's one branch (root ADR-0005) and its anchor commit; lineage counts are distinct WRONG check refs after the
+  reset, bug counts are members after the reset, and a merge keeps the higher count (ADR-0008 d2). The record that
+  reaches a threshold places the hold, with its question, in the same `recordGates` post.
+- **Rationale**: FR-015: counts never stored, so a reset or a release needs no gates write to take effect, and no
+  count can drift from its evidence.
 - **Existing tools**: `claimgate.py`/`shimgate.py` count rules and thresholds (ported); `StateReading.reset`
   and the hold row's `released` from core.
 
