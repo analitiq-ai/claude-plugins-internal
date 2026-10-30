@@ -188,6 +188,33 @@ export async function storyPr(reader: GitHubClient, repo: string, branch: string
   return pickStoryPr(answerOf(z.array(PullRequestHeadAnswer), nodes, `the PRs on ${repo} ${branch}`), branch);
 }
 
+/** A story's branch on GitHub and its PR; `pr` is null until one is opened from the branch. */
+export type IssueStory = { branch: string; pr: StoryPr | null };
+
+// `<k>` is never checked (root ADR-0005 d1), so two branches of one story leave none to pick, whatever their `<k>`.
+export function pickStoryBranch(names: readonly string[], s: number): string | null {
+  assertIssueNumber(s);
+  const branches = names.filter((name) => storyOf(name) === s);
+  if (branches.length > 1) throw new DerivationError(`the story branch of #${s}`, branches.join(", "));
+  return branches[0] ?? null;
+}
+
+const HEADS = "refs/heads/";
+
+const BranchRef = z.object({ ref: z.string().startsWith(HEADS) }).transform(({ ref }) => ref.slice(HEADS.length));
+
+/** Null when GitHub holds no branch of the story: before its first push, or once its merge deleted it. */
+export async function issueStory(reader: GitHubClient, repo: string, s: number): Promise<IssueStory | null> {
+  assertIssueNumber(s);
+  const where = ownerAndName(repo);
+  const at = [where.owner, where.name].map(encodeURIComponent).join("/");
+  // Every branch the grammar gives `s` starts `<s>-us`, so a prefix read misses none; the grammar picks among them.
+  const refs = await reader.restPages(`/repos/${at}/git/matching-refs/heads/${s}-us`);
+  const branch = pickStoryBranch(answerOf(z.array(BranchRef), refs, `the branches of ${repo} starting ${s}-us`), s);
+  if (branch === null) return null;
+  return { branch, pr: await storyPr(reader, repo, branch) };
+}
+
 export function pickSpecPr(prs: readonly PullRequestState[], p: number): SpecPr | null {
   const newest = newestSameRepo(prs, specBranch(p));
   if (newest === null) return null;

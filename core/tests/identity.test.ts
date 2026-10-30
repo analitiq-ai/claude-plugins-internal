@@ -9,9 +9,11 @@ import {
   DerivationError,
   doneFrom,
   isDone,
+  issueStory,
   parseBranch,
   pickSpecFolder,
   pickSpecPr,
+  pickStoryBranch,
   pickStoryPr,
   requirement,
   specBranch,
@@ -338,6 +340,75 @@ describe("storyPr", () => {
     assert.equal(await storyPr(reader, REPO, "feature/x"), null);
     assert.deepEqual(reader.calls, []);
   });
+});
+
+describe("pickStoryBranch", () => {
+  it("is the one branch of story <s>; another story's, the spec's or one off the grammar is not", () => {
+    const names = ["212-usx", "212-us-retry", "2120-us1-retry", "213-us1-retry", "212-spec", "212-us2-Retry", BRANCH];
+    assert.equal(pickStoryBranch(names, 212), BRANCH);
+  });
+
+  it("is null when no branch is story <s>'s", () => {
+    assert.equal(pickStoryBranch([], 212), null);
+    assert.equal(pickStoryBranch(["213-us1-retry", "212-spec"], 212), null);
+  });
+
+  it("fails naming each branch when several are story <s>'s, whatever their <k>", () => {
+    assert.throws(() => pickStoryBranch(["212-us1-retry", BRANCH], 212), derivationError("#212", "212-us1-retry", BRANCH));
+  });
+});
+
+describe("issueStory", () => {
+  const ref = (branch: string) => ({ ref: `refs/heads/${branch}`, node_id: `REF_${branch}`, object: { sha: sha(1), type: "commit" } });
+  const prs = [{ number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, merged: false }];
+
+  function routes(refs: unknown[], onBranch: unknown[] = prs): FakeRoutes {
+    return {
+      restPages: { "/repos/acme/widgets/git/matching-refs/heads/212-us": refs },
+      graphqlPages: [
+        { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === BRANCH, answer: onBranch },
+      ],
+    };
+  }
+
+  const kinds = (calls: FakeCall[]) => calls.map((call) => call.kind);
+
+  it("reads the branches starting <s>-us, then the story PR on the one that is the story's", async () => {
+    const reader = fakeGitHub(routes([ref("212-usx"), ref(BRANCH)]));
+    assert.deepEqual(await issueStory(reader, REPO, 212), {
+      branch: BRANCH,
+      pr: { number: 251, head: sha(251), merged: false },
+    });
+  });
+
+  it("names the branch with no PR before one is opened", async () => {
+    assert.deepEqual(await issueStory(fakeGitHub(routes([ref(BRANCH)], [])), REPO, 212), { branch: BRANCH, pr: null });
+  });
+
+  it("is null, reading no PR, when GitHub holds no branch of the story", async () => {
+    const reader = fakeGitHub(routes([ref("212-usx")]));
+    assert.equal(await issueStory(reader, REPO, 212), null);
+    assert.deepEqual(kinds(reader.calls), ["restPages"]);
+  });
+
+  it("fails naming each branch, reading no PR, when several are the story's", async () => {
+    const reader = fakeGitHub(routes([ref("212-us1-retry"), ref(BRANCH)]));
+    await assert.rejects(issueStory(reader, REPO, 212), derivationError("212-us1-retry", BRANCH));
+    assert.deepEqual(kinds(reader.calls), ["restPages"]);
+  });
+
+  it("refuses an answer naming a ref that is no branch", async () => {
+    const reader = fakeGitHub(routes([{ ...ref(BRANCH), ref: `refs/tags/${BRANCH}` }]));
+    await assert.rejects(issueStory(reader, REPO, 212), /not the shape asked for/);
+  });
+
+  for (const s of [0, -1, 1.5]) {
+    it(`refuses ${s}, which is no issue number, asking GitHub nothing`, async () => {
+      const reader = fakeGitHub({});
+      await assert.rejects(issueStory(reader, REPO, s), TypeError);
+      assert.deepEqual(reader.calls, []);
+    });
+  }
 });
 
 describe("requirement", () => {
