@@ -28,7 +28,9 @@ function inEffect(): Record<string, unknown> {
         denyRead: ["~/.config/codeworks", "/srv/creds", "~/.claude/.credentials.json"],
         denyWrite: ["~/.config/codeworks", "/srv/creds", "~/.local/state/codeworks/reviewer", "~/.claude", "~/.gitconfig"],
         allowManagedReadPathsOnly: true,
+        disabled: false,
       },
+      allowNestedUserNamespaces: false,
       network: {
         allowedDomains: ["github.com"],
         allowManagedDomainsOnly: true,
@@ -78,6 +80,8 @@ const EQUALS: [setting: string, value: unknown, other: unknown][] = [
   ["sandbox.allowUnsandboxedCommands", false, true],
   ["sandbox.excludedCommands", [], ["git"]],
   ["sandbox.filesystem.allowManagedReadPathsOnly", true, false],
+  ["sandbox.filesystem.disabled", false, true],
+  ["sandbox.allowNestedUserNamespaces", false, true],
   ["sandbox.network.allowManagedDomainsOnly", true, false],
   ["sandbox.network.strictAllowlist", true, false],
   ["sandbox.network.allowAllUnixSockets", false, true],
