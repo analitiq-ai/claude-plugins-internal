@@ -1,0 +1,25 @@
+fixes: K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=0]
+states: 27144   transitions: 125653
+
+== VIOLATION unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+  s0: InProgress pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x ready]: launch
+      -> session start
+      -> github round FIX -> push -> internal round CLEAN; turn ends
+      -> CI failure on s0
+
+################ SUMMARY (K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch                 one[dis=0]
+  total distinct: 1

@@ -1,0 +1,37 @@
+fixes: GHR,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[resc=1]
+states: 302681   transitions: 1534219
+
+== VIOLATION progress s0: K1 rescope hold never released: the held-branch watch puts the merge of main back  (4124 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. human: drag s0 -> Blocked before a rescope
+    6. human: runs issue-spec (rescope)
+    7. human: approves spec PR (exempt label) + marks ready
+    8. sweep spec PR: spec PR codex request
+    9. human: merges spec PR (spec.md changed)
+  s0: Blocked(h) pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[rsc(rec v0)] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r1/v1  planner: idle
+
+== VIOLATION hold rsc-s0 has no reachable release: K1 rescope hold never released: the held-branch watch puts the merge of main back  (4124 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. human: drag s0 -> Blocked before a rescope
+    6. human: runs issue-spec (rescope)
+    7. human: approves spec PR (exempt label) + marks ready
+    8. sweep spec PR: spec PR codex request
+    9. human: merges spec PR (spec.md changed)
+  s0: Blocked(h) pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[rsc(rec v0)] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r1/v1  planner: idle
+
+################ SUMMARY (GHR,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  hold rsc-s0 has no reachable release: K1 rescope hold never released: the held-branch watch puts the merge of  one[resc=1]
+  progress s0: K1 rescope hold never released: the held-branch watch puts the merge of main back                 one[resc=1]
+  total distinct: 2

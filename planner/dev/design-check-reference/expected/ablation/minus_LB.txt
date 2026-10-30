@@ -1,0 +1,48 @@
+fixes: GHR,K1,K12,L4,L6,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=0]
+states: 17928   transitions: 82147
+
+== VIOLATION unbounded automated launch loop: CI failure / internal round FIX / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. github round FIX -> push; turn ends
+   10. tick s0 [InProgress x ready]: launch
+   11. session start
+   12. CI failure on s0
+   13. audit stage (round cap): not CONVERGED -> audit hold; turn ends
+   14. human: unlock aud-s0
+  s0: InProgress pr=ready(rfr) att=0 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x ready]: launch
+      -> session start
+      -> internal round FIX -> push; turn ends
+      -> CI failure on s0
+
+== VIOLATION unbounded automated launch loop: internal round FIX / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x draft]: launch
+      -> session start
+      -> internal round FIX -> push; turn ends
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL,WV)
+  unbounded automated launch loop: CI failure / internal round FIX / launch                                      one[dis=0]
+  unbounded automated launch loop: internal round FIX / launch                                                   one[dis=0]
+  total distinct: 2

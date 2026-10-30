@@ -1,0 +1,156 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S9,SC,SIL,T7,T9,UNL,WV   literal grid: False
+
+################ scenario two[crash=1]
+states: 435820   transitions: 2731075
+
+== VIOLATION blocked_move_lost
+   reason posted, crash, next tick: UNDEF
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)
+   block:launch; a bare Ready then goes working:flip
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round CLEAN; turn ends
+    8. CI failure on s0
+    9. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: InProgress pr=draft att=1 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:launch)
+   working:block:launch; a bare Ready then goes working:flip
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, post:rsc, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   11. session start
+   12. internal round CLEAN; turn ends
+   13. tick s0 [InProgress x draft]: lane:Blocked
+   14. human: s0 -> Ready
+   15. human: unlock rsc-s0
+   16. CI failure on s0
+   17. tick s0 [Ready x draft]: post:launch, lane:Blocked
+  s0: Ready(h) pr=draft att=1 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION undefined_cell: InProgress x none (log=exit handled=True exempt=False att=False)
+   InProgress x none (log=exit handled=True exempt=False att=False)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+    6. tick s0 [InProgress x none] no defined action
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell  (2 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [card in InProgress with nothing posted]  (2 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s1: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell  (2 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. session ends turn
+   14. tick s1: post:launch | CRASH
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s1: via blocker s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell  (2 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [card in InProgress with nothing posted]  (2 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. session ends turn
+   14. tick s1: post:launch | CRASH
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress parent: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell  (4 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. session ends turn
+    5. tick s0: post:launch | CRASH
+  s0: InProgress pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit(hd) br=no
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S9,SC,SIL,T7,T9,UNL,WV)
+  blocked_move_lost                                                                                              two[crash=1]
+  progress parent: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell     two[crash=1]
+  progress s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell         two[crash=1]
+  progress s1: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell         two[crash=1]
+  progress s1: via blocker s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): two[crash=1]
+  silent stall s0: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [ca two[crash=1]
+  silent stall s1: S5 launch already HANDLED, card not Blocked (crash after the post, or drag back): no cell [ca two[crash=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)                              two[crash=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (working:block:launch)                      two[crash=1]
+  undefined_cell: InProgress x none (log=exit handled=True exempt=False att=False)                               two[crash=1]
+  total distinct: 10

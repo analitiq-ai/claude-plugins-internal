@@ -1,0 +1,23 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL   literal grid: False
+
+################ scenario one[dis=0]
+states: 19719   transitions: 87385
+
+== VIOLATION merge_codex_waived
+   codex-review success marked WAIVED: no Codex review at the head
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI green on s0
+    7. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    8. Codex out of credits (WAIVED) on s0
+    9. tick s0 [InReview x ready]: squash merge
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=waived fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T7,T9,UNL)
+  merge_codex_waived                                                                                             one[dis=0]
+  total distinct: 1

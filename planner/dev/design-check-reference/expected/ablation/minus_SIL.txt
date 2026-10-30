@@ -1,0 +1,21 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,T7,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=0]
+states: 141261   transitions: 837562
+
+== VIOLATION silent_unrequested
+   Blocked naming Codex silent at a head the orchestrator never asked it to review
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. tick s0 [InProgress x ready]: lane:Blocked, post:sil
+  s0: InProgress pr=ready(rfr) att=1 ci=pend cx=silent fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,T7,T9,UNL,WV)
+  silent_unrequested                                                                                             one[dis=0]
+  total distinct: 1

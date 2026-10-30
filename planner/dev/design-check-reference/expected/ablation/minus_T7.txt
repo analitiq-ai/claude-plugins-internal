@@ -1,0 +1,28 @@
+fixes: GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T9,UNL,WV   literal grid: False
+
+################ scenario one[dis=1]
+states: 387130   transitions: 2219044
+
+== VIOLATION merge_exempt_label_predates_head
+   exempt label applied before the head merged
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: exempt label on s0 story PR
+    8. CI failure on s0
+    9. github round FIX -> push; turn ends
+   10. tick s0 [InProgress x draft]: ready flip
+   11. tick s0 [InProgress x ready]: codex request
+   12. CI green on s0
+   13. Codex pass on s0
+   14. tick s0 [InProgress x ready]: lane:InReview, squash merge
+  s0: InProgress pr=ready(rfr) att=0 ci=green cx=pass fnd=None ex=1 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: -
+  parent: -  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+################ SUMMARY (GHR,K1,K12,L4,L6,LB,LOCK,OUT,PLW,S2,S3,S4,S5,S9,SC,SIL,T9,UNL,WV)
+  merge_exempt_label_predates_head                                                                               one[dis=1]
+  total distinct: 1

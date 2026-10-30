@@ -1,0 +1,480 @@
+fixes: none   literal grid: False
+
+################ scenario two[ext=1,outs=1]
+states: 3815254   transitions: 24062775
+
+== VIOLATION merge_codex_waived
+   codex-review success marked WAIVED: no Codex review at the head
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI green on s0
+    7. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    8. Codex out of credits (WAIVED) on s0
+    9. tick s0 [InReview x ready]: squash merge
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=waived fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION outsider_launch
+   a builder launch whose only work is a thread by a non-trusted author
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. outsider opens a review thread on s0
+    7. tick s0 [InProgress x ready]: launch
+  s0: InProgress pr=ready(rfr) att=1 ci=pend cx=none fnd=outsider ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:REPEAT)
+   block:REPEAT; a bare Ready then goes working:in-review
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+    7. tick s0 [InProgress x ready]: launch
+    8. session start
+    9. github round FIX -> push; turn ends
+   10. tick s0 [InProgress x ready]: launch
+   11. session start
+   12. internal round CLEAN; turn ends
+   13. CI green on s0
+   14. tick s0 [InProgress x ready]: codex request, post:launch, lane:Blocked
+  s0: InProgress pr=ready(rfr) att=1 ci=green cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)
+   block:launch; a bare Ready then goes working:flip
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round CLEAN; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: InProgress pr=draft att=1 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s0: S9 codex-review failure with no findings and no hold: no cell, no named release  (6856 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. tick s0 [InProgress x ready]: post:sil, lane:Blocked
+    8. human: re-request silent Codex on s0
+    9. Codex fail + threads on s0
+   10. human: resolve thread on s0
+  s0: Blocked pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb never posted]  (5768 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. CI failure on s0
+    6. tick s0 [InProgress x draft]: launch
+    7. session start
+    8. github round PUSH_BACK all; turn ends
+    9. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb,rsc never posted]  (2884 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. CI failure on s0
+   11. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. github round PUSH_BACK all; turn ends
+   14. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc never posted]  (7818 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never posted]  (7836 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round ESCALATE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never posted]  (3918 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. internal round RESCOPE; turn ends
+    8. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+    9. human: s0 -> Ready
+   10. tick s0 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   11. session start
+   12. internal round ESCALATE; turn ends
+   13. tick s0 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]  (328 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. human: re-request silent Codex on s0
+    8. Codex fail + threads on s0
+    9. tick s0 [InProgress x ready]: launch
+   10. session start
+   11. github round PUSH_BACK all; turn ends
+   12. human: unlock pb-s0
+  s0: InProgress pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s0: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]  (640 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI green on s0
+    7. tick s0 [InProgress x ready]: codex request, lane:InReview, codex request
+    8. Codex fail + threads on s0
+    9. tick s0 [InReview x ready]: lane:InProgress, launch
+   10. session start
+   11. github round PUSH_BACK all; turn ends
+   12. human: unlock pb-s0
+   13. tick s0 [InProgress x ready]: lane:InReview
+  s0: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s1: S9 codex-review failure with no findings and no hold: no cell, no named release  (6856 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR, internal round CLEAN; turn ends
+   14. tick s1 [InProgress x draft]: ready flip
+   15. Codex module timeout passes unrequested on s1
+   16. tick s1 [InProgress x ready]: post:sil, lane:Blocked
+   17. human: re-request silent Codex on s1
+   18. Codex fail + threads on s1
+   19. human: resolve thread on s1
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress s1: via blocker s0: S9 codex-review failure with no findings and no hold: no cell, no named release  (6856 states; no path to merge or close using design-named human actions)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. tick s0 [InProgress x ready]: post:sil, lane:Blocked
+    8. human: re-request silent Codex on s0
+    9. Codex fail + threads on s0
+   10. human: resolve thread on s0
+  s0: Blocked pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb never posted]  (5768 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR; turn ends
+   14. CI failure on s1
+   15. tick s1 [InProgress x draft]: launch
+   16. session start
+   17. github round PUSH_BACK all; turn ends
+   18. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb] rr=[] sess=0 log=exit(hd) br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb,rsc never posted]  (2884 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR; turn ends
+   14. tick s1 [InProgress x draft]: launch
+   15. session start
+   16. internal round RESCOPE; turn ends
+   17. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+   18. human: s1 -> Ready
+   19. CI failure on s1
+   20. tick s1 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   21. session start
+   22. github round PUSH_BACK all; turn ends
+   23. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=draft att=0 ci=fail cx=none fnd=None ex=0 holds=[pb,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc never posted]  (7818 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR; turn ends
+   14. tick s1 [InProgress x draft]: launch
+   15. session start
+   16. internal round RESCOPE; turn ends
+   17. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never posted]  (7836 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR; turn ends
+   14. tick s1 [InProgress x draft]: launch
+   15. session start
+   16. internal round ESCALATE; turn ends
+   17. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc] rr=[] sess=0 log=exit(hd) br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never posted]  (3918 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR; turn ends
+   14. tick s1 [InProgress x draft]: launch
+   15. session start
+   16. internal round RESCOPE; turn ends
+   17. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+   18. human: s1 -> Ready
+   19. tick s1 [Ready x draft]: assign, lane:InProgress, launch(after Ready)
+   20. session start
+   21. internal round ESCALATE; turn ends
+   22. tick s1 [InProgress x draft]: post:launch, lane:Blocked
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: Blocked pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[esc,rsc(rec v0)] rr=[] sess=0 log=exit(hd) br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]  (328 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR, internal round CLEAN; turn ends
+   14. tick s1 [InProgress x draft]: ready flip
+   15. Codex module timeout passes unrequested on s1
+   16. human: re-request silent Codex on s1
+   17. Codex fail + threads on s1
+   18. tick s1 [InProgress x ready]: launch
+   19. session start
+   20. github round PUSH_BACK all; turn ends
+   21. human: unlock pb-s1
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: InProgress pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION silent stall s1: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]  (640 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+    5. tick s0 [InProgress x draft]: launch
+    6. session start
+    7. human: s1 -> Ready
+    8. CI failure on s0
+    9. github round PUSH_BACK all; turn ends
+   10. human: bypass merge s0
+   11. tick s1 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+   12. session start
+   13. builder first push + draft PR, internal round CLEAN; turn ends
+   14. tick s1 [InProgress x draft]: ready flip
+   15. CI green on s1
+   16. tick s1 [InProgress x ready]: codex request, lane:InReview, codex request
+   17. Codex fail + threads on s1
+   18. tick s1 [InReview x ready]: lane:InProgress, launch
+   19. session start
+   20. github round PUSH_BACK all; turn ends
+   21. human: unlock pb-s1
+   22. tick s1 [InProgress x ready]: lane:InReview
+  s0: Done pr=merged att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=r0/v0 CLOSED
+  s1: InReview pr=ready(rfr) att=1 ci=green cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION progress parent: S9 codex-review failure with no findings and no hold: no cell, no named release  (13712 states)
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. Codex module timeout passes unrequested on s0
+    7. tick s0 [InProgress x ready]: post:sil, lane:Blocked
+    8. human: re-request silent Codex on s0
+    9. Codex fail + threads on s0
+   10. human: resolve thread on s0
+  s0: Blocked pr=ready(rfr) att=1 ci=pend cx=fail fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+
+== VIOLATION unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR, internal round CLEAN; turn ends
+    5. tick s0 [InProgress x draft]: ready flip
+    6. CI failure on s0
+  s0: InProgress pr=ready(rfr) att=1 ci=fail cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x ready]: launch
+      -> session start
+      -> github round FIX -> push -> internal round CLEAN; turn ends
+      -> CI failure on s0
+
+== VIOLATION unbounded automated launch loop: internal round FIX / launch
+   reached by:
+    1. human: s0 -> Ready
+    2. tick s0 [Ready x none]: assign, lane:InProgress, launch(after Ready)
+    3. session start
+    4. builder first push + draft PR; turn ends
+  s0: InProgress pr=draft att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=exit br=r0/v0
+  s1: Backlog(unclaimed) pr=none att=0 ci=pend cx=none fnd=None ex=0 holds=[] rr=[] sess=0 log=None br=no
+  parent: Backlog open  spec: pr=merged landed=1 main r0/v0  planner: idle
+   cycle (no human action, no counter):
+      -> tick s0 [InProgress x draft]: launch
+      -> session start
+      -> internal round FIX -> push; turn ends
+
+################ SUMMARY (spec as written)
+  merge_codex_waived                                                                                             two[ext=1,outs=1]
+  outsider_launch                                                                                                two[ext=1,outs=1]
+  progress parent: S9 codex-review failure with no findings and no hold: no cell, no named release               two[ext=1,outs=1]
+  progress s0: S9 codex-review failure with no findings and no hold: no cell, no named release                   two[ext=1,outs=1]
+  progress s1: S9 codex-review failure with no findings and no hold: no cell, no named release                   two[ext=1,outs=1]
+  progress s1: via blocker s0: S9 codex-review failure with no findings and no hold: no cell, no named release   two[ext=1,outs=1]
+  silent stall s0: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb neve two[ext=1,outs=1]
+  silent stall s0: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb, two[ext=1,outs=1]
+  silent stall s0: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc ne two[ext=1,outs=1]
+  silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never pos two[ext=1,outs=1]
+  silent stall s0: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never two[ext=1,outs=1]
+  silent stall s0: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]        two[ext=1,outs=1]
+  silent stall s0: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]          two[ext=1,outs=1]
+  silent stall s1: S3 (same root) pb hold open, its reason never posted [Blocked, reason of open hold(s) pb neve two[ext=1,outs=1]
+  silent stall s1: S3 (same root) pb,rsc hold open, its reason never posted [Blocked, reason of open hold(s) pb, two[ext=1,outs=1]
+  silent stall s1: S3 (same root) rsc hold open, its reason never posted [Blocked, reason of open hold(s) rsc ne two[ext=1,outs=1]
+  silent stall s1: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc never pos two[ext=1,outs=1]
+  silent stall s1: S3 escalation hold open, question never posted [Blocked, reason of open hold(s) esc,rsc never two[ext=1,outs=1]
+  silent stall s1: S9 codex-review failure, no findings, no hold [card in InProgress with nothing posted]        two[ext=1,outs=1]
+  silent stall s1: S9 codex-review failure, no findings, no hold [card in InReview with nothing posted]          two[ext=1,outs=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:REPEAT)                              two[ext=1,outs=1]
+  spurious_blocked: S4 REPEAT blocks a launch that attested the head (block:launch)                              two[ext=1,outs=1]
+  unbounded automated launch loop: CI failure / github round FIX / internal round CLEAN / launch                 two[ext=1,outs=1]
+  unbounded automated launch loop: internal round FIX / launch                                                   two[ext=1,outs=1]
+  total distinct: 24
