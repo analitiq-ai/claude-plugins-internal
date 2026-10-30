@@ -94,7 +94,6 @@ export const ALLOWED_PLUGINS: readonly string[] = [
 export const UNCHECKED_FOLDERS: Readonly<Record<string, string>> = {
   "<V>/ghcreds": "every other credential: gh, git, SSH, cloud",
   "<V>/plugin/gaterev": "the installed plugin code and data",
-  "/tmp/verify-b-ghsess": "the session's gh config folder",
   "<C>": "the session's package cache folder",
 };
 export const UNCHECKED_SETTINGS: Readonly<Record<string, string>> = {
