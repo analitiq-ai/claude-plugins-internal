@@ -5,7 +5,11 @@ import { isDeepStrictEqual } from "node:util";
 const MANAGED_FOLDER = "/etc/claude-code";
 const MANAGED_FILE = `${MANAGED_FOLDER}/managed-settings.json`;
 
-const HOME_FOLDERS = { "<K>": ".config/codeworks", "<S>": ".local/state/codeworks/reviewer" };
+const HOME_FOLDERS = {
+  "<K>": ".config/codeworks",
+  "<S>": ".local/state/codeworks/reviewer",
+  "<O>": ".local/state/codeworks/orchestrator",
+};
 
 // The one read made where no managed settings exist: planner's own key, on the admin machine (root ADR-0008 d2, d9).
 const EXEMPT = { plugin: "planner", file: "planner-app.pem" };
@@ -23,9 +27,13 @@ export class KeyReadRefused extends Error {
   }
 }
 
-/** `<K>` and `<S>` in a list item stand for that folder written from `~` or as its absolute path. */
+/**
+ * `<K>`, `<S>` and `<O>` stand for that folder: in a list item written from `~` or as its absolute path, in
+ * `equalsPath` as its absolute path alone, since gh reads an `env` value with no `~` expanded.
+ */
 export type RequiredSetting =
   | { readonly setting: string; readonly equals: boolean | readonly [] }
+  | { readonly setting: string; readonly equalsPath: string }
   | { readonly setting: string; readonly holdsPaths: readonly string[] }
   | { readonly setting: string; readonly holdsRules: readonly string[] };
 
@@ -36,7 +44,7 @@ export const REQUIRED_SETTINGS: readonly RequiredSetting[] = [
   { setting: "sandbox.allowUnsandboxedCommands", equals: false },
   { setting: "sandbox.excludedCommands", equals: [] },
   { setting: "sandbox.filesystem.denyRead", holdsPaths: ["<K>", "~/.claude/.credentials.json"] },
-  { setting: "sandbox.filesystem.denyWrite", holdsPaths: ["<K>", "<S>", "~/.claude", "~/.gitconfig"] },
+  { setting: "sandbox.filesystem.denyWrite", holdsPaths: ["<K>", "<S>", "<O>", "~/.claude", "~/.gitconfig"] },
   { setting: "sandbox.filesystem.allowManagedReadPathsOnly", equals: true },
   { setting: "sandbox.filesystem.disabled", equals: false },
   { setting: "sandbox.allowNestedUserNamespaces", equals: false },
@@ -50,6 +58,7 @@ export const REQUIRED_SETTINGS: readonly RequiredSetting[] = [
       "Read(<K>/**)",
       "Edit(<K>/**)",
       "Edit(<S>/**)",
+      "Edit(<O>/**)",
       "Read(~/.claude/.credentials.json)",
       "Edit(~/.claude/**)",
       "Edit(~/.gitconfig)",
@@ -68,6 +77,7 @@ export const REQUIRED_SETTINGS: readonly RequiredSetting[] = [
   { setting: "allowedMcpServers", equals: [] },
   { setting: "allowManagedMcpServersOnly", equals: true },
   { setting: "allowManagedHooksOnly", equals: true },
+  { setting: "env.GH_CONFIG_DIR", equalsPath: "<O>/gh" },
 ];
 
 // Under `allowManagedHooksOnly` every enabled plugin's hooks run, so a plugin §5 does not list must not be on.
@@ -85,9 +95,9 @@ export const UNCHECKED_FOLDERS: Readonly<Record<string, string>> = {
   "<V>/ghcreds": "every other credential: gh, git, SSH, cloud",
   "<V>/plugin/gaterev": "the installed plugin code and data",
   "/tmp/verify-b-ghsess": "the session's gh config folder",
+  "<C>": "the session's package cache folder",
 };
 export const UNCHECKED_SETTINGS: Readonly<Record<string, string>> = {
-  env: "the package caches in `<C>`, the session's package cache folder",
   "sandbox.network.allowedDomains": "GitHub plus the registries the served repo needs",
 };
 
@@ -196,14 +206,9 @@ function valueAt(document: Record<string, unknown>, setting: string): unknown {
   return node;
 }
 
-// A permission rule's absolute path starts with `//`; one `/` would make it relative to the settings file.
-function spellings(item: string, home: string, absolutePrefix: string): string[] {
+function spellings(item: string, roots: readonly string[]): string[] {
   for (const [placeholder, folder] of Object.entries(HOME_FOLDERS)) {
-    if (item.includes(placeholder)) {
-      return [`~/${folder}`, `${absolutePrefix}${home}/${folder}`].map((written) =>
-        item.replace(placeholder, () => written),
-      );
-    }
+    if (item.includes(placeholder)) return roots.map((root) => item.replace(placeholder, () => `${root}/${folder}`));
   }
   return [item];
 }
@@ -216,10 +221,15 @@ function requiredReasons(row: RequiredSetting, document: Record<string, unknown>
       ? []
       : [`${row.setting} is ${JSON.stringify(value)}, not ${JSON.stringify(row.equals)}`];
   }
+  if ("equalsPath" in row) {
+    const [path] = spellings(row.equalsPath, [home]);
+    return value === path ? [] : [`${row.setting} is ${JSON.stringify(value)}, not ${JSON.stringify(path)}`];
+  }
   if (!Array.isArray(value)) return [`${row.setting} is ${JSON.stringify(value)}, not a list`];
-  const [items, absolutePrefix] = "holdsPaths" in row ? [row.holdsPaths, ""] : [row.holdsRules, "/"];
+  // A permission rule's absolute path starts with `//`; one `/` would make it relative to the settings file.
+  const [items, absoluteRoot] = "holdsPaths" in row ? [row.holdsPaths, home] : [row.holdsRules, `/${home}`];
   return items.flatMap((item) => {
-    const accepted = spellings(item, home, absolutePrefix);
+    const accepted = spellings(item, ["~", absoluteRoot]);
     return accepted.some((written) => value.includes(written)) ? [] : [`${row.setting} lacks ${accepted.join(" or ")}`];
   });
 }
