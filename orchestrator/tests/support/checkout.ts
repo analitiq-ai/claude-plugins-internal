@@ -1,8 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
+
+import type { App, mintToken, MintedToken } from "../../plugin/core/tokens.ts";
 
 export const REPO = "acme/widgets";
 export const BOARD = "https://github.com/orgs/acme/projects/1";
@@ -56,4 +59,25 @@ export function scratchCheckout(t: TestContext, settings: string | null = SETTIN
 /** The contents API's answer for codeworks.toml holding `text`. */
 export function contentsAnswer(text: string): unknown {
   return { type: "file", encoding: "base64", content: Buffer.from(text).toString("base64") };
+}
+
+export type MintCall = { app: App; appId: number; keyFile: string; plugin: string; repo: string };
+
+export type FakeMintToken = { mintToken: typeof mintToken; calls: MintCall[] };
+
+/**
+ * Stands in for core's mintToken: each call answers a new token for its repository expiring an hour after `now()`,
+ * or throws `failure` when one is given.
+ */
+export function fakeMintToken(now: () => Date, failure?: Error): FakeMintToken {
+  const calls: MintCall[] = [];
+  return {
+    calls,
+    mintToken: async (app, appId, keyFile, plugin, repo): Promise<MintedToken> => {
+      calls.push({ app, appId, keyFile, plugin, repo });
+      if (failure !== undefined) throw failure;
+      const expires_at = new Date(now().getTime() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+      return { value: randomUUID(), app, repo, expires_at, permissions: {} };
+    },
+  };
 }
