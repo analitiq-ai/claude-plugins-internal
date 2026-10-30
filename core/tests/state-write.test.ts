@@ -24,10 +24,12 @@ import {
   at,
   comment,
   deletion,
+  fixRuling,
   hold,
   move,
   postedSnapshot,
   posts,
+  pushbackRuling,
   reader,
   releasedHold,
   round,
@@ -92,6 +94,7 @@ describe("writeState", () => {
         '      "verdict": null',
         "    }",
         "  ],",
+        '  "rulings": [],',
         '  "v": 1',
         "}",
         "```",
@@ -104,11 +107,13 @@ describe("writeState", () => {
     const old = snapshot({
       holds: [hold("pushback-212"), releasedHold("escalation-212", 90)],
       pushbacks: [{ key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } }],
+      rulings: [fixRuling("thread:PRRT_3", 1, [sha(1)])],
     });
     const next: Snapshot = {
       ...old,
       rounds: [...old.rounds, round(2, { result: "DIRTY", verdict: "CONVERGED_PUSHBACK", root_cause: "AT_CAUSE" })],
       pushbacks: [...old.pushbacks, { key: "thread:PRRT_2", round: { stage: "INTERNAL", n: 2 } }],
+      rulings: [...old.rulings, pushbackRuling("thread:PRRT_2", 2)],
     };
     const out = writer();
     await writeState(reader(current(old)), out, REPO, ISSUE, SHARED, next);
@@ -173,15 +178,22 @@ describe("checkTransition", () => {
       { key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } },
       { key: "thread:PRRT_2", round: { stage: "INTERNAL", n: 2 } },
     ],
+    rulings: [pushbackRuling("thread:PRRT_1", 1), fixRuling("thread:PRRT_4", 2, [sha(5)])],
   });
+  const [pushedBack, fix] = old.rulings;
 
-  it("lets rounds and pushbacks be appended, and nothing changed", () => {
+  it("lets rounds, pushbacks and rulings be appended, and nothing changed", () => {
     checkTransition(old, old);
     checkTransition(old, {
       ...old,
       rounds: [...old.rounds, round(3)],
       pushbacks: [...old.pushbacks, { key: "thread:PRRT_3", round: { stage: "INTERNAL", n: 3 } }],
+      rulings: [...old.rulings, pushbackRuling("thread:PRRT_3", 3)],
     });
+  });
+
+  it("lets a FIX name the commits that fix it, after those it named", () => {
+    checkTransition(old, { ...old, rulings: [pushedBack, { ...fix, commits: [sha(5), sha(6), sha(7)] }] });
   });
 
   const refused: Array<[string, Snapshot]> = [
@@ -192,6 +204,13 @@ describe("checkTransition", () => {
     ["a round inserted before the newest", { ...old, rounds: [old.rounds[0], round(3), old.rounds[1]] }],
     ["a pushback dropped", { ...old, pushbacks: [old.pushbacks[1]] }],
     ["a pushback rewritten", { ...old, pushbacks: [old.pushbacks[0], { ...old.pushbacks[1], key: "thread:PRRT_X" }] }],
+    ["a ruling dropped", { ...old, rulings: [fix] }],
+    ["a ruling rewritten", { ...old, rulings: [{ ...pushedBack, ruling: "DEFER" }, fix] }],
+    ["a ruling's reply rewritten", { ...old, rulings: [{ ...pushedBack, reply: "Moved to #301." }, fix] }],
+    ["a ruling inserted before the newest", { ...old, rulings: [pushedBack, pushbackRuling("thread:PRRT_3", 2), fix] }],
+    ["a FIX's commit dropped", { ...old, rulings: [pushedBack, { ...fix, commits: [] }] }],
+    ["a FIX's commit replaced", { ...old, rulings: [pushedBack, { ...fix, commits: [sha(6)] }] }],
+    ["a commit named before a FIX's first", { ...old, rulings: [pushedBack, { ...fix, commits: [sha(6), sha(5)] }] }],
     ["a hold row added", { ...old, holds: [...old.holds, hold("audit-212")] }],
     ["a hold row dropped", { ...old, holds: [old.holds[0]] }],
     ["a hold row released", { ...old, holds: [releasedHold("pushback-212", 91), old.holds[1]] }],
@@ -269,6 +288,7 @@ describe("placeHold", () => {
       rounds: [],
       holds: [hold("claim-L7", { since: NOW })],
       pushbacks: [],
+      rulings: [],
     });
   });
 
@@ -351,7 +371,13 @@ describe("placeRescopeHold", () => {
   });
 
   it("on a RESCOPE verdict places the row as placeHold does: added or reopened recording no spec PR, nothing on an OPEN row", async () => {
-    assert.deepEqual(await place(null, null), { v: 1, rounds: [], holds: [rescope({ since: NOW, spec_pr: null })], pushbacks: [] });
+    assert.deepEqual(await place(null, null), {
+      v: 1,
+      rounds: [],
+      holds: [rescope({ since: NOW, spec_pr: null })],
+      pushbacks: [],
+      rulings: [],
+    });
     const released = snapshot({ holds: [releasedHold("rescope-212", 90, { spec_pr: null })] });
     assert.deepEqual(await place(released, null), { ...released, holds: [rescope({ since: NOW, spec_pr: null })] });
     assert.equal(await place(snapshot({ holds: [rescope({ spec_pr: null })] }), null), null);
