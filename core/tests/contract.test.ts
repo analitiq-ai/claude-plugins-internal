@@ -141,8 +141,11 @@ async function refusal(validators: string[]): Promise<ValidatorLoadError> {
   assert.fail(`loading ${JSON.stringify(validators)} did not throw`);
 }
 
-function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | undefined, why: RegExp): void {
-  assert.ok(answer !== undefined && !Array.isArray(answer), `expected COULD_NOT_RUN, got ${JSON.stringify(answer)}`);
+function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | string | null, why: RegExp): void {
+  assert.ok(
+    typeof answer === "object" && answer !== null && !Array.isArray(answer),
+    `expected COULD_NOT_RUN, got ${JSON.stringify(answer)}`,
+  );
   assert.equal(answer.outcome, "COULD_NOT_RUN");
   assert.ok(answer.reason !== null);
   assert.match(answer.reason, /^fixture: /, "the reason names the module");
@@ -270,6 +273,24 @@ describe("loading the packages [shared] validators lists", () => {
   });
 });
 
+describe("trigger gives the time of its provider's request for the head, the start SILENT is timed from", () => {
+  it("gives the request's time for every call for one head, each reaching the package", async () => {
+    script.trigger = { answer: SINCE };
+    const module = await fixtureModule();
+    assert.equal(await trigger(module, REPO, PR, HEAD), SINCE);
+    assert.equal(await trigger(module, REPO, PR, HEAD), SINCE);
+    assert.deepEqual(script.calls, [
+      { fn: "trigger", repo: REPO, pr: PR, head: HEAD },
+      { fn: "trigger", repo: REPO, pr: PR, head: HEAD },
+    ]);
+  });
+
+  it("gives null for a provider that reviews on its own and takes no request", async () => {
+    script.trigger = { answer: null };
+    assert.equal(await trigger(await fixtureModule(), REPO, PR, HEAD), null);
+  });
+});
+
 describe("a status is PASS or FAIL only for the head asked", () => {
   for (const outcome of ["PASS", "FAIL"]) {
     it(`gives ${outcome} naming the head asked as ${outcome}, with the package's reason`, async () => {
@@ -363,15 +384,16 @@ describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the mo
     });
   }
 
-  it("answers nothing from trigger when it returns, and lets a second call for one head reach the package", async () => {
-    const module = await fixtureModule();
-    assert.equal(await trigger(module, REPO, PR, HEAD), undefined);
-    assert.equal(await trigger(module, REPO, PR, HEAD), undefined);
-    assert.deepEqual(script.calls, [
-      { fn: "trigger", repo: REPO, pr: PR, head: HEAD },
-      { fn: "trigger", repo: REPO, pr: PR, head: HEAD },
-    ]);
-  });
+  for (const [what, answer] of [
+    ["nothing", undefined],
+    ["a time finer than GitHub's seconds", "2026-10-28T10:00:00.500Z"],
+    ["a number", Date.parse(SINCE)],
+  ] as const) {
+    it(`is COULD_NOT_RUN for a trigger answer that is ${what}`, async () => {
+      script.trigger = { answer };
+      assertCouldNotRun(await trigger(await fixtureModule(), REPO, PR, HEAD), /trigger answer/);
+    });
+  }
 
   for (const outcome of ["SILENT", "COULD_NOT_RUN", "MAYBE"]) {
     it(`is COULD_NOT_RUN for a status outcome outside the four: ${outcome}`, async () => {

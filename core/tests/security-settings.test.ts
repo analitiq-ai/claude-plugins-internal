@@ -35,11 +35,14 @@ function entries(node: Record<string, unknown>, prefix = ""): Entry[] {
   });
 }
 
-// §5's `<V>/keys` and `<V>/state` read as `<K>` and `<S>`, `/<V>` being a permission
+// §5's `<V>/keys`, `<V>/state` and `<V>/orchestrator` read as `<K>`, `<S>` and `<O>`, `/<V>` being a permission
 // rule's absolute form of the same folder.
 function asTableWrites(value: unknown): unknown {
   if (typeof value !== "string") return value;
-  return value.replace(/\/?<V>\/keys/g, "<K>").replace(/\/?<V>\/state/g, "<S>");
+  return value
+    .replace(/\/?<V>\/keys/g, "<K>")
+    .replace(/\/?<V>\/state/g, "<S>")
+    .replace(/\/?<V>\/orchestrator/g, "<O>");
 }
 
 function under(setting: string, parent: string): boolean {
@@ -55,6 +58,7 @@ function required({ setting, value }: Entry): boolean {
   const row = REQUIRED_SETTINGS.find((candidate) => candidate.setting === setting);
   if (row === undefined) return false;
   if ("equals" in row) return isDeepStrictEqual(row.equals, value);
+  if ("equalsPath" in row) return row.equalsPath === value;
   const items: readonly string[] = "holdsPaths" in row ? row.holdsPaths : row.holdsRules;
   return typeof value === "string" && items.includes(value);
 }
@@ -65,6 +69,17 @@ function strays(block: Record<string, unknown>): string[] {
     .map((entry) => ({ setting: entry.setting, value: asTableWrites(entry.value) }))
     .filter((entry) => !unchecked(entry) && !required(entry))
     .map(({ setting, value }) => `§5 ${setting}: ${JSON.stringify(value)} is in neither keys.ts's table nor its exceptions`);
+}
+
+// An exception no §5 entry falls under excuses nothing today, and would let an entry §5 adds under it later in
+// unchecked.
+function unused(block: Record<string, unknown>): string[] {
+  const all = entries(block);
+  const settings = Object.keys(UNCHECKED_SETTINGS).filter((parent) => !all.some(({ setting }) => under(setting, parent)));
+  const folders = Object.keys(UNCHECKED_FOLDERS).filter(
+    (folder) => !all.some(({ value }) => typeof value === "string" && value.includes(folder)),
+  );
+  return [...settings, ...folders].map((exception) => `keys.ts's exception ${JSON.stringify(exception)} matches no entry of §5`);
 }
 
 function enabled(block: Record<string, unknown>): string[] {
@@ -80,6 +95,16 @@ describe("keys.ts against SECURITY.md §5", () => {
 
   it("holds every entry of §5's JSON block in its required settings or its named exceptions", () => {
     assert.deepEqual(strays(block), []);
+  });
+
+  it("uses every exception it names", () => {
+    assert.deepEqual(unused(block), []);
+  });
+
+  it("names an exception no entry of §5 falls under", () => {
+    const changed = structuredClone(block) as { sandbox: { network: Record<string, unknown> } };
+    delete changed.sandbox.network.allowedDomains;
+    assert.deepEqual(unused(changed), [`keys.ts's exception "sandbox.network.allowedDomains" matches no entry of §5`]);
   });
 
   it("allows exactly the plugins §5's enabledPlugins enables", () => {
@@ -99,6 +124,22 @@ describe("keys.ts against SECURITY.md §5", () => {
       stray("sandbox.enabled: false"),
       stray("sandbox.newSetting: true"),
       stray('permissions.deny: "Edit(**/new/**)"'),
+    ]);
+  });
+
+  it("reads <V>/orchestrator as the orchestrator's folder and names a GH_CONFIG_DIR written from ~", () => {
+    const changed = structuredClone(block) as {
+      sandbox: { filesystem: { denyWrite: string[] } };
+      permissions: { deny: string[] };
+      env: Record<string, string>;
+    };
+    changed.sandbox.filesystem.denyWrite.push("<V>/orchestrator");
+    changed.permissions.deny.push("Edit(/<V>/orchestrator/**)");
+    changed.env.GH_CONFIG_DIR = "<V>/orchestrator/gh";
+    assert.deepEqual(strays(changed), []);
+    changed.env.GH_CONFIG_DIR = "~/.local/state/codeworks/orchestrator/gh";
+    assert.deepEqual(strays(changed), [
+      `§5 env.GH_CONFIG_DIR: "~/.local/state/codeworks/orchestrator/gh" is in neither keys.ts's table nor its exceptions`,
     ]);
   });
 });
