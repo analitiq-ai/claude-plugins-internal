@@ -84,6 +84,12 @@ export const Lane = valueSet({
 });
 export type Lane = z.infer<typeof Lane.schema>;
 
+// How the session took its issue (orchestrator ADR-0002 d2, d3).
+export const Taken = valueSet({
+  claim: "the orchestrator's App moved the card from Ready to In progress; the start releases holds",
+  resume: "the card was already In progress or In review; no lane is written and no hold released",
+});
+
 export const CoreSource = z.enum(["threads", "required-checks"]);
 // Not an identifier, so `CoreSource.enum` cannot name it with a dot, and the value scan refuses it quoted elsewhere.
 export const REQUIRED_CHECKS_SOURCE = CoreSource.enum["required-checks"];

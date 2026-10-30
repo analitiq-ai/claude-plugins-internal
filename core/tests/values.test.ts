@@ -17,6 +17,7 @@ import {
   RoundResult,
   RoundStage,
   RoundVerdict,
+  Taken,
 } from "../src/values.ts";
 import {moduleFiles, stringLiterals} from "./source-scan.ts";
 
@@ -47,6 +48,7 @@ const sets: {name: string; set: ValueSet; values: string[]}[] = [
   {name: "hold state", set: HoldState, values: ["OPEN", "RELEASED"]},
   {name: "round stage", set: RoundStage, values: ["INTERNAL", "AUDIT", "GITHUB"]},
   {name: "lane", set: Lane, values: ["Backlog", "Ready", "In progress", "In review", "Blocked", "Done"]},
+  {name: "taken", set: Taken, values: ["claim", "resume"]},
 ];
 
 for (const {name, set, values} of sets) {
