@@ -1,12 +1,8 @@
 <!--
 Sync Impact Report
-- Version: 1.2.1 -> 1.2.2 (PATCH: wording follows the 2026-10-24..26 session design records)
-- Changed: the scope and the repo shape name the validator packages in `validators/`; P2's sources drop
-  reviewer's `unlock` and pre-merge gate and cite reviewer ADR-0013 by its new name (decision 5); P5 names
-  a check run, not a status or the assignee; P7's exception reads a provider's review text in that
-  provider's module; Platform Constraints: the agent machine runs one session per issue, the model's token
-  is read-only and hooks make every write, planner mints its own App token with no reviewer beside it, and the reviewer
-  line drops the review-round `spec` check; "human" reads "admin" throughout.
+- Version: 1.2.2 -> 1.2.3 (PATCH: wording follows the organisation's worktree rule,
+  analitiq-ai/engineering#104)
+- Changed: Delivery Workflow places a story's worktree at `../<repo>.worktrees/<branch>`.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -264,7 +260,7 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 
 Not gates — context so `/speckit-tasks` shapes tasks to fit: one issue per user story (sub-issues
 under the spec's issue when a spec has several), a story branch `<s>-us<k>-<slug>` with its worktree at
-`.claude/worktrees/<branch>`, a draft PR closing its story issue, then the review loops and the
+`../<repo>.worktrees/<branch>`, a draft PR closing its story issue, then the review loops and the
 pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.md` and
 `.claude/rules/pr-review-loop.md`. A story is done when its PR merged or an admin closed its issue
 (`docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`, decision 5). The spec and
@@ -288,4 +284,4 @@ against them.
 - Compliance: `/speckit-plan` evaluates every gate in its Constitution Check; a violation MUST be
   justified in the plan's Complexity Tracking table or the plan changes.
 
-**Version**: 1.2.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-27
+**Version**: 1.2.3 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-30
