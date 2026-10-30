@@ -1,6 +1,7 @@
-// Only the guard is imported statically: any other module would be evaluated, and fail on a missing package,
-// before the guard could name it.
+// Anything this hook needs past the guard is loaded with `await import(...)`: a static import would be evaluated
+// before the guard runs. Type imports are erased, so they load nothing.
 import "../lib/guarded.ts";
+
 import type { HookAnswer, HookDeps } from "../lib/hook-io.ts";
 
 const { PASS, readInput, refusing, runHook } = await import("../lib/hook-io.ts");
