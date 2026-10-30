@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { LaneRefused } from "../plugin/core/board.ts";
 import { GhFolderRefused } from "../plugin/core/gh-config.ts";
 import { GitFailed } from "../plugin/core/git.ts";
 import { GitHubRefused, GitHubUnanswered, RemoteRefused } from "../plugin/core/github.ts";
+import { DerivationError } from "../plugin/core/identity.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
+import { SessionRecordRefused } from "../plugin/core/session-record.ts";
 import { SettingsError } from "../plugin/core/settings.ts";
+import { BoardNotVisible } from "../plugin/core/state.ts";
 import { MintError } from "../plugin/core/tokens.ts";
-import { context, HookInputRefused, readInput, refusalOf, refuse } from "../plugin/lib/hook-io.ts";
+import { context, HookInputRefused, PASS, readInput, refusalOf, refuse, refusing } from "../plugin/lib/hook-io.ts";
 
 const PROMPT_INPUT = readFileSync(new URL("./fixtures/hooks/user-prompt-submit.json", import.meta.url), "utf8");
 const { session_id, cwd } = JSON.parse(PROMPT_INPUT) as { session_id: string; cwd: string };
@@ -113,6 +117,10 @@ describe("refusalOf", () => {
     new RemoteRefused("https://example.invalid/acme/widgets", "dummy why"),
     new HookInputRefused("dummy why"),
     new GitFailed(["remote", "get-url", "origin"], 2, "error: No such remote 'origin'\n"),
+    new LaneRefused("dummy why"),
+    new DerivationError("the blockers of acme/widgets#212", "in another repository: acme/gadgets#7"),
+    new BoardNotVisible("https://github.com/orgs/acme/projects/1"),
+    new SessionRecordRefused("/home/dummy/.local/state/codeworks/orchestrator/sessions/dummy.json", "dummy why"),
   ];
 
   for (const error of named) {
@@ -124,5 +132,19 @@ describe("refusalOf", () => {
   it("names nothing else, so the hook crashes on it", () => {
     assert.equal(refusalOf(new TypeError("dummy")), null);
     assert.equal(refusalOf("dummy"), null);
+  });
+});
+
+describe("refusing", () => {
+  it("answers what the hook answers", async () => {
+    assert.deepEqual(await refusing(async () => PASS), PASS);
+  });
+
+  it("refuses a failure core names a cause for, by its message", async () => {
+    assert.deepEqual(await refusing(async () => Promise.reject(new MintError("dummy cause"))), refuse("mint failed: dummy cause"));
+  });
+
+  it("lets any other failure through, so the hook crashes", async () => {
+    await assert.rejects(refusing(async () => Promise.reject(new TypeError("dummy"))), TypeError);
   });
 });

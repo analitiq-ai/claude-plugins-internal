@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { fakeGitHub, type FakeAnswer } from "../../core/tests/support/fake-github.ts";
 import { GitHubUnanswered } from "../plugin/core/github.ts";
 import type { IssueComment } from "../plugin/core/state.ts";
-import { postKeyed } from "../plugin/lib/keyed.ts";
+import { keyOf, postKeyed } from "../plugin/lib/keyed.ts";
 import { ORCHESTRATOR_LOGIN, REPO } from "./support/checkout.ts";
 
 const ISSUE = 7;
@@ -92,4 +92,10 @@ describe("postKeyed", () => {
       assert.deepEqual(client.calls, []);
     });
   }
+});
+
+describe("keyOf", () => {
+  it("puts a cause's words in the key grammar after its prefix", () => {
+    assert.equal(keyOf("session-start", "mint failed: GitHub's token for acme/widgets is refused"), "session-start-mint-failed-github-s-token-for-acme-widgets-is-refused");
+  });
 });
