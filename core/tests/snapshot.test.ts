@@ -6,6 +6,7 @@ import { Snapshot } from "../src/contracts/snapshot.ts";
 type Fields = Record<string, unknown>;
 
 const HEAD = "0123456789abcdef0123456789abcdef01234567";
+const FIX_COMMIT = "89abcdef0123456789abcdef0123456789abcdef";
 const AT = "2026-10-28T10:00:00Z";
 const LATER = "2026-10-28T11:00:00Z";
 
@@ -31,8 +32,22 @@ function releasedHold(fields: Fields = {}): Fields {
   return hold({ state: "RELEASED", released: LATER, released_by: { comment: 9001, reset: false }, ...fields });
 }
 
+function ruling(fields: Fields = {}): Fields {
+  return {
+    key: "thread:PRRT_1",
+    round: { stage: "INTERNAL", n: 1 },
+    ruling: "PUSH_BACK",
+    latest_trusted_comment_id: "PRRC_1",
+    reply: "Not real: the caller never passes null here.",
+    commits: [],
+    ...fields,
+  };
+}
+
+const THREADLESS = { key: "required-check:ci", latest_trusted_comment_id: null, reply: null };
+
 function snapshot(fields: Fields = {}): Fields {
-  return { v: 1, rounds: [round()], holds: [], pushbacks: [], ...fields };
+  return { v: 1, rounds: [round()], holds: [], pushbacks: [], rulings: [], ...fields };
 }
 
 function accepted(value: Fields): void {
@@ -70,12 +85,23 @@ test("a snapshot holding every stage, kind and state is accepted as written", ()
         hold({ id: "audit-212", kind: "audit" }),
       ],
       pushbacks: [{ key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 2 } }],
+      rulings: [
+        ruling({ round: { stage: "INTERNAL", n: 2 } }),
+        ruling({ key: "thread:PRRT_2", ruling: "FIX", commits: [HEAD, FIX_COMMIT] }),
+        ruling({ key: "thread:PRRT_3", ruling: "DEFER", reply: "Real, and separate: moved to #301." }),
+        ruling({ ...THREADLESS, round: { stage: "GITHUB", n: 1 }, ruling: "FIX", commits: [FIX_COMMIT] }),
+      ],
     }),
   );
 });
 
 test("an empty snapshot is accepted", () => {
-  accepted({ v: 1, rounds: [], holds: [], pushbacks: [] });
+  accepted({ v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] });
+});
+
+test("rulings is required", () => {
+  const { rulings: _, ...unruled } = snapshot();
+  refusedAt(unruled, ["rulings"]);
 });
 
 test("v is 1", () => {
@@ -238,6 +264,55 @@ test("each pushback's round exists", () => {
   refusedAt(snapshot({ rounds: [], pushbacks: [pushback("INTERNAL", 1)] }), ["pushbacks", 0, "round"]);
 });
 
+test("each ruling's round exists", () => {
+  const ruled = (stage: string, n: number) => ruling({ round: { stage, n } });
+  accepted(snapshot({ rulings: [ruled("INTERNAL", 1)] }));
+  refusedAt(snapshot({ rulings: [ruled("INTERNAL", 2)] }), ["rulings", 0, "round"]);
+  refusedAt(snapshot({ rulings: [ruled("AUDIT", 1)] }), ["rulings", 0, "round"]);
+  refusedAt(snapshot({ rounds: [], rulings: [ruled("INTERNAL", 1)] }), ["rulings", 0, "round"]);
+});
+
+test("a finding is ruled once per round, and again in a later round", () => {
+  const rounds = [round(), round({ n: 2 })];
+  refusedAt(snapshot({ rounds, rulings: [ruling(), ruling({ ruling: "DEFER" })] }), ["rulings", 1]);
+  accepted(snapshot({ rounds, rulings: [ruling(), ruling({ round: { stage: "INTERNAL", n: 2 }, ruling: "FIX" })] }));
+  accepted(snapshot({ rounds, rulings: [ruling(), ruling({ key: "thread:PRRT_2" })] }));
+});
+
+test("a ruling takes only a finding ruling's values", () => {
+  for (const value of ["fix", "PATCH", "CONVERGED_PUSHBACK"]) {
+    refusedAt(snapshot({ rulings: [ruling({ ruling: value })] }), ["rulings", 0, "ruling"]);
+  }
+});
+
+test("a ruling's key is a finding's key, never empty", () => {
+  refusedAt(snapshot({ rulings: [ruling({ key: "" })] }), ["rulings", 0, "key"]);
+});
+
+test("reply is set and non-empty exactly when latest_trusted_comment_id is, so a thread always has one", () => {
+  accepted(snapshot({ rulings: [ruling({ ...THREADLESS })] }));
+  refusedAt(snapshot({ rulings: [ruling({ reply: null })] }), ["rulings", 0, "reply"]);
+  refusedAt(snapshot({ rulings: [ruling({ reply: "" })] }), ["rulings", 0, "reply"]);
+  refusedAt(snapshot({ rulings: [ruling({ ...THREADLESS, reply: "Not real." })] }), ["rulings", 0, "reply"]);
+});
+
+test("a FIX names its commits, none before its first passes", () => {
+  accepted(snapshot({ rulings: [ruling({ ruling: "FIX", commits: [] })] }));
+  accepted(snapshot({ rulings: [ruling({ ruling: "FIX", commits: [FIX_COMMIT, HEAD] })] }));
+});
+
+test("commits is empty on a PUSH_BACK or DEFER", () => {
+  for (const value of ["PUSH_BACK", "DEFER"]) {
+    refusedAt(snapshot({ rulings: [ruling({ ruling: value, commits: [FIX_COMMIT] })] }), ["rulings", 0, "commits"]);
+  }
+});
+
+test("each commit is 40 lower-case hex digits", () => {
+  for (const commit of [FIX_COMMIT.slice(1), FIX_COMMIT.toUpperCase(), `${FIX_COMMIT.slice(1)}g`]) {
+    refusedAt(snapshot({ rulings: [ruling({ ruling: "FIX", commits: [commit] })] }), ["rulings", 0, "commits", 0]);
+  }
+});
+
 test("an unknown key is refused at every level", () => {
   refusedAt(snapshot({ extra: 1 }), []);
   refusedAt(snapshot({ rounds: [round({ extra: 1 })] }), ["rounds", 0]);
@@ -256,4 +331,6 @@ test("an unknown key is refused at every level", () => {
     0,
     "round",
   ]);
+  refusedAt(snapshot({ rulings: [ruling({ extra: 1 })] }), ["rulings", 0]);
+  refusedAt(snapshot({ rulings: [ruling({ round: { stage: "INTERNAL", n: 1, extra: 1 } })] }), ["rulings", 0, "round"]);
 });

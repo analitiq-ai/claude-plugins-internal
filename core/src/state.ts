@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import { Snapshot, Time, type Hold, type Round, type RoundId } from "./contracts/snapshot.ts";
+import { Snapshot, Time, type Hold, type Round, type RoundId, type Ruling } from "./contracts/snapshot.ts";
 import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState, Lane } from "./values.ts";
@@ -141,7 +141,7 @@ function snapshotOf(comment: IssueComment): SnapshotRead {
 }
 
 function emptySnapshot(): Snapshot {
-  return { v: 1, rounds: [], holds: [], pushbacks: [] };
+  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] };
 }
 
 function isWriter(actor: Actor | null, writers: ReadonlySet<string>): boolean {
@@ -422,7 +422,17 @@ export function renderState(snapshot: Snapshot): string {
   return `${STATE_TAG}\n${OPENING_FENCE}\n${JSON.stringify(snapshot, sortedKeys, 2)}\n${CLOSING_FENCE}\n`;
 }
 
-/** `writeState`'s transition: rounds and pushbacks only appended, every hold row as it was. */
+function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
+  if (next === undefined) return false;
+  const { commits, ...ruled } = old;
+  const { commits: nextCommits, ...nextRuled } = next;
+  return isDeepStrictEqual(ruled, nextRuled) && isDeepStrictEqual(commits, nextCommits.slice(0, commits.length));
+}
+
+/**
+ * `writeState`'s transition: rounds, pushbacks and rulings only appended, and a ruling's commits only appended to;
+ * every hold row as it was.
+ */
 export function checkTransition(old: Snapshot, next: Snapshot): void {
   const rewrittenRound = old.rounds.find((round, i) => !isDeepStrictEqual(round, next.rounds[i]));
   if (rewrittenRound !== undefined) {
@@ -431,6 +441,11 @@ export function checkTransition(old: Snapshot, next: Snapshot): void {
   const rewrittenPushback = old.pushbacks.find((pushback, i) => !isDeepStrictEqual(pushback, next.pushbacks[i]));
   if (rewrittenPushback !== undefined) {
     throw new StateWriteRefused(`the snapshot drops or rewrites the pushback of ${rewrittenPushback.key}`, null);
+  }
+  const rewrittenRuling = old.rulings.find((ruling, i) => !keepsRuling(ruling, next.rulings[i]));
+  if (rewrittenRuling !== undefined) {
+    const { key, round } = rewrittenRuling;
+    throw new StateWriteRefused(`the snapshot drops or rewrites the ruling of ${key} in round ${round.stage} ${round.n}`, null);
   }
   const before = new Map(old.holds.map((row) => [row.id, row]));
   const after = new Map(next.holds.map((row) => [row.id, row]));
@@ -494,7 +509,7 @@ function openRow(id: string, kind: Hold["kind"], since: string, question: string
 }
 
 /**
- * Posts `snapshot`, which may only append rounds and pushbacks to the state; core stamps each appended round's
+ * Posts `snapshot`, which may only append to the state as `checkTransition` lets it; core stamps each appended round's
  * `at` from GitHub's clock. `writer` is the reviewer App's client.
  */
 export async function writeState(

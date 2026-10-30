@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
+import { FindingRuling, HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
 
 // Whole seconds, as GitHub's clock gives them: core stamps every time from the client's `now()`, so no caller's
 // clock or precision ever reaches a snapshot.
@@ -8,6 +8,8 @@ export const Time = z.iso.datetime({ precision: 0 });
 // The pair that names a round, so a pushback names its round by the same fields the round carries.
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
+
+const CommitSha = z.string().regex(/^[0-9a-f]{40}$/);
 
 export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
   if ((value !== null) !== condition) {
@@ -18,7 +20,7 @@ export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unkno
 export const Round = z
   .strictObject({
     ...RoundId.shape,
-    head: z.string().regex(/^[0-9a-f]{40}$/),
+    head: CommitSha,
     result: RoundResult.schema,
     verdict: RoundVerdict.schema.nullable(),
     root_cause: RootCause.schema.nullable(),
@@ -62,6 +64,32 @@ export type Hold = z.infer<typeof Hold>;
 export const Pushback = z.strictObject({ key: z.string(), round: RoundId });
 export type Pushback = z.infer<typeof Pushback>;
 
+// Keyed as a finding is, so a FIX on a failing required check names its commits as one on a thread does: at stage 2
+// a push adds only commits a FIX ruling names (orchestrator ADR-0001 d4).
+export const Ruling = z
+  .strictObject({
+    key: z.string().min(1),
+    round: RoundId,
+    ruling: FindingRuling.schema,
+    // The finding's own field when ruled: a trusted comment after it is a fresh finding this ruling does not answer
+    // (reviewer ADR-0016 d3), so its thread is not resolved with this reply.
+    latest_trusted_comment_id: z.string().nullable(),
+    // The orchestrator App posts it before resolving the thread (orchestrator ADR-0007 d7); a finding with no thread
+    // has nowhere to answer.
+    reply: z.string().min(1).nullable(),
+    // Appended as each passes reviewer's commit check, after the round that ruled it.
+    commits: z.array(CommitSha),
+  })
+  .superRefine((ruling, ctx) => {
+    const thread = ruling.latest_trusted_comment_id !== null;
+    setExactlyWhen(ctx, "reply", ruling.reply, thread, "latest_trusted_comment_id is set");
+    const fix = FindingRuling.schema.enum.FIX;
+    if (ruling.commits.length > 0 && ruling.ruling !== fix) {
+      ctx.addIssue({ code: "custom", path: ["commits"], message: `commits is empty on every ruling but ${fix}` });
+    }
+  });
+export type Ruling = z.infer<typeof Ruling>;
+
 function roundName({ stage, n }: RoundId): string {
   return `${stage} ${n}`;
 }
@@ -72,6 +100,7 @@ export const Snapshot = z
     rounds: z.array(Round),
     holds: z.array(Hold),
     pushbacks: z.array(Pushback),
+    rulings: z.array(Ruling),
   })
   .superRefine((snapshot, ctx) => {
     const rounds = new Set<string>();
@@ -95,6 +124,19 @@ export const Snapshot = z
       if (!rounds.has(name)) {
         ctx.addIssue({ code: "custom", path: ["pushbacks", i, "round"], message: `round ${name} is not in rounds` });
       }
+    });
+    // A round's assessment rules each of its findings once.
+    const ruled = new Set<string>();
+    snapshot.rulings.forEach((ruling, i) => {
+      const name = roundName(ruling.round);
+      if (!rounds.has(name)) {
+        ctx.addIssue({ code: "custom", path: ["rulings", i, "round"], message: `round ${name} is not in rounds` });
+      }
+      const finding = `${name} ${ruling.key}`;
+      if (ruled.has(finding)) {
+        ctx.addIssue({ code: "custom", path: ["rulings", i], message: `${ruling.key} is already ruled in round ${name}` });
+      }
+      ruled.add(finding);
     });
   });
 export type Snapshot = z.infer<typeof Snapshot>;

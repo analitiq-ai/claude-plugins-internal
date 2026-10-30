@@ -229,6 +229,82 @@
       },
       "type": "array"
     },
+    "rulings": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "commits": {
+            "items": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "key": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "latest_trusted_comment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round": {
+            "additionalProperties": false,
+            "properties": {
+              "n": {
+                "maximum": 9007199254740991,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "stage": {
+                "enum": [
+                  "INTERNAL",
+                  "AUDIT",
+                  "GITHUB"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "stage",
+              "n"
+            ],
+            "type": "object"
+          },
+          "ruling": {
+            "enum": [
+              "FIX",
+              "PUSH_BACK",
+              "DEFER"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "round",
+          "ruling",
+          "latest_trusted_comment_id",
+          "reply",
+          "commits"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "v": {
       "const": 1,
       "type": "number"
@@ -238,7 +314,8 @@
     "v",
     "rounds",
     "holds",
-    "pushbacks"
+    "pushbacks",
+    "rulings"
   ],
   "type": "object"
 }

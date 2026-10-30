@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { Hold, Round, Snapshot } from "../../../src/contracts/snapshot.ts";
+import type { Hold, Round, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
 import type { Shared } from "../../../src/settings.ts";
 import type { CommentDeletion, IssueComment, StatusChange } from "../../../src/state.ts";
 import { fakeGitHub, type FakeGitHub } from "../../support/fake-github.ts";
@@ -57,8 +57,23 @@ export function releasedHold(id: string, comment: number, fields: Partial<Hold> 
   return hold(id, { state: "RELEASED", released: at("09:55"), released_by: { comment, reset: false }, ...fields });
 }
 
+export function pushbackRuling(key: string, n: number): Ruling {
+  return {
+    key,
+    round: { stage: "INTERNAL", n },
+    ruling: "PUSH_BACK",
+    latest_trusted_comment_id: `PRRC_${n}`,
+    reply: "Not real: the caller never passes null here.",
+    commits: [],
+  };
+}
+
+export function fixRuling(key: string, n: number, commits: string[]): Ruling {
+  return { ...pushbackRuling(key, n), ruling: "FIX", reply: "Fixed at the cause: the parser now refuses null.", commits };
+}
+
 export function snapshot(fields: Partial<Snapshot> = {}): Snapshot {
-  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], ...fields };
+  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], rulings: [], ...fields };
 }
 
 export function stateBody(state: Snapshot): string {
