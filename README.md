@@ -89,8 +89,9 @@ folder that the default branch lacks.
 4. Install the planner App on the repository, and keep its key at `~/.config/codeworks/planner-app.pem`,
    mode 0600, owned by you.
 5. Planner scopes each issue in a worktree it creates per the repository's branch rules. Name the place in
-   the repository's `CLAUDE.md`, for example `.claude/worktrees/<branch>`, and add that folder to
-   `.gitignore`. Never under `.git/`: Claude Code protects it, and the run cannot write there.
+   the repository's `CLAUDE.md` as `../<repo>.worktrees/<branch>`, the folder beside the checkout where
+   builder works and the session may write (`orchestrator/README.md`). Never under `.git/`: Claude Code
+   protects it, and the run cannot write there.
 6. Commit and merge to the default branch.
 
 ## Layout
