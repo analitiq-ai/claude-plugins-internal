@@ -224,12 +224,13 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   reach; commits a dead session passed but never pushed are graded again.
 - **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a second tagged
   reviewer App comment on the story issue (`reviewer-gates`), full snapshot, newest wins, read and written
-  through core with the same fail-closed rules as the state (ADR-0011 d2). It holds open items only: per
-  lineage its file, the blob and places its words were last carried to, its chain of claims and words, and the
-  times of its WRONG rulings; per bug its members with times, its
-  ranges, its anchor commit and its site rulings. Counts and release floors MUST be derived from those times
-  against the reset and the hold row's release, never stored. A merged bug carries the higher of its bugs'
-  counts, never their sum (ADR-0008 d2): the lower one's members are kept as evidence that is not counted.
+  through core with the same fail-closed rules as the state (ADR-0011 d2). It holds, per story branch, the anchor commit
+  the stored positions index into and the open items only: per lineage its places and its chain of rulings,
+  each with its check, claim, words, ruling and time; per bug its counted and absorbed trees with times, its
+  ranges, its deep-sweep lists and its site rulings. Counts and release floors MUST be derived from those
+  times against the reset and the hold row's release, never stored; a check counts once; a merged bug carries
+  the higher of its bugs' counts, never their sum (ADR-0008 d2). An anchor GitHub does not have MUST stop the
+  check with an error naming it.
 - **FR-016**: Core's state module MUST read and write each tagged reviewer App comment by its tag, and hold the
   story when any reviewer App comment was edited or deleted; this core change and the amendments to reviewer
   ADR-0001 d2, ADR-0008, ADR-0011 d1–d2 and ADR-0013 d4 land in their own PRs before this spec's code.

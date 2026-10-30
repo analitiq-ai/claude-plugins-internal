@@ -85,14 +85,12 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 
 ## R6: Gate counts derive from times in the gates snapshot
 
-- **Decision**: The gates snapshot holds open lineages (`file`, `blob`, `places`, `chain`, `wrong_at[]`: what `lineage.succeed()` needs to carry a lineage into a later session) and open bugs
-  (`members[{tree, at}]`, `ranges`, `anchor`, `site_rulings`). A lineage's WRONG count is the number of
-  `wrong_at` later than both the newest `/codeworks reset` and the `claim-<id>` row's `released`; a bug's
-  count likewise over `members`. `claim-<id>` is placed at `REFUSALS_BEFORE_USER = 3`, `shim-<id>` at
-  `HOLD_AT = 4`; a merge (ADR-0008) keeps as `members` those of the bug with the higher count, moves the other's into `absorbed` (evidence, never counted), and unions ranges; a tree in `members` or `absorbed` is never counted again, so the merged bug carries the higher count (ADR-0008 d2), never the sum. Ended items
-  are dropped from the next snapshot. The gates evidence is posted first; the hold is then derived, and every
-  deciding run places it when the count reaches its threshold and no OPEN row exists, so a run that dies
-  between the two posts is repaired by the next.
+- **Decision**: The gates snapshot is written once, field by field, from what today's claim and shim gates read
+  again in a later run (every field cites its reader): [contracts/gates-snapshot.md](contracts/gates-snapshot.md). It is keyed per
+  branch, with one anchor commit per branch; lineage counts are distinct WRONG check refs after the reset, bug
+  counts are members after the reset, and a merge keeps the higher count (ADR-0008 d2). The gates evidence is
+  posted first; every deciding run then places a hold whose count reached its threshold and has no OPEN row, so
+  a run that dies between the two posts is repaired by the next.
 - **Rationale**: FR-015: counts never stored, so a reset or a release needs no write to the gates comment
   to take effect, and no count can drift from its evidence.
 - **Existing tools**: `claimgate.py`/`shimgate.py` count rules and thresholds (ported); `StateReading.reset`

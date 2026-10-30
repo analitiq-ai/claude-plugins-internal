@@ -26,11 +26,9 @@ removed.
 Tag `codeworks:reviewer-gates`; full snapshot, newest wins; same fail-closed rules. See
 [contracts/gates-snapshot.md](contracts/gates-snapshot.md).
 
-- `Lineage {id, file, blob: sha40, places: {start, end}[], chain: {claim, words}[], wrong_at: Time[]}`: `blob` is the file's git blob the `places` offsets index into; the next check carries them from it with `succeed()`, fetching the blob into the bare copy (could not run when it cannot be fetched); `chain` keeps the claim ids and words for splits, merges and first-words search.
-- `Bug {id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, start, end}[], anchor: sha40, site_rulings: {site, ruling, issue|null}[]}`
-- Derived, never stored: `count(lineage) = |wrong_at > max(reset.at, hold(claim-<id>).released)|`; same for bugs
-  over `members[].at` (`absorbed` is never counted). Merge (ADR-0008 d2): a merge (ADR-0008) keeps as `members` those of the bug with the higher count, moves the other's into `absorbed` (evidence, never counted), and unions ranges; a tree in `members` or `absorbed` is never counted again.
-- Validation: ids unique; times `Time`; an ended item is absent.
+Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-snapshot.md), the one definition. Per branch: `anchor`, open `lineages`
+(`places`, `chain` of `{ref, claim, line, words, ruling, at}`) and open `bugs` (`members`, `absorbed`, `ranges`,
+`deep`, `rulings`). Counts and floors are derived, never stored.
 
 ## Session issue record (#174's, read only)
 
@@ -51,7 +49,7 @@ per branch, newest pass = `head`, set on every pass, even of a sha already in `p
 | `repo.git/` | hook, `git fetch <clone> <sha>` only | session |
 | `commit-passes.json` (passes and the `off` switch) | hook via core (PR C) | session |
 | `check.json` (running range, step, workflow run ids) | hook | until the range passes or fails |
-| `memos/*.json` (claim reads, verdicts, site rulings) | hook | session (FR-017) |
+| `memos/*.json` (claim reads, verdicts) | hook | session (FR-017) |
 | `released-<issue>-<claimed_at>` | hook after `releaseOnClaim` | session |
 | `write.lock` | hook, held read→post for each state/gates write and the claim step (FR-020) | one write |
 | `gate.log` | hook | session |

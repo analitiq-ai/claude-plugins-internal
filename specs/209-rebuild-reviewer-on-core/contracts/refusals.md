@@ -17,3 +17,4 @@ could-not-run outcomes for writes, which still record nothing.
 | claim/shim check pending for the range | the workflow to launch and its range |
 | branch's GitHub head not an ancestor of the local head | pushed history rewritten; the pushed head to restore |
 | session write lock not acquired in time | could not run; retry the step |
+| gates anchor commit not in the bare copy nor on GitHub | error naming the branch and anchor; nothing graded or recorded |
