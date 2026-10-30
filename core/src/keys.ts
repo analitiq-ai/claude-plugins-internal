@@ -38,6 +38,8 @@ export const REQUIRED_SETTINGS: readonly RequiredSetting[] = [
   { setting: "sandbox.filesystem.denyRead", holdsPaths: ["<K>", "~/.claude/.credentials.json"] },
   { setting: "sandbox.filesystem.denyWrite", holdsPaths: ["<K>", "<S>", "~/.claude", "~/.gitconfig"] },
   { setting: "sandbox.filesystem.allowManagedReadPathsOnly", equals: true },
+  { setting: "sandbox.filesystem.disabled", equals: false },
+  { setting: "sandbox.allowNestedUserNamespaces", equals: false },
   { setting: "sandbox.network.allowManagedDomainsOnly", equals: true },
   { setting: "sandbox.network.strictAllowlist", equals: true },
   { setting: "sandbox.network.allowAllUnixSockets", equals: false },
