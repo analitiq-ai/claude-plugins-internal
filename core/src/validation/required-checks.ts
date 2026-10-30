@@ -15,11 +15,17 @@ type Outcome = StatusAnswer["outcome"];
 // wait on itself (orchestrator ADR-0007 d2).
 const INTERNAL_REVIEW = "internal-review";
 
-const BASE_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { pullRequest(number: $number) { baseRefName } }
+const PULL_REQUEST_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { baseRefName headRefOid mergeable } }
 }`;
 
-const BaseAnswer = z.object({ repository: z.object({ pullRequest: z.object({ baseRefName: z.string().min(1) }) }) });
+const Mergeable = z.enum(["MERGEABLE", "CONFLICTING", "UNKNOWN"]);
+const { CONFLICTING, UNKNOWN } = Mergeable.enum;
+
+const PullRequest = z.object({ baseRefName: z.string().min(1), headRefOid: z.string(), mergeable: Mergeable });
+type PullRequest = z.infer<typeof PullRequest>;
+
+const PullRequestAnswer = z.object({ repository: z.object({ pullRequest: PullRequest }) });
 
 const REQUIRED_STATUS_CHECKS = "required_status_checks";
 
@@ -49,6 +55,7 @@ const PER_PAGE = 100;
 /** One check run or status of a required check; `state` is GitHub's, null when there is none. */
 type Reading = { outcome: Outcome; state: string | null; author: string | null };
 type CheckReading = Reading & { name: string };
+type PullRequestReading = { pullRequest: PullRequest; checks: readonly [CheckReading, ...CheckReading[]] };
 
 export type RequiredChecks = {
   status(repo: string, pr: number, head: string): Promise<StatusAnswer>;
@@ -131,10 +138,11 @@ async function newestStatuses(reader: GitHubClient, at: string, head: string): P
 export function requiredChecks(_shared: Shared, reader: GitHubClient, validators: LoadedModules): RequiredChecks {
   const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map((name) => `${name}-review`)]);
 
-  async function readChecks(repo: string, pr: number, head: string): Promise<readonly [CheckReading, ...CheckReading[]] | CouldNotRun> {
+  async function readChecks(repo: string, pr: number, head: string): Promise<PullRequestReading | CouldNotRun> {
     const where = ownerAndName(repo);
-    const base = answerOf(BaseAnswer, await reader.graphql(BASE_QUERY, { ...where, number: pr }), `the base of ${repo}#${pr}`)
-      .repository.pullRequest.baseRefName;
+    const answered = await reader.graphql(PULL_REQUEST_QUERY, { ...where, number: pr });
+    const { pullRequest } = answerOf(PullRequestAnswer, answered, `${repo}#${pr}`).repository;
+    const base = pullRequest.baseRefName;
     const at = `/repos/${encodeURIComponent(where.owner)}/${encodeURIComponent(where.name)}`;
     const rulesWhere = `the rules of ${repo} branch ${base}`;
     const rules = answerOf(Rules, await reader.restPages(`${at}/rules/branches/${encodeURIComponent(base)}?per_page=${PER_PAGE}`), rulesWhere);
@@ -156,11 +164,11 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
       return worst([pinRead(pin), ...more.map(pinRead)]);
     };
     const [first, ...rest] = names;
-    return [atHead(first), ...rest.map(atHead)];
+    return { pullRequest, checks: [atHead(first), ...rest.map(atHead)] };
   }
 
   // GitHub's no-answer is this reader's check outcome at its own boundary.
-  async function read(repo: string, pr: number, head: string): Promise<readonly [CheckReading, ...CheckReading[]] | CouldNotRun> {
+  async function read(repo: string, pr: number, head: string): Promise<PullRequestReading | CouldNotRun> {
     assertAsked(repo, pr, head);
     try {
       return await readChecks(repo, pr, head);
@@ -171,19 +179,50 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
 
   return {
     async status(repo, pr, head) {
-      const checks = await read(repo, pr, head);
-      if ("outcome" in checks) return checks;
+      const answer = await read(repo, pr, head);
+      if ("outcome" in answer) return answer;
+      const { checks } = answer;
       const { outcome } = worst(checks);
       return { outcome, reason: outcome === PASS ? null : `${SOURCE}: ${described(checks.filter((check) => check.outcome === outcome))}` };
     },
 
     async findings(repo, pr, head) {
-      const checks = await read(repo, pr, head);
-      if ("outcome" in checks) return checks;
-      const unrun = checks.filter((check) => check.outcome === COULD_NOT_RUN);
+      const answer = await read(repo, pr, head);
+      if ("outcome" in answer) return answer;
+      const unrun = answer.checks.filter((check) => check.outcome === COULD_NOT_RUN);
       if (unrun.length > 0) return couldNotRun(SOURCE, described(unrun));
-      return checks.filter((check) => check.outcome === FAIL).map(findingOf);
+      const conflict = conflictAt(answer.pullRequest, repo, pr, head);
+      if (!Array.isArray(conflict)) return conflict;
+      return [...answer.checks.filter((check) => check.outcome === FAIL).map(findingOf), ...conflict];
     },
+  };
+}
+
+// A conflict stops the merge as a failed check does, and this is core's one read of the merge gate (root ADR-0003
+// d6), so it is this reader's finding; status stays the checks alone, which GREEN is (orchestrator ADR-0007 d2).
+// GitHub computes mergeability for the current head only, and only once asked.
+function conflictAt(pullRequest: PullRequest, repo: string, pr: number, head: string): Finding[] | CouldNotRun {
+  const base = pullRequest.baseRefName;
+  if (pullRequest.headRefOid !== head) {
+    return couldNotRun(SOURCE, `GitHub's mergeability of ${repo}#${pr} is of ${pullRequest.headRefOid}, not ${head}`);
+  }
+  if (pullRequest.mergeable === UNKNOWN) return couldNotRun(SOURCE, `GitHub has not yet computed whether ${repo}#${pr} conflicts with ${base}`);
+  return pullRequest.mergeable === CONFLICTING ? [conflictFinding(base)] : [];
+}
+
+function conflictFinding(base: string): Finding {
+  return {
+    source: SOURCE,
+    key: `conflict:${base}`,
+    // GitHub finds a conflict, so no account is its author.
+    author: "",
+    file: null,
+    line: null,
+    text: `the PR conflicts with its base branch ${base}`,
+    thread_id: null,
+    resolvable: false,
+    trusted_comments: [],
+    latest_trusted_comment_id: null,
   };
 }
 

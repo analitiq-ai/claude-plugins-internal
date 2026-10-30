@@ -24,7 +24,7 @@ export const script: Script = fresh();
 
 function fresh(): Script {
   return {
-    trigger: { answer: undefined },
+    trigger: { answer: null },
     status: { throws: new Error("the test set no status answer") },
     findings: { answer: [] },
     calls: [],
@@ -47,7 +47,7 @@ export function open(deps: Deps): OpenedPackage {
   return {
     async trigger(repo, pr, head) {
       script.calls.push({ fn: "trigger", repo, pr, head });
-      play(script.trigger);
+      return play(script.trigger) as string | null;
     },
     async status(repo, pr, head) {
       script.calls.push({ fn: "status", repo, pr, head });

@@ -63,15 +63,22 @@ const STATUSES_PATH = `/repos/acme/widgets/commits/${HEAD}/statuses?per_page=100
 
 type Recorded = {
   base?: string;
+  /** GitHub's mergeability, of `headRefOid`; absent, MERGEABLE at the head asked. */
+  mergeable?: string;
+  headRefOid?: string;
   rules: FakeAnswer;
   /** Check runs by the name asked; a name with no entry is never read, so a read of it throws. */
   runs?: Record<string, ReturnType<typeof run>[]>;
   statuses?: FakeAnswer;
 };
 
-function reader({ base = "main", rules, runs = {}, statuses = [] }: Recorded): FakeGitHub {
+function pullRequest(base: string, mergeable = "MERGEABLE", headRefOid = HEAD) {
+  return { repository: { pullRequest: { baseRefName: base, headRefOid, mergeable } } };
+}
+
+function reader({ base = "main", mergeable, headRefOid, rules, runs = {}, statuses = [] }: Recorded): FakeGitHub {
   return fakeGitHub({
-    graphql: [{ when: (query) => query.includes("baseRefName"), answer: { repository: { pullRequest: { baseRefName: base } } } }],
+    graphql: [{ when: (query) => query.includes("baseRefName"), answer: pullRequest(base, mergeable, headRefOid) }],
     restPages: { [rulesPath(base)]: rules, [STATUSES_PATH]: statuses },
     rest: Object.fromEntries(
       Object.entries(runs).map(([name, list]) => [`GET ${runsPath(name)}`, { total_count: list.length, check_runs: list }]),
@@ -206,7 +213,7 @@ describe("a required check is matched at the head asked", () => {
 
   it("refuses a check-runs answer holding more runs than it gave, never reading part as the whole", async () => {
     const client = fakeGitHub({
-      graphql: [{ when: (query) => query.includes("baseRefName"), answer: { repository: { pullRequest: { baseRefName: "main" } } } }],
+      graphql: [{ when: (query) => query.includes("baseRefName"), answer: pullRequest("main") }],
       restPages: { [rulesPath("main")]: [requiring({ context: "ci" })], [STATUSES_PATH]: [] },
       rest: { [`GET ${runsPath("ci")}`]: { total_count: 101, check_runs: [run("ci", "success")] } },
     });
@@ -281,6 +288,62 @@ describe("a failed required check is one finding naming the check and its conclu
       runs: { ci: [run("ci", "failure")], lint: [run("lint", "cancelled")] },
     });
     assertCouldNotRun(findings, /\blint\b/);
+  });
+});
+
+describe("a conflict with the PR's base branch is one finding, read from GitHub at the head asked", () => {
+  it("a conflicting head is one finding keyed by the base, beside the failed checks", async () => {
+    const { findings } = await answers({
+      base: "release",
+      mergeable: "CONFLICTING",
+      rules: [requiring({ context: "ci" }, { context: "lint" })],
+      runs: { ci: [run("ci", "success")], lint: [run("lint", "failure")] },
+    });
+    assert.ok(Array.isArray(findings));
+    assert.deepEqual(findings.map((finding) => finding.key), ["required-check:lint", "conflict:release"]);
+    const conflict = findings[1];
+    assert.equal(Finding.safeParse(conflict).success, true);
+    assert.deepEqual({ ...conflict, text: undefined }, {
+      source: "required-checks",
+      key: "conflict:release",
+      author: "",
+      file: null,
+      line: null,
+      text: undefined,
+      thread_id: null,
+      resolvable: false,
+      trusted_comments: [],
+      latest_trusted_comment_id: null,
+    });
+    assert.match(conflict.text, /\bconflicts\b.*\brelease\b/);
+  });
+
+  it("leaves status to the required checks: a conflicting head whose checks pass is PASS", async () => {
+    const { status, findings } = await answers({ mergeable: "CONFLICTING", rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "success")] } });
+    assert.deepEqual(status, { outcome: "PASS", reason: null });
+    assert.ok(Array.isArray(findings));
+    assert.deepEqual(findings.map((finding) => finding.key), ["conflict:main"]);
+  });
+
+  it("is COULD_NOT_RUN while GitHub has not computed the mergeability, never read as no conflict", async () => {
+    const { findings } = await answers({ mergeable: "UNKNOWN", rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "success")] } });
+    assertCouldNotRun(findings, /\bmain\b/);
+  });
+
+  it("is COULD_NOT_RUN when GitHub's mergeability is of another head, naming it", async () => {
+    const other = "b".repeat(40);
+    const { findings } = await answers({
+      mergeable: "CONFLICTING",
+      headRefOid: other,
+      rules: [requiring({ context: "ci" })],
+      runs: { ci: [run("ci", "success")] },
+    });
+    assertCouldNotRun(findings, new RegExp(other));
+  });
+
+  it("throws on a mergeability GitHub has added, read as neither a conflict nor none", async () => {
+    const client = reader({ mergeable: "MAYBE", rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "success")] } });
+    await assert.rejects(requiredChecks(SHARED, client, validators).findings(REPO, PR, HEAD), /mergeable/);
   });
 });
 

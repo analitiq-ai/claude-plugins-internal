@@ -375,16 +375,22 @@ const PROJECT_ITEMS_QUERY = `query($owner: String!, $name: String!, $number: Int
   }
 }`;
 
+/** The one read of an issue's comments, which a story's state and the orchestrator's keyed comments share. */
+export async function issueComments(reader: GitHubClient, repo: string, issue: number): Promise<IssueComment[]> {
+  assertIssueNumber(issue);
+  const pages = await reader.graphqlPages(COMMENTS_QUERY, { ...ownerAndName(repo), number: issue }, ["repository", "issue", "comments"]);
+  return answerOf(z.array(IssueCommentNode), pages, `the comments of ${repo}#${issue}`);
+}
+
 // Every read and write of a story's state starts here, so one check covers the issue each of them asks about.
 async function judgeIssue(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<Judgement> {
   assertIssueNumber(issue);
   const where = { ...ownerAndName(repo), number: issue };
-  const [commentNodes, timelineNodes, itemNodes] = await Promise.all([
-    reader.graphqlPages(COMMENTS_QUERY, where, ["repository", "issue", "comments"]),
+  const [comments, timelineNodes, itemNodes] = await Promise.all([
+    issueComments(reader, repo, issue),
     reader.graphqlPages(TIMELINE_QUERY, where, ["repository", "issue", "timelineItems"]),
     reader.graphqlPages(PROJECT_ITEMS_QUERY, where, ["repository", "issue", "projectItems"]),
   ]);
-  const comments = answerOf(z.array(IssueCommentNode), commentNodes, `the comments of ${repo}#${issue}`);
   const timeline = answerOf(z.array(TimelineItem), timelineNodes, `the timeline of ${repo}#${issue}`);
   const items = answerOf(z.array(ProjectItem), itemNodes, `the project items of ${repo}#${issue}`);
 

@@ -10,13 +10,14 @@ const MANAGED_FILE = "/etc/claude-code/managed-settings.json";
 const DROP_IN = "/etc/claude-code/managed-settings.d";
 const REMOTE = `${HOME}/.claude/remote-settings.json`;
 const KEYS = `${HOME}/.config/codeworks`;
+const GH_CONFIG_DIR = `${HOME}/.local/state/codeworks/orchestrator/gh`;
 const KEY_BYTES = Buffer.from("-----BEGIN DUMMY KEY-----\n");
 
 const FILE = 0o100000;
 const DIRECTORY = 0o040000;
 
-// The required settings, with `<K>` and `<S>` written from `~`, around entries the gate
-// leaves alone: a credential folder, a host, a cache.
+// The required settings, with `<K>`, `<S>` and `<O>` written from `~` where a list holds them, around entries the
+// gate leaves alone: a credential folder, a host, a cache.
 function inEffect(): Record<string, unknown> {
   return {
     sandbox: {
@@ -26,7 +27,14 @@ function inEffect(): Record<string, unknown> {
       excludedCommands: [],
       filesystem: {
         denyRead: ["~/.config/codeworks", "/srv/creds", "~/.claude/.credentials.json"],
-        denyWrite: ["~/.config/codeworks", "/srv/creds", "~/.local/state/codeworks/reviewer", "~/.claude", "~/.gitconfig"],
+        denyWrite: [
+          "~/.config/codeworks",
+          "/srv/creds",
+          "~/.local/state/codeworks/reviewer",
+          "~/.local/state/codeworks/orchestrator",
+          "~/.claude",
+          "~/.gitconfig",
+        ],
         allowManagedReadPathsOnly: true,
         disabled: false,
       },
@@ -45,6 +53,7 @@ function inEffect(): Record<string, unknown> {
         "Edit(~/.config/codeworks/**)",
         "Read(//srv/creds/**)",
         "Edit(~/.local/state/codeworks/reviewer/**)",
+        "Edit(~/.local/state/codeworks/orchestrator/**)",
         "Read(~/.claude/.credentials.json)",
         "Edit(~/.claude/**)",
         "Edit(~/.gitconfig)",
@@ -70,7 +79,7 @@ function inEffect(): Record<string, unknown> {
       "auditor@codeworks": true,
       "pr-review-toolkit@claude-plugins-official": true,
     },
-    env: { PIP_CACHE_DIR: "/tmp/cache/pip" },
+    env: { PIP_CACHE_DIR: "/tmp/cache/pip", GH_CONFIG_DIR },
   };
 }
 
@@ -94,7 +103,13 @@ const HOLDS: [setting: string, entry: string][] = [
   ...["~/.config/codeworks", "~/.claude/.credentials.json"].map(
     (entry): [string, string] => ["sandbox.filesystem.denyRead", entry],
   ),
-  ...["~/.config/codeworks", "~/.local/state/codeworks/reviewer", "~/.claude", "~/.gitconfig"].map(
+  ...[
+    "~/.config/codeworks",
+    "~/.local/state/codeworks/reviewer",
+    "~/.local/state/codeworks/orchestrator",
+    "~/.claude",
+    "~/.gitconfig",
+  ].map(
     (entry): [string, string] => ["sandbox.filesystem.denyWrite", entry],
   ),
   ...(inEffect().permissions as { deny: string[] }).deny
@@ -203,20 +218,26 @@ describe("readKey", () => {
     assert.deepEqual(readKey("reviewer-app.pem", "reviewer", readOnly), KEY_BYTES);
   });
 
-  it("reads with <K> and <S> written as absolute paths, a permission rule's starting //", () => {
+  it("reads with <K>, <S> and <O> written as absolute paths, a permission rule's starting //", () => {
     const text = settingsWith([
       ["sandbox.filesystem.denyRead", [`${HOME}/.config/codeworks`, "~/.claude/.credentials.json"]],
       [
         "sandbox.filesystem.denyWrite",
-        [`${HOME}/.config/codeworks`, `${HOME}/.local/state/codeworks/reviewer`, "~/.claude", "~/.gitconfig"],
+        [
+          `${HOME}/.config/codeworks`,
+          `${HOME}/.local/state/codeworks/reviewer`,
+          `${HOME}/.local/state/codeworks/orchestrator`,
+          "~/.claude",
+          "~/.gitconfig",
+        ],
       ],
       [
         "permissions.deny",
         (inEffect().permissions as { deny: string[] }).deny.map((rule) =>
-          rule.replace("~/.config/codeworks", `/${HOME}/.config/codeworks`).replace(
-            "~/.local/state/codeworks/reviewer",
-            `/${HOME}/.local/state/codeworks/reviewer`,
-          ),
+          rule
+            .replace("~/.config/codeworks", `/${HOME}/.config/codeworks`)
+            .replace("~/.local/state/codeworks/reviewer", `/${HOME}/.local/state/codeworks/reviewer`)
+            .replace("~/.local/state/codeworks/orchestrator", `/${HOME}/.local/state/codeworks/orchestrator`),
         ),
       ],
     ]);
@@ -322,6 +343,26 @@ describe("readKey's managed-settings gate", () => {
       const refused = refusal(() => readKey("reviewer-app.pem", "reviewer", fake));
       assertReasons(refused, setting);
       assert.ok(refused.reasons[0].includes(entry), refused.reasons[0]);
+    });
+  }
+
+  it("refuses without env.GH_CONFIG_DIR, naming it", () => {
+    const fake = machine({ text: settingsWith([["env.GH_CONFIG_DIR", DROPPED]]) });
+    assertReasons(refusal(() => readKey("reviewer-app.pem", "reviewer", fake)), "env.GH_CONFIG_DIR is missing");
+  });
+
+  // gh reads GH_CONFIG_DIR as written: `~/…` names a folder called `~` in the working directory.
+  for (const other of [
+    "~/.local/state/codeworks/orchestrator/gh",
+    "/tmp/verify-b-ghsess",
+    `${HOME}/.local/state/codeworks/orchestrator`,
+  ]) {
+    it(`refuses env.GH_CONFIG_DIR set to ${other}, naming it`, () => {
+      const fake = machine({ text: settingsWith([["env.GH_CONFIG_DIR", other]]) });
+      assertReasons(
+        refusal(() => readKey("reviewer-app.pem", "reviewer", fake)),
+        `env.GH_CONFIG_DIR is ${JSON.stringify(other)}, not ${JSON.stringify(GH_CONFIG_DIR)}`,
+      );
     });
   }
 
