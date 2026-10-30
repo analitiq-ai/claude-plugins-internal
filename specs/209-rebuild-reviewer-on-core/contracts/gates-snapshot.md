@@ -42,7 +42,7 @@ Validation: ids unique within each list; times are core `Time`; shas 40 hex.
 ## Derived, never stored
 
 - Lineage count: distinct `ref` with `ruling = WRONG` and `at` after the newest `/codeworks reset` (ADR-0013 d3).
-- `claim-<id>` is placed when that count reaches `REFUSALS_BEFORE_USER = 3` and the hold has no row, or its newest
+- `claim-<id>` is placed when that count reaches `REFUSALS_BEFORE_USER = 3` and the hold has no row, or its
   row is RELEASED and a WRONG `ref` is later than that release ("until one more WRONG", ADR-0013 d4). A WRONG on
   words of a released hold counts like any other: today's `released.claims` exemption (cc:255, cg:86) is dropped
   with `unlock` (ADR-0013 Option E).
@@ -71,7 +71,7 @@ graded and nothing is recorded as passed.
 - Read: `readState(...)` → `snapshot.gates`; one reading per run (FR-004).
 - `recordGates(reader, writer, repo, issue, shared, read: StateReading, gates: Gates, openings: Opening[]): Promise<void>`
   with `Opening {id: "claim-<id>" | "shim-<id>", question: string | null}`: one post of the snapshot `read` holds,
-  with `gates` replaced and each opening placed (a hold with no row, or a new row after a RELEASED one). A hold
+  with `gates` replaced and each opening placed (a hold with no row gets one; a RELEASED row is reopened in place, `withRow`, one row per id, ADR-0013 d1). A hold
   already OPEN is left as it is; the `gates` change is posted regardless. Refuses with `StateWriteRefused`, posting
   nothing, on tamper, contract break, a `gates` on GitHub differing from `read`'s (a stale reading), or the size rule.
 - `writeState`, `placeHold`, `placeRescopeHold` and `releaseOnClaim` refuse a snapshot whose `gates` differs from
