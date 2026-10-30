@@ -14,8 +14,9 @@ Gates   { v: 1, branches: { <branch>: Branch } }
 Branch  { anchor: sha40, lineages: Lineage[], bugs: Bug[] }
 Lineage { id, file, places: {start, end, claim}[], chain: {ref, claim, line, words, ruling, at}[] }
 Bug     { id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, old_start, old_count}[],
-          deep: {same_operation: string[], callers: string[]} | null,
+          deep: {same_operation: Site[], callers: Site[]} | null,
           rulings: {site, ruling, issue: number | null}[] }
+Site    { file, line, function, does }
 ```
 
 | field | why it is kept (reader) |
@@ -29,7 +30,7 @@ Bug     { id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, old_
 | `chain[].ruling`, `at` | the counts and release floors below |
 | `members`, `absorbed` | a tree in either is never counted again (sc:268); a merge keeps as `members` those of the bug with the higher count (sc:224, ADR-0008 d2) and moves the other's into `absorbed` |
 | `ranges` | which bug a change belongs to, by overlap (sc:189); lines are in the anchor's text |
-| `deep` | the deep sweep runs once; the next check reuses its lists (sg:219, 258) |
+| `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
 | `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294) |
 
 Validation: ids unique within a branch's list; times are core `Time`; shas 40 hex.
@@ -44,8 +45,9 @@ Validation: ids unique within a branch's list; times are core `Time`; shas 40 he
 - Bug count: `members` with `at` after the newest reset. `DEEP_AT = 3` makes the deep sweep due; `HOLD_AT = 4`
   places `shim-<id>`. A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
   hold again ("one such commit", ADR-0013 d4).
-- A hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the hold row when
-  it is placed, never into the gates comment.
+- A `claim-<id>` hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the
+  hold row when it is placed, never into the gates comment. Core's snapshot contract allows a question only on
+  `escalation-` holds today (`core/src/contracts/snapshot.ts:53`); PR B extends it to `claim-` holds.
 
 ## Not carried from the ledger
 
