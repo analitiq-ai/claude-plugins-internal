@@ -239,6 +239,8 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
 - **FR-019**: While reviewer is off, it MUST run no check and record no commit-check pass; the session's
   commits are committed and pushed unreviewed, and the push takes no pass record into account. The switch is
   written to the commit-check pass record (`off`), so the orchestrator reads it through the same core contract.
+  An off session records no internal round, so nothing attests its PR: it merges only under an admin's exempt
+  label (ADR-0015 d2), never by the switch alone.
 - **FR-020**: Two hook runs of one session MUST NOT write reviewer state or gates from the same reading: each
   write, and the release on claim, is serialised per session from its read to its post.
 - **FR-021**: The after-commit check MUST grade only from a base that is an ancestor of the commit checked:
