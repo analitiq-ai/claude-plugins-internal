@@ -53,8 +53,9 @@ orchestrator App. Posted only when none with that key exists (HANDLED, ADR-0003 
 
 ## PushPlan (Story 2; Story 4 adds the stage-2 inputs)
 
-`decidePush({commits, passed, identity, stage, fixCommits, defaultBranchMerges})` → `push {branch, head}` or
-`refuse {commit, cause}`. One failing commit refuses all.
+`decidePush({commits, passes, off, identity, stage, fixCommits, defaultBranchMerges})` → `push {branch, head}` or
+`refuse {commit, cause}`. `passes` is the pushed branch's entry of the commit-check pass record; with `off`, a commit
+needs no pass but its change must touch no `.github/` folder. One failing commit refuses all.
 
 ## CountsSnapshot (Story 5)
 

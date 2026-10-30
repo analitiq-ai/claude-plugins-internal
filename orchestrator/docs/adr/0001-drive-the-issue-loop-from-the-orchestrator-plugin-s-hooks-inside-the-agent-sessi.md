@@ -45,7 +45,8 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
    review threads, mergeable field, statuses and checks at the head; issue comments with author, edit
    and time, reviewer's state comments (reviewer ADR-0011) among them; an exempt label's labeled event,
    its sender, that sender's permission and the head's push time (ADR-0005); the effective rules for
-   each PR's base branch (ADR-0009); the session's commits; its own section and `[shared]` of
+   each PR's base branch (ADR-0009); the session's commits; reviewer's commit-check pass record for the
+   session, its passes by branch and whether reviewer is off (reviewer ADR-0006); its own section and `[shared]` of
    `codeworks.toml` (root ADR-0002); its hook's event. It parses no prose except through `core/`'s
    modules (root ADR-0003) and runs no LLM.
 3. We will drive the loop from four hooks. SessionStart mints the session's token (root ADR-0007), and
@@ -57,7 +58,8 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
    (ADR-0008), is its spec's to settle.
 4. We will have the orchestrator's hooks push the session's commits and open the story PR as a draft
    after the first push (builder ADR-0003). Every commit a push adds, but those a merge of the default
-   branch brings in from it, must have passed reviewer's commit check (reviewer ADR-0002). At stage 2
+   branch brings in from it, must have passed reviewer's commit check (reviewer ADR-0002), or, while reviewer
+   is off for the session (reviewer ADR-0006), touch no `.github/` folder. At stage 2
    (ADR-0004) a push adds only commits that a FIX ruling names or a merge of the default branch. Which
    hook pushes, and when in a turn, is this plugin's spec to settle.
 5. We will have a hook that crashes or times out attest, flip, push and merge nothing.

@@ -80,9 +80,10 @@ core.
   workflow runs on the push before any review. The ruleset decides whether a merge goes through, and the
   merge names the head it evaluated.
 - It attests `internal-review` only from the reviewer App's newest record.
-- It pushes only commits reviewer's commit check passed (reviewer ADR-0002) whose author and committer
-  are the agent identity, the name and email of the agent machine's global git config, set at setup and
-  write-denied (§5); at stage 2 only commits a FIX ruling names or a merge of the default branch
+- It pushes only commits whose author and committer are the agent identity, the name and email of the agent
+  machine's global git config, set at setup and write-denied (§5), and that reviewer's commit check passed
+  (reviewer ADR-0002) or, while reviewer is off for the session, whose change touches no `.github/` folder
+  (reviewer ADR-0006); at stage 2 only commits a FIX ruling names or a merge of the default branch
   (orchestrator ADR-0001 d4).
 - A hook that crashes or times out attests, flips, pushes and merges nothing.
 

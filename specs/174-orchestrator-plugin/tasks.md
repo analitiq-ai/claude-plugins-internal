@@ -13,8 +13,8 @@ description: "Task list for the orchestrator plugin carrying core"
 `node:test` against core's fake GitHub (`core/tests/support/fake-github.ts`) or a recorded hook input. A test task
 is run and seen to fail for the stated reason before its implementation task starts.
 
-**Organization**: One phase per user story. Every task marked **core PR** lands in `core/` as its own PR, merged
-before the story PR that first calls it (plan: Delivery order). The managed-settings change (T005) is a governing
+**Organization**: One phase per user story. Every task marked **core** lands in `core/` no later than the story PR
+that first calls it (plan: Delivery order). The managed-settings change (T005) is a governing
 rule and lands as its own PR before Story 1 (Principle VI).
 
 ## Format: `[ID] [P?] [Story] Description`
@@ -123,25 +123,27 @@ a merged spec PR leaves a session App token in the gh folder, the card In progre
 ## Phase 4: User Story 2 - Push and open the draft PR (Priority: P2)
 Story issue: #212
 
-**Goal**: the Stop hook pushes passed commits by the agent identity from a hook-owned copy with an in-memory
+**Goal**: the Stop hook pushes the agent identity's passed commits, or all of them while reviewer is off, from a
+hook-owned copy with an in-memory
 orchestrator token and opens the draft PR; builder stops pushing
 
-**Independent Test**: against the fake GitHub with a passed-commit record naming two agent-identity commits, a Stop
-run pushes both from the copy and opens a draft PR with `Closes #s`; adding a commit by another author pushes
-nothing and refuses the stop naming it.
+**Independent Test**: against the fake GitHub with a commit-check pass record naming two agent-identity commits under
+the story branch, a Stop run pushes both from the copy and opens a draft PR with `Closes #s`; adding a commit the
+record names only under a second branch of the session, or one by another author, pushes nothing and refuses the
+stop naming it; with the record's `off`, the agent-identity commits are pushed with no pass.
 
 ### Unrun behaviour first (R13)
 
-- [ ] T038 [US2] On the agent machine, before C7 lands: start a `run_in_background` reader before the turn ends that, during a Stop hook holding a token in its child's `GH_TOKEN`, tries `/proc/<pid>/environ` of the git child and of the Stop hook's own process. Record the outcome under R13 in `specs/174-orchestrator-plugin/research.md`. **If either is readable, stop: R13 is reopened before T040**
+- [ ] T038 [US2] On the agent machine, before C7 lands: start a `run_in_background` reader before the turn ends that, during a Stop hook holding a token in its child's `GH_TOKEN`, tries `/proc/<pid>/environ` of the git child and of the Stop hook's own process. Record the outcome under R13 in `specs/174-orchestrator-plugin/research.md`. **If either is readable, stop: R13 is reopened before T039**
 
-### Core PRs for Story 2
+### Core for Story 2
 
-- [ ] T039 [P] [US2] **core PR C7.** Failing cases in `core/tests/git.test.ts`, then add to `core/src/git.ts` a push that passes an in-memory token to `gh auth git-credential` through the child's `GH_TOKEN` alone, reusing `pushWithGhCredential`'s credential path; no file is written and the parent's environment is unchanged
-- [ ] T040 [P] [US2] **core PR C12.** Passed-commit record: the contract for reviewer's commit-check passes (reviewer ADR-0002 d2, ADR-0003 d2) in `core/src/contracts/` with its reader in `core/src`, failing tests first in `core/tests/`. Its shape is not in this feature's `contracts/`; settle it with reviewer's records in that PR before writing code
+- [ ] T039 [P] [US2] **core C7, in the US2 PR.** Failing cases in `core/tests/git.test.ts`, then add to `core/src/git.ts` a push that passes an in-memory token to `gh auth git-credential` through the child's `GH_TOKEN` alone, reusing `pushWithGhCredential`'s credential path; no file is written and the parent's environment is unchanged
+- [ ] T040 [US2] Before T041: #209's core PR has merged the commit-check pass record (`core/src/contracts/commit-pass.ts`, `readCommitPasses`); this feature does not define its shape
 
 ### Push (FR-016–FR-018, R13–R14, data-model PushPlan, AgentIdentity)
 
-- [ ] T041 [P] [US2] Write failing `orchestrator/tests/push.test.ts`: `readAgentIdentity` runs core `runGit` with `config --file <resolved ~/.gitconfig> --no-includes --get user.name|user.email`; exit 1 or empty value refuses naming the key (US2 #3); pure `decidePush({commits, passed, identity, stage})` returns `push {branch, head}` only when every new commit is in `passed` and its author and committer equal the identity, otherwise `refuse {commit, cause}` and pushes nothing (US2 #2, SC-004)
+- [ ] T041 [P] [US2] Write failing `orchestrator/tests/push.test.ts`: `readAgentIdentity` runs core `runGit` with `config --file <resolved ~/.gitconfig> --no-includes --get user.name|user.email`; exit 1 or empty value refuses naming the key (US2 #3); pure `decidePush({commits, passes, off, identity, stage})` returns `push {branch, head}` only when every new commit's author and committer equal the identity and the commit is in `passes`, the pushed branch's entry of the commit-check pass record, so a commit passed only under another branch of the session is refused; with `off` no pass is needed and a commit whose change touches a `.github/` folder is refused; otherwise `refuse {commit, cause}` and pushes nothing (US2 #2, #6, SC-004)
 - [ ] T042 [US2] Implement `readAgentIdentity` and `decidePush` in `orchestrator/plugin/lib/push.ts`; T041 passes
 - [ ] T043 [P] [US2] Write failing `orchestrator/tests/push-copy.test.ts` with real temp git repositories: the story branch is fetched from the model's clone into the bare `push/<owner>/<name>.git` with `--no-tags`; the push uses T039's push with the in-memory token; after the first push a draft PR is opened against the fake GitHub whose body carries `Closes #s` and the session's id trailer, and a later session's first push adds its own trailer (FR-018)
 - [ ] T044 [US2] Implement `pushFromCopy` and `openDraftPr` in `orchestrator/plugin/lib/push.ts`; T043 passes
@@ -149,7 +151,7 @@ nothing and refuses the stop naming it.
 ### Stop hook (FR-016b, contracts/hooks.md)
 
 - [ ] T045 [US2] Add Stop → `stop.ts` to `orchestrator/plugin/hooks/hooks.json` with `"timeout": 3900` and no `onFailure` (fails open)
-- [ ] T046 [P] [US2] Write failing `orchestrator/tests/stop-hook.test.ts`: a running `workflow` in `background_tasks` → no push, no step, exit 0 (US2 #4); no `background_tasks` field → no push, card to Blocked naming the missing field via `postKeyed` then `moveCard`, exit 0; passed commits → pushed and draft PR opened (US2 #1); a failing commit → exit 2 naming commit and cause; a thrown error → exit 1; repository and issue come from the session record
+- [ ] T046 [P] [US2] Write failing `orchestrator/tests/stop-hook.test.ts`: a running `workflow` in `background_tasks` → no push, no step, exit 0 (US2 #4); no `background_tasks` field → no push, card to Blocked naming the missing field via `postKeyed` then `moveCard`, exit 0; commits the record names under the story branch → pushed and draft PR opened (US2 #1); the record's `off` → the agent identity's commits pushed with no pass (US2 #6); a failing commit → exit 2 naming commit and cause; a thrown error → exit 1; repository and issue come from the session record, passes and `off` from `readCommitPasses` for the hook's session
 - [ ] T047 [US2] Implement `orchestrator/plugin/hooks/stop.ts` (guard first, dynamic imports) calling `lib/push.ts`; T046 and T007 pass
 - [ ] T048 [P] [US2] Edit `builder/plugin/skills/issue-tackle/SKILL.md` (R19, FR-024): Step 4 (line 58) reads "commit, then end the turn; the orchestrator pushes and opens the draft PR"; remove Step 6's "Mark the PR ready"
 
@@ -206,8 +208,8 @@ Story issue: #215
 **Independent Test**: fake GitHub: each named builder step posts a new snapshot; at `max_turns` the card goes to
 Blocked naming the bound; an edited snapshot sends it to Blocked; a session found not ended counts toward `k_deaths`.
 
-- [ ] T065 [US5] **core PR C6.** Parameterise core's state-comment read and post in `core/src/state.ts` (`judge`, `post`, tamper causes) by tag, App login and schema, so reviewer's state and the counts are two uses of one function set (FR-022, R17); `core/tests/state-read.test.ts` and `core/tests/state-write.test.ts` pass unchanged for reviewer, plus failing-first cases for a second tag
-- [ ] T066 [US5] **core PR C6.** Add `core/src/contracts/counts.ts` per `contracts/counts-comment.md`: strict `{v: 1, since: Time, sessions: [{id: uuid, ended: boolean}], turns: integer ≥ 0, repeat: {head, findings: string[]} | null}`, tag `<!-- codeworks:orchestrator-counts -->`, rendered with sorted keys as `renderState`; test first in `core/tests/counts.test.ts`
+- [ ] T065 [US5] **core C6, in the US5 PR.** Parameterise core's state-comment read and post in `core/src/state.ts` (`judge`, `post`, tamper causes) by tag, App login and schema, so reviewer's state and the counts are two uses of one function set (FR-022, R17); `core/tests/state-read.test.ts` and `core/tests/state-write.test.ts` pass unchanged for reviewer, plus failing-first cases for a second tag
+- [ ] T066 [US5] **core C6, in the US5 PR.** Add `core/src/contracts/counts.ts` per `contracts/counts-comment.md`: strict `{v: 1, since: Time, sessions: [{id: uuid, ended: boolean}], turns: integer ≥ 0, repeat: {head, findings: string[]} | null}`, tag `<!-- codeworks:orchestrator-counts -->`, rendered with sorted keys as `renderState`; test first in `core/tests/counts.test.ts`
 - [ ] T067 [P] [US5] Add `max_turns` and `k_deaths` (each "integer ≥ 1") to `orchestrator/plugin/lib/settings.ts`, failing cases first in `orchestrator/tests/settings.test.ts`
 - [ ] T068 [P] [US5] Write failing `orchestrator/tests/bounds.test.ts` for pure `decideBounds(snapshot, facts, settings)`: REPEAT (same head and findings) → Blocked; two turns in a row from a working lane each ending with an unattested head → Blocked; `turns` ≥ `max_turns` → Blocked; sessions with `ended: false` other than the current one ≥ `k_deaths` → Blocked (US5 #1, SC-006); `since` is the newer of the last Ready move and the last admin `/codeworks reset`, and a snapshot with an older `since` counts nothing; a new snapshot only when a field changed
 - [ ] T069 [US5] Implement `orchestrator/plugin/lib/bounds.ts`: `decideBounds` plus read/post through C6; an edited or untagged newest snapshot, or an orchestrator App comment deleted after it, sends the card to Blocked naming it (US5 #2); T068 passes
@@ -233,16 +235,16 @@ Story issue: #215
 - **Setup (Phase 1)**: none
 - **Foundational (Phase 2)**: after Setup; T005 (M) and T006 are separate PRs merged first; blocks every story
 - **US1 (Phase 3)**: after Phase 2; T018 gates T034; C1–C4 (T019–T023) merged before the US1 PR
-- **US2 (Phase 4)**: after US1 (Stop reads the session record); T038 gates T039; C7, C12 merged first
+- **US2 (Phase 4)**: after US1 (Stop reads the session record); T038 gates T039; #209's core PR merged first; C7 in the US2 PR
 - **US3 (Phase 5)**: after US2 (needs the draft PR); C10 merged first
 - **US4 (Phase 6)**: after US3; C8, C9, C11 merged first
-- **US5 (Phase 7)**: after US2's Stop hook; C6 merged first; independent of US3–US4
+- **US5 (Phase 7)**: after US2's Stop hook; C6 in the US5 PR; independent of US3–US4
 - **Live runs of US2–US5**: after reviewer #209
 - **Polish**: after the stories in scope
 
 ### Within Each Story
 
-- Unrun-behaviour task first, then core PRs, then failing tests, then the code that passes them
+- Unrun-behaviour task first, then core changes, then failing tests, then the code that passes them
 - Pure decisions (`lib/`) before entry files (`hooks/`)
 
 ### Parallel Opportunities
@@ -250,7 +252,7 @@ Story issue: #215
 - Phase 1: T002, T003, T004
 - Phase 2: T007, T009, T011, T012, T014, T016 (test files and leaf modules)
 - US1: core PRs T019/T021/T022/T023; tests T024, T026, T028, T031–T033; T035
-- US2: T039, T040; tests T041, T043, T046; T048
+- US2: T039; tests T041, T043, T046; T048
 - US3: T049, T050, T051, T052
 - US4: T055–T059, T061, T063
 - US5: T067, T068 (after T065–T066)
@@ -284,13 +286,13 @@ Task: "orchestrator/tests/start-writes.test.ts"
 
 ### Incremental Delivery
 
-US1 → US2 (push) → US3 (attest, ready) → US4 (review, merge, wait) → US5 (bounds), each its own story PR after
-its core PRs; US5 may land before US3–US4.
+US1 → US2 (push) → US3 (attest, ready) → US4 (review, merge, wait) → US5 (bounds), each its own story PR carrying
+the core changes it first calls; US5 may land before US3–US4.
 
 ---
 
 ## Notes
 
-- Every **core PR** and the two **governing-rule PRs** (T005, T074) are separate from the story PRs
+- The two **governing-rule PRs** (T005, T074) are separate from the story PRs
 - Verify each test fails for the stated reason before writing the code it grades
 - No Python under `orchestrator/` (FR-003a); no import of another plugin (FR-003)
