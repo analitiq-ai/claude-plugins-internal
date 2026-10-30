@@ -35,11 +35,14 @@ function entries(node: Record<string, unknown>, prefix = ""): Entry[] {
   });
 }
 
-// §5's `<V>/keys` and `<V>/state` read as `<K>` and `<S>`, `/<V>` being a permission
+// §5's `<V>/keys`, `<V>/state` and `<V>/orchestrator` read as `<K>`, `<S>` and `<O>`, `/<V>` being a permission
 // rule's absolute form of the same folder.
 function asTableWrites(value: unknown): unknown {
   if (typeof value !== "string") return value;
-  return value.replace(/\/?<V>\/keys/g, "<K>").replace(/\/?<V>\/state/g, "<S>");
+  return value
+    .replace(/\/?<V>\/keys/g, "<K>")
+    .replace(/\/?<V>\/state/g, "<S>")
+    .replace(/\/?<V>\/orchestrator/g, "<O>");
 }
 
 function under(setting: string, parent: string): boolean {
@@ -55,6 +58,7 @@ function required({ setting, value }: Entry): boolean {
   const row = REQUIRED_SETTINGS.find((candidate) => candidate.setting === setting);
   if (row === undefined) return false;
   if ("equals" in row) return isDeepStrictEqual(row.equals, value);
+  if ("equalsPath" in row) return row.equalsPath === value;
   const items: readonly string[] = "holdsPaths" in row ? row.holdsPaths : row.holdsRules;
   return typeof value === "string" && items.includes(value);
 }
@@ -99,6 +103,22 @@ describe("keys.ts against SECURITY.md §5", () => {
       stray("sandbox.enabled: false"),
       stray("sandbox.newSetting: true"),
       stray('permissions.deny: "Edit(**/new/**)"'),
+    ]);
+  });
+
+  it("reads <V>/orchestrator as the orchestrator's folder and names a GH_CONFIG_DIR written from ~", () => {
+    const changed = structuredClone(block) as {
+      sandbox: { filesystem: { denyWrite: string[] } };
+      permissions: { deny: string[] };
+      env: Record<string, string>;
+    };
+    changed.sandbox.filesystem.denyWrite.push("<V>/orchestrator");
+    changed.permissions.deny.push("Edit(/<V>/orchestrator/**)");
+    changed.env.GH_CONFIG_DIR = "<V>/orchestrator/gh";
+    assert.deepEqual(strays(changed), []);
+    changed.env.GH_CONFIG_DIR = "~/.local/state/codeworks/orchestrator/gh";
+    assert.deepEqual(strays(changed), [
+      `§5 env.GH_CONFIG_DIR: "~/.local/state/codeworks/orchestrator/gh" is in neither keys.ts's table nor its exceptions`,
     ]);
   });
 });
