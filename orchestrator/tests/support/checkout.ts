@@ -38,7 +38,8 @@ export function tempHome(t: TestContext): string {
   return home;
 }
 
-function git(dir: string, ...args: string[]): void {
+/** git in `dir`, reading no global or system config. */
+export function git(dir: string, ...args: string[]): void {
   execFileSync("git", ["-C", dir, "-c", "user.name=Dummy", "-c", "user.email=dummy@example.invalid", ...args], {
     env: { PATH: process.env.PATH, HOME: dir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
   });
