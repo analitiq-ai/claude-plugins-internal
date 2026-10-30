@@ -188,6 +188,33 @@ export async function storyPr(reader: GitHubClient, repo: string, branch: string
   return pickStoryPr(answerOf(z.array(PullRequestHeadAnswer), nodes, `the PRs on ${repo} ${branch}`), branch);
 }
 
+/** A story's branch on GitHub and its PR; `pr` is null until one is opened from the branch. */
+export type IssueStory = { branch: string; pr: StoryPr | null };
+
+// `<k>` is never checked (root ADR-0005 d1), so two branches of one story leave none to pick, whatever their `<k>`.
+export function pickStoryBranch(names: readonly string[], s: number): string | null {
+  assertIssueNumber(s);
+  const branches = names.filter((name) => storyOf(name) === s);
+  if (branches.length > 1) throw new DerivationError(`the story branch of #${s}`, branches.join(", "));
+  return branches[0] ?? null;
+}
+
+const HEADS = "refs/heads/";
+
+const BranchRef = z.object({ ref: z.string().startsWith(HEADS) }).transform(({ ref }) => ref.slice(HEADS.length));
+
+/** Null when GitHub holds no branch of the story: before its first push, or once its merge deleted it. */
+export async function issueStory(reader: GitHubClient, repo: string, s: number): Promise<IssueStory | null> {
+  assertIssueNumber(s);
+  const where = ownerAndName(repo);
+  const at = [where.owner, where.name].map(encodeURIComponent).join("/");
+  // Every branch the grammar gives `s` starts `<s>-us`, so a prefix read misses none; the grammar picks among them.
+  const refs = await reader.restPages(`/repos/${at}/git/matching-refs/heads/${s}-us`);
+  const branch = pickStoryBranch(answerOf(z.array(BranchRef), refs, `the branches of ${repo} starting ${s}-us`), s);
+  if (branch === null) return null;
+  return { branch, pr: await storyPr(reader, repo, branch) };
+}
+
 export function pickSpecPr(prs: readonly PullRequestState[], p: number): SpecPr | null {
   const newest = newestSameRepo(prs, specBranch(p));
   if (newest === null) return null;
@@ -229,6 +256,12 @@ export function doneFrom(prs: readonly { merged: boolean }[], closes: readonly I
 const REPOSITORY_ID_QUERY = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }`;
 
 const RepositoryIdAnswer = z.object({ repository: z.object({ id: z.string() }) });
+
+/** What a node's `repository { id }` is compared with: a name can differ in case or follow a rename, an id cannot. */
+export async function repositoryId(reader: GitHubClient, repo: string): Promise<string> {
+  const answer = await reader.graphql(REPOSITORY_ID_QUERY, ownerAndName(repo));
+  return answerOf(RepositoryIdAnswer, answer, `the id of ${repo}`).repository.id;
+}
 
 // The head branch is deleted on merge (orchestrator ADR-0009 d6), so a story's PRs are found from the issue's
 // timeline; the branch grammar, not the reference, decides which of them are the story's.
@@ -294,8 +327,7 @@ function candidateOf(item: TimelineItem): CandidatePr | null {
 export async function isDone(reader: GitHubClient, repo: string, s: number): Promise<boolean> {
   assertIssueNumber(s);
   const where = ownerAndName(repo);
-  const idAnswer = await reader.graphql(REPOSITORY_ID_QUERY, where);
-  const repositoryId = answerOf(RepositoryIdAnswer, idAnswer, `the id of ${repo}`).repository.id;
+  const ownId = await repositoryId(reader, repo);
   const timeline = ["repository", "issue", "timelineItems"];
   const nodes = await reader.graphqlPages(TIMELINE_QUERY, { ...where, number: s }, timeline);
   const items = answerOf(z.array(TimelineItem), nodes, `the timeline of ${repo}#${s}`);
@@ -304,7 +336,7 @@ export async function isDone(reader: GitHubClient, repo: string, s: number): Pro
     .map(candidateOf)
     .filter(
       (pr): pr is CandidatePr =>
-        pr !== null && pr.repository.id === repositoryId && !pr.isCrossRepository && storyOf(pr.headRefName) === s,
+        pr !== null && pr.repository.id === ownId && !pr.isCrossRepository && storyOf(pr.headRefName) === s,
     );
   const closes = await Promise.all(
     items.flatMap((item) => (item.__typename === "ClosedEvent" ? [item.actor] : [])).map(

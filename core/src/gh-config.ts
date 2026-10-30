@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { parse, stringify, YAMLParseError } from "yaml";
 import { z } from "zod";
 
+import { textIfPresent, writeWhole } from "./files.ts";
 import type { MintedToken } from "./tokens.ts";
 
 // Longer than any planner script runs, so a token checked as one starts outlives its GitHub calls.
@@ -41,34 +41,18 @@ export function writeGhToken(folder: string, token: MintedToken, login: string):
   chmodSync(folder, 0o700);
   // hosts.yml first: a crash between the two leaves the earlier expiry beside the newer token, which mints early,
   // never late.
-  replaceFile(join(folder, HOSTS_FILE), stringify({ [HOST]: { oauth_token: token.value, user: login, git_protocol: "https" } }));
-  replaceFile(join(folder, TOKEN_FILE), `${JSON.stringify({ repo: token.repo, expires_at: token.expires_at })}\n`);
-}
-
-// A reader, gh among them, sees the old file or the new one, never a part-written one.
-function replaceFile(path: string, text: string): void {
-  const temp = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(temp, text, { mode: 0o600, flag: "wx" });
-  renameSync(temp, path);
+  writeWhole(join(folder, HOSTS_FILE), stringify({ [HOST]: { oauth_token: token.value, user: login, git_protocol: "https" } }), renameSync);
+  writeWhole(join(folder, TOKEN_FILE), `${JSON.stringify({ repo: token.repo, expires_at: token.expires_at })}\n`, renameSync);
 }
 
 export function readGhToken(folder: string): StoredToken | null {
-  const hosts = textOf(join(folder, HOSTS_FILE));
-  const stored = textOf(join(folder, TOKEN_FILE));
+  const hosts = textIfPresent(join(folder, HOSTS_FILE));
+  const stored = textIfPresent(join(folder, TOKEN_FILE));
   if (hosts === null && stored === null) return null;
   if (hosts === null) throw new GhFolderRefused(folder, `it holds ${TOKEN_FILE} without ${HOSTS_FILE}`);
   if (stored === null) throw new GhFolderRefused(folder, `it holds ${HOSTS_FILE} without ${TOKEN_FILE}`);
   const { repo, expires_at } = tokenFileOf(folder, stored);
   return { value: hostsFileOf(folder, hosts)[HOST].oauth_token, repo, expires_at };
-}
-
-function textOf(path: string): string | null {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    return null;
-  }
 }
 
 // The file holds the token, so the refusal names the parser's code and line, never its message, which quotes the text.
