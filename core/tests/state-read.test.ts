@@ -5,6 +5,7 @@ import type { Hold, Round, Snapshot } from "../src/contracts/snapshot.ts";
 import type { Shared } from "../src/settings.ts";
 import {
   BoardNotVisible,
+  issueComments,
   readState,
   stateFrom,
   type CommentDeletion,
@@ -12,7 +13,7 @@ import {
   type StateReading,
   type StatusChange,
 } from "../src/state.ts";
-import { GitHubRefused } from "../src/github.ts";
+import { GitHubRefused, GitHubUnanswered } from "../src/github.ts";
 import { fakeGitHub, type FakeAnswer } from "./support/fake-github.ts";
 
 const REPO = "acme/widgets";
@@ -459,6 +460,49 @@ describe("readState", () => {
         assert.match(error.message, /not an issue number/);
         return true;
       });
+      assert.deepEqual(client.calls, []);
+    }
+  });
+});
+
+describe("issueComments", () => {
+  const comments = [
+    comment(101, ADMIN, "Opened the PR.", { createdAt: at("10:00") }),
+    comment(102, ORCHESTRATOR_APP, "<!-- codeworks:orchestrator-reason blocked-211 -->\nBlocked by #211.", {
+      createdAt: at("10:05"),
+      lastEditedAt: at("10:06"),
+    }),
+    comment(103, null, "Written by an account since deleted.", { createdAt: at("10:10") }),
+  ];
+
+  function reader(answer: FakeAnswer) {
+    return fakeGitHub({
+      graphqlPages: [
+        {
+          when: (query, vars) => /\bcomments\(/.test(query) && vars.owner === "acme" && vars.name === "widgets" && vars.number === ISSUE,
+          answer,
+        },
+      ],
+    });
+  }
+
+  it("gives every comment of the issue asked, as GitHub lists them", async () => {
+    assert.deepEqual(await issueComments(reader(comments), REPO, ISSUE), comments);
+  });
+
+  it("refuses an answer that is not the shape asked for, naming what was read", async () => {
+    const fractional = [{ ...comments[0], createdAt: "2026-10-28T10:00:00.250Z" }];
+    await assert.rejects(issueComments(reader(fractional), REPO, ISSUE), /comments of acme\/widgets#212/);
+  });
+
+  it("fails when GitHub does not answer, never reading as no comments", async () => {
+    await assert.rejects(issueComments(reader(new GitHubUnanswered("dummy: no answer")), REPO, ISSUE), GitHubUnanswered);
+  });
+
+  it("refuses an issue that is no issue number before asking GitHub", async () => {
+    for (const issue of [0, -1, 1.5, Number.NaN]) {
+      const client = reader(comments);
+      await assert.rejects(issueComments(client, REPO, issue), /not an issue number/);
       assert.deepEqual(client.calls, []);
     }
   });
