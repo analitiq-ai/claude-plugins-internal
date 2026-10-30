@@ -4,8 +4,8 @@ import { existsSync } from "node:fs";
 import { describe, it, type TestContext } from "node:test";
 
 import { GitHubUnanswered } from "../plugin/core/github.ts";
+import { sessionsFolder } from "../plugin/core/orchestrator-paths.ts";
 import { readSessionRecord } from "../plugin/core/session-record.ts";
-import { sessionsFolder } from "../plugin/lib/paths.ts";
 import { applyStart, type StartDecision } from "../plugin/lib/start.ts";
 import { REPO, tempHome } from "./support/checkout.ts";
 import { GITHUB_NOW, READY_STORY, SHARED, storyGitHub, writes } from "./support/story.ts";

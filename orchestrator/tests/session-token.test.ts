@@ -7,8 +7,8 @@ import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { GhFolderRefused, readGhToken } from "../plugin/core/gh-config.ts";
 import { GitFailed } from "../plugin/core/git.ts";
 import { RemoteRefused } from "../plugin/core/github.ts";
+import { ghFolder } from "../plugin/core/orchestrator-paths.ts";
 import { MintError } from "../plugin/core/tokens.ts";
-import { ghFolder } from "../plugin/lib/paths.ts";
 import { ensureSessionToken, originRepository } from "../plugin/lib/session-token.ts";
 import { settleSettings, type OnGitHub } from "../plugin/lib/settings.ts";
 import {

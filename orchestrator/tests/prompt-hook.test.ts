@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, it, type TestContext } from "node:test";
 
 import { readGhToken } from "../plugin/core/gh-config.ts";
+import { ghFolder, sessionsFolder } from "../plugin/core/orchestrator-paths.ts";
 import { readSessionRecord, writeSessionRecord } from "../plugin/core/session-record.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { run } from "../plugin/hooks/prompt.ts";
 import { context, PASS, type HookAnswer } from "../plugin/lib/hook-io.ts";
-import { ghFolder, sessionsFolder } from "../plugin/lib/paths.ts";
 import { REPO, scratchCheckout } from "./support/checkout.ts";
 import { hookDeps, hookInput, storeSessionToken } from "./support/hook-run.ts";
 import { EDITED_STATE, GITHUB_NOW, READY_STORY, storyGitHub, writes, type Story } from "./support/story.ts";

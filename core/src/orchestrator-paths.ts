@@ -1,12 +1,11 @@
 import { join } from "node:path";
 
-import type { Repository } from "../core/github.ts";
+import type { Repository } from "./github.ts";
+import { HOME_FOLDERS } from "./keys.ts";
 
 // One folder per agent machine, not per repository as planner's: one session at a time runs there (SECURITY.md §2).
-const STATE_FOLDER = [".local", "state", "codeworks", "orchestrator"];
-
 export function stateFolder(home: string): string {
-  return join(home, ...STATE_FOLDER);
+  return join(home, HOME_FOLDERS["<O>"]);
 }
 
 /** The session's gh config folder, which the managed settings name in GH_CONFIG_DIR. */

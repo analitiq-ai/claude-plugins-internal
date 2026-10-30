@@ -3,9 +3,9 @@ import type { TestContext } from "node:test";
 
 import type { FakeGitHub } from "../../../core/tests/support/fake-github.ts";
 import { writeGhToken } from "../../plugin/core/gh-config.ts";
+import { ghFolder } from "../../plugin/core/orchestrator-paths.ts";
 import type { App } from "../../plugin/core/tokens.ts";
 import type { HookDeps } from "../../plugin/lib/hook-io.ts";
-import { ghFolder } from "../../plugin/lib/paths.ts";
 import { fakeMintToken, REPO, SESSION_LOGIN, tempHome } from "./checkout.ts";
 
 export const NOW = new Date("2026-10-30T12:00:00Z");

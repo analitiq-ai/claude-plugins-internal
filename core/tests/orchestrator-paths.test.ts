@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 
-import { ghFolder, pushCopy, sessionsFolder, stateFolder } from "../plugin/lib/paths.ts";
+import { ghFolder, pushCopy, sessionsFolder, stateFolder } from "../src/orchestrator-paths.ts";
 
 const HOME = "/home/dummy";
 
 // The folder the managed settings write-deny to the model and point GH_CONFIG_DIR into (SECURITY.md §5).
-it("roots the state folder at ~/.local/state/codeworks/orchestrator of the home it is given", () => {
+it("roots the orchestrator's state folder at ~/.local/state/codeworks/orchestrator of the home it is given", () => {
   assert.equal(stateFolder(HOME), "/home/dummy/.local/state/codeworks/orchestrator");
 });
 

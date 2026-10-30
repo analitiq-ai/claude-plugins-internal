@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 const MANAGED_FOLDER = "/etc/claude-code";
 const MANAGED_FILE = `${MANAGED_FOLDER}/managed-settings.json`;
 
-const HOME_FOLDERS = {
+export const HOME_FOLDERS = {
   "<K>": ".config/codeworks",
   "<S>": ".local/state/codeworks/reviewer",
   "<O>": ".local/state/codeworks/orchestrator",

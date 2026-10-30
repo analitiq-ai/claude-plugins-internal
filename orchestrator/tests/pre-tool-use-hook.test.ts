@@ -3,10 +3,10 @@ import { describe, it } from "node:test";
 
 import { readGhToken } from "../plugin/core/gh-config.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
+import { ghFolder } from "../plugin/core/orchestrator-paths.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { run } from "../plugin/hooks/pre-tool-use.ts";
 import { PASS } from "../plugin/lib/hook-io.ts";
-import { ghFolder } from "../plugin/lib/paths.ts";
 import { REPO, scratchCheckout } from "./support/checkout.ts";
 import { hookDeps, hookInput, storeSessionToken } from "./support/hook-run.ts";
 import { READY_STORY, storyGitHub } from "./support/story.ts";

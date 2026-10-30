@@ -3,10 +3,10 @@ import { describe, it } from "node:test";
 
 import { fakeGitHub, type FakeAnswer } from "../../core/tests/support/fake-github.ts";
 import { readGhToken } from "../plugin/core/gh-config.ts";
+import { ghFolder } from "../plugin/core/orchestrator-paths.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { run } from "../plugin/hooks/session-start.ts";
 import { PASS } from "../plugin/lib/hook-io.ts";
-import { ghFolder } from "../plugin/lib/paths.ts";
 import { contentsAnswer, REPO, scratchCheckout, SETTINGS, STATUS_ISSUE } from "./support/checkout.ts";
 import { hookDeps, hookInput, storeSessionToken } from "./support/hook-run.ts";
 import { writes } from "./support/story.ts";
