@@ -1,10 +1,12 @@
-import { laneOf } from "../core/board.ts";
+import { laneOf, moveCard } from "../core/board.ts";
 import type { GitHubClient } from "../core/github.ts";
 import { isDone, specIssue, specPr, type SpecPr } from "../core/identity.ts";
 import { blockedBy, subIssues } from "../core/issue-graph.ts";
+import { writeSessionRecord } from "../core/session-record.ts";
 import type { Shared } from "../core/settings.ts";
 import { readState, type StateCause, type StateReading } from "../core/state.ts";
-import type { Lane } from "../core/values.ts";
+import { Lane, Taken } from "../core/values.ts";
+import { postKeyed } from "./keyed.ts";
 
 export type CardFacts = {
   lane: Lane;
@@ -100,4 +102,30 @@ export function decideStart(issue: number, facts: StartFacts): StartDecision {
   }
   if (!facts.state.startable) return refuse(held, null, true);
   return { decision: "start" };
+}
+
+export type StartWrites = {
+  client: GitHubClient;
+  repo: string;
+  issue: number;
+  shared: Shared;
+  /** The folder of session records, and this session's id. */
+  sessions: string;
+  sessionId: string;
+};
+
+/**
+ * Writes `decision` in data-model.md's order: the reason, then the lane, then the record. The lane is the commit
+ * point (ADR-0002 d5), so a failed lane write leaves no record, and reviewer releases nothing (FR-015).
+ */
+export async function applyStart(decision: StartDecision, at: StartWrites): Promise<void> {
+  const { client, repo, issue, shared } = at;
+  if (decision.decision === "refuse") {
+    if (decision.key !== null) await postKeyed(client, repo, issue, decision.key, decision.reason, shared.orchestrator_app_login);
+    if (decision.blocked) await moveCard(client, repo, issue, shared.board, Lane.schema.enum.Blocked);
+    return;
+  }
+  if (decision.decision === "start") await moveCard(client, repo, issue, shared.board, Lane.schema.enum["In progress"]);
+  const taken = decision.decision === "start" ? Taken.schema.enum.claim : Taken.schema.enum.resume;
+  writeSessionRecord(at.sessions, at.sessionId, { v: 1, repo, issue, taken, at: await client.now() });
 }
