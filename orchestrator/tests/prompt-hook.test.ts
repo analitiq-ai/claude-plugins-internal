@@ -89,6 +89,8 @@ describe("the UserPromptSubmit hook", () => {
 
   const refusals: [string, Story, string[], RegExp][] = [
     ["a card in Backlog", { ...READY_STORY, lane: "Backlog" }, [], /#212 is in Backlog/],
+    ["a card in Blocked", { ...READY_STORY, lane: "Blocked" }, [], /#212 is in Blocked/],
+    ["a card in Done", { ...READY_STORY, lane: "Done" }, [], /#212 is in Done/],
     ["no card", { ...READY_STORY, lane: null }, [], /no card/],
     ["a blocker not done", { ...READY_STORY, blockers: [201, 202] }, [], /#202/],
     ["a done story", { ...READY_STORY, doneIssues: [201, 212] }, [], /#212 is done/],
@@ -101,6 +103,7 @@ describe("the UserPromptSubmit hook", () => {
     ],
     ["no merged spec PR", { ...READY_STORY, specPrs: [] }, ["comment <!-- codeworks:orchestrator-reason spec-pr-unmerged-200 -->", "lane Blocked"], /#200/],
     ["a held state", { ...READY_STORY, comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
+    ["a held state In progress", { ...READY_STORY, lane: "In progress", comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
     ["a held state In review", { ...READY_STORY, lane: "In review", comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
   ];
 
