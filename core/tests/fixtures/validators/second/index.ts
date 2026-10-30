@@ -6,7 +6,9 @@ export const logins = ["second-bot[bot]"];
 
 export function open(deps: Deps): OpenedPackage {
   return {
-    async trigger() {},
+    async trigger() {
+      return null;
+    },
     async status() {
       throw new Error("the second package answers no status");
     },
