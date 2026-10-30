@@ -36,7 +36,7 @@ const STARTABLE: CardFacts = {
   lane: "Ready",
   blockers: [{ issue: 201, done: true }],
   specIssue: 200,
-  specPr: { number: 31, state: "merged" },
+  specPrs: [{ number: 31, state: "merged" }],
   subIssues: [],
   done: false,
   state: NO_STATE,
@@ -55,6 +55,10 @@ describe("decideStart", () => {
   it("starts a Ready story whose blockers are done, with a merged spec PR, no sub-issues, not done, and startable", () => {
     assert.deepEqual(decide({}), { decision: "start" });
     assert.deepEqual(decide({ blockers: [], specIssue: S }), { decision: "start" });
+  });
+
+  it("starts a Ready story whose newest spec PR is closed unmerged over an older merged one", () => {
+    assert.deepEqual(decide({ specPrs: [{ number: 35, state: "closed" }, { number: 31, state: "merged" }] }), { decision: "start" });
   });
 
   it("starts over open holds a start releases, since the reading still answers startable", () => {
@@ -82,16 +86,17 @@ describe("decideStart", () => {
     assert.match(decision.reason, /h1/);
   });
 
-  it("refuses a Ready story whose spec PR is open, posting spec-pr-open-<p> naming it, then moving it to Blocked", () => {
-    const decision = refusal(decide({ specPr: { number: 33, state: "open" } }));
+  it("refuses a Ready story with a spec PR open over a merged one, posting spec-pr-open-<p> naming it, then moving it to Blocked", () => {
+    const decision = refusal(decide({ specPrs: [{ number: 33, state: "open" }, { number: 31, state: "merged" }] }));
     assert.equal(decision.key, "spec-pr-open-200");
     assert.equal(decision.blocked, true);
     assert.match(decision.reason, /#33/);
+    assert.doesNotMatch(decision.reason, /#31/);
   });
 
-  for (const specPr of [null, { number: 33, state: "closed" as const }]) {
-    it(`refuses a Ready story with no merged spec PR (newest ${specPr?.state ?? "none"}), posting spec-pr-unmerged-<p>`, () => {
-      const decision = refusal(decide({ specPr }));
+  for (const specPrs of [[], [{ number: 35, state: "closed" as const }, { number: 33, state: "closed" as const }]]) {
+    it(`refuses a Ready story with no merged spec PR (${specPrs.length} closed), posting spec-pr-unmerged-<p>`, () => {
+      const decision = refusal(decide({ specPrs }));
       assert.equal(decision.key, "spec-pr-unmerged-200");
       assert.equal(decision.blocked, true);
       assert.match(decision.reason, /#200/);
@@ -133,11 +138,11 @@ describe("decideStart", () => {
   });
 
   it("refuses a rule that writes nothing before one that writes, and a parent before its spec PR", () => {
-    const allBroken = { subIssues: [213], specPr: null, state: HELD };
+    const allBroken = { subIssues: [213], specPrs: [], state: HELD };
     assert.equal(refusal(decide({ ...allBroken, done: true })).blocked, false);
     assert.equal(refusal(decide({ ...allBroken, blockers: [{ issue: 202, done: false }] })).blocked, false);
     assert.equal(refusal(decide(allBroken)).key, `parent-${S}`);
-    assert.equal(refusal(decide({ specPr: null, state: HELD })).key, "spec-pr-unmerged-200");
+    assert.equal(refusal(decide({ specPrs: [], state: HELD })).key, "spec-pr-unmerged-200");
   });
 });
 
@@ -145,7 +150,7 @@ describe("gatherStartFacts", () => {
   const stateReads = (client: ReturnType<typeof storyGitHub>) =>
     client.calls.filter((call) => call.kind === "graphqlPages" && call.query.includes("comments(")).length;
 
-  it("reads the lane, each blocker done or not, the spec's issue and its newest spec PR, the sub-issues, done, and the state", async () => {
+  it("reads the lane, each blocker done or not, the spec's issue and every spec PR newest first, the sub-issues, done, and the state", async () => {
     const client = storyGitHub({ ...READY_STORY, blockers: [201, 202], specPrs: [{ number: 31, closed: true, merged: true }, { number: 33, closed: false, merged: false }] });
     const facts = await gatherStartFacts(client, REPO, 212, SHARED);
     assert.ok(facts.lane !== null);
@@ -157,7 +162,10 @@ describe("gatherStartFacts", () => {
         { issue: 202, done: false },
       ],
       specIssue: 200,
-      specPr: { number: 33, state: "open" },
+      specPrs: [
+        { number: 33, state: "open" },
+        { number: 31, state: "merged" },
+      ],
       subIssues: [],
       done: false,
     });

@@ -39,6 +39,13 @@ describe("the UserPromptSubmit hook", () => {
     assert.deepEqual(record(), { v: 1, repo: REPO, issue: 212, taken: "claim", at: GITHUB_NOW });
   });
 
+  it("claims a story whose newest spec PR is closed unmerged over an older merged one", async (t) => {
+    const story = { ...READY_STORY, specPrs: [{ number: 31, closed: true, merged: true }, { number: 35, closed: true, merged: false }] };
+    const { github, answer } = prompt(t, "/codeworks 212", story, { tokenMinutes: 30 });
+    assert.deepEqual(await answer(), started("claimed"));
+    assert.deepEqual(writes(github.calls), ["lane In progress"]);
+  });
+
   it("refuses the prompt naming core's cause when the mint fails, writing nothing", async (t) => {
     const { github, answer, record } = prompt(t, "/codeworks 212", READY_STORY, { failing: new MintError("dummy cause") });
     assert.deepEqual(await answer(), { code: 2, stdout: "", stderr: "orchestrator: mint failed: dummy cause\n" });
