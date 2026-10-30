@@ -23,7 +23,9 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   `requireDependencies()`, dynamic import of core). `core/scripts/check-carriers.ts` already grades any
   `*/plugin/core` link, pins and version bump. `diff-match-patch` has an npm package (`diff-match-patch`,
   same algorithm as the Python one `lineage.py` uses), so lineages port without a new algorithm. The four
-  `workflows/*.js` and `agents/*.md` are already non-Python and stay.
+  `workflows/*.js` and `agents/*.md` are already non-Python and stay, except the assessor's brief command:
+  `agents/assessor.md` runs `briefs.py`, so it is repointed to the ported `lib/briefs.ts` entry, same `--ref`
+  argument and `brief_token` output, and its brief's facts come from git and core's state, not the ledger.
 
 ## R2: Reader is the session token; writer is the reviewer App minted per run
 
@@ -138,7 +140,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   ancestor of `head`: when it is not (an amend, rebase or reset past it), `base` becomes the branch's head on
   GitHub; when that is not an ancestor either, pushed history was rewritten and the check refuses, naming the
   pushed head to restore (FR-021). Steps, in order: fence (R8), open holds
-  that refuse commits (`claim-`, `shim-`, `rescope-` except a default-branch merge, ADR-0013 d5), `.github/`
+  that refuse commits (`escalation-`, `claim-`, `shim-`, `rescope-` except a default-branch merge, ADR-0013
+  d4–d5), `.github/`
   and protected-path touch (ADR-0002 d4), merge resolution only for merges (ADR-0002 d3), then the claim and
   shim checks as workflows the model launches on the range (ADR-0003 d2). Their running state and memos are
   files in the same session folder (FR-017). A pass records every commit of the range (R11).
