@@ -39,8 +39,8 @@ Tag `codeworks:reviewer-gates`; full snapshot, newest wins; same fail-closed rul
 ## Commit-check pass record (core, new — PR C)
 
 See [contracts/commit-pass-record.md](contracts/commit-pass-record.md).
-`{v: 1, repository, branches: {<branch>: {issue, passes: {sha, range_from, at}[]}}}`; per branch, newest = last
-element. Append-only within a session; a commit appears once per branch.
+`{v: 1, repository, off, branches: {<branch>: {issue, head: {sha, range_from, at}, passes: {sha, range_from, at}[]}}}`;
+per branch, newest pass = `head`, set on every pass, even of a sha already in `passes`. Append-only within a session; a commit appears once per branch.
 
 ## Session folder (reviewer, local, not a contract)
 

@@ -219,7 +219,7 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   one file per session naming the repository, the issue, claim or resume, and the claim's time (VP-001). This
   spec adds nothing to that record.
 - **FR-014**: The commit-check pass record MUST live beside the hooks' own repository copy, scoped to the
-  session, read and written only through a core contract this spec adds; nothing of it is written to GitHub. Passes are kept per branch, so a session's second story branch or second claim keeps its own newest pass.
+  session, read and written only through a core contract this spec adds; nothing of it is written to GitHub. Passes are kept per branch, so a session's second story branch or second claim keeps its own newest pass; a branch's newest pass is the head it most recently passed, even one that had passed before.
   A session's first check MUST grade from the story branch's head on GitHub, which only commit-check passes
   reach; commits a dead session passed but never pushed are graded again.
 - **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a second tagged

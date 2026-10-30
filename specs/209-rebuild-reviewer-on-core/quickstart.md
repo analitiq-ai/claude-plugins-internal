@@ -36,3 +36,4 @@ node core/scripts/check-carriers.ts --base origin/main
 | 17 | FR-014 | passes on `42-us1-login` then `42-us2-logout` in one session | each branch keeps its own newest pass |
 | 18 | FR-019 | reviewer off; commit | no check runs; nothing recorded |
 | 19 | FR-015 | run dies after gates post with 3rd `wrong_at`, before `placeHold` | next deciding run places `claim-<id>` |
+| 20 | FR-014, FR-021 | GitHub at A; pass B; amend to B′, pass; restore B, pass | newest pass (`head`) B, not B′ |
