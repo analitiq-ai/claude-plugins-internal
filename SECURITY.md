@@ -120,7 +120,8 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 {"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"excludedCommands":[],
  "filesystem":{"denyRead":["<V>/keys","<V>/ghcreds","~/.claude/.credentials.json"],
   "denyWrite":["<V>/keys","<V>/ghcreds","<V>/plugin/gaterev","<V>/state","/tmp/verify-b-ghsess","~/.claude","~/.gitconfig"],
-  "allowManagedReadPathsOnly":true},
+  "allowManagedReadPathsOnly":true,"disabled":false},
+ "allowNestedUserNamespaces":false,
  "network":{"allowedDomains":["github.com","api.github.com","*.githubusercontent.com","pypi.org","files.pythonhosted.org"],
   "allowManagedDomainsOnly":true,"strictAllowlist":true,"allowAllUnixSockets":false}},
 "permissions":{"deny":["TaskStop","Read(/<V>/keys/**)","Edit(/<V>/keys/**)","Read(/<V>/ghcreds/**)","Edit(/<V>/ghcreds/**)",
@@ -146,6 +147,12 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   reviewer's state, the session's gh config, `~/.claude` or the agent identity in `~/.gitconfig`.
 - `sandbox.filesystem.allowManagedReadPathsOnly`: user, project and repo settings cannot reopen a denied
   path.
+- `sandbox.filesystem.disabled: false`: filesystem isolation stays on, and with it the sandbox's built-in
+  protected paths, which stop sandboxed commands writing `.git/config` and `.git/hooks/` in the working
+  directory and, from a linked worktree, in the main repo's `.git`. `true` turns them off (Claude Code
+  docs only, §8).
+- `sandbox.allowNestedUserNamespaces: false`: with `true`, code from a sandboxed command can run outside
+  the sandbox, past those protected paths (Claude Code docs only, §8).
 - `sandbox.network.allowedDomains`: sandboxed commands reach only GitHub and the listed registries. It
   does not cover WebFetch or WebSearch.
 - `sandbox.network.allowManagedDomainsOnly`: lower settings cannot add a host.
@@ -259,6 +266,9 @@ The other rows ran on 2.1.300 to 2.1.306.
   - the gate rewriting every Workflow launch, where §6 rewrites only reviewer workflows and lets other
     results never count;
   - the network and MCP allowlists, unix-socket blocking and `allowManagedReadPathsOnly`;
+  - the built-in protected paths denying sandboxed writes to `.git/config` and `.git/hooks/`, and
+    `sandbox.filesystem.disabled` and `sandbox.allowNestedUserNamespaces` at `false` keeping them in force
+    (Claude Code docs only);
   - hooks running git with no global or system config, no credential helper, and `core.fsmonitor` and
     `core.hooksPath` off;
   - `allowManagedHooksOnly` with `enabledPlugins`, and plugins enabled in the managed file under
