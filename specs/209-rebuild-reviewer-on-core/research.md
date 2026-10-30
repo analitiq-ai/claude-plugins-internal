@@ -85,7 +85,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 
 ## R6: Gate counts derive from times in the gates snapshot
 
-- **Decision**: The gates snapshot holds open lineages (`file`, `wrong_at[]`, `claimed`) and open bugs
+- **Decision**: The gates snapshot holds open lineages (`file`, `blob`, `places`, `chain`, `wrong_at[]`: what `lineage.succeed()` needs to carry a lineage into a later session) and open bugs
   (`members[{tree, at}]`, `ranges`, `anchor`, `site_rulings`). A lineage's WRONG count is the number of
   `wrong_at` later than both the newest `/codeworks reset` and the `claim-<id>` row's `released`; a bug's
   count likewise over `members`. `claim-<id>` is placed at `REFUSALS_BEFORE_USER = 3`, `shim-<id>` at
@@ -141,7 +141,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   GitHub; when that is not an ancestor either, pushed history was rewritten and the check refuses, naming the
   pushed head to restore (FR-021). Steps, in order: fence (R8), open holds
   that refuse commits (`escalation-`, `claim-`, `shim-`, `rescope-` except a default-branch merge, ADR-0013
-  d4–d5), `.github/`
+  d4–d5; `claim-<id>` refuses only a range touching its lineage's `file`, `shim-<id>` only one touching its bug's `ranges` (ADR-0013 d4)), `.github/`
   and protected-path touch (ADR-0002 d4), merge resolution only for merges (ADR-0002 d3), then the claim and
   shim checks as workflows the model launches on the range (ADR-0003 d2). Their running state and memos are
   files in the same session folder (FR-017). A pass records every commit of the range (R11).

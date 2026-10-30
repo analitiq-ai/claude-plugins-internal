@@ -225,7 +225,8 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
 - **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a second tagged
   reviewer App comment on the story issue (`reviewer-gates`), full snapshot, newest wins, read and written
   through core with the same fail-closed rules as the state (ADR-0011 d2). It holds open items only: per
-  lineage its file, the times of its WRONG rulings and its claimed words; per bug its members with times, its
+  lineage its file, the blob and places its words were last carried to, its chain of claims and words, and the
+  times of its WRONG rulings; per bug its members with times, its
   ranges, its anchor commit and its site rulings. Counts and release floors MUST be derived from those times
   against the reset and the hold row's release, never stored. A merged bug carries the higher of its bugs'
   counts, never their sum (ADR-0008 d2): the lower one's members are kept as evidence that is not counted.

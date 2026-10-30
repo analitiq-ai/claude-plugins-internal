@@ -13,7 +13,7 @@ could-not-run outcomes for writes, which still record nothing.
 | GitHub unanswered | could not run; retry the step |
 | `releaseOnClaim` failed | could not run; the next hook run retries the release |
 | range touches a protected path | the path; an admin's PR under an exempt label |
-| commit while `escalation-`, `claim-`, `shim-` or `rescope-` hold open | the hold id; its release (Ready move + admin comment, or `/codeworks reset`) |
+| commit while `escalation-` or `rescope-` hold open, or `claim-`/`shim-` open and the range touches its file/lines | the hold id; its release (Ready move + admin comment, or `/codeworks reset`) |
 | claim/shim check pending for the range | the workflow to launch and its range |
 | branch's GitHub head not an ancestor of the local head | pushed history rewritten; the pushed head to restore |
 | session write lock not acquired in time | could not run; retry the step |
