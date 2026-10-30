@@ -10,8 +10,7 @@ Every field below is one the Python gates read again in a later run; each cites 
 sg `shimgate.py`). Open items only: an ended or merged item is absent.
 
 ```
-Gates   { v: 1, branches: { <branch>: Branch } }
-Branch  { anchor: sha40, lineages: Lineage[], bugs: Bug[] }
+Gates   { v: 1, branch, anchor: sha40, lineages: Lineage[], bugs: Bug[] }
 Lineage { id, file, places: {start, end, claim}[], chain: {ref, claim, line, words, ruling, at}[] }
 Bug     { id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, old_start, old_count}[],
           deep: {same_operation: Site[], callers: Site[]} | null,
@@ -21,7 +20,7 @@ Site    { file, line, function, does }
 
 | field | why it is kept (reader) |
 |---|---|
-| `branches` key | lineages, bugs and their text are per branch today (cg:67-70, sg:48, ledger PKs); a lineage id is `hash(file, words)` with no branch (cc:55-62), so two `<s>-us*` branches would collide in one list |
+| `branch` | a story issue has one branch (root ADR-0005, reviewer ADR-0015 context), so the comment on the story issue holds that branch's items; lineages, bugs and their text are per branch today (cg:67-70, sg:48, ledger PKs). A check on another branch stops with an error naming both, never mixing two branches' items under one hold id |
 | `anchor` | the commit whose file texts `places` and `ranges` index into; replaces the stored text (cg:67-70, sg:51-54), which is `git show <anchor>:<file>`. Both gates carry to the same commit: the head of the newest completed check on the branch |
 | `places[].claim` | a CORRECT removes its places and ends the lineage when none is left (cc:260); words moved unchanged are inherited by claim id (ln:185, ADR-0001 d2) |
 | `chain[].ref` | count = distinct checks ruling WRONG (cc:267); one entry per (ref, claim) (cc:250); a contest is its own ref (cc:394-396) |
@@ -33,7 +32,7 @@ Site    { file, line, function, does }
 | `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
 | `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294) |
 
-Validation: ids unique within a branch's list; times are core `Time`; shas 40 hex.
+Validation: ids unique within each list; times are core `Time`; shas 40 hex.
 
 ## Derived, never stored
 
@@ -67,7 +66,7 @@ graded and nothing is recorded as passed.
 ```
 <!-- codeworks:reviewer-gates -->
 ```json
-{ "v": 1, "branches": { "42-us1-login": { "anchor": "...", "lineages": [], "bugs": [] } } }
+{ "v": 1, "branch": "42-us1-login", "anchor": "...", "lineages": [], "bugs": [] }
 ```
 ```
 

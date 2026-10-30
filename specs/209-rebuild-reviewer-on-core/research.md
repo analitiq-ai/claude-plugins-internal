@@ -86,8 +86,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 ## R6: Gate counts derive from times in the gates snapshot
 
 - **Decision**: The gates snapshot is written once, field by field, from what today's claim and shim gates read
-  again in a later run (every field cites its reader): [contracts/gates-snapshot.md](contracts/gates-snapshot.md). It is keyed per
-  branch, with one anchor commit per branch; lineage counts are distinct WRONG check refs after the reset, bug
+  again in a later run (every field cites its reader): [contracts/gates-snapshot.md](contracts/gates-snapshot.md). It holds the
+  story's one branch (root ADR-0005) and its anchor commit; lineage counts are distinct WRONG check refs after the reset, bug
   counts are members after the reset, and a merge keeps the higher count (ADR-0008 d2). The gates evidence is
   posted first; every deciding run then places a hold whose count reached its threshold and has no OPEN row, so
   a run that dies between the two posts is repaired by the next.

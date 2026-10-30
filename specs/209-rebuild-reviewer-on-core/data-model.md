@@ -26,7 +26,7 @@ removed.
 Tag `codeworks:reviewer-gates`; full snapshot, newest wins; same fail-closed rules. See
 [contracts/gates-snapshot.md](contracts/gates-snapshot.md).
 
-Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-snapshot.md), the one definition. Per branch: `anchor`, open `lineages`
+Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-snapshot.md), the one definition. The story's one `branch`, its `anchor`, open `lineages`
 (`places`, `chain` of `{ref, claim, line, words, ruling, at}`) and open `bugs` (`members`, `absorbed`, `ranges`,
 `deep`, `rulings`). Counts and floors are derived, never stored.
 

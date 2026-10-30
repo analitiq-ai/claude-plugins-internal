@@ -224,7 +224,7 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   reach; commits a dead session passed but never pushed are graded again.
 - **FR-015**: reviewer MUST keep the counts that place `claim-<id>` and `shim-<id>` holds in a second tagged
   reviewer App comment on the story issue (`reviewer-gates`), full snapshot, newest wins, read and written
-  through core with the same fail-closed rules as the state (ADR-0011 d2). It holds, per story branch, the anchor commit
+  through core with the same fail-closed rules as the state (ADR-0011 d2). It holds the story's one branch, the anchor commit
   the stored positions index into and the open items only: per lineage its places and its chain of rulings,
   each with its check, claim, words, ruling and time; per bug its counted and absorbed trees with times, its
   ranges, its deep-sweep lists and its site rulings. Counts and release floors MUST be derived from those
