@@ -54,10 +54,13 @@ describe("orchestratorClient", () => {
     assert.notEqual(usedTokens[1], usedTokens[0]);
   });
 
-  it("mints once for calls made together", async () => {
-    const { mint, write } = harness();
+  it("mints once for calls made together, first and again", async () => {
+    const { mint, write, advance } = harness();
     await Promise.all([write(), write(), write()]);
     assert.equal(mint.calls.length, 1);
+    advance(51);
+    await Promise.all([write(), write(), write()]);
+    assert.equal(mint.calls.length, 2);
   });
 
   it("holds the token in memory: nothing appears under HOME", async (t: TestContext) => {
