@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { GhFolderRefused } from "../plugin/core/gh-config.ts";
+import { GitFailed } from "../plugin/core/git.ts";
 import { GitHubRefused, GitHubUnanswered, RemoteRefused } from "../plugin/core/github.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { SettingsError } from "../plugin/core/settings.ts";
@@ -111,6 +112,7 @@ describe("refusalOf", () => {
     new SettingsError("codeworks.toml [orchestrator]", "dummy why"),
     new RemoteRefused("https://example.invalid/acme/widgets", "dummy why"),
     new HookInputRefused("dummy why"),
+    new GitFailed(["remote", "get-url", "origin"], 2, "error: No such remote 'origin'\n"),
   ];
 
   for (const error of named) {

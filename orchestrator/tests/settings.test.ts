@@ -4,11 +4,12 @@ import { describe, it } from "node:test";
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { GitHubUnanswered } from "../plugin/core/github.ts";
 import { SettingsError } from "../plugin/core/settings.ts";
-import { bootstrapAppIds, defaultBranch, settleSettings } from "../plugin/lib/settings.ts";
+import { bootstrapAppIds, defaultBranch, orchestratorOnGitHub, settleSettings } from "../plugin/lib/settings.ts";
 import {
   APP_ID,
   BOARD,
   contentsAnswer,
+  fakeMintToken,
   REPO,
   scratchCheckout,
   SESSION_APP_ID,
@@ -112,5 +113,46 @@ describe("defaultBranch", () => {
   it("refuses an answer without one", async () => {
     const client = fakeGitHub({ rest: { "GET /repos/acme/widgets": {} } });
     await assert.rejects(defaultBranch(client, REPO), /not the shape asked for/);
+  });
+});
+
+describe("orchestratorOnGitHub", () => {
+  function onGitHub(checkout: string) {
+    const github = fakeGitHub({
+      rest: {
+        "GET /repos/acme/widgets": { default_branch: "trunk" },
+        "GET /repos/acme/widgets/contents/codeworks.toml?ref=trunk": contentsAnswer(SETTINGS),
+      },
+    });
+    const mint = fakeMintToken(() => new Date("2026-10-30T12:00:00Z"));
+    const read = orchestratorOnGitHub(checkout, REPO, { now: () => new Date("2026-10-30T12:00:00Z"), mintToken: mint.mintToken, connect: () => github });
+    return { github, mint, read };
+  }
+
+  it("mints and reads nothing until asked", (t) => {
+    const { github, mint } = onGitHub(scratchCheckout(t));
+    assert.deepEqual(github.calls, []);
+    assert.deepEqual(mint.calls, []);
+  });
+
+  it("mints with HEAD's app_id and settles the file at the default branch with that client", async (t) => {
+    const { github, mint, read } = onGitHub(scratchCheckout(t));
+    const { client, settled } = await read();
+    assert.deepEqual(mint.calls.map(({ app, appId }) => [app, appId]), [["orchestrator", APP_ID]]);
+    assert.deepEqual(settled.orchestrator, { ...IDS, status_issue: STATUS_ISSUE });
+    assert.deepEqual(
+      github.calls.map((call) => (call.kind === "rest" ? call.path : call.kind)),
+      ["/repos/acme/widgets", "/repos/acme/widgets/contents/codeworks.toml?ref=trunk"],
+    );
+    await assert.rejects(client.rest("GET", "/dummy"), /no answer for/);
+    assert.equal(mint.calls.length, 1);
+  });
+
+  it("asked again, answers the first read", async (t) => {
+    const { github, mint, read } = onGitHub(scratchCheckout(t));
+    const [first, second] = await Promise.all([read(), read()]);
+    assert.equal(second, first);
+    assert.equal(mint.calls.length, 1);
+    assert.equal(github.calls.length, 2);
   });
 });
