@@ -92,7 +92,7 @@ checks or merges (GitHub). It runs the gate rule (§6).
   (reviewer ADR-0012), naming who makes it.
 - It refuses builder and review work where the managed settings are not in effect, naming what is missing.
 
-**Builder.** The model, as the session App: it writes code in `.claude/worktrees/` and commits. The
+**Builder.** The model, as the session App: it writes code in `../<repo>.worktrees/` and commits. The
 orchestrator's hooks push its commits and open the draft PR.
 - GitHub: its token writes nothing.
 - Managed settings (§5): no key or credential read, no write to plugin code, reviewer's state or Claude Code
@@ -126,9 +126,9 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   "allowManagedDomainsOnly":true,"strictAllowlist":true,"allowAllUnixSockets":false}},
 "permissions":{"deny":["TaskStop","Read(/<V>/keys/**)","Edit(/<V>/keys/**)","Read(/<V>/ghcreds/**)","Edit(/<V>/ghcreds/**)",
  "Read(~/.claude/.credentials.json)","Edit(/<V>/plugin/gaterev/**)","Edit(/<V>/state/**)","Edit(//tmp/verify-b-ghsess/**)",
- "Edit(~/.claude/**)","Edit(~/.gitconfig)","Edit(**/.claude/settings.json)","Edit(**/.claude/settings.local.json)","Edit(**/.claude/workflows/**)",
- "Edit(**/.claude/agents/**)","Edit(**/.claude/skills/**)","Edit(**/.claude/commands/**)","Edit(**/.claude/hooks/**)",
- "Edit(**/.mcp.json)","Edit(**/.git/config)","Edit(**/.git/hooks/**)"]},
+ "Edit(~/.claude/**)","Edit(~/.gitconfig)","Edit(//**/.claude/settings.json)","Edit(//**/.claude/settings.local.json)","Edit(//**/.claude/workflows/**)",
+ "Edit(//**/.claude/agents/**)","Edit(//**/.claude/skills/**)","Edit(//**/.claude/commands/**)","Edit(//**/.claude/hooks/**)",
+ "Edit(//**/.mcp.json)","Edit(//**/.git/config)","Edit(//**/.git/hooks/**)"]},
 "allowedMcpServers":[],"allowManagedMcpServersOnly":true,
 "allowManagedHooksOnly":true,"enabledPlugins":{"orchestrator@codeworks":true,"builder@codeworks":true,
  "reviewer@codeworks":true,"auditor@codeworks":true,"pr-review-toolkit@claude-plugins-official":true},
@@ -167,8 +167,9 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
 - `permissions.deny` `Read(...)`: Claude's Read and Grep tools, which ignore the sandbox, cannot read the
   keys or credentials.
 - `permissions.deny` `Edit(...)`: Claude's Edit and Write tools, which ignore the sandbox, cannot write
-  those paths, plugin code, reviewer's state, `~/.claude` or the repo's Claude Code config.
-  `.claude/worktrees/` stays writable for builder. Edit rules cover Write; `Write(...)` path rules are
+  those paths, plugin code, reviewer's state, `~/.claude` or a repo's Claude Code config. The repo-config
+  rules start with `//**/`, so they hold in builder's worktrees beside the checkout too: `**/` matches
+  only under the folder the session started in (§7). Edit rules cover Write; `Write(...)` path rules are
   accepted but never checked, so the block has none.
 - `allowedMcpServers: []` with `allowManagedMcpServersOnly`: no MCP server loads unless the managed file
   lists it.
@@ -179,10 +180,12 @@ needs. On Linux the file is `/etc/claude-code/managed-settings.json`.
   trusted.
 - `env`: package caches sit in the session's temp folder, which the sandbox lets commands write.
 
-An admin starts each session with `claude --setting-sources "" --permission-mode bypassPermissions` and
+An admin starts each session from the served repo's main checkout, after `mkdir -p ../<repo>.worktrees`,
+with `claude --setting-sources "" --permission-mode bypassPermissions --add-dir ../<repo>.worktrees` and
 the prompt `/codeworks <issue>`, so no user, project or local settings file loads: a repo's `env` would
 otherwise reach every process Claude Code starts, the codeworks hooks included. Managed settings always
-load, and the plugins they enable still load (§7).
+load, and the plugins they enable still load (§7). `--add-dir` lets sandboxed commands write builder's
+worktrees there; the sandbox cannot create that folder itself, so it exists before the session (§7).
 
 The managed file is the one source of managed settings. Claude Code also merges a
 `managed-settings.d/` folder beside it and, for a Team or Enterprise claude.ai account, settings from
@@ -256,12 +259,13 @@ The other rows ran on 2.1.300 to 2.1.306.
 | `--setting-sources ""` with an installed plugin enabled by `--settings` (2.1.310) | The plugin loaded; not enabled, it did not |
 | Read, Bash and Write deny rules under `bypassPermissions` with `--setting-sources ""` (2.1.310) | All denied |
 | `claude plugin install` of a plugin with a `package-lock.json`, no managed file (2.1.312) | The locked dependency versions installed into the plugin's `node_modules` |
+| Sandboxed `git worktree add ../<repo>.worktrees/<n>` from the main checkout, `--setting-sources ""` (2.1.314) | Refused, `Read-only file system`, unless the folder existed before the session and `--add-dir`, `additionalDirectories` or `sandbox.filesystem.allowWrite` named it |
+| Write tool on `.claude/settings.json` in an `--add-dir` folder outside the start folder (2.1.314) | Written under `Edit(**/.claude/settings.json)`; denied under `Edit(//**/.claude/settings.json)`, which also denied it under the start folder |
 
 ## 8. Known limits and open items
 
 - **Not covered by the tests in §7**, which used a stricter setup:
-  - write deny on every `.claude/` folder, where §5 denies only the listed paths so builder's
-    `.claude/worktrees/` stays writable;
+  - write deny on every `.claude/` folder, where §5 denies only the listed paths;
   - Read deny on all of `~/.claude`, where §5 denies only Claude Code's login file;
   - the gate rewriting every Workflow launch, where §6 rewrites only reviewer workflows and lets other
     results never count;

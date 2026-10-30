@@ -27,7 +27,7 @@ class IssueTackle(unittest.TestCase):
         self.assertSaid("without `branch`", "stop")
 
     def test_works_in_the_issue_worktree_on_the_given_branch(self):
-        self.assertSaid("`.claude/worktrees/<n>`", "`branch`")
+        self.assertSaid("`../<repo>.worktrees/<n>`", "`branch`")
 
     def test_stops_before_code_when_spec_md_is_missing_or_empty_at_the_branch_head(self):
         self.assertSaid("`git show HEAD:<folder>/spec.md`", "missing or empty", "stop", "before writing")

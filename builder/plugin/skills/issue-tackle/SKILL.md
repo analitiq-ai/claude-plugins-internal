@@ -16,9 +16,9 @@ Write no code before both are settled.
 
 ## Step 2 - worktree and spec
 
-With a folder, work in `.claude/worktrees/<n>` on `branch`: check `branch` out there, or reuse that
-worktree when it is already on `branch`. A worktree there on another branch is a stop: say which
-branch it is on.
+With a folder, work in `../<repo>.worktrees/<n>` on `branch`, beside the main checkout (`<repo>` is its
+directory name): check `branch` out there, or reuse that worktree when it is already on `branch`. A worktree there on another branch is a stop:
+say which branch it is on.
 
 Run `git show HEAD:<folder>/spec.md` in the worktree; when `spec.md` is missing or empty at that HEAD,
 stop before writing any code and say so. The review gate reads `spec.md` at the head it reviews, so a
@@ -28,7 +28,7 @@ Then read `<folder>/spec.md`. `plan.md` and `tasks.md` in the same folder say ho
 The requirements `spec.md` states are what this change is for.
 
 With `spec=null`, create the branch `<type>/<n>-<short-description>` per the branch-naming rules, in
-`.claude/worktrees/<n>`. There is no spec to read: the issue is what this change is for, and every
+`../<repo>.worktrees/<n>`. There is no spec to read: the issue is what this change is for, and every
 mention of the spec below does not apply.
 
 Never work on main.

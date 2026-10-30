@@ -23,7 +23,9 @@ are in `docs/adr/`.
 7. Name the board in `board` under `[shared]` in `codeworks.toml`, spell its lanes Backlog, Ready,
    In progress, In review, Blocked, Done (ADR-0002), and add to it a status issue, where the orchestrator
    posts a failure that belongs to no story.
-8. To work a story, move its card to Ready, start a session on the agent machine with
-   `claude --setting-sources "" --permission-mode bypassPermissions`, so no served repo's settings load
-   (`SECURITY.md` §5), and name the issue: `/codeworks <issue>`. The orchestrator's hooks take it from
+8. To work a story, move its card to Ready, run `mkdir -p ../<repo>.worktrees` in the served repo's main
+   checkout on the agent machine, start a session there with
+   `claude --setting-sources "" --permission-mode bypassPermissions --add-dir ../<repo>.worktrees`, so no
+   served repo's settings load and builder can write its worktrees (`SECURITY.md` §5), and name the issue:
+   `/codeworks <issue>`. The orchestrator's hooks take it from
    there. The same prompt resumes a story In progress or In review.
