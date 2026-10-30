@@ -87,7 +87,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   (`members[{tree, at}]`, `ranges`, `anchor`, `site_rulings`). A lineage's WRONG count is the number of
   `wrong_at` later than both the newest `/codeworks reset` and the `claim-<id>` row's `released`; a bug's
   count likewise over `members`. `claim-<id>` is placed at `REFUSALS_BEFORE_USER = 3`, `shim-<id>` at
-  `HOLD_AT = 4`; a merge (ADR-0008) unions members, so the higher count wins by construction. Ended items
+  `HOLD_AT = 4`; a merge (ADR-0008) keeps as `members` those of the bug with the higher count, moves the other's into `absorbed` (evidence, never counted), and unions ranges; a tree in `members` or `absorbed` is never counted again, so the merged bug carries the higher count (ADR-0008 d2), never the sum. Ended items
   are dropped from the next snapshot. The gates evidence is posted first; the hold is then derived, and every
   deciding run places it when the count reaches its threshold and no OPEN row exists, so a run that dies
   between the two posts is repaired by the next.

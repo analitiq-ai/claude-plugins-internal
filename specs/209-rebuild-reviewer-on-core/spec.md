@@ -227,7 +227,8 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   through core with the same fail-closed rules as the state (ADR-0011 d2). It holds open items only: per
   lineage its file, the times of its WRONG rulings and its claimed words; per bug its members with times, its
   ranges, its anchor commit and its site rulings. Counts and release floors MUST be derived from those times
-  against the reset and the hold row's release, never stored.
+  against the reset and the hold row's release, never stored. A merged bug carries the higher of its bugs'
+  counts, never their sum (ADR-0008 d2): the lower one's members are kept as evidence that is not counted.
 - **FR-016**: Core's state module MUST read and write each tagged reviewer App comment by its tag, and hold the
   story when any reviewer App comment was edited or deleted; this core change and the amendments to reviewer
   ADR-0001 d2, ADR-0008, ADR-0011 d1–d2 and ADR-0013 d4 land in their own PRs before this spec's code.

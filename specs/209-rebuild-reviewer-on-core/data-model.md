@@ -27,9 +27,9 @@ Tag `codeworks:reviewer-gates`; full snapshot, newest wins; same fail-closed rul
 [contracts/gates-snapshot.md](contracts/gates-snapshot.md).
 
 - `Lineage {id, file, wrong_at: Time[], claimed: string}`
-- `Bug {id, members: {tree, at}[], ranges: {file, start, end}[], anchor: sha40, site_rulings: {site, ruling, issue|null}[]}`
+- `Bug {id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, start, end}[], anchor: sha40, site_rulings: {site, ruling, issue|null}[]}`
 - Derived, never stored: `count(lineage) = |wrong_at > max(reset.at, hold(claim-<id>).released)|`; same for bugs
-  over `members[].at`. Merge (ADR-0008) = union of members and ranges.
+  over `members[].at` (`absorbed` is never counted). Merge (ADR-0008 d2): a merge (ADR-0008) keeps as `members` those of the bug with the higher count, moves the other's into `absorbed` (evidence, never counted), and unions ranges; a tree in `members` or `absorbed` is never counted again.
 - Validation: ids unique; times `Time`; an ended item is absent.
 
 ## Session issue record (#174's, read only)
