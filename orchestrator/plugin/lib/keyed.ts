@@ -4,6 +4,11 @@ import { issueComments } from "../core/state.ts";
 // Keys are grammar (plan P7): a key can never close the HTML comment or break its line.
 const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/** `prefix`'s key for `cause`, whose words become the key's: one comment per distinct cause. */
+export function keyOf(prefix: string, cause: string): string {
+  return `${prefix}-${cause.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
 /**
  * Posts `text` on `issue` under its key line, unless an orchestrator App comment already starts with that line:
  * the comment is the record that the cause was handled (orchestrator ADR-0003 d3–d4).

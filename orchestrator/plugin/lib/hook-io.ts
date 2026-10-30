@@ -1,12 +1,18 @@
+import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
+import { text } from "node:stream/consumers";
 import { z } from "zod";
 
+import { LaneRefused } from "../core/board.ts";
 import { GhFolderRefused } from "../core/gh-config.ts";
 import { GitFailed } from "../core/git.ts";
-import { GitHubRefused, GitHubUnanswered, RemoteRefused } from "../core/github.ts";
+import { gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused, type GitHubClient } from "../core/github.ts";
+import { DerivationError } from "../core/identity.ts";
 import { KeyReadRefused } from "../core/keys.ts";
+import { SessionRecordRefused } from "../core/session-record.ts";
 import { SettingsError } from "../core/settings.ts";
-import { MintError } from "../core/tokens.ts";
+import { BoardNotVisible } from "../core/state.ts";
+import { mintToken, MintError } from "../core/tokens.ts";
 
 /** The hook input does not hold, or does not type, a field the hook reads. */
 export class HookInputRefused extends Error {
@@ -60,12 +66,6 @@ export function context(event: HookEvent, text: string): HookAnswer {
   return { code: 0, stdout: `${JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: text } })}\n`, stderr: "" };
 }
 
-export function answer({ code, stdout, stderr }: HookAnswer): void {
-  process.stdout.write(stdout);
-  process.stderr.write(stderr);
-  process.exitCode = code;
-}
-
 const NAMED_FAILURES = [
   HookInputRefused,
   MintError,
@@ -76,9 +76,45 @@ const NAMED_FAILURES = [
   SettingsError,
   RemoteRefused,
   GitFailed,
+  LaneRefused,
+  DerivationError,
+  BoardNotVisible,
+  SessionRecordRefused,
 ];
 
 /** The message of a failure core names a cause for, which a hook refuses with; null for one it crashes on. */
 export function refusalOf(error: unknown): string | null {
   return NAMED_FAILURES.some((failure) => error instanceof failure) ? (error as Error).message : null;
+}
+
+/** `hook`'s answer, or the refusal of a failure core names a cause for; any other failure crashes the hook. */
+export async function refusing(hook: () => Promise<HookAnswer>): Promise<HookAnswer> {
+  try {
+    return await hook();
+  } catch (error) {
+    const reason = refusalOf(error);
+    if (reason === null) throw error;
+    return refuse(reason);
+  }
+}
+
+/** The machine and GitHub a hook acts on; a test hands in a temp home, a clock, and fakes of the rest. */
+export type HookDeps = {
+  home: string;
+  now: () => Date;
+  mintToken: typeof mintToken;
+  connect: (token: string) => GitHubClient;
+};
+
+/** Runs a hook entry's `run` on this process's stdin against the real machine and GitHub, and exits with its answer. */
+export async function runHook(run: (stdin: string, deps: HookDeps) => Promise<HookAnswer>): Promise<void> {
+  const { code, stdout, stderr } = await run(await text(process.stdin), {
+    home: homedir(),
+    now: () => new Date(),
+    mintToken,
+    connect: (token) => gitHub(token),
+  });
+  process.stdout.write(stdout);
+  process.stderr.write(stderr);
+  process.exitCode = code;
 }
