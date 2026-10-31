@@ -62,13 +62,11 @@ Story issue: #235
 - [ ] T011 [P] Regenerate `snapshot.schema.json` through `core/scripts/write-schemas.ts` (`Gates` is a sub-schema of `Snapshot`, no file of its own); `core/tests/schemas.test.ts` drift test red first
 - [ ] T012 Bump `planner/plugin/.claude-plugin/plugin.json` version (core changed; `node core/scripts/check-carriers.ts --base origin/main` green); open and merge PR B
 
-### PR C — core: commit-check pass record + protected paths (R11)
+### PR C — core: commit-check pass record (R11)
 
 - [ ] T013 [P] Red tests in new `core/tests/commit-pass.test.ts` per [contracts/commit-pass-record.md](contracts/commit-pass-record.md): `readCommitPasses(session)` → `null` with no file, throws on invalid content; `recordCommitPasses(session, {repository, issue, branch, from, shas, at})` appends every sha under `branches[branch]` in order, a sha appears once per branch while `head` is set on every pass, including GitHub at A, pass B, amend to B′ and pass B′, restore B and pass B → `head` B, refuses a `repository` differing from the file's or an `issue` differing from the branch entry's; two branches keep separate newest passes; `setReviewerOff(session, off)` creates the file when absent; file mode 0600 in folder 0700, written by temp file + rename
-- [ ] T014 [P] Red tests in new `core/tests/protected-paths.test.ts`: `touchesProtected` true for `.github/workflows/x.yml`, `codeworks.toml`, `.claude/settings.json` and the rest of orchestrator ADR-0004 d4's list; false for `src/a.ts`
 - [ ] T015 Create `core/src/contracts/commit-pass.ts` (Zod): `{v: 1, repository: "owner/name", off: boolean, branches: Record<branch, {issue: number, head: {sha: sha40, range_from: sha40, at: Time}, passes: {sha: sha40, range_from: sha40, at: Time}[]}>}`; per branch passes oldest → newest, `head` the newest pass
 - [ ] T016 Create `core/src/commit-pass.ts`: path `~/.local/state/codeworks/reviewer/sessions/<session id>/commit-passes.json`; `readCommitPasses`, `recordCommitPasses`, `setReviewerOff`; atomic write reusing the 0700/0600 temp+rename pattern of `core/src/gh-config.ts` `writeGhToken` (T013 green)
-- [ ] T017 Create `core/src/protected-paths.ts` with `touchesProtected(paths: string[]): boolean` from orchestrator ADR-0004 d4's list (T014 green)
 - [ ] T018 Bump `planner/plugin/.claude-plugin/plugin.json` version; open and merge PR C
 
 ### External — #174 core session issue record (PR #216)
@@ -154,7 +152,7 @@ Story issue: #236
 
 - [ ] T061 [P] [US2] Create `reviewer/plugin/lib/rules/range.ts` (T057 green)
 - [ ] T062 [P] [US2] Create `reviewer/plugin/lib/check/bare-copy.ts` over core `runGit` / `fetchWithGhCredential`; GitHub branch head read with the session token (T058 green)
-- [ ] T063 [US2] Create `reviewer/plugin/lib/check/after-commit.ts` state machine `idle → fetched → based → fenced → structural → awaiting_checks → PASS | FAIL | COULD_NOT_RUN` (data-model); structural steps: holds, `touchesProtected`, merge resolution for merges only (ADR-0002 d3); running state in `<session>/check.json`, memos in `<session>/memos/*.json` (FR-017); PASS → `recordCommitPasses` for every sha of the range; fence step is a pass-through placeholder until US3 (T059, T060 green)
+- [ ] T063 [US2] Create `reviewer/plugin/lib/check/after-commit.ts` state machine `idle → fetched → based → fenced → structural → awaiting_checks → PASS | FAIL | COULD_NOT_RUN` (data-model); structural steps: holds, core's `protectedPaths` over the range's changed files (any path returned refuses, naming it), merge resolution for merges only (ADR-0002 d3); running state in `<session>/check.json`, memos in `<session>/memos/*.json` (FR-017); PASS → `recordCommitPasses` for every sha of the range; fence step is a pass-through placeholder until US3 (T059, T060 green)
 - [ ] T064 [US2] Record HEAD before Bash in `reviewer/plugin/hooks/pre-tool-use.ts`; wire `reviewer/plugin/hooks/post-tool-use.ts` Bash branch to compare heads and run `after-commit.ts`; StructuredOutput claim/shim results feed the awaiting check and, on PASS, the pass record
 - [ ] T065 [US2] Skip the check entirely while `off` is set in the pass record (FR-019)
 
@@ -225,7 +223,7 @@ Story issue: #238
 ## Parallel Opportunities
 
 - Phase 1: T001–T005 all [P].
-- PR B: T007, T008, T011 [P]. PR C: T013, T014 [P].
+- PR B: T007, T008, T011 [P]. PR C: T013 [P].
 - PR S: T021, T022, T024, T026, T028, T030 [P] once T020 is in.
 - US1: T034–T039 tests [P]; T040–T045 ports [P] (distinct files).
 - US2: T057–T060 [P]; T061, T062 [P].
