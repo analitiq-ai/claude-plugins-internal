@@ -43,7 +43,7 @@ temp file + rename. The folder is a model deny path (`core/src/keys.ts` `HOME_FO
   branch entry's.
 - `setReviewerOff(session, off: boolean): void` — writes `off`; the file is created when absent.
 
-## Protected paths (same PR)
+## Protected paths
 
-`touchesProtected(paths: string[]): boolean` — orchestrator ADR-0004 d4's list (`.github/`, `codeworks.toml`,
-`.claude/`, …), one matcher for both plugins.
+Not in this PR: the check calls core's existing `protectedPaths(changedFiles): string[]`
+(`core/src/protected-paths.ts`, orchestrator ADR-0004 d4), the one matcher for both plugins.

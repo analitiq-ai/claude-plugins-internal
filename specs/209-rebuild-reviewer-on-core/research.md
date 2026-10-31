@@ -147,8 +147,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   dead session's unpushed passes are graded again (FR-014).
 - **Existing tools**: `core/src/git.ts` `runGit`, `fetchWithGhCredential`; `core/src/tree.ts` `gitTree`;
   `snapshot.py`'s export for sweepers (ported to export from the bare copy). The protected-path matcher of
-  orchestrator ADR-0004 d4 does not exist in core yet: it is added to core in the R11 PR so the orchestrator
-  and reviewer share one matcher.
+  orchestrator ADR-0004 d4 is core's `protectedPaths` (`core/src/protected-paths.ts`, #230); the check calls it
+  on the range's changed files, so the orchestrator and reviewer share one matcher.
 
 ## R11: Commit-check pass record as a core contract on local disk
 
@@ -157,7 +157,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   `~/.local/state/codeworks/reviewer/sessions/<session>/commit-passes.json`, passes keyed by branch so a second
   story branch or a second claim in one session keeps its own newest pass, written atomically (temp file,
   rename, 0600 in a 0700 folder). Reviewer's hook is its one writer; the orchestrator reads it through the
-  same module. The same PR adds the protected-path matcher (R10).
+  same module.
 - **Rationale**: FR-014, VP-003 (#174 Story 2 needs it); P6. The folder is already a deny path for the model
   (`core/src/keys.ts` `HOME_FOLDERS`), so the model cannot forge a pass.
 - **Existing tools**: `core/src/gh-config.ts` `writeGhToken` (the atomic 0700/0600 write pattern, reused).
