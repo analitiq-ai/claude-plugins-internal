@@ -10,7 +10,9 @@ Only code that passed review merges. Five things hold that:
 
 1. Each served repo's ruleset requires CI, `internal-review` and each external reviewer module's
    `<module>-review` (for example `codex-review`) as check runs from the orchestrator App. No App is on
-   its bypass list (orchestrator ADR-0009).
+   its bypass list (orchestrator ADR-0009). A repo whose GitHub plan offers no rulesets lists its required
+   checks in `required_checks` under `[orchestrator]` instead; there GitHub enforces nothing, and only the
+   orchestrator's merge condition holds this (ADR-0009 d2).
 2. The model's GitHub token is read-only: it cannot push, comment, label, move a card or merge (root
    ADR-0007).
 3. The App keys are readable only by hooks, never by the model.
@@ -77,8 +79,8 @@ Stops, strongest first: **GitHub** (App permissions, ruleset), **managed setting
 core.
 - GitHub: no administration access; workflows write only so a push can carry a merge of the default branch
   that changes a workflow. reviewer fails every other change to `.github/` (reviewer ADR-0002 d4), since a
-  workflow runs on the push before any review. The ruleset decides whether a merge goes through, and the
-  merge names the head it evaluated.
+  workflow runs on the push before any review. The ruleset decides whether a merge goes through (in a repo with
+  none, the orchestrator's merge condition alone), and the merge names the head it evaluated.
 - It attests `internal-review` only from the reviewer App's newest record.
 - It pushes only commits whose author and committer are the agent identity, the name and email of the agent
   machine's global git config, set at setup and write-denied (§5), and that reviewer's commit check passed

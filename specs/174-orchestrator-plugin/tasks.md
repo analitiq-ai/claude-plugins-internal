@@ -195,6 +195,8 @@ module triggered once; all verdicts success → squash-merged naming the head; a
 - [ ] T056 [P] [US4] **core PR C9.** Conflict-with-main finding: failing test in `core/tests/`, then the finding in `core/src/validation/`
 - [ ] T057 [P] [US4] **core PR C11.** Validator request time: failing case in `core/tests/contract.test.ts`, then in `core/src/validation/contract.ts`
 - [ ] T058 [P] [US4] Add `review_timeout` ("integer seconds; 1–3600; absent reads core's default 1800") to `orchestrator/plugin/lib/settings.ts`, failing cases first (3601 refuses, absent → 1800) in `orchestrator/tests/settings.test.ts`
+- [ ] T077 [P] [US4] **core C14, in the US4 PR.** Failing cases in `core/tests/required-checks.test.ts`: given a list, `requiredChecks` grades the listed checks at the head and makes no `rules/branches` request; a listed `internal-review` or `<module>-review` is dropped as from the rules, and a list of only those is could not run; with no list the rules are read as now. Then the list as a parameter of `requiredChecks` in `core/src/validation/required-checks.ts` (R22, FR-020c)
+- [ ] T078 [P] [US4] Add `required_checks` ("check names, at least one, no duplicates; optional") to `orchestrator/plugin/lib/settings.ts`, failing cases first (an empty list and a duplicate refuse; absent leaves the rules) in `orchestrator/tests/settings.test.ts`; pass it to `requiredChecks`; `orchestrator/README.md` step 5 names it for a repo whose plan offers no rulesets (R22, US4 #6)
 - [ ] T059 [P] [US4] Write failing `orchestrator/tests/review.test.ts` for pure `decideReview` and `decideMerge` over core `requiredChecks`, `threadsModule`, `trigger`/`status`/`findings`: ready, attested, GREEN, no findings, no hold → In review and each module triggered once per head (US4 #1); each `<module>-review` written; a ruling on a trusted thread → reply and resolve, FIX only after its commits are pushed, PUSH_BACK/DEFER at once; an untrusted thread resolved unread with a reply saying so (US4 #2); In review, no hold, every module success at the head, GitHub allowing → squash merge naming that `sha` (US4 #4, SC-005); COULD_NOT_RUN or SILENT never read as success
 - [ ] T060 [US4] Implement `decideReview`, `decideMerge` and their writes in `orchestrator/plugin/lib/loop.ts`; T059 passes
 - [ ] T061 [P] [US4] Write failing stage-2 cases in `orchestrator/tests/push.test.ts`: at stage 2 `decidePush` accepts only commits a FIX ruling names or a merge of the default branch (US4 #3, FR-020b)
@@ -241,7 +243,7 @@ Story issue: #215
 - **US1 (Phase 3)**: after Phase 2; T018 gates T034; C1–C4 (T019–T023) merged before the US1 PR
 - **US2 (Phase 4)**: after US1 (Stop reads the session record); T038 gates T039; #209's and #217's core PRs merged first; C7 in the US2 PR
 - **US3 (Phase 5)**: after US2 (needs the draft PR); C10 merged first
-- **US4 (Phase 6)**: after US3; C8, C9, C11 merged first
+- **US4 (Phase 6)**: after US3; C8, C9, C11 merged first; C14 in it
 - **US5 (Phase 7)**: after US2's Stop hook; C6 in the US5 PR; independent of US3–US4
 - **Live runs of US2–US5**: after reviewer #209
 - **Polish**: after the stories in scope

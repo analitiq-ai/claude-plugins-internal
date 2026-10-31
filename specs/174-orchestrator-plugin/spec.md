@@ -22,6 +22,13 @@ the carrier check lists orchestrator."
 
 ## Clarifications
 
+### Session 2026-10-31
+
+- Q: Where are the required checks read in a repo whose GitHub plan offers no rulesets? → A: From
+  `required_checks` under `[orchestrator]`: when it is set, core's required-checks reader grades the listed checks
+  and reads no GitHub rules; when it is not, it reads the rules. GitHub then enforces nothing, and a listed check
+  counts from whichever App posts it (orchestrator ADR-0009 d2).
+
 ### Session 2026-10-30
 
 - Q: Which language are the orchestrator's hooks and scripts written in? → A: TypeScript, run by Node; no Python.
@@ -176,14 +183,14 @@ a protected path is not attested and its card goes to Blocked naming the paths.
 
 ### User Story 4 - External review, replies, merge and the wait (Priority: P2)
 
-Once the PR is ready, the orchestrator reads the required checks and each external reviewer's module, moves the
-card to In review and triggers each module once per head, writes each `<module>-review`, replies to rulings and
-resolves their threads, pushes at stage 2 only FIX commits or a merge of the default branch, waits in the Stop
-hook up to `review_timeout`, and squash-merges on GitHub's gate (orchestrator ADR-0007 d2–d4, d6–d7; ADR-0008;
-ADR-0009).
+Once the PR is ready, the orchestrator reads the required checks, from GitHub's rules or, in a repo whose plan
+offers none, from `required_checks`, and each external reviewer's module, moves the card to In review and triggers
+each module once per head, writes each `<module>-review`, replies to rulings and resolves their threads, pushes at
+stage 2 only FIX commits or a merge of the default branch, waits in the Stop hook up to `review_timeout`, and
+squash-merges on GitHub's gate (orchestrator ADR-0007 d2–d4, d6–d7; ADR-0008; ADR-0009).
 
 **Why this priority**: The merge ends the loop. It needs Story 3, and in core: rulings, replies and FIX commits in
-reviewer's snapshot, the conflict-with-main finding, and the validator request time.
+reviewer's snapshot, the conflict-with-main finding, the validator request time, and the required checks from a list.
 
 **Independent Test**: Against a fake GitHub with a ready, attested PR whose required checks pass: the card moves
 to In review and each module is triggered once; with every module's verdict success, the PR is squash-merged
@@ -203,6 +210,8 @@ naming its head; with a module silent past `review_timeout`, the card goes to Bl
 5. **Given** a module SILENT or a required check missing or pending, **When** the Stop hook runs before
    `review_timeout`, **Then** it waits within its own run, polling GitHub, and the session stays open; past
    `review_timeout`, the card goes to Blocked naming the reporter.
+6. **Given** `required_checks` set under `[orchestrator]`, **When** a hook reads the required checks, **Then** it
+   grades the listed checks at the head and reads no GitHub rules.
 
 ---
 
@@ -271,9 +280,10 @@ next one finds not marked ended counts toward `k_deaths`.
   convention (`planner-app.pem` in `core/src/keys.ts`; `session-app.pem` and `reviewer-app.pem` in its tests).
 - **FR-007**: The orchestrator MUST read `[shared]` and its own `[orchestrator]` section of `codeworks.toml`
   through core's settings reader and MUST refuse, naming the file and key, when one is missing or invalid.
-  `[orchestrator]` holds `app_id`, `session_app_id`, `status_issue`, `exempt_labels`, `max_turns`, `k_deaths` and
-  `review_timeout`; each story adds the keys it reads: Story 1 `app_id`, `session_app_id` and `status_issue`, Story
-  3 `exempt_labels`, Story 4 `review_timeout`, Story 5 `max_turns` and `k_deaths`.
+  `[orchestrator]` holds `app_id`, `session_app_id`, `status_issue`, `exempt_labels`, `max_turns`, `k_deaths`,
+  `review_timeout` and `required_checks`; each story adds the keys it reads: Story 1 `app_id`, `session_app_id` and
+  `status_issue`, Story 3 `exempt_labels`, Story 4 `review_timeout` and `required_checks`, Story 5 `max_turns` and
+  `k_deaths`.
 - **FR-008**: A failure that names no issue (a SessionStart failure) MUST be posted on `status_issue` with the
   orchestrator App, keyed by its cause and posted only when no orchestrator App comment with that key exists.
 
@@ -363,6 +373,9 @@ next one finds not marked ended counts toward `k_deaths`.
   resolve threads, and merge exactly as ADR-0007 d2–d4, d6–d7, ADR-0008 d2–d4 and ADR-0009 d1, d4 decide.
 - **FR-020b**: At stage 2 the Stop hook MUST push only commits a FIX ruling names or a merge of the default branch
   (FR-016).
+- **FR-020c**: The required checks MUST be the names `required_checks` lists under `[orchestrator]` when it is set,
+  read with no GitHub rules read, and GitHub's rules for the PR's base branch otherwise, as ADR-0009 d2 decides. A
+  listed name MUST match a check run or status of that name from any App.
 - **FR-021** *(decides how Stop waits, ADR-0001 d3)*: While a module or required check is pending and
   `review_timeout` has not passed, the Stop hook MUST wait within its own run: it polls GitHub every 30 seconds,
   makes the writes each reading calls for (FR-019 to FR-020a), and returns when a hook names a builder step, the story
@@ -423,7 +436,7 @@ next one finds not marked ended counts toward `k_deaths`.
   builder's step script reads too (#217), and an issue number to its story branch and PR. Story 2: the commit-check
   pass record, which #209's core PR adds, and builder's stop rule, which #217's core PR adds. Story 3: the
   protected-path matcher. Story 4: rulings, replies and FIX commits in the snapshot; the conflict-with-main finding;
-  the validator request time.
+  the validator request time; the required-checks reader taking a list in place of the rules.
 - SECURITY.md §5's managed settings, and core's managed-settings check, gain the folder
   `~/.local/state/codeworks/orchestrator` (write-denied to the model) and `GH_CONFIG_DIR` in `env`, replacing
   the `/tmp/verify-b-ghsess` placeholder, in their own PR before Story 1's (constitution Principle VI).
