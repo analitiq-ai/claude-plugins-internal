@@ -8,10 +8,11 @@ as `SettingsError("codeworks.toml [orchestrator]", …)` (root ADR-0002 d2). Rea
 | `app_id` | integer | ≥ 1; the orchestrator App | 1 |
 | `session_app_id` | integer | ≥ 1; the session App | 1 |
 | `status_issue` | integer | ≥ 1; where failures naming no issue go (FR-008) | 1 |
-| `exempt_labels` | string[] | label names, no duplicates (ADR-0005) | 2 |
-| `max_turns` | integer | ≥ 1 (ADR-0001 d8) | 2 |
-| `k_deaths` | integer | ≥ 1 (ADR-0001 d8) | 2 |
-| `review_timeout` | integer seconds | 1–3600; absent reads core's default 1800 (FR-021) | 2 |
+| `exempt_labels` | string[] | label names, no duplicates (ADR-0005) | 3 |
+| `review_timeout` | integer seconds | 1–3600; absent reads core's default 1800 (FR-021) | 4 |
+| `required_checks` | string[] | check names, at least one, no duplicates; optional, set only where the repo's plan offers no rulesets; when set, the required checks are these and no GitHub rules are read (FR-020c, ADR-0009 d2) | 4 |
+| `max_turns` | integer | ≥ 1 (ADR-0001 d8) | 5 |
+| `k_deaths` | integer | ≥ 1 (ADR-0001 d8) | 5 |
 
 Logins come from `[shared]` (`session_app_login`, `orchestrator_app_login`, …), never from here.
 

@@ -37,11 +37,13 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
 1. We will have the orchestrator squash-merge an In review card's PR, passing no message, between turns,
    once no hold is open on its story issue (reviewer ADR-0013), every module's verdict at the head is
    success and GitHub allows the merge, naming the head it evaluated, so a push in between fails.
-2. We will make GitHub's rulesets the merge contract and the only source of required checks, with no
+2. We will make GitHub's rulesets the merge contract and the source of required checks, with no
    classic branch protection: they require the check runs `internal-review` and each module's
    `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
-   admins only, the only override.
+   admins only, the only override. A repo whose GitHub plan offers no rulesets names its required checks in
+   `required_checks` under `[orchestrator]` instead; the orchestrator then reads no rules, and its own merge
+   condition (d1) is the only gate.
 3. We will never update a branch only because it is behind main: a conflict stays a finding, and builder
    merges main only to resolve one or once main's spec, ADRs or constitution changed (builder ADR-0004).
 4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the
@@ -74,16 +76,23 @@ Rejected: the attestation and the external verdicts are the merge condition.
 Rejected: a branch takes main for a conflict or a changed spec, ADR or constitution (builder ADR-0004),
 never for staleness alone.
 
+### Option E: A plan without rulesets read as no required checks
+
+Rejected: a head would merge with no CI check read, and telling the plan apart from another refusal means
+reading GitHub's error text (constitution P7).
+
 ## Trade-offs
 
 - A PR refused on a rule outside the contract stays In review silently.
 - A branch behind main without conflicts merges as it is, unless main's spec, ADRs or constitution changed
   since its round (ADR-0004).
+- In a repo that lists `required_checks`, GitHub enforces nothing, and a listed check counts from whichever
+  App posts it.
 
 ## Consequences
 
 - Easier: one merge condition; a stop is a board move.
-- Harder: every served repo needs decisions 2 and 6 first.
+- Harder: every served repo needs decision 2's ruleset, or its `required_checks`, and decision 6 first.
 - **How we would know this was wrong:** a merge without every `<module>-review` success at its head
   or under an open hold; a squash commit on main missing a session-id trailer.
 - Revisit if: a rule outside the contract becomes a routine blocker.

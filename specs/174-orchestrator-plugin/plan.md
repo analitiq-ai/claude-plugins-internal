@@ -56,7 +56,7 @@ token never touches disk; no Python; imports only core
 | VI. Rule apart from code | The managed-settings change (SECURITY.md §5, `core/src/keys.ts`) lands in its own PR before Story 1. `check-carriers.ts` is not changed. **Pass** |
 | P4. Could-not-run | A module that does not answer is COULD_NOT_RUN or SILENT through core's `status`/`findings`; a GitHub no-answer refuses, never reads as empty. **Pass** |
 | P6. One writer | Lanes, keyed reasons, counts, check runs, PR state, pushes: the orchestrator App via these hooks. Session record and gh folder: these hooks, write-denied to the model. Releases and rounds: reviewer. **Pass** |
-| P7. Facts as data | The prompt by grammar (R20); the identity by `git config --file`; counts and records as JSON under a tag; the story by branch grammar (root ADR-0005). **Pass** |
+| P7. Facts as data | The prompt by grammar (R20); the identity by `git config --file`; counts and records as JSON under a tag; the story by branch grammar (root ADR-0005); the required checks from GitHub's rules or a settings key, never from a refusal's wording (R22). **Pass** |
 | P8. Generic | Repository from the checkout's origin; every value in `codeworks.toml`; nothing repo-specific. **Pass** |
 | P9. Named identities | Every trust predicate reads a GitHub login or role; no codeworks App counts (core `appLogins`). **Pass** |
 | P1, P3, P5 | Apply to reviewer and planner; P3's split (pure rules, I/O handlers) and P5's mechanism list are followed anyway. **N/A** |
@@ -147,6 +147,7 @@ found that the spec's list does not name.
 | C10 | Protected-path matcher | US3 | spec Assumptions |
 | — | **US3** | | attest, exempt, ready |
 | C8, C9, C11 | Rulings/replies/FIX commits in the snapshot; conflict-with-main finding; validator request time | US4 | spec Assumptions |
+| C14 | Required checks from a list | in US4 | `requiredChecks` grades a given list in place of the rules (R22) |
 | — | **US4** | | In review, modules, replies, stage-2 push, merge, Stop's wait |
 | C6 † | Tagged-snapshot channel | in US5 | `state.ts` read/post parameterised by tag, App and schema (R17) |
 | — | **US5** | | bound counts |
@@ -182,3 +183,4 @@ None.
 - builder's issue-tackle edit: R19
 - `/codeworks <issue>` command and prompt grammar: R20
 - builder's stop, read through core's stop rule (Stop): R21
+- Required checks from `required_checks` where the plan offers no rulesets: R22
