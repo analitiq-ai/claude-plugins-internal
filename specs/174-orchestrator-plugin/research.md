@@ -214,3 +214,17 @@ plan has not executed, and names the task that runs it first.
   accepted the command, and the model received the command's body. The input also carried `prompt_id` and
   `permission_mode`. Saved as `orchestrator/tests/fixtures/hooks/user-prompt-submit.json`, `cwd` and
   `transcript_path` replaced. The decision stands.
+
+## R21: Stop reads builder's stop through core's stop rule (Story 2)
+
+- **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
+  session's issue through core and calls `storyStop`. A stop pushes nothing and names no step, and the session
+  ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
+  is posted keyed (R11) and the card moves to Blocked first.
+- **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only
+  the Blocked reason carries it to the admin. Without the rule, Stop names `issue-tackle <s>` again after every
+  builder stop until REPEAT (FR-023), and the Blocked reason names the bound.
+- **Existing tools**: none on main. #217's core PR adds `storyStop` and `StopState`; the read of its facts is core's
+  too, so this hook and builder's step script read the same facts, not two readers.
+- **Rejected**: a file builder writes for the hook to read: the model may not write a hook's folder (root ADR-0008
+  d6). Parsing the turn's last message: a fact read from prose (P7).

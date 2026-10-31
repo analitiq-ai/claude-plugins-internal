@@ -28,7 +28,8 @@ entry file imports `../lib/guarded.ts` before anything else. A missing core pack
   legal step where one exists.
 - **Context** (UserPromptSubmit on start or resume): exit 0, stdout
   `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[orchestrator] <s> <claimed|resumed>: run builder:issue-tackle <s>"}}`.
-- **Next step** (Stop, Story 2): exit 2 with the step on stderr, refusing the stop; exit 0 lets it end.
+- **Next step** (Stop, Story 2): exit 2 with the step on stderr, refusing the stop; exit 0 lets it end. A stop
+  core's stop rule finds names no step: exit 0, after the Blocked reason and move FR-016c calls for.
 - **Crash**: Stop exits 1 (fails open, ADR-0001 d5); the others exit non-zero and `onFailure: block` holds.
 
 ## Per-hook behaviour (Story 1)
