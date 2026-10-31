@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 const MANAGED_FOLDER = "/etc/claude-code";
 const MANAGED_FILE = `${MANAGED_FOLDER}/managed-settings.json`;
 
-const HOME_FOLDERS = {
+export const HOME_FOLDERS = {
   "<K>": ".config/codeworks",
   "<S>": ".local/state/codeworks/reviewer",
   "<O>": ".local/state/codeworks/orchestrator",
@@ -136,7 +136,14 @@ export function readKey(file: string, plugin: string, machine: Machine = thisMac
     const reasons = managedSettingsReasons(machine, plugin);
     if (reasons.length > 0) throw new KeyReadRefused(path, reasons);
   }
-  const reasons = keyFileReasons(machine, machine.stat(path));
+  let key: FileStat;
+  try {
+    key = machine.stat(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    throw new KeyReadRefused(path, ["does not exist"]);
+  }
+  const reasons = keyFileReasons(machine, key);
   if (reasons.length > 0) throw new KeyReadRefused(path, reasons);
   return machine.readBytes(path);
 }

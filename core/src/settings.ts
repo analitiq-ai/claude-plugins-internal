@@ -57,7 +57,7 @@ export type Settings = {
 };
 
 // No environment variable is read: a key has one source, the file at the ref (root ADR-0002 d3).
-export async function readSettings(tree: Tree): Promise<Settings> {
+async function tablesOf(tree: Tree): Promise<(name: string) => unknown> {
   let text: string;
   try {
     text = await tree.readText(SETTINGS_FILE);
@@ -75,11 +75,22 @@ export async function readSettings(tree: Tree): Promise<Settings> {
     if (!(error instanceof TomlError)) throw error;
     throw new SettingsError(SETTINGS_FILE, error.message, { cause: error });
   }
+  return (name) => (Object.hasOwn(document, name) ? document[name] : undefined);
+}
 
-  const tableAt = (name: string): unknown => (Object.hasOwn(document, name) ? document[name] : undefined);
+export async function readSettings(tree: Tree): Promise<Settings> {
+  const tableAt = await tablesOf(tree);
   const shared = Shared.safeParse(tableAt("shared"));
   if (!shared.success) {
     throw new SettingsError(SHARED_SECTION, z.prettifyError(shared.error), { cause: shared.error });
   }
   return { shared: shared.data, section: (name) => tableAt(name) ?? {} };
+}
+
+/**
+ * One component's section as parsed, `{}` when the file has none, with `[shared]` not judged: for keys read at a
+ * ref whose `[shared]` the installed core may not accept, such as a story branch that changes it.
+ */
+export async function readSection(tree: Tree, name: string): Promise<unknown> {
+  return (await tablesOf(tree))(name) ?? {};
 }

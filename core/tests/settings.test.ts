@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { readSettings, SettingsError } from "../src/settings.ts";
+import { readSection, readSettings, SettingsError } from "../src/settings.ts";
 import { NotInTree, type Tree } from "../src/tree.ts";
 
 const REF = "212-us2-retry-budget";
@@ -279,5 +279,21 @@ describe("readSettings", () => {
         else process.env[name] = value;
       }
     }
+  });
+});
+
+describe("readSection", () => {
+  it("hands one section over parsed and unvalidated, judging no [shared] key", async () => {
+    const text = `[shared]\nunknown = 1\n\n[orchestrator]\napp_id = 7\n`;
+    assert.deepEqual(plain(await readSection(treeAt({ "codeworks.toml": text }), "orchestrator")), { app_id: 7 });
+  });
+
+  it("hands over {} when the file has no such section", async () => {
+    assert.deepEqual(plain(await readSection(treeAt({ "codeworks.toml": EXAMPLE }), "orchestrator")), {});
+  });
+
+  it("refuses as readSettings does: no file, naming the ref, or a file that is not TOML", async () => {
+    await assert.rejects(readSection(treeAt({}, "feature-ref-7f3a"), "orchestrator"), settingsError(/codeworks\.toml/, /feature-ref-7f3a/));
+    await assert.rejects(readSection(treeAt({ "codeworks.toml": "[orchestrator\n" }), "orchestrator"), settingsError(/codeworks\.toml/));
   });
 });

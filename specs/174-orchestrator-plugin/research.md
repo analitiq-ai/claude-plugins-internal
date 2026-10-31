@@ -208,9 +208,12 @@ plan has not executed, and names the task that runs it first.
   the hook's context as its step; every fact comes from the hook.
 - **Rationale**: an unknown slash command may never reach the model or the hook.
 - **Existing tools**: reviewer reads `/reviewer` keywords from `prompt` (shimgate.py), with no command file.
-- **Not run**: whether UserPromptSubmit sees `/codeworks 212` as typed or the expanded command, and whether
-  `-p` accepts an unknown command. Story 1's first task records a real hook input in a `-p` session and fixes
-  the fixture the tests use; if the raw text is not seen, this decision is reopened before any claim code.
+- **Run (T018, 2026-10-30, Claude Code 2.1.314)**: `claude --setting-sources "" --plugin-dir <throwaway> -p
+  "/codeworks 212"` with a throwaway `orchestrator` plugin whose UserPromptSubmit hook saved its stdin and whose
+  `commands/codeworks.md` body asked for one word. The hook's `prompt` was `/codeworks 212` as typed; `-p`
+  accepted the command, and the model received the command's body. The input also carried `prompt_id` and
+  `permission_mode`. Saved as `orchestrator/tests/fixtures/hooks/user-prompt-submit.json`, `cwd` and
+  `transcript_path` replaced. The decision stands.
 
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 

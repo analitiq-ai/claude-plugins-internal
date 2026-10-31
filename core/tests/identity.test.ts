@@ -12,7 +12,7 @@ import {
   issueStory,
   parseBranch,
   pickSpecFolder,
-  pickSpecPr,
+  pickSpecPrs,
   pickStoryBranch,
   pickStoryPr,
   requirement,
@@ -21,6 +21,7 @@ import {
   specFolderAnswer,
   specIssue,
   specPr,
+  specPrs,
   storyPr,
   type IssueClose,
   type PullRequestHead,
@@ -178,20 +179,25 @@ describe("specBranch", () => {
   }
 });
 
-describe("pickSpecPr", () => {
+describe("pickSpecPrs", () => {
   function pr(number: number, headRefName: string, over: Partial<PullRequestState> = {}): PullRequestState {
     return { number, headRefName, isCrossRepository: false, closed: false, merged: false, ...over };
   }
 
-  it("is the newest same-repository PR headed <p>-spec; a fork's or another head's is not the spec's", () => {
+  it("is every same-repository PR headed <p>-spec, newest first; a fork's or another head's is not the spec's", () => {
     const prs = [
-      pr(150, "145-spec", { closed: true }),
+      pr(150, "145-spec", { closed: true, merged: true }),
       pr(170, "145-spec"),
+      pr(160, "145-spec", { closed: true }),
       pr(180, "145-spec", { isCrossRepository: true }),
       pr(190, "145-us1-retry"),
       pr(195, "1450-spec"),
     ];
-    assert.deepEqual(pickSpecPr(prs, 145), { number: 170, state: "open" });
+    assert.deepEqual(pickSpecPrs(prs, 145), [
+      { number: 170, state: "open" },
+      { number: 160, state: "closed" },
+      { number: 150, state: "merged" },
+    ]);
   });
 
   for (const [state, over] of [
@@ -200,30 +206,42 @@ describe("pickSpecPr", () => {
     ["merged", { closed: true, merged: true }],
   ] as const) {
     it(`maps a PR that is ${state} to ${state}`, () => {
-      assert.deepEqual(pickSpecPr([pr(170, "145-spec", over)], 145), { number: 170, state });
+      assert.deepEqual(pickSpecPrs([pr(170, "145-spec", over)], 145), [{ number: 170, state }]);
     });
   }
 
-  it("is null when no same-repository PR is headed <p>-spec", () => {
-    assert.equal(pickSpecPr([], 145), null);
-    assert.equal(pickSpecPr([pr(180, "145-spec", { isCrossRepository: true }), pr(190, "146-spec")], 145), null);
+  it("is empty when no same-repository PR is headed <p>-spec", () => {
+    assert.deepEqual(pickSpecPrs([], 145), []);
+    assert.deepEqual(pickSpecPrs([pr(180, "145-spec", { isCrossRepository: true }), pr(190, "146-spec")], 145), []);
   });
 });
 
-describe("specPr", () => {
+describe("specPrs and specPr", () => {
   const nodes = [
     { number: 150, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: true },
     { number: 160, headRefName: "145-spec", isCrossRepository: true, closed: false, merged: false },
+    { number: 170, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: false },
   ];
-
-  it("reads the PRs headed <p>-spec and picks the newest same-repository one", async () => {
-    const reader = fakeGitHub({
+  const reader = () =>
+    fakeGitHub({
       graphqlPages: [
         { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === "145-spec", answer: nodes },
+        { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === "146-spec", answer: [] },
       ],
     });
-    assert.deepEqual(await specPr(reader, REPO, 145), { number: 150, state: "merged" });
-    assert.equal(reader.calls.length, 1);
+
+  it("specPrs reads the PRs headed <p>-spec once and answers every same-repository one, newest first", async () => {
+    const client = reader();
+    assert.deepEqual(await specPrs(client, REPO, 145), [
+      { number: 170, state: "closed" },
+      { number: 150, state: "merged" },
+    ]);
+    assert.equal(client.calls.length, 1);
+  });
+
+  it("specPr answers the newest of them, and null when there is none", async () => {
+    assert.deepEqual(await specPr(reader(), REPO, 145), { number: 170, state: "closed" });
+    assert.equal(await specPr(reader(), REPO, 146), null);
   });
 });
 

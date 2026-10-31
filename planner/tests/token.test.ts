@@ -338,15 +338,8 @@ describe("gh.ts exits 2 naming the cause, mints nothing and runs no gh", () => {
   }
 });
 
-// Core names no error for an absent key: the read's own error, naming the path, goes through gh.ts's re-throw.
-it("gh.ts with no key fails naming the key's path, minting nothing, writing no folder and running no gh", async (t) => {
+it("gh.ts with no key refuses naming the key's path, minting nothing, writing no folder and running no gh", async (t) => {
   const w = await world(t, { key: false });
-  const run = await w.run(["auth", "status"]);
-  assert.equal(run.status, 1, `exit ${run.status}: ${run.stderr}`);
-  assert.equal(run.stdout, "");
-  const key = join(w.home, ".config", "codeworks", "planner-app.pem");
-  assert.ok(run.stderr.includes(key), `stderr does not name ${key}: ${run.stderr}`);
+  assertRefused(w, await w.run(["auth", "status"]), `${join(w.home, ".config", "codeworks", "planner-app.pem")}: does not exist`);
   assert.deepEqual(w.calls(), []);
-  assert.equal(existsSync(w.folder), false, "the folder was written");
-  assert.deepEqual(w.ghRuns(), [], "gh ran");
 });
