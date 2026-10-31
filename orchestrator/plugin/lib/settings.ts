@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { answerOf, ownerAndName, type GitHubClient } from "../core/github.ts";
-import { readSettings, SETTINGS_FILE, SettingsError, type Shared } from "../core/settings.ts";
+import { readSection, readSettings, SETTINGS_FILE, SettingsError, type Shared } from "../core/settings.ts";
 import { gitHubTree, gitTree } from "../core/tree.ts";
 import { orchestratorClient, type AppTokenDeps } from "./app-token.ts";
 
@@ -30,7 +30,7 @@ function sectionOf<Schema extends z.ZodType>(schema: Schema, section: unknown): 
  * else is taken from HEAD; a forged ID fails the mint, or `settleSettings`'s compare after it (research R5).
  */
 export async function bootstrapAppIds(checkout: string): Promise<AppIds> {
-  const { app_id, session_app_id } = sectionOf(AppIds, (await readSettings(gitTree(checkout, "HEAD"))).section("orchestrator"));
+  const { app_id, session_app_id } = sectionOf(AppIds, await readSection(gitTree(checkout, "HEAD"), "orchestrator"));
   return { app_id, session_app_id };
 }
 

@@ -45,6 +45,11 @@ describe("bootstrapAppIds", () => {
     assert.deepEqual(await bootstrapAppIds(scratchCheckout(t, head)), IDS);
   });
 
+  it("judges no [shared] key at HEAD: a story may change the section the installed core reads", async (t) => {
+    const head = `[shared]\nunknown = 1\n\n[orchestrator]\napp_id = ${APP_ID}\nsession_app_id = ${SESSION_APP_ID}\n`;
+    assert.deepEqual(await bootstrapAppIds(scratchCheckout(t, head)), IDS);
+  });
+
   for (const key of ["app_id", "session_app_id"]) {
     it(`refuses HEAD's [orchestrator] without ${key}, naming the section and the key`, async (t) => {
       const head = settingsText(key === "app_id" ? `session_app_id = ${SESSION_APP_ID}\n` : `app_id = ${APP_ID}\n`);
