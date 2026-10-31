@@ -8,3 +8,8 @@ planner_app_login = "codeworks-planner[bot]"
 
 [planner]
 app_id = 5510825
+
+[orchestrator]
+app_id = 5412829
+session_app_id = 5411132
+status_issue = 255
