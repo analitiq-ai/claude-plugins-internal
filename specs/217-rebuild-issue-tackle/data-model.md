@@ -1,7 +1,7 @@
 # Data model: builder's step
 
 Builder-owned shapes live in `builder/plugin/lib/step.ts` as Zod schemas; every fact in them is read through
-core (research R5–R12). Core additions B0–B7 are listed in `plan.md`.
+core (research R5–R12). Core additions B1–B7 are listed in `plan.md`.
 
 ## StepFacts (input of `decideStep`)
 
@@ -62,7 +62,7 @@ the model a command.
 `no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog, Blocked),
 `no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`,
 `no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr`, `uncommitted_changes`. One enum, defined
-once in core beside the stop rule (B7), which builder's step script and the orchestrator's Stop hook both call
+once in core beside the stop rule and the read of its facts (B7), which builder's step script and the orchestrator's Stop hook both call
 (spec FR-025).
 
 ### Decision order (pure)
@@ -81,6 +81,8 @@ once in core beside the stop rule (B7), which builder's step script and the orch
 10. findings → `github_round`; else `nothing_to_do`
 
 Stages 1–4, 7 and the stop half of 5 and 9 are core's stop rule (B7); builder's `decideStep` calls it first.
+Their facts (`session` through `worktree`, `folder`, `pr`, `head`, `headVsPr`) are read by core's
+`readStoryStopFacts` (B7); builder reads `merge`, `requirement`, `tasks`, `attested` and `findings` itself.
 
 ## State transitions across steps
 

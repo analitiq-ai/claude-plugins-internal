@@ -1,6 +1,6 @@
 # Research: builder rebuilds issue-tackle to its records
 
-Each decision below settles one mechanism `plan.md` lists. Core additions are named B0–B7 and listed in
+Each decision below settles one mechanism `plan.md` lists. Core additions are named B1–B7 and listed in
 `plan.md` (Delivery order).
 
 ## R1: builder's plugin is a core carrier shaped as planner's and the orchestrator's
@@ -67,8 +67,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R5: GitHub is read with the session token from the orchestrator's gh folder
 
-- **Decision**: the script reads the session token with core's `readGhToken(folder)` from the gh folder at
-  core's state path (B0), builds `gitHub(token)`, and refuses (exit 2, naming the folder) on an absent folder or a
+- **Decision**: the script reads the session token with core's `readGhToken(folder)` from core's `ghFolder(home)`
+  (`orchestrator-paths.ts`), builds `gitHub(token)`, and refuses (exit 2, naming the folder) on an absent folder or a
   token past its expiry; it never mints (only hooks read a key, root ADR-0008). The repository is the main
   checkout's origin, checked equal to the token's `repo` and the session record's. Git reads from GitHub use
   core's `fetchWithGhCredential` with the same folder.
@@ -80,12 +80,12 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R6: The session's issue is read from the orchestrator's record
 
-- **Decision**: `readSessionRecord(folder, sessionId)` at core's sessions folder (B0). Absent → stop "no session
+- **Decision**: `readSessionRecord(folder, sessionId)` at core's `sessionsFolder(home)`. Absent → stop "no session
   record" (FR-005); `issue ≠ s` → stop naming the record's issue; `repo` ≠ origin → stop naming both; refused →
   exit 2 naming the file.
 - **Rationale**: builder ADR-0002 d5; root ADR-0008 d1; one writer, the orchestrator's UserPromptSubmit hook (P6).
-- **Existing tools**: core `session-record.ts` (fits). The folder's path lives in the orchestrator's
-  `lib/paths.ts` in #174's plan, which builder cannot import (ADR-0001 d1): B0 moves the path into core.
+- **Existing tools**: core `session-record.ts` (fits); `orchestrator-paths.ts` `ghFolder`, `sessionsFolder` (fit, on main
+  from #242).
 
 ## R7: Lane, closed and done are read through core at every step
 
@@ -204,14 +204,15 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R16: The step's stop rule lives in core, so the Stop hook names builder's stop
 
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–5, 7, 9) in core as a pure
-  `storyStop(facts)` with the `StopState` enum. builder's `decideStep` calls it first; the orchestrator's Stop hook
-  calls it on the same facts and, on a stop, moves the card to Blocked with its reason instead of re-naming
+  `storyStop(facts)` with the `StopState` enum, and the read of its facts as `readStoryStopFacts(s, sessionId,
+  deps)`: read-only, through core's readers and `git.ts` `runGit`, writing nothing. builder cuts or adds the
+  worktree when those facts show none (R8), then reads again. builder's `decideStep` calls it first; the orchestrator's Stop hook
+  reads the same facts through the same function, calls the rule and, on a stop, moves the card to Blocked with its reason instead of re-naming
   `issue-tackle <s>` until REPEAT. No file is written for the hook to read: the model may not write a hook's
   folder (root ADR-0008 d6).
 - **Rationale**: builder ADR-0003 d2 (a stop's message reaches the admin through the Blocked reason); P3 (rule in
   a pure function, one home); critique P1.
-- **Existing tools**: #174's `decideStart` (pure over gathered facts, same split). Needs #174's Stop hook to call it
-  (spec Dependencies).
+- **Existing tools**: #174's `decideStart` (pure over gathered facts, same split). #174 R21 and T076 call both.
 
 ## R15: The constitution's builder line changes first, in its own PR
 

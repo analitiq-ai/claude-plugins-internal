@@ -17,8 +17,8 @@ from the main checkout or any of its worktrees. It imports `../lib/guarded.ts` f
 
 Anything else: exit 2, stderr `builder: step.ts takes <s> --session <id>, not <args>`, nothing read.
 
-Reads (research R5–R12): the session record and gh folder at core's state paths (B0); the main checkout's
-origin; GitHub through the session token; git in the main checkout and the story's worktree.
+Reads (research R5–R12, R16): the stop rule's facts through core's `readStoryStopFacts`; the gh folder at core's
+`ghFolder`; the main checkout's origin; GitHub through the session token; git in the main checkout and the story's worktree.
 
 ## Writes
 

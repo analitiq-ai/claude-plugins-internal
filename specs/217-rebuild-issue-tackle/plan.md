@@ -11,7 +11,7 @@ which reads the session record, lane, issue, branch, worktree, spec folder, task
 check run and findings through core, decides one step in a pure function, and prints it as JSON: a stop, a cut
 (made by the script), a merge of the default branch, implement, internal round, github round, or nothing to do.
 The skill acts on that one step and never pushes, opens a PR, rebases or force-pushes. `root-cause-check` and
-builder's Python tests retire. Eight small core additions (B0–B7) are their own story, US1, each its own PR on a
+builder's Python tests retire. Seven small core additions (B1–B7) are their own story, US1, each its own PR on a
 US1 branch, landing before the builder story that first calls it.
 
 ## Technical Context
@@ -99,7 +99,7 @@ builder/
     ├── step.test.ts              # decideStep, every scenario of US3–US5
     ├── facts.test.ts             # reads vs fake GitHub and a scratch repo: one case per data-model stage 4–5 and 9 outcome (cut idempotent, worktree on another branch, GitHub-only branch, local-only branch, conflicting merge-tree, merge in progress, dirty, head behind)
     └── skill.test.ts             # skill text; carried Python assertions; SC-005 search
-core/src/                         # B0–B7 (US1), each its own PR
+core/src/                         # B1–B7 (US1), each its own PR
 auditor/plugin/skills/pr-audit/SKILL.md   # R14
 planner/plugin/scripts/rootcause.py       # R14, comment only
 .specify/memory/constitution.md           # R15, own PR first
@@ -120,11 +120,10 @@ then present.
 |---|---|---|---|---|
 | K | Constitution amendment | — | US2 | R15 |
 | — | #174 carrier (US1 of #174) | — | US2 | spec Clarifications Q4 |
-| B0 | State folder paths | US1 | US3 | the orchestrator's `gh/` and `sessions/` paths in core from an injected home; #174's `lib/paths.ts` reads them (R5–R6) |
 | B1 | Story branch name | US1 | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
 | B2 | Story tasks | US1 | US3 | `storyTasks(text, s)` in `contracts/tasks.ts` (R11) |
 | B3 | Story PR closed | US1 | US3 | `StoryPr.closed`, read by the query already (R12) |
-| B7 | Stop rule | US1 | US3 | `storyStop(facts)` and `StopState`, pure; #174's Stop hook calls it (R16) |
+| B7 | Stop rule and its facts | US1 | US3 | `storyStop(facts)` and `StopState`, pure; `readStoryStopFacts`, read-only, after B3; #174's Stop hook calls both (R16) |
 | — | **US2** | US2 | US3 | carrier, guard, TypeScript test suite (skill-text tests on today's skill dropped as R2 says), Python removed |
 | — | **US3** | US3 | | script: session, lane, closed/done, branch, cut and worktree, folder, requirement; skill takes `<s>` |
 | B5 | `internal-review` read | US1 | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
@@ -136,8 +135,8 @@ then present.
 root-cause-check's deletion and its retired-text tests ship in US4's PR: the skill invokes it until US4 rewrites the
 skill (spec FR-020).
 
-Coordination with #174 (not this spec's to change): its plan puts the state-folder paths in core from the start
-(B0), and its Stop hook calls B7. Raised on #174 (issuecomment-6528699478).
+Coordination with #174: the state-folder paths are on main in `core/src/orchestrator-paths.ts` (#242), and #174's
+Stop hook calls B7's read and rule (#174 R21, T076; #251).
 
 ## Complexity Tracking
 

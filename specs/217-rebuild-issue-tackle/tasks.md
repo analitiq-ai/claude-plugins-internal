@@ -41,7 +41,7 @@ Story issue: #245
 **Purpose**: the governing-rule change and the cross-plan prerequisites every story waits on
 
 - [ ] T001 **Own PR (K), governing rule, before US2.** Amend `.specify/memory/constitution.md` Platform Constraints: replace "builder is two skills, with no scripts and no hooks" with "builder is one skill and its step script, a core carrier with no hooks", as a PATCH amendment through `/speckit-constitution` (version line, Sync Impact Report and amendment date updated as the constitution's Governance section requires) (R15)
-- [ ] T002 Post one comment on issue #174 naming the two items its plan must carry (plan: Coordination with #174): (a) the state-folder paths (`gh/`, `sessions/<id>.json`, root `~/.local/state/codeworks/orchestrator`) live in core from the start (B0, `core/src/paths.ts`), so #174's `orchestrator/plugin/lib/paths.ts` re-exports or reads them; (b) its Stop hook calls core's `storyStop(facts)` (B7, `core/src/story-stop.ts`) and on a stop moves the card to Blocked with the returned `reason` instead of re-naming `issue-tackle <s>` (R16; FR-025)
+- [x] T002 Post one comment on issue #174 naming the two items its plan must carry (plan: Coordination with #174): the state-folder paths in core; its Stop hook calls core's stop rule and the read of its facts (R16; FR-025). Posted; #174 took both (#251: R21, T076); the paths are on main in `core/src/orchestrator-paths.ts` (#242)
 - [ ] T003 Gate check before US2: confirm on `origin/main` that #174's carrier is merged (`orchestrator/plugin/core` link, `orchestrator/plugin/package.json`, `orchestrator/plugin/package-lock.json`, `orchestrator/plugin/lib/guarded.ts`) and #212 is merged; record the merge commits of each in `specs/217-rebuild-issue-tackle/research.md` under R1. If #174's carrier is not merged, stop: no builder carrier file is written before it (spec Clarifications Q4; FR-018)
 
 ---
@@ -66,11 +66,6 @@ the orchestrator's Stop hook shares (FR-024–FR-026)
 repository; no addition's signature takes a key reader or a writing client (a source-scan case in each test file
 asserts the exported signature's parameter types are `GitHubClient` reader, plain values or a folder path only)
 
-### B0 — State folder paths (before US3)
-
-- [ ] T004 [P] [US1] **core PR B0.** Write failing `core/tests/paths.test.ts`: `statePaths(home)` returns root `<home>/.local/state/codeworks/orchestrator`, `gh` = `<root>/gh`, `sessions` = `<root>/sessions`, `sessionRecord(id)` = `<root>/sessions/<id>.json`; `home` is injected (never read from `process.env` inside the function); a non-absolute `home` refuses; a non-UUID session id refuses
-- [ ] T005 [US1] **core PR B0.** Create `core/src/paths.ts` exporting `statePaths(home)`; T004 passes; bump every carrier's `plugin.json` version
-
 ### B1 — Story branch name (before US3)
 
 - [ ] T006 [P] [US1] **core PR B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
@@ -86,10 +81,10 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 - [ ] T010 [P] [US1] **core PR B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
 - [ ] T011 [US1] **core PR B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T010 passes; existing `identity.test.ts` cases pass unchanged; bump every carrier's `plugin.json` version
 
-### B7 — Stop rule (before US3)
+### B7 — Stop rule and the read of its facts (after B3, before US3)
 
-- [ ] T012 [P] [US1] **core PR B7.** Write failing `core/tests/story-stop.test.ts` for the pure `storyStop(facts)` (R16; data-model Decision order stages 1–5, 7 and the stop half of 9): one case per `StopState` — `no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog and Blocked each), `no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`, `no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr` (behind and diverged each), `uncommitted_changes` — asserting `{state, reason}` and that `reason` names the state, the issue, and the open story PR when one is given; stage order holds (e.g. `done` and Blocked together gives `done`; `no_session_record` beats everything); facts that reach no stop return `null`; a merge in progress returns `null` (it is a `merge` step, not a stop); no `reason` contains a planning-command name (`speckit`, `/plan`, `/specify`, `issue-spec`); the function performs no I/O (source-scan: no import of `node:fs`, `node:child_process`, `github.ts`)
-- [ ] T013 [US1] **core PR B7.** Create `core/src/story-stop.ts` exporting the Zod `StopState` enum (the 16 values above, defined once), the `StoryStopFacts` type (the data-model StepFacts fields stages 1–5, 7, 9 read, later fields optional) and `storyStop(facts): {state, reason} | null`; T012 passes; bump every carrier's `plugin.json` version
+- [ ] T012 [P] [US1] **core PR B7.** Write failing `core/tests/story-stop.test.ts` for the pure `storyStop(facts)` (R16; data-model Decision order stages 1–5, 7 and the stop half of 9): one case per `StopState` — `no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog and Blocked each), `no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`, `no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr` (behind and diverged each), `uncommitted_changes` — asserting `{state, reason}` and that `reason` names the state, the issue, and the open story PR when one is given; stage order holds (e.g. `done` and Blocked together gives `done`; `no_session_record` beats everything); facts that reach no stop return `null`; a merge in progress returns `null` (it is a `merge` step, not a stop); no `reason` contains a planning-command name (`speckit`, `/plan`, `/specify`, `issue-spec`); the function performs no I/O (source-scan: no import of `node:fs`, `node:child_process`, `github.ts`); and failing `core/tests/story-stop-facts.test.ts` for `readStoryStopFacts(s, sessionId, {reader, home, checkout})` against the fake GitHub and a scratch repo: one case per fact (session record at `sessionsFolder(home)` absent → `session: null`, refused → throws naming the file; origin; issue; `isDone`; `laneOf`; `specIssue`; `issueStory` with B3's `closed`; `git branch --list '<s>-us*'`; `git worktree list --porcelain`; `MERGE_HEAD`; `git status --porcelain`; `specFolder` at the worktree's HEAD; `head` and `headVsPr` by `merge-base --is-ancestor`), stopping early in data-model order; it writes nothing (no fetch, no `worktree add`: the scratch repo's refs and worktrees unchanged); its signature takes a `GitHubClient` reader and folder paths only
+- [ ] T013 [US1] **core PR B7.** Create `core/src/story-stop.ts` exporting the Zod `StopState` enum (the 16 values above, defined once), the `StoryStopFacts` type (the data-model StepFacts fields stages 1–5, 7, 9 read, later fields optional) and `storyStop(facts): {state, reason} | null`, and `core/src/story-stop-facts.ts` exporting `readStoryStopFacts`, git through `git.ts` `runGit`; T012 passes; bump every carrier's `plugin.json` version
 
 ### B5 — `internal-review` read (before US4)
 
@@ -106,7 +101,7 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 - [ ] T018 [P] [US1] **core PR B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
 - [ ] T019 [US1] **core PR B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the last B PR to merge closes US1's issue; bump every carrier's `plugin.json` version
 
-**Checkpoint**: B0, B1, B2, B3, B7 merged → US2/US3 may start; B5, B6 merged → US4 may start; B4 merged → US5 may start
+**Checkpoint**: B1, B2, B3, B7 merged → US2/US3 may start; B5, B6 merged → US4 may start; B4 merged → US5 may start
 
 ---
 
@@ -168,12 +163,12 @@ script for a story in each lane and folder state: Ready, one folder, no branch p
 ### Implementation
 
 - [ ] T035 [US3] Create `builder/plugin/lib/step.ts`: Zod `StepFacts` (data-model.md table, later fields optional), `Step` discriminated on `kind` (`stop`, `merge`, `implement`, `internal_round`, `github_round`, `nothing_to_do`) with exactly the fields data-model.md's Step table gives, `StopState` imported from core `story-stop.ts`, and the pure `decideStep(facts)` calling core `storyStop` first, then stages 5 (merge in progress), 6 (`merge.needed`), 8 (`implement`); until US4 an open PR gives `internal_round` with `args {worktree, stage:"internal"}` (stages 9–10 land in T047); T032 part 2 and T033 pass
-- [ ] T036 [US3] Create `builder/plugin/lib/facts.ts` `readFacts(s, sessionId, deps)` reading in data-model order and stopping early: gh folder via core `statePaths` (B0) + `readGhToken`, `gitHub(token)`; origin from the main checkout (parent of `git rev-parse --path-format=absolute --git-common-dir`) via `repositoryOfRemote`, checked equal to the token's `repo`; `readSessionRecord(statePaths(home).sessions, sessionId)`; `codeworks.toml` at the default branch via `gitHubTree` + `readSettings`; REST issue; `isDone`; `laneOf`; `specIssue`; `issueStory` (several → `several_branches`); `git branch --list '<s>-us*'`; `git worktree list --porcelain` (R5–R8)
-- [ ] T037 [US3] In `builder/plugin/lib/facts.ts` add the cut and worktree writes exactly as contracts/step-script.md Writes lists (fetch of the default branch through core `fetchWithGhCredential`, then one of the three `git worktree add` forms), the re-read after them, then in the worktree: `MERGE_HEAD`, `git status --porcelain`, `specFolder(gitTree(worktree,"HEAD"), p)` mapped to the three folder stops, `requirement(tree, folder, body)` and `readSpecFacts` for `observed`, `storyTasks(tasks.md at HEAD, s)`, `git rev-parse HEAD`, and `headVsPr` by `git merge-base --is-ancestor` both ways (R8, R10, R11); `merge` is `{needed:false, why:[]}` until US5 (T058); T034 passes
+- [ ] T036 [US3] Create `builder/plugin/lib/facts.ts` `readFacts(s, sessionId, deps)` reading in data-model order and stopping early: gh folder via core `ghFolder(home)` + `readGhToken`, `gitHub(token)`; the main checkout (parent of `git rev-parse --path-format=absolute --git-common-dir`), its origin via `repositoryOfRemote` checked equal to the token's `repo`; then core `readStoryStopFacts(s, sessionId, {reader, home, checkout})` (B7) for every stop fact, none read elsewhere in builder (R5–R8, R16)
+- [ ] T037 [US3] In `builder/plugin/lib/facts.ts` add the cut and worktree writes exactly as contracts/step-script.md Writes lists (fetch of the default branch through core `fetchWithGhCredential`, then one of the three `git worktree add` forms), the re-read through `readStoryStopFacts` after them, then builder's own reads in the worktree: `requirement(tree, folder, body)` and `readSpecFacts` for `observed`, `storyTasks(tasks.md at HEAD, s)` (R8, R10, R11); `merge` is `{needed:false, why:[]}` until US5 (T058); T034 passes
 - [ ] T038 [US3] Complete `builder/plugin/scripts/step.ts`: after the guard, `await import` `../lib/facts.ts` and `../lib/step.ts`, parse args (T032 part 1), `readFacts` → `decideStep` → print one JSON line; exit 0 for work, 1 for `stop`, 2 with one stderr line `builder: <cause>` for an unanswered or refused read; T032 passes
 - [ ] T039 [US3] Rewrite Steps 1–2 of `builder/plugin/skills/issue-tackle/SKILL.md`: argument-hint `<s>`; refuse any text after `<s>`, naming `issue-tackle <s>` as the one form (FR-001); first action runs `node "${CLAUDE_PLUGIN_ROOT}/scripts/step.ts" <s> --session "${CLAUDE_SESSION_ID}"` (R4); exit 1 or 2 ends the turn quoting the reason or stderr line (FR-010); work happens in the step JSON's `worktree` on its `branch`, and the spec folder is read only from the step JSON's `requirement.source`; a `merge` step with no `argv` is resolved and committed, then the script re-run. Keep Steps 3–7 otherwise as they are on main (US4 rewrites them); drop `spec=`, `branch=` and `../<repo>.worktrees/<n>`
 - [ ] T040 [US3] Extend `builder/tests/skill.test.ts`: the skill's argument-hint is `<s>`; it names `scripts/step.ts` with `--session "${CLAUDE_SESSION_ID}"`; it names no `spec=`, `branch=` or `worktrees/<n>`; T026's cases still pass
-- [ ] T041 [US3] Run quickstart.md §2 for US3's cases and §4 steps 1–2 on the agent machine (after B0–B3, B7 and US2 merged): a Ready story with no branch prints `implement` and the worktree `../<repo>.worktrees/<s>-us<k>-<slug>` exists on a branch cut from the default branch; moving the card to Blocked and running again prints the `lane` stop with `git status` and GitHub unchanged
+- [ ] T041 [US3] Run quickstart.md §2 for US3's cases and §4 steps 1–2 on the agent machine (after B1–B3, B7 and US2 merged): a Ready story with no branch prints `implement` and the worktree `../<repo>.worktrees/<s>-us<k>-<slug>` exists on a branch cut from the default branch; moving the card to Blocked and running again prints the `lane` stop with `git status` and GitHub unchanged
 
 **Checkpoint**: US3 shippable alone; rounds and pushes still as on main
 
@@ -254,7 +249,7 @@ Story issue: #249
 
 - [ ] T062 Run quickstart.md §1–§3 in full from the repo root: `node core/scripts/check-carriers.ts --base origin/main` (builder listed, 0 failures), `npm test --prefix core`, `npm test --prefix builder`, `npm test --prefix planner`; record SC-001–SC-005 results in `specs/217-rebuild-issue-tackle/quickstart.md`'s check log
 - [ ] T063 [P] Confirm `specs/217-rebuild-issue-tackle/contracts/step-script.md` and `contracts/skill.md` match the shipped `builder/plugin/scripts/step.ts` output and `builder/plugin/skills/issue-tackle/SKILL.md`; fix the contract where the code is right
-- [ ] T064 [P] Confirm the #174 coordination (T002) landed: `orchestrator/plugin` reads the state paths from core `paths.ts` and its Stop hook calls core `storyStop`; if not, comment on #174 naming what is missing
+- [ ] T064 [P] Confirm the #174 coordination (T002) landed: `orchestrator/plugin` reads the state paths from core `orchestrator-paths.ts` and its Stop hook calls core `readStoryStopFacts` and `storyStop`; if not, comment on #174 naming what is missing
 
 ---
 
@@ -266,7 +261,7 @@ Story issue: #249
 - **Foundational (Phase 2)**: empty
 - **US1 (Phase 3)**: starts at once; its B PRs merge on the schedule below
 - **US2 (Phase 4)**: after T001, T003 (#174 carrier merged)
-- **US3 (Phase 5)**: after US2 and B0, B1, B2, B3, B7
+- **US3 (Phase 5)**: after US2 and B1, B2, B3, B7
 - **US4 (Phase 6)**: after US3, #212, B5, B6, and reviewer's ADR-0014 d1 and ADR-0017 work
 - **US5 (Phase 7)**: after US4 (shares `step.ts`, `facts.ts`, `SKILL.md`) and B4
 - **Polish (Phase 8)**: after US5
@@ -275,11 +270,10 @@ Story issue: #249
 
 | PR | Tasks | Must merge before |
 |---|---|---|
-| B0 | T004–T005 | US3 (T036) |
 | B1 | T006–T007 | US3 (T034) |
 | B2 | T008–T009 | US3 (T037) |
 | B3 | T010–T011 | US3 (T033) |
-| B7 | T012–T013 | US3 (T035) |
+| B7 | T012–T013 (after B3) | US3 (T035, T036) |
 | B5 | T014–T015 | US4 (T048) |
 | B6 | T016–T017 | US4 (T048) |
 | B4 | T018–T019 | US5 (T058) |
@@ -292,7 +286,7 @@ Story issue: #249
 
 ### Parallel Opportunities
 
-- US1: all seven B PRs touch different files except B1/B3/B4 (`core/src/identity.ts`) — B0, B2, B5, B6, B7 run in parallel with each other and with one of B1/B3/B4 at a time
+- US1: all seven B PRs touch different files except B1/B3/B4 (`core/src/identity.ts`) — B2, B5, B6 run in parallel with each other and with one of B1/B3/B4 at a time; B7 after B3
 - US2: T021, T022, T023 in parallel after T020; T024, T025, T026 in parallel
 - US3: T032, T033, T034 in parallel (T032/T033 are two parts of one file: write them in one sitting)
 - US4: T042–T046 in parallel; T051 in parallel with T049–T050
@@ -304,9 +298,8 @@ Story issue: #249
 
 ```bash
 # Independent core PRs, different files:
-Task: "core PR B0: failing core/tests/paths.test.ts, then core/src/paths.ts"
 Task: "core PR B2: failing storyTasks cases in core/tests/tasks.test.ts, then core/src/contracts/tasks.ts"
-Task: "core PR B7: failing core/tests/story-stop.test.ts, then core/src/story-stop.ts"
+Task: "core PR B5: failing internalReviewAt cases, then core/src/validation/required-checks.ts"
 Task: "core PR B1: failing storyBranchName cases in core/tests/branch.test.ts, then core/src/identity.ts"
 ```
 
@@ -325,7 +318,7 @@ Task: "facts.test.ts: reads against fake GitHub and scratch repos"
 ### MVP First
 
 1. Phase 1 (K amendment, #174 coordination, #174 carrier gate)
-2. US1's B0, B1, B2, B3, B7
+2. US1's B1, B2, B3, B7
 3. US2: builder becomes a carrier, Python tests gone
 4. US3: **STOP and VALIDATE** — the step derives everything from `<s>` and stops correctly (MVP)
 
