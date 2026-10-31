@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- #174's carrier merged (orchestrator plugin with `core` link), core B0–B7 (US1) merged, the reviewer work for ADR-0014 d1 and ADR-0017 merged, the
+- #174's carrier merged (orchestrator plugin with `core` link), core B1–B7 (US1) merged, the reviewer work for ADR-0014 d1 and ADR-0017 merged, the
   constitution amendment (R15) merged.
 - Node ≥ 22.18; `npm ci` in `core/`, `builder/plugin/`, `builder/`.
 

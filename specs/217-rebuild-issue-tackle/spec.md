@@ -46,9 +46,9 @@ and nothing it does not.
 ### User Story 1 - core gains the reads and the stop rule builder needs (Priority: P1)
 
 Every read builder's step needs that core lacks lands in core, each its own PR, before the builder story that first
-calls it: the orchestrator's state-folder paths, the story branch name, the story's task lines, a closed story PR, a
-spec PR's merge commit, the `internal-review` and `<module>-review` check runs at a head, and the step's stop rule.
-The stop rule lives in core so the orchestrator's Stop hook calls the same function and names builder's stop as the
+calls it: the story branch name, the story's task lines, a closed story PR, a
+spec PR's merge commit, the `internal-review` and `<module>-review` check runs at a head, and the step's stop rule with the read of its facts.
+The stop rule and that read live in core so the orchestrator's Stop hook reads the same facts, calls the same function and names builder's stop as the
 card's Blocked reason (builder ADR-0003 d2). No core addition reads a key or writes to GitHub (root ADR-0008 d4).
 
 **Why this priority**: User Stories 2–5 call these reads; builder imports nothing but core (root ADR-0009 d2), and
@@ -65,8 +65,8 @@ addition's signature takes a key reader or a writing client.
    and the name parses back through `parseBranch`.
 2. **Given** a head with `<module>-review` check runs written by the orchestrator's App, **When** core reads the
    head's findings, **Then** it reads them from those check runs and the threads, and loads no validator package.
-3. **Given** the facts of each stop state, **When** the orchestrator's Stop hook and builder's step script call
-   core's stop rule, **Then** both get the same state and reason.
+3. **Given** the facts of each stop state, **When** the orchestrator's Stop hook and builder's step script read
+   them through core and call core's stop rule, **Then** both get the same state and reason.
 
 ---
 
@@ -313,7 +313,8 @@ the new head.
 - **FR-024**: Every core addition builder needs MUST land in `core/` in its own PR under US1, before the builder
   story that first calls it, and MUST take no key reader and no writing client (root ADR-0008 d4).
 - **FR-025**: The step's stop rule MUST be a pure function in core, called by builder's step script and by the
-  orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2).
+  orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2). Its facts MUST be read by one
+  read-only core function both call; builder cuts or adds the worktree itself (FR-027), then reads them again.
 - **FR-026**: The PR's findings MUST be read from the `<module>-review` check runs the orchestrator's App writes at
   the head and from the PR's threads, never by loading validator packages in builder.
 - **FR-027**: A story branch on GitHub with no local branch MUST get its worktree from `origin/<branch>`; a local
