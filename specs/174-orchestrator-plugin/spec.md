@@ -34,6 +34,9 @@ the carrier check lists orchestrator."
 - Q: What does the Stop hook push while reviewer is off for the session? → A: The session's commits by the agent
   identity, without consulting the passes. It reads `off` from the commit-check pass record, which keys passes by
   branch (#209).
+- Q: How does the Stop hook learn that builder stopped? → A: It calls core's stop rule (`storyStop`, #217) on the
+  facts builder's step reads. A stop names no step and pushes nothing; the card goes to Blocked with the rule's
+  reason unless the story is done or closed or the card is outside In progress and In review.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -105,16 +108,20 @@ Between turns the Stop hook pushes the session's commits by the agent identity f
 orchestrator App's token held in memory: those the commit-check pass record names under the pushed branch, or all
 of them while reviewer is off for the session. After the first push it opens the story PR as a draft carrying
 `Closes #s` (orchestrator ADR-0001 d4; ADR-0009 d6). builder's `issue-tackle` stops pushing and opening the PR
-itself, leaving both to the Stop hook (builder ADR-0003 d1).
+itself, leaving both to the Stop hook (builder ADR-0003 d1). When core's stop rule (#217) finds a stop on the
+story, the Stop hook pushes nothing and names no step, and the card goes to Blocked with the rule's reason, so
+builder's stop reaches the admin (builder ADR-0003 d2).
 
 **Why this priority**: Without it the loop stops at a claimed card: the model's token cannot push. It needs
-the commit-check pass record's contract in core first, which #209 adds.
+in core first the commit-check pass record's contract, which #209 adds, and builder's stop rule, which #217
+adds.
 
 **Independent Test**: Against a fake GitHub, with a commit-check pass record naming two commits by the agent identity
 under the story branch, end a turn: both are pushed from the hooks' copy and a draft PR with `Closes #s` exists. Add
 a commit the record names only under a second branch of the same session, or a commit by another author: nothing is
 pushed and the stop is refused naming it. Set the record's `off`: the session's commits by the agent identity are
-pushed without a pass.
+pushed without a pass. Make the story branch differ on GitHub and locally: nothing is pushed, no step is named,
+and the card is in Blocked with the stop rule's reason.
 
 **Acceptance Scenarios**:
 
@@ -132,6 +139,9 @@ pushed without a pass.
 6. **Given** the commit-check pass record's `off` is true, **When** the Stop hook runs, **Then** it pushes the
    session's commits by the agent identity without consulting the passes, and pushes nothing when one is by another
    identity or its change touches a `.github/` folder, refusing the stop naming the commit and the cause.
+7. **Given** core's stop rule finds a stop on the session's story, **When** the Stop hook runs, **Then** it pushes
+   nothing, names no step and lets the session end; when the card is In progress or In review and the stop is
+   neither `done` nor `closed`, the card first goes to Blocked with the rule's reason.
 
 ---
 
@@ -327,6 +337,11 @@ next one finds not marked ended counts toward `k_deaths`.
   lists a running task of type `workflow`, the Stop hook MUST push nothing and name no step. When the input has no
   `background_tasks` field, it MUST push nothing, move the card to Blocked naming the missing field, and let the
   session end. No other hook tracks running agents.
+- **FR-016c** *(decides how Stop sees builder's stop, builder ADR-0003 d2)*: After FR-016b and before it pushes,
+  the Stop hook MUST call core's stop rule (`storyStop`, #217) on the facts builder's step reads for the session's
+  issue. On a stop it MUST push nothing, name no step and let the session end. When the card is In progress or In
+  review and the stop is neither `done` nor `closed`, it MUST first post the rule's reason and move the card to
+  Blocked (ADR-0002 d5); a card outside those lanes is an admin's (ADR-0002 d6).
 - **FR-017** *(decides how the agent identity is read, root ADR-0008 d8)*: The agent identity MUST be `user.name`
   and `user.email` read from `~/.gitconfig` as data with `git config --file`, following no include, through core's
   git runner; a missing or empty value refuses the push naming the key.
@@ -400,13 +415,15 @@ next one finds not marked ended counts toward `k_deaths`.
 ## Assumptions
 
 - All cited records are accepted (PR #176); the issue calls them draft, and this spec follows them as written.
-- Core already provides, on `main`: the token mint and its permission sets (`tokens.ts`), the gh-config write,
-  read and refresh rule (`gh-config.ts`), the key reader, the lane read (`board.ts`), the spec-PR and story-PR
-  lookups and `isDone` (`identity.ts`), `readState` with `startable` and `releaseOnClaim` (`state.ts`), `attests`
+- Core already provides, on `main`: the token mint and its permission sets (`tokens.ts`), the gh-config write, read
+  and refresh rule (`gh-config.ts`), the key reader, the lane read (`board.ts`), the spec-PR and story-PR lookups
+  and `isDone` (`identity.ts`), `readState` with `startable` and `releaseOnClaim` (`state.ts`), `attests`
   (`attest.ts`), and the push through gh's credential (`git.ts`). Each missing capability lands in core no later
-  than the story PR that first uses it. Story 1 needs: the session's issue record, and an issue number to its
-  story branch and PR. Story 2: the commit-check pass record, which #209's core PR adds. Story 3: the protected-path matcher. Story 4: rulings,
-  replies and FIX commits in the snapshot; the conflict-with-main finding; the validator request time.
+  than the story PR that first uses it. Story 1 needs: the session's issue record, the state folder's paths, which
+  builder's step script reads too (#217), and an issue number to its story branch and PR. Story 2: the commit-check
+  pass record, which #209's core PR adds, and builder's stop rule, which #217's core PR adds. Story 3: the
+  protected-path matcher. Story 4: rulings, replies and FIX commits in the snapshot; the conflict-with-main finding;
+  the validator request time.
 - SECURITY.md §5's managed settings, and core's managed-settings check, gain the folder
   `~/.local/state/codeworks/orchestrator` (write-denied to the model) and `GH_CONFIG_DIR` in `env`, replacing
   the `/tmp/verify-b-ghsess` placeholder, in their own PR before Story 1's (constitution Principle VI).

@@ -11,7 +11,8 @@ points), list it in the marketplace, and give it hooks. Story 1: SessionStart, U
 the read-only session token into `~/.local/state/codeworks/orchestrator/gh/`, and UserPromptSubmit claims or
 resumes the issue `/codeworks <s>` names, writing the session's issue record after the lane write. Story 2: the
 Stop hook pushes the agent identity's passed commits, or all of them while reviewer is off, from a hook-owned
-copy and opens the draft PR. Story 3:
+copy and opens the draft PR; on a stop builder's rule in core finds, it pushes nothing and sends the card to Blocked
+with the rule's reason. Story 3:
 attest and flip. Story 4: request modules, reply, merge, and wait up to `review_timeout` inside the Stop run. Story
 5: bound counts in tagged orchestrator App comments. Each decision is a pure function; entry files only read, call
 and write.
@@ -23,8 +24,8 @@ and write.
 **Primary Dependencies**: core (`../../core/src` link) and its pins only: `zod` 4.6.7, `yaml` 2.9.1, `smol-toml`
 1.9.1; `git` and `gh` on the agent machine
 
-**Storage**: GitHub (lanes, comments, check runs); files under `~/.local/state/codeworks/orchestrator/`: `gh/`
-(session token), `sessions/<id>.json` (session's issue), `push/` (Story 2)
+**Storage**: GitHub (lanes, comments, check runs); files under `~/.local/state/codeworks/orchestrator/`, at core's
+paths: `gh/` (session token), `sessions/<id>.json` (session's issue), `push/` (Story 2)
 
 **Testing**: `node --test` and `tsc -p .` in `orchestrator/`; core's `fake-github.ts`; hook entry files driven by
 recorded stdin; `core/scripts/check-carriers.ts` in CI
@@ -104,7 +105,6 @@ orchestrator/
 │       ├── guarded.ts            # guard-only static import
 │       ├── hook-io.ts            # stdin schema, refuse, context
 │       ├── settings.ts           # OrchestratorSettings, R5
-│       ├── paths.ts              # the state folder's paths
 │       ├── app-token.ts          # in-memory orchestrator token, R12
 │       ├── session-token.ts      # ensureSessionToken, R7
 │       ├── start.ts              # decideStart (pure) + facts read, R9
@@ -118,7 +118,7 @@ orchestrator/
     ├── start.test.ts
     ├── prompt-hook.test.ts
     └── …                         # US2–US5 suites
-core/src/                         # C1–C11, each no later than the story PR that first calls it
+core/src/                         # C1–C13, each no later than the story PR that first calls it
 .claude-plugin/marketplace.json   # + orchestrator
 builder/plugin/skills/issue-tackle/SKILL.md   # US2, R19
 ```
@@ -138,9 +138,11 @@ found that the spec's list does not name.
 | C2 | Issue → story branch and PR | US1 | `<s>`'s `<s>-us<k>-<slug>` branch and `storyPr` from it |
 | C3 † | Issue graph | US1 | `blockedBy` and sub-issues of an issue (R9) |
 | C4 † | Lane write | US1 | `moveCard` beside `laneOf` in `board.ts`; only the orchestrator App holds projects write |
+| C13 † | State-folder paths | in US1 | `orchestrator-paths.ts`: the state folder, `gh/`, `sessions/`, `push/` from a given home; builder's step script reads them (#217) |
 | — | **US1** | | plugin, marketplace, three hooks, claim |
 | C7 † | Push with an in-memory token | in US2 | R13 |
 | #209 | Commit-check pass record | US2 | #209's core PR: `readCommitPasses`, passes by branch, `off` |
+| #217 | builder's stop rule | US2 | #217's core PR: `storyStop`, `StopState` and the read of its facts (R21) |
 | — | **US2** | | Stop hook: push, draft PR, running workflow; builder skill change |
 | C10 | Protected-path matcher | US3 | spec Assumptions |
 | — | **US3** | | attest, exempt, ready |
@@ -179,3 +181,4 @@ None.
 - Attest, exempt, ready, In review, replies, merge: R18
 - builder's issue-tackle edit: R19
 - `/codeworks <issue>` command and prompt grammar: R20
+- builder's stop, read through core's stop rule (Stop): R21

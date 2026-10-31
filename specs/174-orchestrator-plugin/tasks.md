@@ -58,7 +58,7 @@ comments, which every story's hooks use
 - [ ] T008 Create `orchestrator/plugin/lib/guarded.ts` statically importing only `../core/guard.ts`, the shape of `planner/plugin/lib/guarded.ts` (copied, not imported: ADR-0001 d1); T007 passes for the guard cases
 - [ ] T009 [P] Write failing `orchestrator/tests/hook-io.test.ts` per `contracts/hooks.md` Input/Output: `session_id` must be a UUID; `cwd` an absolute path; `hook_event_name` equal to the event the file serves; `prompt` (UserPromptSubmit) a string; `tool_name` (PreToolUse) equal to `Bash`; `background_tasks` (Stop) an optional array of `{type, status}`; a refusal writes exactly one stderr line prefixed `orchestrator: `; context output is `{"hookSpecificOutput":{"hookEventName":…,"additionalContext":…}}`
 - [ ] T010 Implement `orchestrator/plugin/lib/hook-io.ts`: per-event Zod input schemas, `readInput(event, stdin)`, `refuse(reason)` (exit 2), `context(event, text)` (exit 0); T009 passes
-- [ ] T011 [P] Implement `orchestrator/plugin/lib/paths.ts` with the state folder's paths: root `~/.local/state/codeworks/orchestrator`, `gh/`, `sessions/<session id>.json`, `push/<owner>/<name>.git`, all from an injected home directory; test first in `orchestrator/tests/paths.test.ts`
+- [ ] T011 [P] **core C13, in the US1 PR.** Implement `core/src/orchestrator-paths.ts` with the state folder's paths: root `~/.local/state/codeworks/orchestrator` (`keys.ts`'s write-denied folder), `gh/`, `sessions/`, `push/<owner>/<name>.git`, all from an injected home directory; test first in `core/tests/orchestrator-paths.test.ts`
 - [ ] T012 [P] Write failing `orchestrator/tests/settings.test.ts` per `contracts/orchestrator-settings.md` with Story 1's keys only (FR-007): `app_id`, `session_app_id`, `status_issue` each "integer ≥ 1"; an unknown key, a missing key or a bad value refuses as `SettingsError("codeworks.toml [orchestrator]", …)`; R5: the bootstrap reads only `app_id` and `session_app_id` from the checkout's `HEAD`, the full file is then read through `gitHubTree` at the given ref with the orchestrator App's token, every other key comes from that GitHub read only, and a differing App ID refuses naming both values
 - [ ] T013 Implement `orchestrator/plugin/lib/settings.ts`: strict `OrchestratorSettings` Zod object, `bootstrapAppIds(checkout)` from `HEAD` via core `gitTree`/`readSettings`, `settleSettings(client, repo, ref, bootstrapped)` via core `gitHubTree`; T012 passes
 - [ ] T014 [P] Write failing `orchestrator/tests/app-token.test.ts` (R12, FR-016a): the orchestrator App token is minted through core `mintToken` with key file `orchestrator-app.pem` (FR-006); it is held in memory and no file appears under a temp `HOME`; before each write the client re-mints when core `needsMint` holds for the held `MintedToken` (under 10 min left), using an injected clock
@@ -125,12 +125,15 @@ Story issue: #212
 
 **Goal**: the Stop hook pushes the agent identity's passed commits, or all of them while reviewer is off, from a
 hook-owned copy with an in-memory
-orchestrator token and opens the draft PR; builder stops pushing
+orchestrator token and opens the draft PR; a stop core's stop rule finds sends the card to Blocked with its reason;
+builder stops pushing
 
-**Independent Test**: against the fake GitHub with a commit-check pass record naming two agent-identity commits under
-the story branch, a Stop run pushes both from the copy and opens a draft PR with `Closes #s`; adding a commit the
-record names only under a second branch of the session, or one by another author, pushes nothing and refuses the
-stop naming it; with the record's `off`, the agent-identity commits are pushed with no pass.
+**Independent Test**: against the fake GitHub with a commit-check pass record naming two agent-identity commits
+under the story branch, a Stop run pushes both from the copy and opens a draft PR with `Closes #s`; adding a commit
+the record names only under a second branch of the session, or one by another author, pushes nothing and refuses the
+stop naming it; with the record's `off`, the agent-identity commits are pushed with no pass; with the story branch
+differing on GitHub and locally, nothing is pushed, no step is named and the card is in Blocked with the stop rule's
+reason.
 
 ### Unrun behaviour first (R13)
 
@@ -140,6 +143,7 @@ stop naming it; with the record's `off`, the agent-identity commits are pushed w
 
 - [ ] T039 [P] [US2] **core C7, in the US2 PR.** Failing cases in `core/tests/git.test.ts`, then add to `core/src/git.ts` a push that passes an in-memory token to `gh auth git-credential` through the child's `GH_TOKEN` alone, reusing `pushWithGhCredential`'s credential path; no file is written and the parent's environment is unchanged
 - [ ] T040 [US2] Before T041: #209's core PR has merged the commit-check pass record (`core/src/contracts/commit-pass.ts`, `readCommitPasses`); this feature does not define its shape
+- [ ] T076 [US2] Before T046: #217's core PR has merged builder's stop rule (`storyStop`, `StopState`) and the read of its facts; this feature does not define them
 
 ### Push (FR-016–FR-018, R13–R14, data-model PushPlan, AgentIdentity)
 
@@ -151,8 +155,8 @@ stop naming it; with the record's `off`, the agent-identity commits are pushed w
 ### Stop hook (FR-016b, contracts/hooks.md)
 
 - [ ] T045 [US2] Add Stop → `stop.ts` to `orchestrator/plugin/hooks/hooks.json` with `"timeout": 3900` and no `onFailure` (fails open)
-- [ ] T046 [P] [US2] Write failing `orchestrator/tests/stop-hook.test.ts`: a running `workflow` in `background_tasks` → no push, no step, exit 0 (US2 #4); no `background_tasks` field → no push, card to Blocked naming the missing field via `postKeyed` then `moveCard`, exit 0; commits the record names under the story branch → pushed and draft PR opened (US2 #1); the record's `off` → the agent identity's commits pushed with no pass (US2 #6); a failing commit → exit 2 naming commit and cause; a thrown error → exit 1; repository and issue come from the session record, passes and `off` from `readCommitPasses` for the hook's session
-- [ ] T047 [US2] Implement `orchestrator/plugin/hooks/stop.ts` (guard first, dynamic imports) calling `lib/push.ts`; T046 and T007 pass
+- [ ] T046 [P] [US2] Write failing `orchestrator/tests/stop-hook.test.ts`: a running `workflow` in `background_tasks` → no push, no step, exit 0 (US2 #4); no `background_tasks` field → no push, card to Blocked naming the missing field via `postKeyed` then `moveCard`, exit 0; commits the record names under the story branch → pushed and draft PR opened (US2 #1); the record's `off` → the agent identity's commits pushed with no pass (US2 #6); a failing commit → exit 2 naming commit and cause; a thrown error → exit 1; repository and issue come from the session record, passes and `off` from `readCommitPasses` for the hook's session; core's stop rule returning a stop → no push, no step, exit 0, and only for a card In progress or In review on a stop other than `done` or `closed` the rule's reason via `postKeyed` then `moveCard` to Blocked (US2 #7, FR-016c)
+- [ ] T047 [US2] Implement `orchestrator/plugin/hooks/stop.ts` (guard first, dynamic imports) calling core's stop rule, then `lib/push.ts`; T046 and T007 pass
 - [ ] T048 [P] [US2] Edit `builder/plugin/skills/issue-tackle/SKILL.md` (R19, FR-024): Step 4 (line 58) reads "commit, then end the turn; the orchestrator pushes and opens the draft PR"; remove Step 6's "Mark the PR ready"
 
 **Checkpoint**: a session on the agent machine pushes and opens the draft PR (live once #209 lands)
@@ -235,7 +239,7 @@ Story issue: #215
 - **Setup (Phase 1)**: none
 - **Foundational (Phase 2)**: after Setup; T005 (M) and T006 are separate PRs merged first; blocks every story
 - **US1 (Phase 3)**: after Phase 2; T018 gates T034; C1–C4 (T019–T023) merged before the US1 PR
-- **US2 (Phase 4)**: after US1 (Stop reads the session record); T038 gates T039; #209's core PR merged first; C7 in the US2 PR
+- **US2 (Phase 4)**: after US1 (Stop reads the session record); T038 gates T039; #209's and #217's core PRs merged first; C7 in the US2 PR
 - **US3 (Phase 5)**: after US2 (needs the draft PR); C10 merged first
 - **US4 (Phase 6)**: after US3; C8, C9, C11 merged first
 - **US5 (Phase 7)**: after US2's Stop hook; C6 in the US5 PR; independent of US3–US4
