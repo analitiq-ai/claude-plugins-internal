@@ -236,8 +236,8 @@ describe("checkTransition", () => {
     ["a gates section written", { ...old, gates: gates() }],
   ];
   for (const [what, next] of refused) {
-    it(`refuses ${what}`, () => {
-      assert.throws(() => checkTransition(old, next), StateWriteRefused);
+    it(`refuses ${what} as a stale reading to retry`, () => {
+      assert.throws(() => checkTransition(old, next), staleRefusal(/the snapshot/));
     });
   }
 
@@ -658,7 +658,7 @@ describe("recordGates", () => {
     assert.deepEqual(postedSnapshot(posts(out)[0]), { ...newer, gates: after });
   });
 
-  it("stamps each time from GitHub's clock: a check the reading holds keeps its time, any other takes now", async () => {
+  it("stamps each time from GitHub's clock: an entry the reading holds, by ref and claim or by tree, keeps its time, any other takes now", async () => {
     const forged = at("23:59");
     const tree = (n: number, time: string) => ({ tree: sha(n), at: time });
     const bug = (id: string, members: Gates["bugs"][number]["members"], absorbed: Gates["bugs"][number]["absorbed"] = []): Gates["bugs"][number] => ({
@@ -687,7 +687,7 @@ describe("recordGates", () => {
       ...next,
       lineages: [
         lineage("L6", { chain: [entry(1, "c1", at("09:00")), entry(3, "c1", NOW)] }),
-        lineage("L7", { chain: [entry(1, "c2", at("09:00")), entry(3, "c2", NOW)] }),
+        lineage("L7", { chain: [entry(1, "c2", NOW), entry(3, "c2", NOW)] }),
       ],
       bugs: [bug("B3", [tree(2, at("09:10")), tree(4, NOW)], [tree(6, at("09:20")), tree(5, NOW)])],
     });
@@ -706,9 +706,19 @@ describe("recordGates", () => {
     });
   }
 
-  for (const id of ["pushback-212", "escalation-212", "audit-212", "rescope-212"]) {
-    it(`refuses an opening of ${id}, naming it, posting nothing`, async () => {
-      await refused(current(snapshot({ gates: before })), after, [{ id, question: null }], refusal(new RegExp(id)));
+  const placers: Array<[string, string]> = [
+    ["pushback-212", "placeHold"],
+    ["escalation-212", "placeHold"],
+    ["audit-212", "placeHold"],
+    ["rescope-212", "placeRescopeHold"],
+  ];
+  for (const [id, placer] of placers) {
+    it(`refuses an opening of ${id}, naming it and ${placer} as its release, posting nothing`, async () => {
+      await refused(current(snapshot({ gates: before })), after, [{ id, question: null }], (error: unknown) => {
+        refusal(new RegExp(id))(error);
+        assert.match((error as StateWriteRefused).release ?? "", new RegExp(`^${placer}\\b`));
+        return true;
+      });
     });
   }
 
