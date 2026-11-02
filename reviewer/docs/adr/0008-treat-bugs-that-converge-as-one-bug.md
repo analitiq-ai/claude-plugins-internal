@@ -13,12 +13,6 @@ relatesTo: ["0001"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{shimcheck,shimgate,ledger}.py"
-  - type: path
-    pattern: "core/src/contracts/gates.ts"
-  - type: path
-    pattern: "reviewer/plugin/lib/check/shim.ts"
-  - type: path
-    pattern: "reviewer/plugin/lib/rules/counts.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -35,23 +29,15 @@ review:
 
 ## Context
 
-The shim check keeps one record per bug: its line ranges (ADR-0001) and the trees of the checks that refused
-it, from which its count of refusals is derived (ADR-0013 d4). One checked change (ADR-0002) can overlap two
-bugs that have a record each. The deep sweep, the hold and its release each belong to one bug, so a change that
-overlaps two has to say which bug they then belong to.
+The shim check keeps one record per bug, with the bug's line ranges (ADR-0001) and its count of refusals. One
+checked change (ADR-0002) can overlap two bugs that have a record each. The deep sweep, the hold and the
+override each belong to one bug, so a change that overlaps two has to say which bug they then belong to.
 
 ## Decision
 
 1. We will treat two tracked bugs as one bug from the moment one checked change overlaps both. Every later
    step applies to them together.
-2. We will give the merged bug the higher of the two counts of refusals. The bug with the higher count goes
-   on, the one with the smaller id on a tie: it keeps its `members` and its deep-sweep lists, moves every tree
-   of the other into `absorbed` as evidence, never counted, takes the union of both bugs' ranges, and takes
-   the other's site rulings for the sites it has not ruled, its own ruling winning. The other bug is dropped.
-3. We will keep each open bug in the gates section of the story's state snapshot (ADR-0011 d1), in the shape
-   of core's snapshot contract `Gates` (`core/src/contracts/gates.ts`).
-4. We will never count again a tree in a bug's `members` or `absorbed`: a check run again on that tree adds
-   nothing to the bug.
+2. We will give the merged bug the higher of the two counts of refusals.
 
 ## Options considered
 
@@ -65,7 +51,7 @@ overlaps two has to say which bug they then belong to.
 
 ### Option B: Count toward both, and say nothing more
 
-Leaves the deep sweep, the hold and the release of each bug undecided.
+Leaves the deep sweep, the hold and the override of each bug undecided.
 
 ### Option C: Keep the bugs apart and treat each as if it were alone
 
@@ -80,10 +66,6 @@ Rejected: the sum can reach the limit at once, so a commit is held although neit
 
 Rejected: a commit that touches two bugs would wipe both counts.
 
-### Option F: Carry the other bug's trees into `members`
-
-Rejected: the count is derived from `members` (ADR-0013 d4), so it would add the two counts (Option D).
-
 ## Trade-offs
 
 - Two bugs that converged stay one bug, with one hold, when they are in fact unrelated.
@@ -92,9 +74,9 @@ Rejected: the count is derived from `members` (ADR-0013 d4), so it would add the
 ## Consequences
 
 - Easier: one check of one change gives one verdict to one bug.
-- Harder: d2 makes a merged bug carry the other's trees in `absorbed`, apart from the trees it counts.
-- **How we would know this was wrong:** admins who release a merged bug's hold and say its two halves had
-  nothing to do with each other.
+- Harder: the shim check records how two bugs became one.
+- **How we would know this was wrong:** users who override a merged bug and say its two halves had nothing to
+  do with each other.
 - Revisit if: such reports come in.
 
 ## Action items

@@ -30,7 +30,7 @@ node core/scripts/check-carriers.ts --base origin/main
 | 11 | US2-1..2, SC-005 | A pass, B fail, C pass | passes: A, then A,B,C; newest C |
 | 12 | US2-3..4 | check could not run / range touches `.github/`, `docs/adr/`, `CLAUDE.md` or the spec folder beyond the story's ticks / range only ticks the story's task block | nothing recorded / nothing recorded / passes |
 | 13 | US2-5 | GitHub branch at A; new session; B, C committed earlier unpushed | first range graded from A |
-| 14 | log mode | `[reviewer] mode = "log"`, scenario 7 | `would_deny` logged; commit not blocked; range recorded as passed |
+| 14 | log mode | `[reviewer] mode = "log"`, scenario 7 | `would_deny` logged; still nothing recorded as passed |
 | 15 | FR-020 | two hook runs post `placeHold(claim-7)` and a round concurrently | both in the newest snapshot |
 | 16 | FR-021 | pass at C; amend C→C'; then reset below GitHub head | C' graded from GitHub head; then refused naming it |
 | 17 | FR-014 | passes on `42-us1-login` then `42-us2-logout` in one session | each branch keeps its own newest pass |

@@ -11,10 +11,9 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   through a carrier symlink `reviewer/plugin/core → ../../core/src` with core's exact pins in
   `reviewer/plugin/package.json` and a v3 lockfile. Every Python module the hook path reaches
   (`gate.py`, `policy.py`, `claimgate.py`, `shimgate.py`, `claimcheck.py`, `shimcheck.py`, `lineage.py`,
-  `briefs.py`, `facts.py`, `assessment.py`, `reshape.py`, `hookio.py`, `shell.py`,
+  `briefs.py`, `facts.py`, `assessment.py`, `reshape.py`, `specbinding.py`, `hookio.py`, `shell.py`,
   `worktree.py`, `snapshot.py`, `sweeper_read.py`, `jev.py`, `adrkit.py`, `decisions.py`, `config.py`,
-  `github.py`) moves to TypeScript under `reviewer/plugin/lib/`; `ledger.py` is deleted (FR-018), and so is
-  `specbinding.py`, since a round records no spec binding (ADR-0014 d1).
+  `github.py`) moves to TypeScript under `reviewer/plugin/lib/`; `ledger.py` is deleted (FR-018).
 - **Rationale**: Root ADR-0009 d2: no Python calls core, and a script moves in the change that first makes it
   call core. The dispatcher (`gate.py`) decides on rounds and holds, so it calls core; every module it imports
   runs in its process, and a TS hook cannot import Python. Calling Python from TS by subprocess would keep
@@ -67,7 +66,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   only its input. Today's `RESHAPE_SPEC` maps to `RESCOPE` and places
   `placeRescopeHold(…, {question})`; `ESCALATE` places an `escalation-<issue>` hold with the question; each question
   says why the round was raised and what must be decided (ADR-0013 d4–d5);
-  spent audits (`max_audits`) place `audit-<issue>`; an open pushback the stage cap reaches places
+  spent audits (`MAX_AUDITS`) place `audit-<issue>`; an open pushback the stage cap reaches places
   `pushback-<issue>`; claim and shim holds are `claim-<lineage>` and `shim-<bug>` (ADR-0013 d4 table).
   Rounds are keyed by `RoundId {stage, n}` on the story issue, not by PR.
 - **Rationale**: FR-003, root ADR-0010. The PR-keyed `epoch` and `unlocked_at` disappear: a hold's release is
@@ -99,25 +98,25 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   reaches a threshold places the hold, with its question, in the same `recordGates` post.
 - **Rationale**: FR-015: counts never stored, so a reset or a release needs no gates write to take effect, and no
   count can drift from its evidence.
-- **Existing tools**: `claimcheck.py`/`shimcheck.py` count rules (ported), their thresholds becoming `[reviewer]` keys read through `ReviewerSettings` (T022); `StateReading.reset`
+- **Existing tools**: `claimgate.py`/`shimgate.py` count rules and thresholds (ported); `StateReading.reset`
   and the hold row's `released` from core.
 
 ## R7: Session issue record read through #174's core reader
 
-- **Decision**: reviewer reads the record only through core's `readSessionRecord(folder, sessionId)`
-  (`SessionRecord {v, repo, issue, taken, at}`), keyed by the hook's `session_id`. Absent file → "no recorded
-  issue"; `SessionRecordRefused` → could not run (P4).
+- **Decision**: reviewer reads the record only through the core function #174 adds (VP-001), keyed by the
+  hook's `session_id`. Absent file → "no recorded issue"; unreadable or invalid file → could not run (P4).
 - **Rationale**: FR-013; P6 (the orchestrator is its one writer). This spec adds nothing to it.
-- **Existing tools**: `core/src/session-record.ts` `readSessionRecord` (#174, PR #216, merged).
+- **Existing tools**: None in core yet (grep of `core/src` for a sessions record finds nothing); it lands with
+  #174's core PR (PR #216). This spec's reviewer code is blocked on it.
 
 ## R8: The fence is a pure function applied by the after-commit check
 
-- **Decision**: `fence(record, branch, lane, switchOn): Allow | Refuse` in `lib/rules/fence.ts`, applying
-  ADR-0015 d1–d3: the branch prefix through core `parseBranch` (story = record issue), the missing record, and
-  the issue's lane read through core `laneOf` on `[shared] board` at each check. It is the
+- **Decision**: `fence(record, branch, switchOn): Allow | Refuse` in `lib/rules/fence.ts`: allow when the
+  switch is off; refuse with `/codeworks <issue>` and `reviewer off` when no record; refuse naming `#<s>` and
+  `<s>-us` when the branch lacks the prefix (parsed by core `parseBranch`, story = record issue). It is the
   first step of the after-commit check (R10), so a commit made by any route is fenced; a fenced-out commit
   is never recorded as passed, and the PostToolUse hook blocks with the refusal.
-- **Rationale**: ADR-0015 d1–d3; ADR-0020 d2 enforces commit refusals through the check of the commits, which
+- **Rationale**: ADR-0015 d1–d2; ADR-0020 d2 enforces commit refusals through the check of the commits, which
   are pushed only once passed. One enforcement point, so `git commit`, rebase and scripts behave alike.
 - **Existing tools**: `core/src/identity.ts` `parseBranch`. A PreToolUse match on `git commit` (today's
   `shell.py` classifier) was rejected: it misses other routes and would be a second fence.
@@ -125,7 +124,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 ## R9: Release on claim exactly once, before anything else in the run
 
 - **Decision**: Every hook entry first runs `claimStep(record, marker)`: if the record names a claim and no
-  marker `released-<issue>-<at>` exists in the session folder, call `releaseOnClaim`, then write the
+  marker `released-<issue>-<claimed_at>` exists in the session folder, call `releaseOnClaim`, then write the
   marker. On a resume or with no record it does nothing. If the call throws, the run refuses as could not
   run and writes no marker, so the next run retries.
 - **Rationale**: FR-007, ADR-0013 d2, orchestrator ADR-0002 d3; two claims in one session get two markers. A
@@ -137,8 +136,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 
 - **Decision**: PostToolUse on every Bash command compares the model clone's branch head to the head before
   the command (ADR-0020 d2). For new commits the hook fetches them into a bare copy at
-  `~/.local/state/codeworks/reviewer/sessions/<session>/repo.git` (created on first use; taken only by
-  `git fetch --no-tags` from the clone into the copy's own refs, ADR-0021 d6), then grades the range `base..head`, where `base` is the newest commit-check pass
+  `~/.local/state/codeworks/reviewer/sessions/<session>/repo.git` (created on first use; `git fetch <clone>
+  <sha>` only, ADR-0021 d6), then grades the range `base..head`, where `base` is the newest commit-check pass
   on that branch or, at the branch's first check in the session, the story branch's head on GitHub (merge base
   with the default branch when the branch is not on GitHub), fetched with the session token. `base` must be an
   ancestor of `head`: when it is not (an amend, rebase or reset past it), `base` becomes the branch's head on
