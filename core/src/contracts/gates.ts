@@ -6,6 +6,9 @@ import { GitSha, Time } from "./scalars.ts";
 const Site = z.strictObject({ file: z.string().min(1), line: z.int().min(1), function: z.string().min(1), does: z.string() });
 const Sites = z.array(Site).superRefine(uniqueBy((site) => JSON.stringify([site.file, site.function])));
 
+// A chain entry is its check's ruling on one claim: a contest's ref repeats across claims.
+export const chainEntryKey = ({ ref, claim }: { ref: string; claim: string }): string => JSON.stringify([ref, claim]);
+
 export const Lineage = z.strictObject({
   id: z.string().min(1),
   file: z.string().min(1),
@@ -22,7 +25,7 @@ export const Lineage = z.strictObject({
         at: Time,
       }),
     )
-    .superRefine(uniqueBy((entry) => JSON.stringify([entry.ref, entry.claim]))),
+    .superRefine(uniqueBy(chainEntryKey)),
 });
 export type Lineage = z.infer<typeof Lineage>;
 

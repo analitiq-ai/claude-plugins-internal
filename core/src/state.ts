@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import type { Gates } from "./contracts/gates.ts";
+import { chainEntryKey, type Gates } from "./contracts/gates.ts";
 import { Time } from "./contracts/scalars.ts";
 import { Round, Snapshot, type Hold, type RoundId, type Ruling } from "./contracts/snapshot.ts";
 import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
@@ -440,7 +440,7 @@ function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
   return isDeepStrictEqual(ruled, nextRuled) && isDeepStrictEqual(commits, nextCommits.slice(0, commits.length));
 }
 
-// A write built from an older reading could not run: it is retried, never released (refusals.md).
+// A write built from an older reading could not run: it is retried, never released.
 const STALE = "a stale reading, retry from a fresh readState";
 
 /**
@@ -450,16 +450,16 @@ const STALE = "a stale reading, retry from a fresh readState";
 export function checkTransition(old: Snapshot, next: Snapshot): void {
   const rewrittenRound = old.rounds.find((round, i) => !isDeepStrictEqual(round, next.rounds[i]));
   if (rewrittenRound !== undefined) {
-    throw new StateWriteRefused(`the snapshot drops or rewrites round ${rewrittenRound.stage} ${rewrittenRound.n}`, null);
+    throw new StateWriteRefused(`the snapshot drops or rewrites round ${rewrittenRound.stage} ${rewrittenRound.n}: ${STALE}`, null);
   }
   const rewrittenPushback = old.pushbacks.find((pushback, i) => !isDeepStrictEqual(pushback, next.pushbacks[i]));
   if (rewrittenPushback !== undefined) {
-    throw new StateWriteRefused(`the snapshot drops or rewrites the pushback of ${rewrittenPushback.key}`, null);
+    throw new StateWriteRefused(`the snapshot drops or rewrites the pushback of ${rewrittenPushback.key}: ${STALE}`, null);
   }
   const rewrittenRuling = old.rulings.find((ruling, i) => !keepsRuling(ruling, next.rulings[i]));
   if (rewrittenRuling !== undefined) {
     const { key, round } = rewrittenRuling;
-    throw new StateWriteRefused(`the snapshot drops or rewrites the ruling of ${key} in round ${round.stage} ${round.n}`, null);
+    throw new StateWriteRefused(`the snapshot drops or rewrites the ruling of ${key} in round ${round.stage} ${round.n}: ${STALE}`, null);
   }
   const before = new Map(old.holds.map((row) => [row.id, row]));
   const after = new Map(next.holds.map((row) => [row.id, row]));
@@ -614,7 +614,8 @@ export type Opening = { id: string; question: string | null };
 function gatesHoldKind(id: string): Hold["kind"] {
   const kind = GATES_HOLD_KINDS.find((each) => id.startsWith(`${each}-`));
   if (kind === undefined) {
-    throw new StateWriteRefused(`recordGates places only ${GATES_HOLD_KINDS.join(" and ")} holds, not ${id}`, null);
+    const placer = id.startsWith(`${HoldKind.schema.enum.rescope}-`) ? "placeRescopeHold, which records its spec PR" : "placeHold";
+    throw new StateWriteRefused(`recordGates places only ${GATES_HOLD_KINDS.join(" and ")} holds, not ${id}`, placer);
   }
   return kind;
 }
@@ -669,15 +670,15 @@ function refuseWithoutRoom(snapshot: Snapshot): void {
   }
 }
 
-// A time is its check's: an entry whose `ref` or `tree` the reading holds keeps that time, a tree a merge moved
-// included, and any other takes `now`.
+// A time is its entry's: a chain entry or a tree the reading holds keeps that time, a tree a merge moved included,
+// and any other takes `now`.
 function stamped(read: Gates | null, gates: Gates, now: string): Gates {
-  const refs = new Map<string, string>(read?.lineages.flatMap((lineage) => lineage.chain.map(({ ref, at }) => [ref, at] as const)));
+  const entries = new Map<string, string>(read?.lineages.flatMap((lineage) => lineage.chain.map((entry) => [chainEntryKey(entry), entry.at] as const)));
   const trees = new Map<string, string>(read?.bugs.flatMap((bug) => [...bug.members, ...bug.absorbed].map(({ tree, at }) => [tree, at] as const)));
   const timed = <Entry extends { tree: string }>(entry: Entry): Entry => ({ ...entry, at: trees.get(entry.tree) ?? now });
   return {
     ...gates,
-    lineages: gates.lineages.map((lineage) => ({ ...lineage, chain: lineage.chain.map((entry) => ({ ...entry, at: refs.get(entry.ref) ?? now })) })),
+    lineages: gates.lineages.map((lineage) => ({ ...lineage, chain: lineage.chain.map((entry) => ({ ...entry, at: entries.get(chainEntryKey(entry)) ?? now })) })),
     bugs: gates.bugs.map((bug) => ({ ...bug, members: bug.members.map(timed), absorbed: bug.absorbed.map(timed) })),
   };
 }
