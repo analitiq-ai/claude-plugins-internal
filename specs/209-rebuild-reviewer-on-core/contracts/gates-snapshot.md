@@ -32,22 +32,22 @@ Site    { file, line, function, does }
 | `chain[].claim`, `words` | first-words search when no place survived (ln:166) |
 | `chain[].line` | the hold question's text (cc:298) |
 | `chain[].ruling`, `at` | the counts and release floors below |
-| `members`, `absorbed` | a tree in either is never counted again (sc:268); a merge keeps as `members` those of the bug with the higher count (sc:224, ADR-0008 d2) and moves the other's into `absorbed` |
+| `members`, `absorbed` | a tree in either is never counted again (sc:268); a merge keeps as `members` those of the bug with the higher count, the smaller id on a tie (sc:222-224, ADR-0008 d2), and moves the other's into `absorbed` |
 | `ranges` | which bug a change belongs to, by overlap (sc:189); lines are in the anchor's text |
-| `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
-| `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294) |
+| `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258); a merge keeps the survivor's and drops the other's (sc:244-245). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
+| `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294); a merge gives the survivor the other's rulings for the sites it has not ruled, its own winning (sg:419-423) |
 
 Validation: ids unique within each list; times are core `Time`; shas 40 hex.
 
 ## Derived, never stored
 
 - Lineage count: distinct `ref` with `ruling = WRONG` and `at` after the newest `/codeworks reset` (ADR-0013 d3).
-- `claim-<id>` is placed when that count reaches `REFUSALS_BEFORE_USER = 3` and the hold has no row, or its
+- `claim-<id>` is placed when that count reaches `claim_hold_at` (a `[reviewer]` key) and the hold has no row, or its
   row is RELEASED and a WRONG `ref` is later than that release ("until one more WRONG", ADR-0013 d4). A WRONG on
   words of a released hold counts like any other: today's `released.claims` exemption (cc:255, cg:86) is dropped
   with `unlock` (ADR-0013 Option E).
-- Bug count: `members` with `at` after the newest reset. `DEEP_AT = 3` makes the deep sweep due; `HOLD_AT = 4`
-  places `shim-<id>`. A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
+- Bug count: `members` with `at` after the newest reset. `shim_deep_at` makes the deep sweep due; `shim_hold_at`
+  places `shim-<id>` (both `[reviewer]` keys). A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
   hold again ("one such commit", ADR-0013 d4).
 - A `claim-<id>` hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the
   hold row in the post that records that WRONG, never into `gates`. Core's snapshot contract allows a question only on
@@ -62,9 +62,11 @@ check records, claim reads and verdicts (session memos, FR-017).
 
 ## Anchor
 
-A check reads the anchor from the hooks' bare copy; when it is absent (a new session), it is fetched from GitHub.
-When GitHub does not have it, the check stops with an error naming the branch and the anchor commit: nothing is
-graded and nothing is recorded as passed.
+A check reads the anchor from the hooks' bare copy; when it is absent (a new session), it fetches it by its sha
+from the model's clone (ADR-0021 d6), then from GitHub. When none has it, the check stops with an error naming
+the branch, the anchor commit and `/codeworks reset`: nothing is graded and nothing is recorded as passed. Once
+the newest reset is later than every `at` in the section, a check that cannot find the anchor starts the section
+over through `recordGates`: no lineages, no bugs, anchored on its own head.
 
 ## Functions
 

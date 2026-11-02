@@ -11,15 +11,15 @@ Hold lifecycle (core-enforced, `checkTransition`): `absent → OPEN (placeHold, 
 (releaseOnClaim, released + released_by)`; a RELEASED row may be reopened by `placeHold`; rows are never
 removed.
 
-| reviewer event | core call | hold id |
-|---|---|---|
-| round recorded | `writeState` (append `Round`) | — |
-| DIRTY / ESCALATE | `placeHold` | `escalation-<issue>` (with question) |
-| DIRTY / RESCOPE (was RESHAPE_SPEC) | `placeRescopeHold(specPr)` | `rescope-<issue>` |
-| audits spent | `placeHold` | `audit-<issue>` |
-| stage cap with open pushback | `placeHold` | `pushback-<issue>` |
-| lineage WRONG count ≥ 3 | `placeHold` | `claim-<lineage>` |
-| bug count ≥ 4 | `placeHold` | `shim-<bug>` |
+When each hold is placed, what it refuses and what its release grants: reviewer ADR-0013 d4's table and d5, the
+one definition; not restated here. The core call each uses:
+
+| hold id | core call |
+|---|---|
+| — (round recorded) | `writeState` (append `Round`) |
+| `escalation-<issue>` (with question), `pushback-<issue>`, `audit-<issue>` | `placeHold` |
+| `rescope-<issue>` | `placeRescopeHold(specPr)`: `null` on a RESCOPE verdict, the spec PR's number when one is seen open |
+| `claim-<lineage>` (with question), `shim-<bug>` | `recordGates` |
 
 ## Gates section (core snapshot, new — PR B)
 
@@ -32,7 +32,7 @@ Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-sn
 
 ## Session issue record (#174's, read only)
 
-`{repository, issue, kind: claim|resume, claimed_at}` at the path VP-001 names, through #174's core reader.
+Core's `SessionRecord {v, repo, issue, taken: claim|resume, at}`, read through `readSessionRecord(folder, sessionId)`.
 
 ## Commit-check pass record (core, new — PR C)
 
@@ -50,7 +50,7 @@ per branch, newest pass = `head`, set on every pass, even of a sha already in `p
 | `commit-passes.json` (passes and the `off` switch) | hook via core (PR C) | session |
 | `check.json` (running range, step, workflow run ids) | hook | until the range passes or fails |
 | `memos/*.json` (claim reads, verdicts) | hook | session (FR-017) |
-| `released-<issue>-<claimed_at>` | hook after `releaseOnClaim` | session |
+| `released-<issue>-<at>` | hook after `releaseOnClaim` | session |
 | `write.lock` | hook, held read→post for each state write and the claim step (FR-020) | one write |
 | `gate.log` | hook | session |
 

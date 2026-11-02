@@ -17,6 +17,8 @@ affects:
     pattern: "reviewer/plugin/scripts/{gate,claimgate,shimgate,jev}.py"
   - type: path
     pattern: "reviewer/plugin/workflows/**"
+  - type: path
+    pattern: "reviewer/plugin/lib/check/after-commit.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -42,7 +44,10 @@ cannot run in the hook, and every commit-time check needs the same way from the 
 1. We will gate commits from the plugin's session hook, which sees each new commit after the Bash command
    that made it (ADR-0020), however it was made, and names the checks it needs; only commits that passed
    are pushed (ADR-0002). The hook decides from recorded state, git (run as root ADR-0008 decision 8
-   says), the ledger and GitHub reads (the state comments, the board lane), and does no slow work.
+   says), the check's session-scoped files (`check.json`, `memos/*.json`) beside the commit-check pass
+   record, and GitHub reads (the state comments, the board lane), and does no slow work. `check.json`
+   holds the running check and `memos/*.json` its reads and verdicts; none of them outlives the session,
+   and reviewer keeps no database.
 2. We will run each check as a Claude Workflow. The workflow only orders the work; the gate supplies its
    prompts and schemas at launch, and a hook validates each answer before it is recorded. Which launches
    and answers count is ADR-0021's gate rule.
