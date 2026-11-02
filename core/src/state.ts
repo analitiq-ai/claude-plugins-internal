@@ -2,10 +2,12 @@ import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import { Snapshot, Time, type Hold, type Round, type RoundId, type Ruling } from "./contracts/snapshot.ts";
+import type { Gates } from "./contracts/gates.ts";
+import { Time } from "./contracts/scalars.ts";
+import { Round, Snapshot, type Hold, type RoundId, type Ruling } from "./contracts/snapshot.ts";
 import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
-import { HoldKind, HoldState, Lane } from "./values.ts";
+import { HoldKind, HoldState, Lane, RootCause, RoundResult, RoundStage, RoundVerdict } from "./values.ts";
 
 // The state comment's first line, byte for byte, then one json fence that ends the body.
 const STATE_TAG = "<!-- codeworks:reviewer-state -->";
@@ -141,7 +143,7 @@ function snapshotOf(comment: IssueComment): SnapshotRead {
 }
 
 function emptySnapshot(): Snapshot {
-  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] };
+  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
 }
 
 function isWriter(actor: Actor | null, writers: ReadonlySet<string>): boolean {
@@ -437,7 +439,7 @@ function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
 
 /**
  * `writeState`'s transition: rounds, pushbacks and rulings only appended, and a ruling's commits only appended to;
- * every hold row as it was.
+ * every hold row and the gates section as they were.
  */
 export function checkTransition(old: Snapshot, next: Snapshot): void {
   const rewrittenRound = old.rounds.find((round, i) => !isDeepStrictEqual(round, next.rounds[i]));
@@ -459,8 +461,12 @@ export function checkTransition(old: Snapshot, next: Snapshot): void {
   if (changed.length > 0) {
     throw new StateWriteRefused(
       `the snapshot changes hold rows ${changed.join(", ")}`,
-      "placeHold, placeRescopeHold or releaseOnClaim, the one call that changes each",
+      "placeHold, placeRescopeHold, recordGates or releaseOnClaim, the one call that changes each",
     );
+  }
+  // A write built from an older reading would drop the counts recorded since.
+  if (!isDeepStrictEqual(old.gates, next.gates)) {
+    throw new StateWriteRefused("the snapshot changes the gates section", "recordGates, the only call that posts a gates section other than the one it read");
   }
 }
 
@@ -489,15 +495,23 @@ async function untamperedSnapshot(reader: GitHubClient, repo: string, issue: num
   return judgement.reading.snapshot ?? emptySnapshot();
 }
 
-// The one place a state comment is posted: never one a reader would take as invalid, never an edit.
-async function post(writer: GitHubClient, repo: string, issue: number, snapshot: Snapshot): Promise<void> {
+// GitHub counts characters; a string's length counts UTF-16 units.
+function characters(text: string): number {
+  return [...text].length;
+}
+
+function meetingContract(snapshot: Snapshot): Snapshot {
   const parsed = Snapshot.safeParse(snapshot);
   if (!parsed.success) {
     throw new StateWriteRefused(`the snapshot breaks its contract: ${z.prettifyError(parsed.error)}`, null);
   }
-  const body = renderState(parsed.data);
-  // GitHub counts characters; a string's length counts UTF-16 units.
-  const size = [...body].length;
+  return parsed.data;
+}
+
+// The one place a state comment is posted: never one a reader would take as invalid, never an edit.
+async function post(writer: GitHubClient, repo: string, issue: number, snapshot: Snapshot): Promise<void> {
+  const body = renderState(meetingContract(snapshot));
+  const size = characters(body);
   if (size > COMMENT_LIMIT) {
     throw new StateWriteRefused(`the state comment would be ${size} characters, over GitHub's limit of ${COMMENT_LIMIT}`, null);
   }
@@ -535,7 +549,12 @@ export async function writeState(
 
 export type HoldPlacement = { id: string; kind: Hold["kind"]; question: string | null };
 
-/** Opens a hold of any kind but `rescope`, stamping `since` from GitHub's clock; an OPEN row is left as it is. */
+// Placed only by recordGates, so a count and the hold it places land in one post (reviewer ADR-0013 d4).
+const GATES_HOLD_KINDS: readonly Hold["kind"][] = [HoldKind.schema.enum.claim, HoldKind.schema.enum.shim];
+
+/**
+ * Opens an escalation, pushback or audit hold, stamping `since` from GitHub's clock; an OPEN row is left as it is.
+ */
 export async function placeHold(
   reader: GitHubClient,
   writer: GitHubClient,
@@ -547,6 +566,9 @@ export async function placeHold(
   const { rescope, escalation } = HoldKind.schema.enum;
   if (kind === rescope) {
     throw new StateWriteRefused(`placeHold does not place a ${rescope} hold`, "placeRescopeHold, which records its spec PR");
+  }
+  if (GATES_HOLD_KINDS.includes(kind)) {
+    throw new StateWriteRefused(`placeHold does not place a ${kind} hold`, "recordGates, which places it with its count");
   }
   if (kind === escalation && (question === null || question === "")) {
     throw new StateWriteRefused(`an ${escalation} hold needs its question (orchestrator ADR-0010 d1)`, null);
@@ -579,6 +601,95 @@ export async function placeRescopeHold(
   if (placed) return;
   const since = await writer.now();
   await post(writer, repo, issue, withRow(working, openRow(id, rescope, since, null, specPr)));
+}
+
+/** A `claim-<lineage>` hold with its question, or a `shim-<bug>` hold with none. */
+export type Opening = { id: string; question: string | null };
+
+function gatesHoldKind(id: string): Hold["kind"] {
+  const kind = GATES_HOLD_KINDS.find((each) => id.startsWith(`${each}-`));
+  if (kind === undefined) {
+    throw new StateWriteRefused(`recordGates places only ${GATES_HOLD_KINDS.join(" and ")} holds, not ${id}`, null);
+  }
+  return kind;
+}
+
+// A time's text has one width, so any time measures as every other.
+const ANY_TIME = "1970-01-01T00:00:00Z";
+
+function longest<Value extends string>(values: readonly Value[]): Value {
+  return values.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+// Every result with the longest verdict and with none, kept where the round contract accepts it, so the reserve
+// follows the contract's rule tying verdict to result.
+function largestRound(): Round {
+  const verdicts = [longest(RoundVerdict.schema.options), null];
+  const rounds = RoundResult.schema.options.flatMap((result) =>
+    verdicts.map((verdict) => ({
+      stage: longest(RoundStage.schema.options),
+      n: Number.MAX_SAFE_INTEGER,
+      head: "f".repeat(40),
+      result,
+      verdict,
+      root_cause: longest(RootCause.schema.options),
+      at: ANY_TIME,
+    })),
+  );
+  const accepted = rounds.filter((round) => Round.safeParse(round).success);
+  return accepted.reduce((a, b) => (JSON.stringify(b).length > JSON.stringify(a).length ? b : a));
+}
+
+// What an admin's release of every open hold and the next round add to `snapshot`, each at its largest.
+function withReserve(snapshot: Snapshot): Snapshot {
+  const { OPEN, RELEASED } = HoldState.schema.enum;
+  // `false` is the longer of the two.
+  const releasedBy = { comment: Number.MAX_SAFE_INTEGER, reset: false };
+  const holds = snapshot.holds.map((row) =>
+    row.state === OPEN ? { ...row, state: RELEASED, released: ANY_TIME, released_by: releasedBy } : row,
+  );
+  return { ...snapshot, holds, rounds: [...snapshot.rounds, largestRound()] };
+}
+
+// A count never takes the room an admin's release of every open hold and one more round row need (the gates
+// section's size rule).
+function refuseWithoutRoom(snapshot: Snapshot): void {
+  const size = characters(renderState(snapshot));
+  const reserve = characters(renderState(withReserve(snapshot))) - size;
+  if (size + reserve > COMMENT_LIMIT) {
+    throw new StateWriteRefused(
+      `the state comment would be ${size} characters, and releasing every open hold and one more round need ${reserve} more, over GitHub's limit of ${COMMENT_LIMIT}`,
+      null,
+    );
+  }
+}
+
+/**
+ * Replaces the gates section and places each opening in one post, so no count is on GitHub without the hold it
+ * reached; an OPEN row is left as it is. `read` is the reading `gates` was built from: gates on GitHub other than
+ * its own refuse the post. `writer` is the reviewer App's client.
+ */
+export async function recordGates(
+  reader: GitHubClient,
+  writer: GitHubClient,
+  repo: string,
+  issue: number,
+  shared: Shared,
+  read: StateReading,
+  gates: Gates,
+  openings: readonly Opening[],
+): Promise<void> {
+  const placements = openings.map(({ id, question }) => ({ id, kind: gatesHoldKind(id), question }));
+  const working = await untamperedSnapshot(reader, repo, issue, shared);
+  if (!isDeepStrictEqual(working.gates, read.snapshot?.gates ?? null)) {
+    throw new StateWriteRefused("the gates section on GitHub is not the one read: a newer write changed it", "recordGates built from a fresh readState");
+  }
+  const placing = placements.filter(({ id }) => working.holds.find((row) => row.id === id)?.state !== HoldState.schema.enum.OPEN);
+  const placedSince = (since: string): Snapshot =>
+    placing.reduce<Snapshot>((state, { id, kind, question }) => withRow(state, openRow(id, kind, since, question, null)), { ...working, gates });
+  // A stand-in time meets the contract and measures as GitHub's would, so a refusal comes before its clock is read.
+  refuseWithoutRoom(meetingContract(placedSince(ANY_TIME)));
+  await post(writer, repo, issue, placing.length === 0 ? placedSince(ANY_TIME) : placedSince(await writer.now()));
 }
 
 export type ClaimRelease = { released: Releasable[]; rebuilt: boolean; reset: CommentAt | null };

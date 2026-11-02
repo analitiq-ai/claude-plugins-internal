@@ -5,7 +5,8 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { Finding } from "../contracts/finding.ts";
-import { Round, Time } from "../contracts/snapshot.ts";
+import { Time } from "../contracts/scalars.ts";
+import { Round } from "../contracts/snapshot.ts";
 import { assertIssueNumber, ownerAndName, type GitHubClient } from "../github.ts";
 import { type Machine, readKey } from "../keys.ts";
 import { couldNotRun, couldNotRunIfUnanswered, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";

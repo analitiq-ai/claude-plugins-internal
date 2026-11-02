@@ -187,7 +187,7 @@ for (const [field, place] of [
 }
 
 test("a hold's id starts with its kind and a hyphen", () => {
-  accepted(snapshot({ holds: [hold({ id: "claim-L7", kind: "claim" }), hold({ id: "shim-B3", kind: "shim" })] }));
+  accepted(snapshot({ holds: [hold({ id: "claim-L7", kind: "claim", question: "Why?" }), hold({ id: "shim-B3", kind: "shim" })] }));
   for (const id of ["escalation-212", "pushback212", "212-pushback", "Pushback-212"]) {
     refusedAt(snapshot({ holds: [hold({ id })] }), ["holds", 0, "id"]);
   }

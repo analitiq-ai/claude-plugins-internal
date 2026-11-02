@@ -1,15 +1,11 @@
 import { z } from "zod";
 import { FindingRuling, HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
-
-// Whole seconds, as GitHub's clock gives them: core stamps every time from the client's `now()`, so no caller's
-// clock or precision ever reaches a snapshot.
-export const Time = z.iso.datetime({ precision: 0 });
+import { Gates } from "./gates.ts";
+import { GitSha, Time } from "./scalars.ts";
 
 // The pair that names a round, so a pushback names its round by the same fields the round carries.
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
-
-const CommitSha = z.string().regex(/^[0-9a-f]{40}$/);
 
 export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
   if ((value !== null) !== condition) {
@@ -20,7 +16,7 @@ export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unkno
 export const Round = z
   .strictObject({
     ...RoundId.shape,
-    head: CommitSha,
+    head: GitSha,
     result: RoundResult.schema,
     verdict: RoundVerdict.schema.nullable(),
     root_cause: RootCause.schema.nullable(),
@@ -51,8 +47,11 @@ export const Hold = z
     const released = HoldState.schema.enum.RELEASED;
     setExactlyWhen(ctx, "released", hold.released, hold.state === released, `state is ${released}`);
     setExactlyWhen(ctx, "released_by", hold.released_by, hold.state === released, `state is ${released}`);
-    const escalation = HoldKind.schema.enum.escalation;
-    setExactlyWhen(ctx, "question", hold.question, hold.kind === escalation, `kind is ${escalation}`);
+    // An escalation's question is the one an admin answers (orchestrator ADR-0010 d1); a claim's is its last WRONG
+    // ruling's failing case and evidence (reviewer ADR-0013 d4).
+    const { escalation, claim } = HoldKind.schema.enum;
+    const asks = hold.kind === escalation || hold.kind === claim;
+    setExactlyWhen(ctx, "question", hold.question, asks, `kind is ${escalation} or ${claim}`);
     // One way only: a rescope placed by a RESCOPE verdict records no spec PR (reviewer ADR-0013 d5).
     const rescope = HoldKind.schema.enum.rescope;
     if (hold.spec_pr !== null && hold.kind !== rescope) {
@@ -78,7 +77,7 @@ export const Ruling = z
     // has nowhere to answer.
     reply: z.string().min(1).nullable(),
     // Appended as each passes reviewer's commit check, after the round that ruled it.
-    commits: z.array(CommitSha),
+    commits: z.array(GitSha),
   })
   .superRefine((ruling, ctx) => {
     const thread = ruling.latest_trusted_comment_id !== null;
@@ -101,6 +100,8 @@ export const Snapshot = z
     holds: z.array(Hold),
     pushbacks: z.array(Pushback),
     rulings: z.array(Ruling),
+    // Null until recordGates first writes it.
+    gates: Gates.nullable(),
   })
   .superRefine((snapshot, ctx) => {
     const rounds = new Set<string>();

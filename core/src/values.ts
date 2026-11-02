@@ -60,6 +60,20 @@ export const HoldKind = valueSet({
   audit: "escalation audits not ruled CONVERGED_PUSHBACK reached their count; refuses rounds",
 });
 
+// A claim judge's verdict on one claim, kept in its lineage's chain (reviewer ADR-0001).
+export const ClaimRuling = valueSet({
+  CORRECT: "every assertion of the claim is confirmed by the code",
+  WRONG: "an assertion of the claim is false or has a failing case",
+  UNSURE: "the judge could not read the code that settles an assertion",
+});
+
+// A shim check's ruling on one site its sweep of a bug listed.
+export const SiteRuling = valueSet({
+  SHARES: "the site shares the bug's defect",
+  NOT_SHARED: "the site does not share the bug's defect",
+  DEFERRED: "the site shares the bug's defect, and an open issue tracks its fix",
+});
+
 // reviewer ADR-0011, ADR-0013.
 export const HoldState = valueSet({
   OPEN: "the hold refuses what its kind refuses",
