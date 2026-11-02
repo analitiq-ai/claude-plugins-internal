@@ -48,21 +48,19 @@ function slugOf(s: number, k: number, title: string): string {
   return slug;
 }
 
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-for (const [what, title] of [
-  ["a /", "fix/ci: retry the push"],
-  ["..", "../../etc/passwd"],
+for (const [what, title, slug] of [
+  ["a /", "fix/ci: retry the push", "fix-ci-retry-the-push"],
+  ["..", "../../etc/passwd", "etc-passwd"],
   // ſ matches [a-z] under a case-insensitive Unicode regex, yet stays ſ when lowercased.
-  ["unicode", "Café ☕ naïve ſtraße 日本語"],
-  ["uppercase", "RETRY The PUSH"],
-  ["runs of punctuation", "retry!!! the -- push???  (again)..."],
-  ["300 characters", "retry the push ".repeat(20)],
+  ["unicode", "Café ☕ naïve ſtraße 日本語", "caf-na-ve-tra-e"],
+  ["uppercase", "RETRY The PUSH", "retry-the-push"],
+  ["digits", "Bump zod to 4.6.7", "bump-zod-to-4-6-7"],
+  ["runs of punctuation", "retry!!! the -- push???  (again)...", "retry-the-push-again"],
+  ["300 characters", "retry the push ".repeat(20), "retry-the-push-retry-the-push-retry-the"],
+  ["41 letters", "a".repeat(41), "a".repeat(40)],
 ]) {
-  test(`a title with ${what} gives a slug of [a-z0-9] runs joined by single -, at most 40 characters`, () => {
-    const slug = slugOf(245, 1, title);
-    assert.match(slug, SLUG);
-    assert.ok(slug.length <= 40, `${slug} is ${slug.length} characters`);
+  test(`a title with ${what} gives the slug ${slug}`, () => {
+    assert.equal(slugOf(245, 1, title), slug);
   });
 }
 
@@ -87,12 +85,12 @@ for (const [s, k] of [
 
 // TypeError, as specBranch refuses a p that is no issue number.
 for (const n of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
-  test(`s = ${n} is refused, as no positive safe integer`, () => {
-    assert.throws(() => storyBranchName(n, 1, "retry the push"), TypeError);
+  test(`s = ${n} is refused, as no issue number`, () => {
+    assert.throws(() => storyBranchName(n, 1, "retry the push"), {name: "TypeError", message: `not an issue number: ${n}`});
   });
 
-  test(`k = ${n} is refused, as no positive safe integer`, () => {
-    assert.throws(() => storyBranchName(245, n, "retry the push"), TypeError);
+  test(`k = ${n} is refused, as no US<k> story index`, () => {
+    assert.throws(() => storyBranchName(245, n, "retry the push"), {name: "TypeError", message: `not a US<k> story index: ${n}`});
   });
 }
 
