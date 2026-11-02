@@ -240,8 +240,8 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
   outcome in a pure function (constitution P3).
 - **FR-012**: The paths a check passes MUST be read from the artifact as data with a grammar (constitution P7), not
   parsed from prose; the plan decides the form for `plan.md`, and for `tasks.md` the task line's paths. One path
-  grammar MUST serve both artifacts, and a name with no `/` MUST count as a path when it names a file at the checkout
-  root.
+  grammar MUST serve both artifacts, and a name with no `/` MUST count as a path when git tracks it at the checkout
+  root or `plan.md`'s `## Touches` lists it (so a root file a task creates is checked before it exists).
 - **FR-013**: The `adr` version the planner step requires MUST be defined once, in core; reviewer reads it from core
   in US5, and until then its Python `VERSION` (`reviewer/plugin/scripts/adrkit.py:21`) is a second copy that #235
   deletes.

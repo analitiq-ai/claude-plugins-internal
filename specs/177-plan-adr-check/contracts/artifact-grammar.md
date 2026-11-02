@@ -23,8 +23,9 @@ No such line, or no heading: could not run, naming the artifact.
 ## `tasks.md` task lines
 
 A task line starts `- [ ] T<n>` or `- [x] T<n>` (any case of `x`). Its paths are its backticked spans that are a
-`PATH`: a span with a `/` always; a span with no `/` only when it names a file at the checkout root (git's answer:
-`git ls-files` at the root, read by the ask step and passed to the pure reader). A span with a second `{…}` group is
+`PATH`: a span with a `/` always; a span with no `/` only when it is in `rootFiles`, the `git ls-files` entries with
+no `/` together with `plan.md`'s `## Touches` entries with no `/` (read by the ask step and passed to the pure
+reader), so a root file a task creates is a path before git tracks it. A span with a second `{…}` group is
 refused (exit 1, naming `tasks.md:<line>`). Its story is `US<k>` from a `[US<k>]` tag, else the text of the
 `## Phase` heading above it. No path on any task line: could not run.
 

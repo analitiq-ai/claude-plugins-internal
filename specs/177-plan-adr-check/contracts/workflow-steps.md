@@ -17,7 +17,7 @@ FAIL, else 0). No subcommand formats a stop of its own.
 ### ask
 
 Removes any `<run>/adr-<a>-verdict.json` first, so a stale verdict is never read. Reads the artifact's paths (root
-files from `git ls-files`), then the rulings file through core's `readRulings` and runs the writer guard (R9): an
+files from `git ls-files` and `plan.md`'s `## Touches`), then the rulings file through core's `readRulings` and runs the writer guard (R9): an
 entry in neither the file at `HEAD` nor `<run>/adr-rulings-written.json` is could not run. Resolves the folders
 (`adrFolders`), runs `checkAdrFolder` once per readable folder, writes `<run>/adr-<a>-asked.json`, prints
 `{"judge": <bool>, "asked": "<sha256 of the asked record>"}` on stdout. Exit 0 when it wrote the record (folder

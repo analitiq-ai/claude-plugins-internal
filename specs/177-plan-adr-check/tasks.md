@@ -139,7 +139,7 @@ naming the record, path and `US2`.
 ### Implementation for User Story 4
 
 - [ ] T033 [US4] In `core/src/contracts/tasks.ts` add `readTaskPaths(tasksText, rootFiles): ArtifactPath[]` beside `readTaskBlockLabels`, each backticked span through `artifactPath` from `core/src/contracts/decision-check.ts`, story from `[US<k>]` else the phase heading via `isPhaseHeading` (R5, FR-012)
-- [ ] T034 [US4] In `planner/plugin/scripts/adr_check.ts` accept artifact `tasks`: ask reads `<spec folder>/tasks.md` through `readTaskPaths` with `rootFiles` from `git ls-files` entries with no `/`, writes `<run>/adr-tasks-asked.json`; decide carries each departure's story so `adrStop` prints `(story US<k>)` and names `tasks.md` as the artifact to change; `stop tasks judge`
+- [ ] T034 [US4] In `planner/plugin/scripts/adr_check.ts` accept artifact `tasks`: ask reads `<spec folder>/tasks.md` through `readTaskPaths` with `rootFiles` from `git ls-files` entries with no `/` and `plan.md` `## Touches` entries with no `/` (R5), writes `<run>/adr-tasks-asked.json`; decide carries each departure's story so `adrStop` prints `(story US<k>)` and names `tasks.md` as the artifact to change; `stop tasks judge`
 - [ ] T035 [US4] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` add the `to-adr-tasks` block after `to-tasks`: `adr-tasks-ask`, `adr-tasks-judging` / `adr-tasks-judge`, `adr-tasks-decide`, the same as `to-adr-plan` with `tasks` (R6, FR-006)
 - [ ] T036 [US4] Verify US4: `npm --prefix core test`, `npm --prefix planner test`, `python3 -m unittest discover -s planner/tests` green
 

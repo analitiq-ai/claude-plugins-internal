@@ -46,6 +46,7 @@ python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'
 | asked record or `## Touches` changed between ask and decide | exit 2 naming what changed |
 | `tasks.md` task `[US2]` names a governed path | exit 1 naming the story (US4 AS1) |
 | `tasks.md` task names `` `codeworks.toml` `` (root file) / `` `adr check` `` (no file) | path checked / not a path |
+| `tasks.md` task names `` `new.toml` ``, untracked, listed in `## Touches` | path checked |
 | `## Touches` empty, or `tasks.md` names no path | exit 2 naming the artifact |
 | `adr_folders = []` | exit 0, "No ADR folder is listed" |
 

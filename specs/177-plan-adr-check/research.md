@@ -66,8 +66,9 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision**: one path grammar for both artifacts, one pure function `artifactPath` in
   `core/src/contracts/decision-check.ts` (artifact-grammar.md, Path): one `{a,b}` group expanded. A task line is
   Spec Kit's `- [ ] T<n> …`; its paths are its backticked spans `artifactPath` accepts: a span with a `/` always,
-  one with no `/` only when it names a file at the checkout root, by git's answer (`git ls-files` at the root, read
-  by the ask step and passed in, so the reader stays pure). A Touches bullet is a path by its place, so no root
+  one with no `/` only when it is in `rootFiles`: the `git ls-files` entries with no `/` together with the
+  `## Touches` entries with no `/`, both read by the ask step and passed in, so the reader stays pure. Touches
+  carries a root file a task creates, which git does not track yet (codex on #279). A Touches bullet is a path by its place, so no root
   check. Its story is its `[US<k>]` tag, else its phase heading. `readTaskPaths` sits in `core/src/contracts/tasks.ts`
   beside the task-block label (that file's comment: the grammar has one home) and calls `artifactPath`.
 - **Rationale**: FR-012: one grammar, so a task naming `codeworks.toml` (governed by root ADR-0002) is checked as
