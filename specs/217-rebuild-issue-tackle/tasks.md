@@ -78,8 +78,8 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 
 ### B3 — Story PR closed (before US3)
 
-- [ ] T010 [P] [US1] **core PR B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
-- [ ] T011 [US1] **core PR B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T010 passes; existing `identity.test.ts` cases pass unchanged; bump every carrier's `plugin.json` version
+- [x] T010 [P] [US1] **core PR B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
+- [x] T011 [US1] **core PR B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T010 passes; existing `identity.test.ts` cases pass unchanged; bump every carrier's `plugin.json` version
 
 ### B7 — Stop rule and the read of its facts (after B3, before US3)
 

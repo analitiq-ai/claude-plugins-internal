@@ -306,18 +306,18 @@ describe("specFolder", () => {
 
 describe("pickStoryPr", () => {
   function head(number: number, headRefName: string, over: Partial<PullRequestHead> = {}): PullRequestHead {
-    return { number, headRefName, headRefOid: sha(number), isCrossRepository: false, merged: false, ...over };
+    return { number, headRefName, headRefOid: sha(number), isCrossRepository: false, closed: false, merged: false, ...over };
   }
 
   it("is the newest same-repo PR on the branch; a fork PR of that head name is not the story's", () => {
     const prs = [
       head(251, BRANCH),
-      head(213, BRANCH, { merged: true }),
+      head(213, BRANCH, { closed: true, merged: true }),
       head(260, BRANCH, { isCrossRepository: true }),
       head(230, BRANCH),
       head(270, "fix-retry"),
     ];
-    assert.deepEqual(pickStoryPr(prs, BRANCH), { number: 251, head: sha(251), merged: false });
+    assert.deepEqual(pickStoryPr(prs, BRANCH), { number: 251, head: sha(251), closed: false, merged: false });
   });
 
   it("is null when only a fork PR has the head name", () => {
@@ -332,11 +332,11 @@ describe("pickStoryPr", () => {
 
 describe("storyPr", () => {
   const nodes = [
-    { number: 213, headRefName: BRANCH, headRefOid: sha(213), isCrossRepository: false, merged: false, body: "first try" },
-    { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, merged: true, body: "" },
-    { number: 230, headRefName: BRANCH, headRefOid: sha(230), isCrossRepository: false, merged: false, body: "" },
-    { number: 260, headRefName: BRANCH, headRefOid: sha(260), isCrossRepository: true, merged: false, body: "a fork" },
-    { number: 270, headRefName: "fix-retry", headRefOid: sha(270), isCrossRepository: false, merged: true, body: "Closes #212" },
+    { number: 213, headRefName: BRANCH, headRefOid: sha(213), isCrossRepository: false, closed: false, merged: false, body: "first try" },
+    { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, closed: true, merged: true, body: "" },
+    { number: 230, headRefName: BRANCH, headRefOid: sha(230), isCrossRepository: false, closed: false, merged: false, body: "" },
+    { number: 260, headRefName: BRANCH, headRefOid: sha(260), isCrossRepository: true, closed: false, merged: false, body: "a fork" },
+    { number: 270, headRefName: "fix-retry", headRefOid: sha(270), isCrossRepository: false, closed: true, merged: true, body: "Closes #212" },
   ];
   const routes: FakeRoutes = {
     graphqlPages: [
@@ -345,7 +345,7 @@ describe("storyPr", () => {
   };
 
   it("reads the PRs whose head is the branch and picks the newest same-repo one", async () => {
-    assert.deepEqual(await storyPr(fakeGitHub(routes), REPO, BRANCH), { number: 251, head: sha(251), merged: true });
+    assert.deepEqual(await storyPr(fakeGitHub(routes), REPO, BRANCH), { number: 251, head: sha(251), closed: true, merged: true });
   });
 
   it("never reads a PR body or its closing references", async () => {
@@ -380,7 +380,7 @@ describe("pickStoryBranch", () => {
 
 describe("issueStory", () => {
   const ref = (branch: string) => ({ ref: `refs/heads/${branch}`, node_id: `REF_${branch}`, object: { sha: sha(1), type: "commit" } });
-  const prs = [{ number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, merged: false }];
+  const prs = [{ number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, closed: false, merged: false }];
 
   function routes(refs: unknown[], onBranch: unknown[] = prs): FakeRoutes {
     return {
@@ -397,7 +397,7 @@ describe("issueStory", () => {
     const reader = fakeGitHub(routes([ref("212-usx"), ref(BRANCH)]));
     assert.deepEqual(await issueStory(reader, REPO, 212), {
       branch: BRANCH,
-      pr: { number: 251, head: sha(251), merged: false },
+      pr: { number: 251, head: sha(251), closed: false, merged: false },
     });
   });
 

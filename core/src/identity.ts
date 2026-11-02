@@ -12,8 +12,8 @@ export type SpecPr = { number: number; state: "open" | "closed" | "merged" };
 
 export type SpecFolderAnswer = { one: string } | { none: true } | { several: readonly string[] };
 
-/** The story's PR: `head` is its head commit. */
-export type StoryPr = { number: number; head: string; merged: boolean };
+/** The story's PR: `head` is its head commit; a merged PR is closed too. */
+export type StoryPr = { number: number; head: string; closed: boolean; merged: boolean };
 
 /** The text a story is built and graded against; `source` says where it was read. */
 export type Requirement = { kind: SpecKind; text: string; source: string };
@@ -136,6 +136,7 @@ const PullRequestHeadAnswer = z.object({
   headRefName: z.string(),
   headRefOid: z.string().regex(/^[0-9a-f]{40}$/),
   isCrossRepository: z.boolean(),
+  closed: z.boolean(),
   merged: z.boolean(),
 });
 export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
@@ -175,7 +176,7 @@ function sameRepoNewestFirst<Pr extends { number: number; headRefName: string; i
 export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
   if (storyOf(branch) === null) return null;
   const [newest] = sameRepoNewestFirst(prs, branch);
-  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, merged: newest.merged };
+  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, closed: newest.closed, merged: newest.merged };
 }
 
 export async function storyPr(reader: GitHubClient, repo: string, branch: string): Promise<StoryPr | null> {
