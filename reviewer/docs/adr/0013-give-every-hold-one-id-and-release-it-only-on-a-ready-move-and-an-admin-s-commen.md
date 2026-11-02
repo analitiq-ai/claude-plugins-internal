@@ -19,6 +19,10 @@ affects:
     pattern: "reviewer/plugin/README.md"
   - type: path
     pattern: "core/**"
+  - type: path
+    pattern: "reviewer/plugin/lib/rules/counts.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/round/gates.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -54,8 +58,9 @@ loop only through GitHub: the board and issue comments.
    new internal round at the head is briefed with the comment (orchestrator ADR-0004). A hold with no such
    comment stays open, and the start stops (orchestrator ADR-0002).
 3. We will have an admin's comment `/codeworks reset` on the story issue release every open hold of the
-   story and restart every count that places one, the orchestrator's included (orchestrator ADR-0001).
-   It moves no card: the admin sets Ready.
+   story and restart every count that places one, the orchestrator's included (orchestrator ADR-0001),
+   and let a check that cannot find its gates anchor start the gates section over (ADR-0001 d2). It moves
+   no card: the admin sets Ready.
 4. We will place each hold, and grant on its release, as follows; each count is a `[reviewer]` key.
    A merge blocker is a validator module's failure through `core/` (ADR-0016) or a failing required check;
    pushed-back threads alone are resolved by the replies.
@@ -64,9 +69,16 @@ loop only through GitHub: the board and issue comments.
    |---|---|---|---|
    | `escalation-<issue>` | a round verdict ESCALATE, or a trusted thread answered after its ruling `k_topic` times (ADR-0016) | commits and rounds | both |
    | `pushback-<issue>` | a github round rules no FIX while a merge blocker fails at the head | rounds | rounds |
-   | `claim-<id>` | the count of WRONG rulings on its lineage | commits touching its file | those, until one more WRONG |
-   | `shim-<id>` | its bug reaches the hold count | commits touching its lines | one such commit |
-   | `audit-<issue>` | the count of escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
+   | `claim-<id>` | its lineage has `claim_hold_at` WRONG rulings, a check counting once | commits touching its file | those, until one more WRONG |
+   | `shim-<id>` | its bug has `shim_hold_at` members (ADR-0008) | commits touching its lines | one such commit |
+   | `audit-<issue>` | `max_audits` escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
+
+   The claim and shim counts take only the WRONG rulings and members dated after `reset.at`, the time of the
+   newest `/codeworks reset` (d3). A release by d2 lowers no count: a released `claim-<id>` holds again at the next
+   check that rules its lineage WRONG, the released words included, and a released `shim-<id>` lets one commit
+   touching its line ranges through, whose check places it again. A `claim-<id>` hold carries the last WRONG
+   ruling's failing case and evidence as its question. The rulings and members live in the gates section of
+   the state snapshot (ADR-0011 d1), and a count and the hold it places land in one post.
 5. We will place `rescope-<issue>` on a `RESCOPE` verdict, and, when reviewer's hook sees a rescope's
    spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording
    that spec PR's number. reviewer's hook derives this at each run: a spec PR whose number a story's

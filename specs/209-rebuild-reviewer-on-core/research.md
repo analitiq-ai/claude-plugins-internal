@@ -61,7 +61,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 - **Decision**: A round's result is core's `RoundResult` (CLEAN / DIRTY / INCOMPLETE, ADR-0021 d4) and a DIRTY
   round's verdict core's `RoundVerdict`. Today's `RESHAPE_SPEC` maps to `RESCOPE` and places
   `placeRescopeHold(issue, specPr)`; `ESCALATE` places an `escalation-<issue>` hold with the question;
-  spent audits (`MAX_AUDITS`) place `audit-<issue>`; an open pushback the stage cap reaches places
+  spent audits (`max_audits`) place `audit-<issue>`; an open pushback the stage cap reaches places
   `pushback-<issue>`; claim and shim holds are `claim-<lineage>` and `shim-<bug>` (ADR-0013 d4 table).
   Rounds are keyed by `RoundId {stage, n}` on the story issue, not by PR.
 - **Rationale**: FR-003, root ADR-0010. The PR-keyed `epoch` and `unlocked_at` disappear: a hold's release is

@@ -42,12 +42,12 @@ Validation: ids unique within each list; times are core `Time`; shas 40 hex.
 ## Derived, never stored
 
 - Lineage count: distinct `ref` with `ruling = WRONG` and `at` after the newest `/codeworks reset` (ADR-0013 d3).
-- `claim-<id>` is placed when that count reaches `REFUSALS_BEFORE_USER = 3` and the hold has no row, or its
+- `claim-<id>` is placed when that count reaches `claim_hold_at` (a `[reviewer]` key) and the hold has no row, or its
   row is RELEASED and a WRONG `ref` is later than that release ("until one more WRONG", ADR-0013 d4). A WRONG on
   words of a released hold counts like any other: today's `released.claims` exemption (cc:255, cg:86) is dropped
   with `unlock` (ADR-0013 Option E).
-- Bug count: `members` with `at` after the newest reset. `DEEP_AT = 3` makes the deep sweep due; `HOLD_AT = 4`
-  places `shim-<id>`. A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
+- Bug count: `members` with `at` after the newest reset. `shim_deep_at` makes the deep sweep due; `shim_hold_at`
+  places `shim-<id>` (both `[reviewer]` keys). A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
   hold again ("one such commit", ADR-0013 d4).
 - A `claim-<id>` hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the
   hold row in the post that records that WRONG, never into `gates`. Core's snapshot contract allows a question only on
@@ -62,9 +62,11 @@ check records, claim reads and verdicts (session memos, FR-017).
 
 ## Anchor
 
-A check reads the anchor from the hooks' bare copy; when it is absent (a new session), it is fetched from GitHub.
-When GitHub does not have it, the check stops with an error naming the branch and the anchor commit: nothing is
-graded and nothing is recorded as passed.
+A check reads the anchor from the hooks' bare copy; when it is absent (a new session), it fetches it by its sha
+from the model's clone (ADR-0021 d6), then from GitHub. When none has it, the check stops with an error naming
+the branch, the anchor commit and `/codeworks reset`: nothing is graded and nothing is recorded as passed. Once
+the newest reset is later than every `at` in the section, a check that cannot find the anchor starts the section
+over through `recordGates`: no lineages, no bugs, anchored on its own head.
 
 ## Functions
 
