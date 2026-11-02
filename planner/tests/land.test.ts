@@ -73,7 +73,27 @@ describe("labelTasks", () => {
     assert.equal(labelTasks(labelled, [101, 102, 103]), labelled);
   });
 
-  it("refuses a phase line that opens as a checkbox item but is no task line, as TaskLineRefused naming it", () => {
+  it("labels a tasks.md that keeps Spec Kit's stock Notes bullets, reading them as no task", () => {
+    const notes = "\n## Notes\n\n- [P] tasks = different files, no dependencies\n- [Story] label maps task to specific user story for traceability\n";
+    assert.equal(labelTasks(tasksMd(3) + notes, [101, 102, 103]), tasksMd(3, [101, 101, 101, 102, 103, 103]) + notes);
+  });
+
+  it("refuses a phase holding tasks of two stories, as TasksRefused naming the phase and both stories", () => {
+    assert.throws(() => labelTasks(tasksMd(3).replace("- [x] T013 [US1]", "- [x] T013 [US2]"), [101, 102, 103]), {
+      name: "TasksRefused",
+      message: `tasks.md: "## Phase 3: ${STORIES[0]}" holds tasks of US1 and US2`,
+    });
+  });
+
+  it("refuses a task line tagged with a story outside any phase, as TasksRefused naming the line", () => {
+    const line = "- [ ] T000 [US1] Retry before any phase";
+    assert.throws(() => labelTasks(tasksMd(3).replace("# Tasks: retry budget\n", `# Tasks: retry budget\n${line}\n`), [101, 102, 103]), {
+      name: "TasksRefused",
+      message: `tasks.md: ${JSON.stringify(line)} is tagged US1 outside any phase`,
+    });
+  });
+
+  it("refuses a phase line that claims a task but is no task line, as TaskLineRefused naming it", () => {
     const line = "  - [ ] T013 [US1] Test story 1";
     assert.throws(() => labelTasks(tasksMd(3).replace("- [x] T013 [US1] Test story 1", line), [101, 102, 103]), {
       name: "TaskLineRefused",
@@ -399,7 +419,7 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assert.equal(tasksIn(w), w.tasks, "tasks.md was written");
   }
 
-  it("for a tasks.md line that opens as a checkbox item but is no task line, naming it", async (t) => {
+  it("for a tasks.md line that claims a task but is no task line, naming it", async (t) => {
     const w = world(t, tasksMd(3).replace("- [x] T013 [US1]", "- [X] T013 [US1]"));
     const run = await land(w, gitHubState());
     assertStops(w, run, [JSON.stringify("- [X] T013 [US1] Test story 1")]);

@@ -135,22 +135,42 @@ describe("storyTasks", () => {
     );
   });
 
-  it("excludes the lines of a labelled block that open as no checkbox item", () => {
+  it("excludes the lines of a labelled block that claim no task", () => {
     const block = [
       "## Phase 1: User Story 1 - Retry an upload (Priority: P1)",
       "Story issue: #13",
       "",
       "**Goal**: retry once, as T010 says",
       "### Tests for User Story 1",
-      "- T011 [US1] Retry with no checkbox",
+      "- T011 [US1] Retry with no box",
+      "- T010 ∥ T011",
       "- [research](research.md) says why",
       "- [a](a.md) says how",
+      "- [P] tasks = different files, no dependencies",
+      "- [Story] label maps task to specific user story for traceability",
       "- [ ] T010 [US1] Retry once",
     ].join("\n");
     assert.deepEqual(storyTasks(block, 13).map((task) => task.id), ["T010"]);
   });
 
-  describe("a line that opens as a checkbox item but is no task line of one story", () => {
+  it("reads a task's story from the tags right after its id, never from its description", () => {
+    const lines = [
+      "- [ ] T010 [P] [US1] Test `[US<k>]` and [US2] in the description",
+      "- [ ] T011\t[US1] Retry after a tab",
+      "- [ ] T012 [USB] Retry over a USB link",
+      "- [ ] T013 Retry, as [US2] does",
+    ];
+    const block = ["## Phase 1: User Story 1 - Retry an upload (Priority: P1)", "Story issue: #13", "", ...lines].join("\n");
+    const expected: StoryTask[] = [
+      { id: "T010", ticked: false, story: 1, line: lines[0] },
+      { id: "T011", ticked: false, story: 1, line: lines[1] },
+      { id: "T012", ticked: false, story: null, line: lines[2] },
+      { id: "T013", ticked: false, story: null, line: lines[3] },
+    ];
+    assert.deepEqual(storyTasks(block, 13), expected);
+  });
+
+  describe("a line that claims a task but is no task line of one story", () => {
     const NO_TASK_LINE = 'is no task line, which reads "- [ ] T<nnn> …" or "- [x] T<nnn> …"';
     const twoBlocks = (in12: string, in13: string, after = "") =>
       [
@@ -171,19 +191,27 @@ describe("storyTasks", () => {
         after,
       ].join("\n");
 
+    it("reads Spec Kit's stock Notes bullets as no task", () => {
+      const notes = ["- [P] tasks = different files, no dependencies", "- [Story] label maps task to specific user story for traceability"];
+      assert.deepEqual(storyTasks(twoBlocks("", "", notes.join("\n")), 13).map((task) => task.id), ["T002"]);
+    });
+
     for (const line of [
       "- [X] T010 [US1] Retry once",
       "- [ ] T010: [US1] Retry once",
-      "- [ ] T010\t[US1] Retry once",
       "  - [ ] T010 [US1] Retry once",
       "- [ ] T12 [US1] Retry once",
       "- [ ] T010a [US1] Retry once",
       "- [ ]T010 [US1] Retry once",
       "- [] T010 [US1] Retry once",
-      "* [ ] T010 [US1] Retry once",
-      "1. [ ] T010 [US1] Retry once",
+      "- [  ] T010 [US1] Retry once",
+      "- [ x] T010 [US1] Retry once",
+      "- [P] T010 [US1] Retry once",
+      "-[ ] T010 [US1] Retry once",
       "-  [ ] T010 [US1] Retry once",
       "-\t[ ] T010 [US1] Retry once",
+      "* [ ] T010 [US1] Retry once",
+      "1. [ ] T010 [US1] Retry once",
       "- [ ] Retry with no task id",
     ]) {
       it(`refuses ${JSON.stringify(line)} in #13's block as TaskLineRefused, never as no task`, () => {
@@ -200,6 +228,16 @@ describe("storyTasks", () => {
       assert.throws(() => storyTasks(twoBlocks(line, ""), 13), refused);
       assert.throws(() => storyTasks(twoBlocks("", "", line), 13), refused);
     });
+
+    for (const tag of ["[US02]", "[us2]", "[US 2]", "[US0]", "[US]"]) {
+      it(`refuses the tag ${tag} after a task's id as TaskLineRefused, never as no story`, () => {
+        const line = `- [ ] T010 [P] ${tag} Retry once`;
+        assert.throws(() => storyTasks(twoBlocks("", line), 13), {
+          name: "TaskLineRefused",
+          message: `tasks.md: ${JSON.stringify(line)} is tagged ${tag}, where a story tag reads "[US<k>]"`,
+        });
+      });
+    }
 
     it("refuses a task line tagged with two stories, where a task is one story's", () => {
       const line = "- [ ] T010 [US1] [US2] Retry once";
