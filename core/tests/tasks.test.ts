@@ -182,6 +182,8 @@ describe("storyTasks", () => {
       "- [] T010 [US1] Retry once",
       "* [ ] T010 [US1] Retry once",
       "1. [ ] T010 [US1] Retry once",
+      "-  [ ] T010 [US1] Retry once",
+      "-\t[ ] T010 [US1] Retry once",
       "- [ ] Retry with no task id",
     ]) {
       it(`refuses ${JSON.stringify(line)} in #13's block as TaskLineRefused, never as no task`, () => {
