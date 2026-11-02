@@ -41,7 +41,8 @@ temp file + rename. The folder is a model deny path (`core/src/keys.ts` `HOME_FO
 - `recordCommitPasses(session, {repository, issue, branch, from, shas, at}): void` — appends every sha of the
   graded range under `branch` not already there, and sets the branch's `head` to the range's head; refuses a repository differing from the file's, or an issue differing from the
   branch entry's.
-- `setReviewerOff(session, off: boolean): void` — writes `off`; the file is created when absent.
+- `setReviewerOff(session, repository, off: boolean): void` — writes `off`; the file is created with `repository` when
+  absent; a `repository` differing from the file's is refused.
 
 ## Protected paths
 
