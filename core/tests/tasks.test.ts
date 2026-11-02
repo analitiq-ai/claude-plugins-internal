@@ -135,18 +135,75 @@ describe("storyTasks", () => {
     );
   });
 
-  it("excludes the lines of a labelled block that are no task line, a T id of under 3 digits among them", () => {
+  it("excludes the lines of a labelled block that open as no checkbox item", () => {
     const block = [
       "## Phase 1: User Story 1 - Retry an upload (Priority: P1)",
       "Story issue: #13",
       "",
       "**Goal**: retry once, as T010 says",
-      "- [ ] Retry with no task id",
+      "### Tests for User Story 1",
       "- T011 [US1] Retry with no checkbox",
-      "- [ ] T12 [US1] Retry under a two-digit id",
+      "- [research](research.md) says why",
       "- [ ] T010 [US1] Retry once",
     ].join("\n");
     assert.deepEqual(storyTasks(block, 13).map((task) => task.id), ["T010"]);
+  });
+
+  describe("a line that opens as a checkbox item but is no task line of one story", () => {
+    const NO_TASK_LINE = 'is no task line, which reads "- [ ] T<nnn> …" or "- [x] T<nnn> …"';
+    const twoBlocks = (in12: string, in13: string, after = "") =>
+      [
+        "## Phase 1: Setup",
+        "Story issue: #12",
+        "",
+        "- [ ] T001 Create the folder",
+        in12,
+        "",
+        "## Phase 2: User Story 1 - Retry an upload (Priority: P1)",
+        "Story issue: #13",
+        "",
+        "- [ ] T002 [US1] Retry once",
+        in13,
+        "",
+        "## Notes",
+        "",
+        after,
+      ].join("\n");
+
+    for (const line of [
+      "- [X] T010 [US1] Retry once",
+      "- [ ] T010: [US1] Retry once",
+      "- [ ] T010\t[US1] Retry once",
+      "  - [ ] T010 [US1] Retry once",
+      "- [ ] T12 [US1] Retry once",
+      "- [ ] T010a [US1] Retry once",
+      "- [ ]T010 [US1] Retry once",
+      "- [] T010 [US1] Retry once",
+      "* [ ] T010 [US1] Retry once",
+      "- [ ] Retry with no task id",
+    ]) {
+      it(`refuses ${JSON.stringify(line)} in #13's block as TaskLineRefused, never as no task`, () => {
+        assert.throws(() => storyTasks(twoBlocks("", line), 13), {
+          name: "TaskLineRefused",
+          message: `tasks.md: ${JSON.stringify(line)} ${NO_TASK_LINE}`,
+        });
+      });
+    }
+
+    it("refuses one in #12's block or in a section that is no phase too: it refuses the whole text", () => {
+      const line = "- [X] T010 Retry once";
+      const refused = { name: "TaskLineRefused", message: `tasks.md: ${JSON.stringify(line)} ${NO_TASK_LINE}` };
+      assert.throws(() => storyTasks(twoBlocks(line, ""), 13), refused);
+      assert.throws(() => storyTasks(twoBlocks("", "", line), 13), refused);
+    });
+
+    it("refuses a task line tagged with two stories, where a task is one story's", () => {
+      const line = "- [ ] T010 [US1] [US2] Retry once";
+      assert.throws(() => storyTasks(twoBlocks("", line), 13), {
+        name: "TaskLineRefused",
+        message: `tasks.md: ${JSON.stringify(line)} is tagged US1 and US2, where a task is one story's`,
+      });
+    });
   });
 
   it("ends a labelled block at a ## section that is no phase, not at a ### heading", () => {

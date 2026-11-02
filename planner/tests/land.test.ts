@@ -72,6 +72,14 @@ describe("labelTasks", () => {
     const labelled = tasksMd(3, [101, 101, 101, 102, 103, 103]);
     assert.equal(labelTasks(labelled, [101, 102, 103]), labelled);
   });
+
+  it("refuses a phase line that opens as a checkbox item but is no task line, as TaskLineRefused naming it", () => {
+    const line = "  - [ ] T013 [US1] Test story 1";
+    assert.throws(() => labelTasks(tasksMd(3).replace("- [x] T013 [US1] Test story 1", line), [101, 102, 103]), {
+      name: "TaskLineRefused",
+      message: `tasks.md: ${JSON.stringify(line)} is no task line, which reads "- [ ] T<nnn> …" or "- [x] T<nnn> …"`,
+    });
+  });
 });
 
 type Issue = { id: number; number: number; title: string; repository_url: string };
@@ -390,6 +398,12 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assert.equal(git(w.checkout, "diff", "--cached", "--name-only"), "", "a path was staged");
     assert.equal(tasksIn(w), w.tasks, "tasks.md was written");
   }
+
+  it("for a tasks.md line that opens as a checkbox item but is no task line, naming it", async (t) => {
+    const w = world(t, tasksMd(3).replace("- [x] T013 [US1]", "- [X] T013 [US1]"));
+    const run = await land(w, gitHubState());
+    assertStops(w, run, [JSON.stringify("- [X] T013 [US1] Test story 1")]);
+  });
 
   it("for kind rescope, naming #178", async (t) => {
     const w = world(t);
