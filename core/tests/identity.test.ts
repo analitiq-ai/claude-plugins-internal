@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, before, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { runGit } from "../src/git.ts";
 import {
@@ -28,6 +29,7 @@ import {
   type PullRequestState,
 } from "../src/identity.ts";
 import { gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
+import { readParameterViolations } from "./source-scan.ts";
 import { fakeGitHub, type FakeCall, type FakeRoutes } from "./support/fake-github.ts";
 
 const REPO = "acme/widgets";
@@ -425,6 +427,57 @@ describe("issueStory", () => {
       const reader = fakeGitHub({});
       await assert.rejects(issueStory(reader, REPO, s), TypeError);
       assert.deepEqual(reader.calls, []);
+    });
+  }
+});
+
+describe("the story PR's closed", () => {
+  const ref = { ref: `refs/heads/${BRANCH}`, node_id: `REF_${BRANCH}`, object: { sha: sha(1), type: "commit" } };
+
+  function routes(closed: boolean, merged: boolean): FakeRoutes {
+    const node = { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, closed, merged };
+    return {
+      restPages: { "/repos/acme/widgets/git/matching-refs/heads/212-us": [ref] },
+      graphqlPages: [
+        { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === BRANCH, answer: [node] },
+      ],
+    };
+  }
+
+  for (const [state, closed, merged] of [
+    ["open", false, false],
+    ["closed unmerged", true, false],
+    ["merged", true, true],
+  ] as const) {
+    const pr = { number: 251, head: sha(251), merged, closed };
+
+    it(`storyPr reads a PR that is ${state} as closed: ${closed}, merged: ${merged}`, async () => {
+      assert.deepEqual(await storyPr(fakeGitHub(routes(closed, merged)), REPO, BRANCH), pr);
+    });
+
+    it(`issueStory reads a PR that is ${state} as closed: ${closed}, merged: ${merged}`, async () => {
+      assert.deepEqual(await issueStory(fakeGitHub(routes(closed, merged)), REPO, 212), { branch: BRANCH, pr });
+    });
+  }
+
+  // The query specPrs sends already asks for `closed`, so the story's PR needs no query of its own to read it.
+  it("storyPr and issueStory ask for the PRs on the branch with the query specPrs asks with", async () => {
+    const reader = fakeGitHub({
+      ...routes(true, false),
+      graphqlPages: [...(routes(true, false).graphqlPages ?? []), { when: (query, vars) => query.includes("pullRequests") && vars.branch === "145-spec", answer: [] }],
+    });
+    await storyPr(reader, REPO, BRANCH);
+    await issueStory(reader, REPO, 212);
+    await specPrs(reader, REPO, 145);
+    const [fromStoryPr, fromIssueStory, fromSpecPrs] = queries(reader.calls);
+    assert.equal(fromStoryPr, fromSpecPrs);
+    assert.equal(fromIssueStory, fromSpecPrs);
+  });
+
+  for (const fn of ["issueStory", "storyPr"]) {
+    it(`${fn} takes no key reader: only GitHub's client and plain values`, () => {
+      const file = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "identity.ts");
+      assert.deepEqual(readParameterViolations(readFileSync(file, "utf8"), "src/identity.ts", fn), []);
     });
   }
 });
