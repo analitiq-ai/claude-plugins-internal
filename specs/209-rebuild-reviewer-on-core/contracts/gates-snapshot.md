@@ -16,10 +16,10 @@ sg `shimgate.py`). Open items only: an ended or merged item is absent.
 ```
 Snapshot.gates: Gates | null    (null until the story's first check; v is the snapshot's)
 Gates   { branch, anchor: sha40, lineages: Lineage[], bugs: Bug[] }
-Lineage { id, file, places: {start, end, claim}[], chain: {ref, claim, line, words, ruling, at}[] }
+Lineage { id, file, places: {start, end, claim}[], chain: {ref, claim, line, words, ruling: ClaimVerdict, at}[] }
 Bug     { id, members: {tree, at}[], absorbed: {tree, at}[], ranges: {file, old_start, old_count}[],
           deep: {same_operation: Site[], callers: Site[]} | null,
-          rulings: {site, ruling, issue: number | null}[] }
+          rulings: {site, ruling: ShimRuling, issue: number | null}[] }
 Site    { file, line, function, does }
 ```
 
@@ -37,7 +37,8 @@ Site    { file, line, function, does }
 | `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258); a merge keeps the survivor's and drops the other's (sc:244-245). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
 | `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294); a merge gives the survivor the other's rulings for the sites it has not ruled, its own winning (sg:419-423) |
 
-Validation: ids unique within each list; times are core `Time`; shas 40 hex.
+Validation: ids unique within each list; rulings take core's `ClaimVerdict` and `ShimRuling` (root ADR-0010); times
+are core `Time`; shas 40 hex.
 
 ## Derived, never stored
 

@@ -14,7 +14,7 @@ hooks-owned bare copy, recording passes in a session-scoped commit-check pass re
 ledger, `unlock`/`override` prompts and `pre_merge_gate.py` are deleted.
 
 Three things land before reviewer's code, each in its own PR (Principle VI, FR-004, FR-016, FR-017):
-1. ADR amendments: reviewer ADR-0011 d1, d2, d5; ADR-0001 d2; ADR-0008; ADR-0013 d4; ADR-0004 d4 and
+1. ADR amendments: root ADR-0010's table; reviewer ADR-0011 d1, d2, d5; ADR-0001 d2; ADR-0008; ADR-0013 d4; ADR-0004 d4 and
    ADR-0003 d1 ("ledger" → the check's session files).
 2. Core: the snapshot's gates section and its one-post write (R5).
 3. Core: commit-check pass record (R11); the protected-path matcher is already core's `protectedPaths`.

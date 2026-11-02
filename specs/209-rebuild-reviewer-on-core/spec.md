@@ -193,7 +193,8 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
 - **FR-002**: reviewer MUST read a story's state only through core's reader, and act on its answer: a held
   or tampered state refuses what it refuses, naming the release core gives.
 - **FR-003**: Rounds and holds MUST use core's value sets (`RoundStage`, `RoundResult`, `RoundVerdict`,
-  `HoldKind`, `HoldState`); reviewer repeats no value's string (root ADR-0010).
+  `HoldKind`, `HoldState`), and the gates section's rulings `ClaimVerdict` and `ShimRuling`; reviewer repeats no
+  value's string (root ADR-0010).
 - **FR-004**: reviewer MUST keep no copy of rounds or holds between hook runs: each hook run that decides on
   them reads the state from GitHub through core and reuses that reading only within the run. This needs
   ADR-0011 d5 amended in its own PR before this spec's code.

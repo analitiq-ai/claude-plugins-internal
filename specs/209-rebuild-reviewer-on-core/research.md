@@ -76,7 +76,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   call that posts the gates change and the `claim-`/`shim-` holds it places in one post; every other writer
   refuses a `gates` differing from the one it read; `recordGates` refuses a snapshot that would not fit with
   every open hold released and one more round recorded ([contracts/gates-snapshot.md](contracts/gates-snapshot.md)).
-  The ADR amendments FR-016 names (reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1, ADR-0013 d4) land first.
+  The ADR amendments FR-016 names (root ADR-0010's table, reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1,
+  ADR-0013 d4) land first.
 - **Rationale**: One comment means one post: a count and its hold land together, so no run can die between them,
   and the newest-unedited rebuild restores counts and holds from the same moment. `judge()` already takes the
   newest reviewer App comment as state, so tamper and release rules apply unchanged. The size rule keeps a

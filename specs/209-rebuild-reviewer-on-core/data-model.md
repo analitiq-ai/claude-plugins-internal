@@ -27,8 +27,8 @@ The state snapshot's `gates: Gates | null`, written only by `recordGates` togeth
 [contracts/gates-snapshot.md](contracts/gates-snapshot.md).
 
 Shape, readers and derivations: [contracts/gates-snapshot.md](contracts/gates-snapshot.md), the one definition. The story's one `branch`, its `anchor`, open `lineages`
-(`places`, `chain` of `{ref, claim, line, words, ruling, at}`) and open `bugs` (`members`, `absorbed`, `ranges`,
-`deep`, `rulings`). Counts and floors are derived, never stored.
+(`places`, `chain` of `{ref, claim, line, words, ruling, at}`, each `ruling` a core `ClaimVerdict`) and open `bugs`
+(`members`, `absorbed`, `ranges`, `deep`, `rulings`, each a core `ShimRuling`). Counts and floors are derived, never stored.
 
 ## Session issue record (#174's, read only)
 
