@@ -75,7 +75,7 @@ describe("labelTasks", () => {
 });
 
 type Issue = { id: number; number: number; title: string; repository_url: string };
-type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean };
+type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean; mergeCommit: { oid: string } | null };
 
 /** What GitHub holds across runs: each run gets a fresh fake recording its own calls over this one state. */
 type GitHubState = {
@@ -97,7 +97,7 @@ function issue(number: number, title = `US: #${number}`, repositoryUrl = REPO_UR
 }
 
 function pr(number: number, over: Partial<Pr> = {}): Pr {
-  return { number, headRefName: BRANCH, isCrossRepository: false, closed: false, merged: false, ...over };
+  return { number, headRefName: BRANCH, isCrossRepository: false, closed: false, merged: false, mergeCommit: null, ...over };
 }
 
 function bodyOf(call: FakeCall): Record<string, unknown> {
@@ -433,7 +433,7 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
 
   it("for a spec PR merged, saying the spec is on the default branch and naming #178", async (t) => {
     const w = world(t);
-    const run = await land(w, gitHubState({ prs: [pr(40, { closed: true, merged: true })] }));
+    const run = await land(w, gitHubState({ prs: [pr(40, { closed: true, merged: true, mergeCommit: { oid: "b".repeat(40) } })] }));
     assertStops(w, run, ["default branch", "#178"]);
   });
 

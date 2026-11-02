@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, before, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { runGit } from "../src/git.ts";
 import {
@@ -28,6 +29,7 @@ import {
   type PullRequestState,
 } from "../src/identity.ts";
 import { gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
+import { readParameterViolations } from "./source-scan.ts";
 import { fakeGitHub, type FakeCall, type FakeRoutes } from "./support/fake-github.ts";
 
 const REPO = "acme/widgets";
@@ -181,12 +183,12 @@ describe("specBranch", () => {
 
 describe("pickSpecPrs", () => {
   function pr(number: number, headRefName: string, over: Partial<PullRequestState> = {}): PullRequestState {
-    return { number, headRefName, isCrossRepository: false, closed: false, merged: false, ...over };
+    return { number, headRefName, isCrossRepository: false, closed: false, merged: false, mergeCommit: null, ...over };
   }
 
   it("is every same-repository PR headed <p>-spec, newest first; a fork's or another head's is not the spec's", () => {
     const prs = [
-      pr(150, "145-spec", { closed: true, merged: true }),
+      pr(150, "145-spec", { closed: true, merged: true, mergeCommit: { oid: sha(150) } }),
       pr(170, "145-spec"),
       pr(160, "145-spec", { closed: true }),
       pr(180, "145-spec", { isCrossRepository: true }),
@@ -194,19 +196,19 @@ describe("pickSpecPrs", () => {
       pr(195, "1450-spec"),
     ];
     assert.deepEqual(pickSpecPrs(prs, 145), [
-      { number: 170, state: "open" },
-      { number: 160, state: "closed" },
-      { number: 150, state: "merged" },
+      { number: 170, state: "open", mergeCommit: null },
+      { number: 160, state: "closed", mergeCommit: null },
+      { number: 150, state: "merged", mergeCommit: { oid: sha(150) } },
     ]);
   });
 
-  for (const [state, over] of [
-    ["open", {}],
-    ["closed", { closed: true }],
-    ["merged", { closed: true, merged: true }],
+  for (const [state, over, mergeCommit] of [
+    ["open", {}, null],
+    ["closed", { closed: true }, null],
+    ["merged", { closed: true, merged: true, mergeCommit: { oid: sha(170) } }, { oid: sha(170) }],
   ] as const) {
     it(`maps a PR that is ${state} to ${state}`, () => {
-      assert.deepEqual(pickSpecPrs([pr(170, "145-spec", over)], 145), [{ number: 170, state }]);
+      assert.deepEqual(pickSpecPrs([pr(170, "145-spec", over)], 145), [{ number: 170, state, mergeCommit }]);
     });
   }
 
@@ -218,9 +220,9 @@ describe("pickSpecPrs", () => {
 
 describe("specPrs and specPr", () => {
   const nodes = [
-    { number: 150, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: true },
-    { number: 160, headRefName: "145-spec", isCrossRepository: true, closed: false, merged: false },
-    { number: 170, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: false },
+    { number: 150, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: true, mergeCommit: { oid: sha(150) } },
+    { number: 160, headRefName: "145-spec", isCrossRepository: true, closed: false, merged: false, mergeCommit: null },
+    { number: 170, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: false, mergeCommit: null },
   ];
   const reader = () =>
     fakeGitHub({
@@ -233,16 +235,77 @@ describe("specPrs and specPr", () => {
   it("specPrs reads the PRs headed <p>-spec once and answers every same-repository one, newest first", async () => {
     const client = reader();
     assert.deepEqual(await specPrs(client, REPO, 145), [
-      { number: 170, state: "closed" },
-      { number: 150, state: "merged" },
+      { number: 170, state: "closed", mergeCommit: null },
+      { number: 150, state: "merged", mergeCommit: { oid: sha(150) } },
     ]);
     assert.equal(client.calls.length, 1);
   });
 
   it("specPr answers the newest of them, and null when there is none", async () => {
-    assert.deepEqual(await specPr(reader(), REPO, 145), { number: 170, state: "closed" });
+    assert.deepEqual(await specPr(reader(), REPO, 145), { number: 170, state: "closed", mergeCommit: null });
     assert.equal(await specPr(reader(), REPO, 146), null);
   });
+});
+
+describe("specPr's merge commit", () => {
+  function onSpecBranch(over: Record<string, unknown>) {
+    const node = {
+      number: 170,
+      headRefName: "145-spec",
+      headRefOid: sha(1170),
+      isCrossRepository: false,
+      closed: false,
+      merged: false,
+      mergeCommit: null,
+      ...over,
+    };
+    return fakeGitHub({
+      graphqlPages: [
+        { when: (query, vars) => query.includes("pullRequests") && inRepo(vars) && vars.branch === "145-spec", answer: [node] },
+      ],
+    });
+  }
+  const MERGED = { closed: true, merged: true, mergeCommit: { oid: sha(170) } };
+
+  for (const [state, over] of [
+    ["open", {}],
+    ["closed", { closed: true }],
+  ] as const) {
+    it(`is null for a PR that is ${state}`, async () => {
+      assert.deepEqual(await specPr(onSpecBranch(over), REPO, 145), { number: 170, state, mergeCommit: null });
+    });
+  }
+
+  it("is the oid of a merged PR's mergeCommit, not of its head", async () => {
+    assert.deepEqual(await specPr(onSpecBranch(MERGED), REPO, 145), {
+      number: 170,
+      state: "merged",
+      mergeCommit: { oid: sha(170) },
+    });
+  });
+
+  it("refuses a merge commit whose oid is no 40-hex commit id", async () => {
+    const client = onSpecBranch({ ...MERGED, mergeCommit: { oid: "HEAD" } });
+    await assert.rejects(specPr(client, REPO, 145), /not the shape asked for/);
+  });
+
+  it("is read in the one query that reads the PR's merged state", async () => {
+    const client = onSpecBranch(MERGED);
+    await specPr(client, REPO, 145);
+    const asked = queries(client.calls);
+    assert.equal(asked.length, 1);
+    assert.match(asked[0], /\bmerged\b/);
+    assert.match(asked[0], /\bmergeCommit\s*\{\s*oid\s*\}/);
+  });
+});
+
+describe("specPrs and specPr signatures (source scan)", () => {
+  for (const fn of ["specPrs", "specPr"]) {
+    it(`${fn} takes no key reader: only GitHub's client and plain values`, () => {
+      const file = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "identity.ts");
+      assert.deepEqual(readParameterViolations(readFileSync(file, "utf8"), "src/identity.ts", fn), []);
+    });
+  }
 });
 
 describe("specFolder", () => {

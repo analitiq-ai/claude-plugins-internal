@@ -26,18 +26,20 @@ export type Story = {
   /** The spec's issue, the story's parent; null when the story is its own. */
   parent: number | null;
   /** The PRs on `<p>-spec`. */
-  specPrs: { number: number; closed: boolean; merged: boolean }[];
+  specPrs: { number: number; closed: boolean; merged: boolean; mergeCommit: { oid: string } | null }[];
   subIssues: number[];
   doneIssues: number[];
   comments: IssueComment[];
 };
+
+export const SPEC_MERGE_COMMIT = { oid: "b".repeat(40) };
 
 export const READY_STORY: Story = {
   story: 212,
   lane: "Ready",
   blockers: [201],
   parent: 200,
-  specPrs: [{ number: 31, closed: true, merged: true }],
+  specPrs: [{ number: 31, closed: true, merged: true, mergeCommit: SPEC_MERGE_COMMIT }],
   subIssues: [],
   doneIssues: [201],
   comments: [],
