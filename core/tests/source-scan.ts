@@ -5,6 +5,8 @@ type Token = {kind: "string" | "word" | "punct" | "other"; value: string; line: 
 
 export type StringLiteral = {value: string; line: number};
 export type ImportSpecifier = {specifier: string; line: number};
+/** `type` is null for a parameter written with no annotation. */
+export type Parameter = {name: string; type: string | null; line: number};
 
 // After any other word, or after `)`, `]` or `}`, a `/` divides.
 const WORDS_BEFORE_REGEX = new Set([
@@ -145,6 +147,10 @@ function tokens(source: string, file: string): Token[] {
   return out;
 }
 
+function is(token: Token | undefined, kind: Token["kind"], value: string): boolean {
+  return token?.kind === kind && token.value === value;
+}
+
 // A template literal with no substitution counts: it is as much a quoted string as '…' and "…".
 export function stringLiterals(text: string, file: string): StringLiteral[] {
   return tokens(text, file)
@@ -155,8 +161,6 @@ export function stringLiterals(text: string, file: string): StringLiteral[] {
 // `require("x")` counts beside the import forms: through `createRequire` it loads code as an import does.
 export function importSpecifiers(text: string, file: string): ImportSpecifier[] {
   const all = tokens(text, file);
-  const is = (token: Token | undefined, kind: Token["kind"], value: string): boolean =>
-    token?.kind === kind && token.value === value;
   return all.flatMap((token, n) => {
     if (token.kind !== "string") return [];
     const [before3, before2, before1] = [all[n - 3], all[n - 2], all[n - 1]];
@@ -168,4 +172,95 @@ export function importSpecifiers(text: string, file: string): ImportSpecifier[] 
         !is(before3, "punct", "."));
     return specifier ? [{specifier: token.value, line: token.line}] : [];
   });
+}
+
+// `=>` is two punct tokens: its `>` closes no bracket and its `=` starts no default.
+function inArrow(all: Token[], n: number): boolean {
+  return (
+    (is(all[n], "punct", "=") && is(all[n + 1], "punct", ">")) ||
+    (is(all[n], "punct", ">") && is(all[n - 1], "punct", "="))
+  );
+}
+
+function depthChange(all: Token[], n: number): number {
+  const token = all[n];
+  if (token.kind !== "punct" || inArrow(all, n)) return 0;
+  if ("([{<".includes(token.value)) return 1;
+  return ")]}>".includes(token.value) ? -1 : 0;
+}
+
+function closer(all: Token[], open: number, file: string): number {
+  let depth = 0;
+  for (let n = open; n < all.length; n++) {
+    depth += depthChange(all, n);
+    if (depth === 0) return n;
+  }
+  throw new Error(`cannot scan ${file}:${all[open].line}: unclosed ${all[open].value}`);
+}
+
+function outsideBrackets(group: Token[], value: string): number[] {
+  const found: number[] = [];
+  let depth = 0;
+  for (let n = 0; n < group.length; n++) {
+    if (depth === 0 && is(group[n], "punct", value) && !inArrow(group, n)) found.push(n);
+    depth += depthChange(group, n);
+  }
+  return found;
+}
+
+// A space only between two words: `readonly string[]`, `Record<string,unknown>`.
+function written(group: Token[]): string {
+  return group
+    .map((token, n) => {
+      const space = n > 0 && token.kind === "word" && group[n - 1].kind === "word" ? " " : "";
+      return space + (token.kind === "string" ? `"${token.value}"` : token.value);
+    })
+    .join("");
+}
+
+function parameter(group: Token[]): Parameter {
+  const [defaultAt = group.length] = outsideBrackets(group, "=");
+  const declared = group.slice(0, defaultAt);
+  const [colon] = outsideBrackets(declared, ":");
+  return {
+    name: written(colon === undefined ? declared : declared.slice(0, colon)),
+    type: colon === undefined ? null : written(declared.slice(colon + 1)),
+    line: group[0].line,
+  };
+}
+
+// Read from the tokens, so a comment or string inside the list is never taken for a parameter.
+export function exportedParameters(text: string, file: string, name: string): Parameter[] | null {
+  const all = tokens(text, file);
+  const at = all.findIndex(
+    (token, n) =>
+      is(token, "word", name) &&
+      is(all[n - 1], "word", "function") &&
+      (is(all[n - 2], "word", "export") || (is(all[n - 2], "word", "async") && is(all[n - 3], "word", "export"))),
+  );
+  if (at === -1) return null;
+  const open = at + 1;
+  if (!is(all[open], "punct", "(")) throw new Error(`cannot scan ${file}:${all[at].line}: no ( after ${name}`);
+  const list = all.slice(open + 1, closer(all, open, file));
+  const cuts = [-1, ...outsideBrackets(list, ","), list.length];
+  return cuts
+    .slice(1)
+    .map((cut, n) => list.slice(cuts[n] + 1, cut))
+    .filter((group) => group.length > 0)
+    .map(parameter);
+}
+
+// Spec 217 FR-024: a core addition builder calls takes no key reader. Its parameters are GitHub's client and plain
+// values, a folder path being a string. A writing client is a GitHubClient as a reader is, so no type tells the two
+// apart: the caller's token decides which one it is handed.
+const READ_PARAMETER_TYPES: ReadonlySet<string> = new Set(["GitHubClient", "string", "number", "boolean"]);
+
+export function readParameterViolations(text: string, file: string, name: string): string[] {
+  const parameters = exportedParameters(text, file, name);
+  if (parameters === null) return [`${file} exports no function ${name}`];
+  return parameters
+    .filter(({type}) => type === null || !READ_PARAMETER_TYPES.has(type))
+    .map(({name: parameter, type, line}) =>
+      type === null ? `${file}:${line} ${name} takes ${parameter} with no type` : `${file}:${line} ${name} takes ${parameter}: ${type}`,
+    );
 }
