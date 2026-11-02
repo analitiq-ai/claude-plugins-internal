@@ -144,6 +144,7 @@ describe("storyTasks", () => {
       "### Tests for User Story 1",
       "- T011 [US1] Retry with no checkbox",
       "- [research](research.md) says why",
+      "- [a](a.md) says how",
       "- [ ] T010 [US1] Retry once",
     ].join("\n");
     assert.deepEqual(storyTasks(block, 13).map((task) => task.id), ["T010"]);
@@ -180,6 +181,7 @@ describe("storyTasks", () => {
       "- [ ]T010 [US1] Retry once",
       "- [] T010 [US1] Retry once",
       "* [ ] T010 [US1] Retry once",
+      "1. [ ] T010 [US1] Retry once",
       "- [ ] Retry with no task id",
     ]) {
       it(`refuses ${JSON.stringify(line)} in #13's block as TaskLineRefused, never as no task`, () => {
