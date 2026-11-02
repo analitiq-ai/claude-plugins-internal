@@ -62,6 +62,7 @@ function snapshot(rounds: number, fields: Partial<Snapshot> = {}): Snapshot {
     holds: [],
     pushbacks: [],
     rulings: [],
+    gates: null,
     ...fields,
   };
 }
@@ -108,7 +109,7 @@ function invalidError(reading: StateReading): string {
   return invalid.error;
 }
 
-const EMPTY: Snapshot = { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] };
+const EMPTY: Snapshot = { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
 
 describe("stateFrom: which comment is the state comment", () => {
   it("is the newest by the reviewer App, among newer admin and orchestrator App comments", () => {

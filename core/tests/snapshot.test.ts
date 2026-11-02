@@ -47,7 +47,7 @@ function ruling(fields: Fields = {}): Fields {
 const THREADLESS = { key: "required-check:ci", latest_trusted_comment_id: null, reply: null };
 
 function snapshot(fields: Fields = {}): Fields {
-  return { v: 1, rounds: [round()], holds: [], pushbacks: [], rulings: [], ...fields };
+  return { v: 1, rounds: [round()], holds: [], pushbacks: [], rulings: [], gates: null, ...fields };
 }
 
 function accepted(value: Fields): void {
@@ -56,7 +56,7 @@ function accepted(value: Fields): void {
   assert.deepEqual(parsed.data, value);
 }
 
-// Every issue's path is compared, so a refusal for any other reason than the one named fails the test.
+// Every issue's path is compared, so a refusal at any other path, or at one more, fails the test.
 function refusedAt(value: Fields, ...paths: PropertyKey[][]): void {
   const parsed = Snapshot.safeParse(value);
   if (parsed.success) assert.fail("accepted");
@@ -80,7 +80,7 @@ test("a snapshot holding every stage, kind and state is accepted as written", ()
         hold(),
         hold({ id: "escalation-212", kind: "escalation", question: "Which reading of FR-3 holds?" }),
         releasedHold({ id: "rescope-212", kind: "rescope", spec_pr: 301 }),
-        hold({ id: "claim-L7", kind: "claim" }),
+        hold({ id: "claim-L7", kind: "claim", question: "Line 4 says parse refuses null; parse(null) returns {}." }),
         releasedHold({ id: "shim-B3", kind: "shim", released_by: { comment: 9002, reset: true } }),
         hold({ id: "audit-212", kind: "audit" }),
       ],
@@ -96,12 +96,23 @@ test("a snapshot holding every stage, kind and state is accepted as written", ()
 });
 
 test("an empty snapshot is accepted", () => {
-  accepted({ v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] });
+  accepted({ v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null });
 });
 
 test("rulings is required", () => {
   const { rulings: _, ...unruled } = snapshot();
   refusedAt(unruled, ["rulings"]);
+});
+
+test("gates is null until the story's first check, or a gates section", () => {
+  accepted(snapshot({ gates: null }));
+  accepted(snapshot({ gates: { branch: "42-us1-login", anchor: HEAD, lineages: [], bugs: [] } }));
+  refusedAt(snapshot({ gates: { branch: "42-us1-login", anchor: "HEAD", lineages: [], bugs: [] } }), ["gates", "anchor"]);
+});
+
+test("gates is required", () => {
+  const { gates: _, ...ungated } = snapshot();
+  refusedAt(ungated, ["gates"]);
 });
 
 test("v is 1", () => {
@@ -161,6 +172,7 @@ for (const [field, place] of [
 ] as const) {
   test(`${field} is YYYY-MM-DDTHH:MM:SSZ, UTC, whole seconds`, () => {
     const path = field === "at" ? ["rounds", 0, field] : ["holds", 0, field];
+    accepted(place(AT));
     for (const time of [
       "2026-10-28T10:00:00.000Z",
       "2026-10-28T10:00:00+00:00",
@@ -222,14 +234,16 @@ test("released_by is {comment: int, reset: bool}", () => {
   ]);
 });
 
-test("question is set and non-empty on an escalation hold", () => {
-  const escalation = { id: "escalation-212", kind: "escalation" };
-  refusedAt(snapshot({ holds: [hold({ ...escalation, question: null })] }), ["holds", 0, "question"]);
-  refusedAt(snapshot({ holds: [hold({ ...escalation, question: "" })] }), ["holds", 0, "question"]);
+test("question is set and non-empty on an escalation or claim hold", () => {
+  for (const kind of ["escalation", "claim"]) {
+    accepted(snapshot({ holds: [hold({ id: `${kind}-212`, kind, question: "Why?" })] }));
+    refusedAt(snapshot({ holds: [hold({ id: `${kind}-212`, kind, question: null })] }), ["holds", 0, "question"]);
+    refusedAt(snapshot({ holds: [hold({ id: `${kind}-212`, kind, question: "" })] }), ["holds", 0, "question"]);
+  }
 });
 
 test("question is null on every other kind", () => {
-  for (const kind of ["rescope", "pushback", "claim", "shim", "audit"]) {
+  for (const kind of ["rescope", "pushback", "shim", "audit"]) {
     refusedAt(snapshot({ holds: [hold({ id: `${kind}-212`, kind, question: "Why?" })] }), ["holds", 0, "question"]);
   }
 });
@@ -247,7 +261,7 @@ test("spec_pr on a rescope hold is an integer of at least 1, or null for one pla
 
 test("spec_pr is null on every kind but rescope", () => {
   for (const kind of ["escalation", "pushback", "claim", "shim", "audit"]) {
-    const question = kind === "escalation" ? "Why?" : null;
+    const question = kind === "escalation" || kind === "claim" ? "Why?" : null;
     refusedAt(snapshot({ holds: [hold({ id: `${kind}-212`, kind, question, spec_pr: 301 })] }), [
       "holds",
       0,

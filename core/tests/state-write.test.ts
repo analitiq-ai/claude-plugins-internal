@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { Hold, Snapshot } from "../src/contracts/snapshot.ts";
+import type { Gates } from "../src/contracts/gates.ts";
+import type { Hold, Round, Snapshot } from "../src/contracts/snapshot.ts";
 import {
   checkTransition,
   placeHold,
   placeRescopeHold,
+  readState,
+  recordGates,
   releaseOnClaim,
   renderState,
+  stateFrom,
   StateWriteRefused,
   writeState,
   type IssueComment,
+  type Opening,
 } from "../src/state.ts";
 import {
   BOARD,
@@ -25,7 +30,9 @@ import {
   comment,
   deletion,
   fixRuling,
+  gates,
   hold,
+  lineage,
   move,
   postedSnapshot,
   posts,
@@ -81,6 +88,7 @@ describe("writeState", () => {
         TAG,
         "```json",
         "{",
+        '  "gates": null,',
         '  "holds": [],',
         '  "pushbacks": [],',
         '  "rounds": [',
@@ -215,12 +223,20 @@ describe("checkTransition", () => {
     ["a hold row dropped", { ...old, holds: [old.holds[0]] }],
     ["a hold row released", { ...old, holds: [releasedHold("pushback-212", 91), old.holds[1]] }],
     ["a released hold row reopened", { ...old, holds: [old.holds[0], hold("escalation-212")] }],
+    ["a gates section written", { ...old, gates: gates() }],
   ];
   for (const [what, next] of refused) {
     it(`refuses ${what}`, () => {
       assert.throws(() => checkTransition(old, next), StateWriteRefused);
     });
   }
+
+  it("refuses a gates change, naming recordGates", () => {
+    const gated = { ...old, gates: gates() };
+    for (const next of [old, { ...gated, gates: gates({ lineages: [lineage("L7")] }) }]) {
+      assert.throws(() => checkTransition(gated, next), refusal(/recordGates/));
+    }
+  });
 });
 
 describe("every write but the release path is refused while a tamper cause stands", () => {
@@ -234,6 +250,10 @@ describe("every write but the release path is refused while a tamper cause stand
     ["writeState", (issue, out) => writeState(reader(issue), out, REPO, ISSUE, SHARED, { ...old, rounds: [...old.rounds, round(2)] })],
     ["placeHold", (issue, out) => placeHold(reader(issue), out, REPO, ISSUE, SHARED, { id: "pushback-212", kind: "pushback", question: null })],
     ["placeRescopeHold", (issue, out) => placeRescopeHold(reader(issue), out, REPO, ISSUE, SHARED, 301)],
+    [
+      "recordGates",
+      async (issue, out) => recordGates(reader(issue), out, REPO, ISSUE, SHARED, await readState(reader(issue), REPO, ISSUE, SHARED), gates(), []),
+    ],
   ];
   const tamperedAt: Record<string, string> = { tampered: at("10:30"), deleted: at("10:40"), invalid: at("10:15") };
 
@@ -282,13 +302,14 @@ describe("placeHold", () => {
 
   it("places a first hold on an issue with no state", async () => {
     const out = writer();
-    await placeHold(reader({ comments: [] }), out, REPO, ISSUE, SHARED, { id: "claim-L7", kind: "claim", question: null });
+    await placeHold(reader({ comments: [] }), out, REPO, ISSUE, SHARED, { id: "audit-212", kind: "audit", question: null });
     assert.deepEqual(postedSnapshot(posts(out)[0]), {
       v: 1,
       rounds: [],
-      holds: [hold("claim-L7", { since: NOW })],
+      holds: [hold("audit-212", { since: NOW })],
       pushbacks: [],
       rulings: [],
+      gates: null,
     });
   });
 
@@ -306,6 +327,18 @@ describe("placeHold", () => {
     await placeHold(reader(current(old)), out, REPO, ISSUE, SHARED, { id: "escalation-212", kind: "escalation", question: "Again?" });
     assert.deepEqual(out.calls, []);
   });
+
+  for (const kind of ["claim", "shim"] as const) {
+    it(`refuses kind ${kind}, naming recordGates, posting nothing`, async () => {
+      const out = writer();
+      const question = kind === "claim" ? "Why?" : null;
+      await assert.rejects(
+        placeHold(reader(current(snapshot())), out, REPO, ISSUE, SHARED, { id: `${kind}-L7`, kind, question }),
+        refusal(/recordGates/),
+      );
+      assert.deepEqual(out.calls, []);
+    });
+  }
 
   it("refuses kind rescope, naming placeRescopeHold", async () => {
     const out = writer();
@@ -377,6 +410,7 @@ describe("placeRescopeHold", () => {
       holds: [rescope({ since: NOW, spec_pr: null })],
       pushbacks: [],
       rulings: [],
+      gates: null,
     });
     const released = snapshot({ holds: [releasedHold("rescope-212", 90, { spec_pr: null })] });
     assert.deepEqual(await place(released, null), { ...released, holds: [rescope({ since: NOW, spec_pr: null })] });
@@ -433,13 +467,17 @@ describe("releaseOnClaim", () => {
     assert.deepEqual(answer.reset, { url: reset.url, at: reset.createdAt });
   });
 
-  it("with a released tamper cause and no open hold, posts the rebuilt working snapshot", async () => {
-    const working = snapshot({ rounds: [round(1), round(2)] });
+  it("with a released tamper cause and no open hold, posts the rebuilt working snapshot, its gates with its holds", async () => {
+    const working = snapshot({
+      rounds: [round(1), round(2)],
+      holds: [releasedHold("claim-L7", 80)],
+      gates: gates({ lineages: [lineage("L7")] }),
+    });
     const out = writer();
     const issue: Issue = {
       comments: [
         stateComment(90, working, { createdAt: at("09:00") }),
-        stateComment(100, snapshot({ rounds: [round(1), round(2), round(3)] }), { lastEditedAt: at("10:30") }),
+        stateComment(100, snapshot({ rounds: [round(1), round(2), round(3)], gates: gates() }), { lastEditedAt: at("10:30") }),
         adminComment(201, "10:45"),
       ],
       moves: [move("11:00")],
@@ -486,6 +524,7 @@ describe("every write refuses an issue that is no issue number before asking Git
     ["placeHold", (read, out, issue) => placeHold(read, out, REPO, issue, SHARED, { id: "pushback-212", kind: "pushback", question: null })],
     ["placeRescopeHold", (read, out, issue) => placeRescopeHold(read, out, REPO, issue, SHARED, 301)],
     ["releaseOnClaim", (read, out, issue) => releaseOnClaim(read, out, REPO, issue, SHARED)],
+    ["recordGates", (read, out, issue) => recordGates(read, out, REPO, issue, SHARED, stateFrom([], [], [], new Set(), SHARED), gates(), [])],
   ];
 
   for (const [write, call] of writes) {
@@ -502,4 +541,172 @@ describe("every write refuses an issue that is no issue number before asking Git
       }
     });
   }
+});
+
+describe("every write but recordGates posts the gates it read", () => {
+  const section = gates({ lineages: [lineage("L7")] });
+  const old = snapshot({ gates: section, holds: [hold("pushback-212", { since: at("10:00") })] });
+
+  it("writeState refuses a snapshot whose gates are not the ones it read, naming recordGates, posting nothing", async () => {
+    for (const changed of [null, gates()]) {
+      const out = writer();
+      const next = { ...old, rounds: [...old.rounds, round(2)], gates: changed };
+      await assert.rejects(writeState(reader(current(old)), out, REPO, ISSUE, SHARED, next), refusal(/recordGates/));
+      assert.deepEqual(out.calls, []);
+    }
+  });
+
+  const released: Issue = { comments: [stateComment(100, old, { createdAt: at("10:00") }), adminComment(201, "10:30")], moves: [move("11:00")] };
+  const writes: Array<[string, Issue, (issue: Issue, out: ReturnType<typeof writer>) => Promise<unknown>]> = [
+    ["writeState", current(old), (issue, out) => writeState(reader(issue), out, REPO, ISSUE, SHARED, { ...old, rounds: [...old.rounds, round(2)] })],
+    ["placeHold", current(old), (issue, out) => placeHold(reader(issue), out, REPO, ISSUE, SHARED, { id: "audit-212", kind: "audit", question: null })],
+    ["placeRescopeHold", current(old), (issue, out) => placeRescopeHold(reader(issue), out, REPO, ISSUE, SHARED, 301)],
+    ["releaseOnClaim", released, (issue, out) => releaseOnClaim(reader(issue), out, REPO, ISSUE, SHARED)],
+  ];
+  for (const [write, issue, call] of writes) {
+    it(`${write} posts the gates it read`, async () => {
+      const out = writer();
+      await call(issue, out);
+      assert.deepEqual(postedSnapshot(posts(out)[0]).gates, section);
+    });
+  }
+});
+
+describe("recordGates", () => {
+  const before = gates({ lineages: [lineage("L6")] });
+  const after = gates({ lineages: [lineage("L6"), lineage("L7")] });
+  const question = "Line 4 says parse refuses a null header; parse(null) returns {}.";
+
+  async function record(issue: Issue, next: Gates, openings: Opening[]): Promise<Snapshot> {
+    const read = await readState(reader(issue), REPO, ISSUE, SHARED);
+    const out = writer();
+    await recordGates(reader(issue), out, REPO, ISSUE, SHARED, read, next, openings);
+    const bodies = posts(out);
+    assert.equal(bodies.length, 1, "one comment is posted");
+    return postedSnapshot(bodies[0]);
+  }
+
+  async function refused(issue: Issue, next: Gates, openings: Opening[], check: (error: unknown) => boolean): Promise<void> {
+    const read = await readState(reader(issue), REPO, ISSUE, SHARED);
+    const out = writer();
+    await assert.rejects(recordGates(reader(issue), out, REPO, ISSUE, SHARED, read, next, openings), check);
+    assert.deepEqual(out.calls, []);
+  }
+
+  it("posts one snapshot with gates replaced and each opening placed, a claim- opening carrying its question", async () => {
+    const old = snapshot({ gates: before, holds: [hold("pushback-212")] });
+    const posted = await record(current(old), after, [
+      { id: "claim-L7", question },
+      { id: "shim-B3", question: null },
+    ]);
+    assert.deepEqual(posted, {
+      ...old,
+      gates: after,
+      holds: [old.holds[0], hold("claim-L7", { since: NOW, question }), hold("shim-B3", { since: NOW })],
+    });
+  });
+
+  it("posts the gates change and leaves an OPEN row as it is", async () => {
+    const old = snapshot({ gates: before, holds: [hold("claim-L7", { question: "Asked before?" })] });
+    assert.deepEqual(await record(current(old), after, [{ id: "claim-L7", question }]), { ...old, gates: after });
+  });
+
+  it("reopens a RELEASED row in its place with a new since and question, still one row per id", async () => {
+    const old = snapshot({ gates: before, holds: [releasedHold("claim-L7", 90, { since: at("08:00") }), hold("pushback-212")] });
+    assert.deepEqual(await record(current(old), after, [{ id: "claim-L7", question }]), {
+      ...old,
+      gates: after,
+      holds: [hold("claim-L7", { since: NOW, question }), old.holds[1]],
+    });
+  });
+
+  it("writes the first state of an issue with none", async () => {
+    assert.deepEqual(await record({ comments: [] }, after, [{ id: "shim-B3", question: null }]), {
+      v: 1,
+      rounds: [],
+      holds: [hold("shim-B3", { since: NOW })],
+      pushbacks: [],
+      rulings: [],
+      gates: after,
+    });
+  });
+
+  it("keeps the rounds and holds written since its reading, when the gates on GitHub are still the reading's", async () => {
+    const old = snapshot({ gates: before });
+    const read = await readState(reader(current(old)), REPO, ISSUE, SHARED);
+    const newer = { ...old, rounds: [...old.rounds, round(2)], holds: [hold("pushback-212")] };
+    const issue: Issue = { comments: [stateComment(100, old), stateComment(101, newer, { createdAt: at("10:05") })] };
+    const out = writer();
+    await recordGates(reader(issue), out, REPO, ISSUE, SHARED, read, after, []);
+    assert.deepEqual(postedSnapshot(posts(out)[0]), { ...newer, gates: after });
+  });
+
+  const stale: Array<[string, Issue, Issue]> = [
+    ["a newer section", current(snapshot({ gates: before })), current(snapshot({ gates: gates() }))],
+    ["a first section", { comments: [] }, current(snapshot({ gates: before }))],
+  ];
+  for (const [what, then, now] of stale) {
+    it(`refuses a stale reading, posting nothing: ${what} was written since`, async () => {
+      const read = await readState(reader(then), REPO, ISSUE, SHARED);
+      const out = writer();
+      await assert.rejects(recordGates(reader(now), out, REPO, ISSUE, SHARED, read, after, []), refusal(/gates/));
+      assert.deepEqual(out.calls, []);
+    });
+  }
+
+  for (const id of ["pushback-212", "escalation-212", "audit-212", "rescope-212"]) {
+    it(`refuses an opening of ${id}, naming it, posting nothing`, async () => {
+      await refused(current(snapshot({ gates: before })), after, [{ id, question: null }], refusal(new RegExp(id)));
+    });
+  }
+
+  const broken: Array<[string, Gates, Opening[]]> = [
+    ["an anchor that is no sha", { ...after, anchor: "HEAD" }, []],
+    ["a claim- opening without its question", after, [{ id: "claim-L7", question: null }]],
+    ["a shim- opening with a question", after, [{ id: "shim-B3", question: "Why?" }]],
+  ];
+  for (const [what, next, openings] of broken) {
+    it(`refuses ${what}, which breaks the contract, posting nothing`, async () => {
+      await refused(current(snapshot({ gates: before })), next, openings, refusal(/contract/));
+    });
+  }
+
+  // The contract's largest release and round, spelt out so core is graded against it: a DIRTY round, whose verdict
+  // outweighs any other result's null, the longest value of every other set, the largest integer, and a time, whose
+  // width is fixed.
+  function reserved(state: Snapshot): Snapshot {
+    const releasedBy = { comment: Number.MAX_SAFE_INTEGER, reset: false };
+    const holds = state.holds.map((row): Hold =>
+      row.state === "OPEN" ? { ...row, state: "RELEASED", released: NOW, released_by: releasedBy } : row,
+    );
+    const largest: Round = {
+      stage: "INTERNAL",
+      n: Number.MAX_SAFE_INTEGER,
+      head: sha(1),
+      result: "DIRTY",
+      verdict: "CONVERGED_PUSHBACK",
+      root_cause: "NOT_APPLICABLE",
+      at: NOW,
+    };
+    return { ...state, holds, rounds: [...state.rounds, largest] };
+  }
+
+  it("refuses unless the snapshot fits with every OPEN hold released and one more largest round, naming size, reserve and limit", async () => {
+    const old = snapshot({ gates: before, holds: [hold("pushback-212"), hold("claim-L5"), releasedHold("audit-212", 90)] });
+    const openings: Opening[] = [{ id: "shim-B3", question: null }];
+    const withWords = (words: string): Gates => gates({ lineages: [lineage("L7", { chain: [{ ...lineage("L7").chain[0], words }] })] });
+    const posted = (words: string): Snapshot => ({ ...old, gates: withWords(words), holds: [...old.holds, hold("shim-B3", { since: NOW })] });
+    const reserve = renderState(reserved(posted(""))).length - renderState(posted("")).length;
+    const fits = "".padEnd(COMMENT_LIMIT - reserve - renderState(posted("")).length, "x");
+    assert.equal(renderState(posted(fits)).length, COMMENT_LIMIT - reserve);
+
+    await refused(current(old), withWords(`${fits}x`), openings, (error: unknown) => {
+      assert.ok(error instanceof StateWriteRefused, `expected StateWriteRefused, got ${String(error)}`);
+      for (const n of [COMMENT_LIMIT - reserve + 1, reserve, COMMENT_LIMIT]) {
+        assert.ok(error.message.includes(String(n)), `${n} is not named: ${error.message}`);
+      }
+      return true;
+    });
+    assert.equal(renderState(await record(current(old), withWords(fits), openings)), renderState(posted(fits)));
+  });
 });

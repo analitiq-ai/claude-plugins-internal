@@ -40,7 +40,7 @@ function releasedHold(fields: Partial<Hold> = {}): Hold {
 }
 
 function snapshot(rounds: Round[], holds: Hold[] = []): Snapshot {
-  return { v: 1, rounds, holds, pushbacks: [], rulings: [] };
+  return { v: 1, rounds, holds, pushbacks: [], rulings: [], gates: null };
 }
 
 function reading(state: Snapshot | null, causes: StateCause[] = []) {

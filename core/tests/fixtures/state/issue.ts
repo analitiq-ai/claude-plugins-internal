@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import type { Gates, Lineage } from "../../../src/contracts/gates.ts";
 import type { Hold, Round, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
 import type { Shared } from "../../../src/settings.ts";
 import type { CommentDeletion, IssueComment, StatusChange } from "../../../src/state.ts";
@@ -46,10 +47,10 @@ export function round(n: number, fields: Partial<Round> = {}): Round {
   return { stage: "INTERNAL", n, head: sha(n), result: "CLEAN", verdict: null, root_cause: null, at: at("09:00"), ...fields };
 }
 
-/** An OPEN row; an escalation gets a question, as its contract needs one. */
+/** An OPEN row; an escalation hold gets a question (orchestrator ADR-0010 d1), and so does a claim hold (reviewer ADR-0013 d4). */
 export function hold(id: string, fields: Partial<Hold> = {}): Hold {
   const kind = id.slice(0, id.indexOf("-")) as Hold["kind"];
-  const question = kind === "escalation" ? "Which reading of FR-3 holds?" : null;
+  const question = kind === "escalation" || kind === "claim" ? "Which reading of FR-3 holds?" : null;
   return { id, kind, state: "OPEN", since: at("10:00"), released: null, released_by: null, question, spec_pr: null, ...fields };
 }
 
@@ -73,7 +74,21 @@ export function fixRuling(key: string, n: number, commits: string[]): Ruling {
 }
 
 export function snapshot(fields: Partial<Snapshot> = {}): Snapshot {
-  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], rulings: [], ...fields };
+  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], rulings: [], gates: null, ...fields };
+}
+
+export function lineage(id: string, fields: Partial<Lineage> = {}): Lineage {
+  return {
+    id,
+    file: "src/parse.ts",
+    places: [{ start: 120, end: 168, claim: "c1" }],
+    chain: [{ ref: sha(1), claim: "c1", line: 4, words: "refuses a null header", ruling: "WRONG", at: at("09:00") }],
+    ...fields,
+  };
+}
+
+export function gates(fields: Partial<Gates> = {}): Gates {
+  return { branch: "212-us1-login", anchor: sha(1), lineages: [], bugs: [], ...fields };
 }
 
 export function stateBody(state: Snapshot): string {
