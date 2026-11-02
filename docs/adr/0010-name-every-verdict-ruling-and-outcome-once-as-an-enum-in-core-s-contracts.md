@@ -63,8 +63,8 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 | Round stage | INTERNAL, AUDIT, GITHUB | core; reviewer ADR-0019 |
 | Finding source | threads, required-checks, or a validator module's name | core; ADR-0003 |
 | Finding kind | DEFECT, FIX_INDUCED, CLASS_SIBLING, DUPLICATE, SPEC_GAP, BIKESHED, GOLD_PLATING, NOT_REAL | reviewer |
-| Claim verdict | CORRECT, WRONG, UNSURE | reviewer |
-| Shim ruling | SHARES, NOT_SHARED, DEFERRED | reviewer |
+| Claim verdict | CORRECT, WRONG, UNSURE | core; reviewer ADR-0001 |
+| Shim ruling | SHARES, NOT_SHARED, DEFERRED | core; reviewer ADR-0008 |
 
 ## Options considered
 

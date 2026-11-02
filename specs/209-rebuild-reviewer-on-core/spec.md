@@ -237,8 +237,8 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
 - **FR-016**: Core's snapshot contract MUST gain `gates: Gates | null`, changed only by one call that posts the
   gates change and the holds it places together; every other write MUST refuse a `gates` differing from the one it
   read, and the gates call MUST refuse a snapshot that would not fit with every open hold released and one more
-  round recorded. This core change and the amendments to reviewer ADR-0001 d2, ADR-0008, ADR-0011 d1 and
-  ADR-0013 d4 land in their own PRs before this spec's code.
+  round recorded. This core change and the amendments to root ADR-0010's table, reviewer ADR-0001 d2, ADR-0008,
+  ADR-0011 d1 and ADR-0013 d4 land in their own PRs before this spec's code.
 - **FR-017**: The state of a running commit check and its read and verdict memos MUST live only in
   session-scoped files beside the commit-check pass record; reviewer MUST keep no database, and nothing of
   these persists across sessions. ADR-0004 d4's "ledger" is amended to the check's record in its own PR.
