@@ -18,8 +18,8 @@ removed.
 | DIRTY / RESCOPE (was RESHAPE_SPEC) | `placeRescopeHold(specPr)` | `rescope-<issue>` |
 | audits spent | `placeHold` | `audit-<issue>` |
 | stage cap with open pushback | `placeHold` | `pushback-<issue>` |
-| lineage WRONG count ≥ 3 | `placeHold` | `claim-<lineage>` |
-| bug count ≥ 4 | `placeHold` | `shim-<bug>` |
+| lineage WRONG count ≥ `claim_hold_at` | `recordGates` | `claim-<lineage>` (with question) |
+| bug count ≥ `shim_hold_at` | `recordGates` | `shim-<bug>` |
 
 ## Gates section (core snapshot, new — PR B)
 

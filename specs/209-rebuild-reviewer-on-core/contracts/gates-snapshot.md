@@ -32,10 +32,10 @@ Site    { file, line, function, does }
 | `chain[].claim`, `words` | first-words search when no place survived (ln:166) |
 | `chain[].line` | the hold question's text (cc:298) |
 | `chain[].ruling`, `at` | the counts and release floors below |
-| `members`, `absorbed` | a tree in either is never counted again (sc:268); a merge keeps as `members` those of the bug with the higher count (sc:224, ADR-0008 d2) and moves the other's into `absorbed` |
+| `members`, `absorbed` | a tree in either is never counted again (sc:268); a merge keeps as `members` those of the bug with the higher count, the smaller id on a tie (sc:222-224, ADR-0008 d2), and moves the other's into `absorbed` |
 | `ranges` | which bug a change belongs to, by overlap (sc:189); lines are in the anchor's text |
-| `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
-| `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294) |
+| `deep` | the deep sweep runs once; the next check reuses its lists (sg:172-175, 219, 258); a merge keeps the survivor's and drops the other's (sc:244-245). A site keeps `file`, `function` (site id, sc:35-36, 67), `line` (its range, sc:120-121) and `does` (the judge's prompt, jev.py:109-110) |
+| `rulings` | a site is ruled once per bug (sg:302); not-shared/deferred sites leave the sweep (sg:392); a deferred ruling is dropped once its `issue` closes (sg:284-294); a merge gives the survivor the other's rulings for the sites it has not ruled, its own winning (sg:419-423) |
 
 Validation: ids unique within each list; times are core `Time`; shas 40 hex.
 

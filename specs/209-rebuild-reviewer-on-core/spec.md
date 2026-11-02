@@ -231,7 +231,7 @@ posted, on the first run only. Repeat with the record faked as a resume; check n
   times against the reset and the hold row's release, never stored; a check counts once; a merged bug carries
   the higher of its bugs' counts, never their sum (ADR-0008 d2). A check MUST look for the anchor in the hooks'
   bare copy, then fetch it by its sha from the model's clone, then from GitHub; when none has it, the check MUST
-  stop with an error naming the anchor and `/codeworks reset`. Once a reset is newer than every time in the
+  stop with an error naming the branch, the anchor and `/codeworks reset`. Once a reset is newer than every time in the
   section, a check that cannot find the anchor MUST drop its lineages and bugs and anchor on its own head. The
   thresholds are `[reviewer]` keys: `claim_hold_at`, `shim_deep_at`, `shim_hold_at`, none in code.
 - **FR-016**: Core's snapshot contract MUST gain `gates: Gates | null`, changed only by one call that posts the

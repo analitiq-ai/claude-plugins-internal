@@ -45,8 +45,9 @@ overlaps two has to say which bug they then belong to.
 1. We will treat two tracked bugs as one bug from the moment one checked change overlaps both. Every later
    step applies to them together.
 2. We will give the merged bug the higher of the two counts of refusals. The bug with the higher count goes
-   on: it keeps its `members`, moves every tree of the other into `absorbed` as evidence, never counted, and
-   takes the union of both bugs' ranges. The other bug is dropped.
+   on, the one with the smaller id on a tie: it keeps its `members` and its deep-sweep lists, moves every tree
+   of the other into `absorbed` as evidence, never counted, takes the union of both bugs' ranges, and takes
+   the other's site rulings for the sites it has not ruled, its own ruling winning. The other bug is dropped.
 3. We will keep each open bug in the gates section of the story's state snapshot (ADR-0011 d1), in the shape
    of core's snapshot contract `Gates` (`core/src/contracts/gates.ts`).
 4. We will never count again a tree in a bug's `members` or `absorbed`: a check run again on that tree adds

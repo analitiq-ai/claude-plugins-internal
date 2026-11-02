@@ -19,5 +19,5 @@ could-not-run outcomes for writes, which still record nothing.
 | claim/shim check pending for the range | the workflow to launch and its range |
 | branch's GitHub head not an ancestor of the local head | pushed history rewritten; the pushed head to restore |
 | session write lock not acquired in time | could not run; retry the step |
-| gates anchor commit not in the bare copy nor on GitHub | error naming the branch and anchor; nothing graded or recorded |
+| gates anchor commit in none of the bare copy, the model's clone and GitHub, and no reset later than every `at` in the section (else the check starts the section over, gates-snapshot.md §Anchor) | error naming the branch, the anchor and `/codeworks reset`; nothing graded or recorded |
 | check on a branch other than the story's gates `branch` | error naming both branches; nothing graded or recorded |

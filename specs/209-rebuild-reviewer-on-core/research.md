@@ -93,7 +93,7 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   reaches a threshold places the hold, with its question, in the same `recordGates` post.
 - **Rationale**: FR-015: counts never stored, so a reset or a release needs no gates write to take effect, and no
   count can drift from its evidence.
-- **Existing tools**: `claimgate.py`/`shimgate.py` count rules and thresholds (ported); `StateReading.reset`
+- **Existing tools**: `claimcheck.py`/`shimcheck.py` count rules (ported), their thresholds becoming `[reviewer]` keys read through `ReviewerSettings` (T022); `StateReading.reset`
   and the hold row's `released` from core.
 
 ## R7: Session issue record read through #174's core reader
