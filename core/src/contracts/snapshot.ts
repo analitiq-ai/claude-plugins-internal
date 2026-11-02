@@ -1,17 +1,12 @@
 import { z } from "zod";
 import { FindingRuling, HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
 import { Gates } from "./gates.ts";
+import { setExactlyWhen } from "./refinements.ts";
 import { GitSha, Time } from "./scalars.ts";
 
 // The pair that names a round, so a pushback names its round by the same fields the round carries.
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
-
-export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
-  if ((value !== null) !== condition) {
-    ctx.addIssue({ code: "custom", path: [field], message: `${field} is set exactly when ${when}` });
-  }
-}
 
 export const Round = z
   .strictObject({

@@ -644,7 +644,7 @@ describe("recordGates", () => {
       holds: [hold("shim-B3", { since: NOW })],
       pushbacks: [],
       rulings: [],
-      gates: after,
+      gates: { ...after, lineages: after.lineages.map((each) => ({ ...each, chain: each.chain.map((entry) => ({ ...entry, at: NOW })) })) },
     });
   });
 

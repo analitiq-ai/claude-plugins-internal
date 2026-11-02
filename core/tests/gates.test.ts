@@ -130,6 +130,11 @@ for (const [what, value, path] of duplicates) {
   });
 }
 
+test("a deep sweep tells sites apart by file and function, whatever characters they hold", () => {
+  const sites = [site({ file: "src/a:b.ts", function: "c" }), site({ file: "src/a", function: "b.ts:c" })];
+  accepted(gates({ bugs: [bug({ deep: { same_operation: sites, callers: sites } })] }));
+});
+
 test("a site ruling carries its issue exactly when it is DEFERRED", () => {
   for (const [ruling, issue] of [["DEFERRED", 301], ["SHARES", null], ["NOT_SHARED", null]] as const) {
     accepted(gates({ bugs: [bug({ rulings: [{ site: "src/parse.ts:load", ruling, issue }] })] }));

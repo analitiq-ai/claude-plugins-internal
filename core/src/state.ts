@@ -95,7 +95,10 @@ export class BoardNotVisible extends Error {
   }
 }
 
-/** A write refused: `release` is what lets it through, null when only a different write would. */
+/**
+ * A write refused: `release` is the admin's act or the other call that lets it through, null when only this write
+ * rebuilt would.
+ */
 export class StateWriteRefused extends Error {
   declare readonly cause: string;
   readonly release: string | null;
@@ -437,6 +440,9 @@ function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
   return isDeepStrictEqual(ruled, nextRuled) && isDeepStrictEqual(commits, nextCommits.slice(0, commits.length));
 }
 
+// A write built from an older reading could not run: it is retried, never released (refusals.md).
+const STALE = "a stale reading, retry from a fresh readState";
+
 /**
  * `writeState`'s transition: rounds, pushbacks and rulings only appended, and a ruling's commits only appended to;
  * every hold row and the gates section as they were.
@@ -460,13 +466,12 @@ export function checkTransition(old: Snapshot, next: Snapshot): void {
   const changed = [...new Set([...before.keys(), ...after.keys()])].filter((id) => !isDeepStrictEqual(before.get(id), after.get(id)));
   if (changed.length > 0) {
     throw new StateWriteRefused(
-      `the snapshot changes hold rows ${changed.join(", ")}`,
-      "placeHold, placeRescopeHold, recordGates or releaseOnClaim, the one call that changes each",
+      `the snapshot's hold rows ${changed.join(", ")} are not those on GitHub: ${STALE}; only placeHold, placeRescopeHold, recordGates and releaseOnClaim change them`,
+      null,
     );
   }
-  // A write built from an older reading would drop the counts recorded since.
   if (!isDeepStrictEqual(old.gates, next.gates)) {
-    throw new StateWriteRefused("the snapshot changes the gates section", "recordGates, the only call that posts a gates section other than the one it read");
+    throw new StateWriteRefused(`the snapshot's gates section is not the one on GitHub: ${STALE}; only recordGates changes it`, null);
   }
 }
 
@@ -664,10 +669,24 @@ function refuseWithoutRoom(snapshot: Snapshot): void {
   }
 }
 
+// A time is its check's: an entry whose `ref` or `tree` the reading holds keeps that time, a tree a merge moved
+// included, and any other takes `now`.
+function stamped(read: Gates | null, gates: Gates, now: string): Gates {
+  const refs = new Map<string, string>(read?.lineages.flatMap((lineage) => lineage.chain.map(({ ref, at }) => [ref, at] as const)));
+  const trees = new Map<string, string>(read?.bugs.flatMap((bug) => [...bug.members, ...bug.absorbed].map(({ tree, at }) => [tree, at] as const)));
+  const timed = <Entry extends { tree: string }>(entry: Entry): Entry => ({ ...entry, at: trees.get(entry.tree) ?? now });
+  return {
+    ...gates,
+    lineages: gates.lineages.map((lineage) => ({ ...lineage, chain: lineage.chain.map((entry) => ({ ...entry, at: refs.get(entry.ref) ?? now })) })),
+    bugs: gates.bugs.map((bug) => ({ ...bug, members: bug.members.map(timed), absorbed: bug.absorbed.map(timed) })),
+  };
+}
+
 /**
  * Replaces the gates section and places each opening in one post, so no count is on GitHub without the hold it
- * reached; an OPEN row is left as it is. `read` is the reading `gates` was built from: gates on GitHub other than
- * its own refuse the post. `writer` is the reviewer App's client.
+ * reached; an OPEN row is left as it is. Core stamps every time in `gates`, as `stamped` keeps or sets it. `read` is
+ * the reading `gates` was built from: gates on GitHub other than its own refuse the post. `writer` is the reviewer
+ * App's client.
  */
 export async function recordGates(
   reader: GitHubClient,
@@ -682,14 +701,17 @@ export async function recordGates(
   const placements = openings.map(({ id, question }) => ({ id, kind: gatesHoldKind(id), question }));
   const working = await untamperedSnapshot(reader, repo, issue, shared);
   if (!isDeepStrictEqual(working.gates, read.snapshot?.gates ?? null)) {
-    throw new StateWriteRefused("the gates section on GitHub is not the one read: a newer write changed it", "recordGates built from a fresh readState");
+    throw new StateWriteRefused(`the gates section on GitHub is not the one read: ${STALE}`, null);
   }
   const placing = placements.filter(({ id }) => working.holds.find((row) => row.id === id)?.state !== HoldState.schema.enum.OPEN);
-  const placedSince = (since: string): Snapshot =>
-    placing.reduce<Snapshot>((state, { id, kind, question }) => withRow(state, openRow(id, kind, since, question, null)), { ...working, gates });
+  const recordedAt = (now: string): Snapshot =>
+    placing.reduce<Snapshot>((state, { id, kind, question }) => withRow(state, openRow(id, kind, now, question, null)), {
+      ...working,
+      gates: stamped(working.gates, gates, now),
+    });
   // A stand-in time meets the contract and measures as GitHub's would, so a refusal comes before its clock is read.
-  refuseWithoutRoom(meetingContract(placedSince(ANY_TIME)));
-  await post(writer, repo, issue, placing.length === 0 ? placedSince(ANY_TIME) : placedSince(await writer.now()));
+  refuseWithoutRoom(meetingContract(recordedAt(ANY_TIME)));
+  await post(writer, repo, issue, recordedAt(await writer.now()));
 }
 
 export type ClaimRelease = { released: Releasable[]; rebuilt: boolean; reset: CommentAt | null };
