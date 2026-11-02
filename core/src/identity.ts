@@ -38,9 +38,14 @@ export class DerivationError extends Error {
   }
 }
 
+const SLUG_RUN = "[a-z0-9]+";
 // Issue numbers have no leading zero, so `0212-…` is no story.
-const STORY_BRANCH = /^([1-9][0-9]*)-us([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const STORY_BRANCH = new RegExp(`^([1-9][0-9]*)-us([1-9][0-9]*)-(${SLUG_RUN}(?:-${SLUG_RUN})*)$`);
 const SPEC_BRANCH = /^([1-9][0-9]*)-spec$/;
+// Matched after lowering, never with `iu`: under `iu` `ſ` matches `[a-z]`, and lowering leaves it `ſ`.
+const SLUG_RUNS = new RegExp(SLUG_RUN, "g");
+const SLUG_MAX = 40;
+const EMPTY_SLUG = "story";
 
 export function parseBranch(name: string): StoryBranch | SpecBranch | null {
   const story = STORY_BRANCH.exec(name);
@@ -48,6 +53,16 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
   const spec = SPEC_BRANCH.exec(name);
   if (spec !== null) return { spec: Number(spec[1]) };
   return null;
+}
+
+/** The title is untrusted, and the name becomes a ref and a worktree path. */
+export function storyBranchName(s: number, k: number, title: string): string {
+  assertIssueNumber(s);
+  assertIssueNumber(k);
+  const runs = title.toLowerCase().match(SLUG_RUNS) ?? [];
+  // Runs are joined by single `-`, so a cut can end on one `-` at most.
+  const slug = runs.join("-").slice(0, SLUG_MAX).replace(/-$/, "");
+  return `${s}-us${k}-${slug || EMPTY_SLUG}`;
 }
 
 export function specBranch(p: number): string {

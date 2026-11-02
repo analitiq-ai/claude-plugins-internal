@@ -68,8 +68,8 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 
 ### B1 — Story branch name (before US3)
 
-- [ ] T006 [P] [US1] **core PR B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
-- [ ] T007 [US1] **core PR B1.** Add `storyBranchName(s, k, title)` beside `parseBranch` in `core/src/identity.ts`, sharing the branch grammar's constants with the parser; T006 passes; bump every carrier's `plugin.json` version
+- [x] T006 [P] [US1] **core PR B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
+- [x] T007 [US1] **core PR B1.** Add `storyBranchName(s, k, title)` beside `parseBranch` in `core/src/identity.ts`, sharing the branch grammar's constants with the parser; T006 passes; bump every carrier's `plugin.json` version
 
 ### B2 — Story tasks (before US3)
 
