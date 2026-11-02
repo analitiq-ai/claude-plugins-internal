@@ -98,8 +98,8 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 
 ### B4 — Spec PR merge commit (before US5)
 
-- [ ] T018 [P] [US1] **core PR B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
-- [ ] T019 [US1] **core PR B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the last B PR to merge closes US1's issue; bump every carrier's `plugin.json` version
+- [x] T018 [P] [US1] **core PR B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
+- [x] T019 [US1] **core PR B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the last B PR to merge closes US1's issue; bump every carrier's `plugin.json` version
 
 **Checkpoint**: B1, B2, B3, B7 merged → US2/US3 may start; B5, B6 merged → US4 may start; B4 merged → US5 may start
 

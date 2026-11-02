@@ -8,7 +8,7 @@ export type StoryBranch = { story: number; k: number; slug: string };
 export type SpecBranch = { spec: number };
 
 /** A same-repository PR on `<p>-spec`; a merged PR is closed too, and reads `merged`. */
-export type SpecPr = { number: number; state: "open" | "closed" | "merged" };
+export type SpecPr = { number: number; state: "open" | "closed" | "merged"; mergeCommit: { oid: string } | null };
 
 export type SpecFolderAnswer = { one: string } | { none: true } | { several: readonly string[] };
 
@@ -131,10 +131,12 @@ export async function specFolder(tree: Tree, p: number): Promise<string> {
   );
 }
 
+const CommitOid = z.string().regex(/^[0-9a-f]{40}$/);
+
 const PullRequestHeadAnswer = z.object({
   number: IssueNumber,
   headRefName: z.string(),
-  headRefOid: z.string().regex(/^[0-9a-f]{40}$/),
+  headRefOid: CommitOid,
   isCrossRepository: z.boolean(),
   merged: z.boolean(),
 });
@@ -146,6 +148,7 @@ const PullRequestStateAnswer = z.object({
   isCrossRepository: z.boolean(),
   closed: z.boolean(),
   merged: z.boolean(),
+  mergeCommit: z.object({ oid: CommitOid }).nullable(),
 });
 export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 
@@ -154,7 +157,7 @@ export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 const PRS_ON_BRANCH_QUERY = `query($owner: String!, $name: String!, $branch: String!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequests(headRefName: $branch, first: 100, after: $cursor) {
-      nodes { number headRefName headRefOid isCrossRepository closed merged }
+      nodes { number headRefName headRefOid isCrossRepository closed merged mergeCommit { oid } }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -214,9 +217,10 @@ export async function issueStory(reader: GitHubClient, repo: string, s: number):
 }
 
 export function pickSpecPrs(prs: readonly PullRequestState[], p: number): SpecPr[] {
-  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, merged }) => ({
+  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, merged, mergeCommit }) => ({
     number,
     state: merged ? "merged" : closed ? "closed" : "open",
+    mergeCommit,
   }));
 }
 
