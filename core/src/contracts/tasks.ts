@@ -7,7 +7,10 @@ const LABEL = /^Story issue: #([1-9][0-9]*)$/;
 const PHASE_HEADING = /^## Phase \S/;
 // `[ ]` and `[x]` only: reviewer ADR-0010 d1 names a tick as `[ ]` flipped to `[x]`.
 const TASK_LINE = /^- \[([ x])\] (T[0-9]{3,})(?= |$)/;
-const STORY_TAG = /\[US([1-9][0-9]*)\]/;
+// A bulleted or numbered list item, however indented or spaced, opening with a box of at most one character: a
+// link's `[text](…)` is no box.
+const CHECKBOX_ITEM = /^\s*(?:[-*+]|[0-9]+[.)])\s+\[[^\]]?\](?!\()/;
+const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
 
 export type StoryTask = { id: string; ticked: boolean; story: number | null; line: string };
 
@@ -17,6 +20,30 @@ export class TaskBlockLabelRefused extends Error {
     super(`tasks.md: ${JSON.stringify(line)} under "${heading}" is no task-block label, which reads "${LABEL_PREFIX} #<n>"`);
     this.name = "TaskBlockLabelRefused";
   }
+}
+
+/** A line that opens as a checkbox item but is no task line of one story: read as no task, its task would go unbuilt. */
+export class TaskLineRefused extends Error {
+  constructor(line: string, reason: string) {
+    super(`tasks.md: ${JSON.stringify(line)} ${reason}`);
+    this.name = "TaskLineRefused";
+  }
+}
+
+/**
+ * The task `line` states; null for a line that opens as no checkbox item. A checkbox item that is no task line of one
+ * story is refused.
+ */
+export function readTaskLine(line: string): StoryTask | null {
+  if (!CHECKBOX_ITEM.test(line)) return null;
+  const task = TASK_LINE.exec(line);
+  if (task === null) throw new TaskLineRefused(line, 'is no task line, which reads "- [ ] T<nnn> …" or "- [x] T<nnn> …"');
+  const stories = new Set(Array.from(line.matchAll(STORY_TAG), ([, k]) => Number(k)));
+  if (stories.size > 1) {
+    throw new TaskLineRefused(line, `is tagged ${Array.from(stories, (k) => `US${k}`).join(" and ")}, where a task is one story's`);
+  }
+  const [story = null] = stories;
+  return { id: task[2], ticked: task[1] === "x", story, line };
 }
 
 /** Spec Kit's `## Phase <n>: <title>`, the heading each task block opens with. */
@@ -52,6 +79,8 @@ export function readTaskBlockLabels(text: string): ReadonlyMap<string, number> {
 /**
  * Each task line of every phase block labelled `#<s>`, in file order. A section that is no phase ends a block.
  * Each block's label is read under its own heading, never looked up by heading text, which two phases can share.
+ * Every line is read, so a checkbox item anywhere that is no task line refuses the whole text, as a malformed label
+ * does.
  */
 export function storyTasks(text: string, s: number): StoryTask[] {
   assertIssueNumber(s);
@@ -61,11 +90,9 @@ export function storyTasks(text: string, s: number): StoryTask[] {
   lines.forEach((line, i) => {
     if (isPhaseHeading(line)) inStory = labelUnder(line, lines[i + 1]) === s;
     else if (line.startsWith("## ")) inStory = false;
-    else if (inStory) {
-      const task = TASK_LINE.exec(line);
-      if (task === null) return;
-      const tag = STORY_TAG.exec(line);
-      tasks.push({ id: task[2], ticked: task[1] === "x", story: tag === null ? null : Number(tag[1]), line });
+    else {
+      const task = readTaskLine(line);
+      if (inStory && task !== null) tasks.push(task);
     }
   });
   return tasks;

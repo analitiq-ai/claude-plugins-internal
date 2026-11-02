@@ -9,7 +9,7 @@ import type { Mint } from "../lib/github.ts";
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const { join, posix } = await import("node:path");
 const { z } = await import("zod");
-const { isPhaseHeading, readTaskBlockLabels, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
+const { isPhaseHeading, readTaskBlockLabels, readTaskLine, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused } = await import("../core/contracts/tasks.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
 const { answerOf, gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
@@ -56,8 +56,6 @@ function stop(...lines: string[]): never {
   throw new Stopped(lines);
 }
 
-const TASK_LINE = /^\s*- \[[ xX]\] /;
-const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
 const PHASE_TITLE = /^## Phase [^:]*: (.+)$/;
 
 type Phase = { line: number; heading: string; story: number | null };
@@ -75,14 +73,14 @@ function phasesOf(lines: readonly string[]): Phase[] {
       phases.push(current);
     } else if (line.startsWith("## ")) {
       current = null;
-    } else if (TASK_LINE.test(line)) {
-      for (const [, k] of line.matchAll(STORY_TAG)) {
-        if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${k} outside any phase`);
-        if (current.story !== null && current.story !== Number(k)) {
-          throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${k}`);
-        }
-        current.story = Number(k);
+    } else {
+      const story = readTaskLine(line)?.story ?? null;
+      if (story === null) continue;
+      if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${story} outside any phase`);
+      if (current.story !== null && current.story !== story) {
+        throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${story}`);
       }
+      current.story = story;
     }
   }
   const order = phases.flatMap((phase) => (phase.story === null ? [] : [phase.story]));
@@ -396,7 +394,7 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
       for (const line of error.lines) io.stderr(line);
       return 1;
     }
-    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused) {
+    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused || error instanceof TaskLineRefused) {
       io.stderr(`${error.message}. Next step: correct the spec folder's tasks.md, then land again.`);
       return 1;
     }
