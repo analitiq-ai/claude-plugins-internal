@@ -88,8 +88,8 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 
 ### B5 — `internal-review` read (before US4)
 
-- [ ] T014 [P] [US1] **core PR B5.** Add failing cases to `core/tests/required-checks.test.ts` for `internalReviewAt(reader, repo, head, appLogin)` (R12; plan P9): `true` only when the newest `internal-review` check run at `head` whose app is `appLogin`'s App has conclusion `success`; a `success` run by another App does not count; no run → `false`; a pending run → `false`; a GitHub no-answer throws `GitHubUnanswered`/`GitHubRefused`, never `false`
-- [ ] T015 [US1] **core PR B5.** Export `internalReviewAt` from `core/src/validation/required-checks.ts` over the private `checkRuns` read and the `INTERNAL_REVIEW` constant; T014 and existing `required-checks.test.ts` cases pass; bump every carrier's `plugin.json` version
+- [x] T014 [P] [US1] **core PR B5.** Add failing cases to `core/tests/required-checks.test.ts` for `internalReviewAt(reader, repo, head, appLogin)` (R12; plan P9): `true` only when the newest `internal-review` check run at `head` whose app is `appLogin`'s App has conclusion `success`; a `success` run by another App does not count; no run → `false`; a pending run → `false`; a GitHub no-answer throws `GitHubUnanswered`/`GitHubRefused`, never `false`
+- [x] T015 [US1] **core PR B5.** Export `internalReviewAt` from `core/src/validation/required-checks.ts` over the private `checkRuns` read and the `INTERNAL_REVIEW` constant; T014 and existing `required-checks.test.ts` cases pass; bump every carrier's `plugin.json` version
 
 ### B6 — PR findings (before US4)
 

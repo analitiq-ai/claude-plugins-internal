@@ -255,7 +255,12 @@ export type Actor = z.infer<typeof Actor>;
  */
 export function restLogin(actor: Actor | null): string | null {
   if (actor === null) return null;
-  return actor.__typename === BOT_TYPE ? `${actor.login}[bot]` : actor.login;
+  return actor.__typename === BOT_TYPE ? appRestLogin(actor.login) : actor.login;
+}
+
+/** The REST login of the App whose slug, or GraphQL's bare `Bot` login, is `slug`. */
+export function appRestLogin(slug: string): string {
+  return `${slug}[bot]`;
 }
 
 // `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.

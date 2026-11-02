@@ -145,11 +145,16 @@ export async function loadValidators(shared: Shared, dir: string, { reader, writ
 
 /**
  * What every check is asked, checked before anything is called or read: a package would turn a caller's mistake
- * into its check's COULD_NOT_RUN, and a head put in a REST path as anything but a sha could name another endpoint.
+ * into its check's COULD_NOT_RUN.
  */
 export function assertAsked(repo: string, pr: number, head: string): void {
   ownerAndName(repo);
   assertIssueNumber(pr);
+  assertHead(head);
+}
+
+/** A head put in a REST path as anything but a sha could name another endpoint. */
+export function assertHead(head: string): void {
   if (!Head.safeParse(head).success) throw new TypeError(`not a commit sha: ${JSON.stringify(head)}`);
 }
 

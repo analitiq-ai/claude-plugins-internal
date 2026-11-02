@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 import type { Finding } from "../contracts/finding.ts";
-import { answerOf, ownerAndName, type GitHubClient } from "../github.ts";
-import { couldNotRun, couldNotRunIfUnanswered, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
+import { answerOf, appRestLogin, ownerAndName, type GitHubClient, type Repository } from "../github.ts";
+import { COMPLETED, couldNotRun, couldNotRunIfUnanswered, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome, REQUIRED_CHECKS_SOURCE as SOURCE } from "../values.ts";
-import { assertAsked } from "./contract.ts";
+import { assertAsked, assertHead } from "./contract.ts";
 
 const { PENDING, PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 
@@ -38,6 +38,7 @@ const RequiredStatusChecks = z.object({ required_status_checks: z.array(Required
 
 // A check run's `app` and a status's `creator` are null once that App or account is gone.
 const CheckRun = z.object({
+  id: z.int(),
   name: z.string(),
   status: z.string(),
   conclusion: z.string().nullable(),
@@ -46,6 +47,8 @@ const CheckRun = z.object({
 type CheckRun = z.infer<typeof CheckRun>;
 
 const CheckRuns = z.object({ total_count: z.int().min(0), check_runs: z.array(CheckRun) });
+
+const SUCCESS = "success";
 
 const CommitStatus = z.object({ context: z.string(), state: z.string(), creator: z.object({ login: z.string() }).nullable() });
 type CommitStatus = z.infer<typeof CommitStatus>;
@@ -92,7 +95,7 @@ function requiredOf(rules: z.infer<typeof Rules>, where: string): RequiredCheck[
 }
 
 function runReading(run: CheckRun): Reading {
-  return { outcome: outcomeOf(run), state: run.conclusion ?? run.status, author: run.app?.slug ?? null };
+  return { outcome: outcomeOf(run), state: run.conclusion ?? run.status, author: run.app === null ? null : appRestLogin(run.app.slug) };
 }
 
 function statusReading(status: CommitStatus): Reading {
@@ -109,6 +112,10 @@ function checkReading(check: RequiredCheck, runs: readonly CheckRun[], newestSta
   if (status !== undefined) readings.push(statusReading(status));
   const deciding = isNonEmpty(readings) ? worst(readings) : { outcome: outcomeOf(undefined), state: null, author: null };
   return { name: check.context, ...deciding };
+}
+
+function repositoryPath({ owner, name }: Repository): string {
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
 async function checkRuns(reader: GitHubClient, at: string, head: string, name: string): Promise<CheckRun[]> {
@@ -134,6 +141,19 @@ async function newestStatuses(reader: GitHubClient, at: string, head: string): P
   return newest;
 }
 
+/**
+ * The attestation (orchestrator ADR-0004): the newest `internal-review` check run at `head` by `appLogin`'s App
+ * concluded success. A run by any other App counts for nothing (d3), and GitHub's no-answer throws, never false.
+ */
+export async function internalReviewAt(reader: GitHubClient, repo: string, head: string, appLogin: string): Promise<boolean> {
+  assertHead(head);
+  const newest = (await checkRuns(reader, repositoryPath(ownerAndName(repo)), head, INTERNAL_REVIEW))
+    .filter((run) => run.app !== null && appRestLogin(run.app.slug) === appLogin)
+    .toSorted((a, b) => b.id - a.id)
+    .at(0);
+  return newest?.status === COMPLETED && newest.conclusion === SUCCESS;
+}
+
 /** The required-checks reader: no `trigger`, never SILENT; the orchestrator times a missing or pending check. */
 export function requiredChecks(_shared: Shared, reader: GitHubClient, validators: LoadedModules): RequiredChecks {
   const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map((name) => `${name}-review`)]);
@@ -143,7 +163,7 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
     const answered = await reader.graphql(PULL_REQUEST_QUERY, { ...where, number: pr });
     const { pullRequest } = answerOf(PullRequestAnswer, answered, `${repo}#${pr}`).repository;
     const base = pullRequest.baseRefName;
-    const at = `/repos/${encodeURIComponent(where.owner)}/${encodeURIComponent(where.name)}`;
+    const at = repositoryPath(where);
     const rulesWhere = `the rules of ${repo} branch ${base}`;
     const rules = answerOf(Rules, await reader.restPages(`${at}/rules/branches/${encodeURIComponent(base)}?per_page=${PER_PAGE}`), rulesWhere);
     const required = requiredOf(rules, rulesWhere).filter((check) => !ownChecks.has(check.context));

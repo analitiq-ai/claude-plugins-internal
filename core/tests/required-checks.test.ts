@@ -236,7 +236,7 @@ describe("a failed required check is one finding naming the check and its conclu
     assert.deepEqual({ ...finding, text: undefined }, {
       source: "required-checks",
       key: "required-check:ci",
-      author: "github-actions",
+      author: "github-actions[bot]",
       file: null,
       line: null,
       text: undefined,
