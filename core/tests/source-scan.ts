@@ -182,18 +182,28 @@ function inArrow(all: Token[], n: number): boolean {
   );
 }
 
+const OPENS = "([{<";
+const CLOSES = ")]}>";
+
 function depthChange(all: Token[], n: number): number {
   const token = all[n];
   if (token.kind !== "punct" || inArrow(all, n)) return 0;
-  if ("([{<".includes(token.value)) return 1;
-  return ")]}>".includes(token.value) ? -1 : 0;
+  if (OPENS.includes(token.value)) return 1;
+  return CLOSES.includes(token.value) ? -1 : 0;
 }
 
+// Each closer must be the one the innermost open bracket awaits: a `>` of a comparison in a default would
+// otherwise close the list early and drop every parameter after it.
 function closer(all: Token[], open: number, file: string): number {
-  let depth = 0;
+  const awaited: string[] = [];
   for (let n = open; n < all.length; n++) {
-    depth += depthChange(all, n);
-    if (depth === 0) return n;
+    const {value, line} = all[n];
+    const change = depthChange(all, n);
+    if (change === 1) awaited.push(CLOSES[OPENS.indexOf(value)]);
+    if (change !== -1) continue;
+    const due = awaited.pop();
+    if (value !== due) throw new Error(`cannot scan ${file}:${line}: ${value} where ${due} is due`);
+    if (awaited.length === 0) return n;
   }
   throw new Error(`cannot scan ${file}:${all[open].line}: unclosed ${all[open].value}`);
 }
@@ -232,13 +242,16 @@ function parameter(group: Token[]): Parameter {
 // Read from the tokens, so a comment or string inside the list is never taken for a parameter.
 export function exportedParameters(text: string, file: string, name: string): Parameter[] | null {
   const all = tokens(text, file);
-  const at = all.findIndex(
-    (token, n) =>
-      is(token, "word", name) &&
-      is(all[n - 1], "word", "function") &&
-      (is(all[n - 2], "word", "export") || (is(all[n - 2], "word", "async") && is(all[n - 3], "word", "export"))),
+  const declarations = all.flatMap((token, n) =>
+    is(token, "word", name) &&
+    is(all[n - 1], "word", "function") &&
+    (is(all[n - 2], "word", "export") || (is(all[n - 2], "word", "async") && is(all[n - 3], "word", "export")))
+      ? [n]
+      : [],
   );
-  if (at === -1) return null;
+  if (declarations.length > 1) throw new Error(`cannot scan ${file}: ${name} is declared ${declarations.length} times`);
+  const [at] = declarations;
+  if (at === undefined) return null;
   const open = at + 1;
   if (!is(all[open], "punct", "(")) throw new Error(`cannot scan ${file}:${all[at].line}: no ( after ${name}`);
   const list = all.slice(open + 1, closer(all, open, file));

@@ -68,8 +68,13 @@ export function httpsUrl(repo: Repository): string {
   return `https://github.com/${owner}/${name}.git`;
 }
 
+/** `what` names the value in the refusal, so a bad argument is never reported as another one. */
+export function assertPositiveInteger(n: number, what: string): void {
+  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not ${what}: ${n}`);
+}
+
 export function assertIssueNumber(n: number): void {
-  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
+  assertPositiveInteger(n, "an issue number");
 }
 
 export function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {

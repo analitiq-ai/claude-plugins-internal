@@ -1,7 +1,7 @@
 import { createPrivateKey, type KeyObject, sign } from "node:crypto";
 import { z } from "zod";
 
-import { answerOf, gitHub, GitHubRefused, ownerAndName, type GitHubClient, type Repository } from "./github.ts";
+import { answerOf, assertPositiveInteger, gitHub, GitHubRefused, ownerAndName, type GitHubClient, type Repository } from "./github.ts";
 import { type Machine, readKey } from "./keys.ts";
 
 export type Permissions = Readonly<Record<string, "read" | "write">>;
@@ -82,7 +82,7 @@ export async function mintToken(
   context: MintContext = {},
 ): Promise<MintedToken> {
   if (!Object.hasOwn(APP_PERMISSIONS, app)) throw new TypeError(`no permission set for an App named ${JSON.stringify(app)}`);
-  if (!Number.isSafeInteger(appId) || appId < 1) throw new TypeError(`not an App ID: ${JSON.stringify(appId)}`);
+  assertPositiveInteger(appId, "an App ID");
   const repository = ownerAndName(repo);
   const permissions: Permissions = APP_PERMISSIONS[app];
 

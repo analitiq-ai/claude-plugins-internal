@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
-import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient, type Repository } from "./github.ts";
+import { answerOf, assertIssueNumber, assertPositiveInteger, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient, type Repository } from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 
 export type StoryBranch = { story: number; k: number; slug: string };
@@ -58,7 +58,7 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
 /** The title is untrusted, and the name becomes a ref and a worktree path. */
 export function storyBranchName(s: number, k: number, title: string): string {
   assertIssueNumber(s);
-  assertIssueNumber(k);
+  assertPositiveInteger(k, "a US<k> story index");
   const runs = title.toLowerCase().match(SLUG_RUNS) ?? [];
   // Runs are joined by single `-`, so a cut can end on one `-` at most.
   const slug = runs.join("-").slice(0, SLUG_MAX).replace(/-$/, "");
