@@ -169,6 +169,28 @@ describe("storyTasks", () => {
     assert.deepEqual(storyTasks(block, 13).map((task) => task.id), ["T010", "T011"]);
   });
 
+  it("reads each block's label from under its own heading when phases repeat a heading", () => {
+    const repeated = [
+      "## Phase 1: Setup",
+      "Story issue: #12",
+      "",
+      "- [ ] T001 Create the folder",
+      "",
+      "## Phase 1: Setup",
+      "Story issue: #13",
+      "",
+      "- [ ] T002 Retry once",
+      "",
+      "## Phase 1: Setup",
+      "",
+      "- [ ] T003 Tidy",
+    ].join("\n");
+    assert.deepEqual(
+      [12, 13].map((s) => storyTasks(repeated, s).map((task) => task.id)),
+      [["T001"], ["T002"]],
+    );
+  });
+
   it("is [] when no block is labelled #<s>", () => {
     assert.deepEqual(storyTasks(text, 99), []);
     assert.deepEqual(storyTasks("## Phase 1: Setup\n\n- [ ] T001 Create the folder", 13), []);
@@ -191,7 +213,7 @@ describe("storyTasks", () => {
       assert.throws(() => storyTasks(malformed, 13), TaskBlockLabelRefused);
     });
 
-    it("refuses #12's well-labelled block too, as readTaskBlockLabels refuses the whole text", () => {
+    it("refuses #12's well-labelled block too: one malformed label refuses the whole text", () => {
       assert.throws(() => storyTasks(malformed, 12), TaskBlockLabelRefused);
     });
   });

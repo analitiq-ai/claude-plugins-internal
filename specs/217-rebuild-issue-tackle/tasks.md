@@ -73,8 +73,8 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 
 ### B2 — Story tasks (before US3)
 
-- [ ] T008 [P] [US1] **core PR B2.** Add failing cases to `core/tests/tasks.test.ts` for `storyTasks(text, s)` (R11, data-model StoryTask): returns `{id, ticked, story, line}` for each line matching `- [ ] T<nnn>` or `- [x] T<nnn>` inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`; `id` is `T` + 3 or more digits; `ticked` is true only for `[x]`; `story` is `k` from the line's `[US<k>]` tag or `null`; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
-- [ ] T009 [US1] **core PR B2.** Add `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; T008 passes; bump every carrier's `plugin.json` version
+- [x] T008 [P] [US1] **core PR B2.** Add failing cases to `core/tests/tasks.test.ts` for `storyTasks(text, s)` (R11, data-model StoryTask): returns `{id, ticked, story, line}` for each line matching `- [ ] T<nnn>` or `- [x] T<nnn>` inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`; `id` is `T` + 3 or more digits; `ticked` is true only for `[x]`; `story` is `k` from the line's `[US<k>]` tag or `null`; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
+- [x] T009 [US1] **core PR B2.** Add `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; T008 passes; bump every carrier's `plugin.json` version
 
 ### B3 — Story PR closed (before US3)
 
