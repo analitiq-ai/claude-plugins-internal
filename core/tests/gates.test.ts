@@ -105,6 +105,40 @@ test("a bug rules each site once", () => {
   refusedAt(gates({ bugs: [bug({ rulings })] }), ["bugs", 0, "rulings", 1, "site"]);
 });
 
+const duplicates: Array<[string, Fields, PropertyKey[]]> = [
+  [
+    "a chain holds one entry per check and claim",
+    gates({ lineages: [lineage({ chain: [(lineage().chain as Fields[])[0], { ...(lineage().chain as Fields[])[0], line: 5, ruling: "UNSURE" }] })] }),
+    ["lineages", 0, "chain", 1],
+  ],
+  ["a bug's members hold each tree once", gates({ bugs: [bug({ members: [{ tree: TREE, at: AT }, { tree: TREE, at: "2026-10-28T11:00:00Z" }] })] }), ["bugs", 0, "members", 1, "tree"]],
+  ["a bug's absorbed trees hold each tree once", gates({ bugs: [bug({ absorbed: [{ tree: TREE, at: AT }, { tree: TREE, at: AT }] })] }), ["bugs", 0, "absorbed", 1, "tree"]],
+  [
+    "a deep sweep lists each same-operation site once",
+    gates({ bugs: [bug({ deep: { same_operation: [site(), site({ line: 30, does: "parses again" })], callers: [] } })] }),
+    ["bugs", 0, "deep", "same_operation", 1],
+  ],
+  [
+    "a deep sweep lists each caller once",
+    gates({ bugs: [bug({ deep: { same_operation: [], callers: [site(), site({ line: 30 })] } })] }),
+    ["bugs", 0, "deep", "callers", 1],
+  ],
+];
+for (const [what, value, path] of duplicates) {
+  test(what, () => {
+    refusedAt(value, path);
+  });
+}
+
+test("a site ruling carries its issue exactly when it is DEFERRED", () => {
+  for (const [ruling, issue] of [["DEFERRED", 301], ["SHARES", null], ["NOT_SHARED", null]] as const) {
+    accepted(gates({ bugs: [bug({ rulings: [{ site: "src/parse.ts:load", ruling, issue }] })] }));
+  }
+  for (const [ruling, issue] of [["DEFERRED", null], ["SHARES", 301], ["NOT_SHARED", 301]] as const) {
+    refusedAt(gates({ bugs: [bug({ rulings: [{ site: "src/parse.ts:load", ruling, issue }] })] }), ["bugs", 0, "rulings", 0, "issue"]);
+  }
+});
+
 for (const [field, place, path] of [
   ["a chain's at", (at: string) => gates({ lineages: [lineage({ chain: [{ ...(lineage().chain as Fields[])[0], at }] })] }), ["lineages", 0, "chain", 0, "at"]],
   ["a member's at", (at: string) => gates({ bugs: [bug({ members: [{ tree: TREE, at }] })] }), ["bugs", 0, "members", 0, "at"]],

@@ -62,6 +62,16 @@ function refusal(pattern: RegExp) {
   };
 }
 
+function staleRefusal(pattern: RegExp) {
+  return (error: unknown) => {
+    assert.ok(error instanceof StateWriteRefused, `expected StateWriteRefused, got ${String(error)}`);
+    assert.equal(error.release, null);
+    assert.match(error.message, /a stale reading, retry from a fresh readState/);
+    assert.match(error.message, pattern);
+    return true;
+  };
+}
+
 // Every object's keys in sorted order, and the text exactly two-space JSON of what it parses to.
 function assertSortedTwoSpace(body: string): void {
   const fenced = body.slice(`${TAG}\n\`\`\`json\n`.length, -"\n```\n".length);
@@ -231,11 +241,18 @@ describe("checkTransition", () => {
     });
   }
 
-  it("refuses a gates change, naming recordGates", () => {
+  it("refuses a gates change as a stale reading to retry, naming recordGates", () => {
     const gated = { ...old, gates: gates() };
     for (const next of [old, { ...gated, gates: gates({ lineages: [lineage("L7")] }) }]) {
-      assert.throws(() => checkTransition(gated, next), refusal(/recordGates/));
+      assert.throws(() => checkTransition(gated, next), staleRefusal(/recordGates/));
     }
+  });
+
+  it("refuses a hold row change as a stale reading to retry, naming the calls that change hold rows", () => {
+    assert.throws(
+      () => checkTransition(old, { ...old, holds: [...old.holds, hold("audit-212")] }),
+      staleRefusal(/placeHold, placeRescopeHold, recordGates and releaseOnClaim/),
+    );
   });
 });
 
@@ -547,11 +564,11 @@ describe("every write but recordGates posts the gates it read", () => {
   const section = gates({ lineages: [lineage("L7")] });
   const old = snapshot({ gates: section, holds: [hold("pushback-212", { since: at("10:00") })] });
 
-  it("writeState refuses a snapshot whose gates are not the ones it read, naming recordGates, posting nothing", async () => {
+  it("writeState refuses a snapshot whose gates are not the ones it read as a stale reading to retry, posting nothing", async () => {
     for (const changed of [null, gates()]) {
       const out = writer();
       const next = { ...old, rounds: [...old.rounds, round(2)], gates: changed };
-      await assert.rejects(writeState(reader(current(old)), out, REPO, ISSUE, SHARED, next), refusal(/recordGates/));
+      await assert.rejects(writeState(reader(current(old)), out, REPO, ISSUE, SHARED, next), staleRefusal(/recordGates/));
       assert.deepEqual(out.calls, []);
     }
   });
@@ -641,15 +658,50 @@ describe("recordGates", () => {
     assert.deepEqual(postedSnapshot(posts(out)[0]), { ...newer, gates: after });
   });
 
+  it("stamps each time from GitHub's clock: a check the reading holds keeps its time, any other takes now", async () => {
+    const forged = at("23:59");
+    const tree = (n: number, time: string) => ({ tree: sha(n), at: time });
+    const bug = (id: string, members: Gates["bugs"][number]["members"], absorbed: Gates["bugs"][number]["absorbed"] = []): Gates["bugs"][number] => ({
+      id,
+      members,
+      absorbed,
+      ranges: [],
+      deep: null,
+      rulings: [],
+    });
+    const entry = (ref: number, claim: string, time: string) => ({ ...lineage("L6").chain[0], ref: sha(ref), claim, at: time });
+    const read = gates({
+      lineages: [lineage("L6", { chain: [entry(1, "c1", at("09:00"))] })],
+      bugs: [bug("B3", [tree(2, at("09:10"))]), bug("B4", [tree(6, at("09:20"))])],
+    });
+    // B4 merges into B3: its tree moves to B3's absorbed.
+    const next = gates({
+      lineages: [
+        lineage("L6", { chain: [entry(1, "c1", forged), entry(3, "c1", forged)] }),
+        lineage("L7", { chain: [entry(1, "c2", forged), entry(3, "c2", forged)] }),
+      ],
+      bugs: [bug("B3", [tree(2, forged), tree(4, forged)], [tree(6, forged), tree(5, forged)])],
+    });
+    const posted = await record(current(snapshot({ gates: read })), next, []);
+    assert.deepEqual(posted.gates, {
+      ...next,
+      lineages: [
+        lineage("L6", { chain: [entry(1, "c1", at("09:00")), entry(3, "c1", NOW)] }),
+        lineage("L7", { chain: [entry(1, "c2", at("09:00")), entry(3, "c2", NOW)] }),
+      ],
+      bugs: [bug("B3", [tree(2, at("09:10")), tree(4, NOW)], [tree(6, at("09:20")), tree(5, NOW)])],
+    });
+  });
+
   const stale: Array<[string, Issue, Issue]> = [
     ["a newer section", current(snapshot({ gates: before })), current(snapshot({ gates: gates() }))],
     ["a first section", { comments: [] }, current(snapshot({ gates: before }))],
   ];
   for (const [what, then, now] of stale) {
-    it(`refuses a stale reading, posting nothing: ${what} was written since`, async () => {
+    it(`refuses a stale reading to retry, posting nothing: ${what} was written since`, async () => {
       const read = await readState(reader(then), REPO, ISSUE, SHARED);
       const out = writer();
-      await assert.rejects(recordGates(reader(now), out, REPO, ISSUE, SHARED, read, after, []), refusal(/gates/));
+      await assert.rejects(recordGates(reader(now), out, REPO, ISSUE, SHARED, read, after, []), staleRefusal(/gates/));
       assert.deepEqual(out.calls, []);
     });
   }
