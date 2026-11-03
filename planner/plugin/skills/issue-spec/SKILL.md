@@ -49,8 +49,8 @@ Anything else, a folder whose parent is not named `specs` included: tell the use
 ## 2. Run it
 
 `DRIVE` is `scripts/drive_workflow.py` in this skill's base directory. It passes the inputs to
-`specify workflow`, and prints one JSON report: `run_id`, `status`, `step`; on a failed step also `stderr`
-and `open_markers`; paused at `review-critique` also `critique`; completed after `not worth doing` also `close`,
+`specify workflow`, and prints one JSON report: `run_id`, `status`, `step`; on a failed step also `stderr`,
+`open_markers` and `adr`; paused at `review-critique` also `critique`; completed after `not worth doing` also `close`,
 the close to do and its reason. `specify` takes the directory it runs in as its
 project (it must hold `.specify/`; a parent's does not count), so the spec folder lands in its `specs/`. Run every `DRIVE` call from `PROJECT` with
 `run_in_background: true` (headless steps take up to ~10 min each).
@@ -74,7 +74,8 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
 4. **Grill.** Invoke `/speckit-grill-me` in this session, from `PROJECT`. On a rescope, give grill the open
    decision first: it is the first question. The user answers every question. Do not answer for the user.
 5. **Resume past grill.** Only after grill finished: `python3 DRIVE resume <run_id> grill_verdict=approve`.
-   If the user wants to stop, pass `grill_verdict=reject`. Expect `paused` at `review-critique`.
+   If the user wants to stop, pass `grill_verdict=reject`. Expect `paused` at `review-critique`. A report with
+   `adr: true` may come back in its place: handle it by the `adr: true` stop, then resume.
 6. **Critique review.** Read the report's `critique` file and show the user its findings. Apply to
    spec.md/plan.md only the findings the user accepts.
 7. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
@@ -107,6 +108,14 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
 - `open_markers: true` goes back to step 4 first.
 - `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
   decision for them.
+- `adr: true`, a stop of the ADR check: show the user every `stderr` line, then act on each by its outcome.
+  `FAIL` on a departure: the user picks one of its next steps: change the artifact; supersede the record, with
+  `/speckit-adrkit-draft` into the spec PR when the line says so, or in the repo that holds the folder; or rule on
+  it. To rule, write `[{"folder": "<entry>", "record": "<id>", "path": "<path>", "reason": "<reason>"}]`, one
+  object per departure ruled on and the reason in the user's words, to a new file in the session scratchpad with
+  the Write tool, and resume with `python3 DRIVE resume <run_id> adr_ruling=@<file>`. `FAIL` on a broken record:
+  fix that record, then resume. Any other line: do what its Next step says, then resume if that was not itself a
+  resume.
 
 ## Undo a rejected rescope that created a parent
 

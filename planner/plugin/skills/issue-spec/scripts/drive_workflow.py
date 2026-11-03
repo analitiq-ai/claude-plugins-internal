@@ -4,10 +4,12 @@
     drive_workflow.py start <spec file> <issue> <spec dir>      a new scope
     drive_workflow.py rescope <spec file> <issue> <spec dir>    a rescope
     drive_workflow.py resume <run id> [<input>=<value>]
+    drive_workflow.py resume <run id> adr_ruling=@<file>    the file's rulings, to this resume's ADR check only
 
 Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks.
 The report is read from the run's state.json because the specify CLI prints only a generic error for a
-failed step; the step's own stderr is recorded nowhere else.
+failed step; the step's own stderr is recorded nowhere else. A failed step of the ADR check reports `adr: true`;
+a failed touches or judge step records no line of its own, so its stderr is the one `adr_check.ts stop` prints.
 """
 import argparse
 import json
@@ -27,6 +29,22 @@ AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Ed
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
 OPEN_MARKERS = "Open clarification markers remain"
 KIND = {"start": "new", "rescope": "rescope"}
+ADR_CHECK = PLUGIN / "scripts" / "adr_check.ts"
+ADR_PROMPT_STEPS = {"adr-plan-touches": ("plan", "touches"), "adr-plan-judge": ("plan", "judge")}
+ADR_STEPS = {"adr-plan-clear", "adr-plan-ask", "adr-plan-decide", *ADR_PROMPT_STEPS}
+ADR_RULING = "adr_ruling="
+RULING_ENV = "ADR_RULING"
+
+
+def _adr_stop(artifact, step):
+    command = ["node", str(ADR_CHECK), "stop", artifact, step]
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True)
+    except OSError as e:
+        sys.exit(f"`{' '.join(command)}` could not run: {e}")
+    if proc.returncode != 2:
+        sys.exit(f"`{' '.join(command)}` exited {proc.returncode}, not 2:\n{proc.stdout}{proc.stderr}")
+    return proc.stderr
 
 
 def report(state):
@@ -40,6 +58,9 @@ def report(state):
         out["error"] = state["error"]
         out["stderr"] = record["output"].get("stderr", "") if current else ""
         out["open_markers"] = step == "no-open-markers" and OPEN_MARKERS in out["stderr"]
+        out["adr"] = step in ADR_STEPS
+        if step in ADR_PROMPT_STEPS:
+            out["stderr"] = _adr_stop(*ADR_PROMPT_STEPS[step])
     if state["status"] == "paused" and record is not None and record["output"].get("show_file"):
         out["critique"] = record["output"]["show_file"]
     # The close is the admin's to make (planner ADR-0006 d1), and the session reads nothing of the run but this
@@ -51,8 +72,10 @@ def report(state):
 
 
 def _specify(args, env):
+    # A ruling reaches only the resume that carries it, never through the driver's own environment.
+    inherited = {name: value for name, value in os.environ.items() if name != RULING_ENV}
     proc = subprocess.run(["specify", "workflow", *args, "--json"], capture_output=True, text=True,
-                          env={**os.environ, "SPECKIT_INTEGRATION_CLAUDE_EXTRA_ARGS": AGENT_ARGS, **ENV, **env})
+                          env={**inherited, "SPECKIT_INTEGRATION_CLAUDE_EXTRA_ARGS": AGENT_ARGS, **ENV, **env})
     return proc
 
 
@@ -108,6 +131,16 @@ def start(kind, spec_file, issue, spec_dir):
     return _state(new.pop().name)
 
 
+def _ruling(value):
+    """The rulings text `@<file>` names. Read from a file so the user's reason never reaches a command line."""
+    if not value.startswith("@"):
+        sys.exit(f"{ADR_RULING} takes @<file>, a file holding the rulings, not {value!r}")
+    try:
+        return Path(value[1:]).read_text()
+    except OSError as e:
+        sys.exit(f"{ADR_RULING}{value}: cannot read the file: {e}")
+
+
 def resume(run_id, verdict):
     if not (RUNS / run_id / "state.json").is_file():
         sys.exit(f"no run {run_id} under {RUNS}")
@@ -115,7 +148,12 @@ def resume(run_id, verdict):
     if not (inputs.get("spec_dir") and inputs.get("kind")):
         sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
                  "which folder it is for. Next step: start the scope again with /planner:issue-spec.")
-    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], _step_env(inputs))
+    env = _step_env(inputs)
+    # Not an input: specify would keep it in inputs.json, and every later resume would rule again.
+    if verdict and verdict.startswith(ADR_RULING):
+        env[RULING_ENV] = _ruling(verdict.removeprefix(ADR_RULING))
+        verdict = None
+    proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], env)
     state = _state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
         sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")

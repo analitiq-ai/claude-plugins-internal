@@ -1,6 +1,7 @@
 import { parse, TomlError } from "smol-toml";
 import { z } from "zod";
 
+import { listedOnce } from "./listed-once.ts";
 import { NotInTree, type Tree } from "./tree.ts";
 import { ModuleName } from "./values.ts";
 
@@ -31,16 +32,6 @@ const AppLogin = z.string().regex(new RegExp(`^${LOGIN}\\[bot\\]$`));
 
 // GraphQL's `ProjectV2.url` has exactly this form, and the release rule compares it to `board` as text.
 const BOARD = new RegExp(`^https://github\\.com/(?:orgs|users)/${LOGIN}/projects/[1-9][0-9]*$`);
-
-function listedOnce<Item extends z.ZodType>(item: Item) {
-  return z.array(item).superRefine((items, ctx) => {
-    items.forEach((value, i) => {
-      if (items.indexOf(value) !== i) {
-        ctx.addIssue({ code: "custom", message: `${JSON.stringify(value)} is listed more than once`, path: [i] });
-      }
-    });
-  });
-}
 
 export const Shared = z.strictObject({
   validators: listedOnce(ModuleName),

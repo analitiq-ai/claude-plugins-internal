@@ -90,6 +90,18 @@ export const Taken = valueSet({
   resume: "the card was already In progress or In review; no lane is written and no hold released",
 });
 
+// planner ADR-0009 (root ADR-0010).
+export const AdrJudgment = valueSet({
+  WITHIN: "the artifact sits inside the record: it does nothing the record rejected or contradicts",
+  DEPARTS: "the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to",
+});
+
+// planner ADR-0009 (root ADR-0010).
+export const CheckedArtifact = valueSet({
+  plan: "the touches step's touches.json",
+  tasks: "tasks.md's task lines",
+});
+
 export const CoreSource = z.enum(["threads", "required-checks"]);
 // Not an identifier, so `CoreSource.enum` cannot name it with a dot, and the value scan refuses it quoted elsewhere.
 export const REQUIRED_CHECKS_SOURCE = CoreSource.enum["required-checks"];

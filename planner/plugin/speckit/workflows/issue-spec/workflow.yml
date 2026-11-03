@@ -2,7 +2,7 @@ schema_version: "1.0"
 workflow:
   id: "issue-spec"
   name: "Spec Cycle"
-  version: "1.6.0"
+  version: "1.7.0"
   author: "Analitiq"
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
 
@@ -235,6 +235,39 @@ steps:
         run: |
           set -eu
           python3 "$PLANNER_ROOT/scripts/settled_design.py" "$SPECIFY_FEATURE_DIRECTORY"
+
+  # Checks the plan against the records of each [shared] adr_folders folder before critique reads it.
+  - id: to-adr-plan
+    type: if
+    condition: *spec-is-written
+    then:
+      - id: adr-plan-clear
+        type: shell
+        timeout: 60
+        run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
+      - id: adr-plan-touches
+        type: prompt
+        integration: "{{ inputs.integration }}"
+        timeout: 1800
+        prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+      - id: adr-plan-ask
+        type: shell
+        output_format: json
+        timeout: 1800
+        run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+      - id: adr-plan-judging
+        type: if
+        condition: "{{ steps.adr-plan-ask.output.data.judge }}"
+        then:
+          - id: adr-plan-judge
+            type: prompt
+            integration: "{{ inputs.integration }}"
+            timeout: 1800
+            prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for artifact plan, spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+      - id: adr-plan-decide
+        type: shell
+        timeout: 1800
+        run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}"
 
   - id: to-mark-critiques
     type: if

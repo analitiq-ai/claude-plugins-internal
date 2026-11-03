@@ -9,6 +9,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
+import yaml
 from paths import PLUGIN
 
 DRIVER = PLUGIN / "skills" / "issue-spec" / "scripts"
@@ -21,6 +22,7 @@ import rootcause  # noqa: E402
 import settled_design  # noqa: E402
 
 PRESET = drive_workflow.PRESET[0]
+WORKFLOW = drive_workflow.WORKFLOW
 
 
 def setUpModule():
@@ -116,6 +118,47 @@ class PlanTemplate(unittest.TestCase):
 
     def test_the_installed_plan_command_carries_the_presets_research_format(self):
         self.assertTrue(installed_skill_carries("speckit.plan"), "speckit-plan SKILL.md lacks the settled-design preset")
+
+
+class TouchesStep(unittest.TestCase):
+    def plan_steps(self):
+        return {step["id"]: step for step in yaml.safe_load((WORKFLOW[0] / "workflow.yml").read_text())["steps"]}
+
+    def test_the_plan_check_clears_touches_json_then_runs_the_touches_step_before_ask(self):
+        """A resume of a run stopped in the block re-runs it from its first step (specify 1.0.x), so a touches step that
+        fails must find no file from the last run."""
+        block = self.plan_steps().get("to-adr-plan")
+        self.assertIsNotNone(block, "workflow.yml has no to-adr-plan block")
+        clear, touches, ask = block["then"][:3]
+        self.assertEqual((clear["id"], clear["type"]), ("adr-plan-clear", "shell"))
+        self.assertIn('rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"', clear["run"])
+        self.assertEqual((touches["id"], touches["type"]), ("adr-plan-touches", "prompt"))
+        self.assertIn("Follow .specify/workflows/issue-spec/adr-touches.md", touches["prompt"])
+        self.assertIn("run folder .specify/workflows/runs/{{ context.run_id }}", touches["prompt"])
+        self.assertEqual(ask["id"], "adr-plan-ask")
+
+    def test_the_touches_step_writes_one_literal_path_per_file_the_plan_touches_and_nothing_else(self):
+        doc = WORKFLOW[0] / "adr-touches.md"
+        self.assertTrue(doc.is_file(), f"{doc} does not exist")
+        text = " ".join(doc.read_text().split())
+        for said in ("Read `<spec folder>/plan.md`", "write `<run folder>/touches.json`", '{"v": 1, "paths": ['):
+            with self.subTest(said=said):
+                self.assertIn(said, text)
+        for rule in (r"one literal path per file", r"creat\w*, chang\w* or delet\w*", r"no glob", r"no brace group",
+                     r"no trailing `?/`?", r"no `?\.\.`?", r"no other file"):
+            with self.subTest(rule=rule):
+                self.assertRegex(text, re.compile(rule, re.IGNORECASE))
+        installed = Path(PROJECT.name) / WORKFLOW[1] / "adr-touches.md"
+        self.assertEqual(installed.read_text(), doc.read_text())
+
+    def test_neither_the_plan_step_nor_the_plan_command_says_anything_of_touches_json(self):
+        [plan] = self.plan_steps()["to-plan"]["then"]
+        self.assertEqual(plan["id"], "plan")
+        self.assertNotIn("touches.json", plan["input"]["args"])
+        self.assertNotIn("touches.json", (PRESET / "commands" / "speckit.plan.md").read_text())
+
+    def test_the_plan_template_has_no_touches_section(self):
+        self.assertEqual([line for line in composed_plan().splitlines() if line.startswith("## Touches")], [])
 
 
 if __name__ == "__main__":
