@@ -18,6 +18,7 @@ export const STATUS_ISSUE = 1;
 const SHARED = `[shared]
 board = "${BOARD}"
 validators = []
+adr_folders = []
 session_app_login = "${SESSION_LOGIN}"
 orchestrator_app_login = "${ORCHESTRATOR_LOGIN}"
 reviewer_app_login = "codeworks-reviewer[bot]"

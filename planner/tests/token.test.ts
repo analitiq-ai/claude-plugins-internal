@@ -32,6 +32,7 @@ const MINT_CALLS = [
 const SETTINGS = `[shared]
 board = "https://github.com/orgs/${OWNER}/projects/1"
 validators = []
+adr_folders = []
 session_app_login = "codeworks-session[bot]"
 orchestrator_app_login = "codeworks-orchestrator[bot]"
 reviewer_app_login = "codeworks-reviewer[bot]"

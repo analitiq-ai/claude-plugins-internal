@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { readSection, readSettings, SettingsError } from "../src/settings.ts";
+import { readSection, readSettings, SettingsError, SHARED_SECTION } from "../src/settings.ts";
 import { NotInTree, type Tree } from "../src/tree.ts";
 
 const REF = "212-us2-retry-budget";
@@ -14,6 +14,7 @@ session_app_login = "codeworks-session[bot]"
 orchestrator_app_login = "codeworks-orchestrator[bot]"
 reviewer_app_login = "codeworks-reviewer[bot]"
 planner_app_login = "codeworks-planner[bot]"
+adr_folders = []
 
 [reviewer]
 # validated by reviewer
@@ -27,6 +28,7 @@ const EXAMPLE_SHARED = {
   orchestrator_app_login: "codeworks-orchestrator[bot]",
   reviewer_app_login: "codeworks-reviewer[bot]",
   planner_app_login: "codeworks-planner[bot]",
+  adr_folders: [],
 };
 
 const REQUIRED_KEYS = [
@@ -36,6 +38,7 @@ const REQUIRED_KEYS = [
   "orchestrator_app_login",
   "reviewer_app_login",
   "planner_app_login",
+  "adr_folders",
 ];
 
 const APP_LOGIN_KEYS = ["session_app_login", "orchestrator_app_login", "reviewer_app_login", "planner_app_login"];
@@ -72,6 +75,14 @@ function settingsError(...named: RegExp[]): (error: unknown) => true {
   return (error) => {
     assert.ok(error instanceof SettingsError, `expected SettingsError, got ${String(error)}`);
     for (const part of named) assert.match(error.message, part);
+    return true;
+  };
+}
+
+function sharedSectionError(...named: RegExp[]): (error: unknown) => true {
+  return (error) => {
+    settingsError(...named)(error);
+    assert.equal((error as SettingsError).where, SHARED_SECTION);
     return true;
   };
 }
@@ -156,6 +167,23 @@ describe("readSettings", () => {
   it("refuses a validators entry listed twice, naming it", async () => {
     const text = sharedWith({ validators: '["fixture", "a-1", "fixture"]' });
     await assert.rejects(settingsOf(text), settingsError(word("validators"), /"fixture"/));
+  });
+
+  for (const [what, value, named] of [
+    ["missing", null, []],
+    ["not a list", '"docs/adr"', []],
+    ["holding an empty entry", '["docs/adr", ""]', []],
+    ["with an entry written twice", '["docs/adr", "../engineering/docs/adr", "docs/adr"]', [/"docs\/adr"/]],
+  ] as const) {
+    it(`refuses adr_folders ${what}, on [shared], naming adr_folders, where a list of paths is read`, async () => {
+      // A [shared] that does not know the key refuses it too, naming it, so a refusal alone would grade nothing.
+      assert.deepEqual((await settingsOf(sharedWith({ adr_folders: '["docs/adr"]' }))).shared.adr_folders, ["docs/adr"]);
+      await assert.rejects(settingsOf(sharedWith({ adr_folders: value })), sharedSectionError(word("adr_folders"), ...named));
+    });
+  }
+
+  it("reads an empty adr_folders as no folder", async () => {
+    assert.deepEqual((await settingsOf(sharedWith({ adr_folders: "[]" }))).shared.adr_folders, []);
   });
 
   for (const board of [

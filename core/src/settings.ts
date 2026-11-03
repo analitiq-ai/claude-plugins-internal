@@ -32,14 +32,20 @@ const AppLogin = z.string().regex(new RegExp(`^${LOGIN}\\[bot\\]$`));
 // GraphQL's `ProjectV2.url` has exactly this form, and the release rule compares it to `board` as text.
 const BOARD = new RegExp(`^https://github\\.com/(?:orgs|users)/${LOGIN}/projects/[1-9][0-9]*$`);
 
-export const Shared = z.strictObject({
-  validators: z.array(ModuleName).superRefine((names, ctx) => {
-    names.forEach((name, i) => {
-      if (names.indexOf(name) !== i) {
-        ctx.addIssue({ code: "custom", message: `${JSON.stringify(name)} is listed more than once`, path: [i] });
+function listedOnce<Item extends z.ZodType>(item: Item) {
+  return z.array(item).superRefine((items, ctx) => {
+    items.forEach((value, i) => {
+      if (items.indexOf(value) !== i) {
+        ctx.addIssue({ code: "custom", message: `${JSON.stringify(value)} is listed more than once`, path: [i] });
       }
     });
-  }),
+  });
+}
+
+export const Shared = z.strictObject({
+  validators: listedOnce(ModuleName),
+  // Required though it may be empty, so a repo that forgot it is refused rather than checked against nothing.
+  adr_folders: listedOnce(z.string().min(1)),
   // Absent, not empty, is what makes the threads module refuse to run.
   trusted_reviewers: z.array(z.string().regex(new RegExp(`^${LOGIN}(?:\\[bot\\])?$`))).optional(),
   board: z.string().regex(BOARD),
