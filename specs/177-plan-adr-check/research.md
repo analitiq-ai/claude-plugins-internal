@@ -181,8 +181,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `REVIEWER_ORG_ADR_DIR` (code, README, tests); it reads the spec folder's rulings file through core's
   `readRulings` and reports no departure an entry names. A folder's label is its entry as written; "org"
   becomes "outside the repo" (resolved path not under the checkout). Its deadline stays reviewer's own. A record
-  with its own `adr check` error, or a story PR changing a file under `specs/**` or under a `docs/adr/` folder at
-  any depth, places hold `adr-<issue>` (new `HoldKind` `adr` in `core/src/values.ts`): it refuses commits and
+  with its own `adr check` error, or a story PR whose diff changes a decision record, or a spec folder beyond its own ticks
+  (TICK_ONLY, reviewer ADR-0010 d1), places hold `adr-<issue>` (new `HoldKind` `adr` in `core/src/values.ts`): it refuses commits and
   rounds, its comment names the file(s), adrkit's rule and message for a broken record, and that planner fixes it; the card goes to Blocked;
   released as every hold.
 - **Rationale**: FR-014, FR-017, FR-020; SC-005. Root ADR-0011 (new, planning PR): planner alone creates and edits

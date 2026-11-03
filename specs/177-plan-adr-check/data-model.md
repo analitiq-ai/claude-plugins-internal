@@ -116,6 +116,5 @@ difference (ask, decide), or a judge that did not answer. `adrStop` maps it to l
 ## Hold `adr-<issue>` (reviewer, US5)
 
 A hold row (`core/src/contracts/snapshot.ts`) of new `HoldKind` `adr` (`core/src/values.ts`): placed by reviewer when
-its decision check finds a record with its own `adr check` error, or a story PR changes a file under `specs/**` or
-under a `docs/adr/` folder at any depth (root ADR-0011); refuses commits and rounds; its comment names the file(s)
+its decision check finds a record with its own `adr check` error, or a story PR's its diff against its merge base changes a decision record, or a spec folder beyond its own ticks (TICK_ONLY, reviewer ADR-0010 d1) (root ADR-0011); refuses commits and rounds; its comment names the file(s)
 (and rule and message for a broken record) and that planner fixes it. Released as every hold (reviewer ADR-0013 d2). Owner: reviewer ADR-0013 d4.

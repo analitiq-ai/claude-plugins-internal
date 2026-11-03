@@ -37,10 +37,13 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
   the planning PR before any code (FR-001). A departure's next steps are change the artifact, supersede the record
   (draft a superseding record into the spec PR when its folder is in this repo, else change it in the repo that
   holds the folder), or rule; a record with its own `adr check` error is a FAIL naming the file, rule and message,
-  next step "fix that record" (FR-008). Reviewer holds `adr-<issue>` on such a record or on a story PR that changes
-  `specs/**` or a `docs/adr/` folder at any depth (FR-020). An empty `adr_folders` passes before any path is read
+  next step "fix that record" (FR-008). Reviewer holds `adr-<issue>` on such a record or on a story PR whose diff
+  changes a decision record, or a spec folder beyond its own ticks (TICK_ONLY, reviewer ADR-0010 d1) (FR-020). An empty `adr_folders` passes before any path is read
   (FR-008). The plan's paths move out of `plan.md` into `<run folder>/touches.json`, written by the plan step and
   read only by planner's check (FR-012). The root `README.md`'s ADR Kit passage is rewritten in US3 and US4.
+- Implementor feedback on #278 (2026-11-03): a story's own ticks in `tasks.md` (TICK_ONLY, reviewer ADR-0010 d1)
+  place no `adr-<issue>` hold; one core function tells a tick from any other change, for the hold and the commit
+  refusal alike (FR-020, root ADR-0011).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -162,8 +165,8 @@ folders from core's function (US2) in place of finding tracked `docs/adr` folder
 ADR-0002 d3: a setting is not an environment variable).
 
 Planner alone creates and edits spec folders and decision records; everyone else reads them (root ADR-0011, added in
-the planning PR). So when the decision check finds a record with its own `adr check` error, or a story PR changes a
-file under `specs/**` or under a `docs/adr/` folder at any depth, reviewer places hold `adr-<issue>` (reviewer
+the planning PR). So when the decision check finds a record with its own `adr check` error, or a story PR's
+its diff against its merge base changes a decision record, or a spec folder beyond its own ticks (TICK_ONLY, reviewer ADR-0010 d1), reviewer places hold `adr-<issue>` (reviewer
 ADR-0013 d4, amended in the planning PR): it refuses commits and rounds, and its comment names the file(s), with
 adrkit's rule and message for a broken record, and says planner fixes it. The card goes to Blocked (orchestrator
 ADR-0002 d5). It is released as every hold is (reviewer ADR-0013 d2).
@@ -189,7 +192,7 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
 5. **Given** the decision check finds a record with its own `adr check` error, **When** reviewer launches a round,
    **Then** it places hold `adr-<issue>`, refusing commits and rounds, with a comment naming the record file,
    adrkit's rule and message, and that planner fixes it; the card goes to Blocked (FR-020).
-6. **Given** a story PR changes a file under `specs/**` or under a `docs/adr/` folder at any depth, **When**
+6. **Given** a story PR's its diff against its merge base changes a decision record, or a spec folder beyond its own ticks (TICK_ONLY, reviewer ADR-0010 d1), **When**
    reviewer sees it, **Then** it places hold `adr-<issue>` with a comment naming the file(s) and that planner
    fixes it; the hold is released only as every hold is (reviewer ADR-0013 d2) (FR-020).
 
@@ -284,7 +287,7 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
   and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
   changed (the same single-writer guard as FR-016).
 - **FR-020**: After #235, when reviewer's decision check finds a record with its own `adr check` error, or a story
-  PR changes a file under `specs/**` or under a `docs/adr/` folder at any depth (root ADR-0011), reviewer MUST
+  PR's its diff against its merge base changes a decision record, or a spec folder beyond its own ticks (TICK_ONLY, reviewer ADR-0010 d1) (root ADR-0011), reviewer MUST
   place hold `adr-<issue>` (reviewer ADR-0013 d4, amended in the planning PR), refusing commits and rounds, with a
   comment naming the file(s), adrkit's rule and message for a broken record, and that planner fixes it; the card goes to Blocked
   (orchestrator ADR-0002 d5); it is released as every hold (reviewer ADR-0013 d2).
