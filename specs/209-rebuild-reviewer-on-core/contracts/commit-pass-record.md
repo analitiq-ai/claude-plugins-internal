@@ -46,5 +46,6 @@ temp file + rename. The folder is a model deny path (`core/src/keys.ts` `HOME_FO
 
 ## Protected paths
 
-Not in this PR: the check calls core's existing `protectedPaths(changedFiles): string[]`
-(`core/src/protected-paths.ts`, orchestrator ADR-0004 d4), the one matcher for both plugins.
+Not in this PR: the check calls core's existing `protectedPaths(changedFiles, {tickOnly, adrFolders}): string[]`
+(`core/src/protected-paths.ts`, orchestrator ADR-0004 d4), the one matcher for both plugins, passing
+`{tickOnly, adrFolders}`: `tickOnly` the story's `tasks.md` when core's `isTickOnly` finds its base and head versions TICK_ONLY, else null; `adrFolders` the `inside` folders of core's `adrFolders`, each relative to the repo root (#177 R12).

@@ -18,7 +18,7 @@ one definition; not restated here. The core call each uses:
 |---|---|
 | — (round recorded) | `writeState` (append `Round`) |
 | `escalation-<issue>` (with question), `pushback-<issue>`, `audit-<issue>` | `placeHold` |
-| `rescope-<issue>` | `placeRescopeHold(specPr)`: `null` on a RESCOPE verdict, the spec PR's number when one is seen open |
+| `rescope-<issue>` | `placeRescopeHold(placement)`: `{question}` on a RESCOPE verdict (why it was raised, what must be decided), `{specPr}` when a spec PR is seen open |
 | `claim-<lineage>` (with question), `shim-<bug>` | `recordGates` |
 
 ## Gates section (core snapshot, new — PR B)

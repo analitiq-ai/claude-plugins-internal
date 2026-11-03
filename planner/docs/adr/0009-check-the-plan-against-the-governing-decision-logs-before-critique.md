@@ -29,6 +29,10 @@ affects:
     pattern: "planner/plugin/lib/adr-check.ts"
   - type: path
     pattern: "planner/plugin/speckit/presets/settled-design/commands/speckit.plan.md"
+  - type: path
+    pattern: "planner/plugin/scripts/rescope_questions.ts"
+  - type: path
+    pattern: "planner/plugin/speckit/presets/settled-design/commands/speckit.tasks.md"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -70,7 +74,7 @@ The tasks, written after critique, name the paths each story touches.
    |---|---|---|
    | `AdrJudgment` | `WITHIN` | the artifact sits inside the record: it does nothing the record rejected or contradicts |
    | `AdrJudgment` | `DEPARTS` | the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to |
-   | `CheckedArtifact` | `plan` | the paths the plan step writes to `touches.json` (d7) |
+   | `CheckedArtifact` | `plan` | the paths the touches step writes to `touches.json` (d7) |
    | `CheckedArtifact` | `tasks` | the paths `tasks.md`'s task lines name (d4) |
 
 6. We will keep the user's rulings that a named departure is not one only in `<spec folder>/adr-rulings.json`,
@@ -78,13 +82,24 @@ The tasks, written after critique, name the paths each story touches.
    `ADR_RULING`. A ruling applies to the resume carrying it only. Neither the judge nor the driving session
    gives one. Every later check of the spec folder drops a departure an entry names; spec-PR review is the
    check on an entry committed by hand.
-7. We will have the plan step write the paths the plan creates, changes or deletes to
-   `<run folder>/touches.json`, the run folder being `.specify/workflows/runs/<run_id>/`, gitignored; only
-   planner's check reads it. `plan.md` carries no path list for the check.
+7. We will have a headless model step of the after-plan check read `plan.md` as it then stands and write
+   the paths it creates, changes or deletes to `<run folder>/touches.json`, the run folder being
+   `.specify/workflows/runs/<run_id>/`, gitignored; only planner's check reads it. A shell step before it
+   deletes the file, so a failed write never leaves the last run's paths behind. A resume re-runs the whole
+   check, so the paths follow every change to the plan, and a departure's next step is "change `plan.md`".
+   `plan.md` carries no path list for the check.
 8. We will name the next steps in every stop. For a departure: change the artifact; supersede the record,
    into the spec PR when its folder is inside this repo (d3), or in the repo that holds the folder when it is
    outside; or resume with a ruling (d6). A FAIL caused by a record's own `adr check` error names the record
    file and adrkit's rule and message, and its next step is "fix that record".
+9. We will have a rescope take its open decision from the questions of every open `escalation-<issue>` hold,
+   and every open `rescope-<issue>` hold a verdict placed, on every open story issue under the spec's issue, the spec's
+   issue itself when it has no sub-issues (reviewer ADR-0013 d4, d5), and from the admin's words when there
+   are none. The after-plan check adds the file of each ADR departure line in them to the paths it checks and
+   stops on it as on a departure the judge named (d8), until a ruling names it (d6) or a superseding record no
+   longer departs; one (folder, record, file) from several stories is one stop and one ruling. The ruling
+   lands in the rescope's spec PR, and every story under the spec then merges the default branch and runs a
+   new round that reads it (orchestrator ADR-0004 d1, reviewer ADR-0022 d3).
 
 ## Options considered
 
@@ -126,8 +141,18 @@ the after-tasks check, which the user did not rule on.
 Rejected by the user on 2026-11-03: only planner's check reads the paths, and in `plan.md` they would mislead the
 builders and reviewers who read the plan but never use them.
 
+### Option I: The plan step writes the paths
+
+Rejected on 2026-11-03: a resume after a plan fix re-runs the check, not the plan step, so the paths would
+still be the old plan's.
+
+### Option J: The admin retypes a departure found at review into the rescope
+
+Rejected: the departure is already in the hold's question; retyping it is a second copy that can drift.
+
 ## Trade-offs
 
+- Each after-plan check runs one more headless step, to write the paths.
 - A folder outside the repo that is behind its remote may lack the record that now binds; the plan passes
   against what the admin keeps there.
 - A departure the user accepts costs a resume carrying the ruling.

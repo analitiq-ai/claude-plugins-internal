@@ -60,8 +60,13 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 ## R4: Rounds and holds map onto core's value sets
 
 - **Decision**: A round's result is core's `RoundResult` (CLEAN / DIRTY / INCOMPLETE, ADR-0021 d4) and a DIRTY
-  round's verdict core's `RoundVerdict`. Today's `RESHAPE_SPEC` maps to `RESCOPE` and places
-  `placeRescopeHold(issue, specPr)`; `ESCALATE` places an `escalation-<issue>` hold with the question;
+  round's verdict core's `RoundVerdict`, the first that matches by reviewer ADR-0017 d2: ESCALATE (a finding ruled
+  ESCALATE, an ADR departure that is not FIX among them; the assessor cannot decide; a deadlock), RESCOPE (a finding shows the spec does not settle a
+  decision), PATCH/CLASS_FIX/REDESIGN (at least one FIX; the assessor picks within ADR-0017 and ADR-0018),
+  CONVERGED_PUSHBACK (every finding PUSH_BACK or DEFER); composed in `lib/rules/rounds.ts`, the assessor's output
+  only its input. Today's `RESHAPE_SPEC` maps to `RESCOPE` and places
+  `placeRescopeHold(…, {question})`; `ESCALATE` places an `escalation-<issue>` hold with the question; each question
+  says why the round was raised and what must be decided (ADR-0013 d4–d5);
   spent audits (`max_audits`) place `audit-<issue>`; an open pushback the stage cap reaches places
   `pushback-<issue>`; claim and shim holds are `claim-<lineage>` and `shim-<bug>` (ADR-0013 d4 table).
   Rounds are keyed by `RoundId {stage, n}` on the story issue, not by PR.
@@ -140,8 +145,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
   GitHub; when that is not an ancestor either, pushed history was rewritten and the check refuses, naming the
   pushed head to restore (FR-021). Steps, in order: fence (R8), open holds
   that refuse commits (`escalation-`, `claim-`, `shim-`, `rescope-` except a default-branch merge, ADR-0013
-  d4–d5; `claim-<id>` refuses only a range touching its lineage's `file`, `shim-<id>` only one touching its bug's `ranges` (ADR-0013 d4)), `.github/`
-  and protected-path touch (ADR-0002 d4), merge resolution only for merges (ADR-0002 d3), then the claim and
+  d4–d5; `claim-<id>` refuses only a range touching its lineage's `file`, `shim-<id>` only one touching its bug's `ranges` (ADR-0013 d4)), a
+  protected-path touch through core's `protectedPaths` (ADR-0002 d4), merge resolution only for merges (ADR-0002 d3), then the claim and
   shim checks as workflows the model launches on the range (ADR-0003 d2). Their running state and memos are
   files in the same session folder (FR-017). A pass records every commit of the range (R11).
 - **Rationale**: ADR-0002 d1–d4, ADR-0021 d6, VP-005 (none of this exists). Grading from GitHub's head means a
@@ -149,7 +154,8 @@ its record is taken as the spec's VP-001 – VP-003 state it.
 - **Existing tools**: `core/src/git.ts` `runGit`, `fetchWithGhCredential`; `core/src/tree.ts` `gitTree`;
   `snapshot.py`'s export for sweepers (ported to export from the bare copy). The protected-path matcher of
   orchestrator ADR-0004 d4 is core's `protectedPaths` (`core/src/protected-paths.ts`, #230); the check calls it
-  on the range's changed files, so the orchestrator and reviewer share one matcher.
+  on the range's changed files with `{tickOnly, adrFolders}`: `tickOnly` the story's `tasks.md` when core's `isTickOnly` finds its base and head versions TICK_ONLY, else null; `adrFolders` the `inside` folders of core's `adrFolders`, each relative to the repo root (#177 R12), so the orchestrator and reviewer share
+  one matcher.
 
 ## R11: Commit-check pass record as a core contract on local disk
 

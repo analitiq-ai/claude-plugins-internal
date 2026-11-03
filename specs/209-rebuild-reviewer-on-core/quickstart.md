@@ -28,7 +28,7 @@ node core/scripts/check-carriers.ts --base origin/main
 | 9 | US4-1..2, SC-004 | OPEN `claim-7`, Ready move + admin comment after; record = claim; run hook twice | one release POST, first run only |
 | 10 | US4-3..5 | record = resume / no admin comment / `/codeworks reset` | no POST / hold OPEN / RELEASED with `reset: true` |
 | 11 | US2-1..2, SC-005 | A pass, B fail, C pass | passes: A, then A,B,C; newest C |
-| 12 | US2-3..4 | check could not run / range touches `.github/` / range touches only `docs/adr/` | nothing recorded / nothing recorded / passes |
+| 12 | US2-3..4 | check could not run / range touches `.github/`, `docs/adr/`, `CLAUDE.md` or the spec folder beyond the story's ticks / range only ticks the story's task block | nothing recorded / nothing recorded / passes |
 | 13 | US2-5 | GitHub branch at A; new session; B, C committed earlier unpushed | first range graded from A |
 | 14 | log mode | `[reviewer] mode = "log"`, scenario 7 | `would_deny` logged; commit not blocked; range recorded as passed |
 | 15 | FR-020 | two hook runs post `placeHold(claim-7)` and a round concurrently | both in the newest snapshot |

@@ -2,27 +2,33 @@
 schemaVersion: 0.2.0
 id: "0022"
 title: "Check only the listed ADR folders and honour a recorded ruling"
-status: draft
+status: accepted
 date: 2026-11-03
-deciders: []
+deciders: ["@Analitiq-Bot-Wonka"]
 tags: [decision-check, adr-folders, ruling, settings, review-round]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0013", "0019"]
+relatesTo: ["0013", "0017", "0019"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{adrkit,decisions}.py"
   - type: path
     pattern: "reviewer/plugin/lib/round/decisions.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/rules/rounds.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/round/assess.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
     name: Claude Code
     model: claude-opus-5-5
+  ratifiedBy: "@Analitiq-Bot-Wonka"
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/177"
 review:
   tier: async
+  decidedAt: 2026-11-03T12:34:02Z
 ---
 
 # ADR-0022: Check only the listed ADR folders and honour a recorded ruling
@@ -41,10 +47,13 @@ at review.
 1. We will take the decision check's folders only from core's `adrFolders` (`[shared] adr_folders`), never
    from tracked `docs/adr` discovery or `REVIEWER_ORG_ADR_DIR` (root ADR-0002 d3). An unreadable listed
    folder is a check that could not run (root ADR-0004).
-2. We will label each folder by its entry as written; a folder outside the repo is "outside the repo", no
-   longer "org".
+2. We will label each folder by its entry as written, always: in a departure's line and in matching a
+   ruling alike. "Outside the repo" is only wording in a message about such a folder; "org" goes.
 3. We will report no departure whose (folder, record, path) an entry of the spec folder's
    `adr-rulings.json` names (planner ADR-0009, the user's ruling).
+4. We will have a departure the check reports ruled FIX or ESCALATE alone (ADR-0017 d2); an ESCALATE names
+   it in the `escalation-<issue>` hold's question by its departure line (ADR-0013 d4), which planner's rescope
+   reads (planner ADR-0009 d9).
 
 ## Options considered
 
@@ -76,4 +85,4 @@ Rejected: every ruled departure would block the story at review.
 ## Action items
 
 1. [ ] US5 of #177 moves the decision check onto `adrFolders` and the rulings file, after #235.
-2. [ ] The ratifier ratifies this record, or sends it back.
+2. [ ] US6 of #177 (#285) carries an escalated departure to planner's rescope, after #235.
