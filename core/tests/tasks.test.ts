@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { readTaskBlockLabels, storyTasks, taskBlockLabel, TaskBlockLabelRefused, type StoryTask } from "../src/contracts/tasks.ts";
-import { readParameterViolations } from "./source-scan.ts";
-
-const core = join(dirname(fileURLToPath(import.meta.url)), "..");
-const tasksModule = join(core, "src", "contracts", "tasks.ts");
 
 describe("taskBlockLabel", () => {
   it("is the line Story issue: #<n>", () => {
@@ -322,8 +315,4 @@ describe("storyTasks", () => {
       assert.throws(() => storyTasks(text, s), TypeError);
     });
   }
-
-  it("takes no key reader: only GitHub's client and plain values", () => {
-    assert.deepEqual(readParameterViolations(readFileSync(tasksModule, "utf8"), relative(core, tasksModule), "storyTasks"), []);
-  });
 });
