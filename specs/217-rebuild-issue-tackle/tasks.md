@@ -63,8 +63,7 @@ Story issue: #245
 the orchestrator's Stop hook shares (FR-024–FR-026)
 
 **Independent Test**: `npm test --prefix core` passes; each addition has a test against the fake GitHub or a scratch
-repository; no addition's signature takes a key reader or a writing client (a source-scan case in each test file
-asserts the exported signature's parameter types are `GitHubClient` reader, plain values or a folder path only)
+repository; no addition's signature takes a key reader or a writing client
 
 ### B1 — Story branch name (before US3)
 
