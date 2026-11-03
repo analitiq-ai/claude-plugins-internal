@@ -1,0 +1,215 @@
+{
+  "changedFiles": [
+    "dup/c.py",
+    "fixtures/adr/corpus/0006-same-id.md",
+    "fixtures/adr/corpus/0007-no-frontmatter.md",
+    "lib/b.py",
+    "src/a.py"
+  ],
+  "governedBy": [
+    {
+      "recordId": "0001",
+      "title": "Accepted on src",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "src/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0002",
+      "title": "Draft on src",
+      "status": "draft",
+      "bucket": "activeProposals",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "src/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0005",
+      "title": "Path and entity",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "lib/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0006",
+      "title": "Same id",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "dup/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0006",
+      "title": "Same id",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "dup/**"
+        }
+      ]
+    }
+  ],
+  "governing": [
+    {
+      "recordId": "0001",
+      "title": "Accepted on src",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "src/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0005",
+      "title": "Path and entity",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "lib/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0006",
+      "title": "Same id",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "dup/**"
+        }
+      ]
+    },
+    {
+      "recordId": "0006",
+      "title": "Same id",
+      "status": "accepted",
+      "bucket": "governing",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "dup/**"
+        }
+      ]
+    }
+  ],
+  "activeProposals": [
+    {
+      "recordId": "0002",
+      "title": "Draft on src",
+      "status": "draft",
+      "bucket": "activeProposals",
+      "firedMatchers": [
+        {
+          "type": "path",
+          "pattern": "src/**"
+        }
+      ]
+    }
+  ],
+  "history": [],
+  "changedRecords": [
+    "fixtures/adr/corpus/0006-same-id.md",
+    "fixtures/adr/corpus/0007-no-frontmatter.md"
+  ],
+  "findings": [
+    {
+      "rule": "affects-repo-not-applicable",
+      "severity": "info",
+      "message": "path matcher \"src/**\" is qualified with repo \"acme/other\" and cannot apply in a single-repository corpus; it was skipped, and is kept for a federation that includes that repository.",
+      "id": "0004",
+      "path": "fixtures/adr/corpus/0004-repo-qualified.md",
+      "field": "affects.path",
+      "pattern": "src/**"
+    },
+    {
+      "rule": "affects-unresolvable",
+      "severity": "info",
+      "message": "Package matcher \"core\" requires a changed-dependency snapshot and is inert.",
+      "id": "0003",
+      "path": "fixtures/adr/corpus/0003-package-matcher.md",
+      "field": "affects.package",
+      "pattern": "core"
+    },
+    {
+      "rule": "affects-unresolvable",
+      "severity": "info",
+      "message": "Entity matcher \"billing\" has no catalog snapshot and is inert.",
+      "id": "0005",
+      "path": "fixtures/adr/corpus/0005-path-and-entity.md",
+      "field": "affects.entity",
+      "pattern": "billing"
+    },
+    {
+      "rule": "frontmatter-fence",
+      "severity": "error",
+      "message": "ADR files must start with a leading --- YAML frontmatter fence",
+      "path": "fixtures/adr/corpus/0007-no-frontmatter.md",
+      "field": "frontmatter"
+    },
+    {
+      "rule": "unique-id",
+      "severity": "error",
+      "message": "ADR id \"0006\" is used by multiple records: fixtures/adr/corpus/0006-one-id.md, fixtures/adr/corpus/0006-same-id.md",
+      "path": "fixtures/adr/corpus/0006-same-id.md",
+      "id": "0006",
+      "field": "id"
+    }
+  ],
+  "markerScan": {
+    "totalCandidates": 5,
+    "limit": 3000,
+    "counts": {
+      "scanned": 2,
+      "absent": 3,
+      "unreadable": 0,
+      "out-of-tree": 0,
+      "truncated": 0,
+      "skipped": 0
+    },
+    "absentPaths": [
+      "dup/c.py",
+      "lib/b.py",
+      "src/a.py"
+    ],
+    "unreadablePaths": [],
+    "outOfTreePaths": [],
+    "truncatedPaths": [],
+    "skippedPaths": [],
+    "declarations": {
+      "total": 0,
+      "retained": 0,
+      "omitted": 0,
+      "perFileOmitted": 0,
+      "batchOmitted": 0,
+      "perFileLimit": 64,
+      "batchLimit": 10000
+    }
+  },
+  "ok": false
+}
