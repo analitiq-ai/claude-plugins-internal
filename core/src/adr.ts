@@ -3,7 +3,7 @@ import { realpath } from "node:fs/promises";
 import { relative } from "node:path";
 import { z } from "zod";
 
-import type { ResolvedAdrFolder } from "./adr-folders.ts";
+import { checkoutToplevel, liesUnder, type ResolvedAdrFolder } from "./adr-folders.ts";
 import { couldNotRun, type CouldNotRun } from "./outcomes.ts";
 
 export const ADR_VERSION = "0.20.0";
@@ -123,7 +123,8 @@ function seconds(ms: number): string {
 /** `adr --version`, then `adr check --dir <folder> --json -- ...paths` from the realpath of `cwd`, the checkout's
  *  toplevel, killed at `deadlineMs`; `--dir` is relative to that realpath when `folder.inside`, else absolute.
  *  Never throws for the folder, only for the caller's fault: TypeError for a `deadlineMs` that is not finite and
- *  above 0 or an empty `paths`, and realpath's error for a `cwd` that does not exist. */
+ *  above 0, an empty `paths`, a `cwd` that is not its checkout's toplevel, or a `folder` whose `inside` is not where
+ *  it lies from `cwd`; realpath's error for a `cwd` that does not exist; GitFailed for one in no git repository. */
 export async function checkAdrFolder(
   cwd: string,
   folder: ResolvedAdrFolder,
@@ -135,6 +136,12 @@ export async function checkAdrFolder(
   // adr runs in the real folder, so a `--dir` made relative to a symlink would name another path. Resolved first,
   // so a spawn's ENOENT can only mean adr is missing.
   const root = await realpath(cwd);
+  // `--dir`'s form comes from `folder.inside`; from below the toplevel adrkit misses a changed record, a silent pass.
+  const toplevel = await checkoutToplevel(root);
+  if (toplevel !== root) throw new TypeError(`adr check runs from its checkout's toplevel ${toplevel}, not ${root}`);
+  if (folder.inside !== liesUnder(root, folder.path)) {
+    throw new TypeError(`${folder.entry} was not resolved from ${root}: inside is ${folder.inside} for ${folder.path}`);
+  }
   const notRun = (why: string): CouldNotRun => couldNotRun(folder.entry, why);
   if (!folder.readable) {
     return notRun(

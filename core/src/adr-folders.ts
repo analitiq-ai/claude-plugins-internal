@@ -15,7 +15,7 @@ function unreachable(error: unknown): boolean {
   return NOT_REACHABLE.has((error as NodeJS.ErrnoException).code ?? "");
 }
 
-function liesUnder(folder: string, path: string): boolean {
+export function liesUnder(folder: string, path: string): boolean {
   const rel = relative(folder, path);
   return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
@@ -23,6 +23,11 @@ function liesUnder(folder: string, path: string): boolean {
 // `--path-format=absolute` makes git answer the realpath, so `inside` compares realpaths on both sides.
 async function gitPath(checkout: string, question: string): Promise<string> {
   return (await runGit(checkout, ["rev-parse", "--path-format=absolute", question])).stdout.replace(/\n$/, "");
+}
+
+/** The realpath of `checkout`'s git toplevel; GitFailed when `checkout` is not in a git repository. */
+export function checkoutToplevel(checkout: string): Promise<string> {
+  return gitPath(checkout, "--show-toplevel");
 }
 
 async function realPathIfPresent(path: string): Promise<string> {
@@ -57,7 +62,7 @@ function located(entry: string, mainCheckout: string, checkoutRoot: string): str
  *  when two entries are one folder, naming both; GitFailed when `checkout` is not in a git repository.
  *  Reads no env var, makes no network call. */
 export async function adrFolders(checkout: string, shared: Shared): Promise<ResolvedAdrFolder[]> {
-  const [commonDir, checkoutRoot] = await Promise.all([gitPath(checkout, "--git-common-dir"), gitPath(checkout, "--show-toplevel")]);
+  const [commonDir, checkoutRoot] = await Promise.all([gitPath(checkout, "--git-common-dir"), checkoutToplevel(checkout)]);
   const mainCheckout = dirname(commonDir);
 
   const resolved = await Promise.all(

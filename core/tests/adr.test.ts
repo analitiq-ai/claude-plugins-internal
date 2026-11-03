@@ -152,6 +152,10 @@ before(async () => {
   for (const dir of [join(repo, "docs", "adr"), join(scratch, "org", "docs", "adr"), bin, noAdr]) {
     mkdirSync(dir, { recursive: true });
   }
+  // The cases that narrow PATH take adr off it, not git, which checkAdrFolder asks for the checkout's toplevel.
+  const git = PATH.split(delimiter).map((dir) => join(dir, "git")).find((path) => existsSync(path));
+  if (git === undefined) throw new Error("git is not on PATH");
+  for (const dir of [bin, noAdr]) symlinkSync(git, join(dir, "git"));
   // test_adrkit.py's Outcomes.setUp: an accepted record and a draft, both on src/**, committed.
   copyFileSync(new URL("0001-accepted-on-src.md", RECORDS), join(repo, "docs", "adr", "0001-a.md"));
   copyFileSync(new URL("0002-draft-on-src.md", RECORDS), join(repo, "docs", "adr", "0002-b.md"));
@@ -359,6 +363,27 @@ describe("checkAdrFolder", () => {
     await assert.rejects(checkAdrFolder(repo, inside, [], FAR), TypeError);
     assert.deepEqual(loggedCalls(), []);
   });
+
+  // From below the toplevel, adrkit 0.20.0 reads `--dir ../docs/adr` and misses a changed broken record: a silent pass.
+  it("throws TypeError, adr not called, for a cwd below the checkout's toplevel", async () => {
+    const below = join(repo, "src");
+    mkdirSync(below, { recursive: true });
+    standIn(answering(ADR_VERSION, printing(CAPTURED, 1)));
+    await assert.rejects(checkAdrFolder(below, inside, PATHS, FAR), TypeError);
+    assert.deepEqual(loggedCalls(), []);
+  });
+
+  // `inside` picks the form of `--dir`, so a folder resolved from another checkout would be passed in the wrong one.
+  for (const { what, wrong } of [
+    { what: "an in-repo folder marked outside", wrong: () => ({ ...inside, inside: false }) },
+    { what: "a folder beside the repo marked inside", wrong: () => ({ ...outside, inside: true }) },
+  ]) {
+    it(`throws TypeError, adr not called, for ${what}`, async () => {
+      standIn(answering(ADR_VERSION, printing(CAPTURED, 1)));
+      await assert.rejects(checkAdrFolder(repo, wrong(), PATHS, FAR), TypeError);
+      assert.deepEqual(loggedCalls(), []);
+    });
+  }
 
   it("reads an answer over the 1 MiB execFile buffers by default", async () => {
     const governing = [{ recordId: "0001", title: "t".repeat(2_000_000) }];
