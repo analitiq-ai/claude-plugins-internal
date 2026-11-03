@@ -106,8 +106,9 @@ approved to release it (the user or another system), and is every action that re
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
 no named approver, or with a way out no decision record names, fails the gate. State that may have been
 tampered with reads as held: a commit under a story's directory on the `ledger` branch that is neither a
-GitHub-signed, add-only commit of the reviewer App nor a repository admin's GitHub-signed deletion of what
-such a commit added, until the admin has deleted what it added and the hold is released as every hold is.
+GitHub-signed, add-only commit of the reviewer App nor a repository admin's GitHub-signed, delete-only
+commit of files an invalid commit added or changed; the hold stands until no file the invalid commit added
+or changed remains on the branch and it is released as every hold is.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7); how the user's action is recognised:
 `reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-ready-move-and-an-admin-s-commen.md`;

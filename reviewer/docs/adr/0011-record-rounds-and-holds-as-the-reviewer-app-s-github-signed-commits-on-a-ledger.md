@@ -71,12 +71,13 @@ branch has moved past is refused.
    - an event commit: GitHub-signed and valid, authored by the reviewer App's bot login (`[shared]` names
      it, root ADR-0002), adding files only;
    - a clearance: GitHub-signed and valid, authored by a user holding the repository admin role (the one
-     d3's bypass admits), deleting files only, every one a file an invalid commit added or changed;
+     d3's bypass admits), deleting files only, every one a file an invalid commit added or changed. It
+     adds nothing to the fold and removes nothing from it;
    - an invalid commit: any other. It changes nothing in the fold: a file it added or changed is no
-     event, and a file it deleted stays the event its commit made it. It holds the story, as a tampered
-     comment held it before. The hold is released as every hold is, by a Ready move and an admin's comment
-     newer than the invalid commit (ADR-0013 d2), and not before a clearance has deleted every file the
-     invalid commit added or changed; one that only deleted leaves nothing to clear.
+     event, and a file it deleted stays the event its commit made it. It places the hold `tamper-<oid>`,
+     named by the commit, which the fold derives and no row records (ADR-0013 d1). ADR-0013 d2 or d3
+     releases it, neither before no file the invalid commit added or changed remains on `ledger`; one
+     that only deleted leaves nothing to clear.
    The fold yields core's `Snapshot` (`core/src/contracts/snapshot.ts`): rounds, holds, pushbacks, rulings
    and gates, a released hold keeping its row and a rescope hold the number of the spec PR that placed it
    (ADR-0013). No reader takes the newest event alone. A story with no directory has no state.
@@ -141,8 +142,8 @@ hold.
 
 ### Option J: A branch per story, `ledger/<n>`
 
-Rejected: a branch per story accumulates in every clone and branch list and needs creating, and the
-API's path filter bounds a story's read on one branch as well.
+Rejected: a branch per story accumulates in every clone and branch list and needs creating, and by
+GitHub's docs a path-filtered history bounds a story's read on one branch as well.
 
 ### Option K: Hash-chained events, or a reader that trusts the newest event
 
@@ -167,25 +168,25 @@ Rejected: the draft PR precedes the first round (builder ADR-0003); every story 
 - Every event is a commit on the served repo: `ledger` grows for as long as the repo lives, since nothing
   on it is deleted, and clones fetch it unless they exclude it.
 - An admin reads JSON files on a branch, not a rendered comment, unless the orchestrator renders one.
-- An invalid commit costs an admin three acts, a clearance, a comment and a Ready move, and a file it
-  changed in place is an event until the clearance deletes it, since no reviewer App commit may rewrite one.
+- An invalid commit costs an admin three acts, a clearance, a comment and a Ready move; a file it changed
+  in place is deleted by the clearance while the event under it stands in the fold.
 - A served repo whose plan offers no rulesets (orchestrator ADR-0009 d2) keeps only the fold's checks: any
   token with `contents: write`, the orchestrator's and planner's Apps included, can rewrite or delete the
-  branch there and drop events and holds with no trace the fold sees, where a deleted comment at least left
-  a timeline event.
+  branch there and drop events and holds with no trace the fold sees, where, by GitHub's docs, a deleted
+  comment at least left a timeline event.
 
 ## Consequences
 
 - Easier: no size cap; a row can never be dropped or rewritten, since an event commit only adds files and
-  a clearance deletes only what an invalid commit put there; a write on a stale reading is refused and
-  made again, not lost; tamper is GitHub's verdict, a signature and an author, not an inference from edit
-  marks and timeline events.
+  a clearance changes nothing in the fold; a write on a stale reading is refused and made again, not
+  lost; tamper is GitHub's verdict, a signature and an author, not an inference from edit marks and
+  timeline events.
 - Harder: an orphan branch and three rulesets per served repo; a read grows with a story's events, since
   the fold reads the directory's commits and each commit's file list; an event or snapshot format change
   is a `core/` release.
 - **How we would know this was wrong:** a round in a fold no reviewer hook wrote; a commit on `ledger`
-  GitHub did not sign; a state read from the newest event alone; a hold released by a deletion; an
-  invalid commit no clearance can clear.
+  GitHub did not sign; a state read from the newest event alone; a hold released by a deletion; a
+  `tamper-<oid>` hold no admin can clear.
 - Revisit if: a second writer needs the record, rounds run outside the session, or GitHub stops signing
   an App's API commits.
 

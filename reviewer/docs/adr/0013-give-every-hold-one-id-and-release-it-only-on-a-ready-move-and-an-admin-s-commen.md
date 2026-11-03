@@ -41,25 +41,28 @@ review:
 
 A story is claimed from Ready on an admin's prompt naming it (orchestrator ADR-0001). Its PR can be
 closed and reopened. A rescope changes the spec a story in flight is graded against. Admins act on the
-loop only through GitHub: the board, issue comments and, to clear an invalid commit from the `ledger`
-branch, a deletion commit (ADR-0011 d2).
+loop only through GitHub: the board and issue comments, and a user holding the repository admin role
+clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011 d2).
 
 ## Decision
 
-1. We will give every hold an id and a row in the state snapshot (ADR-0011), keyed by the story issue's
-   number but `claim-<id>` (its lineage) and `shim-<id>` (its bug). While one is open the story merges
+1. We will give every hold an id, and every hold but `tamper-<oid>` a row in the state record (ADR-0011),
+   keyed by the story issue's number but `claim-<id>` (its lineage), `shim-<id>` (its bug) and
+   `tamper-<oid>` (the invalid commit on `ledger` the fold derives it from, ADR-0011 d2). While one is open the story merges
    nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
 2. We will release holds by one function in `core/`, only on the orchestrator's claim from Ready (orchestrator
    ADR-0002): the orchestrator runs it before it claims, and reviewer's hook writes its releases at its first
    run after the claim, since the two plugins' hooks on one prompt run in parallel.
    reviewer releases each open hold of the story issue for which both a move of the card to Ready on the board
    `[shared] board` names and an admin's comment on the story issue are newer than the commit that
-   placed the hold. An admin is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one;
+   placed the hold, and a `tamper-<oid>` hold not before no file its commit added or changed remains on
+   `ledger` (ADR-0011 d2). An admin is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one;
    for an escalation hold, that comment is its answer. A release by a comment lapses the attestation, and the
    new internal round at the head is briefed with the comment (orchestrator ADR-0004). A hold with no such
    comment stays open, and the start stops (orchestrator ADR-0002).
 3. We will have an admin's comment `/codeworks reset` on the story issue release every open hold of the
-   story and restart every count that places one, the orchestrator's included (orchestrator ADR-0001),
+   story, a `tamper-<oid>` hold once nothing its commit added or changed remains on `ledger` (ADR-0011
+   d2), and restart every count that places one, the orchestrator's included (orchestrator ADR-0001),
    and let a check that cannot find its gates anchor start the gates section over (ADR-0001 d2). It moves
    no card: the admin sets Ready.
 4. We will place each hold, and grant on its release, as follows; each count is a `[reviewer]` key.
@@ -115,8 +118,8 @@ the story issue replaces it.
 
 ## Trade-offs
 
-- Every release costs an admin two acts: a comment and a Ready; a tamper hold a third, the clearance of
-  what the invalid commit added (ADR-0011 d2).
+- Every release costs an admin two acts: a comment and a Ready; a tamper hold a third, a repository
+  admin's clearance of what the invalid commit added or changed (ADR-0011 d2).
 - The code checks that a comment exists, not what it says.
 
 ## Consequences

@@ -72,7 +72,8 @@ A hook mints the session token into a gh config folder the model can read but no
 counts a codeworks App as an admin, writer, trusted or exempt actor. The App keys, the validator modules'
 tokens (for example a DeepSource token) and the classifier key live in `~/.config/codeworks/`. The
 admin's login is the merge ruleset's only bypass; the `ledger` branch's three rulesets (orchestrator
-`README.md`, step 6) let only the reviewer App and an admin commit there, and nobody rewrite or delete it.
+`README.md`, step 6) let only the reviewer App and a repository admin commit there (for an App outside the
+bypass, by GitHub's docs: §8 E2), and nobody rewrite or delete it.
 The reviewer App holds `issues: write` until #209 lands the ledger, then `contents: write` and no `issues`
 permission (reviewer ADR-0011 d3): the table is pinned to core's permission map by a test and changes with
 that code.
@@ -97,8 +98,9 @@ core.
 - A hook that crashes or times out attests, flips, pushes and merges nothing.
 
 **Reviewer.** Hooks as the reviewer App, which from #209 (§3) writes contents: its record, as
-GitHub-signed commits on the `ledger` branch, where rulesets admit only it and an admin and let nobody rewrite (reviewer ADR-0011
-d3). The same permission reaches every unprotected branch and the merge endpoint; the ruleset alone stops
+GitHub-signed commits on the `ledger` branch, where rulesets admit only it and a repository admin and let
+nobody rewrite (reviewer ADR-0011 d3). The same permission reaches every unprotected branch and, by
+GitHub's docs, the merge endpoint; the ruleset alone stops
 a merge, as for the orchestrator App. It runs the gate rule (§6).
 - Hook guardrail: it refuses from the model's tool calls every write the orchestrator or an admin owns
   (reviewer ADR-0012), naming who makes it.
@@ -311,9 +313,10 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **E2:** the `ledger` branch's rulesets were tested on a throwaway repo (#288): an App in the
   restrict-updates bypass commits and GitHub signs the commit, its commit with a custom author is refused
   as unsigned, a user outside the bypass cannot commit, and neither the App nor the admin can force-push
-  or delete the branch. Untested: a served repo whose plan offers no rulesets, where any token with contents write,
-  the orchestrator's and planner's Apps included, can rewrite or delete the branch and drop events and
-  holds with no trace the fold sees (reviewer ADR-0011).
+  or delete the branch. Untested: that the restrict-updates rule stops an App outside its bypass, the orchestrator's and
+  planner's Apps included, which rests on GitHub's docs; and a served repo whose plan offers no rulesets,
+  where any token with contents write can rewrite or delete the branch and drop events and holds with no
+  trace the fold sees (reviewer ADR-0011).
 - **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Plugin npm dependencies under the managed file:** `claude plugin install` fetches a plugin's locked
