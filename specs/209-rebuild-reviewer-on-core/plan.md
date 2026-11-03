@@ -17,7 +17,7 @@ Three things land before reviewer's code, each in its own PR (Principle VI, FR-0
 1. ADR amendments: reviewer ADR-0011 d1, d2, d5; ADR-0001 d2; ADR-0008; ADR-0013 d4; ADR-0004 d4 and
    ADR-0003 d1 ("ledger" → the check's session files).
 2. Core: the snapshot's gates section and its one-post write (R5).
-3. Core: commit-check pass record (R11); the protected-path matcher is already core's `protectedPaths`.
+3. Core: commit-check pass record (R11); the protected-path matcher is already core's `protectedPaths`, called with `{tickOnly, adrFolders}` (#177).
 
 External dependency: #174's core PR adding the session issue record (VP-001, PR #216). US3 and US4 cannot start
 before it merges.
@@ -84,7 +84,7 @@ Post-design re-check: unchanged, all pass.
 - Commit fence as a pure rule applied in the after-commit check: R8
 - Release on claim once per claim, first in the run, marker file: R9
 - After-commit check over a hooks-owned bare copy, graded from GitHub's branch head: R10
-- Commit-check pass record in core: R11; protected paths through core's existing `protectedPaths`: R10
+- Commit-check pass record in core: R11; protected paths through core's existing `protectedPaths(changedFiles, {tickOnly, adrFolders})`: R10
 - `log` mode downgrades refusals only: R12
 - Deleting the ledger, `unlock`/`override`, `pre_merge_gate.py` and the poller inbox: R13
 - `node:test` against the GitHub recorder and temp repositories: R14
@@ -117,7 +117,7 @@ core/src/
 ├── contracts/gates.ts             # PR B
 ├── contracts/commit-pass.ts       # PR C
 ├── commit-pass.ts                 # PR C: read/record, atomic session file
-└── protected-paths.ts             # existing (#230): protectedPaths, called by the after-commit check
+└── protected-paths.ts             # existing (#230): protectedPaths(changedFiles, {tickOnly, adrFolders}), called by the after-commit check
 core/tests/                        # PR B, PR C
 
 reviewer/plugin/

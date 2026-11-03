@@ -13,8 +13,11 @@ asks `adr check` per folder, a headless judge that writes a verdict as data, and
 folder's outcome and stops the run on a departure or a check that could not run; every stop is reported by one
 function. The user can overrule a named departure on resume; the decide step, its only writer, records the ruling
 in the spec folder's `adr-rulings.json`, honoured by later checks and, after #235, by reviewer, whose decision check
-moves onto the same list and holds a story that changes a spec or a record, or meets a broken record, for planner.
-The plan's paths are written by the plan step to the run folder's `touches.json`, read only by the check.
+moves onto the same list. Core's `protectedPaths` names a root spec folder a story PR changes beyond its own ticks,
+so orchestrator never attests it (orchestrator ADR-0004 d4).
+The plan's paths are written to the run folder's `touches.json` by the check's own touches step, from `plan.md` as it
+then stands, and read only by the check. A departure reviewer cannot fix is ruled ESCALATE, one line of the
+escalation hold's question, which planner's rescope reads; a ruling lands for every story under the spec (US6).
 
 ## Technical Context
 
@@ -24,8 +27,8 @@ The plan's paths are written by the plan step to the run folder's `touches.json`
 **Primary Dependencies**: zod 4.6.7, smol-toml 1.9.1; `@adrkit/cli` 0.20.0 (`adr`); Spec Kit workflow engine
 (`shell`, `prompt`, `if` steps).
 
-**Storage**: files: `codeworks.toml`; run folder JSON (`.specify/workflows/runs/<id>/`, gitignored), the plan
-step's `touches.json` among them; the rulings file `<spec folder>/adr-rulings.json`.
+**Storage**: files: `codeworks.toml`; run folder JSON (`.specify/workflows/runs/<id>/`, gitignored), the touches
+step's `touches.json` and a rescope's `review-questions.json` among them; the rulings file `<spec folder>/adr-rulings.json`.
 
 **Testing**: `node --test` (core, planner, reviewer TS); `unittest` (planner Python).
 
@@ -49,14 +52,14 @@ step's `touches.json` among them; the rulings file `<spec folder>/adr-rulings.js
 | II Ownership | Core resolves, planner and reviewer call; external input (`adr` stdout, verdict, ruling, artifact grammar) validated where read. Public-repo rule stays an ADR-0009 rule the admin keeps. Pass. |
 | III Fail loud | Unreadable folder, bad `adr`, bad verdict: could not run, never pass; no fallback to discovering folders. Pass. |
 | IV Test-first | Each story starts from red tests (quickstart). Pass. |
-| V Smallest change | No deadline parameter (planner has none); no judge for a folder nothing governs; reviewer's port reused, not duplicated. Pass. |
-| VI Rule apart | Planner ADR-0009, reviewer ADR-0013, orchestrator ADR-0002 and root ADR-0010 are amended, and reviewer ADR-0022 and root ADR-0011 "planner alone writes specs and ADRs" added, in the planning PR before any code (R11). The `Shared` schema and `codeworks.toml` move together: config, not governed code. Pass. |
+| V Smallest change | One required deadline in `checkAdrFolder`, each caller its own, so a slow `adr` is reported, not killed; no judge for a folder nothing governs; reviewer's Python ported once into core, proved by its own tests; no hold of reviewer's own, core's existing `protectedPaths` extended instead. Pass. |
+| VI Rule apart | Planner ADR-0009 and orchestrator ADR-0004 d4 are amended, and reviewer ADR-0022 and root ADR-0011 "planner alone writes specs and ADRs" added (accepted), and reviewer ADR-0002 d4 and ADR-0017 d2 amended, in the planning PRs before any code (R11). The `Shared` schema and `codeworks.toml` move together: config, not governed code. Pass. |
 | P1 Code decides | Both checks are workflow steps running scripts; the model judges, a script decides; every stop of ask, judge and decide names the next step through one function, `adrStop` (R8). Pass. |
 | P2 Hold release | The stop is released only by a resume whose ruling the user gave (`ADR_RULING`, that resume only), or a changed artifact; both named by amended ADR-0009. Pass. |
 | P3 Pure rules | `decideFolder`/`decideCheck`, `adrStop`, `changedSince` and the grammars are pure; `adr_check.ts` only does I/O. Pass. |
 | P4 Could not run | Its own outcome, exit 2, never a pass, a judge that did not answer included (R8). Pass. |
 | P5 Settled design | Every mechanism below cites a research decision with Existing tools. Pass. |
-| P6 One writer | `codeworks.toml`: admin. `touches.json`: plan step. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
+| P6 One writer | `codeworks.toml`: admin. `touches.json`: touches step. `review-questions.json`: `drive_workflow.py rescope`, from the verdict-placed holds' questions. A departure line: core's `renderAdrDeparture`, called by reviewer's round record. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
 | P7 Data | Paths (one grammar), verdict, rulings file each have a grammar (contracts/artifact-grammar.md). Pass. |
 | P8 Generic | Folders come only from `codeworks.toml`; nothing names this repo. Pass. |
 | P9 Identities | No actor trusted; no GitHub call. Pass. |
@@ -71,7 +74,18 @@ record's own error (R2).
 2026-11-03, implementor feedback review: US1 removed, its ADR-0009 amendment made in the planning PR with reviewer
 ADR-0013's, orchestrator ADR-0002's and new root ADR-0011 (FR-001, R11); the plan's paths moved from a `## Touches`
 section of `plan.md` to `<run folder>/touches.json` (FR-012, FR-019, R4); empty list passes first and a broken
-record is a FAIL with its own next step (FR-008, R8); reviewer's hold `adr-<issue>` (FR-020, R10).
+record is a FAIL with its own next step (FR-008, R8).
+
+2026-11-03, gap sweep after #275: no reviewer hold; a spec or record change is a protected path through core's
+`protectedPaths` and `isTickOnly` (FR-020, R12); `readAdrAnswer(raw)` a port proved by reviewer's tests, with
+notices, a capped scan and a required deadline (R3); one literal path grammar (R5); one stop table (R8); listed in-repo
+ADR folders protected (R12).
+
+2026-11-03, user decisions: `touches.json` deleted by `adr-plan-clear`, then written by the touches step
+`adr-plan-touches` (R4); a ruling from a file, `adr_ruling=@<file>` (R9); a departure at review is ruled FIX or
+ESCALATE, one line of the hold's question, which planner's rescope reads with every verdict-placed question; a
+ruling lapses every story's round under the spec (US6, R13); root ADR-0011 and
+reviewer ADR-0022 accepted.
 
 ## Project Structure
 
@@ -88,16 +102,17 @@ specs/177-plan-adr-check/
 ### Source Code (repository root)
 
 ```text
-core/src/            settings.ts  adr-folders.ts (new)  adr.ts (new)  values.ts  state.ts (US5: hold `adr-<issue>`)
+core/src/            settings.ts  adr-folders.ts (new)  adr.ts (new)  values.ts  protected-paths.ts (US5)  attest.ts (US6)
 core/src/contracts/  decision-check.ts (new)  tasks.ts
-core/tests/          adr-folders.test.ts  adr.test.ts  decision-check.test.ts  tasks.test.ts  settings.test.ts (+ fixtures, typed Shared literals)
-planner/plugin/      scripts/adr_check.ts (new)  lib/adr-check.ts (new)
-                     speckit/workflows/issue-spec/{workflow.yml, adr-judge.md (new)}
-                     speckit/presets/settled-design/commands/speckit.plan.md
+core/tests/          adr-folders.test.ts  adr.test.ts  decision-check.test.ts  tasks.test.ts  protected-paths.test.ts  attest.test.ts  settings.test.ts (+ fixtures, typed Shared literals)
+planner/plugin/      scripts/adr_check.ts (new)  scripts/rescope_questions.ts (new, US6)  lib/adr-check.ts (new)
+                     speckit/workflows/issue-spec/{workflow.yml, adr-touches.md (new), adr-judge.md (new)}
+                     speckit/presets/settled-design/{preset.yml, commands/speckit.tasks.md (new)}
                      skills/issue-spec/{SKILL.md, scripts/drive_workflow.py}
 planner/tests/       adr-check.test.ts (new)  test_drive_workflow.py  test_plan_template.py  token.test.ts
                      support/checkout.ts
 reviewer/plugin/     lib/round/decisions.ts  README.md        (US5)
+                     lib/round/{assess,record}.ts  lib/rules/rounds.ts  (US6)
 reviewer/tests/      decisions.test.ts                       (US5)
 orchestrator/tests/support/  story.ts  checkout.ts  (fixtures)
 codeworks.toml  README.md
@@ -115,14 +130,16 @@ planner owns the check steps and their pure rules; reviewer only changes its own
 - `[shared] adr_folders` key and its schema: R1
 - `adrFolders`, resolving each entry from the main or the calling checkout: R2
 - `checkAdrFolder` / `readAdrAnswer` and `ADR_VERSION` in core: R3
-- the plan step's `<run folder>/touches.json` and its grammar: R4
+- the touches step's `<run folder>/touches.json` and its grammar: R4
 - `tasks.md` task-line paths and story: R5
 - ask → judge → decide steps after plan and after tasks: R6
 - judge verdict file and `AdrJudgment` set: R7
 - per-folder outcome, exit status and the one stop reporter `adrStop`: R8
 - user's ruling on resume, the rulings file, its one writer and the writer guard: R9
-- reviewer's decision check on the listed folders and the rulings file, and its hold `adr-<issue>`: R10
-- the planning PR's decision records, then PR order: R11
+- reviewer's decision check on the listed folders and the rulings file: R10
+- the planning PRs' decision records, then PR order: R11
+- a story PR's spec-folder or record change as a protected path: R12
+- a departure found at review carried to planner's rescope: R13
 
 ## Complexity Tracking
 

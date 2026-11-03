@@ -9,7 +9,7 @@ tags: [root-cause, assessment, policy, shim-check, reviewer-set]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0004", "0008", "0019"]
+relatesTo: ["0004", "0008", "0013", "0018", "0019", "0022"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{policy,briefs,assessment,shimcheck,jev}.py"
@@ -48,7 +48,15 @@ a root-cause verdict is due.
    state snapshot (root ADR-0003), and rule in policy which rulings each verdict admits: SPEC_WRONG admits
    a spec-gap FIX or a PUSH_BACK citing a spec line; CANNOT_TELL admits ESCALATE or a PUSH_BACK naming
    where the mechanism was located; AT_SYMPTOM, when ruled FIX, admits PATCH, CLASS_FIX or REDESIGN with
-   the mechanism named.
+   the mechanism named. A finding the assessor cannot rule is ruled ESCALATE, naming what must be decided.
+   A departure the decision check reports (ADR-0022) admits only a FIX, which changes the code to comply
+   and leaves the record as it is, or an ESCALATE, named in the hold's question by its departure line
+   (ADR-0013 d4); never a PUSH_BACK or a DEFER: only planner may overrule a record (planner ADR-0009 d6,
+   d9). A round's verdict is the first that matches: ESCALATE, when a finding is ruled ESCALATE, the
+   assessor cannot decide, or a deadlock stands; RESCOPE,
+   when a finding shows the spec does not settle a decision; PATCH, CLASS_FIX or REDESIGN, when at least one
+   finding is ruled FIX, the assessor choosing among them by this record and ADR-0018; CONVERGED_PUSHBACK,
+   when every finding is ruled PUSH_BACK or DEFER.
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.

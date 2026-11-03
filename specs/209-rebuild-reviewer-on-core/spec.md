@@ -95,8 +95,9 @@ C; check the record names C as newest pass and A, B, C as passed, and that befor
    C is the newest pass.
 3. **Given** a commit whose check could not run, **When** the record is read, **Then** that commit is not
    passed (constitution P4).
-4. **Given** a commit in the range touches `.github/`, **When** the range is checked, **Then** the check
-   fails and nothing in the range is recorded as passed (ADR-0002 d4).
+4. **Given** a commit in the range touches a protected path (`.github/`, a decision record, the spec folder beyond
+   the story's ticks), **When** the range is checked, **Then** the check fails and nothing in the range is
+   recorded as passed (ADR-0002 d4).
 5. **Given** the story branch on GitHub at A, and B, C passed in a session that ended before its push,
    **When** a new session on the same issue makes its first check, **Then** that check grades the range from
    A, and B, C are pushed only once it passes them (FR-014).

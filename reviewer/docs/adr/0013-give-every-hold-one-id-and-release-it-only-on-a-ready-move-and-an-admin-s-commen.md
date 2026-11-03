@@ -9,7 +9,7 @@ tags: [holds, release, user-authority, reset, rescope, orchestrator]
 scope: component
 reversibility: two-way-door
 blastRadius: component
-relatesTo: ["0001", "0008", "0010", "0011", "0012", "0015", "0016", "0019"]
+relatesTo: ["0001", "0008", "0010", "0011", "0012", "0015", "0016", "0017", "0019"]
 affects:
   - type: path
     pattern: "reviewer/plugin/scripts/{gate,policy,ledger,claimgate,shimgate,hookio}.py"
@@ -72,20 +72,20 @@ loop only through GitHub: the board and issue comments.
    | `claim-<id>` | its lineage has `claim_hold_at` WRONG rulings, a check counting once | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug has `shim_hold_at` members (ADR-0008) | commits touching its lines | one such commit |
    | `audit-<issue>` | `max_audits` escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
-   | `adr-<issue>` | the decision check finds a record with its own `adr check` error, or the story PR's diff against its merge base changes a decision record, or a spec folder beyond TICK_ONLY (ADR-0010 d1; root ADR-0011) | commits and rounds | both |
-
-   An `adr-<issue>` hold's comment names the files and, for a broken record, adrkit's rule and message, and
-   says planner fixes it. It releases as every hold does (d2).
 
    The claim and shim counts take only the WRONG rulings and members dated after `reset.at`, the time of the
    newest `/codeworks reset` (d3). A release by d2 lowers no count: a released `claim-<id>` holds again at the next
    check that rules its lineage WRONG, the released words included, and a released `shim-<id>` lets one commit
    touching its line ranges through, whose check places it again. A `claim-<id>` hold carries the last WRONG
-   ruling's failing case and evidence as its question. The rulings and members live in the gates section of
-   the state snapshot (ADR-0011 d1), and a count and the hold it places land in one post.
-5. We will place `rescope-<issue>` on a `RESCOPE` verdict, and, when reviewer's hook sees a rescope's
-   spec PR open (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording
-   that spec PR's number. reviewer's hook derives this at each run: a spec PR whose number a story's
+   ruling's failing case and evidence as its question. An `escalation-<issue>` hold a verdict places carries
+   as its question why the round escalated and what must be decided, each ADR departure among them one line,
+   `ADR departure: <folder> <record id> <file> — <what departs>` (ADR-0017 d2), written and read by one pair
+   of functions in `core/`. The rulings and members live in the gates section of the state snapshot (ADR-0011
+   d1), and a count and the hold it places land in one post.
+5. We will place `rescope-<issue>` on a `RESCOPE` verdict, carrying as its question, as d4's escalation does,
+   why the round rescoped and what must be decided; and, when reviewer's hook sees a rescope's spec PR open
+   (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording that spec PR's
+   number and no question. The orchestrator posts a verdict's question (orchestrator ADR-0010 d1). reviewer's hook derives this at each run: a spec PR whose number a story's
    rescope row already records places nothing again, released or not; a new spec PR places the hold
    again. It refuses every code commit but a merge of the default branch, and releases as every hold
    does (d2).

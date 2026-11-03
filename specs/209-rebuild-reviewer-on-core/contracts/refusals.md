@@ -14,7 +14,7 @@ Each names the next legal step (FR-010, P1). Which refusals `log` mode turns int
 | write whose `gates` differs from the one it read | could not run; stale reading, retry the step |
 | GitHub unanswered | could not run; retry the step |
 | `releaseOnClaim` failed | could not run; the next hook run retries the release |
-| change touches a `.github/` folder (ADR-0002 d3–d4) | the path; an admin's PR under an exempt label |
+| change touches a path core's `protectedPaths` returns (ADR-0002 d3–d4, orchestrator ADR-0004 d4) | the paths; an admin's or planner's PR |
 | change to a merged story's task block, or spec folder unequal to the default branch's after its merge (ADR-0015 d4) | the file; the default branch's version |
 | commit or round launch while the session's issue is in Blocked or Backlog (ADR-0015 d3) | the lane; the admin moves the card |
 | round launch while a hold that refuses rounds is open (ADR-0013 d4) | the hold id; its release |
