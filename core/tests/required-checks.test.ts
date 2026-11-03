@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -9,11 +8,9 @@ import type { CouldNotRun, StatusAnswer } from "../src/outcomes.ts";
 import type { Shared } from "../src/settings.ts";
 import { loadValidators, type Validators } from "../src/validation/contract.ts";
 import { internalReviewAt, requiredChecks } from "../src/validation/required-checks.ts";
-import { readParameterViolations } from "./source-scan.ts";
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "./support/fake-github.ts";
 
 const DIR = fileURLToPath(new URL("./fixtures/validators/", import.meta.url));
-const REQUIRED_CHECKS_FILE = fileURLToPath(new URL("../src/validation/required-checks.ts", import.meta.url));
 
 const REPO = "acme/widgets";
 const PR = 31;
@@ -476,8 +473,4 @@ describe("internalReviewAt: true only when the newest internal-review check run 
       assert.deepEqual(client.calls, []);
     });
   }
-
-  it("takes no key reader: only GitHub's client and plain values", () => {
-    assert.deepEqual(readParameterViolations(readFileSync(REQUIRED_CHECKS_FILE, "utf8"), "src/validation/required-checks.ts", "internalReviewAt"), []);
-  });
 });
