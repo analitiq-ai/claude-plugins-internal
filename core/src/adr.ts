@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
-import { relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import { z } from "zod";
 
 import { checkoutToplevel, liesUnder, type ResolvedAdrFolder } from "./adr-folders.ts";
@@ -123,8 +123,9 @@ function seconds(ms: number): string {
 /** `adr --version`, then `adr check --dir <folder> --json -- ...paths` from the realpath of `cwd`, the checkout's
  *  toplevel, killed at `deadlineMs`; `--dir` is relative to that realpath when `folder.inside`, else absolute.
  *  Never throws for the folder, only for the caller's fault: TypeError for a `deadlineMs` that is not finite and
- *  above 0, an empty `paths`, a `cwd` that is not its checkout's toplevel, or a `folder` whose `inside` is not where
- *  it lies from `cwd`; realpath's error for a `cwd` that does not exist; GitFailed for one in no git repository. */
+ *  above 0, an empty `paths` or one not normalised and relative to the toplevel, a `cwd` that is not its checkout's
+ *  toplevel, or a `folder` whose `inside` is not where it lies from `cwd`; realpath's error for a `cwd` that does not
+ *  exist; GitFailed for one in no git repository. */
 export async function checkAdrFolder(
   cwd: string,
   folder: ResolvedAdrFolder,
@@ -133,10 +134,15 @@ export async function checkAdrFolder(
 ): Promise<AdrAnswer | CouldNotRun> {
   if (!(Number.isFinite(deadlineMs) && deadlineMs > 0)) throw new TypeError(`not a deadline in ms: ${deadlineMs}`);
   if (paths.length === 0) throw new TypeError("no path to check: adr check of none passes with no record governing");
+  // adrkit 0.20.0 matches each path as written against its cwd, so any other form names no changed file: a silent pass.
+  const unmatched = paths.find((path) => isAbsolute(path) || path.split("/").some((segment) => ["", ".", ".."].includes(segment)));
+  if (unmatched !== undefined) {
+    throw new TypeError(`not a normalised path relative to the checkout's toplevel: ${JSON.stringify(unmatched)}`);
+  }
   // adr runs in the real folder, so a `--dir` made relative to a symlink would name another path. Resolved first,
   // so a spawn's ENOENT can only mean adr is missing.
   const root = await realpath(cwd);
-  // `--dir`'s form comes from `folder.inside`; from below the toplevel adrkit misses a changed record, a silent pass.
+  // The paths are relative to the toplevel and adrkit reads them from its cwd, so from anywhere else they name no file.
   const toplevel = await checkoutToplevel(root);
   if (toplevel !== root) throw new TypeError(`adr check runs from its checkout's toplevel ${toplevel}, not ${root}`);
   if (folder.inside !== liesUnder(root, folder.path)) {

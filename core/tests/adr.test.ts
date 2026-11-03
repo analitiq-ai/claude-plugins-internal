@@ -364,14 +364,25 @@ describe("checkAdrFolder", () => {
     assert.deepEqual(loggedCalls(), []);
   });
 
-  // From below the toplevel, adrkit 0.20.0 reads `--dir ../docs/adr` and misses a changed broken record: a silent pass.
+  // adrkit 0.20.0 matches each path as written against its cwd: from below the toplevel, a repo-relative path names
+  // no file there, so a changed broken record is missed, a silent pass. The folder lies outside the subfolder as
+  // `inside: false` says, so only the toplevel guard refuses it.
   it("throws TypeError, adr not called, for a cwd below the checkout's toplevel", async () => {
     const below = join(repo, "src");
     mkdirSync(below, { recursive: true });
     standIn(answering(ADR_VERSION, printing(CAPTURED, 1)));
-    await assert.rejects(checkAdrFolder(below, inside, PATHS, FAR), TypeError);
+    await assert.rejects(checkAdrFolder(below, outside, PATHS, FAR), TypeError);
     assert.deepEqual(loggedCalls(), []);
   });
+
+  // For the same literal match, any path but a normalised one relative to the toplevel is missed, a silent pass.
+  for (const path of ["./docs/adr/0001-a.md", "src/../docs/adr/0001-a.md", "docs//adr/0001-a.md", "docs/adr/", "/abs/docs/adr/0001-a.md", ""]) {
+    it(`throws TypeError, adr not called, for the path ${JSON.stringify(path)}`, async () => {
+      standIn(answering(ADR_VERSION, printing(CAPTURED, 1)));
+      await assert.rejects(checkAdrFolder(repo, inside, ["src/a.py", path], FAR), TypeError);
+      assert.deepEqual(loggedCalls(), []);
+    });
+  }
 
   // `inside` picks the form of `--dir`, so a folder resolved from another checkout would be passed in the wrong one.
   for (const { what, wrong } of [
