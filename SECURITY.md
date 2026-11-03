@@ -16,10 +16,11 @@ Only code that passed review merges. Five things hold that:
 2. The model's GitHub token is read-only: it cannot push, comment, label, move a card or merge (root
    ADR-0007).
 3. The App keys are readable only by hooks, never by the model.
-4. The orchestrator attests `internal-review` only from a round record posted by the reviewer App: an
-   internal round that passed at the head or at a commit in its history. Commits after it (stage 2) are
+4. The orchestrator attests `internal-review` only from a round record the reviewer App
+   committed to the served repo's `ledger` branch, read as a fold: an internal round that passed at the
+   head or at a commit in its history. Commits after it (stage 2) are
    graded by the external reviewers alone (orchestrator ADR-0004 d1).
-5. reviewer posts that record only from verdicts the gate rule (§6) accepts.
+5. reviewer commits that record only from verdicts the gate rule (§6) accepts.
 
 Every other refusal (commit gates, lane rules, reviewer's refusals of the model's GitHub writes) is a
 guardrail: the boundary catches a bypass of one. A change that weakens any of the five points is a
@@ -56,7 +57,8 @@ Accepted risks:
 
 ## 3. Identities
 
-Four GitHub Apps per served repo, none on a ruleset bypass list, and the admin's personal login.
+Four GitHub Apps per served repo, none on a ruleset bypass list but the reviewer App on the `ledger`
+branch's restrict-updates ruleset (reviewer ADR-0011 d3), and the admin's personal login.
 
 | App | Acts for | Repository permissions | Organization permissions | Key read by |
 |---|---|---|---|---|
@@ -69,7 +71,11 @@ A hook mints the session token into a gh config folder the model can read but no
 `~/.claude` and the session's temp folder, and refreshes it before the hour runs out. No trust check
 counts a codeworks App as an admin, writer, trusted or exempt actor. The App keys, the validator modules'
 tokens (for example a DeepSource token) and the classifier key live in `~/.config/codeworks/`. The
-admin's login is the ruleset's only bypass.
+admin's login is the merge ruleset's only bypass; the `ledger` branch's three rulesets (orchestrator
+`README.md`, step 6) let only the reviewer App and an admin commit there, and nobody rewrite or delete it.
+The reviewer App holds `issues: write` until #209 lands the ledger, then `contents: write` and no `issues`
+permission (reviewer ADR-0011 d3): the table is pinned to core's permission map by a test and changes with
+that code.
 
 ## 4. Boundaries per component
 
@@ -81,7 +87,8 @@ core.
   that changes a workflow. reviewer fails every other change to `.github/` (reviewer ADR-0002 d4), since a
   workflow runs on the push before any review. The ruleset decides whether a merge goes through (in a repo with
   none, the orchestrator's merge condition alone), and the merge names the head it evaluated.
-- It attests `internal-review` only from the reviewer App's newest record.
+- It attests `internal-review` only from the fold of the reviewer App's record on `ledger`, never from
+  its newest event (reviewer ADR-0011 d2).
 - It pushes only commits whose author and committer are the agent identity, the name and email of the agent
   machine's global git config, set at setup and write-denied (§5), and that reviewer's commit check passed
   (reviewer ADR-0002) or, while reviewer is off for the session, whose change touches no `.github/` folder
@@ -89,8 +96,10 @@ core.
   (orchestrator ADR-0001 d4).
 - A hook that crashes or times out attests, flips, pushes and merges nothing.
 
-**Reviewer.** Hooks as the reviewer App, which can write only issues, so a record cannot touch code,
-checks or merges (GitHub). It runs the gate rule (§6).
+**Reviewer.** Hooks as the reviewer App, which writes contents: its record, as GitHub-signed commits on
+the `ledger` branch, where rulesets admit only it and an admin and let nobody rewrite (reviewer ADR-0011
+d3). The same permission reaches every unprotected branch and the merge endpoint; the ruleset alone stops
+a merge, as for the orchestrator App. It runs the gate rule (§6).
 - Hook guardrail: it refuses from the model's tool calls every write the orchestrator or an admin owns
   (reviewer ADR-0012), naming who makes it.
 - It refuses builder and review work where the managed settings are not in effect, naming what is missing.
@@ -299,12 +308,11 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **WebFetch (accepted risk):** an injected prompt can make the model send what it reads, private source
   and the one-hour session token included, to any host through WebFetch. The token is read-only, so it
   leaks read access for at most an hour and writes nothing.
-- **E2:** whether the planner App, which writes issues, can delete a reviewer comment is untested; any
-  admin writer can. If one does, the hold stays:
-  GitHub records the deletion of another account's comment on the issue timeline, which no token can
-  remove, and the state reader holds the story (reviewer ADR-0011 d2). That GitHub records it is from
-  GitHub's docs; tested only that an author deleting its own comment records nothing, and reviewer
-  never deletes its own.
+- **E2:** the `ledger` branch's rulesets were tested on a throwaway repo (#288): an App in the
+  restrict-updates bypass commits and GitHub signs the commit, its commit with a custom author is refused
+  as unsigned, a user outside the bypass cannot commit, and neither the App nor the admin can force-push
+  or delete the branch. Untested: a served repo whose plan offers no rulesets, where only the fold's
+  checks hold (reviewer ADR-0011).
 - **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Plugin npm dependencies under the managed file:** `claude plugin install` fetches a plugin's locked

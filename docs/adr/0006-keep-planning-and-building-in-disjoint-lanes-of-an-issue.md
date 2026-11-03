@@ -35,11 +35,12 @@ review:
 
 ## Context
 
-reviewer's state comment on a story issue is a full snapshot, the newest winning (reviewer ADR-0011).
+reviewer's state record of a story is the fold of its events on the `ledger` branch (reviewer ADR-0011).
 reviewer's hook writes it while a story is built, and again when a rescope places holds (reviewer
-ADR-0013); two writes at once would lose one snapshot. A spec that changes under a running story is built
-against the old one. The board already says what runs: the orchestrator claims only from Ready, resumes
-only a story In progress or In review, and an admin stops a story by dragging it to Blocked (orchestrator
+ADR-0013); a write on a stale reading is refused and made again. A spec that changes under a running
+story is built against the old one. The board already says what runs: the orchestrator claims only from
+Ready, resumes only a story In progress or In review, and an admin stops a story by dragging it to Blocked
+(orchestrator
 ADR-0002).
 
 ## Decision
@@ -56,11 +57,11 @@ ADR-0002).
 
 ### Option A: Disjoint lanes (chosen)
 
-One lane rule keeps one writer per state comment and no build under a changing spec.
+One lane rule keeps one writer per state record and no build under a changing spec.
 
 ### Option B: Refuse a rescope only on a closed issue, in any lane
 
-Rejected: a story in progress builds under the spec being changed, and two writers share its state comment.
+Rejected: a story in progress builds under the spec being changed, and two writers share its state record.
 
 ### Option C: Any lane, with a snapshot that names its base and a writer that retries
 
@@ -78,7 +79,7 @@ Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 ## Consequences
 
-- Easier: the state comment has one writer at a time with no merge logic; no story builds while its spec
+- Easier: the state record has one writer at a time with no merge logic; no story builds while its spec
   changes.
 - Harder: every component that starts work reads the board first. Each enforces this record in its own:
   planner ADR-0005, builder ADR-0002, reviewer ADR-0015, orchestrator ADR-0002.

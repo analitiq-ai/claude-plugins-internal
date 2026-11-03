@@ -52,7 +52,7 @@ loop only through GitHub: the board and issue comments.
    ADR-0002): the orchestrator runs it before it claims, and reviewer's hook writes its releases at its first
    run after the claim, since the two plugins' hooks on one prompt run in parallel.
    reviewer releases each open hold of the story issue for which both a move of the card to Ready on the board
-   `[shared] board` names and an admin's comment on the story issue are newer than the state comment that
+   `[shared] board` names and an admin's comment on the story issue are newer than the commit that
    placed the hold. An admin is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one;
    for an escalation hold, that comment is its answer. A release by a comment lapses the attestation, and the
    new internal round at the head is briefed with the comment (orchestrator ADR-0004). A hold with no such
@@ -81,7 +81,7 @@ loop only through GitHub: the board and issue comments.
    as its question why the round escalated and what must be decided, each ADR departure among them one line,
    `ADR departure: <folder> <record id> <file> — <what departs>` (ADR-0017 d2), written and read by one pair
    of functions in `core/`. The rulings and members live in the gates section of the state snapshot (ADR-0011
-   d1), and a count and the hold it places land in one post.
+   d1), and a count and the hold it places land in one commit.
 5. We will place `rescope-<issue>` on a `RESCOPE` verdict, carrying as its question, as d4's escalation does,
    why the round rescoped and what must be decided; and, when reviewer's hook sees a rescope's spec PR open
    (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording that spec PR's

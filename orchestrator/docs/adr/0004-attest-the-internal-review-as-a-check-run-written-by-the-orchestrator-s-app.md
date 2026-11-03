@@ -34,7 +34,7 @@ review:
 ## Context
 
 The merge contract is GitHub's ruleset (ADR-0009), which needs a check saying the internal review
-passed. reviewer's hook records each round, as the reviewer App, on the story issue (reviewer
+passed. reviewer's hook records each round, as the reviewer App, on the `ledger` branch (reviewer
 ADR-0011, ADR-0021). Which credential turns that record into the trusted check is the
 ruleset's trust root. A PR can also change the config, workflows and hooks that grade it.
 
@@ -67,7 +67,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
 
 ## Options considered
 
-### Option A: The orchestrator's App writes the check run from reviewer's state comment (chosen)
+### Option A: The orchestrator's App writes the check run from reviewer's state record (chosen)
 
 One writer; only hooks read its key.
 
