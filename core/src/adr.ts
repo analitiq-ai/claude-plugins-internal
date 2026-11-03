@@ -136,14 +136,14 @@ export async function checkAdrFolder(
 ): Promise<AdrAnswer | CouldNotRun> {
   if (!(Number.isFinite(deadlineMs) && deadlineMs > 0)) throw new TypeError(`not a deadline in ms: ${deadlineMs}`);
   if (paths.length === 0) throw new TypeError("no path to check: adr check of none passes with no record governing");
-  // adrkit 0.20.0 counts a record as changed only by its normalised path relative to the toplevel, though it lists
-  // and matches other forms, so a broken record named another way passes silently; any path may be a record.
+  // adrkit 0.20.0 counts a changed file as a record only when its text starts with the `--dir` value and a `/`
+  // (isCorpusRecordPath), so a broken record named any other way passes silently. Any path may be a record.
   const unmatched = paths.find((path) => !isPlainPath(path));
   if (unmatched !== undefined) throw new TypeError(`not a normalised relative path: ${JSON.stringify(unmatched)}`);
   // adr runs in the real folder, so a `--dir` made relative to a symlink would name another path. Resolved first,
   // so a spawn's ENOENT can only mean adr is missing.
   const root = await realpath(cwd);
-  // The paths are relative to the toplevel and adrkit reads them from its cwd, so from anywhere else they name no file.
+  // The paths are relative to the toplevel and `--dir` to `root`: from anywhere else no path carries that prefix.
   const toplevel = await checkoutToplevel(root);
   if (toplevel !== root) throw new TypeError(`adr check runs from its checkout's toplevel ${toplevel}, not ${root}`);
   if (folder.inside !== liesUnder(root, folder.path)) {
@@ -189,7 +189,7 @@ export async function checkAdrFolder(
     );
   }
 
-  // adrkit 0.20.0 misses a changed record unless its folder is given relative to the folder it runs in.
+  // Relative, as an absolute `--dir` is never the prefix of a changed record's relative path.
   const dir = folder.inside ? relative(root, folder.path) : folder.path;
   const check = await step("adr check", ["check", "--dir", dir, "--json", "--", ...paths]);
   if (check.kind === "late") return late();

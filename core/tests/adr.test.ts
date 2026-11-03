@@ -364,9 +364,7 @@ describe("checkAdrFolder", () => {
     assert.deepEqual(loggedCalls(), []);
   });
 
-  // adrkit 0.20.0 counts a record as changed only by its normalised path relative to its cwd: from below the
-  // toplevel, a repo-relative path matches no changed record, so a broken one passes silently. The folder lies
-  // outside the subfolder as `inside: false` says, so only the toplevel guard refuses it.
+  // The folder lies outside the subfolder as `inside: false` says, so only checkAdrFolder's toplevel guard refuses this.
   it("throws TypeError, adr not called, for a cwd below the checkout's toplevel", async () => {
     const below = join(repo, "src");
     mkdirSync(below, { recursive: true });
@@ -375,8 +373,7 @@ describe("checkAdrFolder", () => {
     assert.deepEqual(loggedCalls(), []);
   });
 
-  // adrkit 0.20.0 lists and matches these forms but counts a record as changed only by its normalised path, so a
-  // broken record named any of these ways would pass silently.
+  // Each a form isPlainPath refuses; why is at checkAdrFolder's path guard.
   for (const path of ["./docs/adr/0001-a.md", "src/../docs/adr/0001-a.md", "docs//adr/0001-a.md", "docs/adr/", "/abs/docs/adr/0001-a.md", ""]) {
     it(`throws TypeError, adr not called, for the path ${JSON.stringify(path)}`, async () => {
       standIn(answering(ADR_VERSION, printing(CAPTURED, 1)));
