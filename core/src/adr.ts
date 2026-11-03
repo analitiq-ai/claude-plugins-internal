@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
-import { isAbsolute, relative } from "node:path";
+import { relative } from "node:path";
 import { z } from "zod";
 
 import { checkoutToplevel, liesUnder, type ResolvedAdrFolder } from "./adr-folders.ts";
 import { couldNotRun, type CouldNotRun } from "./outcomes.ts";
+import { isPlainPath } from "./tree.ts";
 
 export const ADR_VERSION = "0.20.0";
 export const ADR_INSTALL = `npm install -g @adrkit/cli@${ADR_VERSION}`;
@@ -123,9 +124,10 @@ function seconds(ms: number): string {
 /** `adr --version`, then `adr check --dir <folder> --json -- ...paths` from the realpath of `cwd`, the checkout's
  *  toplevel, killed at `deadlineMs`; `--dir` is relative to that realpath when `folder.inside`, else absolute.
  *  Never throws for the folder, only for the caller's fault: TypeError for a `deadlineMs` that is not finite and
- *  above 0, an empty `paths` or one not normalised and relative to the toplevel, a `cwd` that is not its checkout's
- *  toplevel, or a `folder` whose `inside` is not where it lies from `cwd`; realpath's error for a `cwd` that does not
- *  exist; GitFailed for one in no git repository. */
+ *  above 0, an empty `paths` or a path that is absolute or has an empty, `.` or `..` segment, a `cwd` that is not its
+ *  checkout's toplevel, or a `folder` whose `inside` is not where it lies from `cwd`; realpath's error for a `cwd`
+ *  that does not exist; GitFailed for one in no git repository. Each path must be relative to the toplevel as git
+ *  names it, which is not checked: a path relative to anywhere else matches no changed record. */
 export async function checkAdrFolder(
   cwd: string,
   folder: ResolvedAdrFolder,
@@ -134,11 +136,10 @@ export async function checkAdrFolder(
 ): Promise<AdrAnswer | CouldNotRun> {
   if (!(Number.isFinite(deadlineMs) && deadlineMs > 0)) throw new TypeError(`not a deadline in ms: ${deadlineMs}`);
   if (paths.length === 0) throw new TypeError("no path to check: adr check of none passes with no record governing");
-  // adrkit 0.20.0 matches each path as written against its cwd, so any other form names no changed file: a silent pass.
-  const unmatched = paths.find((path) => isAbsolute(path) || path.split("/").some((segment) => ["", ".", ".."].includes(segment)));
-  if (unmatched !== undefined) {
-    throw new TypeError(`not a normalised path relative to the checkout's toplevel: ${JSON.stringify(unmatched)}`);
-  }
+  // adrkit 0.20.0 counts a record as changed only by its normalised path relative to the toplevel, though it lists
+  // and matches other forms, so a broken record named another way passes silently; any path may be a record.
+  const unmatched = paths.find((path) => !isPlainPath(path));
+  if (unmatched !== undefined) throw new TypeError(`not a normalised relative path: ${JSON.stringify(unmatched)}`);
   // adr runs in the real folder, so a `--dir` made relative to a symlink would name another path. Resolved first,
   // so a spawn's ENOENT can only mean adr is missing.
   const root = await realpath(cwd);
