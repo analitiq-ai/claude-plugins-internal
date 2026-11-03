@@ -84,5 +84,7 @@ Hold `adr-<issue>` (FR-020):
 | a listed folder holds a record with its own `adr check` error | hold `adr-<issue>` placed; comment names the record file, adrkit's rule and message, and that planner fixes it; commits and rounds refused (US5 AS5) |
 | the story PR changes `specs/<n>-x/spec.md` | hold `adr-<issue>`; comment names the file and that planner fixes it (AS6) |
 | the story PR changes a file under a `docs/adr/` folder at any depth (e.g. `planner/docs/adr/0009-….md`) | hold `adr-<issue>` naming it (AS6) |
+| the story PR only flips `[ ]` to `[x]` in its own task block of `tasks.md` | no hold (TICK_ONLY) |
+| the story PR ticks another story's task, or edits a task line's text | hold `adr-<issue>` naming `tasks.md` (AS6) |
 | the story PR changes neither | no `adr` hold |
 | the hold open; a Ready move or an admin's `/codeworks reset` | released (reviewer ADR-0013 d2) |

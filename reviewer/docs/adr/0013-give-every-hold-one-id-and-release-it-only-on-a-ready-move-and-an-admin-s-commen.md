@@ -72,7 +72,7 @@ loop only through GitHub: the board and issue comments.
    | `claim-<id>` | its lineage has `claim_hold_at` WRONG rulings, a check counting once | commits touching its file | those, until one more WRONG |
    | `shim-<id>` | its bug has `shim_hold_at` members (ADR-0008) | commits touching its lines | one such commit |
    | `audit-<issue>` | `max_audits` escalation audits ruled other than CONVERGED_PUSHBACK | rounds | that many audits |
-   | `adr-<issue>` | the decision check finds a record with its own `adr check` error, or the story PR changes a file under `specs/**` or a `docs/adr/` folder at any depth (root ADR-0011) | commits and rounds | both |
+   | `adr-<issue>` | the decision check finds a record with its own `adr check` error, or the story PR's diff against its merge base changes a decision record, or a spec folder beyond TICK_ONLY (ADR-0010 d1; root ADR-0011) | commits and rounds | both |
 
    An `adr-<issue>` hold's comment names the files and, for a broken record, adrkit's rule and message, and
    says planner fixes it. It releases as every hold does (d2).

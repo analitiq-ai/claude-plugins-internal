@@ -38,16 +38,21 @@ review grades the code against a target it just moved.
 ## Decision
 
 1. We will let planner alone create and edit spec folders (`specs/**`) and decision records: every folder
-   `codeworks.toml` `[shared] adr_folders` lists (planner ADR-0009) and every component's `docs/adr`.
-2. We will have builder, reviewer and the orchestrator only read them.
-3. We will hold an implementation story's PR that changes one (reviewer ADR-0013, `adr-<issue>`), and move
-   its card to Blocked for planner (orchestrator ADR-0002).
+   `codeworks.toml` `[shared] adr_folders` lists (planner ADR-0009) and every component's `docs/adr`. The one
+   exception is a story's tick: a `tasks.md` change that only flips `[ ]` to `[x]` inside the task block
+   labelled with the story's issue number (TICK_ONLY, reviewer ADR-0010 d1).
+2. We will have builder, reviewer and the orchestrator only read them, but for that tick.
+3. We will hold an implementation story's PR whose diff against its merge base changes a decision record, or
+   a spec folder beyond TICK_ONLY (reviewer ADR-0013, `adr-<issue>`), and move its card to Blocked for planner
+   (orchestrator ADR-0002). One function in `core/` tells TICK_ONLY from any other change, for this hold and
+   for reviewer ADR-0010 d1's commit refusal alike.
 
 ## Options considered
 
 ### Option A: planner alone writes them; a story PR that changes one is held (chosen)
 
-The spec and records a story is graded against stay fixed while it is built.
+The spec and records a story is graded against stay fixed while it is built; its ticks are its progress
+(reviewer ADR-0010).
 
 ### Option B: A story may change its spec or records, reviewed in its PR
 
@@ -67,7 +72,7 @@ Rejected: a Context grades nothing, and it does not mention decision records.
 - Easier: a story's spec and records change only in planning, in a spec PR.
 - Harder: fixing a typo in a record takes a planning run.
 - **How we would know this was wrong:** stories held for spec or record edits more often than they find a
-  real gap, or a spec or record change merged from a story PR.
+  real gap, a story held for its own ticks, or a spec or record change merged from a story PR.
 - Revisit if: a component other than planner must write a spec folder or a record.
 
 ## Action items
