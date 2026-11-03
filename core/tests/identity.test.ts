@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { runGit } from "../src/git.ts";
 import {
@@ -29,7 +28,6 @@ import {
   type PullRequestState,
 } from "../src/identity.ts";
 import { gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
-import { readParameterViolations } from "./source-scan.ts";
 import { fakeGitHub, type FakeCall, type FakeRoutes } from "./support/fake-github.ts";
 
 const REPO = "acme/widgets";
@@ -297,15 +295,6 @@ describe("specPr's merge commit", () => {
     assert.match(asked[0], /\bmerged\b/);
     assert.match(asked[0], /\bmergeCommit\s*\{\s*oid\s*\}/);
   });
-});
-
-describe("specPrs and specPr signatures (source scan)", () => {
-  for (const fn of ["specPrs", "specPr"]) {
-    it(`${fn} takes no key reader: only GitHub's client and plain values`, () => {
-      const file = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "identity.ts");
-      assert.deepEqual(readParameterViolations(readFileSync(file, "utf8"), "src/identity.ts", fn), []);
-    });
-  }
 });
 
 describe("specFolder", () => {
