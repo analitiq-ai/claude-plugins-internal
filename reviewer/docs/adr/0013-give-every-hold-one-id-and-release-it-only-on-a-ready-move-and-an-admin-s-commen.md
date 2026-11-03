@@ -58,9 +58,9 @@ clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011
    `[shared] board` names and an admin's comment on the story issue are newer than the commit that
    placed the hold, and a `tamper-<oid>` hold not before no file its commit added or changed remains on
    `ledger` (ADR-0011 d2). An admin is a writer other than a codeworks App, read as orchestrator ADR-0010
-   reads one; for an escalation hold, that comment is its answer. A release by a comment lapses the attestation, and the
-   new internal round at the head is briefed with the comment (orchestrator ADR-0004). A hold with no such
-   comment stays open, and the start stops (orchestrator ADR-0002).
+   reads one; for an escalation hold, that comment is its answer. A release by a comment lapses the
+   attestation, and the new internal round at the head is briefed with the comment (orchestrator ADR-0004).
+   A hold with no such comment stays open, and the start stops (orchestrator ADR-0002).
 3. We will have an admin's comment `/codeworks reset` on the story issue release every open hold of the
    story, a `tamper-<oid>` hold once nothing its commit added or changed remains on `ledger` (ADR-0011
    d2), and restart every count that places one, the orchestrator's included (orchestrator ADR-0001),
