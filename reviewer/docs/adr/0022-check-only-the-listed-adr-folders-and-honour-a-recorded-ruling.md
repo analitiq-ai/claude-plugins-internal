@@ -1,0 +1,79 @@
+---
+schemaVersion: 0.2.0
+id: "0022"
+title: "Check only the listed ADR folders and honour a recorded ruling"
+status: draft
+date: 2026-11-03
+deciders: []
+tags: [decision-check, adr-folders, ruling, settings, review-round]
+scope: component
+reversibility: two-way-door
+blastRadius: component
+relatesTo: ["0013", "0019"]
+affects:
+  - type: path
+    pattern: "reviewer/plugin/scripts/{adrkit,decisions}.py"
+  - type: path
+    pattern: "reviewer/plugin/lib/round/decisions.ts"
+provenance:
+  authoredBy: agent-drafted
+  agent:
+    name: Claude Code
+    model: claude-opus-5-5
+  sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/177"
+review:
+  tier: async
+---
+
+# ADR-0022: Check only the listed ADR folders and honour a recorded ruling
+
+## Context
+
+reviewer's decision check finds its own folders: every tracked `docs/adr`, plus `REVIEWER_ORG_ADR_DIR`, an
+environment variable root ADR-0002 d3 rules out for a setting. Planner's plan check (planner ADR-0009) reads
+the folders `codeworks.toml` `[shared] adr_folders` lists, through core's `adrFolders`, so the two checks
+can disagree on which records govern a change. Planner ADR-0009 also lets the user overrule a departure,
+recorded in the spec folder's `adr-rulings.json`; a check that ignores it reports the same departure again
+at review.
+
+## Decision
+
+1. We will take the decision check's folders only from core's `adrFolders` (`[shared] adr_folders`), never
+   from tracked `docs/adr` discovery or `REVIEWER_ORG_ADR_DIR` (root ADR-0002 d3). An unreadable listed
+   folder is a check that could not run (root ADR-0004).
+2. We will label each folder by its entry as written; a folder outside the repo is "outside the repo", no
+   longer "org".
+3. We will report no departure whose (folder, record, path) an entry of the spec folder's
+   `adr-rulings.json` names (planner ADR-0009, the user's ruling).
+
+## Options considered
+
+### Option A: The listed folders through core, and the rulings file honoured (chosen)
+
+Planner and reviewer check the same folders, and a ruling given at planning holds at review.
+
+### Option B: Keep discovery and `REVIEWER_ORG_ADR_DIR`
+
+Rejected: a second, divergent definition of the folders, and a setting in an environment variable.
+
+### Option C: Check the listed folders, ignore rulings
+
+Rejected: every ruled departure would block the story at review.
+
+## Trade-offs
+
+- A tracked `docs/adr` nobody lists is checked by neither planner nor reviewer.
+- A ruling committed by hand into the spec folder is caught only in spec-PR review (planner ADR-0009).
+
+## Consequences
+
+- Easier: one setting names the folders for planner and reviewer.
+- Harder: an admin must list every folder a repo's work is checked against.
+- **How we would know this was wrong:** a round checking a folder `[shared] adr_folders` does not list, or
+  reporting a departure an `adr-rulings.json` entry names.
+- Revisit if: planner and reviewer need different folders.
+
+## Action items
+
+1. [ ] US5 of #177 moves the decision check onto `adrFolders` and the rulings file, after #235.
+2. [ ] The ratifier ratifies this record, or sends it back.

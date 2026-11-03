@@ -44,19 +44,25 @@ export const AdrJudgment = valueSet({
   WITHIN: "the artifact sits inside the record: it does nothing the record rejected or contradicts",
   DEPARTS: "the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to",
 });
-export const CheckedArtifact = valueSet({ plan: "plan.md's Touches", tasks: "tasks.md's task lines" });
+export const CheckedArtifact = valueSet({ plan: "the plan step's touches.json", tasks: "tasks.md's task lines" });
 ```
+
+US5 adds to `HoldKind`: `adr: "a record with its own adr check error, or a story PR changing a spec or a docs/adr
+folder; refuses commits and rounds"` (reviewer ADR-0013 d4, amended in the planning PR).
 
 ## `core/src/contracts/decision-check.ts`
 
 ```ts
 export const ADR_RULINGS_FILE = "adr-rulings.json";
+export const TOUCHES_FILE = "touches.json";   // in the run folder, written by the plan step
 
 /** Pure: one span against the one path grammar; `rootFiles` answers a span with no `/` (artifact-grammar.md). */
 export function artifactPath(span: string, rootFiles: ReadonlySet<string> | "any"): string[] | null;
 
-/** Pure: `plan.md`'s `## Touches`, through `artifactPath`; throws TouchesRefused per line. */
-export function readTouches(planText: string): ArtifactPath[];
+export const TouchedPaths: z.ZodType;  // {v: 1, paths: string[]}, no entry twice
+
+/** Pure: parsed `touches.json`, each entry through `artifactPath`; throws TouchesRefused naming the entry. */
+export function readTouchedPaths(json: unknown): ArtifactPath[];
 
 export const AdrVerdict: z.ZodType;   // verdict file
 export const AdrRuling: z.ZodType;    // {folder, record, path, reason}
@@ -66,7 +72,7 @@ export const AdrRulings: z.ZodType;   // {v: 1, rulings: AdrRuling[]}, no key tw
 export function readRulings(specDir: string): Promise<AdrRuling[]>;
 ```
 
-`readTouches` passes `"any"`: a Touches bullet is a path by its place. See `artifact-grammar.md`.
+`readTouchedPaths` passes `"any"`: a `touches.json` entry is a path by its place. See `artifact-grammar.md`.
 
 ## `core/src/contracts/tasks.ts`
 

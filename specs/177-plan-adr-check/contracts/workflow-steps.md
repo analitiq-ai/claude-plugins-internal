@@ -16,8 +16,12 @@ FAIL, else 0). No subcommand formats a stop of its own.
 
 ### ask
 
-Removes any `<run>/adr-<a>-verdict.json` first, so a stale verdict is never read. Reads the artifact's paths (root
-files from `git ls-files` and `plan.md`'s `## Touches`), then the rulings file through core's `readRulings` and runs the writer guard (R9): an
+Removes any `<run>/adr-<a>-verdict.json` first, so a stale verdict is never read. Reads settings before the
+artifact: on an empty `[shared] adr_folders` it writes the asked record with no paths and no folders and prints
+`{"judge": false, "asked": "<sha256>"}` without reading the paths (decide then passes). Otherwise reads the
+artifact's paths (plan: `<run>/touches.json`; tasks: `tasks.md`, root files from `git ls-files` and
+`<run>/touches.json`); a missing or empty `touches.json`, or a `tasks.md` naming no path, is could not run naming
+it. Then the rulings file through core's `readRulings` and runs the writer guard (R9): an
 entry in neither the file at `HEAD` nor `<run>/adr-rulings-written.json` is could not run. Resolves the folders
 (`adrFolders`), runs `checkAdrFolder` once per readable folder, writes `<run>/adr-<a>-asked.json`, prints
 `{"judge": <bool>, "asked": "<sha256 of the asked record>"}` on stdout. Exit 0 when it wrote the record (folder
@@ -32,8 +36,10 @@ Next step: resume to retry.`
 
 ### decide
 
-First the writer guard again (R9), on what ask recorded: the asked record's sha256 against `<asked digest>` (the
-ask step's output, which the workflow passes and no model step writes), the artifact's paths re-read against the
+Settings first: on an empty `[shared] adr_folders` decide prints
+`No ADR folder is listed in codeworks.toml [shared] adr_folders.` and exits 0, reading no path. Otherwise the writer
+guard again (R9), on what ask recorded: the asked record's sha256 against `<asked digest>` (the
+ask step's output, which the workflow passes and no model step writes), the artifact's paths (`touches.json` or `tasks.md`) re-read against the
 asked record's, the rulings file against `HEAD` and `<run>/adr-rulings-written.json`. Any difference: exit 2,
 naming what changed. Then reads the verdict (when `judge`) and `ADR_RULING`; validates each ruling against the
 asked record and one `checkAdrFolder(folder, [path])` call per new ruling (artifact-grammar.md, `ADR_RULING`); appends each valid one not already there to the rulings file and
@@ -47,13 +53,31 @@ docs/adr: PASS (governing: 0004 Treat a check that could not run…, 0009 …)
 planner/docs/adr: FAIL: 0009 on planner/plugin/scripts/x.py (story US3): <why>. Next step: change tasks.md, draft
   a superseding record into the spec PR (ADR-0009 d3), or resume with adr_ruling naming planner/docs/adr, 0009,
   planner/plugin/scripts/x.py and your reason.
+../engineering/docs/adr: FAIL: 0031 on core/src/x.ts: <why>. Next step: change plan.md, change record 0031 in the
+  repo that holds ../engineering/docs/adr, or resume with adr_ruling naming ../engineering/docs/adr, 0031,
+  core/src/x.ts and your reason.
+docs/adr: FAIL: docs/adr/0011-….md: <adrkit rule>: <adrkit message>. Next step: fix that record.
 ```
 
-No folder listed: prints `No ADR folder is listed in codeworks.toml [shared] adr_folders.`, exit 0.
+The supersede step depends on the record's folder: inside this repo (`ResolvedAdrFolder.inside`), "draft a
+superseding record into the spec PR"; outside, "change record <id> in the repo that holds <folder>". A record's own
+`adr check` error names the record file and adrkit's rule and message; its next step is "fix that record" (planner
+fixes it, in the spec PR or in the repo that holds the folder).
 
 ## `workflow.yml` (version 1.7.0)
 
 No new input: a ruling reaches the run only as `ADR_RULING` from the resume that carries it.
+
+The `plan` step passes its run folder, as the `specify` step passes its premise report (`workflow.yml:136`), so
+`speckit.plan.md` can tell the model to write `<run folder>/touches.json` (artifact-grammar.md):
+
+```yaml
+      - id: plan
+        command: speckit.plan
+        integration: "{{ inputs.integration }}"
+        input:
+          args: "{{ inputs.spec }}\n\nRun folder: .specify/workflows/runs/{{ context.run_id }}"
+```
 
 ```yaml
   - id: to-adr-plan            # after to-settled-design, before to-mark-critiques
@@ -101,8 +125,10 @@ file; give no ruling.
 ## Skill stop (`SKILL.md`)
 
 One rule for every report with `adr: true` (ask, judge, decide; plan or tasks): show every stderr line, then act on
-each by its outcome. FAIL naming a departure (record and path): the user picks: change the artifact, draft a
-superseding record (`/speckit-adrkit-draft`) into the spec folder's component `docs/adr`, or rule; resume with
-`adr_ruling=[…]` only with the user's reason in their words. Any other FAIL: change the artifact as the line says.
-COULD_NOT_RUN: the user fixes what the line names (for the judge, nothing: resume to retry); resume once they say it
-is done.
+each by its outcome. FAIL naming a departure (record and path): the user picks: change the artifact; supersede the
+record, by drafting a superseding record (`/speckit-adrkit-draft`) into the spec PR when its folder is inside this
+repo, or by changing record <id> in the repo that holds <folder> when it is outside; or rule; resume with
+`adr_ruling=[…]` only with the user's reason in their words. FAIL naming a record file with adrkit's rule and
+message: fix that record (in the spec PR, or in the repo that holds its folder), then resume. A refused artifact
+line (exit 1): change the artifact as the line says. COULD_NOT_RUN: the user fixes what the line names (for the
+judge, nothing: resume to retry); resume once they say it is done.
