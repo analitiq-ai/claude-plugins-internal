@@ -41,7 +41,8 @@ review:
 
 A story is claimed from Ready on an admin's prompt naming it (orchestrator ADR-0001). Its PR can be
 closed and reopened. A rescope changes the spec a story in flight is graded against. Admins act on the
-loop only through GitHub: the board and issue comments.
+loop only through GitHub: the board, issue comments and, to clear an invalid commit from the `ledger`
+branch, a deletion commit (ADR-0011 d2).
 
 ## Decision
 
@@ -114,7 +115,8 @@ the story issue replaces it.
 
 ## Trade-offs
 
-- Every release costs an admin two acts: a comment and a Ready.
+- Every release costs an admin two acts: a comment and a Ready; a tamper hold a third, the clearance of
+  what the invalid commit added (ADR-0011 d2).
 - The code checks that a comment exists, not what it says.
 
 ## Consequences

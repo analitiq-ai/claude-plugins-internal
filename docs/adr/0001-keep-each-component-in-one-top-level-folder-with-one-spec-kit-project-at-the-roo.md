@@ -50,14 +50,14 @@ the state record and the validator modules.
    `core/` holds a package in place of `plugin/`. Each validator module (ADR-0003) is a package of its
    own in `validators/<name>/`, with its tests beside it; adding or removing one is adding or removing
    its folder.
-2. We will make `core/` the one home of code more than one component runs: the state-comment read and
+2. We will make `core/` the one home of code more than one component runs: the state record's read and
    write, the validator contract with its Findings schema, the threads module and the read of required
    checks (ADR-0003), the spec facts' model (ADR-0003) and the parser of a story's identity (ADR-0005).
    Each plugin that runs core code, the orchestrator included, carries a symlink to `core/`, and one to
    `validators/` when it runs a validator module; an install copies both into the plugin, and the plugin
    lists their dependencies in its own lockfile, which the install also fetches; no plugin imports
    another's code.
-   Every state-comment write runs in reviewer's hook process, outside the sandbox (ADR-0008).
+   Every state record write runs in reviewer's hook process, outside the sandbox (ADR-0008).
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 

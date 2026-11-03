@@ -5,7 +5,7 @@ title: "Keep the validator modules and the state record behind one contract each
 status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
-tags: [validators, findings, contract, state-comment, core]
+tags: [validators, findings, contract, state-record, core]
 scope: component
 reversibility: two-way-door
 blastRadius: component

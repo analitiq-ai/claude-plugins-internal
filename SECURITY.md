@@ -17,7 +17,7 @@ Only code that passed review merges. Five things hold that:
    ADR-0007).
 3. The App keys are readable only by hooks, never by the model.
 4. The orchestrator attests `internal-review` only from a round record the reviewer App
-   committed to the served repo's `ledger` branch, read as a fold: an internal round that passed at the
+   committed to the served repo's `ledger` branch (from #209; §3), read as a fold: an internal round that passed at the
    head or at a commit in its history. Commits after it (stage 2) are
    graded by the external reviewers alone (orchestrator ADR-0004 d1).
 5. reviewer commits that record only from verdicts the gate rule (§6) accepts.
@@ -87,8 +87,8 @@ core.
   that changes a workflow. reviewer fails every other change to `.github/` (reviewer ADR-0002 d4), since a
   workflow runs on the push before any review. The ruleset decides whether a merge goes through (in a repo with
   none, the orchestrator's merge condition alone), and the merge names the head it evaluated.
-- It attests `internal-review` only from the fold of the reviewer App's record on `ledger`, never from
-  its newest event (reviewer ADR-0011 d2).
+- It attests `internal-review` only from the fold of the reviewer App's record on `ledger` (from #209;
+  §3), never from its newest event (reviewer ADR-0011 d2).
 - It pushes only commits whose author and committer are the agent identity, the name and email of the agent
   machine's global git config, set at setup and write-denied (§5), and that reviewer's commit check passed
   (reviewer ADR-0002) or, while reviewer is off for the session, whose change touches no `.github/` folder
@@ -96,8 +96,8 @@ core.
   (orchestrator ADR-0001 d4).
 - A hook that crashes or times out attests, flips, pushes and merges nothing.
 
-**Reviewer.** Hooks as the reviewer App, which writes contents: its record, as GitHub-signed commits on
-the `ledger` branch, where rulesets admit only it and an admin and let nobody rewrite (reviewer ADR-0011
+**Reviewer.** Hooks as the reviewer App, which from #209 (§3) writes contents: its record, as
+GitHub-signed commits on the `ledger` branch, where rulesets admit only it and an admin and let nobody rewrite (reviewer ADR-0011
 d3). The same permission reaches every unprotected branch and the merge endpoint; the ruleset alone stops
 a merge, as for the orchestrator App. It runs the gate rule (§6).
 - Hook guardrail: it refuses from the model's tool calls every write the orchestrator or an admin owns
@@ -311,8 +311,9 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **E2:** the `ledger` branch's rulesets were tested on a throwaway repo (#288): an App in the
   restrict-updates bypass commits and GitHub signs the commit, its commit with a custom author is refused
   as unsigned, a user outside the bypass cannot commit, and neither the App nor the admin can force-push
-  or delete the branch. Untested: a served repo whose plan offers no rulesets, where only the fold's
-  checks hold (reviewer ADR-0011).
+  or delete the branch. Untested: a served repo whose plan offers no rulesets, where any token with contents write,
+  the orchestrator's and planner's Apps included, can rewrite or delete the branch and drop events and
+  holds with no trace the fold sees (reviewer ADR-0011).
 - **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Plugin npm dependencies under the managed file:** `claude plugin install` fetches a plugin's locked
