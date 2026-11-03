@@ -17,6 +17,10 @@ affects:
     pattern: "reviewer/plugin/agents/*.md"
   - type: path
     pattern: "reviewer/plugin/workflows/{review-round,shim-check}.js"
+  - type: path
+    pattern: "reviewer/plugin/lib/rules/rounds.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/round/assess.ts"
 provenance:
   authoredBy: agent-drafted
   agent:

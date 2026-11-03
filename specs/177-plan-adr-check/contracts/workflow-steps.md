@@ -39,9 +39,10 @@ A judge step that fails or reaches its timeout records `exit_code`, `stderr` and
 Settings first: on an empty `[shared] adr_folders` decide prints the empty-list line and exits 0, reading no path.
 Otherwise the writer guard (R9 a–c) on what ask recorded; then the verdict (when the asked record says `judge`)
 and `ADR_RULING`; validates `ADR_RULING` whole (artifact-grammar.md); appends each valid new ruling to the rulings
-file and to `<run>/adr-rulings-written.json`; on a plan check, adds each departure line in `<run>/review-questions.json`
-whose record governs its path in the asked record as a departure the judge named, once per `(folder, record,
-path)` (R13); drops every departure whose `(folder, record, path)` a rulings entry names; decides each folder (data-model, Folder outcome); prints every folder's lines through `adrStop`.
+file and to `<run>/adr-rulings-written.json`; on a plan check, calls `checkAdrFolder(cwd, folder, [path], …)` once
+per `(folder, record, path)` of the departure lines in `<run>/review-questions.json`, concurrently with the ruling
+checks under the same 1500 s deadline, and adds each departure whose record that call names as governing as a
+departure the judge named, once per key (R13); a call that could not run is exit 2; drops every departure whose `(folder, record, path)` a rulings entry names; decides each folder (data-model, Folder outcome); prints every folder's lines through `adrStop`.
 
 ## Stop table (`ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
@@ -137,8 +138,9 @@ rescope_questions.ts <issue> <out file>
 ```
 
 `<issue>` is the spec's issue. Lists its open sub-issues as the planner App (`planner/plugin/lib/github.ts`), or
-takes the issue itself when it has none; reads each one's state through core's `readState`; takes the question of
-every open `escalation-<issue>` hold and every open `rescope-<issue>` hold with no spec PR, checks each one's
+takes the issue itself when it has none; reads each one's state through core's `readState`; takes every review
+question (artifact-grammar.md): the question of every open `escalation-<issue>` hold and every open
+`rescope-<issue>` hold with no spec PR, checks each one's
 departure lines through `readAdrDepartures`, and writes `<out file>` as `ReviewQuestions`, exit 0. No such
 question: writes nothing, exit 0. A departure line that does not read: exit 1 naming the issue and the line.
 GitHub unanswered or a settings error: exit 2 naming it. Not a check step: it runs before the run, from the skill.

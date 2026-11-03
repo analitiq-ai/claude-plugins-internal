@@ -100,14 +100,17 @@ Writer: the judge (prompt step). Reader: `adr_check.ts decide`.
 whitespace; `path` a `PATH`; `what` one non-empty line. `ReviewQuestions` `{v: 1, questions: {issue, hold,
 question}[]}`, no `(issue, hold)` twice.
 
-- A verdict-placed hold's `question` (core `Hold`, a string): why the round was raised and what must be decided,
+- A review question, an open escalation hold's or verdict-placed rescope hold's `question` (core `Hold`, a
+  string): why the round was raised and what must be decided,
   each departure ruled ESCALATE one line of it (artifact-grammar.md). Writer: reviewer's round record, the lines
   through core's `renderAdrDeparture`. Readers: the orchestrator (posts the question as it stands), planner's
   `rescope_questions.ts` (the lines through `readAdrDepartures`).
-- `<run>/review-questions.json`: the open verdict-placed questions under the spec's issue, copied by
+- `<run>/review-questions.json`: the open review questions under the spec's issue, copied by
   `drive_workflow.py rescope … questions=@<file>`. Readers: the plan check's ask step, which adds each departure's
-  path to the paths it checks, and its decide step, which adds each departure whose record governs its path as a
-  departure the judge named, once per `(folder, record, path)`, before rulings are applied (R13). A ruling is keyed
+  path to the paths it checks, and its decide step, which checks each `(folder, record, path)` with one
+  `checkAdrFolder(cwd, folder, [path], …)` call, under the run's 1500 s deadline with the ruling checks, and adds
+  each departure whose record that call names as governing as a departure the judge named, once per key, before
+  rulings are applied (R13). A ruling is keyed
   on `(folder, record, path)`, never on a story.
 
 ## Rulings written (`<run>/adr-rulings-written.json`)

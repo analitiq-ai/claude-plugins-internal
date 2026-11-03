@@ -15,6 +15,8 @@ affects:
     pattern: "reviewer/plugin/scripts/{shell,worktree,claimcheck,claimgate,shimcheck,shimgate}.py"
   - type: path
     pattern: "specs/004-spec-folder-checks/**"
+  - type: path
+    pattern: "reviewer/plugin/lib/check/after-commit.ts"
 provenance:
   authoredBy: agent-drafted
   agent:

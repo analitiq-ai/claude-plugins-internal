@@ -29,6 +29,10 @@ affects:
     pattern: "planner/plugin/lib/adr-check.ts"
   - type: path
     pattern: "planner/plugin/speckit/presets/settled-design/commands/speckit.plan.md"
+  - type: path
+    pattern: "planner/plugin/scripts/rescope_questions.ts"
+  - type: path
+    pattern: "planner/plugin/speckit/presets/settled-design/commands/speckit.tasks.md"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -88,8 +92,8 @@ The tasks, written after critique, name the paths each story touches.
    into the spec PR when its folder is inside this repo (d3), or in the repo that holds the folder when it is
    outside; or resume with a ruling (d6). A FAIL caused by a record's own `adr check` error names the record
    file and adrkit's rule and message, and its next step is "fix that record".
-9. We will have a rescope take its open decision from the questions of the open `rescope-<issue>` and
-   `escalation-<issue>` holds a verdict placed on every open story issue under the spec's issue, the spec's
+9. We will have a rescope take its open decision from the questions of every open `escalation-<issue>` hold,
+   and every open `rescope-<issue>` hold a verdict placed, on every open story issue under the spec's issue, the spec's
    issue itself when it has no sub-issues (reviewer ADR-0013 d4, d5), and from the admin's words when there
    are none. The after-plan check adds the file of each ADR departure line in them to the paths it checks and
    stops on it as on a departure the judge named (d8), until a ruling names it (d6) or a superseding record no

@@ -15,6 +15,10 @@ affects:
     pattern: "reviewer/plugin/scripts/{adrkit,decisions}.py"
   - type: path
     pattern: "reviewer/plugin/lib/round/decisions.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/rules/rounds.ts"
+  - type: path
+    pattern: "reviewer/plugin/lib/round/assess.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -43,8 +47,8 @@ at review.
 1. We will take the decision check's folders only from core's `adrFolders` (`[shared] adr_folders`), never
    from tracked `docs/adr` discovery or `REVIEWER_ORG_ADR_DIR` (root ADR-0002 d3). An unreadable listed
    folder is a check that could not run (root ADR-0004).
-2. We will label each folder by its entry as written; a folder outside the repo is "outside the repo", no
-   longer "org".
+2. We will label each folder by its entry as written, always: in a departure's line and in matching a
+   ruling alike. "Outside the repo" is only wording in a message about such a folder; "org" goes.
 3. We will report no departure whose (folder, record, path) an entry of the spec folder's
    `adr-rulings.json` names (planner ADR-0009, the user's ruling).
 4. We will have a departure the check reports ruled FIX or ESCALATE alone (ADR-0017 d2); an ESCALATE names

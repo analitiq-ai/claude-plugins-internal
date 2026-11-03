@@ -200,8 +200,9 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision**: `reviewer/plugin/lib/round/decisions.ts` takes folders from `adrFolders` and runs
   `checkAdrFolder(cwd, folder, paths, deadline)` per folder at the same time, with the round's paths as #235 gives
   them and reviewer's own deadline; it drops `decision_folders` discovery and `REVIEWER_ORG_ADR_DIR` (code, README,
-  tests); it keeps reporting `notices`. A folder's label is its entry as written; "org" becomes "outside the repo"
-  (`inside` false).
+  tests); it keeps reporting `notices`. A folder's label is always its entry as written, in departure lines and
+  ruling matches alike; "outside the repo" is only wording in a message about a folder with `inside` false, and
+  "org" goes.
   - Rulings: it reads the rulings file of the spec folder in the checkout through core's `readRulings` (a ruling
     reaches a story with a merge of the default branch, reviewer ADR-0010 d2) and drops, in code, every departure
     finding whose folder label, record id and file match an entry's `folder`, `record` and `path`. A
@@ -266,12 +267,14 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `readAdrDepartures`, like a deadlock in every other respect. The admin's comment and a Ready move release the hold
   (reviewer ADR-0013 d2); the next round is briefed with the comment (orchestrator ADR-0004 d1).
   - When the admin wants the record or the plan changed, they run planner's `rescope <spec folder> #<issue>`. It
-    runs `rescope_questions.ts`, which takes the open verdict-placed questions of every open story issue under the
+    runs `rescope_questions.ts`, which takes the open review questions (every open escalation hold's, and a verdict's open rescope hold's) of every open story issue under the
     spec's issue (core `readState` as the planner App) into a scratch file; `drive_workflow.py rescope …
     questions=@<file>` copies it to `<run>/review-questions.json`. Grill gets them as the open decision; with none,
     the admin's words as today. The plan check's ask adds every departure line's path to the paths it checks, so its
-    record is matched and the user can rule (FR-016); decide adds each departure whose record governs its path as a
-    departure the judge named, once per `(folder, record, path)` however many stories name it, so it stops through
+    record is matched and the user can rule (FR-016); decide checks each `(folder, record, path)` with one
+    `checkAdrFolder(cwd, folder, [path], …)` call, concurrently with the ruling checks under the same 1500 s
+    deadline (the asked record says which records govern a folder, not which path), and adds each departure whose
+    record that call names as a departure the judge named, once per key however many stories name it, so it stops through
     the same `departure-*` rows until the user rules (R9) or a superseding record no longer departs.
   - The ruling, keyed on `(folder, record, path)`, lands in `adr-rulings.json` through the rescope's spec PR. Core's
     `governingDiff` compares that file, so its change on the default branch lapses every story's round under the
@@ -279,7 +282,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     ruling (R10).
 - **Rationale**: planner ADR-0009 d9; reviewer ADR-0017 d2, ADR-0022 d4. Only planner may overrule a record (root
   ADR-0011), and a builder unsupervised at review cannot ask the user, so a departure it cannot fix goes to the
-  admin. A departure is one more reason a round was raised, so it rides the question every verdict-placed hold
+  admin. A departure is one more reason a round was raised, so it rides the question every escalation hold
   already carries; one render/read pair keeps the posted line and the parsed data one grammar.
 - **Alternatives considered** (2026-11-03): a separate block grammar for departures (rejected: a second format in
   one question); a JSON question (rejected: the orchestrator posts it to people as it stands); merging one

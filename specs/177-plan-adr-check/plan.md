@@ -59,7 +59,7 @@ step's `touches.json` and a rescope's `review-questions.json` among them; the ru
 | P3 Pure rules | `decideFolder`/`decideCheck`, `adrStop`, `changedSince` and the grammars are pure; `adr_check.ts` only does I/O. Pass. |
 | P4 Could not run | Its own outcome, exit 2, never a pass, a judge that did not answer included (R8). Pass. |
 | P5 Settled design | Every mechanism below cites a research decision with Existing tools. Pass. |
-| P6 One writer | `codeworks.toml`: admin. `touches.json`: touches step. `review-questions.json`: `drive_workflow.py rescope`, from the verdict-placed holds' questions. A departure line: core's `renderAdrDeparture`, called by reviewer's round record. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
+| P6 One writer | `codeworks.toml`: admin. `touches.json`: touches step. `review-questions.json`: `drive_workflow.py rescope`, from the open escalation and verdict rescope holds' questions. A departure line: core's `renderAdrDeparture`, called by reviewer's round record. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
 | P7 Data | Paths (one grammar), verdict, rulings file each have a grammar (contracts/artifact-grammar.md). Pass. |
 | P8 Generic | Folders come only from `codeworks.toml`; nothing names this repo. Pass. |
 | P9 Identities | No actor trusted; no GitHub call. Pass. |
@@ -83,7 +83,7 @@ ADR folders protected (R12).
 
 2026-11-03, user decisions: `touches.json` deleted by `adr-plan-clear`, then written by the touches step
 `adr-plan-touches` (R4); a ruling from a file, `adr_ruling=@<file>` (R9); a departure at review is ruled FIX or
-ESCALATE, one line of the hold's question, which planner's rescope reads with every verdict-placed question; a
+ESCALATE, one line of the hold's question, which planner's rescope reads with every open review question; a
 ruling lapses every story's round under the spec (US6, R13); root ADR-0011 and
 reviewer ADR-0022 accepted.
 

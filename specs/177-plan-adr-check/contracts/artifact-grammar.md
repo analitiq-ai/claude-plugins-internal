@@ -77,7 +77,8 @@ time; one whose key is already there is satisfied, not refused. Unset: no ruling
 ADR departure: docs/adr 0004 core/src/adr.ts — reads the folder from tracked discovery, which 0004 rejected
 ```
 
-- A verdict-placed hold's question (`escalation-<issue>`, or `rescope-<issue>` with no spec PR) is text: why the
+- A review question is the question of an open `escalation-<issue>` hold, or of an open `rescope-<issue>` hold
+  with no spec PR, as text: why the
   round was raised and what must be decided (reviewer ADR-0013 d4–d5). Each departure ruled ESCALATE is one line of
   it, written by core's `renderAdrDeparture` only and read by `readAdrDepartures` only; the orchestrator posts the
   whole question as it stands (orchestrator ADR-0010 d1).
@@ -95,11 +96,11 @@ ADR departure: docs/adr 0004 core/src/adr.ts — reads the folder from tracked d
 ]}
 ```
 
-- `ReviewQuestions` (core): the question of every open `escalation-<issue>` hold, and every open `rescope-<issue>`
-  hold with no spec PR, of the open story issues under the spec's issue (planner ADR-0009 d9); no `(issue, hold)`
+- `ReviewQuestions` (core): every review question of the open story issues under the spec's issue (planner ADR-0009 d9); no `(issue, hold)`
   twice; each question's departure lines read through `readAdrDepartures`.
 - Written by `drive_workflow.py rescope … questions=@<file>`, copying the file `rescope_questions.ts` wrote, only on
   a rescope that found a question. Absent: no question carried. Present and not `ReviewQuestions`: refused (exit 1,
   naming it).
 - Read by the plan check's ask step, which adds each departure's path to the paths it checks, and its decide step,
-  which stops once per `(folder, record, path)`, however many questions name it (R13).
+  which checks each `(folder, record, path)` with one `adr` call and stops once per key whose record governs it,
+  however many questions name it (R13).

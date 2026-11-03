@@ -55,7 +55,7 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
   from `plan.md` as it then stands, after a shell step deletes the last one, so a resume after a plan fix rebuilds
   it; the plan step writes nothing for the check (FR-012, R4, planner ADR-0009 d7). (D2) A ruling reaches a resume
   from a scratch file the session writes, `adr_ruling=@<file>`, never a command line (FR-016, R9). (Q1–Q3) At
-  review, a departure is ruled FIX or ESCALATE; a verdict-placed hold's question says why and what must be decided,
+  review, a departure is ruled FIX or ESCALATE; an escalation or verdict rescope hold's question says why and what must be decided,
   a departure one line of it that core renders and reads; planner's rescope takes its open decision from those
   questions, and the plan check stops once per departure (FR-021–FR-024, US6, R13; reviewer ADR-0013 d4–d5,
   ADR-0017 d2, planner ADR-0009 d9). (D6) Both callers pass `protectedPaths` `{tickOnly, adrFolders}`;
@@ -243,7 +243,7 @@ once ruled; a rescope with no question takes the admin's words.
 3. **Given** such holds are open on one or more story issues under the spec's issue, **When** the admin runs
    `/planner:issue-spec rescope <spec folder> #<issue>`, **Then** grill opens on those questions, and the plan check
    checks each departure's file and stops once per (folder, record, file) with the departure's next steps (FR-023).
-4. **Given** no verdict-placed question is open under the spec's issue, **When** the admin runs that rescope,
+4. **Given** no escalation hold, nor rescope hold without a spec PR, is open under the spec's issue, **When** the admin runs that rescope,
    **Then** it takes the admin's words as the open decision (FR-023).
 5. **Given** the user rules on it in session, **When** the run resumes with `adr_ruling=@<file>`, **Then** the
    ruling is appended to `adr-rulings.json` and lands in the rescope's spec PR; once merged, every story's round
@@ -352,10 +352,11 @@ once ruled; a rescope with no question takes the admin's words.
 - **FR-022**: Each departure ruled ESCALATE MUST be one line of the `escalation-<issue>` hold's question, written by
   core's `renderAdrDeparture` (folder label, record id, file, what departs) and read back equal by
   `readAdrDepartures`; `Hold.question` stays text.
-- **FR-023**: Planner's `rescope <spec folder> #<issue>` MUST take its open decision from the open verdict-placed
-  questions of every open story issue under the spec's issue, and from the admin's words when there are none; the
-  plan check MUST add each departure line's file to the paths it checks and stop on each departure whose record
-  governs it, as on a departure the judge named, once per (folder, record, file), until a ruling names it (planner
+- **FR-023**: Planner's `rescope <spec folder> #<issue>` MUST take its open decision from the questions of every
+  open escalation hold, and every open rescope hold with no spec PR, of every open story issue under the spec's
+  issue, and from the admin's words when there are none; the
+  plan check MUST add each departure line's file to the paths it checks, check each (folder, record, file) with one
+  `adr` call of that file, and stop on each departure whose record that call names as governing, as on a departure the judge named, once per (folder, record, file), until a ruling names it (planner
   ADR-0009 d9).
 - **FR-024**: A change to the spec folder's `adr-rulings.json` on the default branch MUST lapse every story's
   internal round under that spec (orchestrator ADR-0004 d1), through core's `governingDiff`.
@@ -402,7 +403,7 @@ once ruled; a rescope with no question takes the admin's words.
   ADR-0017 d2's first-match rule and place the holds with their questions; US6 renders each departure line into the
   question once #235 has merged. #209 T010a–T010c set `Hold.question` for `escalation`, `claim` and a verdict's
   `rescope`, give `placeRescopeHold` a question, and add FindingRuling `ESCALATE`.
-- #174 posts a verdict-placed rescope hold's question as it posts an escalation's (orchestrator ADR-0010 d1).
+- #174 posts a verdict's rescope hold's question as it posts an escalation's (orchestrator ADR-0010 d1).
 - #285 (US6) is blocked by #278 (US5): the departures it carries are the ones US5's decision check reports.
 
 ## Why this is worth doing

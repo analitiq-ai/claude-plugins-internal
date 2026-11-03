@@ -76,7 +76,7 @@ Every line is on stderr, as the stop table gives it:
 | `adr_folders = []`, with or without `touches.json` | exit 0, `PASS: codeworks.toml: No ADR folder is listed …`; no path read |
 | `stop plan judge` / `stop plan touches` | exit 2, `COULD_NOT_RUN: adr-plan-judge: the judge did not answer. …` / `… adr-plan-touches: the touches step did not answer. …` |
 | `<run>/review-questions.json` has a departure line `docs/adr 0004 <path>` on a path `touches.json` lacks | ask's asked record holds the path |
-| the same path, `0004` governing it, the verdict all `WITHIN` | exit 1, `FAIL: docs/adr: 0004 on <path>: found at review on #<issue>: …` (US6 AS3) |
+| the same path, decide's own `adr check` of it naming `0004` governing, the verdict all `WITHIN` | exit 1, `FAIL: docs/adr: 0004 on <path>: found at review on #<issue>: …` (US6 AS3) |
 | the same line in two stories' questions | exit 1, one `FAIL` line naming both issues (US6 AS3) |
 | the same, and `adr-rulings.json` names it | exit 0 (US6 AS5) |
 | the same, `0004` superseded and no longer governing | exit 0, no line for it |
@@ -140,4 +140,4 @@ the change (AS5). `git grep REVIEWER_ORG_ADR_DIR -- ':!specs'` finds nothing.
 | `reviewer/tests/assess.test.ts` (after #235) | a decision-check departure ruled PUSH_BACK or DEFER / FIX / ESCALATE | refused as inadmissible / accepted / accepted (US6 AS1) |
 | `reviewer/tests/round-record.test.ts` (after #235) | a round with two departures ruled ESCALATE | `escalation-<issue>` open, `readAdrDepartures` of its question gives both (US6 AS2) |
 | `planner/tests/rescope-questions.test.ts` | a parent's two sub-issues with an open escalation hold and an open verdict rescope hold / an issue with no sub-issues / a rescope hold with a spec PR | file with both questions / the issue read itself / not taken |
-| `planner/tests/rescope-questions.test.ts` | no open verdict-placed question / an unreadable departure line | nothing written, exit 0 (US6 AS4) / exit 1 naming the issue and the line |
+| `planner/tests/rescope-questions.test.ts` | no open review question / an unreadable departure line | nothing written, exit 0 (US6 AS4) / exit 1 naming the issue and the line |

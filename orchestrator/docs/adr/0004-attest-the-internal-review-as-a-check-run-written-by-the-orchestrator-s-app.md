@@ -13,6 +13,10 @@ relatesTo: ["0003", "0005", "0009"]
 affects:
   - type: path
     pattern: "orchestrator/**"
+  - type: path
+    pattern: "core/src/attest.ts"
+  - type: path
+    pattern: "core/src/protected-paths.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
