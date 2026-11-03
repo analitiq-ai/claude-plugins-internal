@@ -243,8 +243,8 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   model's GitHub token is read-only; hooks make every write
   (`docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`).
 - reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the plugin's mode
-  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: GitHub-signed commits on the served repo's `ledger` branch
-  (`reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`).
+  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: GitHub-signed commits on the served
+  repo's `ledger` branch (`reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`).
   Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision reviewer, which
   is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
 - planner runs as the Spec Kit workflow its skill starts (`planner/plugin/skills/issue-spec/`,

@@ -17,9 +17,9 @@ Only code that passed review merges. Five things hold that:
    ADR-0007).
 3. The App keys are readable only by hooks, never by the model.
 4. The orchestrator attests `internal-review` only from a round record the reviewer App
-   committed to the served repo's `ledger` branch (from #209; §3), read as a fold: an internal round that passed at the
-   head or at a commit in its history. Commits after it (stage 2) are
-   graded by the external reviewers alone (orchestrator ADR-0004 d1).
+   committed to the served repo's `ledger` branch (from #209; §3), read as a fold: an internal round
+   that passed at the head or at a commit in its history. Commits after it (stage 2) are graded by the
+   external reviewers alone (orchestrator ADR-0004 d1).
 5. reviewer commits that record only from verdicts the gate rule (§6) accepts.
 
 Every other refusal (commit gates, lane rules, reviewer's refusals of the model's GitHub writes) is a
@@ -313,10 +313,10 @@ The other rows ran on 2.1.300 to 2.1.306.
 - **E2:** the `ledger` branch's rulesets were tested on a throwaway repo (#288): an App in the
   restrict-updates bypass commits and GitHub signs the commit, its commit with a custom author is refused
   as unsigned, a user outside the bypass cannot commit, and neither the App nor the admin can force-push
-  or delete the branch. Untested: that the restrict-updates rule stops an App outside its bypass, the orchestrator's and
-  planner's Apps included, which rests on GitHub's docs; and a served repo whose plan offers no rulesets,
-  where any token with contents write can rewrite or delete the branch and drop events and holds with no
-  trace the fold sees (reviewer ADR-0011).
+  or delete the branch. Untested: that the restrict-updates rule stops an App outside its bypass, the
+  orchestrator's and planner's Apps included, which rests on GitHub's docs; and a served repo whose plan
+  offers no rulesets, where any token with contents write can rewrite or delete the branch and drop
+  events and holds with no trace the fold sees (reviewer ADR-0011).
 - **Open:** which hook pushes the session's commits, and when (orchestrator ADR-0001 d4); how the
   decision-reviewer reads a private org log with a one-repo token.
 - **Plugin npm dependencies under the managed file:** `claude plugin install` fetches a plugin's locked

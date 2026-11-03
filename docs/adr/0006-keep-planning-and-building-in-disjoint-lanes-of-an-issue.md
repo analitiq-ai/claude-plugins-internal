@@ -37,10 +37,9 @@ review:
 
 reviewer's state record of a story is the fold of its events on the `ledger` branch (reviewer ADR-0011),
 which reviewer's hook alone writes, while a story is built and when a rescope places holds (reviewer
-ADR-0013). A spec that changes under a running story is built against the old one. The board already says what runs: the orchestrator claims only from
-Ready, resumes only a story In progress or In review, and an admin stops a story by dragging it to Blocked
-(orchestrator
-ADR-0002).
+ADR-0013). A spec that changes under a running story is built against the old one. The board already
+says what runs: the orchestrator claims only from Ready, resumes only a story In progress or In review,
+and an admin stops a story by dragging it to Blocked (orchestrator ADR-0002).
 
 ## Decision
 

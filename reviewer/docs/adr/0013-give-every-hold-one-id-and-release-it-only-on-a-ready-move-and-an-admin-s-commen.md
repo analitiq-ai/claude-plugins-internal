@@ -48,16 +48,17 @@ clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011
 
 1. We will give every hold an id, and every hold but `tamper-<oid>` a row in the state record (ADR-0011),
    keyed by the story issue's number but `claim-<id>` (its lineage), `shim-<id>` (its bug) and
-   `tamper-<oid>` (the invalid commit on `ledger` the fold derives it from, ADR-0011 d2). While one is open the story merges
-   nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names the id.
+   `tamper-<oid>` (the invalid commit on `ledger` the fold derives it from, ADR-0011 d2). While one is
+   open the story merges nothing: `internal-review` stays pending (orchestrator ADR-0004). A refusal names
+   the id.
 2. We will release holds by one function in `core/`, only on the orchestrator's claim from Ready (orchestrator
    ADR-0002): the orchestrator runs it before it claims, and reviewer's hook writes its releases at its first
    run after the claim, since the two plugins' hooks on one prompt run in parallel.
    reviewer releases each open hold of the story issue for which both a move of the card to Ready on the board
    `[shared] board` names and an admin's comment on the story issue are newer than the commit that
    placed the hold, and a `tamper-<oid>` hold not before no file its commit added or changed remains on
-   `ledger` (ADR-0011 d2). An admin is a writer other than a codeworks App, read as orchestrator ADR-0010 reads one;
-   for an escalation hold, that comment is its answer. A release by a comment lapses the attestation, and the
+   `ledger` (ADR-0011 d2). An admin is a writer other than a codeworks App, read as orchestrator ADR-0010
+   reads one; for an escalation hold, that comment is its answer. A release by a comment lapses the attestation, and the
    new internal round at the head is briefed with the comment (orchestrator ADR-0004). A hold with no such
    comment stays open, and the start stops (orchestrator ADR-0002).
 3. We will have an admin's comment `/codeworks reset` on the story issue release every open hold of the
