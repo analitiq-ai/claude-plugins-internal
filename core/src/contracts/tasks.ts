@@ -5,16 +5,9 @@ import { assertIssueNumber } from "../github.ts";
 const LABEL_PREFIX = "Story issue:";
 const LABEL = /^Story issue: #([1-9][0-9]*)$/;
 const PHASE_HEADING = /^## Phase \S/;
-// A list item (`-`, `*`, `+`, `<n>.` or `<n>)`, however indented or spaced) opening with a bracket claims a task when
-// that bracket holds nothing but blanks, `x` or `X`, or is followed, past any blanks, by `T` and a digit. Spec Kit's
-// Notes bullets `- [P] tasks = …` and `- [Story] label …` claim none.
-const TASK_CLAIM = /^\s*(?:[-*+]|[0-9]+[.)])\s*\[(?:[\sxX]*\]|[^\]]*\]\s*T[0-9])/;
-// Spec Kit's `- [ ] [TaskID] [P?] [Story?] Description`, its tags the brackets right after the id. `[ ]` and `[x]` only:
+// Spec Kit's task line, `- [ ] T<nnn> [P] [US<k>] <description>`, `[P]` and the story tag optional. Ticked is `[x]`:
 // reviewer ADR-0010 d1 names a tick as `[ ]` flipped to `[x]`.
-const TASK_LINE = /^- \[([ x])\] (T[0-9]{3,})(?=\s|$)((?:\s+\[[^\]]*\])*)/;
-const TAG = /\[[^\]]*\]/g;
-const STORY_CLAIM = /^\[\s*us(?![a-z])/i;
-const STORY_TAG = /^\[US([1-9][0-9]*)\]$/;
+const TASK_LINE = /^- \[([ x])\] (T[0-9]{3,})(?= |$)(?: \[P\])?(?: \[US([1-9][0-9]*)\])?/;
 
 export type StoryTask = { id: string; ticked: boolean; story: number | null; line: string };
 
@@ -26,34 +19,11 @@ export class TaskBlockLabelRefused extends Error {
   }
 }
 
-/** A line that claims a task but is no task line, or tags its story wrongly: read as no task or no story, it would go unbuilt. */
-export class TaskLineRefused extends Error {
-  constructor(line: string, reason: string) {
-    super(`tasks.md: ${JSON.stringify(line)} ${reason}`);
-    this.name = "TaskLineRefused";
-  }
-}
-
-/**
- * The task `line` states, its story read from the tags after its id; null for a line that claims no task. A line that
- * claims a task is refused unless it is a task line whose tags name at most one story, each as `[US<k>]`.
- */
+/** The task `line` states when it matches TASK_LINE; null for any line that does not. */
 export function readTaskLine(line: string): StoryTask | null {
-  if (!TASK_CLAIM.test(line)) return null;
   const task = TASK_LINE.exec(line);
-  if (task === null) throw new TaskLineRefused(line, 'is no task line, which reads "- [ ] T<nnn> …" or "- [x] T<nnn> …"');
-  const stories = new Set<number>();
-  for (const [tag] of task[3].matchAll(TAG)) {
-    if (!STORY_CLAIM.test(tag)) continue;
-    const story = STORY_TAG.exec(tag);
-    if (story === null) throw new TaskLineRefused(line, `is tagged ${tag}, where a story tag reads "[US<k>]"`);
-    stories.add(Number(story[1]));
-  }
-  if (stories.size > 1) {
-    throw new TaskLineRefused(line, `is tagged ${Array.from(stories, (k) => `US${k}`).join(" and ")}, where a task is one story's`);
-  }
-  const [story = null] = stories;
-  return { id: task[2], ticked: task[1] === "x", story, line };
+  if (task === null) return null;
+  return { id: task[2], ticked: task[1] === "x", story: task[3] === undefined ? null : Number(task[3]), line };
 }
 
 /** Spec Kit's `## Phase <n>: <title>`, the heading each task block opens with. */
@@ -89,8 +59,6 @@ export function readTaskBlockLabels(text: string): ReadonlyMap<string, number> {
 /**
  * Each task line of every phase block labelled `#<s>`, in file order. A section that is no phase ends a block.
  * Each block's label is read under its own heading, never looked up by heading text, which two phases can share.
- * Every line is read, so a line anywhere that claims a task but is no task line refuses the whole text, as a malformed
- * label does.
  */
 export function storyTasks(text: string, s: number): StoryTask[] {
   assertIssueNumber(s);
@@ -100,9 +68,9 @@ export function storyTasks(text: string, s: number): StoryTask[] {
   lines.forEach((line, i) => {
     if (isPhaseHeading(line)) inStory = labelUnder(line, lines[i + 1]) === s;
     else if (line.startsWith("## ")) inStory = false;
-    else {
+    else if (inStory) {
       const task = readTaskLine(line);
-      if (inStory && task !== null) tasks.push(task);
+      if (task !== null) tasks.push(task);
     }
   });
   return tasks;
