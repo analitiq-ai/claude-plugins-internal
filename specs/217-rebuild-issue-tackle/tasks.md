@@ -23,7 +23,7 @@ are execution order within a PR; B4–B6 are listed under US1 but merge later (s
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependency on an incomplete task)
-- **[Story]**: US3–US1, as spec.md numbers them
+- **[Story]**: US1–US5, as spec.md numbers them
 
 ## Path Conventions
 
@@ -71,10 +71,10 @@ asserts the exported signature's parameter types are `GitHubClient` reader, plai
 - [ ] T006 [P] [US1] **core PR B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
 - [ ] T007 [US1] **core PR B1.** Add `storyBranchName(s, k, title)` beside `parseBranch` in `core/src/identity.ts`, sharing the branch grammar's constants with the parser; T006 passes; bump every carrier's `plugin.json` version
 
-### B2 — Story tasks (before US3)
+### B2 — Task-line grammar and story tasks (before US3)
 
-- [ ] T008 [P] [US1] **core PR B2.** Add failing cases to `core/tests/tasks.test.ts` for `storyTasks(text, s)` (R11, data-model StoryTask): returns `{id, ticked, story, line}` for each line matching `- [ ] T<nnn>` or `- [x] T<nnn>` inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`; `id` is `T` + 3 or more digits; `ticked` is true only for `[x]`; `story` is `k` from the line's `[US<k>]` tag or `null`; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
-- [ ] T009 [US1] **core PR B2.** Add `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; T008 passes; bump every carrier's `plugin.json` version
+- [ ] T008 [P] [US1] **core PR B2.** Add failing cases to `core/tests/tasks.test.ts` for `readTaskLine(line)`, the one task-line grammar (R11): `{id, ticked, story}` or `null` for a line that is no task; a task line is optional leading spaces, `- [ ] ` / `- [x] ` / `- [X] `, then `T` + 3 or more digits; `ticked` is true for `[x]` and `[X]`; `story` is `k` from a `[US<k>]` tag, `k` a positive integer without leading zero (`[US0]`, `[US01]`, `[us1]` are no tag), else `null`; the same tag twice gives that `k`; two different tags on one line refuse as `TaskLineRefused` naming the line; and for `storyTasks(text, s)` (data-model StoryTask), built on `readTaskLine`: returns `{id, ticked, story, line}` for each line matching `- [ ] T<nnn>` or `- [x] T<nnn>` inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`; `id` is `T` + 3 or more digits; `ticked` is true only for `[x]`; `story` is `k` from the line's `[US<k>]` tag or `null`; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
+- [ ] T009 [US1] **core PR B2.** Add `readTaskLine`, `TaskLineRefused`, `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; in the same PR, `planner/plugin/scripts/land.ts` `phasesOf` reads task lines and their tags through core's `readTaskLine`, its `TASK_LINE` and `STORY_TAG` removed, and `planner/tests/land.test.ts` gains a case for a line with two different tags; T008 and `planner/tests/land.test.ts` pass; bump every carrier's `plugin.json` version
 
 ### B3 — Story PR closed (before US3)
 
