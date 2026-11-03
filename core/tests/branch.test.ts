@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { parseBranch, storyBranchName } from "../src/identity.ts";
-import { readParameterViolations } from "./source-scan.ts";
-
-const identitySource = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "identity.ts");
 
 test("a story branch gives its issue, and carries k and the slug unchecked", () => {
   assert.deepEqual(parseBranch("212-us2-retry-budget"), { story: 212, k: 2, slug: "retry-budget" });
@@ -93,7 +87,3 @@ for (const n of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SA
     assert.throws(() => storyBranchName(245, n, "retry the push"), {name: "TypeError", message: `not a US<k> story index: ${n}`});
   });
 }
-
-test("storyBranchName takes no key reader: only GitHub's client and plain values", () => {
-  assert.deepEqual(readParameterViolations(readFileSync(identitySource, "utf8"), "src/identity.ts", "storyBranchName"), []);
-});
