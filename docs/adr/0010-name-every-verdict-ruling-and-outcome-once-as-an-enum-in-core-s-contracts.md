@@ -58,7 +58,7 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 | Finding ruling | FIX, PUSH_BACK, DEFER | core; reviewer ADR-0017 |
 | Root cause | AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL, NOT_APPLICABLE | core; reviewer ADR-0017 |
 | Check outcome | PENDING, PASS, FAIL, SILENT, COULD_NOT_RUN, WAIVED | core; ADR-0003, ADR-0004 |
-| Hold kind | rescope, escalation, pushback, claim, shim, audit | core; reviewer ADR-0013 |
+| Hold kind | rescope, escalation, pushback, claim, shim, audit, adr | core; reviewer ADR-0013 |
 | Hold state | OPEN, RELEASED | core; reviewer ADR-0011, ADR-0013 |
 | Round stage | INTERNAL, AUDIT, GITHUB | core; reviewer ADR-0019 |
 | Finding source | threads, required-checks, or a validator module's name | core; ADR-0003 |

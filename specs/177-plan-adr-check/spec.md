@@ -31,6 +31,16 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
 - Q: When the judge names a departure, can the user overrule it? → A: Yes; a resume can carry the user's ruling that a named departure is not one, recorded in the spec folder, and the step accepts it; ADR-0009's amendment names this.
 - Q: What entry names the Org ADRs in this repo's `codeworks.toml`? → A: `../engineering/docs/adr`, with analitiq-ai/engineering checked out beside this repo on every machine that runs planner or reviewer.
 - Q: Which later checks honor a recorded overrule? → A: Every later planner check of the spec folder and reviewer's decision check; the ruling is a note in the artifact it overrules, in `plan.md` or on the task's line in `tasks.md`. → Superseded by critique review (2026-11-02): rulings are kept in one rulings file in the spec folder that holds only user rulings, written only by the check script from the user's resume, given to the judge and applied by script at every later planner check and by reviewer.
+- Implementor feedback review (2026-11-03): ADRs and specs are written in planning only, so US1 is gone: planner
+  ADR-0009, reviewer ADR-0013, orchestrator ADR-0002 and root ADR-0010 are amended, and reviewer ADR-0022 and root
+  ADR-0011 (planner alone creates and edits spec folders and decision records; everyone else reads them) added, in
+  the planning PR before any code (FR-001). A departure's next steps are change the artifact, supersede the record
+  (draft a superseding record into the spec PR when its folder is in this repo, else change it in the repo that
+  holds the folder), or rule; a record with its own `adr check` error is a FAIL naming the file, rule and message,
+  next step "fix that record" (FR-008). Reviewer holds `adr-<issue>` on such a record or on a story PR that changes
+  `specs/**` or a `docs/adr/` folder at any depth (FR-020). An empty `adr_folders` passes before any path is read
+  (FR-008). The plan's paths move out of `plan.md` into `<run folder>/touches.json`, written by the plan step and
+  read only by planner's check (FR-012). The root `README.md`'s ADR Kit passage is rewritten in US3 and US4.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -41,29 +51,7 @@ admin, once, in `codeworks.toml` `[shared]` (root ADR-0002 d2). A folder may be 
 `docs/adr`, which this repo lists as `../engineering/docs/adr`. Keeping that other checkout current is the admin's job; the check reads what is on disk and makes no
 network call.
 
-### User Story 1 - ADR-0009 is amended to check the listed folders (Priority: P1)
-
-Planner ADR-0009 is amended, in its own PR, before any code it governs: d1 checks the plan after plan and before
-critique against each folder the repo lists, not against "the repo's log and then the org log"; a public repo lists
-no path to private ADRs; d2 (check the org log at its remote head) is dropped, and the record says why Option C (a
-stale or unreachable copy) is now accepted: the folder at the listed path is what is checked, and keeping it current
-is the admin's; the check runs again after tasks, since tasks name the paths each story touches and are written after
-critique; the user may overrule a departure the judge names, with a recorded ruling (FR-016). Its `affects` covers
-what the amended decisions govern.
-
-**Why this priority**: the governing rule ships apart from, and before, the code it governs (constitution
-Principle VI); every other story builds the amended record.
-
-**Independent Test**: Read the amended record: d1 names the listed folders, d2's remote-head rule is gone, the
-after-tasks check is a decision, Option C's rejection is replaced by why it is accepted, and the PR changes no code.
-
-**Acceptance Scenarios**:
-
-1. **Given** the amended ADR-0009, **When** a reader asks which folders a plan is checked against, **Then** the
-   record answers "each folder listed in `codeworks.toml` `[shared]`", with no mention of a repo log, an org log or a
-   remote head.
-2. **Given** the amendment PR, **When** its diff is read, **Then** it changes only decision records (and the
-   constitution's Source lines if they cite the changed decisions), no code.
+US1 (ADR-0009's amendment) was moved into the planning PR on 2026-11-03; ADRs and specs are written in planning only.
 
 ---
 
@@ -105,8 +93,8 @@ unreadable ones as not readable.
 ### User Story 3 - planner checks the plan before critique (Priority: P1)
 
 After `plan` (and the settled-design step) and before critique, a new workflow step runs `adr check` against every
-listed folder, with the paths the plan says it will touch. `adr check` only names the records that govern those paths,
-and fails only on a changed record's own error, so a headless model step then judges the plan against every governing
+listed folder, with the paths the plan step says the plan will touch (`<run folder>/touches.json`, FR-012). `adr
+check` only names the records that govern those paths, and fails only on a changed record's own error, so a headless model step then judges the plan against every governing
 record and writes its verdict as data, and a TypeScript script decides each folder's outcome from it: passed, a
 contradiction (naming the record and the path), or a check that could not run (root ADR-0004). Any contradiction or
 could-not-run stops the run before critique, naming the folder, what was found and the next legal step (constitution
@@ -124,8 +112,9 @@ folder; the step exits with the could-not-run status, never as a pass.
 1. **Given** every listed folder answers with no error finding, **When** the step runs, **Then** it passes and prints,
    per folder, the records that govern the plan's paths.
 2. **Given** a listed folder holds a record the plan contradicts, **When** the step runs, **Then** the run stops
-   before critique, naming the folder, the record id and the path, and the next step: change the plan, or draft a
-   superseding record into the spec PR (ADR-0009 d3).
+   before critique, naming the folder, the record id and the path, and the next steps: change the plan; supersede
+   the record, by drafting a superseding record into the spec PR (ADR-0009 d3) when the folder is inside this repo,
+   or by changing record `<id>` in the repo that holds the folder when it is outside; or resume with a ruling.
 3. **Given** a listed folder cannot be read, or `adr` is missing or at another version, or its answer cannot be read,
    **When** the step runs, **Then** that folder's outcome is a check that could not run, the run stops with the
    could-not-run exit status, and the other folders' outcomes are still printed.
@@ -139,6 +128,9 @@ folder; the step exits with the could-not-run status, never as a pass.
    check as a resume input (Clarifications: rulings honored by later checks; FR-016).
 7. **Given** the rulings file holds an entry the check script did not write and `HEAD` does not hold, **When** the
    step runs, **Then** the check could not run, naming the entry (FR-016).
+8. **Given** a listed folder holds a record with its own `adr check` error, **When** the step runs, **Then** the
+   run stops with that folder FAIL, naming the record file and adrkit's rule and message, and the next step: fix
+   that record (planner fixes it in the spec PR, or in the repo that holds the folder) (FR-008).
 
 ---
 
@@ -169,6 +161,13 @@ folders from core's function (US2) in place of finding tracked `docs/adr` folder
 `REVIEWER_ORG_ADR_DIR`. The environment variable is deleted, with its mention in reviewer's README and tests (root
 ADR-0002 d3: a setting is not an environment variable).
 
+Planner alone creates and edits spec folders and decision records; everyone else reads them (root ADR-0011, added in
+the planning PR). So when the decision check finds a record with its own `adr check` error, or a story PR changes a
+file under `specs/**` or under a `docs/adr/` folder at any depth, reviewer places hold `adr-<issue>` (reviewer
+ADR-0013 d4, amended in the planning PR): it refuses commits and rounds, and its comment names the file(s), with
+adrkit's rule and message for a broken record, and says planner fixes it. The card goes to Blocked (orchestrator
+ADR-0002 d5). It is released as every hold is (reviewer ADR-0013 d2).
+
 **Why this priority**: it removes the second, divergent definition of "the folders a change is checked against", but
 waits for #209's US1 (#235); only this story waits.
 
@@ -187,19 +186,27 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
    listed folders).
 4. **Given** the spec folder's rulings file holds a ruling on record R and path P, **When** reviewer's decision check finds a
    departure from R on P, **Then** the round reports none for it (Clarifications: rulings honored by reviewer).
+5. **Given** the decision check finds a record with its own `adr check` error, **When** reviewer launches a round,
+   **Then** it places hold `adr-<issue>`, refusing commits and rounds, with a comment naming the record file,
+   adrkit's rule and message, and that planner fixes it; the card goes to Blocked (FR-020).
+6. **Given** a story PR changes a file under `specs/**` or under a `docs/adr/` folder at any depth, **When**
+   reviewer sees it, **Then** it places hold `adr-<issue>` with a comment naming the file(s) and that planner
+   fixes it; the hold is released only as every hold is (reviewer ADR-0013 d2) (FR-020).
 
 ---
 
 ### Edge Cases
 
 - The list is empty: the steps check nothing, say that no ADR folder is listed, and pass; an empty list is the
-  admin's choice, not a check that could not run.
+  admin's choice, not a check that could not run. It passes first: settings are read before the artifact, so no
+  path is read and a missing or empty `touches.json` does not stop the run.
 - Two entries resolve to the same folder (e.g. `docs/adr` and an absolute path to it): core refuses the list as it
   refuses a repeated entry, naming both.
 - A listed path exists but is a file, or a folder with no records: a file is a folder that cannot be read; an
   empty folder is checked and governs nothing.
-- The plan or `tasks.md` names no path: the step stops, naming the artifact, as a check that could not run; a check
-  with no paths would pass vacuously.
+- The plan step wrote no `touches.json`, or it lists no path, or `tasks.md` names no path (with a non-empty list):
+  the step stops, naming `touches.json` or `tasks.md`, as a check that could not run; a check with no paths would
+  pass vacuously.
 - A listed folder in another checkout is behind its remote: it is checked as it is on disk (ADR-0009 d2 dropped); the
   step makes no network call.
 - The workflow runs in the main checkout, not a worktree: the parent of `--git-common-dir` is the checkout itself;
@@ -211,9 +218,13 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
 
 ### Functional Requirements
 
-- **FR-001**: Planner ADR-0009 MUST be amended in its own PR, before any code of US2–US5 merges, as US1 states. A
-  reviewer decision record that reviewer's decision check honors a ruling in the spec folder (FR-017) MUST likewise
-  merge in its own PR before US5's code (derived from Round 3, Q1 and constitution Principle VI).
+- **FR-001**: Planner ADR-0009 (as R11 gives it), reviewer ADR-0013 (hold `adr-<issue>`, FR-020), orchestrator
+  ADR-0002 (its Blocked cause) and root ADR-0010 (`adr` added to the Hold kind set) MUST be amended, and reviewer
+  ADR-0022 (the decision check reads only `[shared] adr_folders` and honours a recorded ruling, FR-014, FR-017) and
+  root ADR-0011 (planner alone creates and edits spec folders and decision records; everyone else reads them)
+  added, in the planning PR that precedes any code of US2–US5; no implementation story edits an ADR or a spec
+  (derived from Round 3, Q1 and constitution Principle VI). Superseded 2026-11-03: the reviewer record merged in its
+  own PR before US5's code.
 - **FR-002**: `codeworks.toml` `[shared]` MUST carry one required key whose value is a list of ADR folder paths,
   possibly empty; core's `Shared` schema MUST refuse a missing key, a non-list, an empty path and a repeated entry, and
   MUST accept an empty list.
@@ -230,18 +241,22 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
 - **FR-007**: Each check step MUST call core's function (FR-004) for the folders and MUST run `adr check` once per
   readable folder, with the paths the checked artifact names.
 - **FR-008**: Each folder MUST get its own outcome from the core enum: passed, failed (a departure the judge names,
-  or a changed record's error from `adr check`, naming the record id, the path, and for tasks the story), or could not
-  run (unreadable folder, `adr` missing or at another version, an answer or verdict that cannot be read, no paths to
-  check). Could not run MUST never read as passed.
+  naming the record id, the path, and for tasks the story; or a record's own `adr check` error, naming the record
+  file and adrkit's rule and message, next step "fix that record"), or could not run (unreadable folder, `adr`
+  missing or at another version, an answer or verdict that cannot be read). Could not run MUST never read as passed.
+  An empty `[shared] adr_folders` MUST pass first, before the artifact's paths are read; with a non-empty list, an
+  artifact naming no path MUST be could not run naming the artifact (`touches.json` or `tasks.md`), reported by the
+  ask step.
 - **FR-009**: A failed or could-not-run outcome in any folder MUST stop the run, with distinct exit statuses for the
   two, after printing every folder's outcome; the message MUST name the next legal step.
 - **FR-010**: The check steps MUST make no network call and use no GitHub credential.
 - **FR-011**: The check steps MUST be TypeScript scripts calling core (root ADR-0009 d2), with the decision of each
   outcome in a pure function (constitution P3).
-- **FR-012**: The paths a check passes MUST be read from the artifact as data with a grammar (constitution P7), not
-  parsed from prose; the plan decides the form for `plan.md`, and for `tasks.md` the task line's paths. One path
-  grammar MUST serve both artifacts, and a name with no `/` MUST count as a path when git tracks it at the checkout
-  root or `plan.md`'s `## Touches` lists it (so a root file a task creates is checked before it exists).
+- **FR-012**: The paths a check passes MUST be read as data with a grammar (constitution P7), not parsed from prose:
+  for the plan, `<run folder>/touches.json`, written by the plan step (the model writing the plan) and read only by
+  planner's check, never a section of `plan.md`; for `tasks.md`, the task line's paths. One path grammar MUST serve
+  both, and a name with no `/` MUST count as a path when git tracks it at the checkout root or `touches.json` lists
+  it (so a root file a task creates is checked before it exists).
 - **FR-013**: The `adr` version the planner step requires MUST be defined once, in core; reviewer reads it from core
   in US5, and until then its Python `VERSION` (`reviewer/plugin/scripts/adrkit.py:21`) is a second copy that #235
   deletes.
@@ -265,8 +280,14 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
 - **FR-018**: Every check step (ask, judge, decide, after plan and after tasks) MUST report its stop through one
   shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge that fails or
   does not answer is could not run, and a resume retries it.
-- **FR-019**: The decide step MUST compare the artifact's paths and the asked record with what the ask step saw, and
-  any difference MUST make the check could not run, naming what changed (the same single-writer guard as FR-016).
+- **FR-019**: The decide step MUST compare the artifact's paths (`touches.json` for the plan, `tasks.md` for tasks)
+  and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
+  changed (the same single-writer guard as FR-016).
+- **FR-020**: After #235, when reviewer's decision check finds a record with its own `adr check` error, or a story
+  PR changes a file under `specs/**` or under a `docs/adr/` folder at any depth (root ADR-0011), reviewer MUST
+  place hold `adr-<issue>` (reviewer ADR-0013 d4, amended in the planning PR), refusing commits and rounds, with a
+  comment naming the file(s), adrkit's rule and message for a broken record, and that planner fixes it; the card goes to Blocked
+  (orchestrator ADR-0002 d5); it is released as every hold (reviewer ADR-0013 d2).
 
 ### Key Entities
 
@@ -291,11 +312,14 @@ decision check runs one `adr check` per listed folder and none for an unlisted t
 
 - The adrkit `adr` CLI at the version reviewer pins (0.20.0) is installed where planner runs; its `check --dir
   <folder> --json -- <paths>` answer is read as reviewer's `adrkit.py` reads it today.
-- The key name and the form in which `plan.md` names the paths it touches are the plan's to settle.
+- The key name and the form in which the plan step names the paths the plan touches are the plan's to settle
+  (settled: `adr_folders`, R1; `<run folder>/touches.json`, R4).
 - The public-repo rule (a public repo lists no path to private ADRs) is a rule in ADR-0009 the admin keeps when
   writing `codeworks.toml`; this spec adds no code that reads a repo's visibility.
 - The optional adrkit `after_plan` hook stays as it is; the workflow step does not depend on it.
-- PR order: US1 (ADR-0009 amendment), then US2 (core), then US3 and US4 (planner), then US5 after #235.
+- PR order: the planning PR (ADR-0009, reviewer ADR-0013, orchestrator ADR-0002 and root ADR-0010 amended,
+  reviewer ADR-0022 and root ADR-0011 added; FR-001), then US2 (core), then US3 and US4 (planner), then US5 after
+  #235. Superseded 2026-11-03: the ADR-0009 amendment was a story, US1, in its own PR.
 
 ### Dependencies
 
@@ -321,7 +345,7 @@ Answer: Only after the code is written. Reviewer's decision check (reviewer/plug
 Source: code: reviewer/plugin/scripts/adrkit.py; reviewer/plugin/README.md; planner/plugin/speckit/workflows/issue-spec/workflow.yml.
 
 ### inherited
-Answer: Yes. It comes from planner ADR-0009 d1–d2 (accepted 2026-10-28) by way of #173's grill. ADR-0009's harm and its reachability still hold (above). d2's remote-head rule is the part the issue drops: reading from disk means no credential and no network call, and keeping the folder current is the admin's job. That is why the ADR is amended first, in its own PR.
+Answer: Yes. It comes from planner ADR-0009 d1–d2 (accepted 2026-10-28) by way of #173's grill. ADR-0009's harm and its reachability still hold (above). d2's remote-head rule is the part the issue drops: reading from disk means no credential and no network call, and keeping the folder current is the admin's job. That is why the ADR is amended first, in the planning PR (2026-11-03; was "in its own PR").
 Source: code: planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md; user: issue #177 Decision.
 
 ### needs-spec

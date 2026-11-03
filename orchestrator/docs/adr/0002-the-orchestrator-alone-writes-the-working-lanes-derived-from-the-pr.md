@@ -52,7 +52,8 @@ Admins and the orchestrator share the board; the orchestrator never checks who m
 4. We will never start a parent issue (one with sub-issues): named from Ready, it goes to Blocked, naming
    the sub-issues to name instead; its other lanes are the admin's.
 5. We will make Blocked the one sink for what needs an admin, each cause decided in its own record
-   (ADR-0001, ADR-0004 to ADR-0010). This record's causes: a turn that opened no PR, or a PR closed
+   (ADR-0001, ADR-0004 to ADR-0010; an `adr-<issue>` hold in reviewer ADR-0013, root ADR-0011).
+   This record's causes: a turn that opened no PR, or a PR closed
    unmerged (reason: that turn's final message); an In review PR whose `<module>-review` failed with no
    findings and no hold (reason: dismiss and re-request, or bypass merge). The reason is posted first;
    the lane write is the commit point; these moves fall between turns. At every hook run, the

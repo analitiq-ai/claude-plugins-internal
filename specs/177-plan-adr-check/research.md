@@ -50,16 +50,24 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 
 ## R4: The paths `plan.md` names
 
-- **Decision**: a `## Touches` section in `plan.md`, one `` - `<path>` `` bullet per file the plan creates, changes
-  or deletes, the path in the one path grammar (R5); no glob, no trailing `/`, no `..`. Added to the
-  settled-design preset's plan template (`planner/plugin/speckit/presets/settled-design/templates/plan-template.md`);
-  read by `readTouches` in `core/src/contracts/decision-check.ts`. A bullet not in the grammar is refused (exit 1,
-  naming the line); a section with none is could not run (spec Edge Cases).
-- **Rationale**: P7: paths read from a key with a grammar, not from the Project Structure tree. Same shape as
-  `## Mechanisms`, which `settled_design.py` reads.
+- **Decision** (2026-11-03; supersedes a `## Touches` section in `plan.md`): the plan step writes
+  `<run folder>/touches.json`, `{"v": 1, "paths": ["<PATH>", …]}`, one entry per file the plan creates, changes or
+  deletes, each in the one path grammar (R5), no glob, no trailing `/`, no `..`, no entry twice
+  (artifact-grammar.md). The workflow's `plan` step gets `Run folder: .specify/workflows/runs/{{ context.run_id }}`
+  in its `input.args`, as the `specify` step passes its premise report (`workflow.yml:136`), and the settled-design
+  preset's plan command (`planner/plugin/speckit/presets/settled-design/commands/speckit.plan.md`) tells the model
+  to write the file there. Read by `readTouchedPaths` in `core/src/contracts/decision-check.ts`. Unparsable or wrong
+  shape is refused (exit 1, naming `touches.json`); a missing file or an empty list is could not run, naming
+  `touches.json` (spec Edge Cases). The run folder is gitignored (`.specify/.gitignore`: `workflows/runs/`).
+  `plan.md` and its template are not changed; `## Mechanisms` stays as it is.
+- **Rationale**: P7: paths read from a file with a grammar, not from the Project Structure tree. The paths are the
+  check's input only, so they stay out of `plan.md`, which builders and reviewers read; nobody downstream acts on a
+  list nothing but the check keeps current. They are written in the plan step because only the model writing the
+  plan knows them.
 - **Existing tools**: the template's Project Structure tree (ASCII art, no grammar); `## Mechanisms` (names
-  mechanisms, not paths); adrkit's `check.md` falls back to the plan file itself as the only path, which governs
-  nothing useful.
+  mechanisms, not paths); a `## Touches` section in `plan.md` (rejected 2026-11-03: puts check input in an artifact
+  downstream actors read); adrkit's `check.md` falls back to the plan file itself as the only path, which governs
+  nothing useful; the `specify` step's `Premise report:` run-folder arg (the pattern reused).
 
 ## R5: The paths `tasks.md` names
 
@@ -67,12 +75,12 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `core/src/contracts/decision-check.ts` (artifact-grammar.md, Path): one `{a,b}` group expanded. A task line is
   Spec Kit's `- [ ] T<n> …`; its paths are its backticked spans `artifactPath` accepts: a span with a `/` always,
   one with no `/` only when it is in `rootFiles`: the `git ls-files` entries with no `/` together with the
-  `## Touches` entries with no `/`, both read by the ask step and passed in, so the reader stays pure. Touches
-  carries a root file a task creates, which git does not track yet (codex on #279). A Touches bullet is a path by its place, so no root
-  check. Its story is its `[US<k>]` tag, else its phase heading. `readTaskPaths` sits in `core/src/contracts/tasks.ts`
+  `touches.json` entries with no `/`, both read by the ask step and passed in, so the reader stays pure.
+  `touches.json` carries a root file a task creates, which git does not track yet (codex on #279). A `touches.json`
+  entry is a path by its place, so no root check. Its story is its `[US<k>]` tag, else its phase heading. `readTaskPaths` sits in `core/src/contracts/tasks.ts`
   beside the task-block label (that file's comment: the grammar has one home) and calls `artifactPath`.
 - **Rationale**: FR-012: one grammar, so a task naming `codeworks.toml` (governed by root ADR-0002) is checked as
-  the plan's Touches would check it. Without the root rule every backticked word would be a path. Planner ADR-0008
+  the plan's `touches.json` would check it. Without the root rule every backticked word would be a path. Planner ADR-0008
   d2 keeps the stock template, whose tasks already name files in backticks
   (`specs/209-rebuild-reviewer-on-core/tasks.md`), so no template change is needed.
 - **Existing tools**: `readTaskBlockLabels` in `core/src/contracts/tasks.ts` (labels, not paths; extended beside
@@ -112,14 +120,18 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 
 - **Decision**: pure `decideFolder` and `decideCheck` in `planner/plugin/lib/adr-check.ts`. Per folder:
   `COULD_NOT_RUN` (unreadable, `adr` missing or other version, answer or verdict unreadable) else `FAIL` (a broken
-  record, or a `DEPARTS` no rulings-file entry names) else `PASS`. Empty list: no folder, prints that none is
-  listed, exit 0. Every folder's outcome is printed.
+  record, or a `DEPARTS` no rulings-file entry names) else `PASS`. Empty list: passes first, before the artifact's
+  paths are read: ask reads settings first and prints `{"judge": false, …}` without reading the paths, decide prints
+  that none is listed, exit 0 (2026-11-03). Every folder's outcome is printed.
   Every stop of every check step (ask, judge, decide; plan and tasks) goes through one pure function, `adrStop`, in
   the same module: it maps the stop (folder outcomes, a refused line, a guard difference, a judge that did not
   answer) to lines `<label>: <FAIL|COULD_NOT_RUN>: <what>. Next step: <next>.` and to the exit: 2 when any is
-  `COULD_NOT_RUN`, else 1 when any is `FAIL`, else 0. Next steps: change the artifact, draft a superseding record
-  into the spec PR (ADR-0009 d3), or resume with a ruling; for could not run, what to fix; for the judge, resume to
-  retry. ask and decide call it in-process; the judge step runs no script, so `drive_workflow.py report` gets its
+  `COULD_NOT_RUN`, else 1 when any is `FAIL`, else 0. Next steps for a departure: change the artifact; supersede
+  the record, "draft a superseding record into the spec PR" (ADR-0009 d3) when the record's folder is inside this
+  repo, or "change record <id> in the repo that holds <folder>" when it is outside; or resume with a ruling. For a
+  record's own `adr check` error: the line names the record file and adrkit's rule and message, next step "fix that
+  record" (planner fixes it in the spec PR or in the repo that holds the folder). For could not run, what to fix;
+  for the judge, resume to retry. ask and decide call it in-process; the judge step runs no script, so `drive_workflow.py report` gets its
   lines from `adr_check.ts stop <a> judge`, which calls the same function. `report` sets `adr: true` for every
   `adr-*` step and SKILL.md handles all of them by that one mapping (workflow-steps.md).
 - **Rationale**: FR-008, FR-009, FR-018; P3; P4; exit codes as `settled_design.py` and `spec_facts.ts` (1 refused,
@@ -149,7 +161,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - One writer, decide. Writer guard, one function `changedSince(recorded, now) → {added, removed}` in
     `planner/plugin/lib/adr-check.ts`, used three ways: (a) ask and decide: a rulings-file entry added beyond the
     file at `HEAD` and `<run>/adr-rulings-written.json` (decide's record of every entry it appended) is could not
-    run, naming it; (b) decide: the artifact's paths re-read against the asked record's, any difference could not
+    run, naming it; (b) decide: the artifact's paths (`touches.json` or `tasks.md`) re-read against the asked record's, any difference could not
     run; (c) decide: the asked record's sha256 against the `asked` digest ask printed, which the workflow passes as
     an argument, any difference could not run. Each names what changed (FR-019).
 - **Rationale**: FR-016, FR-017, FR-019; ADR-0004's "a way past it that can succeed"; P2: the user releases the
@@ -168,20 +180,38 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   per readable one; an unreadable one is could not run; it drops `decision_folders` discovery and
   `REVIEWER_ORG_ADR_DIR` (code, README, tests); it reads the spec folder's rulings file through core's
   `readRulings` and reports no departure an entry names. A folder's label is its entry as written; "org"
-  becomes "outside the repo" (resolved path not under the checkout). Its deadline stays reviewer's own.
-- **Rationale**: FR-014, FR-017; SC-005.
-- **Existing tools**: #235's port of `adrkit.py`/`decisions.py` (changed, not duplicated).
+  becomes "outside the repo" (resolved path not under the checkout). Its deadline stays reviewer's own. A record
+  with its own `adr check` error, or a story PR changing a file under `specs/**` or under a `docs/adr/` folder at
+  any depth, places hold `adr-<issue>` (new `HoldKind` `adr` in `core/src/values.ts`): it refuses commits and
+  rounds, its comment names the file(s), adrkit's rule and message for a broken record, and that planner fixes it; the card goes to Blocked;
+  released as every hold.
+- **Rationale**: FR-014, FR-017, FR-020; SC-005. Root ADR-0011 (new, planning PR): planner alone creates and edits
+  spec folders and decision records, everyone else reads them, so a story cannot fix either and must stop for
+  planner; reviewer ADR-0013 d4 (amended in the planning PR) places the hold, d2 releases it; orchestrator ADR-0002
+  d5 makes Blocked the sink.
+- **Existing tools**: #235's port of `adrkit.py`/`decisions.py` (changed, not duplicated); core's hold rows and
+  placement (`core/src/state.ts`, `placeRescopeHold` the model), `HoldKind` (extended, not duplicated).
 
 ## R11: Decision records first, and PR order
 
-- **Decision**: PR 1 amends planner ADR-0009: d1 checks each folder `[shared] adr_folders` lists, after plan and
-  again after tasks, public repo lists no private path; d2 replaced by "the folder on disk is checked, no network,
-  kept current by the admin", Option C accepted with why; the judge's `AdrJudgment` set and the user's ruling
-  (FR-016) decided, in the rulings file with decide its only writer, and spec-PR review named as the check on an
-  entry committed by hand; `affects` adds `core/src/{adr,adr-folders}.ts`, `core/src/contracts/decision-check.ts`,
-  `planner/plugin/scripts/adr_check.ts`, `planner/plugin/lib/**`. PR 2 adds a reviewer record: the decision check
-  honours the spec folder's rulings file and checks only listed folders. `0022` is its working name only; its
-  number is the next free one when it is drafted, since #209/#235 may add reviewer records first. Then US2 (core +
-  `codeworks.toml` + fixtures), US3+US4 (planner), US5 after #235 and that record.
-- **Rationale**: Principle VI; FR-001; root ADR-0010 d3 (a set is added with the record that owns it).
+- **Decision** (2026-11-03; supersedes "PR 1 amends ADR-0009", which was story US1): the planning PR, which
+  precedes any code of US2–US5, amends planner ADR-0009: d1 checks each folder `[shared] adr_folders` lists, after
+  plan and again after tasks, public repo lists no private path; d2 replaced by "the folder on disk is checked, no
+  network, kept current by the admin", Option C accepted with why; the judge's `AdrJudgment` set and the user's
+  ruling (FR-016) decided, in the rulings file with decide its only writer, and spec-PR review named as the check on
+  an entry committed by hand; a departure's next steps (change the artifact; supersede the record in the spec PR
+  when its folder is in this repo, else change it in the repo that holds the folder; or rule) and a broken record's
+  ("fix that record") (R8); the plan's paths in `<run folder>/touches.json`, written by the plan step (R4);
+  `affects`: `planner/plugin/speckit/workflows/**`, `planner/plugin/skills/issue-spec/**`, `core/src/adr.ts`,
+  `core/src/adr-folders.ts`, `core/src/contracts/decision-check.ts`, `core/src/contracts/tasks.ts`,
+  `planner/plugin/scripts/adr_check.ts`, `planner/plugin/lib/adr-check.ts`,
+  `planner/plugin/speckit/presets/settled-design/commands/speckit.plan.md`. The same PR amends reviewer ADR-0013
+  (d4: hold `adr-<issue>`, R10), orchestrator ADR-0002 (d5: its Blocked cause) and root ADR-0010 (`adr` added to
+  the Hold kind set), and adds root ADR-0011 (planner alone creates and edits spec folders and decision records;
+  everyone else reads them) and reviewer ADR-0022 (the decision check checks only the listed folders, labels an
+  outside one by its entry, and honours the spec folder's rulings file). Superseded 2026-11-03: the reviewer record
+  merged in its own PR before US5's code. Then US2 (core + `codeworks.toml` + fixtures), US3+US4 (planner), US5
+  after #235.
+- **Rationale**: Principle VI; FR-001; ADRs and specs are written in planning only, never by an implementation
+  story; root ADR-0010 d3 (a set is added with the record that owns it).
 - **Existing tools**: `/speckit-adrkit-draft` drafts the records.
