@@ -36,10 +36,11 @@ A read that does not answer is no field: the script exits 2 naming it (R3).
 |---|---|---|
 | `id` | `T<nnn>` | Spec Kit's task id |
 | `ticked` | boolean | `[x]` vs `[ ]` |
-| `story` | `k` \| `null` | the line's `[US<k>]` tag |
+| `story` | `k` \| `null` | the `[US<k>]` tag right after the id, past Spec Kit's optional `[P]` |
 | `line` | string | the task line as written |
 
-Only lines inside a phase block labelled `Story issue: #<s>` (planner ADR-0008 d2).
+A task line is Spec Kit's `- [ ] T<nnn> [P] [US<k>] <description>`, `[P]` and the tag optional, ticked `[x]`. Any
+other line is no task. Only lines inside a phase block labelled `Story issue: #<s>` (planner ADR-0008 d2).
 
 ## Step (output of `decideStep`)
 
