@@ -7,7 +7,7 @@ workflow:
   description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
 
 requires:
-  speckit_version: ">=1.0.7"
+  speckit_version: ">=1.1.3,<1.2.0"
   integrations:
     any: ["claude"]
 
@@ -107,8 +107,8 @@ steps:
             type: shell
             run: node "$PLANNER_ROOT/scripts/spec_facts.ts" write "$SPECIFY_FEATURE_DIRECTORY"
 
-  # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
-  # top-level and skips itself on a stop pick, instead of all of them sharing one block.
+  # A resume replays every step already done and re-executes from the step the run halted at (Spec Kit 1.1.x), so only
+  # a loop runs a step again.
 
   # specify writes spec.md from the template, over a no-spec one, so a rescope of a spec skips it and grill amends the
   # spec in place.
@@ -241,33 +241,57 @@ steps:
     type: if
     condition: *spec-is-written
     then:
-      - id: adr-plan-clear
-        type: shell
-        timeout: 60
-        run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
-      - id: adr-plan-touches
-        type: prompt
-        integration: "{{ inputs.integration }}"
-        timeout: 1800
-        prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
-      - id: adr-plan-ask
-        type: shell
-        output_format: json
-        timeout: 1800
-        run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
-      - id: adr-plan-judging
-        type: if
-        condition: "{{ steps.adr-plan-ask.output.data.judge }}"
-        then:
-          - id: adr-plan-judge
+      - id: adr-plan-check           # one iteration is one whole check; report's `again` asks for the next
+        type: do-while
+        max_iterations: 100
+        condition: "{{ steps.adr-plan-report.output.data.again }}"
+        steps:
+          - id: adr-plan-clear       # never the last iteration's paths
+            type: shell
+            timeout: 60
+            run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
+          - id: adr-plan-touches     # exit code not 0: ask never reads the touches.json it left
             type: prompt
             integration: "{{ inputs.integration }}"
             timeout: 1800
-            prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for artifact plan, spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
-      - id: adr-plan-decide
-        type: shell
-        timeout: 1800
-        run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}"
+            continue_on_error: true
+            prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-plan-ask
+            type: shell
+            output_format: json
+            timeout: 1800
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-touches.output.exit_code }}"
+          - id: adr-plan-judging
+            type: if
+            condition: "{{ steps.adr-plan-ask.output.data.judge }}"
+            then:
+              - id: adr-plan-judge   # exit code not 0: decide never reads the verdict it left
+                type: prompt
+                integration: "{{ inputs.integration }}"
+                timeout: 1800
+                continue_on_error: true
+                prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for artifact plan, spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-plan-deciding
+            type: if
+            condition: "{{ steps.adr-plan-ask.output.data.decide }}"
+            then:
+              - id: adr-plan-decide
+                type: shell
+                timeout: 1800
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}" "{{ steps.adr-plan-judge.output.exit_code }}"
+          - id: adr-plan-report
+            type: shell
+            output_format: json
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" report plan ".specify/workflows/runs/{{ context.run_id }}"
+      - id: adr-plan-out-of-rounds   # the loop ended at max_iterations still wanting another
+        type: if
+        condition: "{{ steps.adr-plan-report.output.data.again }}"
+        then:
+          - id: adr-plan-rounds
+            type: shell
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stop plan rounds
 
   - id: to-mark-critiques
     type: if

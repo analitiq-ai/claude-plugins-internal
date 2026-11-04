@@ -8,12 +8,14 @@ import {
   AdrAsked,
   AdrRuling,
   AdrRulings,
+  AdrStopRecord,
   AdrVerdict,
   artifactPath,
   PathRefused,
   readRulings,
   readTouchedPaths,
   RulingsRefused,
+  stopFile,
   TouchesRefused,
 } from "../src/contracts/decision-check.ts";
 import { couldNotRun } from "../src/outcomes.ts";
@@ -303,6 +305,42 @@ describe("AdrRulings", () => {
   it("refuses a ruling that is no AdrRuling", () => {
     assert.equal(AdrRulings.safeParse({ v: 1, rulings: [{ ...RULING, reason: "" }] }).success, false);
   });
+});
+
+describe("stopFile", () => {
+  it("names each check's stop record in the run folder", () => {
+    assert.deepEqual([stopFile("plan"), stopFile("tasks")], ["adr-plan-stop.json", "adr-tasks-stop.json"]);
+  });
+});
+
+describe("AdrStopRecord", () => {
+  const record = {
+    v: 1,
+    exit: 1,
+    lines: ["FAIL: docs/adr: 0004 on core/src/x.ts: it reads the folders from discovery. Next step: change plan.md."],
+    shown: false,
+  };
+
+  it("reads a stop not yet shown, and one shown, exiting 1 or 2", () => {
+    for (const read of [record, { ...record, exit: 2, shown: true }]) assert.deepEqual(AdrStopRecord.parse(read), read);
+  });
+
+  for (const [what, value] of [
+    ["an exit of 0, which is no stop", { ...record, exit: 0 }],
+    ["an exit of 3", { ...record, exit: 3 }],
+    ["an exit that is not a number", { ...record, exit: "1" }],
+    ["no line", { ...record, lines: [] }],
+    ["no lines", { ...record, lines: undefined }],
+    ["a line that is not text", { ...record, lines: [1] }],
+    ["no shown", { ...record, shown: undefined }],
+    ["a shown that is not a boolean", { ...record, shown: "no" }],
+    ["a v other than 1", { ...record, v: 2 }],
+    ["another key", { ...record, step: "adr-plan-decide" }],
+  ] as const) {
+    it(`refuses ${what}`, () => {
+      assert.equal(AdrStopRecord.safeParse(value).success, false);
+    });
+  }
 });
 
 describe("readRulings", () => {

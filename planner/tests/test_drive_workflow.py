@@ -3,7 +3,9 @@
 No test runs the real agent or reaches GitHub: `plan` on a rescope gets a stand-in `claude` that writes no plan,
 `specify` on a new spec gets one that writes the spec the test names where the test names, `gh` is a stand-in
 that keeps each call, and `node` is a stand-in for the preflight step that keeps each call and passes the issue
-unless the test makes it stop the run; any other script it hands to the real node.
+unless the test makes it stop the run; any other script it hands to the real node. AdrPlanCheck replaces the `claude`
+and `node` stand-ins with its own: its `claude` also plays the ADR check's touches step and judge, and its `node` keeps
+each adr_check.ts call.
 """
 import json
 import os
@@ -399,12 +401,12 @@ class Resume(unittest.TestCase):
 
 
 def workflow_steps(steps=None):
-    """Every step of the plugin's workflow, the ones nested in an `if` included."""
+    """Every step of the plugin's workflow, the ones nested in an `if` or a loop included."""
     if steps is None:
         steps = yaml.safe_load((SPECKIT / "workflows" / "issue-spec" / "workflow.yml").read_text())["steps"]
     for step in steps:
         yield step
-        yield from workflow_steps(step.get("then", []) + step.get("else", []))
+        yield from workflow_steps(step.get("then", []) + step.get("else", []) + step.get("steps", []))
 
 
 def same_files(source: Path, installed: Path) -> bool:
@@ -726,30 +728,46 @@ planner_app_login = "codeworks-planner[bot]"
 app_id = 424242
 """
 RULING = {"folder": "docs/adr", "record": "0004", "path": GOVERNED, "reason": "the user keeps discovery for x.ts"}
-JUDGE_STOP = "COULD_NOT_RUN: adr-plan-judge: the judge did not answer. Next step: resume to run the judge again."
-TOUCHES_STOP = "COULD_NOT_RUN: adr-plan-touches: the touches step did not answer. Next step: resume to run it again."
+DEPARTURE = f"FAIL: docs/adr: 0004 on {GOVERNED}: it reads the folders from discovery. Next step: "
+TOUCHES_MISSING = "COULD_NOT_RUN: touches.json: "
+VERDICT_UNREAD = "COULD_NOT_RUN: adr-plan-verdict.json: "
+CHECK_AGAIN = ". Next step: resume to run the check again."
+ROUNDS = ("COULD_NOT_RUN: adr-plan-check: the check stopped 100 times in one run. Next step: start the run again "
+          "with /planner:issue-spec rescope <spec folder> #<issue>.")
+# The check loop's own steps, which specify records under a qualified id in each iteration after the first.
+CHECK_LOOP = ("adr-plan-clear", "adr-plan-touches", "adr-plan-ask", "adr-plan-judging", "adr-plan-deciding",
+              "adr-plan-report")
+# Long enough for a model stand-in to write its file, short beside the stand-in that hangs.
+MODEL_STEP_TIMEOUT = 5
 
 # Stands in for the agent of the plan step, the touches step and the judge, told apart by their prompts. The plan
 # step writes $CLAUDE_PLAN and $CLAUDE_RESEARCH; the touches step writes touches.json from plan.md's backticked paths
-# (CLAUDE_TOUCHES_EMPTY: none; CLAUDE_TOUCHES_FAILS: it fails); the judge writes a verdict with every governing record
-# WITHIN but the `<entry> <id>` CLAUDE_DEPARTS names (CLAUDE_JUDGE_FAILS: it fails).
+# (CLAUDE_TOUCHES_EMPTY: none); the judge writes a verdict with every governing record WITHIN but the `<entry> <id>`
+# CLAUDE_DEPARTS names. Once its file is written, CLAUDE_<STEP>_FAILS makes the touches step or the judge exit 1 and
+# CLAUDE_<STEP>_HANGS makes it outlast MODEL_STEP_TIMEOUT.
 ADR_CLAUDE = '''#!@PYTHON@
-import json, os, re, sys
+import json, os, re, sys, time
 prompt = sys.argv[2]
 with open(@PROMPTS@, "a") as log:
     log.write(prompt + "\\n")
 spec = os.environ["SPECIFY_FEATURE_DIRECTORY"]
 named = re.search(r"run folder (\\S+)\\.$", prompt)
-if "adr-touches.md" in prompt:
-    if os.environ.get("CLAUDE_TOUCHES_FAILS"):
+
+
+def end(step):
+    if os.environ.get(f"CLAUDE_{step}_FAILS"):
         sys.exit(1)
+    if os.environ.get(f"CLAUDE_{step}_HANGS"):
+        time.sleep(60)
+
+
+if "adr-touches.md" in prompt:
     with open(os.path.join(spec, "plan.md")) as plan:
         paths = re.findall(r"`([A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+)`", plan.read())
     with open(os.path.join(named[1], "touches.json"), "w") as out:
         json.dump({"v": 1, "paths": [] if os.environ.get("CLAUDE_TOUCHES_EMPTY") else paths}, out)
+    end("TOUCHES")
 elif "adr-judge.md" in prompt:
-    if os.environ.get("CLAUDE_JUDGE_FAILS"):
-        sys.exit(1)
     with open(os.path.join(named[1], "adr-plan-asked.json")) as record:
         asked = json.load(record)
     verdicts = []
@@ -763,6 +781,7 @@ elif "adr-judge.md" in prompt:
             verdicts.append({"folder": folder["entry"], "record": governing["recordId"], **judged})
     with open(os.path.join(named[1], "adr-plan-verdict.json"), "w") as out:
         json.dump({"v": 1, "artifact": "plan", "verdicts": verdicts}, out)
+    end("JUDGE")
 elif "speckit-plan" in prompt:
     for name, variable in (("plan.md", "CLAUDE_PLAN"), ("research.md", "CLAUDE_RESEARCH")):
         with open(os.path.join(spec, name), "w") as out:
@@ -780,15 +799,16 @@ governing = [{"recordId": "0004", "title": "Read the ADR folders from settings"}
 print(json.dumps({"ok": True, "governing": governing, "findings": []}))
 '''
 
-# Project's node, keeping each adr_check.ts call with the ADR_RULING it was given; ADR_STOP_EXIT makes `stop` exit
-# with it, printing nothing.
+# Project's node, keeping each adr_check.ts call with the ADR_RULING it was given; ADR_DECIDE_CRASHES makes `decide`
+# exit 3 with a line of its own, recording no stop, as a crash would.
 ADR_NODE = '''#!@PYTHON@
 import json, os, sys
 if sys.argv[1].endswith("/scripts/adr_check.ts"):
     with open(@NODE_LOG@, "a") as log:
         log.write(json.dumps({"args": sys.argv[2:], "adr_ruling": os.environ.get("ADR_RULING")}) + "\\n")
-    if sys.argv[2] == "stop" and os.environ.get("ADR_STOP_EXIT") is not None:
-        sys.exit(int(os.environ["ADR_STOP_EXIT"]))
+    if sys.argv[2] == "decide" and os.environ.get("ADR_DECIDE_CRASHES"):
+        print("decide crashed", file=sys.stderr)
+        sys.exit(3)
 if not sys.argv[1].endswith("/scripts/preflight.ts"):
     os.execv(@REAL_NODE@, [@REAL_NODE@, *sys.argv[1:]])
 '''
@@ -801,8 +821,8 @@ def filled(script, **values):
 
 
 class AdrPlanCheck(unittest.TestCase):
-    """The plan's ADR check, between settled-design and mark-critiques, in a checkout whose committed codeworks.toml
-    lists docs/adr; quickstart.md's test_drive_workflow.py cases."""
+    """The plan's ADR check loop, between settled-design and mark-critiques, in a checkout whose committed
+    codeworks.toml lists docs/adr; quickstart.md's test_drive_workflow.py cases."""
 
     def setUp(self):
         self.project = Project(UNANSWERED)
@@ -820,21 +840,58 @@ class AdrPlanCheck(unittest.TestCase):
         self.project.env.update(CLAUDE_PLAN=ADR_PLAN, CLAUDE_RESEARCH=SETTLED_RESEARCH)
         self.project.env.pop("ADR_RULING", None)
 
-    def reach_the_check(self):
-        """A rescope approved at grill, which runs the plan and on into the check."""
+    def reach_the_check(self, changes=None):
+        """A rescope approved at grill, which runs the plan and on into the check; `changes` maps a step id to the
+        settings the run's copy of the workflow gives that step."""
         proc, started = self.project.drive("rescope", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
         self.assertEqual(proc.returncode, 0, proc.stderr)
+        for step_id, settings in (changes or {}).items():
+            self.change_step(started["run_id"], step_id, settings)
         return self.resume(started["run_id"], "grill_verdict=approve")
+
+    def change_step(self, run_id, step_id, settings):
+        """A resume runs the run's own copy of the workflow and refuses one whose steps differ from the root sequence
+        of the run's execution tree, so the step changes in both."""
+        run = self.run_folder(run_id)
+
+        def changed(steps):
+            found = [step for step in workflow_steps(steps) if step.get("id") == step_id]
+            self.assertEqual(len(found), 1, f"the run's workflow has {len(found)} steps {step_id}, not one")
+            found[0].update(settings)
+            return steps
+
+        workflow = yaml.safe_load((run / "workflow.yml").read_text())
+        changed(workflow["steps"])
+        (run / "workflow.yml").write_text(yaml.safe_dump(workflow, sort_keys=False))
+        state = json.loads((run / "state.json").read_text())
+        sequence = state["execution"]["sequence"]
+        sequence["source"] = yaml.safe_dump(changed(yaml.safe_load(sequence["source"])), sort_keys=False)
+        (run / "state.json").write_text(json.dumps(state))
 
     def resume(self, run_id, *args):
         proc, report = self.project.drive("resume", run_id, *args)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return report
 
+    def assert_stopped(self, report, step, starts, ends=""):
+        """The run failed at `step` with `adr: true`, a line of its stderr starting with `starts` and ending `ends`."""
+        self.assertEqual((report["status"], report["step"], report.get("adr")), ("failed", step, True), report)
+        self.assertTrue(any(line.startswith(starts) and line.endswith(ends) for line in report["stderr"].splitlines()),
+                        report["stderr"])
+
+    def left(self, report, name):
+        """The file a model step wrote before it failed, read from the run folder."""
+        return json.loads((self.run_folder(report["run_id"]) / name).read_text())
+
+    def assert_verdict_left(self, report):
+        verdict = self.left(report, "adr-plan-verdict.json")
+        self.assertEqual((verdict["v"], verdict["artifact"], {v["judgment"] for v in verdict["verdicts"]}),
+                         (1, "plan", {"WITHIN"}), verdict)
+
     def departed(self):
         self.project.env["CLAUDE_DEPARTS"] = "docs/adr 0004"
         report = self.reach_the_check()
-        self.assertEqual((report["status"], report["step"]), ("failed", "adr-plan-decide"), report)
+        self.assert_stopped(report, "adr-plan-report", DEPARTURE)
         return report
 
     def run_folder(self, run_id):
@@ -851,82 +908,145 @@ class AdrPlanCheck(unittest.TestCase):
         self.adr_log.unlink()
         return [(call["args"], call["adr_ruling"]) for call in calls]
 
+    def prompts_since(self, seen):
+        """The prompts the stand-in agent was given after the first `seen` characters of its log."""
+        return self.project.prompts.read_text()[seen:]
+
     def ruling_file(self, text):
         path = self.project.root.parent / "ruling.json"
         path.write_text(text)
         return path
 
-    # quickstart Planner: "a run stops at `adr-plan-decide` before `mark-critiques`";
-    # "a decide stop report[s] `adr: true` with [its] lines"
-    def test_a_departure_stops_the_run_at_adr_plan_decide_before_mark_critiques(self):
+    # quickstart Planner: "a run stops at `adr-plan-report` before `mark-critiques`"; "a decide stop ... stop[s] the
+    # run at `adr-plan-report` and report[s] `adr: true` with [its] lines"
+    def test_a_departure_stops_the_run_at_adr_plan_report_before_mark_critiques(self):
         report = self.departed()
-        self.assertIs(report.get("adr"), True, report)
-        self.assertIn("FAIL: docs/adr: 0004 on core/src/x.ts: it reads the folders from discovery. Next step: ",
-                      report["stderr"].splitlines()[0])
+        self.assertTrue(report["stderr"].splitlines()[0].startswith(DEPARTURE), report["stderr"])
         results = self.step_results(report["run_id"])
-        self.assertEqual(results["settled-design"]["status"], "completed")
+        self.assertEqual((results["settled-design"]["status"], results["adr-plan-decide"]["status"]),
+                         ("completed", "completed"))
         self.assertNotIn("mark-critiques", results)
 
     def test_a_plan_its_records_govern_within_runs_on_past_the_check(self):
         report = self.reach_the_check()
         results = self.step_results(report["run_id"])
-        self.assertEqual(results.get("adr-plan-decide", {}).get("status"), "completed", report)
+        self.assertEqual(results.get("adr-plan-report", {}).get("status"), "completed", report)
+        self.assertNotIn("adr-plan-rounds", results)
         self.assertIn("mark-critiques", results)
         self.assertEqual(json.loads((self.run_folder(report["run_id"]) / "touches.json").read_text()),
                          {"v": 1, "paths": [GOVERNED]})
 
-    # quickstart Planner: "an ask stop ... report[s] `adr: true` with [its] lines"
-    def test_an_ask_stop_reports_adr_with_its_lines(self):
+    # quickstart Planner: "an ask stop ... stop[s] the run at `adr-plan-report` and report[s] `adr: true` with [its]
+    # lines"
+    def test_an_ask_stop_stops_the_run_at_adr_plan_report_with_its_lines(self):
         self.project.env["CLAUDE_TOUCHES_EMPTY"] = "1"
         report = self.reach_the_check()
-        self.assertEqual((report["status"], report["step"], report.get("adr")), ("failed", "adr-plan-ask", True),
-                         report)
-        self.assertTrue(any(line.startswith("COULD_NOT_RUN: touches.json: ") for line in report["stderr"].splitlines()),
-                        report["stderr"])
+        self.assert_stopped(report, "adr-plan-report", TOUCHES_MISSING, CHECK_AGAIN)
+        self.assertNotIn("adr-plan-decide", self.step_results(report["run_id"]))
 
-    # quickstart Planner: "a plan changed before a resume makes the touches step rewrite `touches.json` from it"
+    # quickstart Planner: "each resume after a stop runs a new iteration of the check loop, so a plan changed before a
+    # resume makes the touches step rewrite `touches.json` from it"
     def test_a_plan_changed_before_a_resume_gets_a_touches_json_rewritten_from_it(self):
         report = self.departed()
         plan = self.project.root / SPEC_DIR / "plan.md"
         plan.write_text(plan.read_text().replace(f"`{GOVERNED}`", "`lib/y.ts`"))
-        self.resume(report["run_id"])
+        resumed = self.resume(report["run_id"])
+        self.assertEqual(self.step_results(report["run_id"]).get("adr-plan-check:adr-plan-touches:1", {}).get("status"),
+                         "completed", resumed)
         self.assertEqual(json.loads((self.run_folder(report["run_id"]) / "touches.json").read_text()),
                          {"v": 1, "paths": ["lib/y.ts"]})
 
-    # quickstart Planner: "a resume whose touches step fails finds no `touches.json` from the last run"
-    def test_a_resume_whose_touches_step_fails_finds_no_touches_json_from_the_last_run(self):
-        report = self.departed()
-        self.project.env["CLAUDE_TOUCHES_FAILS"] = "1"
-        resumed = self.resume(report["run_id"])
-        self.assertEqual((resumed["status"], resumed["step"], resumed.get("adr")),
-                         ("failed", "adr-plan-touches", True), resumed)
-        self.assertEqual(resumed["stderr"].splitlines(), [TOUCHES_STOP])
-        self.assertFalse((self.run_folder(report["run_id"]) / "touches.json").exists())
-
-    # quickstart Planner: "a touches step that fails reports `adr: true` with `stop plan touches`'s line"
-    def test_a_touches_step_that_fails_reports_adr_with_the_touches_stop(self):
+    # quickstart Planner: "a touches step that writes a valid `touches.json` and then fails or times out stops the run
+    # at `adr-plan-report` with `adr: true` and the `touches-missing` line" — fails
+    def test_a_touches_step_that_writes_touches_json_then_fails_stops_the_run_at_adr_plan_report(self):
         self.project.env["CLAUDE_TOUCHES_FAILS"] = "1"
         report = self.reach_the_check()
-        self.assertEqual((report["status"], report["step"], report.get("adr")), ("failed", "adr-plan-touches", True),
-                         report)
-        self.assertEqual(report["stderr"].splitlines(), [TOUCHES_STOP])
+        self.assert_stopped(report, "adr-plan-report", TOUCHES_MISSING, CHECK_AGAIN)
+        self.assertEqual(self.left(report, "touches.json"), {"v": 1, "paths": [GOVERNED]})
 
-    # quickstart Planner: "a judge that fails reports `adr: true` with `stop`'s line"
-    def test_a_judge_that_fails_reports_adr_with_the_judge_stop(self):
+    # quickstart Planner: "a touches step that writes a valid `touches.json` and then fails or times out stops the run
+    # at `adr-plan-report` with `adr: true` and the `touches-missing` line" — times out
+    def test_a_touches_step_that_writes_touches_json_then_times_out_stops_the_run_at_adr_plan_report(self):
+        self.project.env["CLAUDE_TOUCHES_HANGS"] = "1"
+        report = self.reach_the_check({"adr-plan-touches": {"timeout": MODEL_STEP_TIMEOUT}})
+        self.assert_stopped(report, "adr-plan-report", TOUCHES_MISSING, CHECK_AGAIN)
+        self.assertEqual(self.left(report, "touches.json"), {"v": 1, "paths": [GOVERNED]})
+
+    # quickstart Planner: "a judge that writes a valid verdict and then fails or times out stops the run at
+    # `adr-plan-report` with `adr: true` and the `verdict-unread` line, and the resume runs the whole check again"
+    # — fails
+    def test_a_judge_that_writes_a_verdict_then_fails_stops_the_run_and_the_resume_runs_the_whole_check_again(self):
         self.project.env["CLAUDE_JUDGE_FAILS"] = "1"
         report = self.reach_the_check()
-        self.assertEqual((report["status"], report["step"], report.get("adr")), ("failed", "adr-plan-judge", True),
-                         report)
-        self.assertEqual(report["stderr"].splitlines(), [JUDGE_STOP])
+        self.assert_stopped(report, "adr-plan-report", VERDICT_UNREAD, CHECK_AGAIN)
+        self.assert_verdict_left(report)
+        del self.project.env["CLAUDE_JUDGE_FAILS"]
+        seen = len(self.project.prompts.read_text())
+        self.adr_check_calls()
+        resumed = self.resume(report["run_id"])
+        results = self.step_results(report["run_id"])
+        self.assertEqual({step: results.get(f"adr-plan-check:{step}:1", {}).get("status") for step in CHECK_LOOP},
+                         dict.fromkeys(CHECK_LOOP, "completed"), resumed)
+        self.assertEqual([args[0] for args, _ in self.adr_check_calls()], ["report", "ask", "decide", "report"])
+        for prompt in ("adr-touches.md", "adr-judge.md"):
+            self.assertIn(prompt, self.prompts_since(seen))
+        self.assertIn("mark-critiques", results)
 
-    # quickstart Planner: "`resume <run> adr_ruling=@<file>` exports the file's content as `ADR_RULING`",
-    # "`inputs.json` gains no `adr_ruling`"
+    # quickstart Planner: "a judge that writes a valid verdict and then fails or times out stops the run at
+    # `adr-plan-report` with `adr: true` and the `verdict-unread` line" — times out
+    def test_a_judge_that_writes_a_verdict_then_times_out_stops_the_run_at_adr_plan_report(self):
+        self.project.env["CLAUDE_JUDGE_HANGS"] = "1"
+        report = self.reach_the_check({"adr-plan-judge": {"timeout": MODEL_STEP_TIMEOUT}})
+        self.assert_stopped(report, "adr-plan-report", VERDICT_UNREAD, CHECK_AGAIN)
+        self.assert_verdict_left(report)
+
+    # quickstart Planner: "a decide that crashes fails the run at `adr-plan-decide` and the resume runs decide again,
+    # not clear, touches or ask"
+    def test_a_crashed_decide_fails_the_run_at_adr_plan_decide_and_the_resume_runs_it_not_clear_touches_or_ask(self):
+        self.project.env["ADR_DECIDE_CRASHES"] = "1"
+        report = self.reach_the_check()
+        self.assertEqual((report["status"], report["step"], report.get("adr"), report["stderr"]),
+                         ("failed", "adr-plan-decide", True, "decide crashed\n"), report)
+        del self.project.env["ADR_DECIDE_CRASHES"]
+        seen = len(self.project.prompts.read_text())
+        self.adr_check_calls()
+        resumed = self.resume(report["run_id"])
+        self.assertEqual([args[0] for args, _ in self.adr_check_calls()], ["decide", "report"], resumed)
+        self.assertNotIn("adr-touches.md", self.prompts_since(seen))
+        # Only clear removes touches.json, and the touches step that would write it again did not run.
+        self.assertTrue((self.run_folder(report["run_id"]) / "touches.json").exists())
+        results = self.step_results(report["run_id"])
+        self.assertNotIn("adr-plan-check:adr-plan-clear:1", results)
+        self.assertIn("mark-critiques", results)
+
+    # quickstart Planner: "a stop in an iteration after the first, reported under a qualified id
+    # (`adr-plan-check:adr-plan-report:1`), reports `adr: true`"
+    def test_a_stop_in_a_later_iteration_reports_adr_under_its_qualified_id(self):
+        report = self.departed()
+        self.assert_stopped(self.resume(report["run_id"]), "adr-plan-check:adr-plan-report:1", DEPARTURE)
+
+    # quickstart Planner: "a check that stops 100 times fails the run at `adr-plan-rounds` with `adr: true`"
+    def test_a_check_that_stops_at_every_iteration_fails_the_run_at_adr_plan_rounds(self):
+        """The run's copy of the workflow allows the loop 2 iterations, so the resume after the second stop finds it
+        out of rounds."""
+        self.project.env["CLAUDE_DEPARTS"] = "docs/adr 0004"
+        report = self.reach_the_check({"adr-plan-check": {"max_iterations": 2}})
+        self.assert_stopped(report, "adr-plan-report", DEPARTURE)
+        self.assert_stopped(self.resume(report["run_id"]), "adr-plan-check:adr-plan-report:1", DEPARTURE)
+        rounds = self.resume(report["run_id"])
+        self.assert_stopped(rounds, "adr-plan-rounds", ROUNDS)
+        self.assertEqual(rounds["stderr"].splitlines(), [ROUNDS])
+        self.assertNotIn("mark-critiques", self.step_results(report["run_id"]))
+
+    # quickstart Planner: "`resume <run> adr_ruling=@<file>` exports the file's content as `ADR_RULING` to that call
+    # only, `inputs.json` gains no `adr_ruling`"
     def test_a_resume_with_adr_ruling_at_a_file_hands_decide_its_content_and_no_input(self):
         report = self.departed()
         text = json.dumps([RULING])
         self.adr_check_calls()
         resumed = self.resume(report["run_id"], f"adr_ruling=@{self.ruling_file(text)}")
-        self.assertEqual(self.step_results(report["run_id"])["adr-plan-decide"]["status"], "completed", resumed)
+        results = self.step_results(report["run_id"])
+        self.assertEqual(results.get("adr-plan-check:adr-plan-report:1", {}).get("status"), "completed", resumed)
         [ruling] = {given for args, given in self.adr_check_calls() if args[0] == "decide"}
         self.assertEqual(ruling, text)
         self.assertEqual(json.loads((self.project.root / SPEC_DIR / "adr-rulings.json").read_text()),
@@ -935,16 +1055,19 @@ class AdrPlanCheck(unittest.TestCase):
 
     # quickstart Planner: "... as `ADR_RULING` to that call only"
     def test_adr_ruling_reaches_only_the_resume_that_carries_it(self):
+        """The resume that carries the ruling ends on the touches-missing stop ask records, so no decide reads the
+        ruling; the next resume stops on the departure."""
         report = self.departed()
         text = json.dumps([RULING])
-        self.project.env["CLAUDE_JUDGE_FAILS"] = "1"
+        self.project.env["CLAUDE_TOUCHES_FAILS"] = "1"
         self.adr_check_calls()
-        self.resume(report["run_id"], f"adr_ruling=@{self.ruling_file(text)}")
-        # The driver's own `stop` call is no part of the resume.
-        self.assertEqual([(args[0], given) for args, given in self.adr_check_calls()], [("ask", text), ("stop", None)])
-        del self.project.env["CLAUDE_JUDGE_FAILS"]
+        carried = self.resume(report["run_id"], f"adr_ruling=@{self.ruling_file(text)}")
+        self.assert_stopped(carried, "adr-plan-check:adr-plan-report:1", TOUCHES_MISSING, CHECK_AGAIN)
+        self.assertEqual([(args[0], given) for args, given in self.adr_check_calls()],
+                         [("report", text), ("ask", text), ("report", text)])
+        del self.project.env["CLAUDE_TOUCHES_FAILS"]
         resumed = self.resume(report["run_id"])
-        self.assertEqual((resumed["status"], resumed["step"]), ("failed", "adr-plan-decide"), resumed)
+        self.assert_stopped(resumed, "adr-plan-check:adr-plan-report:2", DEPARTURE)
         self.assertEqual({given for _, given in self.adr_check_calls()}, {None})
         self.assertFalse((self.project.root / SPEC_DIR / "adr-rulings.json").exists())
 
@@ -959,19 +1082,6 @@ class AdrPlanCheck(unittest.TestCase):
                 self.assertNotEqual(proc.returncode, 0, proc.stdout)
                 self.assertEqual((self.run_folder(report["run_id"]) / "state.json").read_text(), state)
                 self.assertEqual(self.adr_check_calls(), [])
-
-    # quickstart Planner: "a `stop` that cannot run exits non-zero"
-    def test_a_stop_that_exits_other_than_2_makes_the_driver_exit_non_zero_naming_it(self):
-        for code in ("1", "0"):
-            with self.subTest(exit=code):
-                self.setUp()
-                self.project.env.update(CLAUDE_JUDGE_FAILS="1", ADR_STOP_EXIT=code)
-                proc, started = self.project.drive("rescope", self.project.spec_file(RESCOPE), ISSUE, SPEC_DIR)
-                self.assertEqual(proc.returncode, 0, proc.stderr)
-                proc, _ = self.project.drive("resume", started["run_id"], "grill_verdict=approve")
-                self.assertNotEqual(proc.returncode, 0, proc.stdout)
-                self.assertIn("adr_check.ts", proc.stderr)
-                self.assertIn(["stop", "plan", "judge"], [args for args, _ in self.adr_check_calls()])
 
 
 class Report(unittest.TestCase):
@@ -1003,27 +1113,12 @@ class Report(unittest.TestCase):
         self.assertEqual(drive_workflow.report(state)["critique"],
                          "specs/7-demo/critiques/critique-2.md")
 
-    # quickstart Planner: "a judge timeout is tested at `report()` with a made-up state"
-    def test_a_judge_timeout_reports_adr_with_the_judge_stop(self):
-        """A timed-out prompt step records its error but writes no verdict, so the line is `stop`'s."""
-        timed_out = "Prompt timed out after 1800 seconds."
-        record = {"status": "failed", "error": timed_out,
-                  "output": {"exit_code": -1, "stdout": "", "stderr": timed_out, "dispatched": True}}
-        out = drive_workflow.report({**self.failed("adr-plan-judge", {"adr-plan-judge": record}), "error": timed_out})
-        self.assertIs(out.get("adr"), True, out)
-        self.assertEqual(out["stderr"].splitlines(), [JUDGE_STOP])
-
-    # quickstart Planner: "a `stop` that cannot run exits non-zero" — node itself cannot start
-    def test_a_stop_whose_node_cannot_start_exits_naming_the_command(self):
-        cannot = FileNotFoundError(2, "No such file or directory", "node")
-        with mock.patch.object(drive_workflow.subprocess, "run", side_effect=cannot):
-            with self.assertRaises(SystemExit) as stopped:
-                drive_workflow.report(self.failed("adr-plan-judge", {}))
-        self.assertIn("adr_check.ts stop plan judge", str(stopped.exception.code))
-
     def test_an_adr_script_step_reports_adr_with_its_own_stderr(self):
+        """In an iteration of the check loop after the first, specify names a step by a qualified id."""
         failed = "Shell command exited with code 2."
-        for step in ("adr-plan-clear", "adr-plan-ask", "adr-plan-decide"):
+        for step in ("adr-plan-clear", "adr-plan-ask", "adr-plan-decide", "adr-plan-report", "adr-plan-rounds",
+                     "adr-plan-check:adr-plan-clear:1", "adr-plan-check:adr-plan-ask:2",
+                     "adr-plan-check:adr-plan-report:1"):
             with self.subTest(step=step):
                 said = ("COULD_NOT_RUN: git: not a git repository. "
                         "Next step: run from a git checkout of the repo, then resume.\n")
@@ -1031,8 +1126,23 @@ class Report(unittest.TestCase):
                 out = drive_workflow.report({**self.failed(step, {step: record}), "error": failed})
                 self.assertEqual((out.get("adr"), out["stderr"]), (True, said))
 
+    def test_a_touches_or_judge_step_reports_its_own_stderr_and_runs_no_command(self):
+        """Both continue on error, so a run fails there only on what the engine raised; there is no stop to print."""
+        timed_out = "Prompt timed out after 1800 seconds."
+        for step in ("adr-plan-touches", "adr-plan-judge", "adr-plan-check:adr-plan-touches:1"):
+            with self.subTest(step=step):
+                own = "the step's own stderr"
+                record = {"status": "failed", "error": timed_out,
+                          "output": {"exit_code": -1, "stdout": "", "stderr": own, "dispatched": True}}
+                with mock.patch.object(drive_workflow.subprocess, "run",
+                                       side_effect=AssertionError("report() ran a command")):
+                    out = drive_workflow.report({**self.failed(step, {step: record}), "error": timed_out})
+                self.assertEqual((out.get("adr", False), out["stderr"]), (False, own))
+
     def test_a_step_outside_the_adr_check_reports_no_adr(self):
-        self.assertFalse(drive_workflow.report(self.failed("settled-design", {})).get("adr", False))
+        for step in ("settled-design", "other-loop:settled-design:1"):
+            with self.subTest(step=step):
+                self.assertFalse(drive_workflow.report(self.failed(step, {})).get("adr", False))
 
 
 class ResumeHandsSpecify(unittest.TestCase):

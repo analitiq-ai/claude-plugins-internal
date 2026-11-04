@@ -10,7 +10,7 @@ preset:
   license: "Proprietary"
 
 requires:
-  speckit_version: ">=1.0.7"
+  speckit_version: ">=1.1.3,<1.2.0"
 
 provides:
   templates:

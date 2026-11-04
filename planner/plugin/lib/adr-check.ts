@@ -20,11 +20,12 @@ type StopRow = {
 };
 
 const RULE_ON = "resume with adr_ruling naming <entry>, <id>, <path> and your reason";
-const JUDGE_AGAIN = "resume to run the judge again";
 const CHECK_AGAIN = "resume to run the check again";
+const START_AGAIN = "start the run again with /planner:issue-spec rescope <spec folder> #<issue>";
 
-/** The stop table (workflow-steps.md), row for row; `<name>` in a label, what or next step is filled from the item.
- *  A `folder` item says its CouldNotRun reason in place of a row: core's, or one verdictMismatch builds. */
+/** The stop table (workflow-steps.md), row for row, and `stop-unread` for the stop record report cannot read, which
+ *  the table's report gives as "exit 2 naming it" but no row; `<name>` in a label, what or next step is filled from
+ *  the item. A `folder` item says its CouldNotRun reason in place of a row: core's, or one verdictMismatch builds. */
 export const ADR_STOPS = {
   empty: { outcome: PASS, label: SETTINGS_FILE, what: "No ADR folder is listed in [shared] adr_folders", next: null },
   governed: { outcome: PASS, label: "<entry>", what: "governing: <records>", next: null },
@@ -48,17 +49,13 @@ export const ADR_STOPS = {
     next: "fix that record (in the spec PR, or in the repo that holds <entry>)",
   },
   folder: { outcome: COULD_NOT_RUN, label: null, what: null, next: null },
-  "verdict-unread": { outcome: COULD_NOT_RUN, label: "<file>", what: "<what>", next: JUDGE_AGAIN },
-  "verdict-mismatch": { outcome: COULD_NOT_RUN, label: "<entry>", what: "the verdict <mismatches>", next: JUDGE_AGAIN },
-  judge: { outcome: COULD_NOT_RUN, label: "adr-<a>-judge", what: "the judge did not answer", next: JUDGE_AGAIN },
-  touches: {
-    outcome: COULD_NOT_RUN,
-    label: "adr-plan-touches",
-    what: "the touches step did not answer",
-    next: "resume to run it again",
-  },
+  "verdict-unread": { outcome: COULD_NOT_RUN, label: "<file>", what: "<what>", next: CHECK_AGAIN },
+  "verdict-mismatch": { outcome: COULD_NOT_RUN, label: "<entry>", what: "the verdict <mismatches>", next: CHECK_AGAIN },
+  rounds: { outcome: COULD_NOT_RUN, label: "adr-<a>-check", what: "the check stopped 100 times in one run", next: START_AGAIN },
+  // A resume runs report alone, on the same record.
+  "stop-unread": { outcome: COULD_NOT_RUN, label: "<file>", what: "<what>", next: START_AGAIN },
   "touches-refused": { outcome: FAIL, label: TOUCHES_FILE, what: "<what>", next: `correct <run>/${TOUCHES_FILE}, then resume` },
-  "touches-missing": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: "<what>", next: "resume to run the touches step again" },
+  "touches-missing": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: "<what>", next: CHECK_AGAIN },
   "questions-refused": {
     outcome: FAIL,
     label: "review-questions.json",

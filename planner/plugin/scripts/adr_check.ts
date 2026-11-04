@@ -1,19 +1,28 @@
-// planner's ADR check on the plan (planner ADR-0009): ask records each listed folder's answer for the judge, decide
-// reads the judge's verdict and the user's rulings, and stop prints the line of a judge or touches step that did
-// not answer. Run from the project root.
+// planner's ADR check on the plan (planner ADR-0009), one iteration of the workflow's check loop: ask records each
+// listed folder's answer for the judge, decide reads the judge's verdict and the user's rulings, report shows a stop
+// once and on the resume asks for another iteration, and stop prints the line of a loop out of rounds. Run from the
+// project root.
 //
-// Every line goes to stderr through adrStop; ask's stdout is its JSON alone. Exit 2 when any line is COULD_NOT_RUN,
-// else 1 when any is FAIL, else 0.
+// Every check line is adrStop's, on stderr; ask's and report's stdout is their JSON alone. ask and decide exit 0 once
+// they reach an answer, writing a stop to the stop record, which report exits with: 2 when any line is COULD_NOT_RUN,
+// else 1. Any other exit of theirs is the step's own failure, never a check stop.
 //
 // Anything past the guard is loaded with `await import(...)`: a static import would be evaluated before the guard
 // runs. A type-only import is erased, so it loads nothing.
 import "../lib/guarded.ts";
-import type { AdrAsked, AdrRuling, AdrVerdict, ArtifactPath, CheckedArtifactName } from "../core/contracts/decision-check.ts";
+import type {
+  AdrAsked,
+  AdrRuling,
+  AdrStopRecord,
+  AdrVerdict,
+  ArtifactPath,
+  CheckedArtifactName,
+} from "../core/contracts/decision-check.ts";
 import type { Shared } from "../core/settings.ts";
 import type { StopItem } from "../lib/adr-check.ts";
 
 const { createHash } = await import("node:crypto");
-const { renameSync, rmSync } = await import("node:fs");
+const { renameSync, rmSync, statSync } = await import("node:fs");
 const { join, relative, resolve } = await import("node:path");
 const { z } = await import("zod");
 const { checkAdrFolder } = await import("../core/adr.ts");
@@ -23,12 +32,14 @@ const {
   ADR_RULINGS_WRITTEN_FILE,
   AdrAsked: AdrAskedSchema,
   AdrRulings,
+  AdrStopRecord: AdrStopRecordSchema,
   AdrVerdict: AdrVerdictSchema,
   askedFile,
   parseRulings,
   readRulings,
   readTouchedPaths,
   RulingsRefused,
+  stopFile,
   TOUCHES_FILE,
   TouchesRefused,
   verdictFile,
@@ -42,14 +53,18 @@ const { adrStop, changedSince, decideCheck, isRuled } = await import("../lib/adr
 const { readPlannerSettings } = await import("../lib/settings.ts");
 
 const USAGE =
-  "Usage: adr_check.ts ask plan <spec folder> <run folder> | decide plan <spec folder> <run folder> <asked digest> | " +
-  "stop plan judge | stop plan touches";
-// An exit no stop uses, so drive_workflow.py, which takes only a stop's 2, catches a call routed wrong.
+  "Usage: adr_check.ts ask plan <spec folder> <run folder> <touches exit code> | decide plan <spec folder> " +
+  "<run folder> <asked digest> <judge exit code> | report plan <run folder> | stop plan rounds";
+// An exit no check outcome uses, so a call routed wrong never reads as one.
 const USAGE_EXIT = 64;
 
 // Under the steps' 1800 s timeout, so the check reports a slow adr before the engine kills the step.
 const ADR_DEADLINE_MS = 1_500_000;
 const STARTED = performance.now();
+
+// The one exit code argument that says a model step answered: Spec Kit records none on some failure paths, and a
+// step that failed may have written its file first.
+const ANSWERED = "0";
 
 /** What is left of the step's deadline, in whole ms: decide's ruling checks run under the one deadline. */
 function deadlineLeft(): number {
@@ -57,8 +72,11 @@ function deadlineLeft(): number {
 }
 
 const EMPTY: StopItem = { kind: "empty" };
+// report and stop are given neither the spec folder nor the issue: their lines leave them to the session that starts
+// the run again.
+const LEFT_FOR_THE_SESSION = { "spec folder": "<spec folder>", issue: "<issue>" };
 
-/** Ends the subcommand with its items' lines. */
+/** A stop: ask and decide record theirs for report to show; any other subcommand ends with its lines. */
 class Stopped extends Error {
   readonly items: StopItem[];
 
@@ -67,6 +85,27 @@ class Stopped extends Error {
     this.name = "Stopped";
     this.items = items;
   }
+}
+
+function stopsOf(error: unknown): StopItem[] {
+  if (error instanceof Stopped) return error.items;
+  if (error instanceof SettingsError) return [{ kind: "settings", fill: { what: error.message } }];
+  if (error instanceof GitFailed) return [{ kind: "git", fill: { what: error.message } }];
+  throw error;
+}
+
+function printJson(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+function printLines(lines: readonly string[]): void {
+  for (const line of lines) process.stderr.write(`${line}\n`);
+}
+
+function shown(items: readonly StopItem[]): number {
+  const { lines, exit } = adrStop(items);
+  printLines(lines);
+  return exit;
 }
 
 function json(text: string, refused: (what: string) => StopItem): unknown {
@@ -80,6 +119,17 @@ function json(text: string, refused: (what: string) => StopItem): unknown {
 
 function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
+}
+
+/** Written whole: a kill mid-write would otherwise leave a file the next step refuses, as if the user had broken it. */
+function writeJson(path: string, value: unknown): string {
+  const text = `${JSON.stringify(value, null, 2)}\n`;
+  writeWhole(path, text, renameSync);
+  return text;
+}
+
+function didNotAnswer(step: string, exitCode: string): string {
+  return `${step} did not answer: its exit code is ${JSON.stringify(exitCode)}, not ${ANSWERED}`;
 }
 
 function judged(asked: AdrAsked): boolean {
@@ -97,6 +147,16 @@ function touchedPaths(run: string): ArtifactPath[] | null {
     if (!(error instanceof TouchesRefused)) throw error;
     throw new Stopped([refused(error.why)]);
   }
+}
+
+/** The plan's paths, read only from a touches step that answered, whatever file one that did not answer left. */
+function planPaths(run: string, touchesExit: string): ArtifactPath[] {
+  const missing = (what: string) => new Stopped([{ kind: "touches-missing", fill: { what } }]);
+  if (touchesExit !== ANSWERED) throw missing(didNotAnswer("the touches step", touchesExit));
+  const paths = touchedPaths(run);
+  if (paths === null) throw missing("the file is missing");
+  if (paths.length === 0) throw missing("the file has no path");
+  return paths;
 }
 
 async function rulingsAtHead(toplevel: string, specDir: string): Promise<AdrRuling[]> {
@@ -139,35 +199,39 @@ async function guardedRulings(toplevel: string, specDir: string, run: string): P
   return rulings;
 }
 
-/** Written whole: a kill mid-write would otherwise leave a file the next check refuses, as if the user had broken it. */
-function writeJson(path: string, value: unknown): string {
-  const text = `${JSON.stringify(value, null, 2)}\n`;
-  writeWhole(path, text, renameSync);
-  return text;
+type Found = { items: StopItem[] };
+
+/** What ask or decide found, once it reached an answer: a pass's lines, printed, or a stop, written to the stop record
+ *  for report to show. The pass, or null on a stop. */
+async function settled<Pass extends Found>(run: string, artifact: CheckedArtifactName, found: Promise<Pass>): Promise<Pass | null> {
+  let pass: Pass | null = null;
+  let items: StopItem[];
+  try {
+    pass = await found;
+    items = pass.items;
+  } catch (error) {
+    items = stopsOf(error);
+  }
+  const { lines, exit } = adrStop(items);
+  if (pass !== null && exit === 0) {
+    printLines(lines);
+    return pass;
+  }
+  // AdrStopRecord refuses an exit of 0 and an empty list, so a stop that says nothing fails the step, never passes.
+  writeJson(join(run, stopFile(artifact)), AdrStopRecordSchema.parse({ v: 1, exit, lines, shown: false }));
+  return null;
 }
 
-function writeAsked(run: string, asked: AdrAsked): void {
-  const text = writeJson(join(run, askedFile(asked.artifact)), AdrAskedSchema.parse(asked));
-  process.stdout.write(`${JSON.stringify({ judge: judged(asked), asked: sha256(text) })}\n`);
-}
-
-async function ask(artifact: CheckedArtifactName, specDir: string, run: string): Promise<StopItem[]> {
-  rmSync(join(run, verdictFile(artifact)), { force: true });
+async function asking(artifact: CheckedArtifactName, specDir: string, run: string, touchesExit: string): Promise<Found & { asked: AdrAsked }> {
   const toplevel = await checkoutToplevel(process.cwd());
   const { shared } = await readPlannerSettings(toplevel);
-  if (shared.adr_folders.length === 0) {
-    writeAsked(run, { v: 1, artifact, paths: [], folders: [] });
-    return [EMPTY];
-  }
-  const paths = touchedPaths(run);
-  if (paths === null || paths.length === 0) {
-    throw new Stopped([{ kind: "touches-missing", fill: { what: paths === null ? "missing" : "no path" } }]);
-  }
+  if (shared.adr_folders.length === 0) return { items: [EMPTY], asked: { v: 1, artifact, paths: [], folders: [] } };
+  const paths = planPaths(run, touchesExit);
   await guardedRulings(toplevel, specDir, run);
   const folders = await adrFolders(toplevel, shared);
   const checked = paths.map(({ path }) => path);
   const answers = await Promise.all(folders.map((folder) => checkAdrFolder(toplevel, folder, checked, ADR_DEADLINE_MS)));
-  writeAsked(run, {
+  const asked: AdrAsked = {
     v: 1,
     artifact,
     paths,
@@ -175,8 +239,21 @@ async function ask(artifact: CheckedArtifactName, specDir: string, run: string):
       const answer = answers[i];
       return "outcome" in answer ? { entry, path, inside, outcome: answer } : { entry, path, inside, governing: answer.governing, broken: answer.broken };
     }),
-  });
-  return [];
+  };
+  return { items: [], asked };
+}
+
+async function ask(artifact: CheckedArtifactName, specDir: string, run: string, touchesExit: string): Promise<number> {
+  rmSync(join(run, verdictFile(artifact)), { force: true });
+  rmSync(join(run, stopFile(artifact)), { force: true });
+  const found = await settled(run, artifact, asking(artifact, specDir, run, touchesExit));
+  if (found === null) {
+    printJson({ judge: false, decide: false, asked: "" });
+    return 0;
+  }
+  const text = writeJson(join(run, askedFile(artifact)), AdrAskedSchema.parse(found.asked));
+  printJson({ judge: judged(found.asked), decide: true, asked: sha256(text) });
+  return 0;
 }
 
 /** What ask recorded, when its bytes are those ask printed the digest of (R9 c). */
@@ -187,11 +264,13 @@ function askedRecord(run: string, artifact: CheckedArtifactName, digest: string)
   return AdrAskedSchema.parse(JSON.parse(text));
 }
 
-function readVerdict(run: string, artifact: CheckedArtifactName): AdrVerdict {
+/** The judge's verdict, read only from a judge that answered, whatever file one that did not answer left. */
+function readVerdict(run: string, artifact: CheckedArtifactName, judgeExit: string): AdrVerdict {
   const file = verdictFile(artifact);
   const unread = (what: string): StopItem => ({ kind: "verdict-unread", fill: { file, what } });
+  if (judgeExit !== ANSWERED) throw new Stopped([unread(didNotAnswer("the judge", judgeExit))]);
   const text = textIfPresent(join(run, file));
-  if (text === null) throw new Stopped([unread("missing")]);
+  if (text === null) throw new Stopped([unread("the file is missing")]);
   const parsed = AdrVerdictSchema.safeParse(json(text, unread));
   if (!parsed.success) throw new Stopped([unread(`not an AdrVerdict: ${z.prettifyError(parsed.error)}`)]);
   if (parsed.data.artifact !== artifact) throw new Stopped([unread(`a verdict on ${parsed.data.artifact}, not ${artifact}`)]);
@@ -246,10 +325,10 @@ async function newRulings(
   return fresh;
 }
 
-async function decide(artifact: CheckedArtifactName, specDir: string, run: string, digest: string): Promise<StopItem[]> {
+async function deciding(artifact: CheckedArtifactName, specDir: string, run: string, digest: string, judgeExit: string): Promise<Found> {
   const toplevel = await checkoutToplevel(process.cwd());
   const { shared } = await readPlannerSettings(toplevel);
-  if (shared.adr_folders.length === 0) return [EMPTY];
+  if (shared.adr_folders.length === 0) return { items: [EMPTY] };
   const rulings = await guardedRulings(toplevel, specDir, run);
   const asked = askedRecord(run, artifact, digest);
   // A touches.json gone or emptied since ask lost every path ask recorded: the paths guard names them.
@@ -258,9 +337,49 @@ async function decide(artifact: CheckedArtifactName, specDir: string, run: strin
     const changes = [...added.map(({ path }) => `added ${path}`), ...removed.map(({ path }) => `removed ${path}`)];
     throw new Stopped([{ kind: "guard-paths", fill: { file: TOUCHES_FILE, changes: changes.join(", ") } }]);
   }
-  const verdict = judged(asked) ? readVerdict(run, artifact) : null;
+  // With no judge, the argument is an earlier iteration's, or empty.
+  const verdict = judged(asked) ? readVerdict(run, artifact, judgeExit) : null;
   const fresh = await newRulings(toplevel, shared, specDir, run, asked, rulings);
-  return decideCheck(asked, verdict, [...rulings, ...fresh]);
+  return { items: decideCheck(asked, verdict, [...rulings, ...fresh]) };
+}
+
+async function decide(artifact: CheckedArtifactName, specDir: string, run: string, digest: string, judgeExit: string): Promise<number> {
+  await settled(run, artifact, deciding(artifact, specDir, run, digest, judgeExit));
+  return 0;
+}
+
+/** The stop ask or decide recorded; one that does not parse stops report, naming it. */
+function stopRecord(text: string, file: string): AdrStopRecord {
+  const unread = (what: string): StopItem => ({ kind: "stop-unread", fill: { file, what, ...LEFT_FOR_THE_SESSION } });
+  const parsed = AdrStopRecordSchema.safeParse(json(text, unread));
+  if (!parsed.success) throw new Stopped([unread(`not an AdrStopRecord: ${z.prettifyError(parsed.error)}`)]);
+  return parsed.data;
+}
+
+/** A stop not yet shown stops the run here, once; on the resume after it, report asks for another iteration. */
+function report(artifact: CheckedArtifactName, run: string): number {
+  const file = stopFile(artifact);
+  const path = join(run, file);
+  // A run folder that is not there is a wrong argument, not an iteration that recorded no stop.
+  if (!statSync(run).isDirectory()) throw new Error(`${run} is not a folder`);
+  const text = textIfPresent(path);
+  if (text === null) {
+    printJson({ again: false });
+    return 0;
+  }
+  const record = stopRecord(text, file);
+  if (record.shown) {
+    rmSync(path);
+    printJson({ again: true });
+    return 0;
+  }
+  printLines(record.lines);
+  writeJson(path, AdrStopRecordSchema.parse({ ...record, shown: true }));
+  return record.exit;
+}
+
+function outOfRounds(artifact: CheckedArtifactName): number {
+  return shown([{ kind: "rounds", fill: { a: artifact, ...LEFT_FOR_THE_SESSION } }]);
 }
 
 function usage(): never {
@@ -268,30 +387,20 @@ function usage(): never {
   process.exit(USAGE_EXIT);
 }
 
-function subcommand(args: readonly string[]): Promise<StopItem[]> {
+async function subcommand(args: readonly string[]): Promise<number> {
   const [command, artifact, ...rest] = args;
   const { plan } = CheckedArtifact.schema.enum;
-  if (command === "ask" && artifact === plan && rest.length === 2) return ask(plan, rest[0], rest[1]);
-  if (command === "decide" && artifact === plan && rest.length === 3) return decide(plan, rest[0], rest[1], rest[2]);
-  if (command === "stop" && artifact === plan && rest.length === 1) {
-    if (rest[0] === "judge") return Promise.resolve([{ kind: "judge", fill: { a: plan } }]);
-    if (rest[0] === "touches") return Promise.resolve([{ kind: "touches" }]);
+  if (artifact === plan) {
+    if (command === "ask" && rest.length === 3) return ask(plan, rest[0], rest[1], rest[2]);
+    if (command === "decide" && rest.length === 4) return decide(plan, rest[0], rest[1], rest[2], rest[3]);
+    if (command === "report" && rest.length === 1) return report(plan, rest[0]);
+    if (command === "stop" && rest.length === 1 && rest[0] === "rounds") return outOfRounds(plan);
   }
   usage();
 }
 
-function stopsOf(error: unknown): StopItem[] {
-  if (error instanceof Stopped) return error.items;
-  if (error instanceof SettingsError) return [{ kind: "settings", fill: { what: error.message } }];
-  if (error instanceof GitFailed) return [{ kind: "git", fill: { what: error.message } }];
-  throw error;
-}
-
 async function main(args: readonly string[]): Promise<void> {
-  const items = await subcommand(args).catch(stopsOf);
-  const { lines, exit } = adrStop(items);
-  for (const line of lines) process.stderr.write(`${line}\n`);
-  process.exitCode = exit;
+  process.exitCode = await subcommand(args).catch((error: unknown) => shown(stopsOf(error)));
 }
 
 if (import.meta.main) await main(process.argv.slice(2));

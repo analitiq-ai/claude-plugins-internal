@@ -120,22 +120,60 @@ class PlanTemplate(unittest.TestCase):
         self.assertTrue(installed_skill_carries("speckit.plan"), "speckit-plan SKILL.md lacks the settled-design preset")
 
 
-class TouchesStep(unittest.TestCase):
-    def plan_steps(self):
-        return {step["id"]: step for step in yaml.safe_load((WORKFLOW[0] / "workflow.yml").read_text())["steps"]}
+def workflow_yml():
+    return yaml.safe_load((WORKFLOW[0] / "workflow.yml").read_text())
 
-    def test_the_plan_check_clears_touches_json_then_runs_the_touches_step_before_ask(self):
-        """A resume of a run stopped in the block re-runs it from its first step (specify 1.0.x), so a touches step that
-        fails must find no file from the last run."""
-        block = self.plan_steps().get("to-adr-plan")
+
+def plan_steps():
+    return {step["id"]: step for step in workflow_yml()["steps"]}
+
+
+class PlanCheckLoop(unittest.TestCase):
+    """The check is a do-while loop (specify 1.1.x): one iteration is one whole check; report's `again` asks for the
+    next."""
+
+    AGAIN = "{{ steps.adr-plan-report.output.data.again }}"
+
+    def check(self):
+        block = plan_steps().get("to-adr-plan")
         self.assertIsNotNone(block, "workflow.yml has no to-adr-plan block")
-        clear, touches, ask = block["then"][:3]
+        self.assertEqual([step["id"] for step in block["then"]], ["adr-plan-check", "adr-plan-out-of-rounds"])
+        return block["then"]
+
+    def test_the_plan_check_loops_while_report_asks_again_then_names_a_loop_out_of_rounds(self):
+        check, out_of_rounds = self.check()
+        self.assertEqual((check["type"], check["max_iterations"], check["condition"]), ("do-while", 100, self.AGAIN))
+        self.assertEqual(check["steps"][-1]["id"], "adr-plan-report")
+        self.assertEqual((out_of_rounds["type"], out_of_rounds["condition"]), ("if", self.AGAIN))
+        [rounds] = out_of_rounds["then"]
+        self.assertEqual(rounds["id"], "adr-plan-rounds")
+        self.assertIn('/scripts/adr_check.ts" stop plan rounds', rounds["run"])
+
+    def test_each_iteration_clears_touches_json_then_runs_the_touches_step_before_ask(self):
+        clear, touches, ask = self.check()[0]["steps"][:3]
         self.assertEqual((clear["id"], clear["type"]), ("adr-plan-clear", "shell"))
         self.assertIn('rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"', clear["run"])
         self.assertEqual((touches["id"], touches["type"]), ("adr-plan-touches", "prompt"))
         self.assertIn("Follow .specify/workflows/issue-spec/adr-touches.md", touches["prompt"])
         self.assertIn("run folder .specify/workflows/runs/{{ context.run_id }}", touches["prompt"])
         self.assertEqual(ask["id"], "adr-plan-ask")
+
+    def test_the_touches_step_and_the_judge_continue_on_error(self):
+        """ask or decide is given a model step's exit code, so the step's failure must not end the run first."""
+        loop = {step["id"]: step for step in self.check()[0]["steps"]}
+        [judge] = loop["adr-plan-judging"]["then"]
+        for step in (loop["adr-plan-touches"], judge):
+            with self.subTest(step=step["id"]):
+                self.assertIs(step.get("continue_on_error"), True)
+
+    def test_the_workflow_and_the_preset_require_spec_kit_1_1_3_and_below_1_2(self):
+        for name, requires in (("workflow.yml", workflow_yml()["requires"]),
+                               ("preset.yml", yaml.safe_load((PRESET / "preset.yml").read_text())["requires"])):
+            with self.subTest(file=name):
+                self.assertEqual(requires["speckit_version"], ">=1.1.3,<1.2.0")
+
+
+class TouchesStep(unittest.TestCase):
 
     def test_the_touches_step_writes_one_literal_path_per_file_the_plan_touches_and_nothing_else(self):
         doc = WORKFLOW[0] / "adr-touches.md"
@@ -152,7 +190,7 @@ class TouchesStep(unittest.TestCase):
         self.assertEqual(installed.read_text(), doc.read_text())
 
     def test_neither_the_plan_step_nor_the_plan_command_says_anything_of_touches_json(self):
-        [plan] = self.plan_steps()["to-plan"]["then"]
+        [plan] = plan_steps()["to-plan"]["then"]
         self.assertEqual(plan["id"], "plan")
         self.assertNotIn("touches.json", plan["input"]["args"])
         self.assertNotIn("touches.json", (PRESET / "commands" / "speckit.plan.md").read_text())

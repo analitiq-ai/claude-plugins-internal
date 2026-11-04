@@ -15,6 +15,7 @@ export const TOUCHES_FILE = "touches.json";
 export const ADR_RULINGS_WRITTEN_FILE = "adr-rulings-written.json";
 export const askedFile = (artifact: CheckedArtifactName) => `adr-${artifact}-asked.json`;
 export const verdictFile = (artifact: CheckedArtifactName) => `adr-${artifact}-verdict.json`;
+export const stopFile = (artifact: CheckedArtifactName) => `adr-${artifact}-stop.json`;
 
 export type ArtifactPath = { path: string; line: number; story: string | null };
 
@@ -148,6 +149,15 @@ export const AdrRulings = z.strictObject({
   rulings: listedOnce(AdrRuling, ({ folder, record, path }) => `${folder} ${record} ${path}`),
 });
 export type AdrRulings = z.infer<typeof AdrRulings>;
+
+/** A check's stop: ask or decide writes it, report shows it once, then on the resume deletes it. */
+export const AdrStopRecord = z.strictObject({
+  v: z.literal(1),
+  exit: z.literal([1, 2]),
+  lines: z.array(NonEmpty).min(1),
+  shown: z.boolean(),
+});
+export type AdrStopRecord = z.infer<typeof AdrStopRecord>;
 
 export class RulingsRefused extends Error {
   readonly file: string;

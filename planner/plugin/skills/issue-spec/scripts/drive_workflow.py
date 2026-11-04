@@ -6,10 +6,11 @@
     drive_workflow.py resume <run id> [<input>=<value>]
     drive_workflow.py resume <run id> adr_ruling=@<file>    the file's rulings, to this resume's ADR check only
 
-Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks.
+Inputs reach specify as argv, never through a shell: issue text routinely carries backticks. An ADR ruling is no
+input and reaches no command line: it goes to that one resume's environment.
 The report is read from the run's state.json because the specify CLI prints only a generic error for a
-failed step; the step's own stderr is recorded nowhere else. A failed step of the ADR check reports `adr: true`;
-a failed touches or judge step records no line of its own, so its stderr is the one `adr_check.ts stop` prints.
+failed step; the step's own stderr is recorded nowhere else. A failed step of ADR_STEPS also reports `adr: true`. The
+touches and judge steps are not among them: they continue on error, and ask or decide is given their exit code.
 """
 import argparse
 import json
@@ -29,22 +30,15 @@ AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Ed
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
 OPEN_MARKERS = "Open clarification markers remain"
 KIND = {"start": "new", "rescope": "rescope"}
-ADR_CHECK = PLUGIN / "scripts" / "adr_check.ts"
-ADR_PROMPT_STEPS = {"adr-plan-touches": ("plan", "touches"), "adr-plan-judge": ("plan", "judge")}
-ADR_STEPS = {"adr-plan-clear", "adr-plan-ask", "adr-plan-decide", *ADR_PROMPT_STEPS}
+ADR_STEPS = {"adr-plan-clear", "adr-plan-ask", "adr-plan-decide", "adr-plan-report", "adr-plan-rounds"}
 ADR_RULING = "adr_ruling="
 RULING_ENV = "ADR_RULING"
 
 
-def _adr_stop(artifact, step):
-    command = ["node", str(ADR_CHECK), "stop", artifact, step]
-    try:
-        proc = subprocess.run(command, capture_output=True, text=True)
-    except OSError as e:
-        sys.exit(f"`{' '.join(command)}` could not run: {e}")
-    if proc.returncode != 2:
-        sys.exit(f"`{' '.join(command)}` exited {proc.returncode}, not 2:\n{proc.stdout}{proc.stderr}")
-    return proc.stderr
+def _own_id(step):
+    """In a loop iteration after the first, specify names a step `<loop>:<step>:<n>`."""
+    parts = step.split(":")
+    return parts[1] if len(parts) == 3 else step
 
 
 def report(state):
@@ -58,9 +52,7 @@ def report(state):
         out["error"] = state["error"]
         out["stderr"] = record["output"].get("stderr", "") if current else ""
         out["open_markers"] = step == "no-open-markers" and OPEN_MARKERS in out["stderr"]
-        out["adr"] = step in ADR_STEPS
-        if step in ADR_PROMPT_STEPS:
-            out["stderr"] = _adr_stop(*ADR_PROMPT_STEPS[step])
+        out["adr"] = _own_id(step) in ADR_STEPS
     if state["status"] == "paused" and record is not None and record["output"].get("show_file"):
         out["critique"] = record["output"]["show_file"]
     # The close is the admin's to make (planner ADR-0006 d1), and the session reads nothing of the run but this
@@ -107,8 +99,8 @@ def _state(run_id):
 
 
 def _step_env(inputs):
-    """The inputs a shell step reads from its environment. A resume re-runs the step the run stopped in, so a
-    resume needs them as much as the start does."""
+    """The inputs a shell step reads from its environment. A resume runs every step from the one the run halted at,
+    the check loop's next iterations among them, so it needs them as much as the start does."""
     return {"ISSUE": inputs["issue"], "SPECIFY_FEATURE_DIRECTORY": inputs["spec_dir"]}
 
 

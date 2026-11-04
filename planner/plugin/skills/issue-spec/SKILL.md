@@ -114,8 +114,8 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
   it. To rule, write `[{"folder": "<entry>", "record": "<id>", "path": "<path>", "reason": "<reason>"}]`, one
   object per departure ruled on and the reason in the user's words, to a new file in the session scratchpad with
   the Write tool, and resume with `python3 DRIVE resume <run_id> adr_ruling=@<file>`. `FAIL` on a broken record:
-  fix that record, then resume. Any other line: do what its Next step says, then resume if that was not itself a
-  resume.
+  fix that record, then resume. Any other line that names a Next step: do what it says, then resume unless that step
+  resumed the run or started it again.
 
 ## Undo a rejected rescope that created a parent
 
