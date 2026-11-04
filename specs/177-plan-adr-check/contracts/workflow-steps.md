@@ -78,7 +78,8 @@ changed, runs that round. Writes its done record. Exit 0.
 First writes `<run>/adr-inputs.json` (`SourceHashes` of core's `roundInputPaths`: every file the round checks, the
 tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every
 file in each folder `[shared] adr_folders` lists that resolves), whatever follows: it is the round's first step after `tasks.md` is written, so the hashes are
-of the files every later step of the round reads. Then the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
+of the files every later step of the round reads. A stop record already written this round (by tasks-written):
+writes its done record and checks nothing more, so the round's first stop is the one shown. Otherwise the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
 R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
 (extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
 rescope's sub-issues are its existing stories, which its new `tasks.md` may drop or reorder; reconciling them is

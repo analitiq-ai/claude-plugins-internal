@@ -95,6 +95,7 @@ stop table gives it. A stop's exit below is the one `report` exits with; tasks-w
 | `tasks-due`: no `tasks.md` / no `tasks-sources.json` / a source changed / none changed | `due` true / true / true / false |
 | `tasks-written` with tasks exit code `0` | `tasks-sources-next.json` renamed to `tasks-sources.json`, done record written |
 | `tasks-written` with tasks exit code `1`, empty or `-1` | exit 0, `tasks-unfinished` recorded `unanswered: true`, nothing renamed, done record written |
+| `stories` after that, the partial `tasks.md` breaking the story plan | adr-inputs.json and its done record written, no check run, the stop record still `tasks-unfinished`, `unanswered: true`; report shows it |
 | `tasks-written` with neither hash file | non-zero exit, no done record |
 | `stories`: `tasks.md` breaking the story plan or a task-block label | exit 1, `tasks-refused`, next step deletes `tasks.md` |
 | `stories` on a `new` run: extra, foreign or out-of-order sub-issues / the same on a `rescope` | exit 1, `sub-issues-extra` / `-foreign` / `-misplaced` / no sub-issue check |
