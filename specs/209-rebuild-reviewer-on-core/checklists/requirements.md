@@ -31,9 +31,10 @@
 
 ## Notes
 
-- Three [NEEDS CLARIFICATION] markers open: FR-012 (rebuild scope), FR-013 (session-issue record owner and
-  claim/resume field), FR-014 (where the passed-commit record lives). Scope stays unbounded until FR-012 is
-  answered.
+- Revalidated 2026-11-04 after the rescope to the `ledger` record (reviewer ADR-0011, ADR-0013 as merged in
+  #290): no marker remains; every requirement, scenario, entity and criterion that rested on the tagged
+  comment now rests on the fold (FR-001, FR-002, FR-004, FR-015, FR-016, FR-020, FR-022–FR-025, SC-002,
+  SC-006, OS-001–OS-003).
 - Named core calls (`writeState`, `releaseOnClaim`, value sets) and the TypeScript rule (FR-011) are kept on
   purpose: they are the accepted decisions the issue cites (ADR-0011 d3, ADR-0013 d2, root ADR-0009 d2,
   ADR-0010), not design choices made here. Repo convention (specs 104, 111) names them the same way.
