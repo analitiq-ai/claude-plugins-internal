@@ -159,7 +159,7 @@ marks exempt PRs, and flips an attested draft with no hold to ready (orchestrato
 d4–d5).
 
 **Why this priority**: GitHub's ruleset merges nothing without `internal-review`, and no external reviewer runs on
-a draft. It needs Story 2's draft PR and core's protected-path matcher.
+a draft. It needs Story 2's draft PR and core's protected-path matcher, called with `{tickOnly, adrFolders}` (#177).
 
 **Independent Test**: Against a fake GitHub with reviewer's state recording an INTERNAL round CLEAN at the head of
 a draft PR: `internal-review` is success at the head from the orchestrator App and the PR is ready. A PR changing

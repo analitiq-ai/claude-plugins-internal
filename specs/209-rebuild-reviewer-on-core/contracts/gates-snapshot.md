@@ -1,11 +1,13 @@
 # Contract: gates section of the state snapshot (core, PR B)
 
 Owner: `core/src/contracts/gates.ts` (Zod), the `gates` field of core's `Snapshot`
-(`core/src/contracts/snapshot.ts`); written only by `recordGates` in `core/src/state.ts`. Writer: reviewer's hook as
-the reviewer App (P6). Reader: reviewer's hook, through `readState`.
+(`core/src/contracts/snapshot.ts`), carried by the `gates` event of the ledger record
+([ledger-record.md](ledger-record.md)); written only by `recordGates` in `core/src/state.ts`. Writer: reviewer's
+hook as the reviewer App (P6). Reader: reviewer's hook, through `readState`.
 
-The counts live in the state comment, not a second comment, so a WRONG ruling or bug member and the hold its
-count places land in one post: there is no window in which a count is on GitHub and its hold is not.
+The section is the payload of the newest `gates` event in the story's fold, null before the first. A `gates`
+event lands in one commit with the hold events its counts place, so a WRONG ruling or bug member and the hold its
+count places land together: there is no window in which a count is on `ledger` and its hold is not.
 
 ## Shape
 
@@ -50,8 +52,8 @@ Validation: ids unique within each list; times are core `Time`; shas 40 hex.
   places `shim-<id>` (both `[reviewer]` keys). A RELEASED `shim-<id>` lets one commit touching its `ranges` through; that run places the
   hold again ("one such commit", ADR-0013 d4).
 - A `claim-<id>` hold's question (the last WRONG's failing case and evidence, cc:301-306) is written into the
-  hold row in the post that records that WRONG, never into `gates`. Core's snapshot contract allows a question only on
-  `escalation-` holds today (`core/src/contracts/snapshot.ts:53`); PR B extends it to `claim-` holds.
+  hold event in the commit that records that WRONG, never into `gates`. Core's snapshot contract allows a question only
+  on `escalation-` holds today (`core/src/contracts/snapshot.ts:55`); PR B extends it to `claim-` holds.
 
 ## Not carried from the ledger
 
@@ -70,28 +72,23 @@ over through `recordGates`: no lineages, no bugs, anchored on its own head.
 
 ## Functions
 
-- Read: `readState(...)` → `snapshot.gates`; one reading per run (FR-004).
-- `recordGates(reader, writer, repo, issue, shared, read: StateReading, gates: Gates, openings: Opening[]): Promise<void>`
-  with `Opening {id: "claim-<id>" | "shim-<id>", question: string | null}`: one post of the snapshot `read` holds,
-  with `gates` replaced and each opening placed (a hold with no row gets one; a RELEASED row is reopened in place, `withRow`, one row per id, ADR-0013 d1). A hold
-  already OPEN is left as it is; the `gates` change is posted regardless. Refuses with `StateWriteRefused`, posting
-  nothing, on tamper, contract break, a `gates` on GitHub differing from `read`'s (a stale reading), or the size rule.
-- `writeState`, `placeHold`, `placeRescopeHold` and `releaseOnClaim` refuse a snapshot whose `gates` differs from
-  the one they read (`checkTransition`): only `recordGates` changes `gates`, so no write built from an older
-  reading drops a count.
+- Read: `readState(...)` → `snapshot.gates`; one reading per run, advanced by each write (FR-004, R3).
+- `recordGates(reader, writer, repo, issue, shared, reading: StateReading, ref: string, gates: Gates, openings:
+  Opening[]): Promise<StateReading>` with `Opening {id: "claim-<id>" | "shim-<id>", question: string | null}` and
+  `ref` the check's workflow run: one commit of `gates.<ref>.json` and a `hold` event for each opening not OPEN (a
+  hold with no row gets one; a RELEASED row is reopened in place, one row per id, ADR-0013 d1). A hold already OPEN
+  is left as it is; the `gates` event is committed regardless. A reading the branch has moved past is refused by
+  GitHub (`StateStale`, R3); tamper and contract breaks refuse as every write does
+  ([ledger-record.md](ledger-record.md#writes)).
+- `writeState` refuses a `next` whose `gates` differs from `reading`'s: only `recordGates` changes `gates`.
 
-## Size rule
+The record has no size cap (ADR-0011 Context), so no reserve is kept for releases.
 
-All writers share the state comment's `COMMENT_LIMIT` (65 536). `recordGates` refuses unless the snapshot it would
-post still fits after every OPEN hold is released and one more round of the largest size the snapshot contract
-allows is appended. A count can therefore never take the room a release needs: an admin's release and the next
-round always fit. The refusal names the snapshot's size, that reserve and the limit; nothing is dropped to fit.
+## Event form
 
-## Comment form
-
-The state comment (`STATE_TAG`, `snapshotOf`'s frame), its snapshot carrying `gates`:
+`issues/42/gates.<ref>.json` on `ledger`:
 
 ```json
-{ "v": 1, "rounds": [], "holds": [], "pushbacks": [],
-  "gates": { "branch": "42-us1-login", "anchor": "...", "lineages": [], "bugs": [] } }
+{ "gates": { "anchor": "...", "branch": "42-us1-login", "bugs": [], "lineages": [] },
+  "kind": "gates", "ref": "<workflow run>", "v": 1 }
 ```
