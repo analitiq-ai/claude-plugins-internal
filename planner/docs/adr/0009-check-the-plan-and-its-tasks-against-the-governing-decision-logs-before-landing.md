@@ -67,9 +67,7 @@ after critique and after a check stops, and a check that skips what it judges un
    outcome (root ADR-0004); a FAIL or COULD_NOT_RUN in any stops the run. The check is a loop, one round per
    resume after a stop, and each round works out everything again from the files as they then stand: the
    settled-design check, the plan's paths, the tasks when their sources changed (d4), the story checks landing
-   makes, and the ADR check itself; nothing is skipped as unchanged. A round that would pass on files changed
-   since it read them runs again, so the run completes only on files a round checked. A public repo lists no path
-   to private ADRs.
+   makes, and the ADR check itself; nothing is skipped as unchanged. A public repo lists no path to private ADRs.
 2. We will check the folder on disk at the listed path, with no network call and no credential. Keeping it
    current is the admin's.
 3. We will commit a record the plan needs into the spec PR beside the spec it governs (ADR-0010), and a

@@ -96,16 +96,18 @@ export const STOP_FILE = "adr-stop.json";
 export const TOUCHES_FROM_FILE = "touches-from.json";           // plan.md and spec.md as the touches step read them
 export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources the current tasks.md was written from
 export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
-export const DECIDED_FILE = "adr-decided.json";                 // decide ran this round
+export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as ask read them
 
 export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
 
 export const SourceHashes: z.ZodType;   // {v: 1, files: {<repo-relative path>: <sha256>}}
 /** The sha256 of each path that exists under `cwd`, an absent one left out; equal sets mean unchanged sources. */
 export function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes>;
-/** Every file the tasks command reads (workflow-steps.md, tasks-due). */
+/** Every file the tasks command reads: the spec folder's spec.md, plan.md, research.md, data-model.md,
+ *  quickstart.md, every file under contracts/, and .specify/memory/constitution.md. */
 export function tasksSourcePaths(cwd: string, specDir: string): Promise<string[]>;
-/** Every file a round checks: tasksSourcePaths, `tasks.md`, and every file in each of `folderPaths`. */
+/** Every file a round checks: tasksSourcePaths, tasks.md, the rulings file, codeworks.toml, and every file in
+ *  each of `folderPaths`. */
 export function roundInputPaths(cwd: string, specDir: string, folderPaths: readonly string[]): Promise<string[]>;
 
 /** Pure: one span against the path grammar (artifact-grammar.md). `null`: the span is not a path. Throws
@@ -116,8 +118,7 @@ export const TouchedPaths: z.ZodType;   // {v: 1, paths: PATH[]}, no entry twice
 /** Pure: parsed `touches.json`; throws TouchesRefused naming `touches.json` and the entry. */
 export function readTouchedPaths(json: unknown): ArtifactPath[];
 
-export const AdrAsked: z.ZodType;       // asked record, its `inputs` a SourceHashes
-export const AdrDecided: z.ZodType;     // {v: 1}
+export const AdrAsked: z.ZodType;       // asked record
 export const AdrVerdict: z.ZodType;     // verdict file; `folder` is the entry as written
 export const AdrRuling: z.ZodType;      // {folder, record, path}, plus `reason`; `path` a PATH
 export const AdrRulings: z.ZodType;     // {v: 1, rulings: AdrRuling[]}, no (folder, record, path) twice;

@@ -54,7 +54,7 @@ for the task lines). The run folder is gitignored; builders and reviewers never 
 | `<run>/touches-from.json` | `adr-clear` | ask (`touches-stale`) | `plan.md`, `spec.md`, before the touches step reads them |
 | `<run>/tasks-sources-next.json` | `adr-tasks-due` | `adr-tasks-written` | every file the tasks command reads, before it runs |
 | `<run>/tasks-sources.json` | `adr-tasks-written` (renames the one above) | `adr-tasks-due`, report | the sources the current `tasks.md` was written from |
-| `inputs` of `<run>/adr-asked.json` | ask | report | `roundInputPaths`: the tasks sources, `tasks.md` and every file in each listed folder, as ask read them |
+| `<run>/adr-inputs.json` | ask, first, every round; decide rewrites the rulings file's entry after appending | report | `roundInputPaths`: the tasks sources, `tasks.md`, the rulings file, `codeworks.toml` and every file in each listed folder, as the round read them |
 
 ## Artifact path (`ArtifactPath`, `core/src/contracts/decision-check.ts`)
 
@@ -67,15 +67,13 @@ for the task lines). The run folder is gitignored; builders and reviewers never 
 
 ## Asked record (`AdrAsked`, `<run>/adr-asked.json`)
 
-Writer: `adr_check.ts ask`. Readers: the judge, `adr_check.ts decide`, and `adr_check.ts report` (its `inputs`
-and folder paths).
+Writer: `adr_check.ts ask`. Readers: the judge, `adr_check.ts decide`.
 
 | Field | Type |
 |---|---|
 | `v` | `1` |
 | `paths` | `ArtifactPath[]` |
 | `folders` | per listed folder, in list order: `{entry, path, inside, outcome: CouldNotRun}` or `{entry, path, inside, governing, broken}` |
-| `inputs` | `SourceHashes` of every file the round checks; report hashes them again before the loop ends on a pass |
 
 Stdout JSON only: `judge`, true when any folder has a governing record; `decide`, false when ask recorded a stop;
 `asked`, the sha256 of the record's bytes, which the workflow passes to decide (R9 c), empty when ask recorded a
@@ -105,8 +103,10 @@ Writer: the judge (prompt step). Reader: `adr_check.ts decide`.
   whichever artifact named the path.
 - One resume's ruling: `ADR_RULING`, an `AdrRuling[]` as JSON, read by `drive_workflow.py` from the file named in
   `adr_ruling=@<file>` and exported to that invocation only. Writer: the session, with the Write tool, on the user's
-  words only. Validated whole against the departures of the round that resume runs (artifact-grammar.md): one
-  refused ruling, a ruling naming no departure among them, refuses them all.
+  words only. Reaches every round that call runs; validated whole against the departures of the round whose decide
+  reads it (artifact-grammar.md): one refused ruling, a ruling naming no departure among them, refuses them all; one
+  whose key the rulings file already holds is satisfied. A ruling the call never added and never refused is named by
+  `drive_workflow.py` (`ruling_unapplied`).
 
 ## Departure found at review (`AdrDeparture`, `ReviewQuestions`)
 
@@ -127,17 +127,10 @@ question}[]}`, no `(issue, hold)` twice.
   rulings are applied (R13). A ruling is keyed
   on `(folder, record, path)`, never on a story.
 
-## Decided record (`AdrDecided`, `<run>/adr-decided.json`)
-
-`{v: 1}`. Writer: `adr_check.ts decide`, first, before anything it reads; deleted by `adr-clear` at each round's
-start, so one that is there means decide ran this round. Reader: `adr_check.ts report`, which adds the
-`ruling-unapplied` line to a stop when `ADR_RULING` is set and the record is absent.
-
 ## Stop record (`AdrStopRecord`, `<run>/adr-stop.json`)
 
-Writers: `adr_check.ts` stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, adding the
-`ruling-unapplied` line when it applies, then rewriting it `shown: true` once it printed the lines (one that does
-not parse rewritten as its `stop-unread` line); `adr-clear`,
+Writers: `adr_check.ts` stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, rewriting it
+`shown: true` once it printed the lines (one that does not parse rewritten as its `stop-unread` line); `adr-clear`,
 deleting it at each round's start. Every run-folder record is written to a temporary file, then renamed over it. Readers: `adr_check.ts report`, and ask (a record there was written this round by stories).
 
 | Field | Type | Rule |

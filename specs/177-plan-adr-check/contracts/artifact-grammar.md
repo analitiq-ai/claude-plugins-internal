@@ -32,7 +32,7 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - Read only by planner's check (`readTouchedPaths`). The run folder is gitignored (`.specify/.gitignore`:
   `workflows/runs/`); builders and reviewers never see it.
 
-## Source hashes (`<run>/touches-from.json`, `<run>/tasks-sources.json`, `<run>/tasks-sources-next.json`)
+## Source hashes (`<run>/touches-from.json`, `<run>/tasks-sources.json`, `<run>/tasks-sources-next.json`, `<run>/adr-inputs.json`)
 
 ```json
 {"v": 1, "files": {"specs/177-x/plan.md": "<sha256>", "specs/177-x/spec.md": "<sha256>"}}
@@ -46,10 +46,9 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - `tasks-sources-next.json`: written by `adr-tasks-due` from every file the tasks command reads (workflow-steps.md);
   renamed to `tasks-sources.json` by `adr-tasks-written` once the tasks command has written `tasks.md`. A round is
   due to write `tasks.md` when it is missing, `tasks-sources.json` is missing, or the two differ.
-- the asked record's `inputs`: written by ask from `roundInputPaths`; report, finding no stop, hashes those files
-  again and `tasksSourcePaths` against `tasks-sources.json`, and any difference runs a new round, no stop.
-- `AdrDecided` (`<run>/adr-decided.json`): exactly the key `v` (`1`); written by decide first, deleted by
-  `adr-clear`.
+- `adr-inputs.json`: written by ask first, every round, from core's `roundInputPaths` (every file the round checks);
+  decide records the rulings file's new hash in it after appending. report hashes them again, and `tasksSourcePaths`
+  against `tasks-sources.json`, before it shows a stop or ends the loop: any difference runs a new round.
 
 ## `<run folder>/adr-stop.json` (a round's stop, until shown and resumed)
 
@@ -98,8 +97,8 @@ command tells the model to write one literal path per backtick span.
 
 A JSON array of `AdrRuling`. The session writes it, on the user's words only, to a scratch file with the Write tool;
 `drive_workflow.py resume <run> adr_ruling=@<file>` reads the file and exports its content as `ADR_RULING` to that
-one `specify resume` call, so the user's words never reach a command line (SKILL.md §1). It reaches the one round
-that resume runs, and decide is its only reader. Decide refuses the whole array (`ruling-refused`, nothing
+one `specify resume` call, so the user's words never reach a command line (SKILL.md §1). It reaches every round
+that call runs, and decide is its only reader. Decide refuses the whole array (`ruling-refused`, nothing
 appended) when it is not JSON, not an array of `AdrRuling`, or any ruling's folder is not listed, its path is not
 an asked path, `checkAdrFolder(cwd, folder, [path], deadlineMs)`, called once for that ruling, does not name its
 record as governing, or its key names no departure this round found (the judge's or one found at review), matched
@@ -107,9 +106,10 @@ before any departure is dropped. Decide makes those calls concurrently under one
 what is left of it; a call that could not run is exit 2, nothing appended. A ruling whose key the rulings file
 already holds is satisfied, not refused, and not re-checked. Each valid new ruling is appended to
 `<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there, so a
-decide that fails between the two leaves no entry the writer guard refuses and a rerun appends none twice. A round
-that stops before decide applies no ruling, and report adds the `ruling-unapplied` line to its stop: give it again
-on the resume after. Unset: no ruling.
+decide that fails between the two leaves no entry the writer guard refuses and a rerun appends none twice. A ruling a
+later round of the same call finds in the rulings file is satisfied there. A resume whose rounds never apply it
+(they stop before decide, or report fails after a pass) leaves it out of the rulings file, and `drive_workflow.py`
+names it in `ruling_unapplied` (workflow-steps.md). Unset: no ruling.
 
 ## Departure line (in a hold's question)
 

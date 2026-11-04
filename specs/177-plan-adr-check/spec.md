@@ -157,8 +157,8 @@ could-not-run status, never as a pass.
    rulings file, and any departure the ruling does not name still stops the run (Clarifications: overrule allowed).
 6. **Given** the rulings file holds a ruling on record R and path P, **When** a later round or a rescope judges a
    departure from R on P, in the plan's paths or the tasks', **Then** it passes it without stopping; a resume's
-   ruling reaches only the round that resume runs, and one naming no departure that round found is refused, nothing
-   appended (Clarifications: rulings honored by later checks; FR-016).
+   ruling reaches every round of that resume and no later one, one naming no departure the round that reads it
+   found is refused, nothing appended, and one the resume neither applied nor refused is named to the user (Clarifications: rulings honored by later checks; FR-016).
 7. **Given** the rulings file holds an entry the check script did not write and `HEAD` does not hold, **When** a
    round runs, **Then** the check could not run, naming the entry (FR-016).
 8. **Given** a listed folder holds a record with its own `adr check` error, **When** a round runs, **Then** the
@@ -319,7 +319,7 @@ once ruled; a rescope with no question takes the admin's words.
   two, after printing every folder's outcome; the message MUST name the next legal step.
   A check stop is a failed or could-not-run outcome a round recorded and showed, a touches or judge step that did
   not answer among them. Every resume after a check stop MUST run a new round on the artifacts as they then stand;
-  a loop that stops 100 times in one run MUST stop the run as could not run, never passing it. A step that fails
+  a loop that runs 100 rounds in one run MUST stop the run as could not run, never passing it. A step that fails
   without an answer is no check stop: the run fails at that step, and a resume runs that step, then the rest of
   its round. No next step MUST send the user to edit `tasks.md`: a `tasks.md` refused is deleted, and the next
   round writes it again.
@@ -350,9 +350,8 @@ once ruled; a rescope with no question takes the admin's words.
   script MUST accept it only when the folder is listed, the path is one the round asked, `adr check` on that folder
   with that one path names the record as governing, and its key names a departure that round found (the judge's or
   one found at review), and is then the only writer that adds it to the file, to its own run record first. A ruling
-  applies to the round of the resume that carries it only; it is not kept as a run input, and a round that stops
-  before the check script reads it MUST say so in its stop. An entry the check script did not write and that is not
-  in the file at `HEAD`
+  applies to the rounds of the resume that carries it only; it is not kept as a run input, and the driver MUST name
+  every ruling that resume neither added to the file nor refused. An entry the check script did not write and that is not in the file at `HEAD`
   MUST make the check could not run. Only the user gives a ruling; neither the judge nor the driving session gives one.
 - **FR-017**: The rulings file MUST be given to the judge, and the check script MUST then drop every departure whose
   folder, record id and path match an entry, at every planner check of the spec folder (every later round, a
@@ -362,9 +361,10 @@ once ruled; a rescope with no question takes the admin's words.
   step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the check
   again.
 - **FR-019**: The decide step MUST compare the paths (`touches.json` and `tasks.md`) and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
-  changed (the same single-writer guard as FR-016). Before the loop ends on a pass, the report step MUST hash again
-  every file the round checked (the tasks' sources, `tasks.md`, every file in each listed folder) and, when any
-  changed since the round read it, run a new round instead, so the run completes only on files a round checked.
+  changed (the same single-writer guard as FR-016). Before it shows a stop or ends the loop on a pass, the report
+  step MUST hash again every file the round checked (the tasks' sources, `tasks.md`, the rulings file,
+  `codeworks.toml`, every file in each listed folder) and, when any changed since the round read it, drop the
+  round's stop and run a new round, so the run completes and stops only on files a round checked.
 - **FR-020**: Core's `protectedPaths` (orchestrator ADR-0004 d4) MUST name each root spec folder a story PR changes
   beyond TICK_ONLY (reviewer ADR-0010 d1; root ADR-0011), told by one pure core function, `isTickOnly`, and each
   in-repo folder `[shared] adr_folders` lists that it changes (root ADR-0011 d1); a folder named `specs` below the
