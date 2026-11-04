@@ -17,6 +17,7 @@ export const BOARD = "https://github.com/orgs/acme/projects/1";
 const SETTINGS = `[shared]
 board = "${BOARD}"
 validators = []
+adr_folders = []
 session_app_login = "codeworks-session[bot]"
 orchestrator_app_login = "codeworks-orchestrator[bot]"
 reviewer_app_login = "codeworks-reviewer[bot]"

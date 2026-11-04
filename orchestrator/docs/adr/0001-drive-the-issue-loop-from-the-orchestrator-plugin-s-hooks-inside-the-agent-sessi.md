@@ -43,8 +43,9 @@ token writes nothing (root ADR-0007), so every GitHub write a turn needs is a ho
 2. We will give it only these inputs: the prompt that names the session's issue; the board and its
    issues (lane and when it was set, parent, sub-issues, `blockedBy`, closer); open PRs, their changed files,
    review threads, mergeable field, statuses and checks at the head; issue comments with author, edit
-   and time, reviewer's state comments (reviewer ADR-0011) among them; an exempt label's labeled event,
-   its sender, that sender's permission and the head's push time (ADR-0005); the effective rules for
+   and time; reviewer's state record on the `ledger` branch (reviewer ADR-0011); an exempt label's
+   labeled event, its sender, that sender's permission and the head's push time (ADR-0005); the effective
+   rules for
    each PR's base branch (ADR-0009); the session's commits; reviewer's commit-check pass record for the
    session, its passes by branch and whether reviewer is off (reviewer ADR-0006); its own section and `[shared]` of
    `codeworks.toml` (root ADR-0002); its hook's event. It parses no prose except through `core/`'s

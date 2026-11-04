@@ -25,6 +25,7 @@ const WINDOW = { timeoutSeconds: 1800, since: "2026-10-28T10:00:00Z" };
 
 const SHARED: Shared = {
   validators: ["fixture"],
+  adr_folders: [],
   trusted_reviewers: ["alice"],
   board: "https://github.com/orgs/example-org/projects/1",
   session_app_login: "codeworks-session[bot]",

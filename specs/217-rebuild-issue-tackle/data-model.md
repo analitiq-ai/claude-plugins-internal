@@ -35,8 +35,8 @@ A read that does not answer is no field: the script exits 2 naming it (R3).
 | Field | Type | Rule |
 |---|---|---|
 | `id` | `T<nnn>` | Spec Kit's task id |
-| `ticked` | boolean | `[x]` vs `[ ]` |
-| `story` | `k` \| `null` | the line's `[US<k>]` tag |
+| `ticked` | boolean | `[x]` or `[X]` vs `[ ]`, read by core's `readTaskLine` |
+| `story` | `k` \| `null` | the line's `[US<k>]` tag, read by core's `readTaskLine`; two different tags refuse |
 | `line` | string | the task line as written |
 
 Only lines inside a phase block labelled `Story issue: #<s>` (planner ADR-0008 d2).

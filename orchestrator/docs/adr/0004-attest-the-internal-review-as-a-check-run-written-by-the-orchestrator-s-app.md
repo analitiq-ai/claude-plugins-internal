@@ -13,6 +13,10 @@ relatesTo: ["0003", "0005", "0009"]
 affects:
   - type: path
     pattern: "orchestrator/**"
+  - type: path
+    pattern: "core/src/attest.ts"
+  - type: path
+    pattern: "core/src/protected-paths.ts"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -30,7 +34,7 @@ review:
 ## Context
 
 The merge contract is GitHub's ruleset (ADR-0009), which needs a check saying the internal review
-passed. reviewer's hook records each round, as the reviewer App, on the story issue (reviewer
+passed. reviewer's hook records each round, as the reviewer App, on the `ledger` branch (reviewer
 ADR-0011, ADR-0021). Which credential turns that record into the trusted check is the
 ruleset's trust root. A PR can also change the config, workflows and hooks that grade it.
 
@@ -40,8 +44,8 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    reviewer's state (reviewer ADR-0011) records an INTERNAL or AUDIT round CLEAN or CONVERGED_PUSHBACK at the
    head or a commit in its history, and no hold is open; success marked "exempt" on an exempt PR (ADR-0005);
    else pending. Later commits and github rounds, stage 2, never undo that round, except that it lapses, and a
-   new internal round runs at the head, when: the default branch's `spec.md` of the story's spec, its
-   `**/docs/adr/` folders or `.specify/memory/` differ from those at the round's commit; a merge of the
+   new internal round runs at the head, when: the default branch's `spec.md` or `adr-rulings.json` of the
+   story's spec, its `**/docs/adr/` folders or `.specify/memory/` differ from those at the round's commit; a merge of the
    default branch since that round differs from the merge git makes of its parents without conflict; or an
    admin's comment released a hold since that round (reviewer ADR-0013), the new round briefed with it. On a
    lapse for the default branch's files, that round runs after builder merges the default branch (builder
@@ -53,6 +57,8 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    any other App, or a commit status of that name, counts for nothing.
 4. We will never attest a PR that changes `codeworks.toml`, `.github/`, `.claude/`, `.specify/memory/`,
    a `docs/adr/` folder, or an `AGENTS.md` or `CLAUDE.md` file, at any depth and in any letter case,
+   a folder inside the repo that `[shared] adr_folders` lists (reviewer ADR-0022 d1), or the root `specs/`
+   folder beyond a story's own ticks (TICK_ONLY, reviewer ADR-0010 d1; root ADR-0011),
    Bot-authored or not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005)
    attests it. A validator's own config, `.deepsource.toml` for one, belongs to its package in
    `validators/` (root ADR-0003) and is not on this list.
@@ -61,7 +67,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
 
 ## Options considered
 
-### Option A: The orchestrator's App writes the check run from reviewer's state comment (chosen)
+### Option A: The orchestrator's App writes the check run from reviewer's state record (chosen)
 
 One writer; only hooks read its key.
 
