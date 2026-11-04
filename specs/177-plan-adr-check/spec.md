@@ -52,8 +52,8 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
   in planner (FR-018, R8). A listed folder inside the repo is a protected path, as root ADR-0011 d1 names it
   (FR-020, R12).
 - User decisions (2026-11-03): (D1) `touches.json` is written by the check's own touches step, `adr-plan-touches`,
-  from `plan.md` as it then stands, after a shell step deletes the last one, so a resume after a plan fix rebuilds
-  it; the plan step writes nothing for the check (FR-012, R4, planner ADR-0009 d7). (D2) A ruling reaches a resume
+  from `plan.md` as it then stands, after a shell step deletes the last one; every resume after a stop runs the
+  whole check again, so a resume after a plan fix rebuilds it; the plan step writes nothing for the check (FR-012, R4, planner ADR-0009 d7). (D2) A ruling reaches a resume
   from a scratch file the session writes, `adr_ruling=@<file>`, never a command line (FR-016, R9). (Q1–Q3) At
   review, a departure is ruled FIX or ESCALATE; an escalation or verdict rescope hold's question says why and what must be decided,
   a departure one line of it that core renders and reads; planner's rescope takes its open decision from those
@@ -137,8 +137,9 @@ folder; the step exits with the could-not-run status, never as a pass.
 3. **Given** a listed folder cannot be read, or `adr` is missing or at another version, or its answer cannot be read,
    **When** the step runs, **Then** that folder's outcome is a check that could not run, the run stops with the
    could-not-run exit status, and the other folders' outcomes are still printed.
-4. **Given** the run is resumed after the plan is fixed, **When** the check runs again, **Then** it rebuilds the
-   plan's paths from `plan.md` as it now stands and checks the plan against them.
+4. **Given** the run stopped at the check and is resumed after the plan is fixed, **When** the run resumes,
+   **Then** the whole check runs again: it rebuilds the plan's paths from `plan.md` as it now stands and checks the
+   plan against them.
 5. **Given** the run stopped on a named departure, **When** the user resumes it with a ruling that overrules that
    departure and gives a reason, **Then** the step passes that departure, the ruling is added to the spec folder's
    rulings file, and any departure the ruling does not name still stops the run (Clarifications: overrule allowed).
@@ -308,12 +309,14 @@ once ruled; a rescope with no question takes the admin's words.
   ask step.
 - **FR-009**: A failed or could-not-run outcome in any folder MUST stop the run, with distinct exit statuses for the
   two, after printing every folder's outcome; the message MUST name the next legal step.
+  Every resume after a check stops MUST run that whole check again on the artifacts as they then stand; a check
+  that stops 100 times in one run MUST stop the run as could not run, never passing it.
 - **FR-010**: The check steps MUST make no network call and use no GitHub credential.
 - **FR-011**: The check steps MUST be TypeScript scripts calling core (root ADR-0009 d2), with the decision of each
   outcome in a pure function (constitution P3).
 - **FR-012**: The paths a check passes MUST be read as data with a grammar (constitution P7), not parsed from prose:
   for the plan, `<run folder>/touches.json`, written by the check's own touches step from `plan.md` as it then stands,
-  rebuilt at every resume, and read only by planner's check, never a section of `plan.md`; for `tasks.md`, the task line's paths. One path grammar, a literal
+  rebuilt each time the check runs again after a stop, and read only by planner's check, never a section of `plan.md`; for `tasks.md`, the task line's paths. One path grammar, a literal
   path with no glob or brace group, MUST serve both, and a name with no `/` MUST count as a path when git tracks it at the checkout root or `touches.json` lists
   it (so a root file a task creates is checked before it exists).
 - **FR-013**: The `adr` version the planner step requires MUST be defined once, in core, with one reader of `adr`'s

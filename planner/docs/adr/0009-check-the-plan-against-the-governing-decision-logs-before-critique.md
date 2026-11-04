@@ -74,20 +74,19 @@ The tasks, written after critique, name the paths each story touches.
    |---|---|---|
    | `AdrJudgment` | `WITHIN` | the artifact sits inside the record: it does nothing the record rejected or contradicts |
    | `AdrJudgment` | `DEPARTS` | the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to |
-   | `CheckedArtifact` | `plan` | the paths the touches step writes to `touches.json` (d7) |
+   | `CheckedArtifact` | `plan` | the paths the check reads from `plan.md` (d7) |
    | `CheckedArtifact` | `tasks` | the paths `tasks.md`'s task lines name (d4) |
 
 6. We will keep the user's rulings that a named departure is not one only in `<spec folder>/adr-rulings.json`,
-   which lands in the spec PR. The decide step is its only writer, and writes only from the resume's
-   `ADR_RULING`. A ruling applies to the resume carrying it only. Neither the judge nor the driving session
+   which lands in the spec PR. The check is its only writer, and writes only the ruling a resume carries. A
+   ruling applies to the resume carrying it only. Neither the judge nor the driving session
    gives one. Every later check of the spec folder drops a departure an entry names; spec-PR review is the
    check on an entry committed by hand.
-7. We will have a headless model step of the after-plan check read `plan.md` as it then stands and write
-   the paths it creates, changes or deletes to `<run folder>/touches.json`, the run folder being
-   `.specify/workflows/runs/<run_id>/`, gitignored; only planner's check reads it. A shell step before it
-   deletes the file, so a failed write never leaves the last run's paths behind. A resume re-runs the whole
-   check, so the paths follow every change to the plan, and a departure's next step is "change `plan.md`".
-   `plan.md` carries no path list for the check.
+7. We will have a headless model step of the after-plan check read `plan.md` as it then stands and list the
+   paths it creates, changes or deletes; only planner's check reads the list, and `plan.md` carries none.
+   Every resume after a check stops runs that whole check again, this step included, on the artifacts as they
+   then stand, so the paths follow every change to the plan and a departure's next step is "change
+   `plan.md`".
 8. We will name the next steps in every stop. For a departure: change the artifact; supersede the record,
    into the spec PR when its folder is inside this repo (d3), or in the repo that holds the folder when it is
    outside; or resume with a ruling (d6). A FAIL caused by a record's own `adr check` error names the record
@@ -143,7 +142,7 @@ builders and reviewers who read the plan but never use them.
 
 ### Option I: The plan step writes the paths
 
-Rejected on 2026-11-03: a resume after a plan fix re-runs the check, not the plan step, so the paths would
+Rejected on 2026-11-03: a resume after a plan fix runs the check again, not the plan step, so the paths would
 still be the old plan's.
 
 ### Option J: The admin retypes a departure found at review into the rescope

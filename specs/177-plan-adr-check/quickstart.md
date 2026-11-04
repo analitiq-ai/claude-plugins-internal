@@ -1,6 +1,6 @@
 # Quickstart: validating the ADR check
 
-Prerequisites: node ≥ 22.18, `npm install -g @adrkit/cli@0.20.0`, the `specify` CLI, analitiq-ai/engineering
+Prerequisites: node ≥ 22.18, `npm install -g @adrkit/cli@0.20.0`, the `specify` CLI 1.1.3 (`pip install specify-cli==1.1.3`), analitiq-ai/engineering
 checked out beside this repo (`../engineering`).
 
 ## Core (US2)
@@ -45,9 +45,10 @@ node --test planner/tests/adr-check.test.ts
 python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'
 ```
 
-`planner/tests/adr-check.test.ts` drives `adr_check.ts ask` then `decide` in a scratch spec folder with a stand-in
-`adr`, a `<run>/touches.json` and a verdict file written by the test in the touches step's and the judge's place.
-Every line is on stderr, as the stop table gives it:
+`planner/tests/adr-check.test.ts` drives `adr_check.ts ask`, `decide`, then `report` in a scratch spec folder with a
+stand-in `adr`, a `<run>/touches.json` and a verdict file written by the test in the touches step's and the judge's
+place. Every line is on stderr, as the stop table gives it. A stop's exit below is the one `report` exits with; ask
+and decide exit 0 once they record it in `<run>/adr-<a>-stop.json`:
 
 | Scenario | Expect |
 |---|---|
@@ -81,18 +82,28 @@ Every line is on stderr, as the stop table gives it:
 | the same, and `adr-rulings.json` names it | exit 0 (US6 AS5) |
 | the same, `0004` superseded and no longer governing | exit 0, no line for it |
 | `<run>/review-questions.json` not `ReviewQuestions`, or with a departure line that does not read | exit 1, `FAIL: review-questions.json: …` |
-| ask | stdout is `{"judge", "asked"}` only |
+| ask | stdout is `{"judge", "decide", "asked"}` only; `decide` true when it recorded no stop |
+| ask records a stop (e.g. `touches.json` missing) | exit 0, stdout `{"judge": false, "decide": false, "asked": ""}`, the stop record written |
+| ask with a stop record left from the last iteration | removes it first |
+| `report`, stop record `shown: false` | its lines on stderr, exit its `exit`, record rewritten `shown: true` |
+| `report`, stop record `shown: true` | record deleted, stdout `{"again": true}`, exit 0 |
+| `report`, no stop record | stdout `{"again": false}`, exit 0 |
+| `stop plan rounds` | exit 2, `COULD_NOT_RUN: adr-plan-check: the check stopped 100 times in one run. …` |
 
 `test_drive_workflow.py`, with stand-in `claude` (writing a plan that passes `settled_design.py`; as the touches
 step, a `touches.json` from it), a stand-in judge writing the verdict, stand-in `adr`, and a committed `codeworks.toml` with
-`[planner] app_id` and `adr_folders`: a run stops at `adr-plan-decide` before `mark-critiques`; `resume <run>
+`[planner] app_id` and `adr_folders`: a run stops at `adr-plan-report` before `mark-critiques`; `resume <run>
 adr_ruling=@<file>` exports the file's content as `ADR_RULING` to that call only, `inputs.json` gains no
-`adr_ruling`, the after-tasks check runs without it; `adr_ruling=<json>` with no `@` exits non-zero; a plan changed
-before a resume makes the touches step rewrite `touches.json` from it; a resume whose touches step fails finds no
-`touches.json` from the last run; a touches step that fails reports `adr: true`
+`adr_ruling`, the after-tasks check runs without it; `adr_ruling=<json>` with no `@` exits non-zero; each resume
+after a stop runs a new iteration of the check loop, so a plan changed before a resume makes the touches step
+rewrite `touches.json` from it; a resume whose touches step fails finds no `touches.json` from the last iteration;
+a decide that crashes fails the run at `adr-plan-decide` and the resume runs decide again, not clear, touches or
+ask; a stop in an iteration after the first, reported under a qualified id (`adr-plan-check:adr-plan-report:1`),
+reports `adr: true`; a check that stops 100 times fails the run at `adr-plan-rounds` with `adr: true`; a touches
+step that fails reports `adr: true`
 with `stop plan touches`'s line; `rescope … questions=@<file>` lands the file as `<run>/review-questions.json`;
 an ask stop and
-a decide stop report `adr: true` with their lines; a judge that fails reports `adr: true` with `stop`'s line, and a
+a decide stop each stop the run at `adr-plan-report` and report `adr: true` with their lines; a judge that fails reports `adr: true` with `stop`'s line, and a
 judge timeout is tested at `report()` with a made-up state; a `stop` that cannot run exits non-zero; a rescope runs
 both checks.
 
@@ -100,7 +111,7 @@ both checks.
 
 From a worktree of this repo, `/planner:issue-spec #<issue>` on an issue whose plan touches
 `planner/plugin/scripts/settled_design.py` with a design that contradicts planner ADR-0008: the run stops at
-`adr-plan-decide` naming `planner/docs/adr`, `0008` and the path. Rename `../engineering` and resume: stops with
+`adr-plan-report` naming `planner/docs/adr`, `0008` and the path. Rename `../engineering` and resume: stops with
 `COULD_NOT_RUN` for `../engineering/docs/adr`.
 
 ## Protected paths (US5, core)

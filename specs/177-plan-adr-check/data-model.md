@@ -38,9 +38,9 @@ ADR-0009.
 
 ## Touched paths (`TouchedPaths`, `<run>/touches.json`)
 
-`{v: 1, paths: PATH[]}`, no entry twice (artifact-grammar.md). Deleted by `adr-plan-clear`, the after-plan check's
-first step; written by the touches step `adr-plan-touches`, its second, from `plan.md` as it then stands
-(`adr-touches.md`), rebuilt at every resume. Readers: `adr_check.ts` ask and decide only (plan's paths; tasks' root entries). The run
+`{v: 1, paths: PATH[]}`, no entry twice (artifact-grammar.md). Deleted by `adr-plan-clear`, the after-plan check
+loop's first step; written by the touches step `adr-plan-touches`, its second, from `plan.md` as it then stands
+(`adr-touches.md`), rebuilt in each iteration of the check loop, so at each resume after a stop. Readers: `adr_check.ts` ask and decide only (plan's paths; tasks' root entries). The run
 folder is gitignored; builders and reviewers never see it. Unparsable or wrong shape: refused; missing or empty:
 could not run, naming `touches.json`, for both artifacts.
 
@@ -63,9 +63,9 @@ Writer: `adr_check.ts ask`. Readers: the judge, `adr_check.ts decide`.
 | `paths` | `ArtifactPath[]` |
 | `folders` | per listed folder, in list order: `{entry, path, inside, outcome: CouldNotRun}` or `{entry, path, inside, governing, broken}` |
 
-Stdout JSON only: `judge`, true when any folder has a governing record; `asked`, the sha256 of the record's bytes,
-which the workflow passes to decide (R9 c). On an empty `adr_folders` the record has no paths and no folders, no
-artifact is read, and `judge` is false.
+Stdout JSON only: `judge`, true when any folder has a governing record; `decide`, false when ask recorded a stop;
+`asked`, the sha256 of the record's bytes, which the workflow passes to decide (R9 c), empty when ask recorded a
+stop. On an empty `adr_folders` the record has no paths and no folders, no artifact is read, and `judge` is false.
 
 ## Verdict (`AdrVerdict`, `<run>/adr-<artifact>-verdict.json`)
 
@@ -113,6 +113,18 @@ question}[]}`, no `(issue, hold)` twice.
   rulings are applied (R13). A ruling is keyed
   on `(folder, record, path)`, never on a story.
 
+## Stop record (`AdrStopRecord`, `<run>/adr-<artifact>-stop.json`)
+
+Writers: `adr_check.ts` ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, rewriting it
+`shown: true` once it printed the lines, then deleting it on the resume. Reader: `adr_check.ts report`.
+
+| Field | Type | Rule |
+|---|---|---|
+| `v` | `1` | |
+| `exit` | `1` \| `2` | 2 when any line is `COULD_NOT_RUN`, else 1 |
+| `lines` | string[] | non-empty; each a line `adrStop` rendered |
+| `shown` | boolean | `report` printed the lines |
+
 ## Rulings written (`<run>/adr-rulings-written.json`)
 
 `AdrRulings`: every entry decide appended to the rulings file in this run. Writer: `adr_check.ts decide`. Readers:
@@ -137,4 +149,5 @@ but the rulings file.
 ## Check stop (`AdrStop`, `ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
 A stop is a list of `{kind, label, what}` items, `kind` a row of the stop table (workflow-steps.md); `adrStop`
-renders each as a line and the list as an exit (R8). Every subcommand's every line goes through it.
+renders each as a line and the list as an exit (R8). Every subcommand's every line goes through it; ask's and
+decide's stop lines reach stderr through the stop record and `report`.

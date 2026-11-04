@@ -67,21 +67,21 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 ## R4: The paths `plan.md` names
 
 - **Decision** (2026-11-03; supersedes a `## Touches` section in `plan.md`, then the plan step writing the file): a
-  headless prompt step, `adr-plan-touches`, the second step of the `to-adr-plan` block, reads `plan.md` as it then
+  headless prompt step, `adr-plan-touches`, the second step of the plan check's loop (R6), reads `plan.md` as it then
   stands and writes `<run folder>/touches.json`, `{"v": 1, "paths": ["<PATH>", …]}`, one literal path per file the
   plan creates, changes or deletes, no entry twice (artifact-grammar.md), following
-  `planner/plugin/speckit/workflows/issue-spec/adr-touches.md`. The engine re-runs the whole top-level block a run
-  stopped in (specify_cli `workflows/engine.py:1185-1188`), so every resume after a plan fix rebuilds the file and
-  a departure's next step stays "change `plan.md`". The block's first step, `adr-plan-clear` (shell), deletes the
-  file, so a touches step that fails leaves none and ask stops on it, never on the last run's paths. Read by `readTouchedPaths` in
+  `planner/plugin/speckit/workflows/issue-spec/adr-touches.md`. Each resume after a stop runs a new iteration of
+  the check loop (R6, R14), so every resume after a plan fix rebuilds the file and a departure's next step stays
+  "change `plan.md`". The iteration's first step, `adr-plan-clear` (shell), deletes the file, so a touches step that
+  fails leaves none and ask stops on it, never on the last run's paths. Read by `readTouchedPaths` in
   `core/src/contracts/decision-check.ts`. Unparsable or wrong shape is refused (exit 1, naming `touches.json`); a
   missing file or an empty list is could not run, naming `touches.json`, at both checks (the tasks check reads its
   root entries). The run folder is gitignored (`.specify/.gitignore`: `workflows/runs/`). `plan.md`, its template,
   the `plan` step and `speckit.plan.md` are not changed.
 - **Rationale**: P7: paths read from a file with a grammar, not from the Project Structure tree. The paths are the
   check's input only, so they stay out of `plan.md`, which builders and reviewers read. Written inside the check
-  block, not by the plan step, because a resume re-runs the block, not the plan step: paths the plan step wrote
-  would still be the old plan's after a fix (planner ADR-0009 d7, Option I).
+  loop, not by the plan step, because a resume after a stop runs the check again, not the plan step: paths the plan
+  step wrote would still be the old plan's after a fix (planner ADR-0009 d7, Option I).
 - **Existing tools**: the template's Project Structure tree (ASCII art, no grammar); `## Mechanisms` (names
   mechanisms, not paths); a `## Touches` section in `plan.md` (rejected 2026-11-03: puts check input in an artifact
   downstream actors read); the plan step writing the file (rejected 2026-11-03, above); Spec Kit's `prompt` step
@@ -108,16 +108,31 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 
 ## R6: Where the check runs in the workflow
 
-- **Decision**: two top-level `if` blocks on `*spec-is-written` in `workflow.yml`: `to-adr-plan` after
-  `to-settled-design`, before `to-mark-critiques`; `to-adr-tasks` after `to-tasks`. The plan block opens with `adr-plan-clear` (shell, deletes
-  `touches.json`) and `adr-plan-touches` (prompt, `timeout: 1800`, R4); then each holds `adr-<a>-ask` (shell, `output_format: json`, `timeout: 1800`), an `if` on `steps.adr-<a>-ask.output.data.judge`
-  holding `adr-<a>-judge` (Spec Kit `prompt` step following `adr-judge.md`, `timeout: 1800`), then `adr-<a>-decide`
-  (shell, `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the
-  shell step's 300 s default). One block per check, so a resume re-runs clear, touches, ask, judge and decide on the artifact as it now stands (US3 AS4).
-- **Rationale**: P1 (planner): a workflow step that runs a script decides; FR-006; the engine re-runs the whole
-  top-level block a run stopped in. A shell step with `output_format: json` parses stdout into `output.data`; an
-  `if` reads a boolean from one `{{ }}` expression; shell and prompt steps inherit the resume's environment, so
-  `ADR_RULING` reaches only that resume.
+- **Decision** (2026-11-04; supersedes one block per check): two top-level `if` blocks on
+  `*spec-is-written` in `workflow.yml`: `to-adr-plan` after `to-settled-design`, before `to-mark-critiques`;
+  `to-adr-tasks` after `to-tasks`. Each holds a `do-while` loop, `adr-<a>-check` (`max_iterations: 100`, condition
+  `steps.adr-<a>-report.output.data.again`), one iteration one whole check, then `adr-<a>-rounds`. The plan loop
+  opens with `adr-plan-clear` (shell, deletes `touches.json`) and `adr-plan-touches` (prompt, `timeout: 1800`, R4);
+  then each holds `adr-<a>-ask` (shell, `output_format: json`, `timeout: 1800`), an `if` on
+  `steps.adr-<a>-ask.output.data.judge` holding `adr-<a>-judge` (Spec Kit `prompt` step following `adr-judge.md`,
+  `timeout: 1800`), an `if` on `steps.adr-<a>-ask.output.data.decide` holding `adr-<a>-decide` (shell,
+  `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the shell
+  step's 300 s default), then `adr-<a>-report` (shell, `output_format: json`).
+  - ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-<a>-stop.json` (data-model.md)
+    and print nothing else. A non-zero exit from either means only that the step itself failed; the run fails there
+    and the resume runs that step again (R14).
+  - report: a stop not yet shown is printed and the run stops at `adr-<a>-report` with the stop's exit; the resume
+    runs report again, which deletes the shown stop and prints `{"again": true}`, so the loop runs a new iteration:
+    clear, touches, ask, judge, decide on the artifacts as they then stand, with that resume's `ADR_RULING`. No stop:
+    `{"again": false}`, the loop ends.
+  - `adr-<a>-rounds`, an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
+    another stops the run as could not run (`stop <a> rounds`), never walking past the check.
+- **Rationale**: P1 (planner): a workflow step that runs a script decides; FR-006; planner ADR-0009 d7: every
+  resume after a stop runs the whole check again. Spec Kit ≥ 1.1 re-executes only from the halted step (R14), so a
+  check that stops at its last step and asks for another iteration is how a resume gets the whole check. A shell
+  step with `output_format: json` parses stdout into `output.data`; an `if` and a `do-while` read a boolean from one
+  `{{ }}` expression; shell and prompt steps inherit the resume's environment, so `ADR_RULING` reaches only that
+  resume.
 - **Existing tools**: `command: speckit.adrkit.check` (prose answer, one folder) does not fit P7; Spec Kit's
   `prompt` step sends an inline prompt to the integration with the same tools as a command step: used for the
   judge; the critique pattern (`mark-critiques` → command → `find`) is the model for script → model → script.
@@ -150,8 +165,9 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     so the label appears once.
   - One line per departure and per broken record; a PASS line names the governing records, or that none governs;
     titles in full. A tasks departure names every story whose task names its path.
-  - Every line on stderr; ask's stdout is its JSON only.
-  - Exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`, else 0.
+  - Every line on stderr; ask's and report's stdout is their JSON only.
+  - A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`. ask and decide record it with
+    the lines in `<run>/adr-<a>-stop.json` and exit 0; `adr-<a>-report` prints the lines and exits with it (R6).
   - A failed prompt step records `exit_code`, `stderr` and `error` but writes no verdict, so the judge's stop comes
     from `adr_check.ts stop <a> judge` (the same table), which `drive_workflow.py report` runs from the project
     root; `stop` reads no settings, and a `stop` that cannot run makes `drive_workflow.py` exit non-zero.
@@ -187,8 +203,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     against the `asked` digest ask printed, which the workflow passes as an argument. Each names what changed
     (FR-019).
 - **Rationale**: FR-016, FR-017, FR-019; ADR-0004's "a way past it that can succeed"; P2: the user releases the
-  stop; P6: one writer. A resume re-runs the whole block, judge included, so a ruling checked against the judge's
-  answer would be refused when the model does not repeat it; a persisted input would reach the after-tasks check.
+  stop; P6: one writer. A resume after a stop runs a new iteration of the check loop, judge included (R6), so a
+  ruling checked against the judge's answer would be refused when the model does not repeat it; a persisted input would reach the after-tasks check.
   The headless steps hold Write/Edit, so a file only decide writes, checked against `HEAD` and decide's run record,
   is what keeps a model from adding a ruling; an entry committed by hand is seen in spec-PR review.
 - **Existing tools**: gate `verdict_input` (a choice from fixed options; a ruling carries data, so a gate does not
@@ -290,3 +306,20 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Existing tools**: the escalation and rescope holds and their release (reviewer ADR-0013 d2); `readState` (used);
   `governingDiff` (extended); SKILL.md step 4's open decision for grill (fed, not duplicated); the decide step's
   departure rows (reused).
+
+## R14: How a Spec Kit resume continues a run
+
+- **Decision** (2026-11-04): Spec Kit `>=1.1.3,<1.2.0` for the `issue-spec` workflow and the settled-design preset
+  (`requires: speckit_version`), CI pinned at `specify-cli==1.1.3`. On 1.1.x a resume replays the result of every
+  step already done and re-executes only from the step the run halted at; each resume after a stop runs a new
+  iteration of the check loop (R6). A step that failed is run again; a step inside a loop iteration after the first
+  is reported with a qualified id, `<loop>:<step>:<n>` (observed `to-check:check-stop:1`), others possibly
+  unqualified, so `drive_workflow.py` matches an ADR step by its own id, the qualified id's middle segment.
+- **Rationale**: verified with a stand-in workflow on 1.0.7, 1.1.3 and 1.3.0: 1.0.7 re-runs the top-level step a
+  run stopped in with everything nested in it (module `specify_cli.workflows.engine`); 1.1.3 and 1.3.0 keep an
+  execution tree and replay steps whose phase is `done` (module `specify_cli.workflows._execution`), so "change
+  `plan.md`, then resume" rebuilt `touches.json` on 1.0.7 only, and three tests of the one-block design fail on
+  1.1.3. The loop gives the same answer on all three. 1.1.3 is this repo's `.specify/init-options.json` version;
+  ADR Kit's extension caps Spec Kit below 1.2.0.
+- **Existing tools**: Spec Kit's `do-while` step (`max_iterations`, `condition`), used; the workflow's per-step
+  top-level layout, whose comment states the 1.0.x resume and is corrected (T025).

@@ -5,29 +5,37 @@
 ```text
 adr_check.ts ask    <plan|tasks> <spec folder> <run folder>
 adr_check.ts decide <plan|tasks> <spec folder> <run folder> <asked digest>
+adr_check.ts report <plan|tasks> <run folder>
 adr_check.ts stop   <plan|tasks> judge
+adr_check.ts stop   <plan|tasks> rounds
 adr_check.ts stop   plan touches
 ```
 
 Run from the project root (the workflow's cwd; `drive_workflow.py` runs `stop` there too). ask and decide read
-settings from `codeworks.toml` at the checkout's HEAD, through `readPlannerSettings`; `stop` reads no settings.
+settings from `codeworks.toml` at the checkout's HEAD, through `readPlannerSettings`; report and `stop` read none.
 Each `adr` call gets `ADR_DEADLINE_MS = 1_500_000`, under the steps' 1800 s timeout, so the script reports a slow
 `adr` before the engine kills the step; the folders are checked at the same time. Every line of every subcommand
 goes to stderr, printed by one function, `adrStop` (`planner/plugin/lib/adr-check.ts`, R8), from the stop table
-below; ask's stdout carries its JSON only. Exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`,
-else 0. No subcommand formats a line of its own.
+below; ask's and report's stdout carries their JSON only. A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1
+when any is `FAIL`. ask and decide exit 0 once they reach an answer: on a stop they write it to
+`<run>/adr-<a>-stop.json` (`AdrStopRecord`: `{v: 1, exit, lines, shown: false}`) and print nothing else, and report
+exits with it. A non-zero exit from ask or decide means only that the step itself failed (a crash, a file it cannot
+write): the run fails at that step and the resume runs it again. `stop` prints its row and exits 2. No subcommand
+formats a line of its own.
 
 ### ask
 
-Removes `<run>/adr-<a>-verdict.json` first, so a stale verdict is never read. Reads settings before the artifact:
-on an empty `[shared] adr_folders` it writes the asked record with no paths and no folders and prints
-`{"judge": false, "asked": "<sha256>"}` without reading the paths (decide then passes). Otherwise reads
+Removes `<run>/adr-<a>-verdict.json` and `<run>/adr-<a>-stop.json` first, so a stale verdict or stop is never
+read. Reads settings before the artifact: on an empty `[shared] adr_folders` it writes the asked record with no paths
+and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}` without reading the paths (decide
+then passes). Otherwise reads
 `<run>/touches.json` (both artifacts: the plan's paths, or the tasks check's root entries) and, for tasks,
 `tasks.md`; on a plan check, adds to the paths the path of each departure line in `<run>/review-questions.json`
 (R13), so its record is matched and the user can rule on it; then the rulings file through core's `readRulings` and the writer guard (R9 a). Resolves the folders
 (`adrFolders`), runs `checkAdrFolder` per folder, writes `<run>/adr-<a>-asked.json` (`AdrAsked`), prints
-`{"judge": <bool>, "asked": "<sha256 of the asked record's bytes>"}` on stdout. `judge` is true when any folder
-has a governing record. Exit 0 when it wrote the record (folder outcomes are decide's), else as its stop lines give.
+`{"judge": <bool>, "decide": true, "asked": "<sha256 of the asked record's bytes>"}` on stdout. `judge` is true when
+any folder has a governing record. Folder outcomes are decide's. On a stop of its own it writes the stop record and
+prints `{"judge": false, "decide": false, "asked": ""}`. Exit 0 either way.
 
 ### judge (prompt step, `adr-judge.md`)
 
@@ -42,12 +50,20 @@ and `ADR_RULING`; validates `ADR_RULING` whole (artifact-grammar.md); appends ea
 file and to `<run>/adr-rulings-written.json`; on a plan check, calls `checkAdrFolder(cwd, folder, [path], …)` once
 per `(folder, record, path)` of the departure lines in `<run>/review-questions.json`, concurrently with the ruling
 checks under the same 1500 s deadline, and adds each departure whose record that call names as governing as a
-departure the judge named, once per key (R13); a call that could not run is exit 2; drops every departure whose `(folder, record, path)` a rulings entry names; decides each folder (data-model, Folder outcome); prints every folder's lines through `adrStop`.
+departure the judge named, once per key (R13); a call that could not run is could not run; drops every departure whose `(folder, record, path)` a rulings entry names; decides each folder (data-model, Folder outcome). A pass prints every folder's lines through `adrStop`; a stop writes them to the stop record. Exit 0 either way.
+
+### report
+
+The check loop's last step (R6). Stop record with `shown: false`: prints its lines to stderr, rewrites it with
+`shown: true`, and exits with its `exit`, so the run stops at `adr-<a>-report`. With `shown: true` (the resume after
+that stop): deletes it, prints `{"again": true}`, exit 0, and the loop runs a new iteration with that resume's
+`ADR_RULING`. No stop record: prints `{"again": false}`, exit 0. A record that does not parse: exit 2 naming it.
 
 ## Stop table (`ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
 A typed constant, `ADR_STOPS: Record<StopKind, {outcome: CheckOutcome; label; what; next}>`, so a stop kind with no
-row does not compile; each outcome is a value of core's `CheckOutcome`, never a string literal. One row per stop kind; `adrStop` renders each line as `<OUTCOME>: <label>: <what>. Next step: <next>.`, the
+row does not compile; each outcome is a value of core's `CheckOutcome`, never a string literal. Step is the step
+that finds the stop; ask's and decide's stops are printed by `adr-<a>-report`. One row per stop kind; `adrStop` renders each line as `<OUTCOME>: <label>: <what>. Next step: <next>.`, the
 PASS rows with no next step. A `CouldNotRun` from core already reads `<label>: <what>. Next step: <next>.` and is
 printed after `COULD_NOT_RUN: ` as it is, so the label appears once. `<artifact>` is `plan.md` for
 plan, `tasks.md` for tasks. One line per departure and per broken record; titles in full.
@@ -65,6 +81,7 @@ plan, `tasks.md` for tasks. One line per departure and per broken record; titles
 | `verdict-mismatch` | decide | COULD_NOT_RUN | entry | the verdict misses governing `<id>`, names `<id>` not governing, or names `<path>` not asked | resume to run the judge again |
 | `judge` | judge | COULD_NOT_RUN | `adr-<a>-judge` | the judge did not answer | resume to run the judge again |
 | `touches` | touches | COULD_NOT_RUN | `adr-plan-touches` | the touches step did not answer | resume to run it again |
+| `rounds` | rounds | COULD_NOT_RUN | `adr-<a>-check` | the check stopped 100 times in one run | start the run again with `/planner:issue-spec rescope <spec folder> #<issue>` |
 | `touches-refused` | ask, decide | FAIL | `touches.json` | `<entry>`: what is wrong | correct `<run>/touches.json`, then resume |
 | `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | missing, or no path | resume to run the touches step again |
 | `questions-refused` | ask, decide | FAIL | `review-questions.json` | what does not parse | rerun the rescope from `/planner:issue-spec rescope` |
@@ -83,38 +100,61 @@ plan, `tasks.md` for tasks. One line per departure and per broken record; titles
 No new input: a ruling reaches the run only as `ADR_RULING` from the resume that carries it.
 
 ```yaml
-  - id: to-adr-plan            # after to-settled-design, before to-mark-critiques
+  - id: to-adr-plan                # after to-settled-design, before to-mark-critiques
     type: if
     condition: *spec-is-written
     then:
-      - id: adr-plan-clear       # a resume re-runs the block: no touches step leaves the last run's paths
-        type: shell
-        timeout: 60
-        run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
-      - id: adr-plan-touches
-        type: prompt
-        integration: "{{ inputs.integration }}"
-        timeout: 1800
-        prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
-      - id: adr-plan-ask
-        type: shell
-        output_format: json
-        timeout: 1800
-        run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
-      - id: adr-plan-judging
-        type: if
-        condition: "{{ steps.adr-plan-ask.output.data.judge }}"
-        then:
-          - id: adr-plan-judge
+      - id: adr-plan-check           # one iteration is one whole check; each resume after a stop runs a new one
+        type: do-while
+        max_iterations: 100
+        condition: "{{ steps.adr-plan-report.output.data.again }}"
+        steps:
+          - id: adr-plan-clear       # a touches step that fails leaves no file, never the last iteration's paths
+            type: shell
+            timeout: 60
+            run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
+          - id: adr-plan-touches
             type: prompt
             integration: "{{ inputs.integration }}"
             timeout: 1800
-            prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for artifact plan, spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
-      - id: adr-plan-decide
-        type: shell
-        timeout: 1800
-        run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}"
-  # to-adr-tasks: the same with `tasks`, after to-tasks, with no touches step: it reads the plan's touches.json.
+            prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-plan-ask
+            type: shell
+            output_format: json
+            timeout: 1800
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+          - id: adr-plan-judging
+            type: if
+            condition: "{{ steps.adr-plan-ask.output.data.judge }}"
+            then:
+              - id: adr-plan-judge
+                type: prompt
+                integration: "{{ inputs.integration }}"
+                timeout: 1800
+                prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for artifact plan, spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-plan-deciding
+            type: if
+            condition: "{{ steps.adr-plan-ask.output.data.decide }}"
+            then:
+              - id: adr-plan-decide
+                type: shell
+                timeout: 1800
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}"
+          - id: adr-plan-report
+            type: shell
+            output_format: json
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" report plan ".specify/workflows/runs/{{ context.run_id }}"
+      - id: adr-plan-out-of-rounds   # the loop ended at max_iterations still wanting another
+        type: if
+        condition: "{{ steps.adr-plan-report.output.data.again }}"
+        then:
+          - id: adr-plan-rounds
+            type: shell
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stop plan rounds
+  # to-adr-tasks: the same loop with `tasks` (adr-tasks-check … adr-tasks-rounds), after to-tasks, with no clear or
+  # touches step: it reads the plan's touches.json.
 ```
 
 ## `adr-touches.md` (installed with the workflow)
@@ -155,9 +195,11 @@ GitHub unanswered or a settings error: exit 2 naming it. Not a check step: it ru
   `<run>/review-questions.json` once the run has started, before it resumes past grill; a file it cannot read
   exits non-zero.
 - `report` sets `adr: true` when the failed step is any of `adr-plan-clear`, `adr-plan-touches`, `adr-plan-ask`, `adr-plan-judge`, `adr-plan-decide`,
-  `adr-tasks-ask`, `adr-tasks-judge`, `adr-tasks-decide`. For a judge or touches step, `stderr` is what
+  `adr-plan-report`, `adr-plan-rounds`, `adr-tasks-ask`, `adr-tasks-judge`, `adr-tasks-decide`, `adr-tasks-report`,
+  `adr-tasks-rounds`, matched by the step's own id: in a loop iteration after the first, specify reports a qualified
+  id, `<loop>:<step>:<n>` (e.g. `adr-plan-check:adr-plan-report:1`), whose middle segment is it. For a judge or touches step, `stderr` is what
   `node <plugin>/scripts/adr_check.ts stop <a> judge` (or `stop plan touches`) prints, run from the project root; if that cannot run or
-  exits other than 2, `drive_workflow.py` exits non-zero naming it. For ask and decide, the step's own stderr.
+  exits other than 2, `drive_workflow.py` exits non-zero naming it. For any other step, the step's own stderr.
 
 ## Skill (`SKILL.md`)
 

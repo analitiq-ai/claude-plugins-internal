@@ -57,7 +57,7 @@ Set up once, and merged to the repository's default branch before the first `/pl
 planner reads `codeworks.toml` at `HEAD`, and landing stops on any committed path outside the spec
 folder that the default branch lacks.
 
-1. Install the Spec Kit CLI, `specify` 1.0.7 or later and below 1.2.0 (ADR Kit's limit), and initialise the
+1. Install the Spec Kit CLI, `specify` 1.1.3 or later and below 1.2.0 (ADR Kit's limit), and initialise the
    repository: `specify init --here --integration claude`.
 
    Planning uses three third-party Spec Kit community extensions, part of neither Spec Kit nor planner: grill
