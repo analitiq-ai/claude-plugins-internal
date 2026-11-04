@@ -317,6 +317,11 @@ class Merged(Repo):
         tree = worktree.merged(str(self.root), head, base)
         self.assertEqual(worktree.files_in(str(self.root), f"{tree}..HEAD"), ["n.py"])
 
+    def test_the_commits_per_file_leave_out_what_the_base_branch_committed(self):
+        head, base = self.diverged()
+        self.assertEqual(worktree.commits_per_file(str(self.root), head), {"m.py": 1, "n.py": 1})
+        self.assertEqual(worktree.commits_per_file(str(self.root), head, base), {"n.py": 1})
+
     def test_a_base_the_head_already_carries_gives_the_heads_own_tree(self):
         head = self.commit("b.py", "x\n", "feat: b")
         base = git(self.root, "rev-parse", "main")
@@ -361,15 +366,32 @@ class RoundFacts(Repo):
         ledger.record_report(state, rnd["ref"], REVIEWERS[0], {"findings": findings}, now=T0)
         return rnd
 
-    def test_second_round_landing_on_fix_written_lines_shifts_the_burden_of_proof(self):
-        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
-        first = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
-        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5)], first)
+    def patched_first_round(self, state):
+        """Round one, on a 20-line b.py with a finding at line 5, assessed PATCH."""
+        head = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
+        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5)], head)
         assess(state, "PATCH")
+
+    def fix_b(self):
+        """The branch's own fix: one commit that splits b.py line 5 in two."""
         lines = [f"b{i}\n" for i in range(20)]
         lines[4:5] = ["fixed-a\n", "fixed-b\n"]
-        second = self.commit("b.py", "".join(lines), "fix: b")
-        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=6)], second)
+        return self.commit("b.py", "".join(lines), "fix: b")
+
+    def main_edits_merged(self):
+        """Main rewrites a.py lines 11-13, one commit each, and the branch merges main."""
+        git(self.root, "checkout", "-q", "main")
+        lines = [f"line{i}\n" for i in range(30)]
+        for i in range(3):
+            lines[10 + i] = f"main{i}\n"
+            self.commit("a.py", "".join(lines), f"main {i}")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+
+    def test_second_round_landing_on_fix_written_lines_shifts_the_burden_of_proof(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.patched_first_round(state)
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=6)], self.fix_b())
 
         got = facts.round_facts(state, rnd, str(self.root))
         self.assertTrue(got["count_not_falling"])
@@ -393,6 +415,31 @@ class RoundFacts(Repo):
         state["spec"] = None
         state["spec_blob"] = None
         self.assertTrue(briefs.brief(state, rnd)["change_under_review"].endswith(f"diff {moved}...HEAD"))
+
+    def test_a_file_the_base_branch_edited_three_times_is_not_at_its_third_edit(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.patched_first_round(state)
+        self.main_edits_merged()
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=6)], self.fix_b())
+        self.assertEqual(facts.round_facts(state, rnd, str(self.root))["files_at_third_edit"], [])
+
+    def test_a_finding_on_a_line_the_base_branch_wrote_is_not_on_fix_lines(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.patched_first_round(state)
+        self.main_edits_merged()
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="a.py", line=11),
+                                      finding("code-reviewer-2", file="b.py", line=6)], self.fix_b())
+        got = facts.round_facts(state, rnd, str(self.root))["findings"]
+        self.assertFalse(got["code-reviewer-1"]["on_fix_lines"])
+        self.assertTrue(got["code-reviewer-2"]["on_fix_lines"])
+
+    def test_fix_additions_leave_out_what_the_base_branch_added(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.patched_first_round(state)
+        self.main_edits_merged()
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=6)], self.fix_b())
+        got = facts.round_facts(state, rnd, str(self.root))
+        self.assertEqual((got["original_additions"], got["fix_additions"]), (20, 2))
 
     def test_first_round_never_carries_a_burden(self):
         state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
@@ -418,6 +465,15 @@ class RoundFacts(Repo):
             head = self.commit("b.py", f"{i + 1}\n", f"fix {i}")
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], head)
         self.assertEqual(facts.round_facts(state, rnd, str(self.root))["files_at_third_edit"], ["b.py"])
+
+    def test_commits_before_the_first_reviewed_head_are_not_edits(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.commit("b.py", "-1\n", "feat: b, first draft")
+        first = self.commit("b.py", "0\n", "feat: b")
+        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], first)
+        assess(state, "PATCH")
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], self.commit("b.py", "1\n", "fix"))
+        self.assertEqual(facts.round_facts(state, rnd, str(self.root))["files_at_third_edit"], [])
 
     def test_a_finding_that_names_no_line_is_measured_like_any_other(self):
         """`line` is not required of a finding, and a whole-branch judgement never carries one."""
