@@ -647,7 +647,9 @@ def on_workflow(payload: dict, deadline: adrkit.Deadline) -> dict | None:
             try:
                 base = _review_base(where, merges_into)
                 spent["review-base fetch"] = time.monotonic() - started
+                started = time.monotonic()
                 decision = _delta_start(where, decision, base)
+                spent["merge of the last reviewed head"] = time.monotonic() - started
             except RuntimeError as exc:
                 return block(payload, action, str(exc), event)
             governance = None

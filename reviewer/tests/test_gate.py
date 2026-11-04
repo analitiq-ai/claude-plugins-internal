@@ -237,6 +237,18 @@ class InternalRound(Gate):
         reviewed = second["waves"][0][0]["prompt"].split("git diff ")[1].split("\n")[0]
         self.assertEqual(worktree.files_in(str(self.root), reviewed), ["n.py"])
 
+    def test_a_round_whose_reviewed_head_git_no_longer_has_is_refused_with_why(self):
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "commit", "-q", "--amend", "-m", "feat: b amended")
+        git(self.root, "reflog", "expire", "--expire=now", "--all")
+        git(self.root, "gc", "-q", "--prune=now")
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIsNone(args)
+        self.assertIn(f"measured from its head {self.head[:7]}", self.reason(out))
+        self.assertIn("not something we can merge", self.reason(out))
+
     def test_a_round_is_measured_from_the_branch_the_pr_merges_into(self):
         git(self.root, "checkout", "-q", "-b", "dev", "main")
         dev = self.commit("d.py", "d\n", "dev work")

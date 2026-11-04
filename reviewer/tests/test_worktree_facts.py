@@ -335,6 +335,19 @@ class Merged(Repo):
         for line in ("-<<<<<<<", "-feat", "-=======", "-main", "->>>>>>>", "+resolved"):
             self.assertIn(line, patch)
 
+    def test_a_repository_with_sha256_objects_gives_its_tree(self):
+        root = Path(self.tmp.name) / "sha256"
+        root.mkdir()
+        git(root, "init", "-q", "-b", "main", "--object-format=sha256")
+        git(root, "config", "user.email", "t@example.com")
+        git(root, "config", "user.name", "t")
+        (root / "a.py").write_text("a\n")
+        git(root, "add", "a.py")
+        git(root, "commit", "-q", "-m", "base")
+        head = git(root, "rev-parse", "HEAD")
+        self.assertEqual(len(head), 64)
+        self.assertEqual(worktree.merged(str(root), head, head), git(root, "rev-parse", "HEAD^{tree}"))
+
     def test_a_head_git_cannot_merge_is_an_error(self):
         with self.assertRaises(RuntimeError) as failed:
             worktree.merged(str(self.root), "0" * 39 + "1", git(self.root, "rev-parse", "main"))

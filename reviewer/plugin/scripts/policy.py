@@ -27,7 +27,9 @@ class Decision:
     allow: bool
     reason: str = ""
     scope: str = ""
-    delta_from: str = ""  # the last reviewed head; the gate diffs from it as merged with the round's base
+    # What a delta round diffs from: policy sets the last reviewed head, and the gate replaces it with that head's
+    # tree merged with the round's base before the briefs read it.
+    delta_from: str = ""
     escalation: bool = False
 
 
