@@ -177,6 +177,22 @@ def review_base(root: str, target: str) -> str:
     return git(root, "merge-base", tracking, "HEAD")
 
 
+_OID = re.compile(r"[0-9a-f]{40}")
+
+
+def merged(root: str, head: str, base: str) -> str:
+    """The tree `head` would hold once it merged `base`, as git merges them: a conflict is left as git leaves it,
+    both sides between markers, so a diff from this tree shows how it was resolved. A `base` the head already
+    carries gives the head's own tree. RuntimeError when git cannot merge them."""
+    args = ("merge-tree", "--write-tree", "--no-messages", "--name-only", head, base)
+    done = _run(root, *args)
+    # git exits 1 both for a conflict, whose tree it still writes, and for a side it cannot merge, where it writes none.
+    tree = done.stdout.split("\n", 1)[0]
+    if done.returncode not in (0, 1) or not _OID.fullmatch(tree):
+        raise _failure(root, args, done)
+    return tree
+
+
 def files_in(root: str, rev_range: str) -> list[str]:
     """Every path `rev_range` touches, both sides of a rename."""
     return _listed(root, *_DIFF, "--no-renames", "--name-only", "-z", rev_range)

@@ -27,7 +27,7 @@ class Decision:
     allow: bool
     reason: str = ""
     scope: str = ""
-    delta_from: str = ""
+    delta_from: str = ""  # the last reviewed head; the gate diffs from it as merged with the round's base
     escalation: bool = False
 
 

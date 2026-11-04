@@ -31,6 +31,7 @@ import ledger
 import policy
 import reshape
 import test_policy
+import worktree
 
 SCRIPTS = PLUGIN / "scripts"
 GATE = SCRIPTS / "gate.py"
@@ -218,9 +219,23 @@ class InternalRound(Gate):
         self.commit("b.py", "fixed\n", "fix: b")
         _, second = self.launch()
         prompt = second["waves"][0][0]["prompt"]
-        self.assertIn(f"git diff {self.head}", prompt)
+        reviewed_tree = git(self.root, "rev-parse", f"{self.head}^{{tree}}")
+        self.assertIn(f"git diff {reviewed_tree}..HEAD", prompt)
         self.assertIn("unchecked None", prompt)
         self.assertTrue(second["round_ref"].endswith("internal-0.2"))
+
+    def test_a_round_after_a_merge_of_the_base_branch_reviews_only_the_branchs_own_work(self):
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "checkout", "-q", "main")
+        self.commit("m.py", "m\n", "merged elsewhere")
+        git(self.root, "push", "-q", "origin", "main")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+        self.commit("n.py", "n\n", "feat: n")
+        _, second = self.launch()
+        reviewed = second["waves"][0][0]["prompt"].split("git diff ")[1].split("\n")[0]
+        self.assertEqual(worktree.files_in(str(self.root), reviewed), ["n.py"])
 
     def test_a_round_is_measured_from_the_branch_the_pr_merges_into(self):
         git(self.root, "checkout", "-q", "-b", "dev", "main")
@@ -2050,6 +2065,21 @@ class DecisionReview(Gate):
         _, first = self.launch()
         self.run_reviewers(first, [])
         self.change("lib/b.py")
+        _, second = self.launch()
+        self.assertEqual(second["decisions"]["governing"], [])
+        self.assertNotIn(self.DECISION, self.reviewers(second))
+
+    def test_a_delta_round_is_not_asked_about_what_the_base_branch_merged_in(self):
+        needs_adr(self)
+        self.change("lib/b.py")
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "checkout", "-q", "-B", "main", "origin/main")
+        self.change()
+        git(self.root, "push", "-q", "origin", "main")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+        self.change("lib/c.py")
         _, second = self.launch()
         self.assertEqual(second["decisions"]["governing"], [])
         self.assertNotIn(self.DECISION, self.reviewers(second))
