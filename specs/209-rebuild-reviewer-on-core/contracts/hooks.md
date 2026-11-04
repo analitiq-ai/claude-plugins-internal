@@ -12,7 +12,7 @@ skip it. Every refusal is from [refusals.md](refusals.md). No entry posts to an 
 | PreToolUse `Read\|Glob\|Grep` | `pre-tool-use.ts` | sweeper read confinement |
 | PostToolUse `Bash` | `post-tool-use.ts` | fetch the clone's HEAD into the bare copy, compare (ADR-0020 d2); after-commit check (R13): fence, structural steps |
 | PostToolUse `Workflow` | `post-tool-use.ts` | record a recorded launch's run ID; invalid when seen before or `scriptPath` differs (ADR-0021 d2) |
-| PostToolUse `StructuredOutput` | `post-tool-use.ts` | record round reports/assessments → `writeState` (round named by its run) / `placeHold` / `placeRescopeHold`; claim/shim results → `recordGates` + pass record |
+| PostToolUse `StructuredOutput` | `post-tool-use.ts` | record round reports/assessments → one `writeState` (round named by its run, the holds it places as `placements`), a spec PR seen open → `placeRescopeHold`; claim/shim results → `recordGates` + pass record |
 | SubagentStart / SubagentStop | `subagent.ts` | in-flight reviewer tracking |
 | UserPromptSubmit | `user-prompt-submit.ts` | `reviewer on` / `reviewer off` only; writes `off` via core `setReviewerOff` |
 | SessionStart `resume\|compact` | `session-start.ts` | off-switch notice |

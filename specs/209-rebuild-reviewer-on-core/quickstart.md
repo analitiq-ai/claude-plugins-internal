@@ -25,7 +25,7 @@ node core/scripts/check-carriers.ts --base origin/main
 | 3 | US1-3 | an unsigned commit (or one by another author) adds a file under `issues/42/` | fold unchanged; `tamper-<oid>` cause with that file in `remaining`; no commit; refusal names the clearance, Ready move and admin comment |
 | 4 | US1-4, SC-002 | hold placed; new session folder | hold still OPEN; no reviewer file holds rounds, holds or gates |
 | 5 | US1-5 | gates with WRONG rulings from 2 checks; a third check rules WRONG; then the same tree re-checked in a new session | one commit with `gates.<ref>.json` and `hold.claim-<id>.<since>.json`; the re-check adds no count |
-| 6 | US1-6, FR-020 | two writers from one reading (`placeHold(claim-7)` and a round) | the second is refused by the expected head → `StateStale`; it reads and decides again; both events in the fold; a retry whose event is already there commits nothing |
+| 6 | US1-6, FR-020 | two writers from one reading (`recordGates` placing `claim-7`, and a round) | the second is refused by the expected head → `StateStale`; it reads and decides again; both events in the fold; a retry whose event is already there commits nothing |
 | 7 | US1-7 | fake answers `wasSignedByGitHub: false` | `StateWriteUnsigned` naming the oid; nothing else committed; next read derives `tamper-<oid>` |
 | 8 | FR-025 | no `ledger` ref | every read and write refuses as could not run, naming README step 6; nothing created |
 | 9 | US3-1..2, SC-003 | commits on `42-us2-logout`, `43-us1-other`, `main` | first proceeds to checks; others refused naming `#42`, `42-us`; none recorded |

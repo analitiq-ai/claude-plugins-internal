@@ -24,7 +24,7 @@ refs match `[A-Za-z0-9._-]+`.
 |---|---|---|---|
 | `round` | `{kind, v, round: Round}` (`Round` gains `run`) | `round.<run>.json` | no round with its `(stage, n)` or `run` |
 | `ruling` | `{kind, v, ruling: Ruling}` with `commits: []` | `ruling.<r>.<h(key)>.json` | its round is in `rounds`; `(round, key)` not ruled |
-| `ruling-commit` | `{kind, v, round: RoundId, key, commit: sha40}` | `ruling-commit.<r>.<h(key)>.<commit>.json` | its ruling is FIX and lacks `commit` |
+| `ruling-commit` | `{kind, v, round: RoundId, key, commit: sha40}` | `ruling-commit.<r>.<h(key)>.<commit>.json` | its ruling is in `rulings`, is FIX, and its `commits` lacks `commit` |
 | `pushback` | `{kind, v, pushback: Pushback}` | `pushback.<r>.<h(key)>.json` | its round is in `rounds` |
 | `hold` | `{kind, v, hold: {id, kind, since, question, spec_pr}}` | `hold.<id>.<since>.json` | no row, or its row RELEASED (reopened in place); a `rescope` with `spec_pr` set also when its row records another `spec_pr` or none, OPEN or not (ADR-0013 d5) |
 | `release` | `{kind, v, release: {id, since, released, released_by}}` | `release.<id>.<since>.json` | the row `id` is OPEN with that `since` |
@@ -78,15 +78,21 @@ could not run.
 ## Writes
 
 Each takes the run's `reading`, commits at most once with `createCommitOnBranch` (`expectedHeadOid:
-reading.head`, additions only, headline `issues/<n>: <kinds>`), and returns the reading after its commit.
+reading.head`, additions only, headline `issues/<n>: <kinds>`), and returns the reading after its commit. One
+write's events are one commit: a round and the holds its report places, a gates section and the holds its counts
+place, and every release of one claim land together or not at all (ADR-0011 d1, ADR-0013 d4, FR-015).
 
-| function | events | refuses (`StateWriteRefused`, posting nothing) |
+| function | events | refuses (`StateWriteRefused`, committing nothing) |
 |---|---|---|
-| `writeState(r, w, repo, issue, shared, reading, next)` | `round`, `ruling`, `ruling-commit`, `pushback` from `checkTransition(reading.snapshot, next)`; new rounds' `at` from `w.now()` | transition breaks; a hold or `gates` differs from `reading`'s |
-| `placeHold(…, reading, {id, kind, question})` | `hold`, or none when the row is OPEN | `rescope` kind; escalation/claim with no question |
-| `placeRescopeHold(…, reading, {question} \| {specPr})` | `hold` (rescope), none when placed as ADR-0013 d5 says | — |
+| `writeState(r, w, repo, issue, shared, reading, next, placements)` | `round`, `ruling`, `ruling-commit`, `pushback` from `checkTransition(reading.snapshot, next)`, new rounds' `at` from `w.now()`; a `hold` (`spec_pr` null, `since` from `w.now()`) per placement `{id, kind, question}` whose row is not OPEN; an OPEN row is left as it is | transition breaks; `next`'s holds or `gates` differ from `reading`'s; a `claim` or `shim` placement (`recordGates` places them); a `rescope` placement with a spec PR (`placeRescopeHold`); an `escalation` or `rescope` placement with no question |
+| `placeRescopeHold(…, reading, specPr)` | `hold` (`rescope-<issue>`, `spec_pr: specPr`, no question); none when the row records `specPr`, released or not (ADR-0013 d5) | — |
 | `recordGates(…, reading, ref, gates, openings)` | `gates` + a `hold` for each opening not OPEN | — |
 | `releaseOnClaim(…, reading)` → `ClaimRelease {released, reset}` | a `release` per releasable hold and releasable tamper | an unreleased tamper not releasable, naming its `remaining` and the release |
+
+Which write places each hold: one a round's report places (`escalation-`, `pushback-`, `audit-`, a verdict's
+`rescope-`) is a placement of that round's `writeState`; a spec PR's `rescope-` is `placeRescopeHold`'s; `claim-`
+and `shim-` are `recordGates`'s. There is no `placeHold`: a hold with no round is `writeState` with `next` the
+reading's snapshot.
 
 Every write refuses while an unreleased tamper stands, except `releaseOnClaim`'s commit when every such tamper
 is releasable, which is the write that releases them (FR-024). The refusal names: a repository admin's deletion on

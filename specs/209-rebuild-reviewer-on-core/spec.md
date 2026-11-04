@@ -66,8 +66,8 @@ answers success for the head.
    recorded CLEAN, **Then** `ledger` gets one new reviewer App commit under `issues/42/` that adds that
    round's file (stage INTERNAL, head `H`, result CLEAN) and changes nothing else; the fold's earlier rounds
    and hold rows are unchanged.
-2. **Given** a round ruled ESCALATE, **When** it is recorded, **Then** the snapshot carries the round and an
-   OPEN `escalation-42` hold, placed through core's hold call, and the orchestrator's reading of the story
+2. **Given** a round ruled ESCALATE, **When** it is recorded, **Then** one commit adds the round and an OPEN
+   `escalation-42` hold, placed as that round write's placement, and the orchestrator's reading of the story
    is held.
 3. **Given** a commit under `issues/42/` that is neither a reviewer App event commit nor a repository
    admin's clearance (an invalid commit), **When** reviewer's hook would record a round, **Then** the fold

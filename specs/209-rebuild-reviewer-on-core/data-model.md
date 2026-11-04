@@ -28,9 +28,9 @@ restated here. The core call each uses:
 
 | hold id | core call |
 |---|---|
-| — (round recorded) | `writeState` (appends a `Round`, file named by its `run`) |
-| `escalation-<issue>` (with question), `pushback-<issue>`, `audit-<issue>` | `placeHold` |
-| `rescope-<issue>` | `placeRescopeHold`: `{question}` on a RESCOPE verdict, `{specPr}` when a spec PR is seen open |
+| — (round recorded) | `writeState` (appends a `Round`, file named by its `run`, with the holds its report places) |
+| `escalation-<issue>` (with question), `pushback-<issue>`, `audit-<issue>`, `rescope-<issue>` on a RESCOPE verdict (with question) | `writeState`'s `placements`, in the round's commit |
+| `rescope-<issue>` for a spec PR seen open | `placeRescopeHold(specPr)` |
 | `claim-<lineage>` (with question), `shim-<bug>` | `recordGates` |
 | release of any, `tamper-<oid>` included | `releaseOnClaim` |
 

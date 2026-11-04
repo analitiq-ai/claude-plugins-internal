@@ -140,15 +140,17 @@ named, at main 49a3d8b (reviewer ADR-0011 and ADR-0013 as merged in #290).
 - **Decision**: One private `commitEvents(writer, repo, issue, reading, events)` in `core/src/state.ts` is the
   only path to `ledger`: it refuses when `reading` has an unreleased tamper, unless the events release every one
   of them, which only `releaseOnClaim` sends and only when each is releasable (FR-002, FR-024; the refusal names
-  the release), validates every event, drops events whose file the fold already holds (retry, FR-016), commits nothing when none is left,
-  and otherwise calls `createCommitOnBranch` (`fileChanges.additions` only, `expectedHeadOid: reading.head`,
+  the release), validates every event, drops events whose file the fold already holds (retry, FR-016), commits
+  nothing when none is left, and otherwise calls `createCommitOnBranch` (`fileChanges.additions` only, `expectedHeadOid: reading.head`,
   headline `issues/<n>: <kinds>`), asking back `commit { oid signature { isValid wasSignedByGitHub } }`. An answer
   not both true throws `StateWriteUnsigned` naming the oid (FR-016). The public writes keep their roles and gain
-  the reading: `writeState(…, reading, next)` derives round, ruling, ruling-commit and pushback events from
-  `checkTransition(reading.snapshot, next)` and stamps each new round's `at` from GitHub's clock;
-  `placeHold(…, reading, placement)`; `placeRescopeHold(…, reading, {question} | {specPr})`;
-  `recordGates(…, reading, ref, gates, openings)`; `releaseOnClaim(…, reading)`, one commit of a release event for
-  every releasable hold and releasable tamper. Each returns the advanced reading (R3).
+  the reading: `writeState(…, reading, next, placements)` derives round, ruling, ruling-commit and pushback events
+  from `checkTransition(reading.snapshot, next)`, stamps each new round's `at` from GitHub's clock, and adds a hold
+  event per placement whose row is not OPEN, so a round and the holds its report places (escalation, pushback, audit,
+  a verdict's rescope) are one commit (ADR-0013 d4, FR-015); `placeRescopeHold(…, reading, specPr)` for a spec PR
+  seen open; `recordGates(…, reading, ref, gates, openings)`; `releaseOnClaim(…, reading)`, one commit of a release
+  event for every releasable hold and releasable tamper. `placeHold` goes: no hold is placed apart from the round or
+  the gates that place it. Each returns the advanced reading (R3).
 - **Rationale**: ADR-0011 d1, d3; FR-001, FR-016, FR-020, FR-023. Core derives events from transitions, so
   reviewer never writes a file name or a path, and the add-only rule is the mutation's own shape.
 - **Existing tools**: `checkTransition`, `withRow`/`openRow` (now the fold's), `writer.now()`; GitHub's
