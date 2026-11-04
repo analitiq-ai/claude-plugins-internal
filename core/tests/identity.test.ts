@@ -269,8 +269,8 @@ describe("specPr's merge commit", () => {
     ["open", {}],
     ["closed", { closed: true }],
   ] as const) {
-    it(`is null for a PR that is ${state}`, async () => {
-      assert.deepEqual(await specPr(onSpecBranch(over), REPO, 145), { number: 170, state, mergeCommit: null });
+    it(`refuses a PR that is ${state} yet holds a merge commit`, async () => {
+      await assert.rejects(specPr(onSpecBranch({ ...over, mergeCommit: { oid: sha(170) } }), REPO, 145), /not the shape asked for/);
     });
   }
 
