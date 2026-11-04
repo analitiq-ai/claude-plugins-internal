@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
 import { chainEntryKey, Gates } from "./contracts/gates.ts";
-import { byFileName, EVENT_KIND, eventFile, eventText, inApplyOrder, LedgerEvent, tamperId } from "./contracts/ledger.ts";
+import { byFileName, EVENT_KIND, eventFile, eventText, inApplyOrder, LedgerEvent } from "./contracts/ledger.ts";
 import { GitSha, NameSegment, Time } from "./contracts/scalars.ts";
 import { HoldRequest, type Hold, type Round, type RoundId, type Ruling, type Snapshot } from "./contracts/snapshot.ts";
 import {
@@ -13,6 +13,7 @@ import {
   assertIssueNumber,
   connectionNodes,
   GitHubRefused,
+  GitHubUnanswered,
   isWriterRole,
   ownerAndName,
   restLogin,
@@ -23,7 +24,7 @@ import {
 } from "./github.ts";
 import {
   applyEvents,
-  EMPTY_SNAPSHOT,
+  emptySnapshot,
   foldStory,
   mayClear,
   mayHoldEvents,
@@ -66,16 +67,25 @@ export type StatusChange = z.infer<typeof StatusChangeNode>;
 
 const ProjectItem = z.object({ project: z.object({ url: z.string() }) });
 
-/** Why a story is held. Not a value set: no component but core writes or compares one. */
-export type StateCause = { cause: "tampered"; commit: string; remaining: string[] } | { cause: "open_hold"; id: string };
+/** Why a story is held. A union tag, not a value set: no agent answers in it (root ADR-0010 d1). */
+export type StateCause = { cause: "tampered"; id: string; commit: string; remaining: string[] } | { cause: "open_hold"; id: string };
 
 export type CommentAt = { url: string; at: string };
 
 /** `comment.id` is the comment's `databaseId`, which the release records. */
 export type Releasable = { id: string; comment: CommentAt & { id: number }; reset: boolean };
 
-/** An invalid commit to the story: `at` is its release floor; `remaining`, its files at the head, from the root. */
-export type Tamper = { commit: string; at: string; remaining: string[]; released: boolean; releasable: Releasable | null };
+/**
+ * An invalid commit to the story: `at` is its release floor; `remaining`, its files at the head, from the root;
+ * `released` and `released_by`, null until its release, as a hold row's are.
+ */
+export type Tamper = Pick<Hold, "released" | "released_by"> & {
+  id: string;
+  commit: string;
+  at: string;
+  remaining: string[];
+  releasable: Releasable | null;
+};
 
 /** What a reading is folded from, so a write folds its own commit onto it as a read at that commit would. */
 export type Folded = {
@@ -183,7 +193,7 @@ function firstLine(body: string): string {
   return body.split("\n", 1)[0];
 }
 
-/** The first line of the comment the orchestrator App asks an escalation hold's question with. */
+/** The first line of the comment the orchestrator App asks a hold's question with. */
 export function questionTag(hold: Pick<Hold, "id" | "since">): string {
   return `<!-- codeworks:hold-question ${hold.id} ${hold.since} -->`;
 }
@@ -244,10 +254,11 @@ function holdRelease(hold: Hold, floor: string, terms: ReleaseTerms): Releasable
   const reset = resetAfter(terms, second);
   if (reset !== null) return releasedBy(hold.id, reset, true);
   if (!readyAfter(terms, second)) return null;
-  // An escalation's answer is a writer's comment after its question (orchestrator ADR-0010 d2); with no question
-  // posted, only a reset releases it.
+  // An escalation, or a rescope a verdict placed, asks a question (orchestrator ADR-0010 d1), and its answer is a
+  // writer's comment after it (d2); with no question posted, only a reset releases the hold.
+  const { escalation, rescope } = HoldKind.schema.enum;
   let answeredAfter = 0;
-  if (hold.kind === HoldKind.schema.enum.escalation) {
+  if (hold.kind === escalation || (hold.kind === rescope && hold.spec_pr === null)) {
     const tag = questionTag(hold);
     const question = terms.orchestratorComments.find((comment) => firstLine(comment.body) === tag);
     if (question === undefined) return null;
@@ -278,10 +289,10 @@ function tamperOf(derived: DerivedTamper, issue: number, folded: Folded, story: 
   // An invalid commit's date is its author's to set; the first GitHub-signed commit after it, if one is, bounds it.
   const at = earlier(committedDate, successor);
   const remaining = derived.touched.filter((name) => story.headFiles.has(name)).map((name) => `${storyDir(issue)}/${name}`);
-  const released = story.releasedTampers.has(derived.id);
+  const release = story.tamperReleases.get(derived.id);
   // While a file it left stays on `ledger`, the release rule does not reach it.
-  const releasable = released || remaining.length > 0 ? null : tamperRelease(derived.id, at, terms);
-  return { commit: oid, at, remaining, released, releasable };
+  const releasable = release !== undefined || remaining.length > 0 ? null : tamperRelease(derived.id, at, terms);
+  return { id: derived.id, commit: oid, at, remaining, released: release?.released ?? null, released_by: release?.released_by ?? null, releasable };
 }
 
 function holdFloor(story: StoryFold, id: string): string {
@@ -299,7 +310,7 @@ function readingOf(head: string, issue: number, folded: Folded, story: StoryFold
   const releasable = openHolds.flatMap((row) => holdRelease(row, holdFloor(story, row.id), terms) ?? []);
   const tamper = story.tampers.map((derived) => tamperOf(derived, issue, folded, story, terms));
   const causes: StateCause[] = [
-    ...tamper.flatMap((each): StateCause[] => (each.released ? [] : [{ cause: "tampered", commit: each.commit, remaining: each.remaining }])),
+    ...unreleased(tamper).map(({ id, commit, remaining }): StateCause => ({ cause: "tampered", id, commit, remaining })),
     ...openHolds.map((row): StateCause => ({ cause: "open_hold", id: row.id })),
   ];
   return {
@@ -312,7 +323,7 @@ function readingOf(head: string, issue: number, folded: Folded, story: StoryFold
     // A key pushed back more than once is named by its last pushback's round.
     pushed_back: new Map((snapshot?.pushbacks ?? []).map((pushback) => [pushback.key, pushback.round])),
     releasable,
-    startable: tamper.every((each) => each.released || each.releasable !== null) && releasable.length === openHolds.length,
+    startable: unreleased(tamper).every((each) => each.releasable !== null) && releasable.length === openHolds.length,
     reset: terms.reset === null ? null : { url: terms.reset.url, at: terms.reset.createdAt },
     folded,
   };
@@ -489,23 +500,39 @@ async function storyCommits(reader: GitHubClient, repo: string, issue: number, h
   return history.map((node, i) => storyCommitOf(node, authors[i].author?.login ?? null)).toReversed();
 }
 
+// Anything not a Blob, such as a tree, has no text, so the commit adding it holds no event.
+const BlobAnswer = z.union([
+  z.strictObject({ text: z.string().nullable(), isTruncated: z.boolean(), isBinary: z.boolean().nullable() }),
+  z.strictObject({}),
+]);
+
+// Null for a binary or a non-Blob, neither of which is an event's text. A text GitHub does not give whole is unread, so
+// it fails the read rather than make the commit invalid.
+function blobText(answer: z.infer<typeof BlobAnswer> | null, blob: string, where: string): string | null {
+  if (answer === null) throw new GitHubUnanswered(`GitHub has no object ${blob} in ${where}`);
+  if (!("text" in answer) || answer.isBinary === true) return null;
+  if (answer.isTruncated) throw new GitHubUnanswered(`GitHub truncated the text of blob ${blob} in ${where}`);
+  if (answer.text === null) throw new GitHubUnanswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
+  return answer.text;
+}
+
 async function blobTexts(reader: GitHubClient, repo: string, blobs: readonly string[]): Promise<Map<string, string>> {
   const unique = [...new Set(blobs)];
   if (unique.length === 0) return new Map();
   const aliases = unique.map((_, i) => `b${i}`);
   const query = `query($owner: String!, $name: String!, ${aliases.map((alias) => `$${alias}: GitObjectID!`).join(", ")}) {
   repository(owner: $owner, name: $name) {
-    ${aliases.map((alias) => `${alias}: object(oid: $${alias}) { ... on Blob { text } }`).join("\n    ")}
+    ${aliases.map((alias) => `${alias}: object(oid: $${alias}) { ... on Blob { text isTruncated isBinary } }`).join("\n    ")}
   }
 }`;
   const vars = Object.fromEntries(aliases.map((alias, i) => [alias, unique[i]]));
-  // A tree, or anything else not a Blob, answers with no text.
-  const Blobs = z.object({ repository: z.record(z.string(), z.object({ text: z.string().nullable().optional() }).nullable()) });
-  const answer = answerOf(Blobs, await reader.graphql(query, { ...ownerAndName(repo), ...vars }), `the blobs of ${repo}'s ${LEDGER_BRANCH}`);
+  const where = `${repo}'s ${LEDGER_BRANCH}`;
+  const Blobs = z.object({ repository: z.record(z.string(), BlobAnswer.nullable()) });
+  const answer = answerOf(Blobs, await reader.graphql(query, { ...ownerAndName(repo), ...vars }), `the blobs of ${where}`);
   return new Map(
     aliases.flatMap((alias, i) => {
-      const text = answer.repository[alias]?.text;
-      return typeof text === "string" ? [[unique[i], text] as const] : [];
+      const text = blobText(answer.repository[alias] ?? null, unique[i], where);
+      return text === null ? [] : [[unique[i], text] as const];
     }),
   );
 }
@@ -638,9 +665,9 @@ function contracted<Schema extends z.ZodType>(schema: Schema, value: unknown, wh
 // release rule.
 function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
   if (tampers.length === 0) return;
-  const held = tampers.map(({ commit, at, remaining }) => {
+  const held = tampers.map(({ id, commit, at, remaining }) => {
     const left = remaining.length === 0 ? "no file" : remaining.join(", ");
-    return `${tamperId(commit)}, invalid commit ${commit} at ${at}, leaves ${left} on ${LEDGER_BRANCH}`;
+    return `${id}, invalid commit ${commit} at ${at}, leaves ${left} on ${LEDGER_BRANCH}`;
   });
   const releases = tampers.map(({ at, remaining }) => {
     const answered = `a Ready move on ${shared.board} and an admin's comment, both after ${at}, then the claim`;
@@ -649,8 +676,8 @@ function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
   throw new StateWriteRefused(`the story is held for ${held.join("; ")}`, releases.join("; "));
 }
 
-function unreleasedTampers(reading: StateReading): Tamper[] {
-  return reading.tamper.filter((each) => !each.released);
+function unreleased(tampers: readonly Tamper[]): Tamper[] {
+  return tampers.filter((each) => each.released === null);
 }
 
 function writable(issue: number, reading: StateReading): Folded {
@@ -671,6 +698,16 @@ function holdEvent(request: HoldRequest, since: string): LedgerEvent {
 function blobOid(text: string): string {
   const body = Buffer.from(text, "utf8");
   return createHash("sha1").update(`blob ${body.length}\0`).update(body).digest("hex");
+}
+
+// The same file with the same text is a retried write's; with other text it is another event, which dropping would
+// lose.
+function isWritten(story: StoryFold, issue: number, event: LedgerEvent): boolean {
+  const file = eventFile(event);
+  const blob = story.eventBlobs.get(file);
+  if (blob === undefined) return false;
+  if (blob !== blobOid(eventText(event))) throw new StateWriteRefused(`${storyDir(issue)}/${file} is on ${LEDGER_BRANCH} with other text`, null);
+  return true;
 }
 
 const COMMIT_MUTATION = `mutation($input: CreateCommitOnBranchInput!) {
@@ -699,7 +736,7 @@ async function commitEvents(
   const folded = writable(issue, reading);
   const reviewer = shared.reviewer_app_login;
   const story = foldStory(folded.commits, folded.texts, folded.roles, reviewer);
-  const fresh = events.map((event) => contracted(LedgerEvent, event, `the ${event.kind} event`)).filter((event) => !story.eventFiles.has(eventFile(event)));
+  const fresh = events.map((event) => contracted(LedgerEvent, event, `the ${event.kind} event`)).filter((event) => !isWritten(story, issue, event));
   if (fresh.length === 0) return reading;
   const ordered = inApplyOrder(fresh);
   const applied = applyEvents(story, ordered, now, new Set(story.tampers.map(({ id }) => id)));
@@ -772,8 +809,8 @@ export async function writeState(
   placements: readonly Placement[],
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleasedTampers(reading), shared);
-  const transition = checkTransition(reading.snapshot ?? EMPTY_SNAPSHOT, next);
+  refuseTampers(unreleased(reading.tamper), shared);
+  const transition = checkTransition(reading.snapshot ?? emptySnapshot(), next);
   for (const event of transition) contracted(LedgerEvent, event, `the ${event.kind} event`);
   const placing = placements.map(placementRequest).filter((request) => !isOpen(reading, request.id));
   if (transition.length === 0 && placing.length === 0) return reading;
@@ -799,7 +836,7 @@ export async function placeRescopeHold(
   specPr: number,
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleasedTampers(reading), shared);
+  refuseTampers(unreleased(reading.tamper), shared);
   const { rescope } = HoldKind.schema.enum;
   const request = contracted(
     HoldRequest,
@@ -860,7 +897,7 @@ export async function recordGates(
   openings: readonly Opening[],
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleasedTampers(reading), shared);
+  refuseTampers(unreleased(reading.tamper), shared);
   const requests = openings.map(openingRequest);
   const checked = contracted(Gates, gates, "the gates section");
   contracted(NameSegment, ref, `the gates ref ${JSON.stringify(ref)}`);
@@ -892,7 +929,7 @@ export async function releaseOnClaim(
   reading: StateReading,
 ): Promise<ClaimRelease> {
   writable(issue, reading);
-  const tampers = unreleasedTampers(reading);
+  const tampers = unreleased(reading.tamper);
   refuseTampers(
     tampers.filter((each) => each.releasable === null),
     shared,

@@ -5,7 +5,10 @@ import { Snapshot, type Hold, type RoundId } from "./contracts/snapshot.ts";
 import { isAdminRole } from "./github.ts";
 import { FindingRuling, HoldKind, HoldState } from "./values.ts";
 
-export const EMPTY_SNAPSHOT: Snapshot = { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
+// A new one per call: a reading's snapshot is its caller's to change, so no two may share an array.
+export function emptySnapshot(): Snapshot {
+  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
+}
 
 /** A file of a story's directory as a commit leaves it; `blob` is git's object id of its text. */
 export type StoryFile = { name: string; blob: string };
@@ -28,7 +31,8 @@ export type Ledgered = {
   snapshot: Snapshot;
   /** Per hold row, the committedDate of the commit that placed its current opening: its release floor. */
   placed: ReadonlyMap<string, string>;
-  releasedTampers: ReadonlySet<string>;
+  /** Per released tamper's id, its release, as a hold row records one. */
+  tamperReleases: ReadonlyMap<string, Pick<Hold, "released" | "released_by">>;
 };
 
 export type DerivedTamper = {
@@ -41,8 +45,8 @@ export type DerivedTamper = {
 export type StoryFold = Ledgered & {
   /** Oldest first. */
   tampers: DerivedTamper[];
-  /** The file each applied event was read from: an event in one of these is already written. */
-  eventFiles: ReadonlySet<string>;
+  /** Per file an applied event was read from, its blob: an event of that file and text is already written. */
+  eventBlobs: ReadonlyMap<string, string>;
   /** The directory's files at the newest commit. */
   headFiles: ReadonlySet<string>;
 };
@@ -118,8 +122,8 @@ function applyEvent(state: Ledgered, event: LedgerEvent, committedDate: string, 
       // The contract sets `since` on a hold's release and on no tamper's.
       if (since === null) {
         if (!derived.has(id)) return `${id} is no tamper the fold derived`;
-        if (state.releasedTampers.has(id)) return `${id} is already released`;
-        return { ...state, releasedTampers: new Set(state.releasedTampers).add(id) };
+        if (state.tamperReleases.has(id)) return `${id} is already released`;
+        return { ...state, tamperReleases: new Map(state.tamperReleases).set(id, { released, released_by }) };
       }
       const at = snapshot.holds.findIndex((row) => row.id === id);
       const row = at === -1 ? undefined : snapshot.holds[at];
@@ -215,10 +219,10 @@ export function foldStory(
   roles: ReadonlyMap<string, string>,
   reviewerLogin: string,
 ): StoryFold {
-  let state: Ledgered = { snapshot: EMPTY_SNAPSHOT, placed: new Map(), releasedTampers: new Set() };
+  let state: Ledgered = { snapshot: emptySnapshot(), placed: new Map(), tamperReleases: new Map() };
   const tampers: DerivedTamper[] = [];
   const derived = new Set<string>();
-  const eventFiles = new Set<string>();
+  const eventBlobs = new Map<string, string>();
   // Whose text each file in the directory holds: a clearance deletes only an invalid commit's.
   const origins = new Map<string, Origin>();
   for (const commit of commits) {
@@ -226,8 +230,8 @@ export function foldStory(
     const applied = events === null ? null : applyEvents(state, events, commit.committedDate, derived);
     if (applied?.ok) {
       state = applied.state;
-      for (const { name } of commit.added) {
-        eventFiles.add(name);
+      for (const { name, blob } of commit.added) {
+        eventBlobs.set(name, blob);
         origins.set(name, "event");
       }
     } else if (clears(commit, origins, roles, reviewerLogin)) {
@@ -241,5 +245,5 @@ export function foldStory(
       for (const name of commit.removed) origins.delete(name);
     }
   }
-  return { ...state, tampers, eventFiles, headFiles: new Set(origins.keys()) };
+  return { ...state, tampers, eventBlobs, headFiles: new Set(origins.keys()) };
 }

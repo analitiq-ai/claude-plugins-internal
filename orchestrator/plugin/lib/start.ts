@@ -55,9 +55,7 @@ const issues = (numbers: readonly number[]) => numbers.map((number) => `#${numbe
 function causeOf(cause: StateCause): string {
   switch (cause.cause) {
     case "tampered":
-      return cause.remaining.length === 0
-        ? `tamper ${cause.commit}`
-        : `tamper ${cause.commit} (an admin deletes ${cause.remaining.join(", ")} from ledger)`;
+      return cause.remaining.length === 0 ? cause.id : `${cause.id} (an admin deletes ${cause.remaining.join(", ")} from ledger)`;
     case "open_hold":
       return `open hold ${cause.id}`;
   }

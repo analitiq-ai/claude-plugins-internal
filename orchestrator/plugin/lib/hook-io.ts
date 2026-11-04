@@ -11,7 +11,7 @@ import { DerivationError } from "../core/identity.ts";
 import { KeyReadRefused } from "../core/keys.ts";
 import { SessionRecordRefused } from "../core/session-record.ts";
 import { SettingsError } from "../core/settings.ts";
-import { BoardNotVisible } from "../core/state.ts";
+import { BoardNotVisible, LedgerMissing } from "../core/state.ts";
 import { mintToken, MintError } from "../core/tokens.ts";
 
 /** The hook input does not hold, or does not type, a field the hook reads. */
@@ -79,6 +79,7 @@ const NAMED_FAILURES = [
   LaneRefused,
   DerivationError,
   BoardNotVisible,
+  LedgerMissing,
   SessionRecordRefused,
 ];
 
