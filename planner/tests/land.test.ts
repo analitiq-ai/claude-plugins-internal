@@ -73,6 +73,11 @@ describe("labelTasks", () => {
     assert.equal(labelTasks(labelled, [101, 102, 103]), labelled);
   });
 
+  it("labels each story phase with its own issue when a phase's tags touch, as [P][US2]", () => {
+    const touching = (text: string) => text.replace("T004 [P] [US2]", "T004 [P][US2]").replace("T014 [US2]", "T014 [P][US2]");
+    assert.equal(labelTasks(touching(tasksMd(3)), [101, 102, 103]), touching(tasksMd(3, [101, 101, 101, 102, 103, 103])));
+  });
+
   it("labels a tasks.md that keeps Spec Kit's stock Notes bullets, reading them as no task", () => {
     const notes = "\n## Notes\n\n- [P] tasks = different files, no dependencies\n- [Story] label maps task to specific user story for traceability\n";
     assert.equal(labelTasks(tasksMd(3) + notes, [101, 102, 103]), tasksMd(3, [101, 101, 101, 102, 103, 103]) + notes);

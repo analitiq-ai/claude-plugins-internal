@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { readTaskBlockLabels, readTaskLine, storyTasks, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused, type StoryTask } from "../src/contracts/tasks.ts";
+import { readTaskBlockLabels, readTaskLine, storyTasks, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused, type StoryTask, type TaskLine } from "../src/contracts/tasks.ts";
 
 describe("taskBlockLabel", () => {
   it("is the line Story issue: #<n>", () => {
@@ -81,41 +81,45 @@ describe("readTaskBlockLabels", () => {
 });
 
 describe("readTaskLine", () => {
-  it("reads id, tick and [US<k>] story of a task line, [X] and indented ones included", () => {
-    const cases: [string, ReturnType<typeof readTaskLine>][] = [
-      ["- [ ] T001 Create the folder", { id: "T001", ticked: false, story: null }],
-      ["- [x] T002 [P] [US1] Test one retry", { id: "T002", ticked: true, story: 1 }],
-      ["- [X] T003 [US2] Cap at three", { id: "T003", ticked: true, story: 2 }],
-      ["    - [ ] T1005 [US12] Log each retry", { id: "T1005", ticked: false, story: 12 }],
-    ];
-    for (const [line, expected] of cases) assert.deepEqual(readTaskLine(line), expected, line);
-  });
+  const task = (id: string, ticked: boolean, story: number | null): TaskLine => ({ id, ticked, story });
 
-  it("is null for a line that is no task", () => {
-    for (const line of ["", "**Goal**: retry once, as T010 says", "- [P] tasks = different files, no dependencies", "- [ ] T12 Retry with a two-digit id"]) {
-      assert.equal(readTaskLine(line), null, line);
-    }
-  });
+  const reads: [clause: string, line: string, read: TaskLine | null][] = [
+    ["- [ ] opens an unticked task", "- [ ] T001 Create the folder", task("T001", false, null)],
+    ["- [x] opens a ticked task", "- [x] T002 Test one retry", task("T002", true, null)],
+    ["- [X] opens a ticked task", "- [X] T003 Cap at three", task("T003", true, null)],
+    ["leading spaces open a task", "    - [ ] T004 Log each retry", task("T004", false, null)],
+    ["an id of more than 3 digits is read whole", "- [ ] T1005 Log each retry", task("T1005", false, null)],
+    ["an id of 2 digits is no task", "- [ ] T12 Retry", null],
+    ["a line naming an id with no checkbox is no task", "**Goal**: retry once, as T010 says", null],
+    ["Spec Kit's [P] Notes bullet is no task", "- [P] tasks = different files, no dependencies", null],
+    ["Spec Kit's [Story] Notes bullet is no task", "- [Story] label maps task to specific user story for traceability", null],
+    ["a [US<k>] tag after a space is story k", "- [ ] T010 [P] [US1] Retry once", task("T010", false, 1)],
+    ["k of two digits is read whole", "- [ ] T010 [US12] Retry once", task("T010", false, 12)],
+    ["a [US<k>] tag right after another tag is story k", "- [ ] T010 [P][US1] Retry once", task("T010", false, 1)],
+    ["a [US<k>] tag in the description is story k", "- [ ] T010 Retry, as [US2] says", task("T010", false, 2)],
+    ["[US0] is no tag", "- [ ] T010 [US0] Retry once", task("T010", false, null)],
+    ["[US01] is no tag", "- [ ] T010 [US01] Retry once", task("T010", false, null)],
+    ["[us1] is no tag", "- [ ] T010 [us1] Retry once", task("T010", false, null)],
+    ["the same tag twice is that story", "- [ ] T010 [US2] Retry, as [US2] does", task("T010", false, 2)],
+  ];
+  for (const [clause, line, read] of reads) {
+    it(`${clause}: ${JSON.stringify(line)}`, () => {
+      assert.deepEqual(readTaskLine(line), read);
+    });
+  }
 
-  it("reads [US0], [US01] and [us1] as no tag", () => {
-    for (const tag of ["[US0]", "[US01]", "[us1]"]) assert.deepEqual(readTaskLine(`- [ ] T010 ${tag} Retry once`), { id: "T010", ticked: false, story: null }, tag);
-  });
-
-  it("reads the same tag twice as that story", () => {
-    assert.deepEqual(readTaskLine("- [ ] T010 [US2] Retry, as [US2] does"), { id: "T010", ticked: false, story: 2 });
-  });
-
-  it("refuses a line tagged with two different stories as TaskLineRefused naming the line", () => {
-    const line = "- [ ] T010 [US1] [US2] Retry once";
-    assert.throws(
-      () => readTaskLine(line),
-      (error: unknown) => {
-        assert.ok(error instanceof TaskLineRefused, String(error));
-        assert.ok(error.message.includes(JSON.stringify(line)), error.message);
-        return true;
-      },
-    );
-  });
+  for (const line of ["- [ ] T010 [US1] [US2] Retry once", "- [ ] T010 [US1][US2] Retry once"]) {
+    it(`refuses ${JSON.stringify(line)}, tagged with two different stories, as TaskLineRefused naming the line`, () => {
+      assert.throws(
+        () => readTaskLine(line),
+        (error: unknown) => {
+          assert.ok(error instanceof TaskLineRefused, String(error));
+          assert.ok(error.message.includes(JSON.stringify(line)), error.message);
+          return true;
+        },
+      );
+    });
+  }
 });
 
 describe("storyTasks", () => {
