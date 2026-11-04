@@ -26,7 +26,9 @@ named, at main 49a3d8b (reviewer ADR-0011 and ADR-0013 as merged in #290).
   `diff-match-patch` has an npm package (same algorithm as the Python one `lineage.py` uses), so lineages port
   without a new algorithm. The four `workflows/*.js` and `agents/*.md` are already non-Python and stay, except the
   assessor's brief command: `agents/assessor.md` runs `briefs.py`, so it is repointed to the ported
-  `lib/briefs.ts` entry, same `--ref` argument and `brief_token` output, its facts from git and core's state.
+  `lib/briefs.ts` entry, same `--ref` argument and `brief_token` output, its facts from git and core's state, at
+  CUT with `hooks.json` (R16): until then the live `gate.py` grades the assessor's `brief_token` against the SQLite
+  round, which only `briefs.py` can produce.
 
 ## R2: Reader is the session token; writer is the reviewer App, `contents: write`, minted per writing run
 
