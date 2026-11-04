@@ -39,7 +39,7 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
   holds the folder), or rule; a record with its own `adr check` error is a FAIL naming the file, rule and message,
   next step "fix that record" (FR-008). An empty `adr_folders` passes before any path is read
   (FR-008). The plan's paths move out of `plan.md` into `<run folder>/touches.json`, read only by planner's check
-  (FR-012; its writer settled below). The root `README.md`'s ADR Kit passage is rewritten in US3 and US4.
+  (FR-012; its writer settled below). The root `README.md`'s ADR Kit passage is rewritten in US3.
 - Implementor feedback on #278 (2026-11-03): a story's own ticks in `tasks.md` (TICK_ONLY, reviewer ADR-0010 d1)
   are not a spec change; one core function tells a tick from any other change (FR-020, root ADR-0011).
 - Gap sweep after implementor feedback on #275 (2026-11-03), every contract checked against the code it extends,
@@ -60,6 +60,14 @@ path to private ADRs. Reading and resolving the list is one function in core. Re
   questions, and the plan check stops once per departure (FR-021–FR-024, US6, R13; reviewer ADR-0013 d4–d5,
   ADR-0017 d2, planner ADR-0009 d9). (D6) Both callers pass `protectedPaths` `{tickOnly, adrFolders}`;
   specs 174 and 209 say so. (D10) Root ADR-0011 and reviewer ADR-0022 are accepted.
+- User decision (2026-11-04), after adversarial passes and stand-in runs on Spec Kit 1.1.3: one check, after
+  critique, over the plan's and the tasks' paths, in place of a check before critique and a second after tasks
+  (Option K). Each round of its loop works everything out again: settled-design, the plan's paths (recorded with
+  the `plan.md` and `spec.md` they were listed from, so a change after that stops the round), `tasks.md` written
+  again when a file the tasks command reads changed, landing's story checks, then the ADR check. `tasks.md` is
+  derived, never edited by hand; a departure's next step is "change `plan.md`" whichever artifact named its path. A
+  resume's ruling must match a departure its round found, or it is refused. US4 is merged into US3 (#277 into
+  #276); folds in #303 (planner ADR-0009 d1, d4–d8; FR-006, FR-009, FR-012, FR-015–FR-019, FR-025; R6, R9, R15).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -109,68 +117,64 @@ unreadable ones as not readable.
 
 ---
 
-### User Story 3 - planner checks the plan before critique (Priority: P1)
+### User Story 3 - planner checks the plan and its tasks before the run completes (Priority: P1)
 
-After `plan` (and the settled-design step) and before critique, a new workflow step runs `adr check` against every
-listed folder, with the paths a step reading the plan writes (`<run folder>/touches.json`, FR-012). `adr
-check` only names the records that govern those paths, and fails only on a changed record's own error, so a headless model step then judges the plan against every governing
-record and writes its verdict as data, and a TypeScript script decides each folder's outcome from it: passed, a
-contradiction (naming the record and the path), or a check that could not run (root ADR-0004). Any contradiction or
-could-not-run stops the run before critique, naming the folder, what was found and the next legal step (constitution
-P1).
+After the critique gate, one check loop runs on every run that writes a spec. Each round, one per resume after a
+stop, works everything out again from the files as they then stand: the settled-design check; the plan's paths,
+which a headless step lists from `plan.md` into `<run folder>/touches.json` (FR-012); `tasks.md`, written by the
+tasks command when it is missing or a file it reads changed since it was written (FR-025); the checks landing makes
+of `tasks.md`; then `adr check` against every listed folder over the plan's and the tasks' paths. `adr check` only
+names the records that govern those paths, and fails only on a changed record's own error, so a headless model step
+then judges the plan and the tasks against every governing record and writes its verdict as data, and a TypeScript
+script decides each folder's outcome from it: passed, a contradiction (naming the record, the path and, for a task
+path, its stories), or a check that could not run (root ADR-0004). Any contradiction or could-not-run stops the run
+before it completes, naming the folder, what was found and the next legal step (constitution P1).
 
 **Why this priority**: this is the harm the issue names: a plan that contradicts an accepted record passes planning
 unchecked and is first caught at review, after the code is written.
 
-**Independent Test**: Drive the step against a scratch spec folder whose plan touches a path a record in a listed
-folder governs with an error-severity finding; the step exits non-zero naming the record. Point one entry at a missing
-folder; the step exits with the could-not-run status, never as a pass.
+**Independent Test**: Drive the steps against a scratch spec folder whose plan touches a path a record in a listed
+folder governs, and whose `tasks.md` names a path a record governs that the plan's paths do not reach; the round
+stops naming each record, and the task's story. Point one entry at a missing folder; the round stops with the
+could-not-run status, never as a pass.
 
 **Acceptance Scenarios**:
 
-1. **Given** every listed folder answers with no error finding, **When** the step runs, **Then** it passes and prints,
-   per folder, the records that govern the plan's paths.
-2. **Given** a listed folder holds a record the plan contradicts, **When** the step runs, **Then** the run stops
-   before critique, naming the folder, the record id and the path, and the next steps: change the plan; supersede
-   the record, by drafting a superseding record into the spec PR (ADR-0009 d3) when the folder is inside this repo,
-   or by changing record `<id>` in the repo that holds the folder when it is outside; or resume with a ruling.
+1. **Given** every listed folder answers with no error finding, **When** a round runs, **Then** it passes and
+   prints, per folder, the records that govern the plan's and the tasks' paths, and the run completes.
+2. **Given** a listed folder holds a record the plan or the tasks contradict, **When** a round runs, **Then** the
+   run stops, naming the folder, the record id, the path and, for a task path, every story whose task names it, and
+   the next steps: change `plan.md`, from which the next round writes `tasks.md` again; supersede the record, by
+   drafting a superseding record into the spec PR (ADR-0009 d3) when the folder is inside this repo, or by changing
+   record `<id>` in the repo that holds the folder when it is outside; or resume with a ruling.
 3. **Given** a listed folder cannot be read, or `adr` is missing or at another version, or its answer cannot be read,
-   **When** the step runs, **Then** that folder's outcome is a check that could not run, the run stops with the
+   **When** a round runs, **Then** that folder's outcome is a check that could not run, the run stops with the
    could-not-run exit status, and the other folders' outcomes are still printed.
-4. **Given** the run stopped at the check and is resumed after the plan is fixed, **When** the run resumes,
-   **Then** the whole check runs again: it rebuilds the plan's paths from `plan.md` as it now stands and checks the
-   plan against them.
+4. **Given** the plan was changed at the critique gate, or after a stop, **When** the next round runs, **Then** it
+   lists the plan's paths from `plan.md` as it now stands, writes `tasks.md` again from it, and checks both.
 5. **Given** the run stopped on a named departure, **When** the user resumes it with a ruling that overrules that
-   departure and gives a reason, **Then** the step passes that departure, the ruling is added to the spec folder's
+   departure and gives a reason, **Then** the round passes that departure, the ruling is added to the spec folder's
    rulings file, and any departure the ruling does not name still stops the run (Clarifications: overrule allowed).
-6. **Given** the rulings file holds a ruling on record R and path P, **When** the after-tasks check or a rerun judges
-   a departure from R on P, **Then** it passes it without stopping, and a plan ruling never reaches the after-tasks
-   check as a resume input (Clarifications: rulings honored by later checks; FR-016).
-7. **Given** the rulings file holds an entry the check script did not write and `HEAD` does not hold, **When** the
-   step runs, **Then** the check could not run, naming the entry (FR-016).
-8. **Given** a listed folder holds a record with its own `adr check` error, **When** the step runs, **Then** the
+6. **Given** the rulings file holds a ruling on record R and path P, **When** a later round or a rescope judges a
+   departure from R on P, in the plan's paths or the tasks', **Then** it passes it without stopping; a resume's
+   ruling reaches only the round that resume runs, and one naming no departure that round found is refused, nothing
+   appended (Clarifications: rulings honored by later checks; FR-016).
+7. **Given** the rulings file holds an entry the check script did not write and `HEAD` does not hold, **When** a
+   round runs, **Then** the check could not run, naming the entry (FR-016).
+8. **Given** a listed folder holds a record with its own `adr check` error, **When** a round runs, **Then** the
    run stops with that folder FAIL, naming the record file and adrkit's rule and message, and the next step: fix
    that record (planner fixes it in the spec PR, or in the repo that holds the folder) (FR-008).
+9. **Given** no file the tasks command reads changed since `tasks.md` was written, **When** a round runs, **Then**
+   `tasks.md` is not written again (FR-025).
+10. **Given** `plan.md` or `spec.md` changes after a round listed the plan's paths, **When** that round reaches the
+   ADR check, **Then** it stops as could not run, and the next round lists the paths again (FR-012).
+11. **Given** `tasks.md` breaks the story plan, or the spec issue's sub-issues are extra, in another repository or
+   out of story order, **When** a round runs, **Then** the run stops with the landing check's line, whose next step
+   never edits `tasks.md` (FR-025).
 
 ---
 
-### User Story 4 - planner checks the tasks again (Priority: P2)
-
-After `tasks`, the same check runs again against every listed folder, with the paths `tasks.md` names, so a story
-whose task paths a record governs is caught before the spec PR opens. Outcomes and stops are as in US3.
-
-**Why this priority**: tasks are written after critique and name paths the plan may not; without this the check sees
-only the plan's paths.
-
-**Independent Test**: A scratch `tasks.md` whose task names a path governed by a record the plan's paths did not
-reach; the after-tasks step stops naming that record and the task's story.
-
-**Acceptance Scenarios**:
-
-1. **Given** `tasks.md` names a path a listed record governs and contradicts, **When** the after-tasks step runs,
-   **Then** the run stops naming the record, the path and the story whose task names it.
-2. **Given** a listed folder cannot be read at the after-tasks step, **When** it runs, **Then** the outcome is a check
-   that could not run, as in US3.
+US4 (the tasks checked again after tasks) was merged into US3 on 2026-11-04: one check now reads both.
 
 ---
 
@@ -222,7 +226,7 @@ Reviewer runs unsupervised, so it cannot ask the user to overrule a record. A de
 is ruled FIX (builder makes the code comply) or ESCALATE: the round escalates, its hold's question naming the
 departure in one line, the orchestrator posts it, and the card goes to Blocked. The admin answers; when the code is
 right and the record or plan wrong, they run planner's rescope, which takes its open decision from the open
-questions under the spec's issue, and its plan check stops on each departure as on a judged one, so the user rules or
+questions under the spec's issue, and its check stops on each departure as on a judged one, so the user rules or
 supersedes the record: its path is checked whatever the plan says, so changing the plan does not clear it. The
 ruling reaches every story under the spec through the spec PR.
 
@@ -232,7 +236,7 @@ starts. Its reviewer half waits for #235.
 **Independent Test**: core's tests: a departure renders to its line and reads back equal; a question with no line
 reads as none; a change to the spec folder's `adr-rulings.json` lapses a round. Reviewer's tests: a departure ruled
 PUSH_BACK or DEFER is refused; one ruled ESCALATE lands in the hold's question as its line. Planner's tests: a
-rescope with a carried departure stops at the plan check naming it once, however many stories carry it, and passes
+rescope with a carried departure stops at the check naming it once, however many stories carry it, and passes
 once ruled; a rescope with no question takes the admin's words.
 
 **Acceptance Scenarios**:
@@ -243,7 +247,7 @@ once ruled; a rescope with no question takes the admin's words.
    is ESCALATE and `escalation-<issue>`'s question holds the line naming the folder, record, file and what departs
    (FR-022).
 3. **Given** such holds are open on one or more story issues under the spec's issue, **When** the admin runs
-   `/planner:issue-spec rescope <spec folder> #<issue>`, **Then** grill opens on those questions, and the plan check
+   `/planner:issue-spec rescope <spec folder> #<issue>`, **Then** grill opens on those questions, and the check
    checks each departure's file and stops once per (folder, record, file) with the departure's next steps (FR-023).
 4. **Given** no escalation hold, nor rescope hold without a spec PR, is open under the spec's issue, **When** the admin runs that rescope,
    **Then** it takes the admin's words as the open decision (FR-023).
@@ -263,15 +267,16 @@ once ruled; a rescope with no question takes the admin's words.
 - A listed path exists but is a file, or a folder with no records: a file is a folder that cannot be read; an
   empty folder is checked and governs nothing.
 - The touches step wrote no `touches.json`, or it lists no path, or `tasks.md` names no path (with a non-empty list):
-  the step stops, naming `touches.json` or `tasks.md`, as a check that could not run, at both checks; a check with
-  no paths would pass vacuously.
+  the round stops, naming `touches.json` or `tasks.md`, as a check that could not run; a check with no paths would
+  pass vacuously.
 - A task names files with a glob or a brace group (`a/{b,c}.ts`): refused, naming `tasks.md:<line>`; a path is one
   literal path.
 - A listed folder in another checkout is behind its remote: it is checked as it is on disk (ADR-0009 d2 dropped); the
   step makes no network call.
 - The workflow runs in the main checkout, not a worktree: the parent of `--git-common-dir` is the checkout itself;
   resolution is the same.
-- A rescope run (starts at grill): the plan and tasks steps run, so both checks run.
+- A rescope run (starts at grill): the plan step and the check loop run; its first round writes `tasks.md` again,
+  since the run has no record of the sources it was written from.
 - `adr` answers slowly: past 1500 s the folder is could not run, naming the deadline and each step's seconds,
   before the step's 1800 s timeout ends it.
 
@@ -297,8 +302,10 @@ once ruled; a rescope with no question takes the admin's words.
   result MUST carry the entry as written, the resolved path, whether it lies inside the calling checkout, and
   whether it is a readable folder.
 - **FR-005**: The function MUST NOT read an environment variable or make a network call.
-- **FR-006**: The planner workflow MUST run an ADR check step after `plan` and the settled-design step and before
-  critique, and a second after `tasks`, both on every run where the spec is written, rescope included.
+- **FR-006**: The planner workflow MUST run one ADR check loop after the critique gate, on every run where the spec
+  is written, rescope included, in place of the `tasks` step. Each round, one per resume after a stop, MUST run in
+  order: the settled-design check, the touches step (FR-012), `tasks.md` written again when due (FR-025), landing's
+  story checks (FR-025), and the ADR check over the plan's and the tasks' paths; no part is skipped as unchanged.
 - **FR-007**: Each check step MUST call core's function (FR-004) for the folders and MUST run `adr check` once per
   readable folder, with the paths the checked artifact names.
 - **FR-008**: Each folder MUST get its own outcome from the core enum: passed, failed (a departure the judge names,
@@ -310,16 +317,21 @@ once ruled; a rescope with no question takes the admin's words.
   ask step.
 - **FR-009**: A failed or could-not-run outcome in any folder MUST stop the run, with distinct exit statuses for the
   two, after printing every folder's outcome; the message MUST name the next legal step.
-  A check stop is a failed or could-not-run outcome the check recorded and showed, a touches or judge step that did
-  not answer among them. Every resume after a check stop MUST run that whole check again on the artifacts as they
-  then stand; a check that stops 100 times in one run MUST stop the run as could not run, never passing it. A step
-  that fails without an answer is no check stop: the run fails at that step, and a resume runs that step alone.
-- **FR-010**: The check steps MUST make no network call and use no GitHub credential.
+  A check stop is a failed or could-not-run outcome a round recorded and showed, a touches or judge step that did
+  not answer among them. Every resume after a check stop MUST run a new round on the artifacts as they then stand;
+  a loop that stops 100 times in one run MUST stop the run as could not run, never passing it. A step that fails
+  without an answer is no check stop: the run fails at that step, and a resume runs that step, then the rest of
+  its round. No next step MUST send the user to edit `tasks.md`: a `tasks.md` refused is deleted, and the next
+  round writes it again.
+- **FR-010**: The ADR check steps (ask, judge, decide) MUST make no network call and use no GitHub credential;
+  landing's story checks read the spec issue's sub-issues as the planner App, as landing does (FR-025).
 - **FR-011**: The check steps MUST be TypeScript scripts calling core (root ADR-0009 d2), with the decision of each
   outcome in a pure function (constitution P3).
 - **FR-012**: The paths a check passes MUST be read as data with a grammar (constitution P7), not parsed from prose:
   for the plan, `<run folder>/touches.json`, written by the check's own touches step from `plan.md` as it then stands,
-  rebuilt each time the check runs again after a stop, and read only by planner's check, never a section of `plan.md`; for `tasks.md`, the task line's paths. One path grammar, a literal
+  rebuilt in every round, and read only by planner's check, never a section of `plan.md`; the round MUST record the
+  hashes of the `plan.md` and `spec.md` the touches step read, and a difference when the ADR check runs MUST make
+  the round could not run; for `tasks.md`, the task line's paths. One path grammar, a literal
   path with no glob or brace group, MUST serve both, and a name with no `/` MUST count as a path when git tracks it at the checkout root or `touches.json` lists
   it (so a root file a task creates is checked before it exists).
 - **FR-013**: The `adr` version the planner step requires MUST be defined once, in core, with one reader of `adr`'s
@@ -328,26 +340,26 @@ once ruled; a rescope with no question takes the admin's words.
 - **FR-014**: After #235 merges, reviewer's decision check MUST take its folders from core's function only, no longer
   finding tracked `docs/adr` folders itself, so planner and reviewer check the same folders; `REVIEWER_ORG_ADR_DIR`
   MUST be deleted from reviewer's code, README and tests.
-- **FR-015**: After each `adr check`, a headless model step MUST judge the checked artifact (`plan.md`, then
-  `tasks.md`) against every record `adr check` named as governing, and write one verdict per record as data with a
+- **FR-015**: After each `adr check`, a headless model step MUST judge `plan.md` and `tasks.md` against every
+  record `adr check` named as governing, and write one verdict per record as data with a
   grammar (constitution P7); the TypeScript script MUST decide each folder's outcome from that verdict, never from
   the model's prose. A folder whose paths no record governs needs no judgment and passes.
 - **FR-016**: Rulings MUST be kept in one rulings file in the spec folder that holds only the user's rulings, each
   `{folder, record id, path, reason}` in a form with a grammar (constitution P7), so it lands in the spec PR. A resume
-  MAY carry the user's ruling, read from a file the session writes so it never reaches a command line; the check script MUST accept it only when the folder is listed, the path is one the
-  artifact names, and `adr check` on that folder with that one path names the record as governing (never against the
-  judge's answer), and is then the only writer that adds it to the file. A ruling applies to the resume that carries it
-  only; it is not kept as a run input. An entry the check script did not write and that is not in the file at `HEAD`
+  MAY carry the user's ruling, read from a file the session writes so it never reaches a command line; the check
+  script MUST accept it only when the folder is listed, the path is one the round asked, `adr check` on that folder
+  with that one path names the record as governing, and its key names a departure that round found (the judge's or
+  one found at review), and is then the only writer that adds it to the file, to its own run record first. A ruling
+  applies to the round of the resume that carries it only; it is not kept as a run input. An entry the check script did not write and that is not in the file at `HEAD`
   MUST make the check could not run. Only the user gives a ruling; neither the judge nor the driving session gives one.
 - **FR-017**: The rulings file MUST be given to the judge, and the check script MUST then drop every departure whose
-  folder, record id and path match an entry, at every planner check of the spec folder (the after-tasks check, a
-  rerun, a rescope) and, after #235, at reviewer's decision check, which MUST not report such a departure.
-- **FR-018**: Every check step (ask, judge, decide, after plan and after tasks) MUST report its stop through one
+  folder, record id and path match an entry, at every planner check of the spec folder (every later round, a
+  rescope) and, after #235, at reviewer's decision check, which MUST not report such a departure.
+- **FR-018**: Every check step (stories, ask, judge, decide, rounds) MUST report its stop through one
   shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge or touches
   step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the check
   again.
-- **FR-019**: The decide step MUST compare the artifact's paths (`touches.json` for the plan, `tasks.md` for tasks)
-  and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
+- **FR-019**: The decide step MUST compare the paths (`touches.json` and `tasks.md`) and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
   changed (the same single-writer guard as FR-016).
 - **FR-020**: Core's `protectedPaths` (orchestrator ADR-0004 d4) MUST name each root spec folder a story PR changes
   beyond TICK_ONLY (reviewer ADR-0010 d1; root ADR-0011), told by one pure core function, `isTickOnly`, and each
@@ -362,11 +374,17 @@ once ruled; a rescope with no question takes the admin's words.
 - **FR-023**: Planner's `rescope <spec folder> #<issue>` MUST take its open decision from the questions of every
   open escalation hold, and every open rescope hold with no spec PR, of every open story issue under the spec's
   issue, and from the admin's words when there are none; the
-  plan check MUST add each departure line's file to the paths it checks, check each (folder, record, file) with one
+  check MUST add each departure line's file to the paths it checks, check each (folder, record, file) with one
   `adr` call of that file, and stop on each departure whose record that call names as governing, as on a departure the judge named, once per (folder, record, file), until a ruling names it (planner
   ADR-0009 d9).
 - **FR-024**: A change to the spec folder's `adr-rulings.json` on the default branch MUST lapse every story's
   internal round under that spec (orchestrator ADR-0004 d1), through core's `governingDiff`.
+- **FR-025**: `tasks.md` MUST be written only by the tasks command in a round, when it is missing or a file the
+  command reads changed since it was last written, by hashes taken before the command runs (planner ADR-0009 d4).
+  The checks landing makes of `tasks.md` (its story plan and task-block labels; the spec issue's sub-issues: extra,
+  in another repository, or out of story order) MUST run in every round, through the same pure functions
+  `land.ts` calls, and `land.ts`'s own stops MUST name no edit to `tasks.md`; an edit after the run is seen in
+  spec-PR review.
 
 ### Key Entities
 
@@ -378,10 +396,10 @@ once ruled; a rescope with no question takes the admin's words.
 
 ### Measurable Outcomes
 
-- **SC-001**: Every planner run that writes a spec checks its plan, and again its tasks, against 100% of the listed
-  ADR folders before critique and before the spec PR respectively.
-- **SC-002**: A plan contradicting a record in any listed folder never reaches critique: 0 such runs pass the step in
-  the tests.
+- **SC-001**: Every planner run that writes a spec checks its plan and its tasks, as they stand when it completes,
+  against 100% of the listed ADR folders.
+- **SC-002**: A plan or tasks contradicting a record in any listed folder never lands: 0 such runs complete in the
+  tests.
 - **SC-003**: An unreadable listed folder is reported as could not run in 100% of cases, never as passed.
 - **SC-004**: The same `codeworks.toml` resolves every folder outside the repo to the same path from the main checkout
   and from every worktree, and every folder inside the repo to the calling checkout's own copy.
@@ -396,7 +414,7 @@ once ruled; a rescope with no question takes the admin's words.
 - The public-repo rule (a public repo lists no path to private ADRs) is a rule in ADR-0009 the admin keeps when
   writing `codeworks.toml`; this spec adds no code that reads a repo's visibility.
 - The optional adrkit `after_plan` hook stays as it is; the workflow step does not depend on it.
-- PR order: the planning PRs (FR-001), then US2 (core), then US3 and US4 (planner), then US5 (core's protected
+- PR order: the planning PRs (FR-001), then US2 (core), then US3 (planner), then US5 (core's protected
   paths; reviewer after #235), then US6 (#285, after #278: core's departure line and lapse; reviewer after #235; planner's rescope).
 
 ### Dependencies
@@ -417,14 +435,14 @@ once ruled; a rescope with no question takes the admin's words.
 
 ### harm
 Answer: A plan that contradicts an accepted ADR, in this repo's folders or in the Org ADRs (analitiq-ai/engineering `docs/adr`), passes planning unchecked. The contradiction first surfaces at reviewer's decision check, after the code is written, when it is the most expensive thing to change.
-Source: code: planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md, Context; planner/plugin/speckit/workflows/issue-spec/workflow.yml has no `adr check` step.
+Source: code: planner/docs/adr/0009-check-the-plan-and-its-tasks-against-the-governing-decision-logs-before-landing.md, Context; planner/plugin/speckit/workflows/issue-spec/workflow.yml has no `adr check` step.
 
 ### reachable
 Answer: observed: on main, `workflow.yml` runs no `adr check` (the only `adr` match is an ADR-0006 comment at line 88), though the adrkit extension is installed in `.specify/extensions/adrkit`. Every planner run today goes plan → critique → tasks with no decision check, and no setting lists ADR folders (`codeworks.toml` `[shared]` has none).
 Source: code: planner/plugin/speckit/workflows/issue-spec/workflow.yml; .specify/extensions/adrkit; codeworks.toml.
 
 ### change-alters
-Answer: Yes. A plan contradicting a record in any listed folder: the new step after plan reads each folder in the `[shared]` list (relative paths resolved from the main checkout), runs `adr check`, and the contradiction stops the run before critique. The step runs again after tasks, catching a story whose task paths a record governs. A folder that can't be read is a check that could not run, not a pass (root ADR-0004).
+Answer: Yes. A plan contradicting a record in any listed folder: the new check after critique reads each folder in the `[shared]` list (relative paths resolved from the main checkout), runs `adr check` over the plan's and the tasks' paths, and the contradiction stops the run before it completes, catching too a story whose task paths a record governs. A folder that can't be read is a check that could not run, not a pass (root ADR-0004).
 Source: user: issue #177 Decision (2026-11-02) and Done when; code: docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md.
 
 ### owner
@@ -433,7 +451,7 @@ Source: code: reviewer/plugin/scripts/adrkit.py; reviewer/plugin/README.md; plan
 
 ### inherited
 Answer: Yes. It comes from planner ADR-0009 d1–d2 (accepted 2026-10-28) by way of #173's grill. ADR-0009's harm and its reachability still hold (above). d2's remote-head rule is the part the issue drops: reading from disk means no credential and no network call, and keeping the folder current is the admin's job. That is why the ADR is amended first, in the planning PR (2026-11-03; was "in its own PR").
-Source: code: planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md; user: issue #177 Decision.
+Source: code: planner/docs/adr/0009-check-the-plan-and-its-tasks-against-the-governing-decision-logs-before-landing.md; user: issue #177 Decision.
 
 ### needs-spec
 Answer: Decisions remain. The issue fixes the outcome and the ordering, but these are still open: the `[shared]` key name and the shape of each entry; the signature of core's read-and-resolve function and its could-not-run result; what a failing or could-not-run check does to the paused run (stop, or show the user a ruling); how the after-tasks check maps a story's task paths to records; and the split into PRs (ADR-0009 amendment, then the planner half, then the reviewer story after #235).

@@ -21,19 +21,33 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 {"v": 1, "paths": ["core/src/adr-folders.ts", "codeworks.toml"]}
 ```
 
-- Deleted by `adr-plan-clear`, the first step of each iteration of the after-plan check loop, then written by the
-  touches step, `adr-plan-touches`, its second (`adr-touches.md`): it reads `plan.md` as it then stands and writes
-  one literal path per file the plan creates, changes or deletes. Each resume after a stop runs a new iteration of
-  the check loop, so the file follows every change to the plan, and ask never reads the last iteration's file; a touches
-  step whose exit code is not `0` is `touches-missing`, whatever file it left. Not a section of `plan.md` (R4).
+- Deleted by `adr-clear` at the start of each round of the check loop, then written by the touches step,
+  `adr-touches` (`adr-touches.md`): it reads `plan.md` as it then stands and writes one literal path per file the
+  plan creates, changes or deletes. Each resume after a stop runs a new round, so the file follows every change to
+  the plan, and ask never reads an earlier round's file; a touches step whose exit code is not `0` is
+  `touches-missing`, whatever file it left. Not a section of `plan.md` (R4).
 - `TouchedPaths`: exactly the keys `v` (`1`) and `paths`; each entry a `PATH`; no entry twice.
-- Unparsable JSON or another shape: refused (`TouchesRefused`, exit 1, naming `touches.json` and the entry). No
-  file, or `paths` empty: could not run, naming `touches.json`, for both artifacts (the tasks check reads its root
-  entries).
+- Unparsable JSON or another shape: `touches-refused`, naming `touches.json` and the entry. No file, or `paths`
+  empty: `touches-missing`.
 - Read only by planner's check (`readTouchedPaths`). The run folder is gitignored (`.specify/.gitignore`:
   `workflows/runs/`); builders and reviewers never see it.
 
-## `<run folder>/adr-<artifact>-stop.json` (a check's stop, until shown and resumed)
+## Source hashes (`<run>/touches-from.json`, `<run>/tasks-sources.json`, `<run>/tasks-sources-next.json`)
+
+```json
+{"v": 1, "files": {"specs/177-x/plan.md": "<sha256>", "specs/177-x/spec.md": "<sha256>"}}
+```
+
+- `SourceHashes`: exactly the keys `v` (`1`) and `files`, a map from a repo-relative path to the sha256 of its
+  bytes; an absent file is left out. Two are equal when they name the same paths with the same hashes. Computed by
+  one core function, `sourceHashes(cwd, paths)`.
+- `touches-from.json`: written by `adr-clear` from `plan.md` and `spec.md`, before the touches step reads them; ask
+  hashes them again, and any difference is `touches-stale`.
+- `tasks-sources-next.json`: written by `adr-tasks-due` from every file the tasks command reads (workflow-steps.md);
+  renamed to `tasks-sources.json` by `adr-tasks-written` once the tasks command has written `tasks.md`. A round is
+  due to write `tasks.md` when it is missing, `tasks-sources.json` is missing, or the two differ.
+
+## `<run folder>/adr-stop.json` (a round's stop, until shown and resumed)
 
 ```json
 {"v": 1, "exit": 1, "lines": ["FAIL: docs/adr: 0004 on core/src/x.ts: …. Next step: …."], "shown": false}
@@ -41,19 +55,21 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 
 - `AdrStopRecord`: exactly the keys `v` (`1`), `exit` (`1` or `2`: 2 when any line is `COULD_NOT_RUN`, else 1),
   `lines` (non-empty, each a line `adrStop` rendered) and `shown` (boolean).
-- Written with `shown: false` by ask or decide when the check stops, which then exit 0; removed by ask at the start
-  of each iteration. `adr_check.ts report` prints the lines and rewrites it `shown: true`, then on the resume
-  deletes it and asks for a new iteration (workflow-steps.md, report).
+- Written with `shown: false` by stories, ask or decide when the round stops, which then exit 0; deleted by
+  `adr-clear` at the start of each round, so one that is there was written this round. `adr_check.ts report`
+  prints the lines and rewrites it `shown: true`, then on the resume deletes it and asks for a new round
+  (workflow-steps.md, report).
 
 ## `tasks.md` task lines
 
-A task line starts `- [ ] T<n>` or `- [x] T<n>` (any case of `x`). Its paths are its backticked spans
+Written by the tasks command in a round that is due (Source hashes), never by hand (planner ADR-0009 d4). A task
+line starts `- [ ] T<n>` or `- [x] T<n>` (any case of `x`). Its paths are its backticked spans
 `artifactPath` returns, one literal path per span: a span with a `/` always; a span with no `/` only when it is in
 `rootFiles`, the `git ls-files` entries with no `/` together with `touches.json`'s entries with no `/` (read by the
 ask step and passed to the pure reader), so a root file a task creates is a path before git tracks it. A span
-`artifactPath` refuses: refused (exit 1, naming `tasks.md:<line>`). Its story is `US<k>` from a `[US<k>]` tag, else
-the text of the `## ` heading above it without `## `. A task line above every `## ` heading: refused, naming
-`tasks.md:<line>`. No path on any task line: could not run, naming `tasks.md`. The settled-design preset's tasks
+`artifactPath` refuses: `tasks-refused`, naming `tasks.md:<line>`. Its story is `US<k>` from a `[US<k>]` tag, else
+the text of the `## ` heading above it without `## `. A task line above every `## ` heading: `tasks-refused`, naming
+`tasks.md:<line>`. No path on any task line: `tasks-empty`. The settled-design preset's tasks
 command tells the model to write one literal path per backtick span.
 
 ## Rulings file (`<spec folder>/adr-rulings.json`)
@@ -75,13 +91,17 @@ command tells the model to write one literal path per backtick span.
 
 A JSON array of `AdrRuling`. The session writes it, on the user's words only, to a scratch file with the Write tool;
 `drive_workflow.py resume <run> adr_ruling=@<file>` reads the file and exports its content as `ADR_RULING` to that
-one `specify resume` call, so the user's words never reach a command line (SKILL.md §1). Decide refuses the whole array (exit 1, nothing appended)
-when it is not JSON, not an array of `AdrRuling`, or any ruling's folder is not listed, its path is not an asked
-path, or `checkAdrFolder(cwd, folder, [path], deadlineMs)`, called once for that ruling, does not name its record as
-governing. Decide makes those calls concurrently under one 1500 s deadline, every call given what is left of it; a
-call that could not run is exit 2, nothing appended. Entries already in the rulings file are not
-re-checked. A valid ruling is appended to the rulings file whether or not the judge named that departure this
-time; one whose key is already there is satisfied, not refused. Unset: no ruling.
+one `specify resume` call, so the user's words never reach a command line (SKILL.md §1). It reaches the one round
+that resume runs, and decide is its only reader. Decide refuses the whole array (`ruling-refused`, nothing
+appended) when it is not JSON, not an array of `AdrRuling`, or any ruling's folder is not listed, its path is not
+an asked path, `checkAdrFolder(cwd, folder, [path], deadlineMs)`, called once for that ruling, does not name its
+record as governing, or its key names no departure this round found (the judge's or one found at review), matched
+before any departure is dropped. Decide makes those calls concurrently under one 1500 s deadline, every call given
+what is left of it; a call that could not run is exit 2, nothing appended. A ruling whose key the rulings file
+already holds is satisfied, not refused, and not re-checked. Each valid new ruling is appended to
+`<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there, so a
+decide that fails between the two leaves no entry the writer guard refuses and a rerun appends none twice. A round
+that stops before decide applies no ruling: give it again on the resume after. Unset: no ruling.
 
 ## Departure line (in a hold's question)
 
@@ -113,6 +133,6 @@ ADR departure: docs/adr 0004 core/src/adr.ts — reads the folder from tracked d
 - Written by `drive_workflow.py rescope … questions=@<file>`, copying the file `rescope_questions.ts` wrote, only on
   a rescope that found a question. Absent: no question carried. Present and not `ReviewQuestions`: refused (exit 1,
   naming it).
-- Read by the plan check's ask step, which adds each departure's path to the paths it checks, and its decide step,
+- Read by the check's ask step, which adds each departure's path to the paths it checks, and its decide step,
   which checks each `(folder, record, path)` with one `adr` call and stops once per key whose record governs it,
   however many questions name it (R13).

@@ -38,41 +38,45 @@ listing `../org/docs/adr`, `docs/adr`, an absolute folder, a missing one and an 
 | any `COULD_NOT_RUN` | its reason names the folder once |
 | an in-repo folder / an outside one | `--dir` relative to `cwd` / absolute |
 
-## Planner (US3, US4)
+## Planner (US3)
 
 ```sh
 node --test planner/tests/adr-check.test.ts
 python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'
 ```
 
-`planner/tests/adr-check.test.ts` drives `adr_check.ts ask`, `decide`, then `report` in a scratch spec folder with a
-stand-in `adr`, a `<run>/touches.json` and a verdict file written by the test in the touches step's and the judge's
-place. Every line is on stderr, as the stop table gives it. A stop's exit below is the one `report` exits with; ask
-and decide exit 0 once they record it in `<run>/adr-<a>-stop.json`:
+`planner/tests/adr-check.test.ts` drives `adr_check.ts clear`, `tasks-due`, `tasks-written`, `stories`, `ask`,
+`decide`, then `report` in a scratch spec folder with a stand-in `adr`, a stand-in GitHub, a `<run>/touches.json`
+and a verdict file written by the test in the touches step's and the judge's place. Every line is on stderr, as the
+stop table gives it. A stop's exit below is the one `report` exits with; stories, ask and decide exit 0 once they
+record it in `<run>/adr-stop.json`:
 
 | Scenario | Expect |
 |---|---|
 | verdict all `WITHIN` | exit 0, `PASS: <entry>: governing: …` per folder (US3 AS1) |
 | no record governs | exit 0, `PASS: <entry>: no record governs these paths`; no judge |
 | one `DEPARTS` on `core/src/x.ts` from `0004` (folder inside) | exit 1, `FAIL: docs/adr: 0004 on core/src/x.ts: …`, next step: change `plan.md`, draft a superseding record into the spec PR, or resume with `adr_ruling` (AS2) |
-| one `DEPARTS` from a record in `../org/docs/adr` (outside) | exit 1, next step: change record `<id>` in the repo that holds `../org/docs/adr` (AS2) |
+| one `DEPARTS` from a record in `../org/docs/adr` (outside) | exit 1, next step: change `plan.md`, change record `<id>` in the repo that holds `../org/docs/adr`, or rule (AS2) |
+| any stop line | no next step names an edit to `tasks.md` |
 | `adr` answers a record with its own error | exit 1, `FAIL` naming the file, rule and message, "fix that record" (AS8) |
 | one entry missing, `adr` absent, or verdict missing a record | exit 2, other folders still printed, each label once (AS3) |
-| verdict file missing or not an `AdrVerdict` | exit 2, `COULD_NOT_RUN: adr-plan-verdict.json: …` |
+| verdict file missing or not an `AdrVerdict` | exit 2, `COULD_NOT_RUN: adr-verdict.json: …` |
 | `ADR_RULING` names the departure | exit 0, `adr-rulings.json` and `<run>/adr-rulings-written.json` gain it (AS5) |
-| `ADR_RULING` valid, the verdict names no such departure | exit 0, still appended |
+| `ADR_RULING` valid, no departure this round on its key | exit 1, `FAIL: adr_ruling: …`; nothing appended |
+| decide fails after appending to `adr-rulings-written.json`, then reruns | each entry once in both files |
 | `ADR_RULING` not JSON, or with an unlisted folder, an unasked path, or a record not governing its path, beside a valid one | exit 1, `FAIL: adr_ruling: …`; nothing appended |
 | `ADR_RULING` already in `adr-rulings.json` | exit 0, file unchanged |
-| `adr-rulings.json` holds the key; rerun or `tasks` check departs from it | exit 0 (AS6) |
+| `adr-rulings.json` holds the key; a later round departs from it, on a plan or a task path | exit 0 (AS6) |
 | an entry, or an entry's `reason`, neither at `HEAD` nor in the run record | exit 2 naming the entry (AS7) |
 | an entry removed by hand | no stop |
-| asked record or `touches.json` changed between ask and decide | exit 2 naming what changed |
-| `tasks.md` task `[US2]` and a `## Phase 4: …` task name one governed path | exit 1 naming `story US2, Phase 4: …` (US4 AS1) |
+| asked record, `touches.json` or `tasks.md` changed between ask and decide | exit 2 naming what changed |
+| `plan.md` or `spec.md` changed after `clear` | ask exit 0, `touches-stale` recorded |
+| `tasks.md` task `[US2]` and a `## Phase 4: …` task name one governed path | exit 1 naming `story US2, Phase 4: …` (US3 AS2) |
 | `tasks.md` task names `` `codeworks.toml` `` (root file) / `` `adr check` `` / a URL | path checked / not a path / not a path |
 | `tasks.md` task names `` `new.toml` ``, untracked, listed in `touches.json` | path checked |
 | `tasks.md` task names `` `a/{b,c}.ts` `` or `` `a/*.ts` `` | exit 1, `FAIL: tasks.md:<line>: …` |
 | a task line above every `## ` heading | exit 1 naming `tasks.md:<line>` |
-| `touches.json` missing or `paths` empty (plan or tasks), or `tasks.md` names no path | exit 2 naming `touches.json` / `tasks.md` |
+| `touches.json` missing or `paths` empty, or `tasks.md` names no path | exit 2 naming `touches.json` / `tasks.md`; `tasks.md`'s next step deletes it |
 | `touches.json` unparsable, an extra key, an entry not a `PATH`, or an entry twice | exit 1 naming `touches.json` |
 | `adr_folders = []`, with or without `touches.json` | exit 0, `PASS: codeworks.toml: No ADR folder is listed …`; no path read |
 | `<run>/review-questions.json` has a departure line `docs/adr 0004 <path>` on a path `touches.json` lacks | ask's asked record holds the path |
@@ -82,36 +86,45 @@ and decide exit 0 once they record it in `<run>/adr-<a>-stop.json`:
 | the same, `0004` superseded and no longer governing | exit 0, no line for it |
 | `<run>/review-questions.json` not `ReviewQuestions`, or with a departure line that does not read | exit 1, `FAIL: review-questions.json: …` |
 | ask | stdout is `{"judge", "decide", "asked"}` only; `decide` true when it recorded no stop |
-| `ask plan` with touches exit code `1`, empty, or `00`, and a valid `touches.json` | exit 0, `touches-missing` recorded |
+| `ask` with touches exit code `1`, empty, or `00`, and a valid `touches.json` | exit 0, `touches-missing` recorded |
 | `decide` with judge exit code other than `0` and a valid all-`WITHIN` verdict, the asked record saying `judge` | exit 0, `verdict-unread` recorded |
 | `decide` with judge exit code `1` or empty, the asked record saying no judge | argument ignored, passes |
 | ask records a stop (e.g. `touches.json` missing) | exit 0, stdout `{"judge": false, "decide": false, "asked": ""}`, the stop record written |
-| ask with a stop record left from the last iteration | removes it first |
+| `clear` with every round file left from the last round | all deleted; `touches-from.json` written |
+| `stories` stop recorded, then `ask` | ask stdout `{"judge": false, "decide": false, "asked": ""}`, reads nothing |
+| `tasks-due`: no `tasks.md` / no `tasks-sources.json` / a source changed / none changed | `due` true / true / true / false |
+| `tasks-written` | `tasks-sources-next.json` renamed to `tasks-sources.json` |
+| `stories`: `tasks.md` breaking the story plan or a task-block label | exit 1, `tasks-refused`, next step deletes `tasks.md` |
+| `stories`: extra, foreign or out-of-order sub-issues | exit 1, `sub-issues-extra` / `-foreign` / `-misplaced` |
+| `stories`: GitHub unanswered | exit 2, `COULD_NOT_RUN: GitHub: …` |
 | `report`, stop record `shown: false` | its lines on stderr, exit its `exit`, record rewritten `shown: true` |
 | `report`, stop record `shown: true` | record deleted, stdout `{"again": true}`, exit 0 |
 | `report`, no stop record | stdout `{"again": false}`, exit 0 |
-| `stop plan rounds` | exit 2, `COULD_NOT_RUN: adr-plan-check: the check stopped 100 times in one run. …` |
+| `stop rounds` | exit 2, `COULD_NOT_RUN: adr-check: the check stopped 100 times in one run. …` |
 
 `test_drive_workflow.py`, with stand-in `claude` (writing a plan that passes `settled_design.py`; as the touches
-step, a `touches.json` from it), a stand-in judge writing the verdict, stand-in `adr`, and a committed `codeworks.toml` with
-`[planner] app_id` and `adr_folders`: a run stops at `adr-plan-report` before `mark-critiques`; `resume <run>
+step, a `touches.json` from it; as the tasks command, a `tasks.md` from the plan), a stand-in judge writing the
+verdict, stand-in `adr`, stand-in GitHub, and a committed `codeworks.toml` with `[planner] app_id` and
+`adr_folders`: a run whose plan departs passes critique and stops at `adr-report`; `resume <run>
 adr_ruling=@<file>` exports the file's content as `ADR_RULING` to that call only, `inputs.json` gains no
-`adr_ruling`, the after-tasks check runs without it; `adr_ruling=<json>` with no `@` exits non-zero; each resume
-after a stop runs a new iteration of the check loop, so a plan changed before a resume makes the touches step
-rewrite `touches.json` from it; a touches step that writes a valid `touches.json` and then fails or times out stops
-the run at `adr-plan-report` with `adr: true` and the `touches-missing` line;
-a decide that crashes fails the run at `adr-plan-decide` and the resume runs decide again, not clear, touches or
-ask; a stop in an iteration after the first, reported under a qualified id (`adr-plan-check:adr-plan-report:1`),
-reports `adr: true`; a check that stops 100 times fails the run at `adr-plan-rounds` with `adr: true`; `rescope … questions=@<file>` lands the file as `<run>/review-questions.json`;
-an ask stop and
-a decide stop each stop the run at `adr-plan-report` and report `adr: true` with their lines; a judge that writes a valid verdict and then fails or times out stops the run at `adr-plan-report` with
-`adr: true` and the `verdict-unread` line, and the resume runs the whole check again; a rescope runs both checks.
+`adr_ruling`, and the round after carries none; `adr_ruling=<json>` with no `@` exits non-zero; each resume after a
+stop runs a new round, so a plan changed before a resume makes the touches step rewrite `touches.json` and the
+tasks command rewrite `tasks.md` from it; a resume with nothing changed writes `tasks.md` no second time; a touches
+step that writes a valid `touches.json` and then fails or times out stops the run at `adr-report` with `adr: true`
+and the `touches-missing` line; a decide that crashes fails the run at `adr-decide` and the resume runs decide, then
+report, not clear, touches or ask; a tasks command that crashes leaves the next round due; a stop in a round after
+the first, reported under a qualified id (`adr-check:adr-report:1`), reports `adr: true`; a round that stops 100
+times fails the run at `adr-rounds` with `adr: true`; `rescope … questions=@<file>` lands the file as
+`<run>/review-questions.json`; a stories, an ask and a decide stop each stop the run at `adr-report` and report
+`adr: true` with their lines; a judge that writes a valid verdict and then fails or times out stops the run at
+`adr-report` with `adr: true` and the `verdict-unread` line, and the resume runs a new round; a rescope runs the
+check loop, its first round writing `tasks.md` again.
 
 ## End to end (manual)
 
 From a worktree of this repo, `/planner:issue-spec #<issue>` on an issue whose plan touches
 `planner/plugin/scripts/settled_design.py` with a design that contradicts planner ADR-0008: the run stops at
-`adr-plan-report` naming `planner/docs/adr`, `0008` and the path. Rename `../engineering` and resume: stops with
+`adr-report` naming `planner/docs/adr`, `0008` and the path. Rename `../engineering` and resume: stops with
 `COULD_NOT_RUN` for `../engineering/docs/adr`.
 
 ## Protected paths (US5, core)

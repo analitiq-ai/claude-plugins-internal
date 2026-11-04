@@ -66,23 +66,23 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 
 ## R4: The paths `plan.md` names
 
-- **Decision** (2026-11-03; supersedes a `## Touches` section in `plan.md`, then the plan step writing the file): a
-  headless prompt step, `adr-plan-touches`, the second step of the plan check's loop (R6), reads `plan.md` as it then
-  stands and writes `<run folder>/touches.json`, `{"v": 1, "paths": ["<PATH>", …]}`, one literal path per file the
-  plan creates, changes or deletes, no entry twice (artifact-grammar.md), following
-  `planner/plugin/speckit/workflows/issue-spec/adr-touches.md`. Each resume after a stop runs a new iteration of
-  the check loop (R6, R14), so every resume after a plan fix rebuilds the file and a departure's next step stays
-  "change `plan.md`". The iteration's first step, `adr-plan-clear` (shell), deletes the file, so ask never reads the
-  last iteration's paths; a touches step whose exit code is not `0` has not answered, and ask stops on it whatever
-  file it left (R6). Read by `readTouchedPaths` in
-  `core/src/contracts/decision-check.ts`. Unparsable or wrong shape is refused (exit 1, naming `touches.json`); a
-  missing file or an empty list is could not run, naming `touches.json`, at both checks (the tasks check reads its
-  root entries). The run folder is gitignored (`.specify/.gitignore`: `workflows/runs/`). `plan.md`, its template,
-  the `plan` step and `speckit.plan.md` are not changed.
+- **Decision** (2026-11-04; supersedes a `## Touches` section in `plan.md`, then the plan step writing the file):
+  a headless prompt step, `adr-touches`, in every round of the check loop (R6), reads `plan.md` as it then stands
+  and writes `<run folder>/touches.json`, `{"v": 1, "paths": ["<PATH>", …]}`, one literal path per file the plan
+  creates, changes or deletes, no entry twice (artifact-grammar.md), following
+  `planner/plugin/speckit/workflows/issue-spec/adr-touches.md`. The round's `adr-clear` (shell) deletes the last
+  file first and records the hashes of `plan.md` and `spec.md` in `<run>/touches-from.json`; ask hashes them again
+  and stops as `touches-stale` on any difference, so the paths it checks are those of the plan it judges. A touches
+  step whose exit code is not `0` has not answered, and ask stops on it whatever file it left (R6). Read by
+  `readTouchedPaths` in `core/src/contracts/decision-check.ts`. Unparsable or wrong shape is `touches-refused`; a
+  missing file or an empty list is `touches-missing`, both could not run. The run folder is gitignored
+  (`.specify/.gitignore`: `workflows/runs/`). `plan.md`, its template, the `plan` step and `speckit.plan.md` are not
+  changed.
 - **Rationale**: P7: paths read from a file with a grammar, not from the Project Structure tree. The paths are the
   check's input only, so they stay out of `plan.md`, which builders and reviewers read. Written inside the check
-  loop, not by the plan step, because a resume after a stop runs the check again, not the plan step: paths the plan
-  step wrote would still be the old plan's after a fix (planner ADR-0009 d7, Option I).
+  loop, not by the plan step, because a resume after a stop runs a new round, not the plan step: paths the plan step
+  wrote would still be the old plan's after a fix (planner ADR-0009 d7, Option I). A model step cannot be made to
+  read a file at a given moment, so the shell step before it records what it read.
 - **Existing tools**: the template's Project Structure tree (ASCII art, no grammar); `## Mechanisms` (names
   mechanisms, not paths); a `## Touches` section in `plan.md` (rejected 2026-11-03: puts check input in an artifact
   downstream actors read); the plan step writing the file (rejected 2026-11-03, above); Spec Kit's `prompt` step
@@ -109,55 +109,63 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 
 ## R6: Where the check runs in the workflow
 
-- **Decision** (2026-11-04; supersedes one block per check): two top-level `if` blocks on
-  `*spec-is-written` in `workflow.yml`: `to-adr-plan` after `to-settled-design`, before `to-mark-critiques`;
-  `to-adr-tasks` after `to-tasks`. Each holds a `do-while` loop, `adr-<a>-check` (`max_iterations: 100`, condition
-  `steps.adr-<a>-report.output.data.again`), one iteration one whole check, then `adr-<a>-rounds`. The plan loop
-  opens with `adr-plan-clear` (shell, deletes `touches.json`) and `adr-plan-touches` (prompt, `timeout: 1800`,
-  `continue_on_error: true`, R4);
-  then each holds `adr-<a>-ask` (shell, `output_format: json`, `timeout: 1800`), an `if` on
-  `steps.adr-<a>-ask.output.data.judge` holding `adr-<a>-judge` (Spec Kit `prompt` step following `adr-judge.md`,
-  `timeout: 1800`, `continue_on_error: true`), an `if` on `steps.adr-<a>-ask.output.data.decide` holding `adr-<a>-decide` (shell,
-  `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the shell
-  step's 300 s default), then `adr-<a>-report` (shell, `output_format: json`).
-  - ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-<a>-stop.json` (data-model.md)
-    and print nothing else. A touches or judge step that fails or times out continues. One rule for both: a model step
-    that did not finish with exit code `0` has not answered, whatever file it left, since it may have written a
-    valid partial file first. ask takes `steps.adr-plan-touches.output.exit_code` and records `touches-missing`;
-    decide takes `steps.adr-<a>-judge.output.exit_code` and, when the asked record says `judge`, records
-    `verdict-unread` without reading the verdict. Only the literal `0` is answered (on 1.1.3 a non-zero dispatch
-    records its code, a timeout `-1`, a missing CLI `1`; an invalid timeout is refused when the workflow loads). Without a judge, decide ignores the value, stale from an earlier iteration or empty. The
-    tasks check has no touches step, so `ask tasks` takes no touches argument. So every check stop, an
-    outcome ask or decide recorded and report showed, halts the run at `adr-<a>-report`, the one stop point.
+- **Decision** (2026-11-04; supersedes a check after plan and a second after tasks, Option K): one top-level `if`
+  on `*spec-is-written` in `workflow.yml`, `to-adr-check`, after `to-review-critique`, in place of `to-tasks`. It
+  holds a `do-while` loop, `adr-check` (`max_iterations: 100`, condition `steps.adr-report.output.data.again`), one
+  round per resume after a stop, then `adr-out-of-rounds`. A round, every part every time (workflow-steps.md):
+  `adr-settled-design`; `adr-clear` (shell: deletes `touches.json`, the asked, verdict and stop records, writes
+  `touches-from.json`); `adr-touches` (prompt, `timeout: 1800`, `continue_on_error: true`, R4); `adr-tasks-due`
+  (shell, `output_format: json`) and an `if` on its `due` holding `adr-tasks` (`command: speckit.tasks`) and
+  `adr-tasks-written` (R15); `adr-stories` (shell, R15); `adr-ask` (shell, `output_format: json`,
+  `timeout: 1800`); an `if` on `steps.adr-ask.output.data.judge` holding `adr-judge` (Spec Kit `prompt` step
+  following `adr-judge.md`, `timeout: 1800`, `continue_on_error: true`); an `if` on
+  `steps.adr-ask.output.data.decide` holding `adr-decide` (shell, `timeout: 1800`: decide calls `adr` once per new
+  ruling, concurrently under one 1500 s deadline, past the shell step's 300 s default); `adr-report` (shell,
+  `output_format: json`). The judge reads `plan.md` and `tasks.md` together, so one verdict covers both.
+  - stories, ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-stop.json`
+    (data-model.md) and print nothing else, and ask, finding one stories wrote, asks nothing. A touches or judge
+    step that fails or times out continues. One rule for both: a model step that did not finish with exit code `0`
+    has not answered, whatever file it left, since it may have written a valid partial file first. ask takes
+    `steps.adr-touches.output.exit_code` and records `touches-missing`; decide takes
+    `steps.adr-judge.output.exit_code` and, when the asked record says `judge`, records `verdict-unread` without
+    reading the verdict. Only the literal `0` is answered (on 1.1.3 a non-zero dispatch records its code, a timeout
+    `-1`, a missing CLI `1`; an invalid timeout is refused when the workflow loads). Without a judge, decide ignores
+    the value, stale from an earlier round or empty. So every check stop, an outcome stories, ask or decide
+    recorded and report showed, halts the run at `adr-report`, the one stop point.
   - Round outputs: a step skipped in a round keeps the output of the round it last ran, and a later template reads
     that value (executed on 1.1.3: `steps.<id>.output.data` of a step under a false `if` held the earlier round's).
     So a step reads another step's output only when that step runs earlier in every round, or when a record written
     this round shows it ran (contracts/workflow-steps.md); every other decision reads a run-folder file written this
     round.
-  - A step that crashes without an answer (clear, ask, decide, report or rounds exiting non-zero) is no check stop:
-    the run fails at that step and the resume runs that step alone (R14).
-  - report: a stop not yet shown is printed and the run stops at `adr-<a>-report` with the stop's exit; the resume
-    runs report again, which deletes the shown stop and prints `{"again": true}`, so the loop runs a new iteration:
-    clear, touches, ask, judge, decide on the artifacts as they then stand, with that resume's `ADR_RULING`. No stop:
-    `{"again": false}`, the loop ends.
-  - `adr-<a>-rounds`, an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
-    another stops the run as could not run (`stop <a> rounds`), never walking past the check.
-- **Rationale**: P1 (planner): a workflow step that runs a script decides; FR-006; planner ADR-0009 d7: every
-  resume after a stop runs the whole check again. Spec Kit ≥ 1.1 re-executes only from the halted step (R14), so a
-  check that stops at its last step and asks for another iteration is how a resume gets the whole check. A shell
+  - A step that crashes without an answer (any shell step of the round exiting non-zero, or rounds) is no check
+    stop: the run fails at that step and the resume runs that step, then the rest of its round (R14).
+  - report: a stop not yet shown is printed and the run stops at `adr-report` with the stop's exit; the resume runs
+    report again, which deletes the shown stop and prints `{"again": true}`, so the loop runs a new round on the
+    artifacts as they then stand, with that resume's `ADR_RULING`. No stop: `{"again": false}`, the loop ends.
+  - `adr-rounds`, under an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
+    another stops the run as could not run (`stop rounds`), never walking past the check.
+- **Rationale**: P1 (planner): a workflow step that runs a script decides; FR-006; planner ADR-0009 d1 and d7:
+  every round works everything out again, so no part is skipped as unchanged and nothing an earlier round found
+  is trusted. One check after the tasks sees what landing lands; the critique gate before it reviews a plan the
+  check has not yet seen (planner ADR-0009, trade-offs). Spec Kit ≥ 1.1 re-executes only from the halted step
+  (R14), so a round that stops at its last step and asks for another is how a resume gets the whole round. A shell
   step with `output_format: json` parses stdout into `output.data`; an `if` and a `do-while` read a boolean from one
   `{{ }}` expression; shell and prompt steps inherit the resume's environment, so `ADR_RULING` reaches only that
-  resume.
+  resume. Moving the tasks command into the round writes `tasks.md` once per change of its sources, not once
+  before the loop and again in it.
+- **Alternatives considered** (2026-11-04): a check after plan and a second after tasks (Option K, rejected: two
+  loops, two sets of files, and a plan fixed at the second check never re-checked by the first); a tasks step
+  before the loop and one in it (rejected: `tasks.md` written twice on a run that never stops).
 - **Existing tools**: `command: speckit.adrkit.check` (prose answer, one folder) does not fit P7; Spec Kit's
   `prompt` step sends an inline prompt to the integration with the same tools as a command step: used for the
   judge; the critique pattern (`mark-critiques` → command → `find`) is the model for script → model → script.
 
 ## R7: The judge's verdict
 
-- **Decision**: the ask step writes `<run>/adr-<a>-asked.json` (`AdrAsked`: per folder entry, path, `inside`, and
-  could-not-run or governing and broken records; the artifact's paths). The judge reads it, the artifact (`plan.md`
-  or `tasks.md`) and the spec folder's rulings file, and writes `<run>/adr-<a>-verdict.json`:
-  `{v: 1, artifact, verdicts: [{folder, record, judgment, paths, why}]}`, `folder` the entry as written, `judgment`
+- **Decision**: the ask step writes `<run>/adr-asked.json` (`AdrAsked`: per folder entry, path, `inside`, and
+  could-not-run or governing and broken records; the plan's and the tasks' paths, each with the artifact that named
+  it). The judge reads it, `plan.md`, `tasks.md` and the spec folder's rulings file, and writes
+  `<run>/adr-verdict.json`: `{v: 1, verdicts: [{folder, record, judgment, paths, why}]}`, `folder` the entry as written, `judgment`
   from core enum `AdrJudgment` (`WITHIN`, `DEPARTS`), `paths` non-empty for `DEPARTS`. Zod schemas in
   `core/src/contracts/decision-check.ts`. A verdict missing or unparsable is could not run for the check; one
   missing a governing record, naming one not governing, or naming a path not asked is could not run for that
@@ -172,7 +180,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision**: pure `decideFolder` and `decideCheck` in `planner/plugin/lib/adr-check.ts`. Per folder:
   `COULD_NOT_RUN` (core's `CouldNotRun`, or the verdict mismatching the asked record) else `FAIL` (a broken record,
   or a `DEPARTS` no rulings entry names) else `PASS`. Empty list: passes first, before the artifact's paths are
-  read. Every stop of every check step (ask, decide, rounds; plan and tasks) is a list of items rendered by one pure
+  read. Every stop of every check step (stories, ask, decide, rounds) is a list of items rendered by one pure
   function, `adrStop`, from one table as data, `ADR_STOPS` (workflow-steps.md): kind → outcome → label → what →
   next step.
   - A line reads `<OUTCOME>: <label>: <what>. Next step: <next>.` That order lets core's `CouldNotRun` reason, which
@@ -181,8 +189,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - One line per departure and per broken record; a PASS line names the governing records, or that none governs;
     titles in full. A tasks departure names every story whose task names its path.
   - Every line on stderr; ask's and report's stdout is their JSON only.
-  - A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`. ask and decide record it with
-    the lines in `<run>/adr-<a>-stop.json` and exit 0; `adr-<a>-report` prints the lines and exits with it (R6).
+  - A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`. stories, ask and decide record it
+    with the lines in `<run>/adr-stop.json` and exit 0; `adr-report` prints the lines and exits with it (R6).
   - A judge or touches step that does not answer (exit code not `0`) continues on error, and its stop is the
     `verdict-unread` or `touches-missing` row decide or ask records; `drive_workflow.py` runs no `stop`.
 - **Rationale**: FR-008, FR-009, FR-018; P3; P4; exit codes as `settled_design.py` and `spec_facts.ts` (1 refused,
@@ -203,22 +211,27 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - Validation, deterministic, against `adr` and never the judge, all or nothing: the whole `ADR_RULING` is refused
     (exit 1, nothing appended) when it is not JSON or not `AdrRuling[]`, or any ruling's folder is not listed, its
     path is not an asked path, or `checkAdrFolder` run on that folder with that one path does not name its record as
-    governing. One call per new ruling makes the record–path pair exact, since `adr check` answers for the whole
-    path set. A call that could not run makes the check could not run, nothing appended. Entries already in the
-    file are not re-checked; a valid ruling is appended also when the judge did not name that departure this time.
+    governing, or its key names no departure this round found (the judge's or one found at review), matched before
+    any departure is dropped. One call per new ruling makes the record–path pair exact, since `adr check` answers
+    for the whole path set. A call that could not run makes the check could not run, nothing appended. A ruling
+    whose key the file already holds is satisfied, not refused or re-checked. Each valid new ruling is appended to
+    `<run>/adr-rulings-written.json`, then to the rulings file, each append skipping an entry already there. A
+    round that stops before decide applies no ruling.
   - Honouring: the judge is given the file (`adr-judge.md`), and decide drops every departure whose
     `(folder, record, path)` an entry names, at every check of the spec folder.
   - One writer, decide. Writer guard, one function `changedSince(recorded, now) → {added, removed}` in
     `planner/plugin/lib/adr-check.ts`, used three ways: (a) ask and decide: a rulings-file entry, compared whole
     (reason included, so a hand-edited reason is seen), in neither the file at `HEAD` nor
     `<run>/adr-rulings-written.json` is could not run, naming it; `removed` is no stop there (a ruling deleted by
-    hand only makes the check stricter); (b) decide: the artifact's paths re-read against the asked record's,
+    hand only makes the check stricter); (b) decide: `touches.json`'s and `tasks.md`'s paths re-read against the
+    asked record's,
     compared as `{path, line, story}`, any `added` or `removed` could not run; (c) decide: the asked record's sha256
     against the `asked` digest ask printed, which the workflow passes as an argument. Each names what changed
     (FR-019).
 - **Rationale**: FR-016, FR-017, FR-019; ADR-0004's "a way past it that can succeed"; P2: the user releases the
-  stop; P6: one writer. A resume after a stop runs a new iteration of the check loop, judge included (R6), so a
-  ruling checked against the judge's answer would be refused when the model does not repeat it; a persisted input would reach the after-tasks check.
+  stop; P6: one writer. A resume after a stop runs a new round, judge included (R6), so a ruling is matched against
+  the departures that round found, the judge's and review's alike; a ruling naming none rules on nothing the user
+  saw, so it is refused rather than written. A persisted input would reach every later round.
   The headless steps hold Write/Edit, so a file only decide writes, checked against `HEAD` and decide's run record,
   is what keeps a model from adding a ruling; an entry committed by hand is seen in spec-PR review.
 - **Existing tools**: gate `verdict_input` (a choice from fixed options; a ruling carries data, so a gate does not
@@ -249,7 +262,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 ## R11: Decision records first, and PR order
 
 - **Decision** (2026-11-03): the planning PRs, which precede any code of US2–US6, amend planner ADR-0009 (folders
-  listed in `[shared] adr_folders`; on disk, no network; after plan and after tasks; the judge's `AdrJudgment`; the
+  listed in `[shared] adr_folders`; on disk, no network; one check after tasks, every round redoing everything, d1;
+  `tasks.md` derived, landing's story checks in every round, d4; the judge's `AdrJudgment`; the
   rulings file with decide its only writer; next steps per stop; the plan's paths in `<run folder>/touches.json`,
   written by the check's own touches step, d7; a rescope takes its open decision from review's hold questions, d9), orchestrator
   ADR-0004 d4 (the root `specs/` folder beyond TICK_ONLY and every in-repo listed folder are protected paths),
@@ -260,7 +274,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   ESCALATE), and add root ADR-0011 (planner alone creates and edits
   spec folders and decision records; a story PR that changes one is never attested) and reviewer ADR-0022 (the
   decision check reads only the listed folders and honours the rulings file), both accepted 2026-11-03. Then US2
-  (core + `codeworks.toml` + fixtures), US3 and US4 (planner), US5 (core's protected paths, then reviewer after
+  (core + `codeworks.toml` + fixtures), US3 (planner; US4 merged into it 2026-11-04), US5 (core's protected paths, then reviewer after
   #235), US6 (#285, after #278: core's departure line and lapse, reviewer after #235, planner's rescope).
 - **Rationale**: Principle VI; FR-001; ADRs and specs are written in planning only, never by an implementation
   story; root ADR-0010 d3 (a set is added with the record that owns it).
@@ -300,7 +314,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     runs `rescope_questions.ts`, which takes the open review questions (every open escalation hold's, and a verdict's open rescope hold's) of every open story issue under the
     spec's issue (core `readState` as the planner App) into a scratch file; `drive_workflow.py rescope …
     questions=@<file>` copies it to `<run>/review-questions.json`. Grill gets them as the open decision; with none,
-    the admin's words as today. The plan check's ask adds every departure line's path to the paths it checks, so its
+    the admin's words as today. The check's ask adds every departure line's path to the paths it checks, so its
     record is matched and the user can rule (FR-016); decide checks each `(folder, record, path)` with one
     `checkAdrFolder(cwd, folder, [path], …)` call, concurrently with the ruling checks under the same 1500 s
     deadline (the asked record says which records govern a folder, not which path), and adds each departure whose
@@ -326,7 +340,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision** (2026-11-04): Spec Kit `>=1.1.3,<1.2.0` for the `issue-spec` workflow and the settled-design preset
   (`requires: speckit_version`), CI pinned at `specify-cli==1.1.3`. On 1.1.x a resume replays the result of every
   step already done and re-executes only from the step the run halted at; each resume after a stop runs a new
-  iteration of the check loop (R6). A step that failed is run again; a step inside a loop iteration after the first
+  round of the check loop (R6). A step that failed is run again, then the rest of its round; a step inside a loop iteration after the first
   is reported with a qualified id, `<loop>:<step>:<n>` (observed `to-check:check-stop:1`), others possibly
   unqualified, so `drive_workflow.py` matches an ADR step by its own id, the qualified id's middle segment. A step
   with `continue_on_error: true` that fails is recorded and the run goes on, which is how touches and judge reach
@@ -339,3 +353,29 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   ADR Kit's extension caps Spec Kit below 1.2.0.
 - **Existing tools**: Spec Kit's `do-while` step (`max_iterations`, `condition`), used; the workflow's per-step
   top-level layout, whose comment states the 1.0.x resume and is corrected (T025).
+
+## R15: `tasks.md` in the round, and landing's checks of it
+
+- **Decision** (2026-11-04): `tasks.md` is derived, never edited by hand (planner ADR-0009 d4). Each round's
+  `adr-tasks-due` hashes every file the tasks command reads (the spec folder's `spec.md`, `plan.md`, `research.md`,
+  `data-model.md`, `quickstart.md`, `contracts/**`, and `.specify/memory/constitution.md`) into
+  `<run>/tasks-sources-next.json` and is due when `tasks.md` is missing, `<run>/tasks-sources.json` is missing, or
+  the two differ; then the tasks command runs and `adr-tasks-written` renames the first to the second. Hashes taken
+  before the command, promoted after it, so a halt mid-command or a source changed while it ran leaves the next
+  round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
+  extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
+  `TaskBlockLabelRefused`) and the spec issue's sub-issues (extra, in another repository, out of story order), read
+  as the planner App. `land.ts`'s next steps stop sending the admin to `tasks.md`: extra sub-issues are removed from
+  the issue, an out-of-order one reordered, a refused `tasks.md` rescoped. Folds in #303.
+- **Rationale**: a `tasks.md` landing refuses after the run has completed can only be fixed by hand or by a rescope;
+  checked in every round, it stops while the run can still resume, and a stop's next step deletes `tasks.md` so the
+  next round writes it again. Hashing the sources keeps a round that changed nothing from writing `tasks.md` again
+  and losing nothing a re-run would not also lose. One set of functions for both callers keeps the two checks one
+  rule (Principle I). The ADR steps stay offline (FR-010); the sub-issues are GitHub's, read as landing reads them.
+- **Alternatives considered**: writing `tasks.md` in every round (rejected: a model step re-run on unchanged input
+  for nothing); hand edits to `tasks.md` as a next step (rejected: the next tasks run discards them, and the check
+  would grade a file no command wrote); the checks only in `land.ts` (rejected: they stop after the run has
+  completed).
+- **Existing tools**: `land.ts`'s `read` (`storyPlan`, `TasksRefused`, `TaskBlockLabelRefused`, the sub-issue
+  checks), moved, not duplicated; `planner/plugin/lib/github.ts`; core's `sourceHashes` (new, beside
+  `decision-check.ts`).

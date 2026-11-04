@@ -7,14 +7,14 @@ description: "Task list for #177: planner checks the plan against the ADR folder
 
 **Input**: Design documents from `specs/177-plan-adr-check/`
 
-**Prerequisites**: plan.md, spec.md, research.md (R1–R14), data-model.md, contracts/ (`core.md`, `artifact-grammar.md`,
+**Prerequisites**: plan.md, spec.md, research.md (R1–R15), data-model.md, contracts/ (`core.md`, `artifact-grammar.md`,
 `workflow-steps.md`), quickstart.md
 
 **Tests**: required. Constitution Principle IV (test-first) and quickstart.md name every test; each story writes its
 tests first and sees them fail for the expected reason before implementing.
 
 **Organization**: one phase per user story; one story is one PR (constitution, Delivery Workflow). PR order (R11):
-the planning PRs (decision records, no code) → US2 → US3 → US4; US5's core half after US2, its reviewer half after
+the planning PRs (decision records, no code) → US2 → US3 (US4 merged into it, 2026-11-04); US5's core half after US2, its reviewer half after
 #235; US6 (#285) after US5 (#278), its reviewer half after #235. US1 was moved into the planning PR on 2026-11-03; ADRs and specs are written in planning only.
 
 ## Format: `[ID] [P?] [Story] Description`
@@ -71,70 +71,58 @@ pinned version and read by one reader, all in core.
 
 ---
 
-## Phase 4: User Story 3 - planner checks the plan before critique (Priority: P1)
-Story issue: #276
+## Phase 4: User Story 3 - planner checks the plan and its tasks before the run completes (Priority: P1)
+Story issue: #276 (US4, #277, merged into it on 2026-11-04; #277 has no tasks)
 
-**Goal**: a check loop `adr-plan-check` (clear → touches → ask → judge → decide → report) between
-`to-settled-design` and `to-mark-critiques`; a script decides each folder's outcome from the judge's verdict; every
-line comes from one stop table through `adrStop`; each resume after a stop runs a new iteration; the user can
-overrule a departure on resume.
+**Goal**: one check loop `adr-check` after the critique gate, in place of `to-tasks`; each round runs
+settled-design → clear → touches → the tasks command when due → landing's story checks → ask → judge → decide →
+report over the plan's and the tasks' paths; a script decides each folder's outcome from the judge's verdict; every
+line comes from one stop table through `adrStop`; each resume after a stop runs a new round; the user can overrule a
+departure the round found on resume; `tasks.md` is never edited by hand. Folds in #303.
 
-**Independent Test**: `node --test planner/tests/adr-check.test.ts` and
-`python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'` green for every plan row of
-quickstart.md's table; the manual end-to-end check in quickstart.md stops at `adr-plan-report`.
+**Independent Test**: `node --test planner/tests/adr-check.test.ts planner/tests/land.test.ts` and
+`python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'` green for every row of quickstart.md's
+Planner table; the manual end-to-end check in quickstart.md stops at `adr-report`.
 
 ### Tests for User Story 3 (write first, see them fail)
 
-- [ ] T016 [P] [US3] Create `core/tests/decision-check.test.ts`: `artifactPath` per `contracts/artifact-grammar.md` (under `"any"`: a `PATH` returned, anything else `PathRefused`; for a task span: a `PATH` with `/` returned, a no-`/` span returned only when `rootFiles` holds it, a span with `/` and a glob or brace character or a `.`/`..` segment `PathRefused`, a command, URL or `<run>/x` placeholder `null`); `readTouchedPaths`: `{"v": 1, "paths": [...]}` read with each entry's 1-based index as `line`; an extra or missing key, `v` other than `1`, an entry not a `PATH` or an entry twice throws `TouchesRefused` naming `touches.json` and the entry; `paths: []` returns `[]` (the script makes it could not run); `AdrAsked` with each folder's `inside`; `AdrVerdict`: `v: 1`, `judgment` from `AdrJudgment`, `paths` non-empty for `DEPARTS` and empty for `WITHIN`, `why` non-empty; `AdrRuling`: four non-empty strings, `path` a `PATH`, no other key; `AdrRulings`: `{v: 1, rulings}` with no `(folder, record, path)` twice; `AdrStopRecord`: `{v: 1, exit, lines, shown}`, `exit` `1` or `2` only, `lines` non-empty, no other key; `readRulings`: absent file → `[]`, unparsable → `RulingsRefused`
-- [ ] T017 [P] [US3] Create `planner/tests/adr-check.test.ts`: unit cases for the pure `decideFolder`, `decideCheck`, `changedSince` and `adrStop` (one case per `ADR_STOPS` row (no `judge` or `touches` kind: those are `verdict-unread` and `touches-missing`): line `<OUTCOME>: <label>: <what>. Next step: <next>.`, PASS with no next step, a core `CouldNotRun` printed with its label once; exit 2 when any `COULD_NOT_RUN`, else 1 when any `FAIL`, else 0); then drive `node planner/plugin/scripts/adr_check.ts ask plan …` and `decide plan …` in a scratch checkout (`planner/tests/support/checkout.ts`) with a stand-in `adr` on `PATH`, a verdict file the test writes in the judge's place and a `<run>/touches.json` the test writes in the touches step's place, one case per plan row of `specs/177-plan-adr-check/quickstart.md`'s Planner table, every line read from stderr and ask's and report's stdout read as JSON alone; a stop's exit read from `report plan …` after ask and decide each exit 0 having written `<run>/adr-plan-stop.json`; ask recording a stop prints `decide: false` and `judge: false`; the touches and judge exit code arguments: only the literal `0` is answered, an empty value, `1` or `00` not, so `ask plan` records `touches-missing` beside a valid `touches.json` and decide, the asked record saying `judge`, records `verdict-unread` beside a valid verdict without reading it, while with no judge decide ignores the argument; ask removes a stale stop record; `report` with the record `shown: false` (its lines, its exit, rewritten `shown: true`), `shown: true` (deleted, `{"again": true}`) and none (`{"again": false}`); `stop plan rounds` exits 2 with the `rounds` row
-- [ ] T018 [P] [US3] In `planner/tests/test_drive_workflow.py` add a fixture reaching the ADR steps: a stand-in `claude` whose plan step writes a `plan.md` that passes `settled_design.py` and whose `adr-plan-touches` step writes `<run>/touches.json` from it, a stand-in judge that writes the verdict, a stand-in `adr`, and a committed `codeworks.toml` with `[planner] app_id` and `adr_folders`; cases: a run stops at `adr-plan-report` before `mark-critiques`; a plan changed before a resume gets a `touches.json` rewritten from it, the resume running a new iteration of `adr-plan-check`; a touches step that writes a valid `touches.json` and then fails or times out stops the run at `adr-plan-report` with `adr: true` and the `touches-missing` line; a decide that crashes (exit non-zero, no stop record) fails the run at `adr-plan-decide` and the resume runs decide again, not clear, touches or ask; a stop in an iteration after the first, reported under a qualified id (`adr-plan-check:adr-plan-report:1`), reports `adr: true` with its lines; a check that stops at every iteration fails the run at `adr-plan-rounds` after `max_iterations` with `adr: true` and the `rounds` line (the test may lower `max_iterations` in its copy of the workflow); `resume <run> adr_ruling=@<file>` exports the file's content as `ADR_RULING` for that `specify resume` only and `inputs.json` gains no `adr_ruling`; `adr_ruling=<json>` without `@`, or an unreadable file, exits non-zero before resuming; an ask stop and a decide stop each stop the run at `adr-plan-report` and report `adr: true` with its stderr lines; a judge that writes a valid verdict and then fails or times out stops the run at `adr-plan-report` with `adr: true` and the `verdict-unread` line, and the resume runs the whole check again; #291's `test_a_judge_that_fails_reports_adr_with_the_judge_stop`, `test_a_judge_timeout_reports_adr_with_the_judge_stop` and `test_a_touches_step_that_fails_reports_adr_with_the_touches_stop` change to expect these stops
-- [ ] T019 [P] [US3] In `planner/tests/test_plan_template.py` assert `planner/plugin/speckit/workflows/issue-spec/workflow.yml`'s `to-adr-plan` block holds the `do-while` `adr-plan-check` (`max_iterations: 100`, condition `steps.adr-plan-report.output.data.again`) and then `adr-plan-out-of-rounds`, and the loop opens with shell step `adr-plan-clear` deleting `<run folder>/touches.json`, then prompt step `adr-plan-touches` following `adr-touches.md`, before `adr-plan-ask`, `adr-plan-touches` and `adr-plan-judge` with `continue_on_error: true`, and ends with `adr-plan-report`; `requires.speckit_version` is `>=1.1.3,<1.2.0` in `workflow.yml` and `planner/plugin/speckit/presets/settled-design/preset.yml`; `adr-touches.md` tells the model to read `plan.md` and write `<run folder>/touches.json` as `{"v": 1, "paths": [...]}`, one literal path per file created, changed or deleted, no glob, no brace group, no trailing `/`, no `..`, and no other file; the `plan` step's `input.args` and `speckit.plan.md` say nothing of `touches.json`; the plan template has no `## Touches` section
+- [ ] T016 [P] [US3] Create `core/tests/decision-check.test.ts`: `artifactPath` per `contracts/artifact-grammar.md` (under `"any"`: a `PATH` returned, anything else `PathRefused`; for a task span: a `PATH` with `/` returned, a no-`/` span returned only when `rootFiles` holds it, a span with `/` and a glob or brace character or a `.`/`..` segment `PathRefused`, a command, URL or `<run>/x` placeholder `null`); `readTouchedPaths`: `{"v": 1, "paths": [...]}` read with each entry's 1-based index as `line` and `artifact: plan`; an extra or missing key, `v` other than `1`, an entry not a `PATH` or an entry twice throws `TouchesRefused` naming `touches.json` and the entry; `paths: []` returns `[]` (the script makes it could not run); `AdrAsked` with each folder's `inside` and each path's `artifact`; `AdrVerdict`: `v: 1`, no `artifact` key, `judgment` from `AdrJudgment`, `paths` non-empty for `DEPARTS` and empty for `WITHIN`, `why` non-empty; `AdrRuling`: four non-empty strings, `path` a `PATH`, no other key; `AdrRulings`: `{v: 1, rulings}` with no `(folder, record, path)` twice; `AdrStopRecord`: `{v: 1, exit, lines, shown}`, `exit` `1` or `2` only, `lines` non-empty, no other key; `SourceHashes` and `sourceHashes(cwd, paths)`: an absent file left out, equal for unchanged bytes, unequal for a changed or removed file; `readRulings`: absent file → `[]`, unparsable → `RulingsRefused`
+- [ ] T030 [P] [US3] In `core/tests/tasks.test.ts` add `readTaskPaths(tasksText, rootFiles)` cases: `- [ ] T<n>` and `- [x]`/`- [X]` lines read; backticked spans with `/` that are a `PATH` are paths, `artifact: tasks`; `` `codeworks.toml` `` is a path when `rootFiles` holds it, `` `adr check` `` and a URL are not; `` `a/{b,c}.ts` `` and `` `a/*.ts` `` throw `PathRefused` reported as `tasks.md:<line>`; story is `US<k>` from `[US<k>]`, else the heading's text without `## `; a task line above every `## ` heading is refused naming `tasks.md:<line>`; non-task lines ignored
+- [ ] T017 [P] [US3] Create `planner/tests/adr-check.test.ts`: unit cases for the pure `decideFolder`, `decideCheck`, `changedSince` and `adrStop` (one case per `ADR_STOPS` row: line `<OUTCOME>: <label>: <what>. Next step: <next>.`, PASS with no next step, a core `CouldNotRun` printed with its label once; exit 2 when any `COULD_NOT_RUN`, else 1 when any `FAIL`, else 0; no row's next step names an edit to `tasks.md`); then drive `node planner/plugin/scripts/adr_check.ts clear`, `tasks-due`, `tasks-written`, `stories`, `ask`, `decide`, `report` and `stop rounds` in a scratch checkout (`planner/tests/support/checkout.ts`) with a stand-in `adr` on `PATH`, a stand-in GitHub, a verdict file the test writes in the judge's place and a `<run>/touches.json` the test writes in the touches step's place, one case per row of `specs/177-plan-adr-check/quickstart.md`'s Planner table, every line read from stderr and the stdout of tasks-due, ask and report read as JSON alone; a stop's exit read from `report` after stories, ask and decide each exit 0 having written `<run>/adr-stop.json`
+- [ ] T031 [P] [US3] In `planner/tests/adr-check.test.ts` add the task-path rows: a `[US2]` task and a phase task naming one governed path with a `DEPARTS` verdict → exit 1 naming record, path and both stories, next step "change `plan.md`"; a path both `touches.json` and a task name → one entry per artifact; a `tasks.md` naming no path → exit 2, `tasks-empty`; a ruling written in one round honoured in the next with no `ADR_RULING` set (US3 AS6); a ruling on a key no departure of the round names → `ruling-refused`, nothing appended
+- [ ] T066 [P] [US3] In `planner/tests/land.test.ts` assert `land.ts`'s stops name no edit to `tasks.md`: extra sub-issues → "remove them from #p's sub-issues"; a sub-issue out of story order → "order #p's sub-issues so sub-issue k is US<k>'s issue"; a `tasks.md` it refuses → "run `/planner:issue-spec rescope <spec folder> #p`"; and that `storyPlan` and the sub-issue checks are imported from `planner/plugin/lib/story-plan.ts`
+- [ ] T018 [P] [US3] In `planner/tests/test_drive_workflow.py` add a fixture reaching the check loop: a stand-in `claude` whose plan step writes a `plan.md` that passes `settled_design.py`, whose `adr-touches` step writes `<run>/touches.json` from it and whose tasks command writes `tasks.md` from it, a stand-in judge that writes the verdict, a stand-in `adr`, a stand-in GitHub, and a committed `codeworks.toml` with `[planner] app_id` and `adr_folders`; one case per sentence of `specs/177-plan-adr-check/quickstart.md`'s `test_drive_workflow.py` paragraph, the stop step `adr-report`, the qualified id `adr-check:adr-report:1`, the rounds step `adr-rounds` (the test may lower `max_iterations` in its copy of the workflow); #291's `test_a_judge_that_fails_reports_adr_with_the_judge_stop`, `test_a_judge_timeout_reports_adr_with_the_judge_stop` and `test_a_touches_step_that_fails_reports_adr_with_the_touches_stop` change to expect these stops
+- [ ] T032 [P] [US3] In `planner/tests/test_drive_workflow.py` add: a resume carrying `adr_ruling` reaches only the round it runs, the next round runs without `ADR_RULING`; a rescope run (starts at grill) runs the check loop, its first round writing `tasks.md` again; a resume after `plan.md` is changed writes `tasks.md` again and checks it; a resume with nothing changed does not run the tasks command; a judge that writes a valid verdict and then fails stops the run at `adr-report` with the `verdict-unread` line
+- [ ] T019 [P] [US3] In `planner/tests/test_plan_template.py` assert `planner/plugin/speckit/workflows/issue-spec/workflow.yml` has no `to-tasks` block and its `to-adr-check` block, after `to-review-critique`, holds the `do-while` `adr-check` (`max_iterations: 100`, condition `steps.adr-report.output.data.again`) and then `adr-out-of-rounds`, the loop's steps in the order and with the settings `contracts/workflow-steps.md` gives (`adr-touches` and `adr-judge` with `continue_on_error: true`, `adr-tasks` under an `if` on `steps.adr-tasks-due.output.data.due`), ending with `adr-report`; `requires.speckit_version` is `>=1.1.3,<1.2.0` in `workflow.yml` and `planner/plugin/speckit/presets/settled-design/preset.yml`; `adr-touches.md` tells the model to read `plan.md` and write `<run folder>/touches.json` as `{"v": 1, "paths": [...]}`, one literal path per file created, changed or deleted, no glob, no brace group, no trailing `/`, no `..`, and no other file; the `plan` step's `input.args` and `speckit.plan.md` say nothing of `touches.json`; the plan template has no `## Touches` section
+- [ ] T048 [P] [US3] In `planner/tests/test_plan_template.py` assert `planner/plugin/speckit/presets/settled-design/preset.yml` registers command `speckit.tasks` from `commands/speckit.tasks.md` with strategy `append`, and that file tells the model to name each file a task touches as one literal path per backtick span, no glob, no brace group
 
 ### Implementation for User Story 3
 
 - [ ] T020 [US3] In `core/src/values.ts` add `AdrJudgment` and `CheckedArtifact` exactly as `specs/177-plan-adr-check/contracts/core.md` gives them, each with a comment naming its owner, planner ADR-0009 (root ADR-0010)
-- [ ] T021 [US3] Create `core/src/contracts/decision-check.ts` per `contracts/core.md` and `contracts/artifact-grammar.md`: the file-name constants and `askedFile`/`verdictFile`, `ArtifactPath`, pure `artifactPath(span, rootFiles)` with `PathRefused`, Zod `TouchedPaths`, pure `readTouchedPaths(json)` (passes `"any"`) with `TouchesRefused`, Zod `AdrAsked`, `AdrVerdict`, `AdrRuling`, `AdrRulings` (no key twice), `stopFile` and Zod `AdrStopRecord`, `readRulings(specDir)` with `RulingsRefused` (R4, R5, R6, R7, R9, FR-012)
-- [ ] T022 [US3] Create `planner/plugin/lib/adr-check.ts`, pure: `FolderOutcome` per data-model.md, `decideFolder`, `decideCheck`, `changedSince(recorded, now) → {added, removed}` (R9), the stop table `ADR_STOPS` as data, row for row as `contracts/workflow-steps.md` gives it, and `adrStop(items) → {lines, exit}` rendering it; a departure's row chosen by its folder's `inside`; a tasks departure naming every story whose task names its path, comma-separated (R8, FR-018)
-- [ ] T023 [US3] Create `planner/plugin/scripts/adr_check.ts` (I/O only, imports `../lib/guarded.ts` first like `planner/plugin/scripts/spec_facts.ts`) with `ask plan`, `decide plan`, `report plan`, `stop plan rounds` per `contracts/workflow-steps.md`: settings through `readPlannerSettings` for ask and decide, none for report and stop; settings first (empty `adr_folders`: the empty row, no path read); ask takes the touches step's exit code as its last argument and removes `<run>/adr-plan-verdict.json` and `<run>/adr-plan-stop.json`; a touches exit code other than the literal `0` (empty included) records `touches-missing`, whatever `touches.json` holds; else it reads `<run>/touches.json` through `readTouchedPaths`, runs the writer guard, calls `adrFolders` and `checkAdrFolder(…, ADR_DEADLINE_MS)` for every folder at once, writes `<run>/adr-plan-asked.json`, prints `{"judge", "decide", "asked"}` alone on stdout (`decide: false`, `judge: false` when it recorded a stop); decide takes the judge's exit code as its last argument, runs the guard (a–c), reads the verdict when judged (a judge exit code other than the literal `0`: `verdict-unread`, the verdict not read; no judge: the argument ignored, as it may be stale) and `ADR_RULING`, validates `ADR_RULING` whole (one `checkAdrFolder(cwd, folder, [path], …)` per new ruling, all at once under one `ADR_DEADLINE_MS`, each given what is left of it), appends valid new ones to `<spec folder>/adr-rulings.json` and `<run>/adr-rulings-written.json`, drops ruled departures, decides; ask and decide exit 0 once they reach an answer, writing a stop to `<run>/adr-plan-stop.json` (`AdrStopRecord`, `shown: false`) and printing nothing else, a non-zero exit only when the step itself fails; report prints a `shown: false` record's lines and exits with its `exit`, rewriting it `shown: true`, deletes a `shown: true` one and prints `{"again": true}`, and with none prints `{"again": false}`; every line rendered through `adrStop`, none formatted locally (R6, FR-007–FR-011, FR-016–FR-019)
-- [ ] T024 [US3] Create `planner/plugin/speckit/workflows/issue-spec/adr-judge.md` per `contracts/workflow-steps.md`: read `<run>/adr-<a>-asked.json`, the artifact (`plan.md` for plan, `tasks.md` for tasks), `<spec folder>/adr-rulings.json` and each governing record's file; judge each governing record as `reviewer/plugin/agents/decision-reviewer.md` defines a departure, naming none a rulings entry already rules on; write `<run>/adr-<a>-verdict.json` per `AdrVerdict` (one verdict per governing record per folder, `folder` the entry as the asked record gives it, `paths` only from the asked paths); write no other file; give no ruling (R7, FR-015)
-- [ ] T025 [US3] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` bump `version` to `1.7.0` and add the `to-adr-plan` `if` block on `*spec-is-written` after `to-settled-design` and before `to-mark-critiques`, holding the `do-while` loop `adr-plan-check` (`max_iterations: 100`, condition `steps.adr-plan-report.output.data.again`) of `adr-plan-clear`, `adr-plan-touches` (`continue_on_error: true`; ask passing `steps.adr-plan-touches.output.exit_code`), `adr-plan-ask`, `adr-plan-judging` / `adr-plan-judge` (`continue_on_error: true`; decide passing `steps.adr-plan-judge.output.exit_code`), `adr-plan-deciding` / `adr-plan-decide` and `adr-plan-report`, then `adr-plan-out-of-rounds` / `adr-plan-rounds`, each prompt, ask and decide step with `timeout: 1800`, exactly as `contracts/workflow-steps.md` gives them; no new input; set `requires.speckit_version` to `">=1.1.3,<1.2.0"` here and in `planner/plugin/speckit/presets/settled-design/preset.yml`; correct the comment above `scope`, which says a resume re-executes the whole top-level step the run stopped in (true on 1.0.x only; 1.1.x re-executes from the halted step, R14) (R6, R14, FR-006)
-- [ ] T065 [US3] In `.github/workflows/tests.yml` pin `pip install specify-cli==1.1.3`, the floor `workflow.yml` declares (R14)
+- [ ] T021 [US3] Create `core/src/contracts/decision-check.ts` per `contracts/core.md` and `contracts/artifact-grammar.md`: the file-name constants, `ArtifactPath` (with `artifact`), pure `artifactPath(span, rootFiles)` with `PathRefused`, Zod `TouchedPaths`, pure `readTouchedPaths(json)` (passes `"any"`) with `TouchesRefused`, Zod `AdrAsked`, `AdrVerdict`, `AdrRuling`, `AdrRulings` (no key twice), `AdrStopRecord`, `SourceHashes` and `sourceHashes(cwd, paths)`, `readRulings(specDir)` with `RulingsRefused` (R4, R5, R6, R7, R9, R15, FR-012)
+- [ ] T033 [US3] In `core/src/contracts/tasks.ts` add `readTaskPaths(tasksText, rootFiles): ArtifactPath[]` beside `readTaskBlockLabels`, each backticked span through `artifactPath` from `core/src/contracts/decision-check.ts`, `artifact: tasks`, story from `[US<k>]` else the heading found by `isPhaseHeading` (R5, FR-012)
+- [ ] T022 [US3] Create `planner/plugin/lib/adr-check.ts`, pure: `FolderOutcome` per data-model.md, `decideFolder`, `decideCheck`, `changedSince(recorded, now) → {added, removed}` (R9), the stop table `ADR_STOPS` as data, row for row as `contracts/workflow-steps.md` gives it, and `adrStop(items) → {lines, exit}` rendering it; a departure's row chosen by its folder's `inside`; a task-path departure naming every story whose task names its path, comma-separated (R8, FR-018)
+- [ ] T067 [US3] Move `land.ts`'s pure story checks (`storyPlan`, `TasksRefused`, `TaskBlockLabelRefused`, and the extra, foreign and misplaced sub-issue checks) into `planner/plugin/lib/story-plan.ts`, `land.ts` importing them; change `land.ts`'s next steps (`:284`, `:297`, `:400`) to the ones `contracts/workflow-steps.md` (`land.ts`) gives (R15, FR-025, #303)
+- [ ] T023 [US3] Create `planner/plugin/scripts/adr_check.ts` (I/O only, imports `../lib/guarded.ts` first like `planner/plugin/scripts/spec_facts.ts`) with `clear`, `tasks-due`, `tasks-written`, `stories`, `ask`, `decide`, `report` and `stop rounds`, each exactly as `contracts/workflow-steps.md` gives it: settings through `readPlannerSettings` for stories, ask and decide only; stories through `story-plan.ts` and `planner/plugin/lib/github.ts`; ask reading `touches.json` through `readTouchedPaths` and `tasks.md` through `readTaskPaths` (`rootFiles` from `git ls-files` entries with no `/` and `touches.json` entries with no `/`), comparing `touches-from.json` first; decide matching `ADR_RULING` against the round's departures before any is dropped and appending to `<run>/adr-rulings-written.json` before `<spec folder>/adr-rulings.json`, each skipping an entry already there; stories, ask and decide exit 0 once they reach an answer, writing a stop to `<run>/adr-stop.json`; every line rendered through `adrStop`, none formatted locally (R6, R15, FR-007–FR-011, FR-016–FR-019, FR-025)
+- [ ] T024 [US3] Create `planner/plugin/speckit/workflows/issue-spec/adr-judge.md` per `contracts/workflow-steps.md`: read `<run>/adr-asked.json`, `plan.md`, `tasks.md`, `<spec folder>/adr-rulings.json` and each governing record's file; judge each governing record as `reviewer/plugin/agents/decision-reviewer.md` defines a departure, naming none a rulings entry already rules on; write `<run>/adr-verdict.json` per `AdrVerdict` (one verdict per governing record per folder, `folder` the entry as the asked record gives it, `paths` only from the asked paths); write no other file; give no ruling (R7, FR-015)
 - [ ] T026 [US3] Create `planner/plugin/speckit/workflows/issue-spec/adr-touches.md` per `contracts/workflow-steps.md`, installed with the workflow as `adr-judge.md` is; the `plan` step, `speckit.plan.md` and the plan template are not changed (R4, FR-012)
-- [ ] T027 [US3] In `planner/plugin/skills/issue-spec/scripts/drive_workflow.py`: `resume <run> adr_ruling=@<file>` reads the file and exports its content as `ADR_RULING` in the env of that one `specify resume` call, passing no `-i` for it (never written to `inputs.json`); a value without `@` or an unreadable file exits non-zero before resuming; `report` sets `adr: true` for the nine `adr-plan-clear` and `adr-*-{ask,decide,report,rounds}` steps, matched by the step's own id, the middle segment of a qualified `<loop>:<step>:<n>` id (R14), `stderr` the step's own, running no `adr_check.ts stop`; update the module docstring, and correct the `_step_env` docstring, which states the 1.0.x resume (R8, R9, R14)
-- [ ] T028 [US3] In `planner/plugin/skills/issue-spec/SKILL.md`: §2's report fields gain `adr`; steps 5 and 7 say a report with `adr: true` may come back in place of the one they expect; `## Stops` gains the one rule for every report with `adr: true` as `contracts/workflow-steps.md` (Skill) gives it, the user's ruling written with the Write tool to a scratch file and passed as `adr_ruling=@<file>`; SKILL.md:47 is unchanged
-- [ ] T043 [US3] In the root `README.md` rewrite the ADR Kit passage: the plan check is planner's own `adr-plan-*` steps, run after plan and before critique, against the folders `codeworks.toml` `[shared] adr_folders` lists, with the `adr` CLI at core's `ADR_VERSION` (0.20.0, `npm install -g @adrkit/cli@0.20.0`); drop "ADR Kit's check", "0.3.0 or later" and "`docs/adr` by default"
-- [ ] T029 [US3] Verify US3: `npm --prefix core test`, `npm --prefix planner test`, `python3 -m unittest discover -s planner/tests` green; run the manual end-to-end check in `specs/177-plan-adr-check/quickstart.md` (a plan contradicting planner ADR-0008 stops at `adr-plan-report` with the real judge, and a resume after fixing `plan.md` runs the whole check again, critique P4; renamed `../engineering` gives `COULD_NOT_RUN`)
+- [ ] T049 [US3] Create `planner/plugin/speckit/presets/settled-design/commands/speckit.tasks.md` (strategy `append`, registered in `preset.yml`): each file a task touches is one literal path in its own backtick span, no glob, no brace group; planner ADR-0008 d2 customises the stock tasks template only through presets (R5)
+- [ ] T025 [US3] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` bump `version` to `1.7.0`, remove the `to-tasks` block and add `to-adr-check` after `to-review-critique`, exactly as `contracts/workflow-steps.md` gives it; no new input; set `requires.speckit_version` to `">=1.1.3,<1.2.0"` here and in `planner/plugin/speckit/presets/settled-design/preset.yml`; correct the comment above `scope`, which says a resume re-executes the whole top-level step the run stopped in (true on 1.0.x only; 1.1.x re-executes from the halted step, R14) (R6, R14, FR-006)
+- [ ] T065 [US3] In `.github/workflows/tests.yml` pin `pip install specify-cli==1.1.3`, the floor `workflow.yml` declares (R14)
+- [ ] T027 [US3] In `planner/plugin/skills/issue-spec/scripts/drive_workflow.py`: `resume <run> adr_ruling=@<file>` reads the file and exports its content as `ADR_RULING` in the env of that one `specify resume` call, passing no `-i` for it (never written to `inputs.json`); a value without `@` or an unreadable file exits non-zero before resuming; `report` sets `adr: true` for the steps `contracts/workflow-steps.md` (`drive_workflow.py`) lists, matched by the step's own id, the middle segment of a qualified `<loop>:<step>:<n>` id (R14), `stderr` the step's own, running no `adr_check.ts stop`; update the module docstring, and correct the `_step_env` docstring, which states the 1.0.x resume (R8, R9, R14)
+- [ ] T028 [US3] In `planner/plugin/skills/issue-spec/SKILL.md`: §2's report fields gain `adr`; steps 5 and 7 say a report with `adr: true` may come back in place of the one they expect; `## Stops` gains the one rule for every report with `adr: true` as `contracts/workflow-steps.md` (Skill) gives it, the user's ruling written with the Write tool to a scratch file and passed as `adr_ruling=@<file>`, and `step: settled-design` covering `adr-settled-design`; SKILL.md:47 is unchanged
+- [ ] T043 [US3] In the root `README.md` rewrite the ADR Kit passage: the check is planner's own `adr-*` steps, run after critique over the paths the plan and `tasks.md` name, against the folders `codeworks.toml` `[shared] adr_folders` lists, with the `adr` CLI at core's `ADR_VERSION` (0.20.0, `npm install -g @adrkit/cli@0.20.0`); drop "ADR Kit's check", "0.3.0 or later" and "`docs/adr` by default"
+- [ ] T029 [US3] Verify US3: `npm --prefix core test`, `npm --prefix planner test`, `python3 -m unittest discover -s planner/tests` green; run the manual end-to-end check in `specs/177-plan-adr-check/quickstart.md` (a plan contradicting planner ADR-0008 passes critique and stops at `adr-report` with the real judge, and a resume after fixing `plan.md` runs a new round over it and the `tasks.md` written again from it; renamed `../engineering` gives `COULD_NOT_RUN`)
 
-**Checkpoint**: US3 PR merged; plans are checked before critique.
+**Checkpoint**: US3 PR merged; the plan and its tasks are checked before the run completes.
 
 ---
 
-## Phase 5: User Story 4 - planner checks the tasks again (Priority: P2)
-Story issue: #277
+## Phase 5: User Story 4 (merged into US3)
+Story issue: #277 (no tasks)
 
-**Goal**: the same check loop (ask → judge → decide → report) after `to-tasks`, over the literal paths `tasks.md` names, each
-departure naming its stories.
-
-**Independent Test**: `planner/tests/adr-check.test.ts` tasks rows: a `[US2]` task naming a governed path stops
-naming the record, path and `US2`.
-
-### Tests for User Story 4 (write first, see them fail)
-
-- [ ] T030 [P] [US4] In `core/tests/tasks.test.ts` add `readTaskPaths(tasksText, rootFiles)` cases: `- [ ] T<n>` and `- [x]`/`- [X]` lines read; backticked spans with `/` that are a `PATH` are paths; `` `codeworks.toml` `` is a path when `rootFiles` holds it, `` `adr check` `` and a URL are not; `` `a/{b,c}.ts` `` and `` `a/*.ts` `` throw `PathRefused` reported as `tasks.md:<line>`; story is `US<k>` from `[US<k>]`, else the heading's text without `## `; a task line above every `## ` heading is refused naming `tasks.md:<line>`; non-task lines ignored
-- [ ] T031 [P] [US4] In `planner/tests/adr-check.test.ts` add the tasks rows of `specs/177-plan-adr-check/quickstart.md`: a `[US2]` task and a phase task naming one governed path with a `DEPARTS` verdict → exit 1 naming record, path and both stories (US4 AS1); missing folder → exit 2 (AS2); a `tasks.md` naming no path → exit 2 naming `tasks.md`; `touches.json` missing at the tasks check → exit 2 naming it; a ruling written at the plan check honoured at the tasks check with no `ADR_RULING` set (US3 AS6)
-- [ ] T032 [P] [US4] In `planner/tests/test_drive_workflow.py` add: after a plan-check resume carrying `adr_ruling`, the after-tasks check runs without `ADR_RULING`; a rescope run (starts at grill) runs both `adr-plan-*` and `adr-tasks-*`; a tasks check stops at `adr-tasks-report`, and a resume after `tasks.md` is changed runs a new iteration of `adr-tasks-check` over it; a tasks judge that writes a valid verdict and then fails stops the run at `adr-tasks-report` with the `verdict-unread` line
-- [ ] T048 [P] [US4] In `planner/tests/test_plan_template.py` assert `planner/plugin/speckit/presets/settled-design/preset.yml` registers command `speckit.tasks` from `commands/speckit.tasks.md` with strategy `append`, and that file tells the model to name each file a task touches as one literal path per backtick span, no glob, no brace group
-
-### Implementation for User Story 4
-
-- [ ] T033 [US4] In `core/src/contracts/tasks.ts` add `readTaskPaths(tasksText, rootFiles): ArtifactPath[]` beside `readTaskBlockLabels`, each backticked span through `artifactPath` from `core/src/contracts/decision-check.ts`, story from `[US<k>]` else the heading found by `isPhaseHeading` (R5, FR-012)
-- [ ] T049 [US4] Create `planner/plugin/speckit/presets/settled-design/commands/speckit.tasks.md` (strategy `append`, registered in `preset.yml`): each file a task touches is one literal path in its own backtick span, no glob, no brace group; planner ADR-0008 d2 customises the stock tasks template only through presets (R5)
-- [ ] T034 [US4] In `planner/plugin/scripts/adr_check.ts` accept artifact `tasks`: ask reads `<run>/touches.json` (missing or empty: could not run) and `<spec folder>/tasks.md` through `readTaskPaths` with `rootFiles` from `git ls-files` entries with no `/` and `touches.json` entries with no `/` (R5), writes `<run>/adr-tasks-asked.json` (`ask tasks` takes no touches exit code: the tasks check has no touches step); decide takes the tasks judge's exit code as for plan; decide carries each departure's stories; `report tasks`, `stop tasks rounds`
-- [ ] T035 [US4] In `planner/plugin/speckit/workflows/issue-spec/workflow.yml` add the `to-adr-tasks` block after `to-tasks`: the `do-while` loop `adr-tasks-check` of `adr-tasks-ask`, `adr-tasks-judging` / `adr-tasks-judge` (`continue_on_error: true`; decide passing `steps.adr-tasks-judge.output.exit_code`), `adr-tasks-deciding` / `adr-tasks-decide` and `adr-tasks-report`, then `adr-tasks-out-of-rounds` / `adr-tasks-rounds`, the same as `to-adr-plan` with `tasks` and no clear or touches step (R6, FR-006)
-- [ ] T044 [US4] In the root `README.md` ADR passage T043 rewrote, add that the same check runs again after tasks (`adr-tasks-*`), over the paths `tasks.md` names
-- [ ] T036 [US4] Verify US4: `npm --prefix core test`, `npm --prefix planner test`, `python3 -m unittest discover -s planner/tests` green
-
-**Checkpoint**: US4 PR merged; tasks are checked before the spec PR.
+US4's tasks (T030–T036, T044, T048, T049) moved into Phase 4 on 2026-11-04; T034, T035 and T044 were folded into
+T023, T025 and T043.
 
 ---
 
@@ -176,7 +164,7 @@ Story issue: #285
 
 **Goal**: a decision-check departure is ruled FIX or ESCALATE; one ruled ESCALATE is a line of the escalation
 hold's question that core renders and reads; planner's rescope takes its open decision from every open review question, the
-plan check checks each departure's file and stops once per (folder, record, file); a ruling landing lapses every
+check checks each departure's file and stops once per (folder, record, file); a ruling landing lapses every
 story's round under the spec (R13).
 
 **Independent Test**: `npm --prefix core test`, `npm --prefix planner test`, `npm --prefix reviewer test`,
@@ -194,7 +182,7 @@ story's round under the spec (R13).
 
 - [ ] T058 [US6] In `core/src/contracts/decision-check.ts` add `REVIEW_QUESTIONS_FILE`, `ReviewQuestions`, `AdrDeparture`, pure `renderAdrDeparture` and `readAdrDepartures` with `DepartureRefused` per `contracts/core.md` and `contracts/artifact-grammar.md` (T053 green)
 - [ ] T059 [US6] In `core/src/attest.ts` have `governs` take `<spec folder>/adr-rulings.json` (`ADR_RULINGS_FILE`), the comment naming orchestrator ADR-0004 d1 (T054 green)
-- [ ] T060 [US6] In `planner/plugin/lib/adr-check.ts` and `planner/plugin/scripts/adr_check.ts` have the plan check read `<run>/review-questions.json` through `ReviewQuestions` and `readAdrDepartures` (`questions-refused` row on failure): ask adds each departure's path to the paths it checks; decide calls `checkAdrFolder(cwd, folder, [path], …)` once per `(folder, record, path)`, concurrently with the ruling checks under the same `ADR_DEADLINE_MS`, and adds each departure whose record that call names as governing as a judged departure, once per key, its `what` reading `found at review on #<issue>, …: <what>; …`, before rulings are applied (R13, FR-023; T055 green)
+- [ ] T060 [US6] In `planner/plugin/lib/adr-check.ts` and `planner/plugin/scripts/adr_check.ts` have the check read `<run>/review-questions.json` through `ReviewQuestions` and `readAdrDepartures` (`questions-refused` row on failure): ask adds each departure's path to the paths it checks; decide calls `checkAdrFolder(cwd, folder, [path], …)` once per `(folder, record, path)`, concurrently with the ruling checks under the same `ADR_DEADLINE_MS`, and adds each departure whose record that call names as governing as a judged departure, once per key, its `what` reading `found at review on #<issue>, …: <what>; …`, before rulings are applied (R13, FR-023; T055 green)
 - [ ] T061 [US6] Create `planner/plugin/scripts/rescope_questions.ts` per `contracts/workflow-steps.md`, listing sub-issues and reading state through core's `readState` as the planner App (`planner/plugin/lib/github.ts`) (T056 green)
 - [ ] T062 [US6] In `planner/plugin/skills/issue-spec/scripts/drive_workflow.py` accept `rescope <spec file> <issue> <spec dir> questions=@<file>`, copying the file to `<run>/review-questions.json` once the run has started; in `planner/plugin/skills/issue-spec/SKILL.md` §1 `rescope` runs `rescope_questions.ts` into a scratch file, stopping on a non-zero exit, §2 passes it when written, and step 4 gives grill those questions as the open decision, else the admin's words (T056 green)
 - [ ] T063 [US6] After #235 and #209's T047, in `reviewer/plugin/lib/round/assess.ts` refuse PUSH_BACK and DEFER for a decision-check departure (reviewer ADR-0017 d2), and in `reviewer/plugin/lib/round/record.ts` write each departure ruled ESCALATE into the escalation hold's question through `renderAdrDeparture` (ADR-0013 d4) (T057 green)
@@ -207,7 +195,7 @@ story's round under the spec (R13).
 ## Phase 8: Polish & Cross-Cutting Concerns
 Story issue: #278
 
-- [ ] T042 Run every command in `specs/177-plan-adr-check/quickstart.md` once US4 has merged and confirm each expectation, recording any mismatch as a fix in the story it belongs to
+- [ ] T042 Run every command in `specs/177-plan-adr-check/quickstart.md` once US3 has merged and confirm each expectation, recording any mismatch as a fix in the story it belongs to
 
 ---
 
@@ -217,8 +205,7 @@ Story issue: #278
 
 - **Planning PRs**: first; amend the decision records and block every story (FR-001).
 - **US2** (P1): after the planning PRs merge.
-- **US3** (P1): after US2 merges (calls `adrFolders`, `checkAdrFolder`).
-- **US4** (P2): after US3 merges (extends `adr_check.ts` and `workflow.yml`; reuses `artifactPath`).
+- **US3** (P1): after US2 merges (calls `adrFolders`, `checkAdrFolder`); holds US4's tasks.
 - **US5** (P3): T050–T052 after US2; T038–T041 after #235 and US3 (`readRulings`, T021). `protectedPaths`'
   callers, #174 and #209 US2, pass `{tickOnly, adrFolders}` in their own stories.
 - **US6** (P3): T053–T056 and T058–T062 after US5 (#278); T057 and T063 after #235, #209's T010a–T010c, T034 and T047, and T039.
@@ -227,16 +214,15 @@ Story issue: #278
 
 - Tests first, failing for the expected reason, then implementation.
 - US2: T008 before T009 and T010 (both read `Shared`); T011–T013 after T008.
-- US3: T020 → T021 → T022 → T023; T024–T028, T065 and T043 after T023; T029 last.
-- US4: T033 → T049 → T034 → T035 → T044 → T036.
+- US3: T020 → T021 → T033 → T022 → T067 → T023; T024–T028, T049, T065 and T043 after T023; T029 last.
 - US5: T051 → T052; T039 → T040 → T041.
 - US6: T058 → T060; T058 → T061 → T062; T058 → T063; T059 alone; T064 last.
 
 ### Parallel Opportunities
 
 - US2: T005, T006, T007 together; then T011, T012, T013 together.
-- US3: T016, T017, T018, T019 together; T024, T026, T028 and T043 in parallel once T023 is done.
-- US4: T030, T031, T032, T048 together.
+- US3: T016, T030, T017, T031, T066, T018, T032, T019, T048 together; T024, T026, T028, T049 and T043 in parallel
+  once T023 is done.
 - US5: T050 and T038 together.
 - US6: T053, T054, T055, T056 together; T057 after #235.
 
@@ -252,23 +238,23 @@ Task: "ported readAdrAnswer/checkAdrFolder cases in core/tests/adr.test.ts" (T00
 
 ```text
 Task: "grammar and schema cases in core/tests/decision-check.test.ts"       (T016)
-Task: "stop table and ask/decide rows in planner/tests/adr-check.test.ts"   (T017)
+Task: "stop table and round-step rows in planner/tests/adr-check.test.ts" (T017)
 Task: "adr report and ADR_RULING cases in planner/tests/test_drive_workflow.py" (T018)
-Task: "touches step in planner/tests/test_plan_template.py"                 (T019)
+Task: "the check loop in planner/tests/test_plan_template.py"             (T019)
+Task: "land.ts next steps in planner/tests/land.test.ts"                   (T066)
 ```
 
 ## Implementation Strategy
 
 ### MVP
 
-Planning PRs → US2 → US3: plans are checked before critique against every listed folder. Stop and validate with
+Planning PRs → US2 → US3: plans and their tasks are checked against every listed folder before the run completes. Stop and validate with
 quickstart's Planner rows and the manual end-to-end check.
 
 ### Incremental delivery
 
 1. Planning PRs: the rules (no code; not a story).
 2. US2: the list and `adr` in core; rollout reinstall named in the PR (MVP start).
-3. US3: the check after plan (MVP complete).
-4. US4: the check after tasks.
-5. US5: the protected spec folder in core; reviewer on the same list, after #235.
-6. US6: a departure found at review reaches planner's rescope.
+3. US3: the check of the plan and its tasks (MVP complete; US4 merged into it).
+4. US5: the protected spec folder in core; reviewer on the same list, after #235.
+5. US6: a departure found at review reaches planner's rescope.

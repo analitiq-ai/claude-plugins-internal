@@ -78,7 +78,7 @@ export const AdrJudgment = valueSet({
   WITHIN: "the artifact sits inside the record: it does nothing the record rejected or contradicts",
   DEPARTS: "the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to",
 });
-export const CheckedArtifact = valueSet({ plan: "the touches step's touches.json", tasks: "tasks.md's task lines" });
+export const CheckedArtifact = valueSet({ plan: "a path the touches step's touches.json lists", tasks: "a path a task line of tasks.md names" });
 ```
 
 ## `core/src/contracts/decision-check.ts`
@@ -90,11 +90,18 @@ Every file planner's check reads or writes in the run folder or the spec folder,
 export const ADR_RULINGS_FILE = "adr-rulings.json";              // in the spec folder
 export const TOUCHES_FILE = "touches.json";                      // in the run folder, written by the touches step
 export const ADR_RULINGS_WRITTEN_FILE = "adr-rulings-written.json";
-export const askedFile = (artifact: CheckedArtifactName) => `adr-${artifact}-asked.json`;
-export const verdictFile = (artifact: CheckedArtifactName) => `adr-${artifact}-verdict.json`;
-export const stopFile = (artifact: CheckedArtifactName) => `adr-${artifact}-stop.json`;
+export const ASKED_FILE = "adr-asked.json";
+export const VERDICT_FILE = "adr-verdict.json";
+export const STOP_FILE = "adr-stop.json";
+export const TOUCHES_FROM_FILE = "touches-from.json";           // plan.md and spec.md as the touches step read them
+export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources the current tasks.md was written from
+export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
 
-export type ArtifactPath = { path: string; line: number; story: string | null };
+export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
+
+export const SourceHashes: z.ZodType;   // {v: 1, files: {<repo-relative path>: <sha256>}}
+/** The sha256 of each path that exists under `cwd`, an absent one left out; equal sets mean unchanged sources. */
+export function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes>;
 
 /** Pure: one span against the path grammar (artifact-grammar.md). `null`: the span is not a path. Throws
  *  PathRefused naming the span when it reads as a path but breaks the grammar. */
