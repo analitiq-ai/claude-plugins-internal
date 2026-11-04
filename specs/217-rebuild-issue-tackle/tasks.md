@@ -15,10 +15,10 @@ GitHub (`core/tests/support/fake-github.ts`) and a scratch repository (`planner/
 task is run and seen to fail for the stated reason before its implementation task starts.
 
 **Organization**: One phase per user story, in the spec's delivery order: US1, US2, US3, US4, US5. Every task marked
-**core PR Bn** lands in `core/` as its own PR on a US1 branch `<s1>-us1-<slug>`, merged before the builder story that
-first calls it (plan: Delivery order), and bumps the `version` in every carrier's `.claude-plugin/plugin.json` then
-present (`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged; FR-022). Task numbers
-are execution order within a PR; B4–B6 are listed under US1 but merge later (see Dependencies).
+**Bn** lands in `core/` in US1's one PR on one US1 branch `<s1>-us1-<slug>`, merged before US3 (plan: Delivery
+order); that PR bumps the `version` in every carrier's `.claude-plugin/plugin.json` then present once
+(`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged; FR-022). Task numbers are
+execution order within a PR.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -59,48 +59,48 @@ owned by US1; builder's carrier itself is US2. This phase is intentionally empty
 ## Phase 3: User Story 1 - core gains the reads and the stop rule builder needs (Priority: P1)
 Story issue: #245
 
-**Goal**: every read builder's step needs that core lacks lands in core, each its own PR, plus the pure stop rule
+**Goal**: every read builder's step needs that core lacks lands in core in one PR, plus the pure stop rule
 the orchestrator's Stop hook shares (FR-024–FR-026)
 
 **Independent Test**: `npm test --prefix core` passes; each addition has a test against the fake GitHub or a scratch
 repository; no addition's signature takes a key reader or a writing client
 
-### B1 — Story branch name (before US3)
+### B1 — Story branch name
 
-- [ ] T006 [P] [US1] **core PR B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
-- [ ] T007 [US1] **core PR B1.** Add `storyBranchName(s, k, title)` beside `parseBranch` in `core/src/identity.ts`, sharing the branch grammar's constants with the parser; T006 passes; bump every carrier's `plugin.json` version
+- [ ] T006 [P] [US1] **B1.** Add failing cases to `core/tests/branch.test.ts` for `storyBranchName(s, k, title)` (US1 #1): titles with `/`, `..`, unicode, uppercase, runs of punctuation and 300 characters give a slug matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters, with no leading, trailing or doubled `-`; an empty or all-punctuation title gives `story`; a 40-character cut never ends on `-`; `s` and `k` must be positive safe integers or it throws; for every case `parseBranch(storyBranchName(s, k, title))` deep-equals `{story: s, k, slug}` (R8)
+- [ ] T007 [US1] **B1.** Add `storyBranchName(s, k, title)` beside `parseBranch` in `core/src/identity.ts`, sharing the branch grammar's constants with the parser; T006 passes
 
-### B2 — Task-line grammar and story tasks (before US3)
+### B2 — Task-line grammar and story tasks
 
-- [ ] T008 [P] [US1] **core PR B2.** Add failing cases to `core/tests/tasks.test.ts` for `readTaskLine(line)`, the one task-line grammar (R11): `{id, ticked, story}` or `null` for a line that is no task; a task line is optional leading spaces, `- [ ] ` / `- [x] ` / `- [X] `, then `T` + 3 or more digits; `ticked` is true for `[x]` and `[X]`; `story` is `k` from a `[US<k>]` tag, `k` a positive integer without leading zero (`[US0]`, `[US01]`, `[us1]` are no tag), else `null`; the same tag twice gives that `k`; two different tags on one line refuse as `TaskLineRefused` naming the line; and for `storyTasks(text, s)` (data-model StoryTask), built on `readTaskLine`: returns `{id, ticked, story, line}` for each line `readTaskLine` reads as a task inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`, `[X]` and indented task lines included; `id`, `ticked` and `story` are `readTaskLine`'s; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
-- [ ] T009 [US1] **core PR B2.** Add `readTaskLine`, `TaskLineRefused`, `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; in the same PR, `planner/plugin/scripts/land.ts` `phasesOf` reads task lines and their tags through core's `readTaskLine`, its `TASK_LINE` and `STORY_TAG` removed, and `planner/tests/land.test.ts` gains a case for a line with two different tags; T008 and `planner/tests/land.test.ts` pass; bump every carrier's `plugin.json` version
+- [ ] T008 [P] [US1] **B2.** Add failing cases to `core/tests/tasks.test.ts` for `readTaskLine(line)`, the one task-line grammar (R11): `{id, ticked, story}` or `null` for a line that is no task; a task line is optional leading spaces, `- [ ] ` / `- [x] ` / `- [X] `, then `T` + 3 or more digits; `ticked` is true for `[x]` and `[X]`; `story` is `k` from a `[US<k>]` tag, `k` a positive integer without leading zero (`[US0]`, `[US01]`, `[us1]` are no tag), else `null`; the same tag twice gives that `k`; two different tags on one line refuse as `TaskLineRefused` naming the line; and for `storyTasks(text, s)` (data-model StoryTask), built on `readTaskLine`: returns `{id, ticked, story, line}` for each line `readTaskLine` reads as a task inside every phase block whose label line (per `readTaskBlockLabels`) is `Story issue: #<s>`, `[X]` and indented task lines included; `id`, `ticked` and `story` are `readTaskLine`'s; `line` is the line as written; lines in blocks labelled another issue, unlabelled blocks and non-task lines are excluded; no block labelled `#<s>` returns `[]`; a malformed label refuses as `TaskBlockLabelRefused`, never as no tasks
+- [ ] T009 [US1] **B2.** Add `readTaskLine`, `TaskLineRefused`, `storyTasks(text, s)` and the `StoryTask` type to `core/src/contracts/tasks.ts`, reusing `isPhaseHeading` and the label grammar there; in the same PR, `planner/plugin/scripts/land.ts` `phasesOf` reads task lines and their tags through core's `readTaskLine`, its `TASK_LINE` and `STORY_TAG` removed, and `planner/tests/land.test.ts` gains a case for a line with two different tags; T008 and `planner/tests/land.test.ts` pass
 
-### B3 — Story PR closed (before US3)
+### B3 — Story PR closed
 
-- [ ] T010 [P] [US1] **core PR B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
-- [ ] T011 [US1] **core PR B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T010 passes; existing `identity.test.ts` cases pass unchanged; bump every carrier's `plugin.json` version
+- [ ] T010 [P] [US1] **B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
+- [ ] T011 [US1] **B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T010 passes; existing `identity.test.ts` cases pass unchanged
 
-### B7 — Stop rule and the read of its facts (after B3, before US3)
+### B7 — Stop rule and the read of its facts (after B3)
 
-- [ ] T012 [P] [US1] **core PR B7.** Write failing `core/tests/story-stop.test.ts` for the pure `storyStop(facts)` (R16; data-model Decision order stages 1–5, 7 and the stop half of 9): one case per `StopState` — `no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog and Blocked each), `no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`, `no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr` (behind and diverged each), `uncommitted_changes` — asserting `{state, reason}` and that `reason` names the state, the issue, and the open story PR when one is given; stage order holds (e.g. `done` and Blocked together gives `done`; `no_session_record` beats everything); facts that reach no stop return `null`; a merge in progress returns `null` (it is a `merge` step, not a stop); no `reason` contains a planning-command name (`speckit`, `/plan`, `/specify`, `issue-spec`); the function performs no I/O (source-scan: no import of `node:fs`, `node:child_process`, `github.ts`); and failing `core/tests/story-stop-facts.test.ts` for `readStoryStopFacts(s, sessionId, {reader, home, checkout})` against the fake GitHub and a scratch repo: one case per fact (session record at `sessionsFolder(home)` absent → `session: null`, refused → throws naming the file; origin; issue; `isDone`; `laneOf`; `specIssue`; `issueStory` with B3's `closed`; `git branch --list '<s>-us*'`; `git worktree list --porcelain`; `MERGE_HEAD`; `git status --porcelain`; `specFolder` at the worktree's HEAD; `head` and `headVsPr` by `merge-base --is-ancestor`), stopping early in data-model order; it writes nothing (no fetch, no `worktree add`: the scratch repo's refs and worktrees unchanged)
-- [ ] T013 [US1] **core PR B7.** Create `core/src/story-stop.ts` exporting the Zod `StopState` enum (the 16 values above, defined once), the `StoryStopFacts` type (the data-model StepFacts fields stages 1–5, 7, 9 read, later fields optional) and `storyStop(facts): {state, reason} | null`, and `core/src/story-stop-facts.ts` exporting `readStoryStopFacts`, git through `git.ts` `runGit`; T012 passes; bump every carrier's `plugin.json` version
+- [ ] T012 [P] [US1] **B7.** Write failing `core/tests/story-stop.test.ts` for the pure `storyStop(facts)` (R16; data-model Decision order stages 1–5, 7 and the stop half of 9): one case per `StopState` — `no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog and Blocked each), `no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`, `no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr` (behind and diverged each), `uncommitted_changes` — asserting `{state, reason}` and that `reason` names the state, the issue, and the open story PR when one is given; stage order holds (e.g. `done` and Blocked together gives `done`; `no_session_record` beats everything); facts that reach no stop return `null`; a merge in progress returns `null` (it is a `merge` step, not a stop); no `reason` contains a planning-command name (`speckit`, `/plan`, `/specify`, `issue-spec`); the function performs no I/O (source-scan: no import of `node:fs`, `node:child_process`, `github.ts`); and failing `core/tests/story-stop-facts.test.ts` for `readStoryStopFacts(s, sessionId, {reader, home, checkout})` against the fake GitHub and a scratch repo: one case per fact (session record at `sessionsFolder(home)` absent → `session: null`, refused → throws naming the file; origin; issue; `isDone`; `laneOf`; `specIssue`; `issueStory` with B3's `closed`; `git branch --list '<s>-us*'`; `git worktree list --porcelain`; `MERGE_HEAD`; `git status --porcelain`; `specFolder` at the worktree's HEAD; `head` and `headVsPr` by `merge-base --is-ancestor`), stopping early in data-model order; it writes nothing (no fetch, no `worktree add`: the scratch repo's refs and worktrees unchanged)
+- [ ] T013 [US1] **B7.** Create `core/src/story-stop.ts` exporting the Zod `StopState` enum (the 16 values above, defined once), the `StoryStopFacts` type (the data-model StepFacts fields stages 1–5, 7, 9 read, later fields optional) and `storyStop(facts): {state, reason} | null`, and `core/src/story-stop-facts.ts` exporting `readStoryStopFacts`, git through `git.ts` `runGit`; T012 passes
 
-### B5 — `internal-review` read (before US4)
+### B5 — `internal-review` read
 
-- [ ] T014 [P] [US1] **core PR B5.** Add failing cases to `core/tests/required-checks.test.ts` for `internalReviewAt(reader, repo, head, appLogin)` (R12; plan P9): `true` only when the newest `internal-review` check run at `head` whose app is `appLogin`'s App has conclusion `success`; a `success` run by another App does not count; no run → `false`; a pending run → `false`; a GitHub no-answer throws `GitHubUnanswered`/`GitHubRefused`, never `false`
-- [ ] T015 [US1] **core PR B5.** Export `internalReviewAt` from `core/src/validation/required-checks.ts` over the private `checkRuns` read and the `INTERNAL_REVIEW` constant; T014 and existing `required-checks.test.ts` cases pass; bump every carrier's `plugin.json` version
+- [ ] T014 [P] [US1] **B5.** Add failing cases to `core/tests/required-checks.test.ts` for `internalReviewAt(reader, repo, head, appLogin)` (R12; plan P9): `true` only when the newest `internal-review` check run at `head` whose app is `appLogin`'s App has conclusion `success`; a `success` run by another App does not count; no run → `false`; a pending run → `false`; a GitHub no-answer throws `GitHubUnanswered`/`GitHubRefused`, never `false`
+- [ ] T015 [US1] **B5.** Export `internalReviewAt` from `core/src/validation/required-checks.ts` over the private `checkRuns` read and the `INTERNAL_REVIEW` constant; T014 and existing `required-checks.test.ts` cases pass
 
-### B6 — PR findings (before US4)
+### B6 — PR findings
 
-- [ ] T016 [P] [US1] **core PR B6.** Write failing `core/tests/pr-findings.test.ts` against the fake GitHub for `prFindings(reader, repo, pr, head, settings)` (R12; FR-026; US1 #2): returns `Finding[]` (core `contracts/finding.ts`) from `requiredChecks`, from each `<module>-review` check run at `head` written by `[shared] orchestrator_app_login`'s App (its output parsed as findings), and from `threadsModule`; a module's check run absent or pending throws naming the module, never returns `[]`; a check run by another App is ignored; the module set comes from `settings` only; the test asserts no validator package is imported (source-scan of `core/src/validation/pr-findings.ts`: no import of `validation/contract.ts` `loadValidators` or `readKey`)
-- [ ] T017 [US1] **core PR B6.** Create `core/src/validation/pr-findings.ts` exporting `prFindings`; T016 passes; bump every carrier's `plugin.json` version
+- [ ] T016 [P] [US1] **B6.** Write failing `core/tests/pr-findings.test.ts` against the fake GitHub for `prFindings(reader, repo, pr, head, settings)` (R12; FR-026; US1 #2): returns `Finding[]` (core `contracts/finding.ts`) from `requiredChecks`, from each `<module>-review` check run at `head` written by `[shared] orchestrator_app_login`'s App (its output parsed as findings), and from `threadsModule`; a module's check run absent or pending throws naming the module, never returns `[]`; a check run by another App is ignored; the module set comes from `settings` only; the test asserts no validator package is imported (source-scan of `core/src/validation/pr-findings.ts`: no import of `validation/contract.ts` `loadValidators` or `readKey`)
+- [ ] T017 [US1] **B6.** Create `core/src/validation/pr-findings.ts` exporting `prFindings`; T016 passes
 
-### B4 — Spec PR merge commit (before US5)
+### B4 — Spec PR merge commit
 
-- [ ] T018 [P] [US1] **core PR B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
-- [ ] T019 [US1] **core PR B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the last B PR to merge closes US1's issue; bump every carrier's `plugin.json` version
+- [ ] T018 [P] [US1] **B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
+- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the PR carries `Closes #245` from creation (builder ADR-0003 d1) and bumps every carrier's `plugin.json` version once
 
-**Checkpoint**: B1, B2, B3, B7 merged → US2/US3 may start; B5, B6 merged → US4 may start; B4 merged → US5 may start
+**Checkpoint**: US1's PR merged → US3 may start
 
 ---
 
@@ -167,7 +167,7 @@ script for a story in each lane and folder state: Ready, one folder, no branch p
 - [ ] T038 [US3] Complete `builder/plugin/scripts/step.ts`: after the guard, `await import` `../lib/facts.ts` and `../lib/step.ts`, parse args (T032 part 1), `readFacts` → `decideStep` → print one JSON line; exit 0 for work, 1 for `stop`, 2 with one stderr line `builder: <cause>` for an unanswered or refused read; T032 passes
 - [ ] T039 [US3] Rewrite Steps 1–2 of `builder/plugin/skills/issue-tackle/SKILL.md`: argument-hint `<s>`; refuse any text after `<s>`, naming `issue-tackle <s>` as the one form (FR-001); first action runs `node "${CLAUDE_PLUGIN_ROOT}/scripts/step.ts" <s> --session "${CLAUDE_SESSION_ID}"` (R4); exit 1 or 2 ends the turn quoting the reason or stderr line (FR-010); work happens in the step JSON's `worktree` on its `branch`, and the spec folder is read only from the step JSON's `requirement.source`; a `merge` step with no `argv` is resolved and committed, then the script re-run. Keep Steps 3–7 otherwise as they are on main (US4 rewrites them); drop `spec=`, `branch=` and `../<repo>.worktrees/<n>`
 - [ ] T040 [US3] Extend `builder/tests/skill.test.ts`: the skill's argument-hint is `<s>`; it names `scripts/step.ts` with `--session "${CLAUDE_SESSION_ID}"`; it names no `spec=`, `branch=` or `worktrees/<n>`; T026's cases still pass
-- [ ] T041 [US3] Run quickstart.md §2 for US3's cases and §4 steps 1–2 on the agent machine (after B1–B3, B7 and US2 merged): a Ready story with no branch prints `implement` and the worktree `../<repo>.worktrees/<s>-us<k>-<slug>` exists on a branch cut from the default branch; moving the card to Blocked and running again prints the `lane` stop with `git status` and GitHub unchanged
+- [ ] T041 [US3] Run quickstart.md §2 for US3's cases and §4 steps 1–2 on the agent machine (after US1 and US2 merged): a Ready story with no branch prints `implement` and the worktree `../<repo>.worktrees/<s>-us<k>-<slug>` exists on a branch cut from the default branch; moving the card to Blocked and running again prints the `lane` stop with `git status` and GitHub unchanged
 
 **Checkpoint**: US3 shippable alone; rounds and pushes still as on main
 
@@ -185,7 +185,7 @@ findings, attested clean) and read the step it names, twice each; read the skill
 previous turn's state and no `root-cause-check`; `git ls-files` outside `specs/` and `**/docs/adr/` names no
 `root-cause-check`
 
-**Prerequisites**: #212 merged; B5 and B6 merged; reviewer's gate accepts a launch with no `spec` (reviewer ADR-0014
+**Prerequisites**: #212 merged; reviewer's gate accepts a launch with no `spec` (reviewer ADR-0014
 d1) and reviewer's root-cause reviewer runs in the internal round (reviewer ADR-0017) — confirm each on `origin/main`
 and record the commits under R12 in `specs/217-rebuild-issue-tackle/research.md` before T047; if any is missing,
 stop
@@ -224,7 +224,7 @@ re-runs the step (FR-016, FR-017)
 script and read `merge` before any folder check; run the skill's merge path on a conflicting change and confirm
 every earlier head is an ancestor of the new head
 
-**Prerequisite**: B4 merged
+**Prerequisite**: US4 merged
 
 ### Tests first
 
@@ -258,16 +258,16 @@ Story issue: #249
 
 - **Setup (Phase 1)**: T001 (own PR) before US2; T002 any time before #174's Stop hook PR; T003 gates US2
 - **Foundational (Phase 2)**: empty
-- **US1 (Phase 3)**: starts at once; its B PRs merge on the schedule below
+- **US1 (Phase 3)**: starts at once; one PR, merged before US3
 - **US2 (Phase 4)**: after T001, T003 (#174 carrier merged)
-- **US3 (Phase 5)**: after US2 and B1, B2, B3, B7
-- **US4 (Phase 6)**: after US3, #212, B5, B6, and reviewer's ADR-0014 d1 and ADR-0017 work
-- **US5 (Phase 7)**: after US4 (shares `step.ts`, `facts.ts`, `SKILL.md`) and B4
+- **US3 (Phase 5)**: after US2 and US1
+- **US4 (Phase 6)**: after US3, #212, and reviewer's ADR-0014 d1 and ADR-0017 work
+- **US5 (Phase 7)**: after US4 (shares `step.ts`, `facts.ts`, `SKILL.md`)
 - **Polish (Phase 8)**: after US5
 
-### Core PR schedule (US1)
+### Core additions (US1, one PR)
 
-| PR | Tasks | Must merge before |
+| Section | Tasks | First caller |
 |---|---|---|
 | B1 | T006–T007 | US3 (T034) |
 | B2 | T008–T009 | US3 (T037) |
@@ -285,7 +285,7 @@ Story issue: #249
 
 ### Parallel Opportunities
 
-- US1: all seven B PRs touch different files except B1/B3/B4 (`core/src/identity.ts`) — B2, B5, B6 run in parallel with each other and with one of B1/B3/B4 at a time; B7 after B3
+- US1: the B sections touch different files except B1/B3/B4 (`core/src/identity.ts`) — B2, B5, B6 in parallel with each other and with one of B1/B3/B4 at a time; B7 after B3
 - US2: T021, T022, T023 in parallel after T020; T024, T025, T026 in parallel
 - US3: T032, T033, T034 in parallel (T032/T033 are two parts of one file: write them in one sitting)
 - US4: T042–T046 in parallel; T051 in parallel with T049–T050
@@ -296,10 +296,10 @@ Story issue: #249
 ## Parallel Example: User Story 1
 
 ```bash
-# Independent core PRs, different files:
-Task: "core PR B2: failing storyTasks cases in core/tests/tasks.test.ts, then core/src/contracts/tasks.ts"
-Task: "core PR B5: failing internalReviewAt cases, then core/src/validation/required-checks.ts"
-Task: "core PR B1: failing storyBranchName cases in core/tests/branch.test.ts, then core/src/identity.ts"
+# Independent B sections, different files:
+Task: "B2: failing storyTasks cases in core/tests/tasks.test.ts, then core/src/contracts/tasks.ts"
+Task: "B5: failing internalReviewAt cases, then core/src/validation/required-checks.ts"
+Task: "B1: failing storyBranchName cases in core/tests/branch.test.ts, then core/src/identity.ts"
 ```
 
 ## Parallel Example: User Story 3
@@ -317,20 +317,20 @@ Task: "facts.test.ts: reads against fake GitHub and scratch repos"
 ### MVP First
 
 1. Phase 1 (K amendment, #174 coordination, #174 carrier gate)
-2. US1's B1, B2, B3, B7
+2. US1 (B1–B7, one PR)
 3. US2: builder becomes a carrier, Python tests gone
 4. US3: **STOP and VALIDATE** — the step derives everything from `<s>` and stops correctly (MVP)
 
 ### Incremental Delivery
 
 1. US3 → the skill takes `<s>` alone, cuts the right branch, refuses wrong lanes and folders
-2. B5, B6 → US4 → resumes from GitHub, ends at an attested draft, root-cause-check retired
-3. B4 → US5 → rescopes reach stories in flight by merge only
+2. US4 → resumes from GitHub, ends at an attested draft, root-cause-check retired
+3. US5 → rescopes reach stories in flight by merge only
 
 ---
 
 ## Notes
 
-- Each core PR bumps every carrier's plugin version present at the time (FR-022)
+- US1's PR bumps every carrier's plugin version present at the time, once (FR-022)
 - builder writes only commits, ticks and, on a cut, a local branch and worktree (P6); a task that would push, open a PR or write a lane is wrong
 - Planner adds the `Story issue: #<s>` label lines under each phase heading when it lands this file; do not add them by hand

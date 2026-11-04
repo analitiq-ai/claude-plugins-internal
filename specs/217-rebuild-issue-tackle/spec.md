@@ -45,8 +45,8 @@ and nothing it does not.
 
 ### User Story 1 - core gains the reads and the stop rule builder needs (Priority: P1)
 
-Every read builder's step needs that core lacks lands in core, each its own PR, before the builder story that first
-calls it: the story branch name, the story's task lines, a closed story PR, a
+Every read builder's step needs that core lacks lands in core, in US1's one PR, before the first builder story that
+calls one (US3): the story branch name, the story's task lines, a closed story PR, a
 spec PR's merge commit, the `internal-review` and `<module>-review` check runs at a head, and the step's stop rule with the read of its facts.
 The stop rule and that read live in core so the orchestrator's Stop hook reads the same facts, calls the same function and names builder's stop as the
 card's Blocked reason (builder ADR-0003 d2). No core addition reads a key or writes to GitHub (root ADR-0008 d4).
@@ -310,8 +310,8 @@ the new head.
 
 **Core additions and step robustness (US1, critique 2026-10-30)**
 
-- **FR-024**: Every core addition builder needs MUST land in `core/` in its own PR under US1, before the builder
-  story that first calls it, and MUST take no key reader and no writing client (root ADR-0008 d4).
+- **FR-024**: Every core addition builder needs MUST land in `core/` in US1's one PR (org ADR-0003, root ADR-0005),
+  merged before US3, and MUST take no key reader and no writing client (root ADR-0008 d4).
 - **FR-025**: The step's stop rule MUST be a pure function in core, called by builder's step script and by the
   orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2). Its facts MUST be read by one
   read-only core function both call; builder cuts or adds the worktree itself (FR-027), then reads them again.

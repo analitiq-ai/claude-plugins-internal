@@ -11,8 +11,8 @@ which reads the session record, lane, issue, branch, worktree, spec folder, task
 check run and findings through core, decides one step in a pure function, and prints it as JSON: a stop, a cut
 (made by the script), a merge of the default branch, implement, internal round, github round, or nothing to do.
 The skill acts on that one step and never pushes, opens a PR, rebases or force-pushes. `root-cause-check` and
-builder's Python tests retire. Seven small core additions (B1–B7) are their own story, US1, each its own PR on a
-US1 branch, landing before the builder story that first calls it.
+builder's Python tests retire. Seven small core additions (B1–B7) are their own story, US1, one PR on one US1
+branch, merged before US3.
 
 ## Technical Context
 
@@ -45,7 +45,7 @@ core; no Python
 | Gate | Answer |
 |---|---|
 | I. Contract-first | Shared shapes stay core's: session record, spec facts, task-block label, `Finding`; B2 adds the task-line read beside the label grammar, B6 the findings composite three callers need. The `Step` JSON is builder's own, read only by its skill (contracts/step-script.md). No second validator. **Pass** |
-| II. Ownership & trust | builder code in `builder/`; reads and grammars in `core/` by their own PRs; the auditor and planner edits only drop a retired name. Arguments, session record, settings and GitHub answers validated where they enter (R3, R5–R7). No key read. **Pass** |
+| II. Ownership & trust | builder code in `builder/`; reads and grammars in `core/` by US1's own PR; the auditor and planner edits only drop a retired name. Arguments, session record, settings and GitHub answers validated where they enter (R3, R5–R7). No key read. **Pass** |
 | III. Fail loud | Every unanswered read exits 2 naming it; a refused record or token is never read as absent; a module's check run pending or absent exits 2, never a pass (R12). The skill repairs no folder (ADR-0002 d3); a dirty worktree or a head behind the PR stops (R8). **Pass** |
 | IV. Test-first | `decideStep` is pure, so each acceptance scenario starts as a failing unit test; reads tested against the fake GitHub and a scratch repo; R4's substitution is run on the agent machine before step code. **Pass** |
 | V. Smallest complete change | One script, one skill; core additions only where builder needs a read core lacks; the stale `alq-` pattern in the carried guard test is fixed, not copied (R2). **Pass** |
@@ -99,7 +99,7 @@ builder/
     ├── step.test.ts              # decideStep, every scenario of US3–US5
     ├── facts.test.ts             # reads vs fake GitHub and a scratch repo: one case per data-model stage 4–5 and 9 outcome (cut idempotent, worktree on another branch, GitHub-only branch, local-only branch, conflicting merge-tree, merge in progress, dirty, head behind)
     └── skill.test.ts             # skill text; carried Python assertions; SC-005 search
-core/src/                         # B1–B7 (US1), each its own PR
+core/src/                         # B1–B7 (US1), one PR
 auditor/plugin/skills/pr-audit/SKILL.md   # R14
 planner/plugin/scripts/rootcause.py       # R14, comment only
 .specify/memory/constitution.md           # R15, own PR first
@@ -111,10 +111,11 @@ exist, and the carrier check lists builder once the link exists; no workflow cha
 
 ## Delivery order and core needs
 
-Story order: US1, US2, US3, US4, US5 (spec). US1 is the core story: its B PRs each go on their own US1 branch
-(`<s1>-us1-<slug>`, reviewer's fence admits only the session issue's `<s>-us*`), each closes nothing until the last
-closes US1's issue, and each lands before the builder story that first calls it. Each bumps every carrier's version
-then present.
+Story order: US1, US2, US3, US4, US5 (spec). US1 is the core story: B1–B7 go in one PR on one US1 branch
+(`<s1>-us1-<slug>`; one issue, branch and PR per story, org ADR-0003, root ADR-0005; reviewer's fence admits only
+the session issue's `<s>-us*`), which closes US1's issue (builder ADR-0003 d1), bumps every carrier's version then
+present once, and merges before US3, the first story that calls a B addition. The "Before" column names that
+first caller.
 
 | # | PR | Story | Before | Holds |
 |---|---|---|---|---|
