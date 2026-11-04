@@ -30,10 +30,20 @@ const HELD: StateReading = {
   ...NO_STATE,
   held: true,
   causes: [
-    { cause: "tampered", commit: TAMPER_COMMIT, remaining: [LEFT_ON_LEDGER] },
+    { cause: "tampered", id: `tamper-${TAMPER_COMMIT}`, commit: TAMPER_COMMIT, remaining: [LEFT_ON_LEDGER] },
     { cause: "open_hold", id: "h1" },
   ],
-  tamper: [{ commit: TAMPER_COMMIT, at: "2026-10-29T11:00:00Z", remaining: [LEFT_ON_LEDGER], released: false, releasable: null }],
+  tamper: [
+    {
+      id: `tamper-${TAMPER_COMMIT}`,
+      commit: TAMPER_COMMIT,
+      at: "2026-10-29T11:00:00Z",
+      remaining: [LEFT_ON_LEDGER],
+      released: null,
+      released_by: null,
+      releasable: null,
+    },
+  ],
   startable: false,
 };
 
@@ -84,17 +94,17 @@ describe("decideStart", () => {
     });
   }
 
-  it("names a tamper by its commit and the files it left on ledger, with an admin's deletion of them as its release", () => {
+  it("names a tamper by its id and the files it left on ledger, with an admin's deletion of them as its release", () => {
     const { reason } = refusal(decide({ state: HELD }));
-    assert.ok(reason.includes(TAMPER_COMMIT), reason);
+    assert.ok(reason.includes(`tamper-${TAMPER_COMMIT}`), reason);
     assert.ok(reason.includes(LEFT_ON_LEDGER), reason);
     assert.match(reason, /admin deletes .*from ledger/);
   });
 
-  it("names a tamper that left no file on ledger by its commit, with no deletion to make", () => {
-    const cleared: StateReading = { ...HELD, causes: [{ cause: "tampered", commit: TAMPER_COMMIT, remaining: [] }] };
+  it("names a tamper that left no file on ledger by its id, with no deletion to make", () => {
+    const cleared: StateReading = { ...HELD, causes: [{ cause: "tampered", id: `tamper-${TAMPER_COMMIT}`, commit: TAMPER_COMMIT, remaining: [] }] };
     const { reason } = refusal(decide({ state: cleared }));
-    assert.ok(reason.includes(TAMPER_COMMIT), reason);
+    assert.ok(reason.includes(`tamper-${TAMPER_COMMIT}`), reason);
     assert.doesNotMatch(reason, /delet/);
   });
 

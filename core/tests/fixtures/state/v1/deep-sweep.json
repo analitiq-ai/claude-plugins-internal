@@ -1,0 +1,84 @@
+{
+  "commits": [
+    {
+      "date": "2026-10-28T09:10:00Z",
+      "files": {
+        "round.run-31.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"000000000000000000000000000000000000001f\",\n    \"n\": 1,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-31\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n",
+        "gates.run-31.json": "{\n  \"gates\": {\n    \"anchor\": \"0000000000000000000000000000000000000020\",\n    \"branch\": \"212-us1-login\",\n    \"bugs\": [\n      {\n        \"absorbed\": [],\n        \"deep\": {\n          \"callers\": [\n            {\n              \"does\": \"parses each file it opens\",\n              \"file\": \"src/parse.ts\",\n              \"function\": \"load\",\n              \"line\": 40\n            }\n          ],\n          \"same_operation\": [\n            {\n              \"does\": \"reads the header line into fields\",\n              \"file\": \"src/parse.ts\",\n              \"function\": \"parse\",\n              \"line\": 12\n            }\n          ]\n        },\n        \"id\": \"B5\",\n        \"members\": [\n          {\n            \"at\": \"2026-10-28T09:10:00Z\",\n            \"tree\": \"0000000000000000000000000000000000000021\"\n          }\n        ],\n        \"ranges\": [\n          {\n            \"file\": \"src/parse.ts\",\n            \"old_count\": 4,\n            \"old_start\": 10\n          }\n        ],\n        \"rulings\": [\n          {\n            \"issue\": null,\n            \"ruling\": \"SHARES\",\n            \"site\": \"src/parse.ts:parse\"\n          },\n          {\n            \"issue\": 301,\n            \"ruling\": \"DEFERRED\",\n            \"site\": \"src/parse.ts:load\"\n          }\n        ]\n      }\n    ],\n    \"lineages\": []\n  },\n  \"kind\": \"gates\",\n  \"ref\": \"run-31\",\n  \"v\": 1\n}\n"
+      }
+    }
+  ],
+  "snapshot": {
+    "v": 1,
+    "rounds": [
+      {
+        "stage": "INTERNAL",
+        "n": 1,
+        "run": "run-31",
+        "head": "000000000000000000000000000000000000001f",
+        "result": "CLEAN",
+        "verdict": null,
+        "root_cause": null,
+        "at": "2026-10-28T09:00:00Z"
+      }
+    ],
+    "holds": [],
+    "pushbacks": [],
+    "rulings": [],
+    "gates": {
+      "branch": "212-us1-login",
+      "anchor": "0000000000000000000000000000000000000020",
+      "lineages": [],
+      "bugs": [
+        {
+          "id": "B5",
+          "members": [
+            {
+              "tree": "0000000000000000000000000000000000000021",
+              "at": "2026-10-28T09:10:00Z"
+            }
+          ],
+          "absorbed": [],
+          "ranges": [
+            {
+              "file": "src/parse.ts",
+              "old_start": 10,
+              "old_count": 4
+            }
+          ],
+          "deep": {
+            "same_operation": [
+              {
+                "file": "src/parse.ts",
+                "line": 12,
+                "function": "parse",
+                "does": "reads the header line into fields"
+              }
+            ],
+            "callers": [
+              {
+                "file": "src/parse.ts",
+                "line": 40,
+                "function": "load",
+                "does": "parses each file it opens"
+              }
+            ]
+          },
+          "rulings": [
+            {
+              "site": "src/parse.ts:parse",
+              "ruling": "SHARES",
+              "issue": null
+            },
+            {
+              "site": "src/parse.ts:load",
+              "ruling": "DEFERRED",
+              "issue": 301
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "tamper": []
+}

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { eventText, type LedgerEvent } from "../src/contracts/ledger.ts";
 import type { Hold, Snapshot } from "../src/contracts/snapshot.ts";
-import { questionTag, readState, releaseOnClaim, StateWriteRefused, type Releasable } from "../src/state.ts";
+import { questionTag, readState, releaseOnClaim, StateWriteRefused, type Releasable, type Tamper } from "../src/state.ts";
 import {
   ADMIN,
   ISSUE,
@@ -260,6 +260,42 @@ const ESCALATION_QUESTION: Fixture[] = [
   },
 ];
 
+// Orchestrator ADR-0010 d1 posts a question for a rescope hold a verdict placed, as for an escalation; never for a spec PR's.
+const VERDICT_RESCOPE = hold("rescope-212", { since: at("10:00") });
+const SPEC_PR_RESCOPE = hold("rescope-212", { since: at("10:00"), spec_pr: 301 });
+const RESCOPE_ASKED = questionComment(150, VERDICT_RESCOPE, "10:10");
+
+const RESCOPE_QUESTION: Fixture[] = [
+  {
+    name: "a verdict's rescope hold's admin comment at 10:05, before its question at 10:10",
+    holds: [VERDICT_RESCOPE],
+    issue: { comments: [adminComment(140, "10:05"), RESCOPE_ASKED], moves: [move("11:00")] },
+    releasable: [],
+    startable: false,
+  },
+  {
+    name: "a verdict's rescope hold's admin comment at 10:20, after its question, and Ready after it",
+    holds: [VERDICT_RESCOPE],
+    issue: { comments: [adminComment(140, "10:05"), RESCOPE_ASKED, adminComment(160, "10:20")], moves: [move("11:00")] },
+    releasable: [["rescope-212", 160, false]],
+    startable: true,
+  },
+  {
+    name: "a verdict's rescope hold whose question is not posted, with an admin comment and Ready",
+    holds: [VERDICT_RESCOPE],
+    issue: { comments: [adminComment(160, "10:20")], moves: [move("11:00")] },
+    releasable: [],
+    startable: false,
+  },
+  {
+    name: "a spec PR's rescope hold, which asks no question, released by an admin comment and Ready",
+    holds: [SPEC_PR_RESCOPE],
+    issue: { comments: [adminComment(160, "10:20")], moves: [move("11:00")] },
+    releasable: [["rescope-212", 160, false]],
+    startable: true,
+  },
+];
+
 const THREE = [
   hold("pushback-212", { since: at("09:30") }),
   hold("audit-212", { since: at("09:40") }),
@@ -465,8 +501,12 @@ function filesOf(events: LedgerEvent[]): Record<string, string> {
   return Object.fromEntries(events.map((each) => [inStory(fileOf(each)), eventText(each)]));
 }
 
+function releasedBy(released: readonly Releasable[]): Map<string, { comment: number; reset: boolean }> {
+  return new Map(released.map(({ id, comment, reset }) => [id, { comment: comment.id, reset }]));
+}
+
 function releasedRows(state: Snapshot, released: readonly Releasable[]): Snapshot {
-  const by = new Map(released.map(({ id, comment, reset }) => [id, { comment: comment.id, reset }]));
+  const by = releasedBy(released);
   return {
     ...state,
     holds: state.holds.map((row) => {
@@ -474,6 +514,14 @@ function releasedRows(state: Snapshot, released: readonly Releasable[]): Snapsho
       return released_by === undefined ? row : { ...row, state: "RELEASED", released: NOW, released_by };
     }),
   };
+}
+
+function releasedTampers(tampers: readonly Tamper[], released: readonly Releasable[]): Tamper[] {
+  const by = releasedBy(released);
+  return tampers.map((tamper) => {
+    const released_by = by.get(tamper.id);
+    return released_by === undefined ? tamper : { ...tamper, released: NOW, released_by, releasable: null };
+  });
 }
 
 async function bothGiveOneAnswer(fixture: Fixture): Promise<void> {
@@ -512,7 +560,7 @@ async function bothGiveOneAnswer(fixture: Fixture): Promise<void> {
 
   const out = writer(ledger);
   const claim = releaseOnClaim(reader(fixture.issue, ledger), out, REPO, ISSUE, SHARED, reading);
-  if (reading.tamper.some((tamper) => !tamper.released && tamper.releasable === null)) {
+  if (reading.tamper.some((tamper) => tamper.released === null && tamper.releasable === null)) {
     await assert.rejects(claim, StateWriteRefused);
     assert.deepEqual(out.calls, []);
     return;
@@ -530,11 +578,13 @@ async function bothGiveOneAnswer(fixture: Fixture): Promise<void> {
   const releases = releasable.map(({ id, comment: by, reset: byReset }) => event.release(id, since.get(id) ?? null, NOW, by.id, byReset));
   assert.deepEqual(addedFiles(asked[0]), filesOf(releases));
   assert.deepEqual(answer.reading.snapshot, releasedRows(reading.snapshot, releasable));
+  assert.deepEqual(answer.reading.tamper, releasedTampers(reading.tamper, releasable));
 }
 
 const SETS: Array<[string, Fixture[]]> = [
   ["a Ready move and an admin's comment after the hold", READY_AND_COMMENT],
   ["an escalation hold's question", ESCALATION_QUESTION],
+  ["a verdict's rescope hold's question", RESCOPE_QUESTION],
   ["/codeworks reset", ADMIN_RESET],
   ["a tamper's release", TAMPER],
   ["nothing held", NOTHING_HELD],

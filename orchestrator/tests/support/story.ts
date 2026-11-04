@@ -56,6 +56,11 @@ export const READY_STORY: Story = {
   ledger: quietLedger(),
 };
 
+/** A repository with no `ledger` branch: setup step 6 never ran. */
+export function missingLedger(): FakeLedger {
+  return fakeLedger({ exists: false });
+}
+
 /** A `ledger` with an unsigned commit to story 212. */
 export function tamperedLedger(): FakeLedger {
   const ledger = quietLedger();

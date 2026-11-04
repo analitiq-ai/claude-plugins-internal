@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { Gates } from "../src/contracts/gates.ts";
-import { eventText, type LedgerEvent } from "../src/contracts/ledger.ts";
+import { eventText, tamperId, type LedgerEvent } from "../src/contracts/ledger.ts";
 import type { Hold, Snapshot } from "../src/contracts/snapshot.ts";
 import { GitHubRefused } from "../src/github.ts";
 import {
@@ -349,6 +349,16 @@ describe("writeState", () => {
       assert.deepEqual([...read.calls, ...out.calls], []);
     });
   }
+
+  it("refuses a round whose run names the file of another round in the fold, committing nothing", async () => {
+    const ledger = ledgerOf(state);
+    const reading = await readingOf(ledger);
+    const out = writer(ledger);
+    const next = { ...state, rounds: [ROUND_1, round(2, { run: ROUND_1.run })] };
+    const file = fileOf(event.round(ROUND_1)).replaceAll(".", "\\.");
+    await assert.rejects(writeState(reader({}, ledger), out, REPO, ISSUE, SHARED, reading, next, []), refusal(new RegExp(file)));
+    assert.deepEqual(commitsAsked(out), []);
+  });
 });
 
 describe("checkTransition", () => {
@@ -547,6 +557,15 @@ describe("recordGates", () => {
     assert.deepEqual(again, advanced);
   });
 
+  it("refuses other gates under a ref the fold holds, committing neither them nor the hold their count reaches", async () => {
+    const { ledger, advanced } = await record(snapshot({ gates: before }), "check-2", after, [{ id: "claim-L7", question }]);
+    const out = writer(ledger);
+    const other = gates({ lineages: [lineage("L6"), lineage("L7"), lineage("L8")] });
+    const opening = { id: "shim-B9", question: null };
+    await assert.rejects(recordGates(reader({}, ledger), out, REPO, ISSUE, SHARED, advanced, "check-2", other, [opening]), refusal(/gates\.check-2\.json/));
+    assert.deepEqual(commitsAsked(out), []);
+  });
+
   const placers: Array<[string, string]> = [
     ["pushback-212", "writeState"],
     ["escalation-212", "writeState"],
@@ -646,7 +665,8 @@ describe("releaseOnClaim", () => {
     assert.deepEqual(addedFiles(onlyCommit(out)), filesOf(event.release(`tamper-${oid}`, null, NOW, 201)));
     const by = { id: 201, url: adminComment(201, "10:45").url, at: at("10:45") };
     assert.deepEqual(answer.released, [{ id: `tamper-${oid}`, comment: by, reset: false }]);
-    assert.deepEqual(answer.reading.tamper, [{ commit: oid, at: at("10:15"), remaining: [], released: true, releasable: null }]);
+    const released = { released: NOW, released_by: { comment: 201, reset: false } };
+    assert.deepEqual(answer.reading.tamper, [{ id: tamperId(oid), commit: oid, at: at("10:15"), remaining: [], ...released, releasable: null }]);
     assert.deepEqual([answer.reading.held, answer.reading.causes, answer.reading.startable], [false, [], true]);
   });
 

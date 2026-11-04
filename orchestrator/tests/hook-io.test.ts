@@ -10,7 +10,7 @@ import { DerivationError } from "../plugin/core/identity.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { SessionRecordRefused } from "../plugin/core/session-record.ts";
 import { SettingsError } from "../plugin/core/settings.ts";
-import { BoardNotVisible } from "../plugin/core/state.ts";
+import { BoardNotVisible, LedgerMissing } from "../plugin/core/state.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { context, HookInputRefused, PASS, readInput, refusalOf, refuse, refusing } from "../plugin/lib/hook-io.ts";
 
@@ -120,6 +120,7 @@ describe("refusalOf", () => {
     new LaneRefused("dummy why"),
     new DerivationError("the blockers of acme/widgets#212", "in another repository: acme/gadgets#7"),
     new BoardNotVisible("https://github.com/orgs/acme/projects/1"),
+    new LedgerMissing("acme/widgets"),
     new SessionRecordRefused("/home/dummy/.local/state/codeworks/orchestrator/sessions/dummy.json", "dummy why"),
   ];
 

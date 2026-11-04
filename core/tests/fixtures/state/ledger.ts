@@ -106,6 +106,8 @@ export class FakeLedger {
   restOmits: string[] = [];
   /** Commits per page of the branch's unfiltered history, small so a read across pages is exercised. */
   pageSize = 2;
+  /** Per blob oid, GitHub's answer for it in place of its full text: none, a binary's or a truncated one. */
+  readonly blobAnswers = new Map<string, unknown>();
   private made = 0;
 
   constructor(exists: boolean) {
@@ -157,7 +159,7 @@ export class FakeLedger {
     return {
       graphql: [
         { when: (query) => /\bref\(qualifiedName: "refs\/heads\/ledger"\)/.test(query), answer: () => this.refAnswer() },
-        { when: (query) => /\.\.\. on Blob \{ text \}/.test(query), answer: (call: FakeCall) => this.blobsAnswer(varsOf(call)) },
+        { when: (query) => /\.\.\. on Blob \{/.test(query), answer: (call: FakeCall) => this.blobsAnswer(varsOf(call)) },
         {
           when: (query) => /\bhistory\(first: \d+, after: \$cursor\)/.test(query),
           answer: (call: FakeCall) => this.branchPage(varsOf(call)),
@@ -217,8 +219,9 @@ export class FakeLedger {
     return {
       repository: Object.fromEntries(
         blobs.map(([alias, oid]) => {
+          if (this.blobAnswers.has(String(oid))) return [alias, this.blobAnswers.get(String(oid))];
           const text = this.blob(oid);
-          return [alias, text === null ? null : { text }];
+          return [alias, text === null ? null : { text, isTruncated: false, isBinary: false }];
         }),
       ),
     };

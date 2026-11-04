@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { eventText, type LedgerEvent } from "../src/contracts/ledger.ts";
+import { eventText, tamperId, type LedgerEvent } from "../src/contracts/ledger.ts";
 import type { Snapshot } from "../src/contracts/snapshot.ts";
 import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
-import { BoardNotVisible, issueComments, LedgerMissing, readState, storyTouched, type StateReading } from "../src/state.ts";
+import { BoardNotVisible, issueComments, LedgerMissing, readState, storyTouched, type Releasable, type StateReading, type Tamper } from "../src/state.ts";
 import {
   ADMIN,
   BOARD,
@@ -32,6 +32,7 @@ import {
 import {
   GITHUB_SIGNED,
   OWN_KEY_SIGNED,
+  blobOid,
   clearanceCommit,
   event,
   eventCommit,
@@ -60,6 +61,10 @@ const BY_THE_APP = { signature: GITHUB_SIGNED, author: SHARED.reviewer_app_login
 // A tamper's remaining files are named from the repository root, as the admin deleting them finds them.
 function inStory(name: string): string {
   return `${storyDir()}/${name}`;
+}
+
+function unreleasedTamper(oid: string, floor: string, remaining: string[], releasable: Releasable | null = null): Tamper {
+  return { id: tamperId(oid), commit: oid, at: floor, remaining, released: null, released_by: null, releasable };
 }
 
 describe("readState: the ledger branch", () => {
@@ -308,10 +313,10 @@ describe("readState: a commit the fold takes as invalid", () => {
       const reading = await read(ledger);
       const remaining = breach.remaining.map(inStory);
       assert.deepEqual(reading.snapshot, (await read(before)).snapshot);
-      assert.deepEqual(reading.tamper, [{ commit: oid, at: at("09:30"), remaining, released: false, releasable: null }]);
+      assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), remaining)]);
       assert.deepEqual(
         reading.causes.filter((cause) => cause.cause === "tampered"),
-        [{ cause: "tampered", commit: oid, remaining }],
+        [{ cause: "tampered", id: tamperId(oid), commit: oid, remaining }],
       );
       assert.deepEqual([reading.held, reading.startable], [true, false]);
     });
@@ -332,7 +337,7 @@ describe("readState: an admin's clearance", () => {
       reading.tamper.map((tamper) => [tamper.commit, tamper.remaining]),
       [[oid, []]],
     );
-    assert.deepEqual(reading.causes, [{ cause: "tampered", commit: oid, remaining: [] }]);
+    assert.deepEqual(reading.causes, [{ cause: "tampered", id: tamperId(oid), commit: oid, remaining: [] }]);
   });
 
   it("of a file an invalid commit changed in place leaves the event the file first held in the fold", async () => {
@@ -398,7 +403,7 @@ describe("readState: an admin's clearance", () => {
     const oid = clearanceCommit(ledger, [fileOf(pushback)], { date: at("10:30") });
     const reading = await read(ledger);
     assert.deepEqual(reading.snapshot, snapshot({ rounds: [ROUND_1], holds: [hold("pushback-212", { since: at("09:00") })] }));
-    assert.deepEqual(reading.tamper, [{ commit: oid, at: at("10:30"), remaining: [], released: false, releasable: null }]);
+    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("10:30"), [])]);
   });
 });
 
@@ -455,6 +460,50 @@ describe("readState: the reads it makes", () => {
       assert.deepEqual(heads, heads.map(() => head), `a ${kind} read not at the first head`);
     }
   });
+
+  const UNREAD: Array<[string, (text: string) => unknown]> = [
+    ["no object for the blob", () => null],
+    ["no text for a blob it does not call binary", () => ({ text: null, isTruncated: false, isBinary: false })],
+    ["no text for a blob whose encoding it cannot tell", () => ({ text: null, isTruncated: false, isBinary: null })],
+    ["a truncated text", (text) => ({ text: text.slice(0, 20), isTruncated: true, isBinary: false })],
+  ];
+  for (const [what, answer] of UNREAD) {
+    it(`fails the read with GitHubUnanswered naming the blob, deriving no tamper, when GitHub answers ${what} for an event commit's file`, async () => {
+      const ledger = fakeLedger();
+      eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+      const text = eventText(event.round(round(2)));
+      eventCommit(ledger, [event.round(round(2))], { date: at("09:30") });
+      ledger.blobAnswers.set(blobOid(text), answer(text));
+      await assert.rejects(read(ledger), (error: unknown) => {
+        assert.ok(error instanceof GitHubUnanswered, `expected GitHubUnanswered, got ${String(error)}`);
+        assert.match(error.message, new RegExp(blobOid(text)));
+        return true;
+      });
+    });
+  }
+
+  it("takes the reviewer App's commit of a binary file as invalid, its tamper derived", async () => {
+    const ledger = fakeLedger();
+    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+    const binary = "\u0000\u0001";
+    const oid = reviewerCommit(ledger, { "round.run-2.json": binary }, { date: at("09:30") });
+    ledger.blobAnswers.set(blobOid(binary), { text: null, isTruncated: false, isBinary: true });
+    const reading = await read(ledger);
+    assert.deepEqual(reading.snapshot, snapshot({ rounds: [ROUND_1] }));
+    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory("round.run-2.json")])]);
+  });
+});
+
+describe("readState: readings", () => {
+  it("gives each reading a snapshot of its own, so a caller's change to one reaches no other", async () => {
+    const ledger = fakeLedger();
+    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+    const first = await read(ledger);
+    first.snapshot?.pushbacks.push({ key: "PRRC_9", round: ROUND_1_ID });
+    first.snapshot?.holds.push(hold("audit-212"));
+    const second = await read(ledger);
+    assert.deepEqual(second.snapshot, snapshot({ rounds: [ROUND_1] }));
+  });
 });
 
 describe("readState: release floors", () => {
@@ -480,7 +529,7 @@ describe("readState: release floors", () => {
     clearanceCommit(ledger, Object.keys(added), { date: at("10:30") });
     const reading = await read(ledger, { comments: [adminComment(201, "10:45")], moves: [move("11:00")] });
     const release = { id: `tamper-${oid}`, comment: { id: 201, url: adminComment(201, "10:45").url, at: at("10:45") }, reset: false };
-    assert.deepEqual(reading.tamper, [{ commit: oid, at: at("10:30"), remaining: [], released: false, releasable: release }]);
+    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("10:30"), [], release)]);
     assert.equal(reading.startable, true);
   });
 
@@ -516,35 +565,41 @@ describe("readState: release floors", () => {
     eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
     const oid = invalidCommit(ledger, { put: files(ROUND_2), date: at("09:30") });
     const reading = await read(ledger, { comments: [adminComment(201, "10:45"), adminComment(202, "10:50", "/codeworks reset")], moves: [move("11:00")] });
-    assert.deepEqual(reading.tamper, [{ commit: oid, at: at("09:30"), remaining: [inStory(fileOf(ROUND_2))], released: false, releasable: null }]);
+    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory(fileOf(ROUND_2))])]);
     assert.equal(reading.startable, false);
   });
 });
 
 describe("readState: frozen v1 histories", () => {
-  // Each file's text as it was committed, byte for byte.
-  type FrozenCommit = { date: string; files: Record<string, string> };
-  type Frozen = { commits: FrozenCommit[]; snapshot: Snapshot };
+  // Each file's text as it was committed, byte for byte. A commit is the reviewer App's unless `by` makes it an
+  // admin's invalid commit or clearance, the fake's oids naming a tamper as the history was written.
+  type FrozenCommit = { date: string; by?: "invalid" | "clearance"; files?: Record<string, string>; remove?: string[] };
+  type Frozen = { commits: FrozenCommit[]; snapshot: Snapshot; tamper: Tamper[] };
   const folder = new URL("./fixtures/state/v1/", import.meta.url);
   const names = readdirSync(folder).filter((name) => name.endsWith(".json"));
   const frozenOf = (name: string) => JSON.parse(readFileSync(new URL(name, folder), "utf8")) as Frozen;
 
-  it("has at least one history, each of at least one commit, every commit adding a file", () => {
+  it("has at least one history, each of at least one commit, every commit adding or removing a file", () => {
     assert.ok(names.length > 0, "no history");
     for (const name of names) {
       const { commits } = frozenOf(name);
       assert.ok(commits.length > 0, `${name} has no commit`);
-      assert.ok(commits.every((commit) => Object.keys(commit.files).length > 0), `${name} has a commit adding no file`);
+      const changes = (commit: FrozenCommit) => Object.keys(commit.files ?? {}).length + (commit.remove ?? []).length;
+      assert.ok(commits.every((commit) => changes(commit) > 0), `${name} has a commit changing no file`);
     }
   });
 
   for (const name of names) {
-    it(`folds ${name} to the snapshot it was written with, deriving no tamper`, async () => {
+    it(`folds ${name} to the snapshot and the tampers it was written with`, async () => {
       const frozen = frozenOf(name);
       const ledger = fakeLedger();
-      for (const { date, files: written } of frozen.commits) reviewerCommit(ledger, written, { date });
+      for (const { date, by, files: put = {}, remove = [] } of frozen.commits) {
+        if (by === "invalid") invalidCommit(ledger, { put, remove, date });
+        else if (by === "clearance") clearanceCommit(ledger, remove, { date });
+        else reviewerCommit(ledger, put, { date });
+      }
       const reading = await read(ledger);
-      assert.deepEqual(reading.tamper, []);
+      assert.deepEqual(reading.tamper, frozen.tamper);
       assert.deepEqual(reading.snapshot, frozen.snapshot);
     });
   }
