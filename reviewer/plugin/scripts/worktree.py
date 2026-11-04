@@ -182,9 +182,9 @@ _OID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 def merged(root: str, head: str, base: str) -> str:
     """The tree `head` would hold once it merged `base`, as git merges them. A text conflict is left as git leaves
-    it, both sides between markers, so a diff from this tree shows how it was resolved; a modify/delete or binary
-    conflict keeps the head's side, so a resolution that kept it does not show. A `base` the head already carries
-    gives the head's own tree. RuntimeError when git cannot merge them."""
+    it, both sides between markers, so a diff from this tree shows how it was resolved; a modify/delete conflict
+    keeps the modified side and a binary conflict the head's, so a resolution that kept that side does not show.
+    A `base` the head already carries gives the head's own tree. RuntimeError when git cannot merge them."""
     args = ("merge-tree", "--write-tree", "--no-messages", "--name-only", head, base)
     done = _run(root, *args)
     # git exits 1 both for a conflict, whose tree it still writes, and for a side it cannot merge, where it writes none.

@@ -441,8 +441,6 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
 def _delta_start(where: worktree.Worktree, decision: policy.Decision, base: str) -> policy.Decision:
     """A delta round diffs from the last reviewed head as it would be once it merged `base`: what the base branch
     brought in since that round is not the branch's work. RuntimeError saying why when git cannot merge them."""
-    if decision.scope != "delta":
-        return decision
     try:
         return replace(decision, delta_from=worktree.merged(where.root, decision.delta_from, base))
     except RuntimeError as exc:
@@ -647,9 +645,10 @@ def on_workflow(payload: dict, deadline: adrkit.Deadline) -> dict | None:
             try:
                 base = _review_base(where, merges_into)
                 spent["review-base fetch"] = time.monotonic() - started
-                started = time.monotonic()
-                decision = _delta_start(where, decision, base)
-                spent["merge of the last reviewed head"] = time.monotonic() - started
+                if decision.scope == "delta":
+                    started = time.monotonic()
+                    decision = _delta_start(where, decision, base)
+                    spent["merge of the last reviewed head"] = time.monotonic() - started
             except RuntimeError as exc:
                 return block(payload, action, str(exc), event)
             governance = None

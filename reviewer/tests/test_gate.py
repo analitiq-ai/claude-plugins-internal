@@ -2196,6 +2196,7 @@ class DecisionReview(Gate):
         self.assertEqual(self.decision(out), "deny")
         for step in ("docs/adr", "deadline", "gh calls", "review-base fetch", "adr --version", "adr check of docs/adr"):
             self.assertIn(step, self.reason(out))
+        self.assertNotIn("merge of the last reviewed head", self.reason(out))  # a full round merges nothing
 
     def test_a_skipped_file_the_change_does_not_touch_says_nothing(self):
         needs_adr(self)
