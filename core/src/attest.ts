@@ -67,9 +67,9 @@ function roundName(round: Round): string {
 }
 
 function causeText(cause: StateCause): string {
-  if ("id" in cause) return `${cause.cause} ${cause.id}`;
-  if ("error" in cause) return `${cause.cause}: ${cause.error}`;
-  return cause.cause;
+  if (cause.cause === "open_hold") return `${cause.cause} ${cause.id}`;
+  const left = cause.remaining.length === 0 ? "no file" : cause.remaining.join(", ");
+  return `${cause.cause} ${cause.commit}, leaving ${left}`;
 }
 
 // Resolved once, so a revision the clone lacks throws here, not as "not in history" from `merge-base`, and no

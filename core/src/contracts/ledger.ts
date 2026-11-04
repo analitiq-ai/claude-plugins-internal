@@ -17,6 +17,11 @@ function isTamperId(id: string): boolean {
   return TAMPER_ID.test(id);
 }
 
+/** The id the fold derives for invalid commit `oid`, which its release names. */
+export function tamperId(oid: string): string {
+  return `${TAMPER_PREFIX}${oid}`;
+}
+
 const Release = z
   .strictObject({ id: NameSegment, since: Time.nullable(), released: Time, released_by: ReleasedBy })
   .superRefine((release, ctx) => {
@@ -28,6 +33,7 @@ const Release = z
     setExactlyWhen(ctx, "since", release.since, !tamper, "the id is a hold's");
   });
 
+// Declared in the order one commit's events apply in.
 const LedgerEventKind = valueSet({
   round: "a review round",
   ruling: "a round's ruling on one finding",
@@ -37,20 +43,21 @@ const LedgerEventKind = valueSet({
   release: "a hold's opening, or a tamper, released",
   gates: "the gates section, replaced whole",
 });
-const KIND = LedgerEventKind.schema.enum;
+/** The kinds by name, so a module outside this one names a kind without quoting it. */
+export const EVENT_KIND = LedgerEventKind.schema.enum;
 
 export const LedgerEvent = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal(KIND.round), v: V1, round: Round }),
-  z.strictObject({ kind: z.literal(KIND.ruling), v: V1, ruling: Ruling }).superRefine((event, ctx) => {
+  z.strictObject({ kind: z.literal(EVENT_KIND.round), v: V1, round: Round }),
+  z.strictObject({ kind: z.literal(EVENT_KIND.ruling), v: V1, ruling: Ruling }).superRefine((event, ctx) => {
     if (event.ruling.commits.length > 0) {
       ctx.addIssue({ code: "custom", path: ["ruling", "commits"], message: "a ruling's commits are each a ruling-commit event" });
     }
   }),
-  z.strictObject({ kind: z.literal(KIND["ruling-commit"]), v: V1, round: RoundId, key: z.string().min(1), commit: GitSha }),
-  z.strictObject({ kind: z.literal(KIND.pushback), v: V1, pushback: Pushback }),
-  z.strictObject({ kind: z.literal(KIND.hold), v: V1, hold: HoldPlacement }),
-  z.strictObject({ kind: z.literal(KIND.release), v: V1, release: Release }),
-  z.strictObject({ kind: z.literal(KIND.gates), v: V1, ref: NameSegment, gates: Gates }),
+  z.strictObject({ kind: z.literal(EVENT_KIND["ruling-commit"]), v: V1, round: RoundId, key: z.string().min(1), commit: GitSha }),
+  z.strictObject({ kind: z.literal(EVENT_KIND.pushback), v: V1, pushback: Pushback }),
+  z.strictObject({ kind: z.literal(EVENT_KIND.hold), v: V1, hold: HoldPlacement }),
+  z.strictObject({ kind: z.literal(EVENT_KIND.release), v: V1, release: Release }),
+  z.strictObject({ kind: z.literal(EVENT_KIND.gates), v: V1, ref: NameSegment, gates: Gates }),
 ]);
 export type LedgerEvent = z.infer<typeof LedgerEvent>;
 
@@ -70,23 +77,38 @@ function timeSegment(time: string): string {
 /** The event's file name in its story's directory: it keys the event, so a retry of one event is one file. */
 export function eventFile(event: LedgerEvent): string {
   switch (event.kind) {
-    case KIND.round:
+    case EVENT_KIND.round:
       return `round.${event.round.run}.json`;
-    case KIND.ruling:
+    case EVENT_KIND.ruling:
       return `ruling.${roundSegment(event.ruling.round)}.${hashed(event.ruling.key)}.json`;
-    case KIND["ruling-commit"]:
+    case EVENT_KIND["ruling-commit"]:
       return `ruling-commit.${roundSegment(event.round)}.${hashed(event.key)}.${event.commit}.json`;
-    case KIND.pushback:
+    case EVENT_KIND.pushback:
       return `pushback.${roundSegment(event.pushback.round)}.${hashed(event.pushback.key)}.json`;
-    case KIND.hold:
+    case EVENT_KIND.hold:
       return `hold.${event.hold.id}.${timeSegment(event.hold.since)}.json`;
-    case KIND.release: {
+    case EVENT_KIND.release: {
       const { id, since } = event.release;
       return since === null ? `release.${id}.json` : `release.${id}.${timeSegment(since)}.json`;
     }
-    case KIND.gates:
+    case EVENT_KIND.gates:
       return `gates.${event.ref}.json`;
   }
+}
+
+/** Two file names of a story's directory in git's tree order, which compares code units. */
+export function byFileName(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
+/** `events` in the order one commit's events apply in: by kind, as `LedgerEventKind` declares them, then by file name. */
+export function inApplyOrder(events: readonly LedgerEvent[]): LedgerEvent[] {
+  const kinds: readonly string[] = LedgerEventKind.schema.options;
+  return events
+    .map((event) => ({ event, rank: kinds.indexOf(event.kind), file: eventFile(event) }))
+    .toSorted((a, b) => a.rank - b.rank || byFileName(a.file, b.file))
+    .map(({ event }) => event);
 }
 
 export function eventText(event: LedgerEvent): string {

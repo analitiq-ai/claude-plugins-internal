@@ -25,13 +25,13 @@ export const Round = z
   });
 export type Round = z.infer<typeof Round>;
 
-const placementFields = {
+const PlacementShape = z.strictObject({
   id: NameSegment,
   kind: HoldKind.schema,
   since: Time,
   question: z.string().min(1).nullable(),
   spec_pr: z.int().min(1).nullable(),
-};
+});
 
 type Placed = { id: string; kind: z.infer<typeof HoldKind.schema>; question: string | null; spec_pr: number | null };
 
@@ -50,15 +50,19 @@ function placementRules(hold: Placed, ctx: z.RefinementCtx): void {
   }
 }
 
+/** A hold as a write asks for it, checked before core asks GitHub's clock for its `since`. */
+export const HoldRequest = PlacementShape.omit({ since: true }).superRefine(placementRules);
+export type HoldRequest = z.infer<typeof HoldRequest>;
+
 /** A hold as its ledger event places it: a row without its state and release fields. */
-export const HoldPlacement = z.strictObject(placementFields).superRefine(placementRules);
+export const HoldPlacement = PlacementShape.superRefine(placementRules);
 export type HoldPlacement = z.infer<typeof HoldPlacement>;
 
 export const ReleasedBy = z.strictObject({ comment: z.int(), reset: z.boolean() });
 
 export const Hold = z
   .strictObject({
-    ...placementFields,
+    ...PlacementShape.shape,
     state: HoldState.schema,
     released: Time.nullable(),
     released_by: ReleasedBy.nullable(),

@@ -104,6 +104,34 @@ const Connection = z.object({
     .refine((page) => !page.hasNextPage || page.endCursor !== null, "hasNextPage is true with no endCursor"),
 });
 
+/**
+ * Every node of the connection at `connectionPath` under `data`, asked page by page through `graphql`, so each page
+ * is its own call; `query` declares `$cursor: String`.
+ */
+export async function connectionNodes(
+  graphql: GitHubClient["graphql"],
+  query: string,
+  vars: Record<string, unknown>,
+  connectionPath: readonly string[],
+): Promise<unknown[]> {
+  const nodes: unknown[] = [];
+  let cursor: string | null = null;
+  do {
+    const data = await graphql(query, { ...vars, cursor });
+    const found = connectionPath.reduce<unknown>(
+      (value, key) => (typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined),
+      data,
+    );
+    const connection = Connection.safeParse(found);
+    if (!connection.success) {
+      throw new Error(`POST /graphql: ${connectionPath.join(".")} is not a connection: ${z.prettifyError(connection.error)}`);
+    }
+    nodes.push(...connection.data.nodes);
+    cursor = connection.data.pageInfo.hasNextPage ? connection.data.pageInfo.endCursor : null;
+  } while (cursor !== null);
+  return nodes;
+}
+
 type Exchange = { status: number; headers: Headers; text: string };
 
 export function gitHub(token: string, api = "https://api.github.com", timeoutMs = REQUEST_TIMEOUT_MS): GitHubClient {
@@ -177,22 +205,7 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
     graphql,
 
     async graphqlPages(query, vars, connectionPath) {
-      const nodes: unknown[] = [];
-      let cursor: string | null = null;
-      do {
-        const data = await graphql(query, { ...vars, cursor });
-        const found = connectionPath.reduce<unknown>(
-          (value, key) => (typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined),
-          data,
-        );
-        const connection = Connection.safeParse(found);
-        if (!connection.success) {
-          throw new Error(`POST /graphql: ${connectionPath.join(".")} is not a connection: ${z.prettifyError(connection.error)}`);
-        }
-        nodes.push(...connection.data.nodes);
-        cursor = connection.data.pageInfo.hasNextPage ? connection.data.pageInfo.endCursor : null;
-      } while (cursor !== null);
-      return nodes;
+      return connectionNodes(graphql, query, vars, connectionPath);
     },
 
     // Any token may read /rate_limit, and the read does not count against the limit.
@@ -259,11 +272,17 @@ export function restLogin(actor: Actor | null): string | null {
 }
 
 // `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.
-const WRITER_ROLES: ReadonlySet<string> = new Set(["admin", "maintain", "write"]);
+const ADMIN_ROLE = "admin";
+const WRITER_ROLES: ReadonlySet<string> = new Set([ADMIN_ROLE, "maintain", "write"]);
 
 /** A writer's role, as a done close and an admin's comment both read it (orchestrator ADR-0010 d2). */
 export function isWriterRole(role: string): boolean {
   return WRITER_ROLES.has(role);
+}
+
+/** The one role whose deletion on `ledger` clears a tamper's files (FR-022). */
+export function isAdminRole(role: string): boolean {
+  return role === ADMIN_ROLE;
 }
 
 const PermissionAnswer = z.object({ role_name: z.string() });
