@@ -46,7 +46,7 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - `tasks-sources-next.json`: written by `adr-tasks-due` from every file the tasks command reads (workflow-steps.md);
   renamed to `tasks-sources.json` by `adr-tasks-written` once the tasks command has written `tasks.md`. A round is
   due to write `tasks.md` when it is missing, `tasks-sources.json` is missing, or the two differ.
-- `adr-inputs.json`: written by ask first, every round, from core's `roundInputPaths` (every file the round checks);
+- `adr-inputs.json`: written by stories first, every round, from core's `roundInputPaths` (every file the round checks);
   decide records the rulings file's new hash in it after appending. report hashes them again, and `tasksSourcePaths`
   against `tasks-sources.json`, before it shows a stop or ends the loop: any difference runs a new round.
 

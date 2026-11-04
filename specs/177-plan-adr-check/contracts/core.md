@@ -96,7 +96,7 @@ export const STOP_FILE = "adr-stop.json";
 export const TOUCHES_FROM_FILE = "touches-from.json";           // plan.md and spec.md as the touches step read them
 export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources the current tasks.md was written from
 export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
-export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as ask read them
+export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as stories hashed them
 
 export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
 

@@ -120,7 +120,8 @@ step that writes a valid `touches.json` and then fails or times out stops the ru
 the `touches-missing` line and the touches step's error from `state.json`; a decide that crashes fails the run at `adr-decide` and the resume runs decide, then
 report, not clear, touches or ask; when `plan.md` changed before that resume, report shows no stop from the old plan
 and runs a new round at once, which stops on the new plan's departure; a rulings entry deleted by hand after a
-decide crash is no longer honoured on that resume; a judge that edits `plan.md` gets a new round, not a pass; a tasks command that crashes leaves the next round due; a stop in a round after
+decide crash is no longer honoured on that resume; an ask that crashes, then a `tasks.md` edit, then a resume gets a new round whose stories checks the edited
+`tasks.md`; a judge that edits `plan.md` gets a new round, not a pass; a tasks command that crashes leaves the next round due; a stop in a round after
 the first, reported under a qualified id (`adr-check:adr-report:1`), reports `adr: true`; a loop that runs 100
 rounds fails the run at `adr-rounds` with `adr: true`; `rescope … questions=@<file>` lands the file as
 `<run>/review-questions.json`; a stories, an ask and a decide stop each stop the run at `adr-report` and report

@@ -140,7 +140,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - A step that crashes without an answer (any shell step of the round exiting non-zero, or rounds) is no check
     stop: the run fails at that step and the resume runs that step, then the rest of its round (R14). The rest of
     that round is what the earlier run left: touches, the tasks, ask and the judge are not run again. So report
-    trusts a round only when every file it checked is unchanged: ask records them first (`adr-inputs.json`,
+    trusts a round only when every file it checked is unchanged: stories, the round's first step after `tasks.md` is written, records them first (`adr-inputs.json`,
     `roundInputPaths`), and report, before it shows a stop or ends the loop, hashes them again and the tasks sources
     against `tasks-sources.json`; any difference drops the round's stop and runs a new round at once (executed on
     1.1.3, stand-in). One rule covers a plan edited before a resume that re-runs only decide or report (its old stop

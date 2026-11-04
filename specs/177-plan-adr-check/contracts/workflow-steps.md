@@ -9,12 +9,12 @@ adr_check.ts tasks-written <run folder>
 adr_check.ts stories      <issue> <kind> <spec folder> <run folder>
 adr_check.ts ask          <spec folder> <run folder> <touches exit code>
 adr_check.ts decide       <spec folder> <run folder> <asked digest> <judge exit code>
-adr_check.ts report       <run folder>
+adr_check.ts report       <spec folder> <run folder>
 adr_check.ts stop         rounds <kind> <issue> <spec folder>
 ```
 
-Run from the project root (the workflow's cwd). stories, ask and decide read settings from `codeworks.toml` at the
-checkout's HEAD, through `readPlannerSettings`; the others read none. Each `adr` call gets
+Run from the project root (the workflow's cwd). stories, ask, decide and report read settings from `codeworks.toml`
+at the checkout's HEAD, through `readPlannerSettings`; the others read none. Each `adr` call gets
 `ADR_DEADLINE_MS = 1_500_000`, under the steps' 1800 s timeout, so the script reports a slow `adr` before the
 engine kills the step; the folders are checked at the same time. Every line of every subcommand goes to stderr,
 printed by one function, `adrStop` (`planner/plugin/lib/adr-check.ts`, R8), from the stop table below; the stdout of
@@ -61,7 +61,10 @@ again, and report, finding them changed, runs that round. Exit 0.
 
 ### stories
 
-The checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
+First writes `<run>/adr-inputs.json` (`SourceHashes` of core's `roundInputPaths`: every file the round checks, the
+tasks sources, `tasks.md`, the rulings file, `codeworks.toml` and every file in each folder `[shared] adr_folders`
+lists that resolves), whatever follows: it is the round's first step after `tasks.md` is written, so the hashes are
+of the files every later step of the round reads. Then the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
 R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
 (extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
 rescope's sub-issues are its existing stories, which its new `tasks.md` may drop or reorder; reconciling them is
@@ -69,9 +72,7 @@ landing a rescope's (#178, planner ADR-0010 d5). On a stop writes the stop recor
 
 ### ask
 
-First writes `<run>/adr-inputs.json` (`SourceHashes` of core's `roundInputPaths`: every file the round checks, the
-tasks sources, `tasks.md`, the rulings file, `codeworks.toml` and every file in each folder `[shared] adr_folders`
-lists that resolves), whatever follows. A stop record already written this round (by stories): prints `{"judge": false, "decide": false, "asked": ""}` and
+A stop record already written this round (by stories): prints `{"judge": false, "decide": false, "asked": ""}` and
 reads nothing more. Otherwise reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
 asked record with no paths and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}`
 without reading the paths (decide then passes). Otherwise: a touches step that did not answer is
@@ -114,7 +115,7 @@ The round's last step (R6). First, before anything it shows: hashes again every 
 (the folders `[shared] adr_folders` lists as it now stands) and of `tasksSourcePaths`. When the first set differs from `<run>/adr-inputs.json`, or the second from
 `<run>/tasks-sources.json` (`tasks.md` written from older sources), or `adr-inputs.json` is missing or does not
 read, it deletes the stop record, prints `{"again": true}`, exit 0, writing no stop, and the loop runs a new round
-at once: a file changed after the round read it, on a resume that re-ran only a failed step, by a model step writing
+at once: a file changed after stories hashed it, on a resume that re-ran only a failed step (stories itself included), by a model step writing
 what it must not, or by hand, so that round's stop is out of date and its pass is no pass. Only with every file
 unchanged does it go on. Stop record with `shown: false`: prints its lines to stderr, rewrites it with
 `shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the resume after
@@ -161,8 +162,8 @@ full.
 | `guard-rulings` | ask, decide | COULD_NOT_RUN | `adr-rulings.json` | entry `<folder> <id> <path>` was not written by the check | remove the entry; only a resume with `adr_ruling` adds one |
 | `guard-paths` | decide | COULD_NOT_RUN | `touches.json` or `tasks.md` | changed after ask: added `<p>`, removed `<p>` | resume to run the check again |
 | `guard-asked` | decide | COULD_NOT_RUN | `adr-asked.json` | changed after ask | resume to run the check again |
-| `settings` | stories, ask, decide | COULD_NOT_RUN | `codeworks.toml` | the `SettingsError` message | fix `codeworks.toml` at HEAD, then resume |
-| `git` | stories, ask, decide | COULD_NOT_RUN | `git` | the `GitFailed` message | run from a git checkout of the repo, then resume |
+| `settings` | stories, ask, decide, report | COULD_NOT_RUN | `codeworks.toml` | the `SettingsError` message | fix `codeworks.toml` at HEAD, then resume |
+| `git` | stories, ask, decide, report | COULD_NOT_RUN | `git` | the `GitFailed` message | run from a git checkout of the repo, then resume |
 
 ## `workflow.yml` (version 1.7.0)
 
