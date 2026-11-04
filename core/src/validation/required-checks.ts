@@ -37,16 +37,14 @@ type RequiredCheck = z.infer<typeof RequiredCheck>;
 const RequiredStatusChecks = z.object({ required_status_checks: z.array(RequiredCheck) });
 
 // A check run's `app` and a status's `creator` are null once that App or account is gone.
-const CheckRun = z.object({
+export const CheckRun = z.object({
   id: z.int(),
   name: z.string(),
   status: z.string(),
   conclusion: z.string().nullable(),
   app: z.object({ id: z.int(), slug: z.string() }).nullable(),
 });
-type CheckRun = z.infer<typeof CheckRun>;
-
-const CheckRuns = z.object({ total_count: z.int().min(0), check_runs: z.array(CheckRun) });
+export type CheckRun = z.infer<typeof CheckRun>;
 
 const SUCCESS = "success";
 
@@ -114,13 +112,26 @@ function checkReading(check: RequiredCheck, runs: readonly CheckRun[], newestSta
   return { name: check.context, ...deciding };
 }
 
-function repositoryPath({ owner, name }: Repository): string {
+/** The check run the orchestrator's App writes for `module` at a head (orchestrator ADR-0008 d3). */
+export function moduleCheckName(module: string): string {
+  return `${module}-review`;
+}
+
+export function repositoryPath({ owner, name }: Repository): string {
   return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
-async function checkRuns(reader: GitHubClient, at: string, head: string, name: string): Promise<CheckRun[]> {
+/** The latest check runs named `name` at `head`, each read as `run`. */
+export async function checkRuns<Run extends z.ZodType<CheckRun>>(
+  reader: GitHubClient,
+  at: string,
+  head: string,
+  name: string,
+  run: Run,
+): Promise<z.output<Run>[]> {
   const path = `${at}/commits/${head}/check-runs?check_name=${encodeURIComponent(name)}&filter=latest&per_page=${PER_PAGE}`;
-  const answer = answerOf(CheckRuns, await reader.rest("GET", path), `the check runs ${name} at ${head}`);
+  const runs = z.object({ total_count: z.int().min(0), check_runs: z.array(run) });
+  const answer = answerOf(runs, await reader.rest("GET", path), `the check runs ${name} at ${head}`);
   // The client's restPages reads lists, and check runs come wrapped. One name at one head, latest only, is a run
   // per check suite, well inside a page; past one, a part read as the whole could pass a head a run failed.
   if (answer.check_runs.length < answer.total_count) {
@@ -141,22 +152,27 @@ async function newestStatuses(reader: GitHubClient, at: string, head: string): P
   return newest;
 }
 
+/** The newest of `runs` by `appLogin`'s App; a run by another App, or by one that is gone, is left out. */
+export function newestRunBy<Run extends CheckRun>(runs: readonly Run[], appLogin: string): Run | undefined {
+  return runs
+    .filter((run) => run.app !== null && appRestLogin(run.app.slug) === appLogin)
+    .toSorted((a, b) => b.id - a.id)
+    .at(0);
+}
+
 /**
  * The attestation (orchestrator ADR-0004): the newest `internal-review` check run at `head` by `appLogin`'s App
  * concluded success. A run by any other App counts for nothing (d3), and GitHub's no-answer throws, never false.
  */
 export async function internalReviewAt(reader: GitHubClient, repo: string, head: string, appLogin: string): Promise<boolean> {
   assertHead(head);
-  const newest = (await checkRuns(reader, repositoryPath(ownerAndName(repo)), head, INTERNAL_REVIEW))
-    .filter((run) => run.app !== null && appRestLogin(run.app.slug) === appLogin)
-    .toSorted((a, b) => b.id - a.id)
-    .at(0);
+  const newest = newestRunBy(await checkRuns(reader, repositoryPath(ownerAndName(repo)), head, INTERNAL_REVIEW, CheckRun), appLogin);
   return newest?.status === COMPLETED && newest.conclusion === SUCCESS;
 }
 
 /** The required-checks reader: no `trigger`, never SILENT; the orchestrator times a missing or pending check. */
 export function requiredChecks(_shared: Shared, reader: GitHubClient, validators: LoadedModules): RequiredChecks {
-  const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map((name) => `${name}-review`)]);
+  const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map(moduleCheckName)]);
 
   async function readChecks(repo: string, pr: number, head: string): Promise<PullRequestReading | CouldNotRun> {
     const where = ownerAndName(repo);
@@ -172,7 +188,7 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
 
     const names = [...new Set(required.map((check) => check.context))];
     const [runs, newest] = await Promise.all([
-      Promise.all(names.map((name) => checkRuns(reader, at, head, name))),
+      Promise.all(names.map((name) => checkRuns(reader, at, head, name, CheckRun))),
       newestStatuses(reader, at, head),
     ]);
     const allRuns = runs.flat();
