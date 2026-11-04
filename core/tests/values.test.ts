@@ -6,6 +6,7 @@ import {fileURLToPath, pathToFileURL} from "node:url";
 import * as z from "zod";
 import {
   CheckOutcome,
+  ClaimVerdict,
   CoreSource,
   FindingRuling,
   FindingSource,
@@ -17,6 +18,7 @@ import {
   RoundResult,
   RoundStage,
   RoundVerdict,
+  ShimRuling,
   Taken,
 } from "../src/values.ts";
 import {moduleFiles, stringLiterals} from "./source-scan.ts";
@@ -33,7 +35,7 @@ const sets: {name: string; set: ValueSet; values: string[]}[] = [
     set: RoundVerdict,
     values: ["PATCH", "CLASS_FIX", "REDESIGN", "RESCOPE", "CONVERGED_PUSHBACK", "ESCALATE"],
   },
-  {name: "finding ruling", set: FindingRuling, values: ["FIX", "PUSH_BACK", "DEFER"]},
+  {name: "finding ruling", set: FindingRuling, values: ["FIX", "PUSH_BACK", "DEFER", "ESCALATE"]},
   {
     name: "root cause",
     set: RootCause,
@@ -49,6 +51,8 @@ const sets: {name: string; set: ValueSet; values: string[]}[] = [
   {name: "round stage", set: RoundStage, values: ["INTERNAL", "AUDIT", "GITHUB"]},
   {name: "lane", set: Lane, values: ["Backlog", "Ready", "In progress", "In review", "Blocked", "Done"]},
   {name: "taken", set: Taken, values: ["claim", "resume"]},
+  {name: "claim verdict", set: ClaimVerdict, values: ["CORRECT", "WRONG", "UNSURE"]},
+  {name: "shim ruling", set: ShimRuling, values: ["SHARES", "NOT_SHARED", "DEFERRED"]},
 ];
 
 for (const {name, set, values} of sets) {

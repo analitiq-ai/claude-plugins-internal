@@ -32,6 +32,13 @@ for (const { file, text } of generatedFiles) {
   });
 }
 
+test("the schema files are spec facts, the snapshot, a finding and a ledger event", () => {
+  assert.deepEqual(
+    schemaFiles.map(({ file }) => file),
+    ["spec-facts.schema.json", "snapshot.schema.json", "finding.schema.json", "ledger-event.schema.json"],
+  );
+});
+
 test("the generated files include premise.json", () => {
   assert.deepEqual(
     generatedFiles.map(({ file }) => file),
