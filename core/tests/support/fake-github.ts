@@ -21,6 +21,11 @@ export type GraphQLRoute = {
   answer: FakeAnswer;
 };
 
+export type PathRoute = {
+  when: (path: string) => boolean;
+  answer: FakeAnswer;
+};
+
 export type FakeRoutes = {
   /**
    * Keyed `"<METHOD> <path>"`, the path exactly as the caller passes it, query string included. A PATCH or DELETE
@@ -29,6 +34,8 @@ export type FakeRoutes = {
   rest?: Record<string, FakeAnswer>;
   /** Keyed by path; the answer is the whole list, every page read. */
   restPages?: Record<string, FakeAnswer>;
+  /** For a path no `restPages` key names, the first route whose `when` holds answers; the answer is the whole list. */
+  restPagesMatching?: PathRoute[];
   /** The first route whose `when` holds answers; the answer is `data`. */
   graphql?: GraphQLRoute[];
   /** The first route whose `when` holds answers; the answer is the whole node list, every page read. */
@@ -87,7 +94,10 @@ export function fakeGitHub(routes: FakeRoutes): FakeGitHub {
     },
     async restPages(path) {
       const call: FakeCall = { kind: "restPages", path };
-      return list(byKey(routes.restPages, path, call), call);
+      if (routes.restPages !== undefined && Object.hasOwn(routes.restPages, path)) return list(byKey(routes.restPages, path, call), call);
+      calls.push(call);
+      const route = routes.restPagesMatching?.find((candidate) => candidate.when(path));
+      return list(answer(call, route !== undefined, route?.answer), call);
     },
     async graphql(query, vars) {
       return byQuery(routes.graphql, query, vars, { kind: "graphql", query, vars });

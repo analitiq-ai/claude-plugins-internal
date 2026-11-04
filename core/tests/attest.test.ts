@@ -22,7 +22,7 @@ function sha(n: number): string {
 }
 
 function round(fields: Partial<Round> = {}): Round {
-  return { stage: "INTERNAL", n: 1, head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), ...fields };
+  return { stage: "INTERNAL", n: 1, run: "run-1", head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), ...fields };
 }
 
 function releasedHold(fields: Partial<Hold> = {}): Hold {
@@ -40,7 +40,7 @@ function releasedHold(fields: Partial<Hold> = {}): Hold {
 }
 
 function snapshot(rounds: Round[], holds: Hold[] = []): Snapshot {
-  return { v: 1, rounds, holds, pushbacks: [], rulings: [] };
+  return { v: 1, rounds, holds, pushbacks: [], rulings: [], gates: null };
 }
 
 function reading(state: Snapshot | null, causes: StateCause[] = []) {
@@ -410,6 +410,14 @@ describe("attests, in a scratch repository", () => {
     );
     assert.equal(answer.attested, false);
     assert.match(answer.reason ?? "", /escalation-212/);
+  });
+
+  it("does not attest a tampered story, naming the invalid commit and the files it left", async () => {
+    const tampered: StateCause = { cause: "tampered", commit: sha(99), remaining: ["issues/212/round.run-2.json"] };
+    const answer = await attests(repo, reading(snapshot([cleanAtA()]), [tampered]), commits.b, "main", SPEC);
+    assert.equal(answer.attested, false);
+    assert.match(answer.reason ?? "", new RegExp(`tampered ${sha(99)}`));
+    assert.match(answer.reason ?? "", /issues\/212\/round\.run-2\.json/);
   });
 
   it("does not attest with no state", async () => {

@@ -1,0 +1,257 @@
+{
+  "commits": [
+    {
+      "date": "2026-10-28T09:05:00Z",
+      "files": {
+        "round.run-11.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000001\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": \"AT_CAUSE\",\n    \"run\": \"run-11\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": \"PATCH\"\n  },\n  \"v\": 1\n}\n",
+        "ruling.INTERNAL-1.041ca3516f506b0b0323357b721c9b271f3f853ab28eaa5b79707d253314a480.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"thread:PRRT_1\",\n    \"latest_trusted_comment_id\": \"PRRC_1\",\n    \"reply\": \"Fixed at the cause.\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    },\n    \"ruling\": \"FIX\"\n  },\n  \"v\": 1\n}\n",
+        "ruling.INTERNAL-1.e24c3bb40f00dbb409814efefcc5f679e4664a48a4da76243dd4aebfd2696687.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"thread:PRRT_2\",\n    \"latest_trusted_comment_id\": \"PRRC_2\",\n    \"reply\": \"Not real.\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    },\n    \"ruling\": \"PUSH_BACK\"\n  },\n  \"v\": 1\n}\n",
+        "pushback.INTERNAL-1.e24c3bb40f00dbb409814efefcc5f679e4664a48a4da76243dd4aebfd2696687.json": "{\n  \"kind\": \"pushback\",\n  \"pushback\": {\n    \"key\": \"thread:PRRT_2\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    }\n  },\n  \"v\": 1\n}\n",
+        "hold.pushback-212.20261028T090500Z.json": "{\n  \"hold\": {\n    \"id\": \"pushback-212\",\n    \"kind\": \"pushback\",\n    \"question\": null,\n    \"since\": \"2026-10-28T09:05:00Z\",\n    \"spec_pr\": null\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:20:00Z",
+      "files": {
+        "ruling-commit.INTERNAL-1.041ca3516f506b0b0323357b721c9b271f3f853ab28eaa5b79707d253314a480.0000000000000000000000000000000000000007.json": "{\n  \"commit\": \"0000000000000000000000000000000000000007\",\n  \"key\": \"thread:PRRT_1\",\n  \"kind\": \"ruling-commit\",\n  \"round\": {\n    \"n\": 1,\n    \"stage\": \"INTERNAL\"\n  },\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:25:00Z",
+      "files": {
+        "release.pushback-212.20261028T090500Z.json": "{\n  \"kind\": \"release\",\n  \"release\": {\n    \"id\": \"pushback-212\",\n    \"released\": \"2026-10-28T09:25:00Z\",\n    \"released_by\": {\n      \"comment\": 201,\n      \"reset\": false\n    },\n    \"since\": \"2026-10-28T09:05:00Z\"\n  },\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:30:00Z",
+      "files": {
+        "round.run-12.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:30:00Z\",\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-12\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:40:00Z",
+      "files": {
+        "round.run-13.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:40:00Z\",\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": null,\n    \"run\": \"run-13\",\n    \"stage\": \"AUDIT\",\n    \"verdict\": \"ESCALATE\"\n  },\n  \"v\": 1\n}\n",
+        "ruling.AUDIT-1.93478a24d3cc071cac034120d5d9ef35c9bc24050b6f63181047d330baf61214.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"check:lint\",\n    \"latest_trusted_comment_id\": null,\n    \"reply\": null,\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"AUDIT\"\n    },\n    \"ruling\": \"ESCALATE\"\n  },\n  \"v\": 1\n}\n",
+        "hold.escalation-212.20261028T094000Z.json": "{\n  \"hold\": {\n    \"id\": \"escalation-212\",\n    \"kind\": \"escalation\",\n    \"question\": \"Which reading of FR-3 holds?\",\n    \"since\": \"2026-10-28T09:40:00Z\",\n    \"spec_pr\": null\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:50:00Z",
+      "files": {
+        "hold.rescope-212.20261028T095000Z.json": "{\n  \"hold\": {\n    \"id\": \"rescope-212\",\n    \"kind\": \"rescope\",\n    \"question\": null,\n    \"since\": \"2026-10-28T09:50:00Z\",\n    \"spec_pr\": 301\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T10:10:00Z",
+      "files": {
+        "gates.run-14.json": "{\n  \"gates\": {\n    \"anchor\": \"0000000000000000000000000000000000000002\",\n    \"branch\": \"212-us1-login\",\n    \"bugs\": [\n      {\n        \"absorbed\": [],\n        \"deep\": null,\n        \"id\": \"B3\",\n        \"members\": [\n          {\n            \"at\": \"2026-10-28T10:10:00Z\",\n            \"tree\": \"0000000000000000000000000000000000000003\"\n          }\n        ],\n        \"ranges\": [\n          {\n            \"file\": \"src/parse.ts\",\n            \"old_count\": 2,\n            \"old_start\": 4\n          }\n        ],\n        \"rulings\": [\n          {\n            \"issue\": 77,\n            \"ruling\": \"DEFERRED\",\n            \"site\": \"s1\"\n          }\n        ]\n      }\n    ],\n    \"lineages\": [\n      {\n        \"chain\": [\n          {\n            \"at\": \"2026-10-28T10:10:00Z\",\n            \"claim\": \"c1\",\n            \"line\": 4,\n            \"ref\": \"run-14\",\n            \"ruling\": \"WRONG\",\n            \"words\": \"refuses a null header\"\n          }\n        ],\n        \"file\": \"src/parse.ts\",\n        \"id\": \"L7\",\n        \"places\": [\n          {\n            \"claim\": \"c1\",\n            \"end\": 168,\n            \"start\": 120\n          }\n        ]\n      }\n    ]\n  },\n  \"kind\": \"gates\",\n  \"ref\": \"run-14\",\n  \"v\": 1\n}\n",
+        "hold.claim-L7.20261028T101000Z.json": "{\n  \"hold\": {\n    \"id\": \"claim-L7\",\n    \"kind\": \"claim\",\n    \"question\": \"Line 4 says parse refuses null; it does not.\",\n    \"since\": \"2026-10-28T10:10:00Z\",\n    \"spec_pr\": null\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n",
+        "hold.shim-B3.20261028T101000Z.json": "{\n  \"hold\": {\n    \"id\": \"shim-B3\",\n    \"kind\": \"shim\",\n    \"question\": null,\n    \"since\": \"2026-10-28T10:10:00Z\",\n    \"spec_pr\": null\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T10:40:00Z",
+      "files": {
+        "release.escalation-212.20261028T094000Z.json": "{\n  \"kind\": \"release\",\n  \"release\": {\n    \"id\": \"escalation-212\",\n    \"released\": \"2026-10-28T10:40:00Z\",\n    \"released_by\": {\n      \"comment\": 300,\n      \"reset\": true\n    },\n    \"since\": \"2026-10-28T09:40:00Z\"\n  },\n  \"v\": 1\n}\n",
+        "release.rescope-212.20261028T095000Z.json": "{\n  \"kind\": \"release\",\n  \"release\": {\n    \"id\": \"rescope-212\",\n    \"released\": \"2026-10-28T10:40:00Z\",\n    \"released_by\": {\n      \"comment\": 300,\n      \"reset\": true\n    },\n    \"since\": \"2026-10-28T09:50:00Z\"\n  },\n  \"v\": 1\n}\n"
+      }
+    }
+  ],
+  "snapshot": {
+    "v": 1,
+    "rounds": [
+      {
+        "stage": "INTERNAL",
+        "n": 1,
+        "run": "run-11",
+        "head": "0000000000000000000000000000000000000001",
+        "result": "DIRTY",
+        "verdict": "PATCH",
+        "root_cause": "AT_CAUSE",
+        "at": "2026-10-28T09:00:00Z"
+      },
+      {
+        "stage": "INTERNAL",
+        "n": 2,
+        "run": "run-12",
+        "head": "0000000000000000000000000000000000000002",
+        "result": "CLEAN",
+        "verdict": null,
+        "root_cause": null,
+        "at": "2026-10-28T09:30:00Z"
+      },
+      {
+        "stage": "AUDIT",
+        "n": 1,
+        "run": "run-13",
+        "head": "0000000000000000000000000000000000000002",
+        "result": "DIRTY",
+        "verdict": "ESCALATE",
+        "root_cause": null,
+        "at": "2026-10-28T09:40:00Z"
+      }
+    ],
+    "holds": [
+      {
+        "id": "pushback-212",
+        "kind": "pushback",
+        "since": "2026-10-28T09:05:00Z",
+        "question": null,
+        "spec_pr": null,
+        "state": "RELEASED",
+        "released": "2026-10-28T09:25:00Z",
+        "released_by": {
+          "comment": 201,
+          "reset": false
+        }
+      },
+      {
+        "id": "escalation-212",
+        "kind": "escalation",
+        "since": "2026-10-28T09:40:00Z",
+        "question": "Which reading of FR-3 holds?",
+        "spec_pr": null,
+        "state": "RELEASED",
+        "released": "2026-10-28T10:40:00Z",
+        "released_by": {
+          "comment": 300,
+          "reset": true
+        }
+      },
+      {
+        "id": "rescope-212",
+        "kind": "rescope",
+        "since": "2026-10-28T09:50:00Z",
+        "question": null,
+        "spec_pr": 301,
+        "state": "RELEASED",
+        "released": "2026-10-28T10:40:00Z",
+        "released_by": {
+          "comment": 300,
+          "reset": true
+        }
+      },
+      {
+        "id": "claim-L7",
+        "kind": "claim",
+        "since": "2026-10-28T10:10:00Z",
+        "question": "Line 4 says parse refuses null; it does not.",
+        "spec_pr": null,
+        "state": "OPEN",
+        "released": null,
+        "released_by": null
+      },
+      {
+        "id": "shim-B3",
+        "kind": "shim",
+        "since": "2026-10-28T10:10:00Z",
+        "question": null,
+        "spec_pr": null,
+        "state": "OPEN",
+        "released": null,
+        "released_by": null
+      }
+    ],
+    "pushbacks": [
+      {
+        "key": "thread:PRRT_2",
+        "round": {
+          "stage": "INTERNAL",
+          "n": 1
+        }
+      }
+    ],
+    "rulings": [
+      {
+        "key": "thread:PRRT_1",
+        "round": {
+          "stage": "INTERNAL",
+          "n": 1
+        },
+        "ruling": "FIX",
+        "latest_trusted_comment_id": "PRRC_1",
+        "reply": "Fixed at the cause.",
+        "commits": [
+          "0000000000000000000000000000000000000007"
+        ]
+      },
+      {
+        "key": "thread:PRRT_2",
+        "round": {
+          "stage": "INTERNAL",
+          "n": 1
+        },
+        "ruling": "PUSH_BACK",
+        "latest_trusted_comment_id": "PRRC_2",
+        "reply": "Not real.",
+        "commits": []
+      },
+      {
+        "key": "check:lint",
+        "round": {
+          "stage": "AUDIT",
+          "n": 1
+        },
+        "ruling": "ESCALATE",
+        "latest_trusted_comment_id": null,
+        "reply": null,
+        "commits": []
+      }
+    ],
+    "gates": {
+      "branch": "212-us1-login",
+      "anchor": "0000000000000000000000000000000000000002",
+      "lineages": [
+        {
+          "id": "L7",
+          "file": "src/parse.ts",
+          "places": [
+            {
+              "start": 120,
+              "end": 168,
+              "claim": "c1"
+            }
+          ],
+          "chain": [
+            {
+              "ref": "run-14",
+              "claim": "c1",
+              "line": 4,
+              "words": "refuses a null header",
+              "ruling": "WRONG",
+              "at": "2026-10-28T10:10:00Z"
+            }
+          ]
+        }
+      ],
+      "bugs": [
+        {
+          "id": "B3",
+          "members": [
+            {
+              "tree": "0000000000000000000000000000000000000003",
+              "at": "2026-10-28T10:10:00Z"
+            }
+          ],
+          "absorbed": [],
+          "ranges": [
+            {
+              "file": "src/parse.ts",
+              "old_start": 4,
+              "old_count": 2
+            }
+          ],
+          "deep": null,
+          "rulings": [
+            {
+              "site": "s1",
+              "ruling": "DEFERRED",
+              "issue": 77
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
