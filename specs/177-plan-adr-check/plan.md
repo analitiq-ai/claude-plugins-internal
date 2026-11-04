@@ -8,10 +8,13 @@
 
 `[shared] adr_folders` lists the ADR folders a repo's work is checked against. Core resolves them (`adrFolders`:
 outside-repo entries from the main checkout, in-repo ones in the calling checkout) and runs `adr` at one pinned
-version (`checkAdrFolder`). Planner's workflow gains two checks, after plan and after tasks, each a script that
-asks `adr check` per folder, a headless judge that writes a verdict as data, a script that decides each
-folder's outcome, and a last step that stops the run on a departure or a check that could not run; every stop is
-reported by one function. Each check is a loop, so every resume after a stop runs the whole check again. The user can overrule a named departure on resume; the decide step, its only writer, records the ruling
+version (`checkAdrFolder`). Planner's workflow gains one check loop after the critique gate, in place of the tasks
+step. Each round, one per resume after a stop, works everything out again: settled-design, the plan's paths,
+`tasks.md` written again when a file the tasks command reads changed, landing's checks of `tasks.md`, then a script
+that asks `adr check` per folder over the plan's and the tasks' paths, a headless judge that writes a verdict as
+data, a script that decides each folder's outcome, and a last step that stops the run on a departure or a check
+that could not run; every stop is reported by one function. `tasks.md` is derived, never edited by hand. The user
+can overrule a departure the round found on resume; the decide step, its only writer, records the ruling
 in the spec folder's `adr-rulings.json`, honoured by later checks and, after #235, by reviewer, whose decision check
 moves onto the same list. Core's `protectedPaths` names a root spec folder a story PR changes beyond its own ticks,
 so orchestrator never attests it (orchestrator ADR-0004 d4).
@@ -40,7 +43,8 @@ step's `touches.json` and a rescope's `review-questions.json` among them; the ru
 
 **Performance Goals**: none; planner waits for `adr` (shell step timeout 1800 s).
 
-**Constraints**: no network call, no GitHub credential in the check (FR-010); no env var for a setting.
+**Constraints**: no network call, no GitHub credential in the ADR check steps (FR-010); landing's story checks read
+the sub-issues as the planner App (FR-025); no env var for a setting.
 
 **Scale/Scope**: ~7 ADR folders, tens of paths per artifact.
 
@@ -56,15 +60,15 @@ step's `touches.json` and a rescope's `review-questions.json` among them; the ru
 | IV Test-first | Each story starts from red tests (quickstart). Pass. |
 | V Smallest change | One required deadline in `checkAdrFolder`, each caller its own, so a slow `adr` is reported, not killed; no judge for a folder nothing governs; reviewer's Python ported once into core, proved by its own tests; no hold of reviewer's own, core's existing `protectedPaths` extended instead. Pass. |
 | VI Rule apart | Planner ADR-0009 and orchestrator ADR-0004 d4 are amended, and reviewer ADR-0022 and root ADR-0011 "planner alone writes specs and ADRs" added (accepted), and reviewer ADR-0002 d4 and ADR-0017 d2 amended, in the planning PRs before any code (R11). The `Shared` schema and `codeworks.toml` move together: config, not governed code. Pass. |
-| P1 Code decides | Both checks are workflow steps running scripts; the model judges, a script decides; every stop of ask, judge and decide names the next step through one function, `adrStop` (R8). Pass. |
+| P1 Code decides | The check is workflow steps running scripts; the model judges, a script decides; every stop of stories, ask, judge and decide names the next step through one function, `adrStop` (R8); `land.ts` and the round share one set of story checks (R15). Pass. |
 | P2 Hold release | The stop is released only by a resume whose ruling the user gave (`ADR_RULING`, that resume only), or a changed artifact; both named by amended ADR-0009. Pass. |
 | P3 Pure rules | `decideFolder`/`decideCheck`, `adrStop`, `changedSince` and the grammars are pure; `adr_check.ts` only does I/O. Pass. |
 | P4 Could not run | Its own outcome, exit 2, never a pass, a judge that did not answer included (R8). Pass. |
 | P5 Settled design | Every mechanism below cites a research decision with Existing tools. Pass. |
-| P6 One writer | `codeworks.toml`: admin. `touches.json`: touches step. `review-questions.json`: `drive_workflow.py rescope`, from the open escalation and verdict rescope holds' questions. A departure line: core's `renderAdrDeparture`, called by reviewer's round record. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
+| P6 One writer | `codeworks.toml`: admin. `touches.json`: touches step. `touches-from.json`: clear. `tasks.md`: the tasks command, in a round that is due; never by hand. `tasks-sources*.json`: tasks-due and tasks-written. `review-questions.json`: `drive_workflow.py rescope`, from the open escalation and verdict rescope holds' questions. A departure line: core's `renderAdrDeparture`, called by reviewer's round record. Asked record: ask step. Verdict: judge. Rulings file: decide step, from the user's `ADR_RULING` only; an entry neither at `HEAD` nor in decide's run record, or an asked record or paths changed after ask, is could not run (R9). Pass. |
 | P7 Data | Paths (one grammar), verdict, rulings file each have a grammar (contracts/artifact-grammar.md). Pass. |
 | P8 Generic | Folders come only from `codeworks.toml`; nothing names this repo. Pass. |
-| P9 Identities | No actor trusted; no GitHub call. Pass. |
+| P9 Identities | No actor trusted; the one GitHub read, the spec issue's sub-issues, is the planner App's, as in `land.ts`. Pass. |
 
 ## Spec amendments
 
@@ -89,9 +93,16 @@ ESCALATE, one line of the hold's question, which planner's rescope reads with ev
 ruling lapses every story's round under the spec (US6, R13); root ADR-0011 and
 reviewer ADR-0022 accepted.
 
-2026-11-04, Spec Kit 1.1.x resumes from the halted step, not the whole top-level block: each check is a `do-while`
-loop whose iteration is one whole check, ask and decide record a stop for `adr-<a>-report` to print, and each
-resume after a stop runs a new iteration (R6, R14).
+2026-11-04, Spec Kit 1.1.x resumes from the halted step, not the whole top-level block: the check is a `do-while`
+loop whose round is one whole check, stories, ask and decide record a stop for `adr-report` to print, and each
+resume after a stop runs a new round (R6, R14).
+
+2026-11-04, user decision after adversarial passes and stand-in runs on 1.1.3: one check after critique over the
+plan's and the tasks' paths replaces the check before critique and the one after tasks (Option K); each round
+redoes settled-design, the plan's paths (stamped with the `plan.md` and `spec.md` they came from), `tasks.md` when
+its sources changed, landing's story checks and the ADR check; `tasks.md` is never hand-edited; a ruling must
+match a departure its round found; US4 merged into US3; folds in #303 (FR-006, FR-012, FR-015–FR-019, FR-025; R4,
+R6, R9, R15).
 
 ## Project Structure
 
@@ -111,12 +122,13 @@ specs/177-plan-adr-check/
 core/src/            settings.ts  adr-folders.ts (new)  adr.ts (new)  values.ts  protected-paths.ts (US5)  attest.ts (US6)
 core/src/contracts/  decision-check.ts (new)  tasks.ts
 core/tests/          adr-folders.test.ts  adr.test.ts  decision-check.test.ts  tasks.test.ts  protected-paths.test.ts  attest.test.ts  settings.test.ts (+ fixtures, typed Shared literals)
-planner/plugin/      scripts/adr_check.ts (new)  scripts/rescope_questions.ts (new, US6)  lib/adr-check.ts (new)
+planner/plugin/      scripts/adr_check.ts (new)  scripts/land.ts  scripts/rescope_questions.ts (new, US6)
+                     lib/adr-check.ts (new)  lib/story-plan.ts (new, from land.ts)
                      speckit/workflows/issue-spec/{workflow.yml, adr-touches.md (new), adr-judge.md (new)}
                      speckit/presets/settled-design/{preset.yml, commands/speckit.tasks.md (new)}
                      skills/issue-spec/{SKILL.md, scripts/drive_workflow.py}
 .github/workflows/   tests.yml   (specify-cli 1.1.3)
-planner/tests/       adr-check.test.ts (new)  test_drive_workflow.py  test_plan_template.py  token.test.ts
+planner/tests/       adr-check.test.ts (new)  land.test.ts  test_drive_workflow.py  test_plan_template.py  token.test.ts
                      support/checkout.ts
 reviewer/plugin/     lib/round/decisions.ts  README.md        (US5)
                      lib/round/{assess,record}.ts  lib/rules/rounds.ts  (US6)
@@ -139,7 +151,9 @@ planner owns the check steps and their pure rules; reviewer only changes its own
 - `checkAdrFolder` / `readAdrAnswer` and `ADR_VERSION` in core: R3
 - the touches step's `<run folder>/touches.json` and its grammar: R4
 - `tasks.md` task-line paths and story: R5
-- the check loop (clear → touches → ask → judge → decide → report) after plan and after tasks: R6
+- the check loop after critique (settled-design → clear → touches → tasks when due → stories → ask → judge →
+  decide → report): R6
+- `tasks.md` written only when its sources changed, and landing's story checks in every round: R15
 - the Spec Kit floor and how a resume continues a run: R14
 - judge verdict file and `AdrJudgment` set: R7
 - per-folder outcome, exit status and the one stop reporter `adrStop`: R8
