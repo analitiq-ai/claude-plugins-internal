@@ -85,8 +85,9 @@ def review_range(decision: policy.Decision, base: str) -> str:
 def _scope(where: worktree.Worktree, decision: policy.Decision, base: str) -> str:
     run = f"Review branch {where.branch} of {where.slug}.\nIn {where.root}, run: git diff {review_range(decision, base)}\n"
     if decision.scope == "delta":
-        return (run + "That is what changed since the previous review round. The rest of the branch was reviewed then: "
-                "read it for context, report on the delta.")
+        return (run + "That is what the branch changed since the previous review round, less what it merged from the "
+                "branch it merges into. The rest was reviewed then, or merged in: read it for context, report on the "
+                "delta.")
     return run + "That is the whole change under review."
 
 

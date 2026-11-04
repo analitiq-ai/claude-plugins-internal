@@ -120,12 +120,13 @@ that is under review.
    A commit whose code is all in test files skips this check (`specs/012-tests-only-tree/`).
 8. **An internal round is checked against the decisions that govern its change.** At launch, the gate asks adrkit's
    `adr check` which accepted decision records (ADRs) govern the files of the round's own diff range: the whole
-   change for a full round, what changed since the last round for a delta. It asks once per corpus, all at once:
-   every tracked `docs/adr` folder of the repo, and the org's at `REVIEWER_ORG_ADR_DIR` when it is set; a folder reached
-   both ways is checked once, as the org's. When a record governs the change, `reviewer:decision-reviewer` joins
-   the round, briefed with each record by its corpus and id, and the round waits for it like any reviewer; its
-   findings are assessed with the others, and the rulings on them are written to `gate.log` as a `decision-review`
-   line. A matcher adrkit cannot evaluate in one repo (a `package` or `entity` matcher, or one qualified with a repo)
+   change for a full round, what the branch changed since the last round for a delta, less what it merged from
+   the branch it merges into. It asks once per corpus, all at once: every tracked `docs/adr` folder of the repo, and
+   the org's at `REVIEWER_ORG_ADR_DIR` when it is set; a folder reached both ways is checked once, as the org's.
+   When a record governs the change, `reviewer:decision-reviewer` joins the round, briefed with each record by its
+   corpus and id, and the round waits for it like any reviewer; its findings are assessed with the others, and the
+   rulings on them are written to `gate.log` as a `decision-review` line. A matcher adrkit cannot evaluate in one
+   repo (a `package` or `entity` matcher, or one qualified with a repo)
    is a notice, and the round runs; every other adrkit finding is ignored. The launch is refused when a round reviews
    more than `max_review_files` files, when a corpus cannot be checked (`adr` missing or not the version below, its
    answer unreadable, a call past the hook's deadline, a capped marker scan, an `REVIEWER_ORG_ADR_DIR` that is no

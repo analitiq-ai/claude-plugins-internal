@@ -297,6 +297,63 @@ class ReviewBase(Repo):
             worktree.review_base(str(self.root), "no-such-branch")
 
 
+class Merged(Repo):
+    """The last reviewed head as it would be once it carried the base. A delta round diffs from it, so what the
+    base branch brought in since that round is not reviewed as the branch's work."""
+
+    def diverged(self):
+        """The branch reviewed at `head`; main moved on; the branch merged main and committed new work."""
+        head = self.commit("b.py", "x\n", "feat: b")
+        git(self.root, "checkout", "-q", "main")
+        base = self.commit("m.py", "m\n", "merged elsewhere")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+        self.commit("n.py", "n\n", "feat: n")
+        return head, base
+
+    def test_what_the_base_branch_changed_is_in_the_tree_so_only_the_branchs_own_work_is_left(self):
+        head, base = self.diverged()
+        self.assertEqual(sorted(worktree.files_in(str(self.root), f"{head}..HEAD")), ["m.py", "n.py"])
+        tree = worktree.merged(str(self.root), head, base)
+        self.assertEqual(worktree.files_in(str(self.root), f"{tree}..HEAD"), ["n.py"])
+
+    def test_a_base_the_head_already_carries_gives_the_heads_own_tree(self):
+        head = self.commit("b.py", "x\n", "feat: b")
+        base = git(self.root, "rev-parse", "main")
+        self.assertEqual(worktree.merged(str(self.root), head, base), git(self.root, "rev-parse", f"{head}^{{tree}}"))
+
+    def test_a_conflict_is_left_as_git_leaves_it_so_the_diff_from_the_tree_shows_its_resolution(self):
+        head = self.commit("b.py", "feat\n", "feat: b")
+        git(self.root, "checkout", "-q", "main")
+        base = self.commit("b.py", "main\n", "b elsewhere")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        conflicted = subprocess.run(["git", "-C", str(self.root), "merge", "-q", "--no-edit", "main"], capture_output=True)
+        self.assertEqual(conflicted.returncode, 1)
+        self.commit("b.py", "resolved\n", "merge main")
+        tree = worktree.merged(str(self.root), head, base)
+        patch = worktree.diff(str(self.root), f"{tree}..HEAD")
+        for line in ("-<<<<<<<", "-feat", "-=======", "-main", "->>>>>>>", "+resolved"):
+            self.assertIn(line, patch)
+
+    def test_a_repository_with_sha256_objects_gives_its_tree(self):
+        root = Path(self.tmp.name) / "sha256"
+        root.mkdir()
+        git(root, "init", "-q", "-b", "main", "--object-format=sha256")
+        git(root, "config", "user.email", "t@example.com")
+        git(root, "config", "user.name", "t")
+        (root / "a.py").write_text("a\n")
+        git(root, "add", "a.py")
+        git(root, "commit", "-q", "-m", "base")
+        head = git(root, "rev-parse", "HEAD")
+        self.assertEqual(len(head), 64)
+        self.assertEqual(worktree.merged(str(root), head, head), git(root, "rev-parse", "HEAD^{tree}"))
+
+    def test_a_head_git_cannot_merge_is_an_error(self):
+        with self.assertRaises(RuntimeError) as failed:
+            worktree.merged(str(self.root), "0" * 39 + "1", git(self.root, "rev-parse", "main"))
+        self.assertIn("not something we can merge", str(failed.exception))
+
+
 class RoundFacts(Repo):
     def round_with(self, state, findings, head):
         rnd = ledger.open_round(state, "internal", head_sha=head, base_sha=git(self.root, "rev-parse", "main"),

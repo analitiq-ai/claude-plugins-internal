@@ -31,6 +31,7 @@ import ledger
 import policy
 import reshape
 import test_policy
+import worktree
 
 SCRIPTS = PLUGIN / "scripts"
 GATE = SCRIPTS / "gate.py"
@@ -218,9 +219,35 @@ class InternalRound(Gate):
         self.commit("b.py", "fixed\n", "fix: b")
         _, second = self.launch()
         prompt = second["waves"][0][0]["prompt"]
-        self.assertIn(f"git diff {self.head}", prompt)
+        reviewed_tree = git(self.root, "rev-parse", f"{self.head}^{{tree}}")
+        self.assertIn(f"git diff {reviewed_tree}..HEAD", prompt)
         self.assertIn("unchecked None", prompt)
         self.assertTrue(second["round_ref"].endswith("internal-0.2"))
+
+    def test_a_round_after_a_merge_of_the_base_branch_reviews_only_the_branchs_own_work(self):
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "checkout", "-q", "main")
+        self.commit("m.py", "m\n", "merged elsewhere")
+        git(self.root, "push", "-q", "origin", "main")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+        self.commit("n.py", "n\n", "feat: n")
+        _, second = self.launch()
+        reviewed = second["waves"][0][0]["prompt"].split("git diff ")[1].split("\n")[0]
+        self.assertEqual(worktree.files_in(str(self.root), reviewed), ["n.py"])
+
+    def test_a_round_whose_reviewed_head_git_no_longer_has_is_refused_with_why(self):
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "commit", "-q", "--amend", "-m", "feat: b amended")
+        git(self.root, "reflog", "expire", "--expire=now", "--all")
+        git(self.root, "gc", "-q", "--prune=now")
+        out, args = self.launch()
+        self.assertEqual(self.decision(out), "deny")
+        self.assertIsNone(args)
+        self.assertIn(f"measured from its head {self.head[:7]}", self.reason(out))
+        self.assertIn("not something we can merge", self.reason(out))
 
     def test_a_round_is_measured_from_the_branch_the_pr_merges_into(self):
         git(self.root, "checkout", "-q", "-b", "dev", "main")
@@ -2054,6 +2081,21 @@ class DecisionReview(Gate):
         self.assertEqual(second["decisions"]["governing"], [])
         self.assertNotIn(self.DECISION, self.reviewers(second))
 
+    def test_a_delta_round_is_not_asked_about_what_the_base_branch_merged_in(self):
+        needs_adr(self)
+        self.change("lib/b.py")
+        _, first = self.launch()
+        self.run_reviewers(first, [])
+        git(self.root, "checkout", "-q", "-B", "main", "origin/main")
+        self.change()
+        git(self.root, "push", "-q", "origin", "main")
+        git(self.root, "checkout", "-q", "feat/1-demo")
+        git(self.root, "merge", "-q", "--no-edit", "main")
+        self.change("lib/c.py")
+        _, second = self.launch()
+        self.assertEqual(second["decisions"]["governing"], [])
+        self.assertNotIn(self.DECISION, self.reviewers(second))
+
     def test_org_and_repo_records_with_one_id_are_both_briefed_under_their_corpora(self):
         needs_adr(self)
         org = Path(self.tmp.name) / "engineering/docs/adr"
@@ -2154,6 +2196,7 @@ class DecisionReview(Gate):
         self.assertEqual(self.decision(out), "deny")
         for step in ("docs/adr", "deadline", "gh calls", "review-base fetch", "adr --version", "adr check of docs/adr"):
             self.assertIn(step, self.reason(out))
+        self.assertNotIn("merge of the last reviewed head", self.reason(out))  # a full round merges nothing
 
     def test_a_skipped_file_the_change_does_not_touch_says_nothing(self):
         needs_adr(self)
