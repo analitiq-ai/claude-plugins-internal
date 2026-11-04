@@ -41,7 +41,7 @@ An install copies a plugin's whole folder, so tests, specs and records cannot si
 may reference only paths inside its own root. The repo answered with two trees: `plugins/<name>/`
 installed, `dev/<name>/` not, each `dev/` folder its own Spec Kit project. Each component lives in two
 places, and the constitutions repeat the same principles. reviewer, planner and the orchestrator all use
-the state comment and the validator modules.
+the state record and the validator modules.
 
 ## Decision
 
@@ -50,14 +50,14 @@ the state comment and the validator modules.
    `core/` holds a package in place of `plugin/`. Each validator module (ADR-0003) is a package of its
    own in `validators/<name>/`, with its tests beside it; adding or removing one is adding or removing
    its folder.
-2. We will make `core/` the one home of code more than one component runs: the state-comment read and
+2. We will make `core/` the one home of code more than one component runs: the state record's read and
    write, the validator contract with its Findings schema, the threads module and the read of required
    checks (ADR-0003), the spec facts' model (ADR-0003) and the parser of a story's identity (ADR-0005).
    Each plugin that runs core code, the orchestrator included, carries a symlink to `core/`, and one to
    `validators/` when it runs a validator module; an install copies both into the plugin, and the plugin
    lists their dependencies in its own lockfile, which the install also fetches; no plugin imports
    another's code.
-   Every state-comment write runs in reviewer's hook process, outside the sandbox (ADR-0008).
+   Every state record write runs in reviewer's hook process, outside the sandbox (ADR-0008).
 3. We will keep one Spec Kit project at the root, with one constitution and specs in `specs/<p>-<slug>/`.
 4. We will keep records of the repo as a whole in `docs/adr/` at the root.
 
@@ -73,7 +73,7 @@ Rejected: each plugin stays split across two trees.
 
 ### Option C: A repository per component
 
-Rejected: the components share contracts (the state comment, hold ids, status names, the validator
+Rejected: the components share contracts (the state record, hold ids, status names, the validator
 modules) that should change in one PR.
 
 ### Option D: Shared code inside one plugin, a hand-kept copy in each, or installed at session start
@@ -89,7 +89,7 @@ install needs a release tag and a fetch of this repo from every environment.
 ## Consequences
 
 - Easier: one Spec Kit to upgrade; a component's code, tests and records in one place; one implementation
-  of the state comment and of each validator.
+  of the state record and of each validator.
 - Harder: an install's source is `<component>/plugin`, one level deeper than the usual `plugins/<name>`;
   each plugin that runs core code lists core's dependencies in its own lockfile.
 - **How we would know this was wrong:** a component needing its own Spec Kit project or constitution, or

@@ -15,6 +15,7 @@ export const TAG = "<!-- codeworks:reviewer-state -->";
 
 export const SHARED: Shared = {
   validators: ["fixture"],
+  adr_folders: [],
   trusted_reviewers: ["alice"],
   board: BOARD,
   session_app_login: "codeworks-session[bot]",

@@ -37,7 +37,7 @@ machine, and planner and the admins work elsewhere (root ADR-0008).
 1. We will keep every state that outlives a session on GitHub: the claim is the card's move from Ready
    to In progress by the orchestrator's App (ADR-0002); the attestation is a check run at the head
    (ADR-0004); rounds and holds are the
-   reviewer App's tagged state comments on the story issue, read as reviewer ADR-0011 decides; findings
+   reviewer App's commits on the served repo's `ledger` branch, read as reviewer ADR-0011 decides; findings
    come from the validator modules (root ADR-0003), the required checks and the mergeable field
    (ADR-0007); the escalation
    question, its answer and every Blocked reason are issue comments.
@@ -55,7 +55,7 @@ machine, and planner and the admins work elsewhere (root ADR-0008).
 
 ## Options considered
 
-### Option A: GitHub objects, reviewer's state in tagged issue comments (chosen)
+### Option A: GitHub objects, reviewer's state on the `ledger` branch (chosen)
 
 ### Option B: A PR body section
 

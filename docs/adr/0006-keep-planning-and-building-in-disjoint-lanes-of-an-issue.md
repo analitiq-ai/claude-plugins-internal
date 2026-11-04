@@ -5,7 +5,7 @@ title: "Keep planning and building in disjoint lanes of an issue"
 status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
-tags: [lanes, board, rescope, concurrency, state-comment]
+tags: [lanes, board, rescope, concurrency, state-record]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -35,12 +35,11 @@ review:
 
 ## Context
 
-reviewer's state comment on a story issue is a full snapshot, the newest winning (reviewer ADR-0011).
-reviewer's hook writes it while a story is built, and again when a rescope places holds (reviewer
-ADR-0013); two writes at once would lose one snapshot. A spec that changes under a running story is built
-against the old one. The board already says what runs: the orchestrator claims only from Ready, resumes
-only a story In progress or In review, and an admin stops a story by dragging it to Blocked (orchestrator
-ADR-0002).
+reviewer's state record of a story is the fold of its events on the `ledger` branch (reviewer ADR-0011),
+which reviewer's hook alone writes, while a story is built and when a rescope places holds (reviewer
+ADR-0013). A spec that changes under a running story is built against the old one. The board already
+says what runs: the orchestrator claims only from Ready, resumes only a story In progress or In review,
+and an admin stops a story by dragging it to Blocked (orchestrator ADR-0002).
 
 ## Decision
 
@@ -56,15 +55,16 @@ ADR-0002).
 
 ### Option A: Disjoint lanes (chosen)
 
-One lane rule keeps one writer per state comment and no build under a changing spec.
+One lane rule keeps a story from building under a changing spec, and reviewer's hook the one writer of its
+state record, with no second writer to merge.
 
 ### Option B: Refuse a rescope only on a closed issue, in any lane
 
-Rejected: a story in progress builds under the spec being changed, and two writers share its state comment.
+Rejected: a story in progress builds under the spec being changed.
 
-### Option C: Any lane, with a snapshot that names its base and a writer that retries
+### Option C: Any lane, with a writer that retries on a stale reading
 
-Rejected: a second mechanism for what the lanes already keep apart.
+Rejected: a retry (reviewer ADR-0011 d1) orders two writes; it does not stop a build under a changing spec.
 
 ### Option D: planner moves the cards to Blocked itself
 
@@ -78,13 +78,13 @@ Rejected: only the orchestrator's hooks write a lane (orchestrator ADR-0002).
 
 ## Consequences
 
-- Easier: the state comment has one writer at a time with no merge logic; no story builds while its spec
-  changes.
+- Easier: reviewer's hook is the state record's one writer, with nothing to merge; no story builds while
+  its spec changes.
 - Harder: every component that starts work reads the board first. Each enforces this record in its own:
   planner ADR-0005, builder ADR-0002, reviewer ADR-0015, orchestrator ADR-0002.
-- **How we would know this was wrong:** a rescope hold lost to another state write, or a story built
-  under a spec a rescope was changing.
-- Revisit if: planning runs without an admin, or state moves out of a single snapshot.
+- **How we would know this was wrong:** a second writer of a story's state record, or a story built under
+  a spec a rescope was changing.
+- Revisit if: planning runs without an admin, or a second component must write a story's state.
 
 ## Action items
 
