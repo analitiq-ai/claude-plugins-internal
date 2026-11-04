@@ -6,11 +6,11 @@
 adr_check.ts clear        <spec folder> <run folder>
 adr_check.ts tasks-due    <spec folder> <run folder>
 adr_check.ts tasks-written <run folder>
-adr_check.ts stories      <issue> <spec folder> <run folder>
+adr_check.ts stories      <issue> <kind> <spec folder> <run folder>
 adr_check.ts ask          <spec folder> <run folder> <touches exit code>
 adr_check.ts decide       <spec folder> <run folder> <asked digest> <judge exit code>
 adr_check.ts report       <run folder>
-adr_check.ts stop         rounds
+adr_check.ts stop         rounds <kind> <issue> <spec folder>
 ```
 
 Run from the project root (the workflow's cwd). stories, ask and decide read settings from `codeworks.toml` at the
@@ -25,7 +25,8 @@ exits with it. A non-zero exit from any subcommand but report and stop means onl
 crash, a file it cannot write): the run fails at that step and the resume runs that step alone, then the rest of
 the round; that is no check stop. A check stop is an outcome stories, ask or decide recorded and report showed;
 each resume after one runs a new round of the check loop. `stop` prints its row and exits 2. No subcommand formats
-a line of its own.
+a line of its own. Every run-folder record a subcommand writes is written to a temporary file in the run folder,
+then renamed over the record, so a step killed mid-write leaves the old record or the new one, never a torn one.
 
 A model step (touches, judge) has answered only when its exit code argument is the literal `0`; any other value,
 empty included, is not answered, whatever file the step left.
@@ -39,7 +40,8 @@ round.
 ### clear
 
 The round's first step after settled-design. Deletes `<run>/touches.json`, `<run>/adr-asked.json`,
-`<run>/adr-verdict.json` and `<run>/adr-stop.json`, so no step reads an earlier round's, then writes
+`<run>/adr-verdict.json` and `<run>/adr-stop.json` (the stop the last round showed), so no step reads an
+earlier round's, then writes
 `<run>/touches-from.json` (`SourceHashes`: `plan.md` and `spec.md` as they stand, the files the touches step is
 about to read). Exit 0.
 
@@ -59,9 +61,10 @@ again. Exit 0.
 ### stories
 
 The checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
-R15): the story plan (`storyPlan`, task-block labels) and the spec issue's sub-issues (extra, in another
-repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). On a stop writes the
-stop record. Exit 0 either way.
+R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
+(extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
+rescope's sub-issues are its existing stories, which its new `tasks.md` may drop or reorder; reconciling them is
+landing a rescope's (#178, planner ADR-0010 d5). On a stop writes the stop record. Exit 0 either way.
 
 ### ask
 
@@ -104,8 +107,10 @@ prints every folder's lines through `adrStop`; a stop writes them to the stop re
 
 The round's last step (R6). Stop record with `shown: false`: prints its lines to stderr, rewrites it with
 `shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the resume after
-that stop): deletes it, prints `{"again": true}`, exit 0, and the loop runs a new round with that resume's
-`ADR_RULING`. No stop record: prints `{"again": false}`, exit 0. A record that does not parse: exit 2 naming it.
+that stop): keeps it, prints `{"again": true}`, exit 0, and the loop runs a new round with that resume's
+`ADR_RULING`, whose `adr-clear` deletes it; a report re-run before that clear finds it again and asks again. No
+stop record: prints `{"again": false}`, exit 0. A record that does not parse (`stop-unread`): prints that line,
+writes a valid record of it with `shown: true`, and exits 2, so the resume after asks for a new round.
 
 ## Stop table (`ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
@@ -128,7 +133,8 @@ full.
 | `folder` | ask, decide | COULD_NOT_RUN | entry | core's `CouldNotRun` reason | core's |
 | `verdict-unread` | decide | COULD_NOT_RUN | `adr-verdict.json` | the judge did not answer (its exit code not `0`), or the file is missing or not an `AdrVerdict` (what) | resume to run the check again |
 | `verdict-mismatch` | decide | COULD_NOT_RUN | entry | the verdict misses governing `<id>`, names `<id>` not governing, or names `<path>` not asked | resume to run the check again |
-| `rounds` | rounds | COULD_NOT_RUN | `adr-check` | the check stopped 100 times in one run | start the run again with `/planner:issue-spec rescope <spec folder> #<issue>` |
+| `rounds` | rounds | COULD_NOT_RUN | `adr-check` | the check stopped 100 times in one run | discard the run's changes to `<spec folder>`, then start again: a `new` run, remove `<spec folder>` and run `/planner:issue-spec #<issue> [<dir>]`; a `rescope`, restore `<spec folder>` to the branch's last commit and run `/planner:issue-spec rescope <spec folder> #<issue>` |
+| `stop-unread` | report | COULD_NOT_RUN | `adr-stop.json` | does not parse | resume to run the check again |
 | `touches-refused` | ask | COULD_NOT_RUN | `touches.json` | `<entry>`: what is wrong | resume to run the check again |
 | `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | the touches step did not answer (its exit code not `0`), or the file is missing or has no path | resume to run the check again |
 | `touches-stale` | ask | COULD_NOT_RUN | `touches.json` | `plan.md` or `spec.md` changed after this round listed the plan's paths | resume to run the check again |
@@ -196,7 +202,7 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
           - id: adr-stories
             type: shell
             timeout: 300
-            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stories "$ISSUE" "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stories "$ISSUE" "{{ inputs.kind }}" "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
           - id: adr-ask
             type: shell
             output_format: json
@@ -232,7 +238,7 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
           - id: adr-rounds
             type: shell
             timeout: 60
-            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stop rounds
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stop rounds "{{ inputs.kind }}" "$ISSUE" "$SPECIFY_FEATURE_DIRECTORY"
 ```
 
 ## `adr-touches.md` (installed with the workflow)
@@ -253,8 +259,9 @@ other file; give no ruling.
 
 `read` calls the same `story-plan.ts` functions as `stories` (R15). Its stops never send the admin to edit
 `tasks.md`: extra sub-issues, "remove them from #p's sub-issues"; a sub-issue out of story order, "order #p's
-sub-issues so sub-issue k is US<k>'s issue"; a `tasks.md` it refuses, "tasks.md is not as the run wrote it; run
-`/planner:issue-spec rescope <spec folder> #p`". A `tasks.md` edited after the run is seen only in spec-PR review
+sub-issues so sub-issue k is US<k>'s issue"; a `tasks.md` it refuses, "tasks.md is not as the run wrote it; remove
+`<spec folder>`, then run `/planner:issue-spec #p [<dir>]` again" (nothing has landed, so there is no spec PR a
+rescope could run on). A `tasks.md` edited after the run is seen only in spec-PR review
 (planner ADR-0009 d4).
 
 ## `planner/plugin/scripts/rescope_questions.ts`
@@ -285,7 +292,10 @@ GitHub unanswered or a settings error: exit 2 naming it. Not a check step: it ru
   run never fails there; `adr-settled-design` and `adr-tasks` report as the step they are), matched by the step's
   own id: in a loop round after the first, specify reports a qualified id, `<loop>:<step>:<n>` (e.g.
   `adr-check:adr-report:1`), whose middle segment is it. `stderr` is the step's own; `drive_workflow.py` runs no
-  `stop`.
+  `stop`. A stop at `adr-report` whose lines hold `touches-missing` or `verdict-unread` also gets the model step's
+  own error: `state.json`'s `step_results` entry for `adr-touches`, or for `adr-judge` only when this round's
+  `<run>/adr-asked.json` names a governing record (ask's `judge`), keyed by the bare id, which holds the step's
+  latest round; a skipped judge's entry is an earlier round's and is not shown.
 
 ## Skill (`SKILL.md`)
 

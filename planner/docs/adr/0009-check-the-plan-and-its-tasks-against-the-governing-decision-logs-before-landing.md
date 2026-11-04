@@ -76,8 +76,9 @@ after critique and after a check stops, and a check that skips what it judges un
    missing or when a file that command reads (`spec.md`, `plan.md`, `research.md`, `data-model.md`,
    `quickstart.md`, `contracts/`, the constitution) changed since it was last written, and never otherwise.
    Nobody edits it by hand: a fault in it is fixed in the plan or the spec, or by deleting it so the next round
-   writes it again. The checks landing makes of `tasks.md` (its story plan and the spec issue's sub-issues, read
-   as the planner App, as landing reads them) run in every round, so they stop while the run can still resume;
+   writes it again. The checks landing makes of `tasks.md` (its story plan and, on a new spec, the spec issue's
+   sub-issues, read as the planner App, as landing reads them) run in every round, so they stop while the run can
+   still resume; a rescope's existing stories are reconciled where a rescope lands (ADR-0010 d5);
    an edit to `tasks.md` after the run is checked only in spec-PR review, as an entry committed by hand to the
    rulings file is (d6).
 5. We will have a headless model step judge the plan and the tasks against each record `adr check` names as

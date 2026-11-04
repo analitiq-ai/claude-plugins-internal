@@ -57,8 +57,9 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
   `lines` (non-empty, each a line `adrStop` rendered) and `shown` (boolean).
 - Written with `shown: false` by stories, ask or decide when the round stops, which then exit 0; deleted by
   `adr-clear` at the start of each round, so one that is there was written this round. `adr_check.ts report`
-  prints the lines and rewrites it `shown: true`, then on the resume deletes it and asks for a new round
-  (workflow-steps.md, report).
+  prints the lines and rewrites it `shown: true`, then on the resume keeps it and asks for a new round, whose
+  `adr-clear` deletes it; one that does not parse is shown as `stop-unread` and rewritten valid (workflow-steps.md,
+  report).
 
 ## `tasks.md` task lines
 
@@ -85,7 +86,9 @@ command tells the model to write one literal path per backtick span.
 - No file: no ruling. A file that does not parse is refused (`RulingsRefused`, exit 1), never read as empty.
 - Writer: the decide step only (R9). Readers: the judge, every later ask and decide, reviewer's decision check (US5).
 - Writer guard: every entry, compared whole (reason included), must be in the file at `HEAD` or in
-  `<run>/adr-rulings-written.json`; any other entry makes the check could not run, naming it (R9).
+  `<run>/adr-rulings-written.json`; any other entry makes the check could not run, naming it (R9). A
+  `adr-rulings-written.json` that does not parse is deleted and the guard runs without it, so it names every entry
+  the run added.
 
 ## `ADR_RULING` (one resume's ruling)
 

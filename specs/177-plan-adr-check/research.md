@@ -140,10 +140,16 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - A step that crashes without an answer (any shell step of the round exiting non-zero, or rounds) is no check
     stop: the run fails at that step and the resume runs that step, then the rest of its round (R14).
   - report: a stop not yet shown is printed and the run stops at `adr-report` with the stop's exit; the resume runs
-    report again, which deletes the shown stop and prints `{"again": true}`, so the loop runs a new round on the
-    artifacts as they then stand, with that resume's `ADR_RULING`. No stop: `{"again": false}`, the loop ends.
+    report again, which keeps the shown stop and prints `{"again": true}`, so the loop runs a new round on the
+    artifacts as they then stand, with that resume's `ADR_RULING`; the round's `adr-clear` deletes it. Deleting it
+    in report would let a report killed between the delete and its print find no stop on the resume and end the
+    loop unchecked. No stop: `{"again": false}`, the loop ends. A stop record that does not parse is shown as
+    `stop-unread` and rewritten valid, so the resume asks for a new round instead of failing at report again.
+    Every run-folder record is written to a temporary file, then renamed.
   - `adr-rounds`, under an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
-    another stops the run as could not run (`stop rounds`), never walking past the check.
+    another stops the run as could not run (`stop rounds`), never walking past the check. Its next step discards the
+    run's changes to the spec folder and starts again with the run's own kind: a `new` run cannot start over an
+    existing folder (`spec_folder.py`), and a rescope's folder is restored to the branch, not removed.
 - **Rationale**: P1 (planner): a workflow step that runs a script decides; FR-006; planner ADR-0009 d1 and d7:
   every round works everything out again, so no part is skipped as unchanged and nothing an earlier round found
   is trusted. One check after the tasks sees what landing lands; the critique gate before it reviews a plan the
@@ -364,9 +370,12 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   before the command, promoted after it, so a halt mid-command or a source changed while it ran leaves the next
   round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
   extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
-  `TaskBlockLabelRefused`) and the spec issue's sub-issues (extra, in another repository, out of story order), read
-  as the planner App. `land.ts`'s next steps stop sending the admin to `tasks.md`: extra sub-issues are removed from
-  the issue, an out-of-order one reordered, a refused `tasks.md` rescoped. Folds in #303.
+  `TaskBlockLabelRefused`) and, on a `new` run, the spec issue's sub-issues (extra, in another repository, out of
+  story order), read as the planner App. A rescope's sub-issues are its existing stories, which its new `tasks.md`
+  may drop or reorder; reconciling them belongs to landing a rescope (#178, planner ADR-0010 d5), not to this check.
+  `land.ts`'s next steps stop sending the admin to `tasks.md`: extra sub-issues are removed from the issue, an
+  out-of-order one reordered, a refused `tasks.md` removed with its spec folder and the run started again (nothing
+  has landed, so no spec PR exists for a rescope to run on). Folds in #303.
 - **Rationale**: a `tasks.md` landing refuses after the run has completed can only be fixed by hand or by a rescope;
   checked in every round, it stops while the run can still resume, and a stop's next step deletes `tasks.md` so the
   next round writes it again. Hashing the sources keeps a round that changed nothing from writing `tasks.md` again

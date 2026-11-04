@@ -168,8 +168,8 @@ could-not-run status, never as a pass.
    `tasks.md` is not written again (FR-025).
 10. **Given** `plan.md` or `spec.md` changes after a round listed the plan's paths, **When** that round reaches the
    ADR check, **Then** it stops as could not run, and the next round lists the paths again (FR-012).
-11. **Given** `tasks.md` breaks the story plan, or the spec issue's sub-issues are extra, in another repository or
-   out of story order, **When** a round runs, **Then** the run stops with the landing check's line, whose next step
+11. **Given** `tasks.md` breaks the story plan, or, on a new spec, the spec issue's sub-issues are extra, in another
+   repository or out of story order, **When** a round runs, **Then** the run stops with the landing check's line, whose next step
    never edits `tasks.md` (FR-025).
 
 ---
@@ -381,8 +381,8 @@ once ruled; a rescope with no question takes the admin's words.
   internal round under that spec (orchestrator ADR-0004 d1), through core's `governingDiff`.
 - **FR-025**: `tasks.md` MUST be written only by the tasks command in a round, when it is missing or a file the
   command reads changed since it was last written, by hashes taken before the command runs (planner ADR-0009 d4).
-  The checks landing makes of `tasks.md` (its story plan and task-block labels; the spec issue's sub-issues: extra,
-  in another repository, or out of story order) MUST run in every round, through the same pure functions
+  The checks landing makes of `tasks.md` (its story plan and task-block labels; on a new spec, the spec issue's
+  sub-issues: extra, in another repository, or out of story order) MUST run in every round, through the same pure functions
   `land.ts` calls, and `land.ts`'s own stops MUST name no edit to `tasks.md`; an edit after the run is seen in
   spec-PR review.
 

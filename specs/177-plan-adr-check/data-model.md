@@ -127,8 +127,8 @@ question}[]}`, no `(issue, hold)` twice.
 ## Stop record (`AdrStopRecord`, `<run>/adr-stop.json`)
 
 Writers: `adr_check.ts` stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, rewriting it
-`shown: true` once it printed the lines, then deleting it on the resume; `adr-clear`, deleting it at each round's
-start. Readers: `adr_check.ts report`, and ask (a record there was written this round by stories).
+`shown: true` once it printed the lines (one that does not parse rewritten as its `stop-unread` line); `adr-clear`,
+deleting it at each round's start. Every run-folder record is written to a temporary file, then renamed over it. Readers: `adr_check.ts report`, and ask (a record there was written this round by stories).
 
 | Field | Type | Rule |
 |---|---|---|
@@ -142,7 +142,7 @@ start. Readers: `adr_check.ts report`, and ask (a record there was written this 
 `AdrRulings`: every entry decide appended to the rulings file in this run, each appended here before the rulings
 file. Writer: `adr_check.ts decide`. Readers:
 the writer guard in ask and decide (R9 a): a rulings-file entry, compared whole, in neither this record nor the file
-at `HEAD` is could not run.
+at `HEAD` is could not run. A record that does not parse is deleted, and the guard names every entry the run added.
 
 ## Folder outcome (`FolderOutcome`, `planner/plugin/lib/adr-check.ts`)
 
