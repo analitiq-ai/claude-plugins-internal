@@ -121,7 +121,7 @@ then present.
 | K | Constitution amendment | — | US2 | R15 |
 | — | #174 carrier (US1 of #174) | — | US2 | spec Clarifications Q4 |
 | B1 | Story branch name | US1 | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
-| B2 | Story tasks | US1 | US3 | `storyTasks(text, s)` in `contracts/tasks.ts` (R11) |
+| B2 | Task-line grammar and story tasks | US1 | US3 | `readTaskLine` and `storyTasks(text, s)` in `contracts/tasks.ts`; planner's `land.ts` reads tags through it (R11) |
 | B3 | Story PR closed | US1 | US3 | `StoryPr.closed`, read by the query already (R12) |
 | B7 | Stop rule and its facts | US1 | US3 | `storyStop(facts)` and `StopState`, pure; `readStoryStopFacts`, read-only, after B3; #174's Stop hook calls both (R16) |
 | — | **US2** | US2 | US3 | carrier, guard, TypeScript test suite (skill-text tests on today's skill dropped as R2 says), Python removed |

@@ -147,15 +147,17 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R11: Task ticks are read from tasks.md by core
 
-- **Decision**: core gains `storyTasks(text, s)` (B2) in `contracts/tasks.ts`: every task line (`- [ ]` /
-  `- [x]` + Spec Kit's `T<nnn>` id) in each phase block whose label is `Story issue: #<s>`, with its id, tick and
-  `[US<k>]` tag. The script reads `tasks.md` at HEAD; no block labelled `#<s>` gives no tasks, and an implement
+- **Decision**: core gains `storyTasks(text, s)` (B2) in `contracts/tasks.ts`: every task line (optional leading spaces, `- [ ]` /
+  `- [x]` / `- [X]` + Spec Kit's `T<nnn>` id; Spec Kit's implement ticks with `[X]`) in each phase block whose label is `Story issue: #<s>`, with its id, tick and
+  `[US<k>]` tag, each line read by one exported grammar, `readTaskLine`. planner's `land.ts` reads tags through
+  it too, dropping its private `TASK_LINE` and `STORY_TAG`, so one grammar answers both. The script reads `tasks.md` at HEAD; no block labelled `#<s>` gives no tasks, and an implement
   step then builds the requirement as one task (spec Edge Cases). The skill ticks a task in a commit that flips
   only its `[ ]` (FR-023), which reviewer's TICK_ONLY rule admits (reviewer ADR-0010 d1).
 - **Rationale**: builder ADR-0003 d3, planner ADR-0008 d2; reviewer #209 grades ticks by the same blocks, so the
-  read has one home beside `readTaskBlockLabels`.
+  read has one home beside `readTaskBlockLabels`; root ADR-0005's reason (several parsers of one grammar answer
+  differently at its edges) applies to the `[US<k>]` tag Spec Kit writes (planner ADR-0008 d2).
 - **Existing tools**: core `contracts/tasks.ts` `readTaskBlockLabels`, `isPhaseHeading` (the label grammar fits;
-  no task-line read exists).
+  no task-line read exists); planner `land.ts` `TASK_LINE`, `STORY_TAG` (private, moved to core).
 
 ## R12: The PR state is the story PR, its `internal-review` check run and its findings
 

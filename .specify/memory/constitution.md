@@ -105,13 +105,15 @@ Gate: for every lock, count or hold the plan adds or changes, does the plan name
 approved to release it (the user or another system), and is every action that releases it named
 by a decision record? Nothing else may release the hold, lower it or start it again. A hold with
 no named approver, or with a way out no decision record names, fails the gate. State that may have been
-tampered with reads as held: a newest reviewer App comment that was edited or lacks the state tag, or a
-reviewer App comment deleted after it.
+tampered with reads as held: a commit under a story's directory on the `ledger` branch that is neither a
+GitHub-signed, add-only commit of the reviewer App nor a repository admin's GitHub-signed, delete-only
+commit of files an invalid commit added or changed; the hold stands until no file the invalid commit added
+or changed remains on the branch and it is released as every hold is.
 
 Source: `reviewer/plugin/README.md` (What it enforces 2, 4, 5, 6, 7); how the user's action is recognised:
 `reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-ready-move-and-an-admin-s-commen.md`;
 which actions release a hold: the decision record in `reviewer/docs/adr/` that decides that hold.
-Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
+Tampered state reads as held: `reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`
 (decision 2). Only reviewer's hook writes state, the rescope hold included:
 `reviewer/docs/adr/0013-give-every-hold-one-id-and-release-it-only-on-a-ready-move-and-an-admin-s-commen.md`
 (decision 5).
@@ -140,7 +142,7 @@ never as a pass, never as a finding against the author, and never as a guess? Th
 exception: an external reviewer out of credits passes, marked WAIVED.
 
 Source: `docs/adr/0004-treat-a-check-that-could-not-run-as-its-own-outcome-and-enforce-every-check-from.md`
-(decisions 1–4); the exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+(decisions 1–4); the exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-record-behind-one-contract-each-in-core.md`
 (decision 6). reviewer: `reviewer/plugin/README.md` (What it enforces 2, 5, 6). planner:
 `planner/plugin/scripts/premise_report.py`, `rootcause.py`, `settled_design.py` (each exit status).
 
@@ -160,11 +162,11 @@ settled-design step).
 Applies to: reviewer, planner, builder, orchestrator.
 
 Gate: for every state the plan reads or writes (a lane, a label, a check run, a state
-comment, a hold, a commit), does the plan name its one writer, and does the component write only the
+record, a hold, a commit), does the plan name its one writer, and does the component write only the
 state it owns and refuse, from the model's tool calls, every write it does not own?
 
-Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
-(decision 3); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
+Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`
+(decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
 (decision 1). planner: `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
@@ -181,12 +183,12 @@ another reader land in such a form? The one exception is a verdict a provider pu
 review text, which that provider's validator module reads there, in that module alone.
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
-(decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`
+(decisions 1, 2); `reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`
 (decision 1). planner: `planner/docs/adr/0008-spec-facts-as-front-matter-in-spec-md-spec-kit-s-stock-tasks-template.md`
 (decision 1); `planner/docs/adr/0007-give-an-issue-that-needs-no-spec-a-spec-folder-that-says-so.md`
 (decision 1); `orchestrator/docs/adr/0003-keep-the-loop-s-durable-state-in-github-objects.md`
 (decision 3). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`; the
-exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+exception: `docs/adr/0003-keep-the-validator-modules-and-the-state-record-behind-one-contract-each-in-core.md`
 (decision 6).
 
 ### P8. Generic over Repositories
@@ -203,7 +205,7 @@ Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-eac
 (decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-from-the-orchestrator-plugin-s-hooks-inside-the-agent-sessi.md`
 (decision 2). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`;
 `docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`;
-`docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+`docs/adr/0003-keep-the-validator-modules-and-the-state-record-behind-one-contract-each-in-core.md`
 (decision 2).
 
 ### P9. Trust Only Named Identities
@@ -217,7 +219,7 @@ finding only when a trusted reviewer started it?
 
 Source: All: `docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`
 (decisions 1, 3, 4 and 5);
-`docs/adr/0003-keep-the-validator-modules-and-the-state-comment-behind-one-contract-each-in-cor.md`
+`docs/adr/0003-keep-the-validator-modules-and-the-state-record-behind-one-contract-each-in-core.md`
 (decision 2).
 
 ## Platform Constraints
@@ -241,8 +243,8 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
   model's GitHub token is read-only; hooks make every write
   (`docs/adr/0007-let-the-model-act-only-as-the-session-app-and-hooks-as-the-orchestrator-and-revi.md`).
 - reviewer: the claim, shim and decision checks each have a `log` / `enforce` setting beside the plugin's mode
-  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: tagged comments on the story issue
-  (`reviewer/docs/adr/0011-record-rounds-and-holds-in-tagged-issue-comments-through-core-the-newest-by-the.md`).
+  (`reviewer/plugin/README.md`: Mode). Where it keeps its state: GitHub-signed commits on the served
+  repo's `ledger` branch (`reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`).
   Reviewer agents come from the `pr-review-toolkit` and `auditor` plugins, except the decision reviewer, which
   is its own `agents/decision-reviewer.md` (`reviewer/plugin/README.md`, end of Layout).
 - planner runs as the Spec Kit workflow its skill starts (`planner/plugin/skills/issue-spec/`,

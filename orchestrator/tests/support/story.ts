@@ -7,6 +7,7 @@ import { BOARD, contentsAnswer, ORCHESTRATOR_LOGIN, SESSION_LOGIN, SETTINGS } fr
 export const SHARED: Shared = {
   board: BOARD,
   validators: [],
+  adr_folders: [],
   session_app_login: SESSION_LOGIN,
   orchestrator_app_login: ORCHESTRATOR_LOGIN,
   reviewer_app_login: "codeworks-reviewer[bot]",

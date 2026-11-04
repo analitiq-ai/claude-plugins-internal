@@ -18,6 +18,7 @@ const HEAD = "a".repeat(40);
 
 const SHARED: Shared = {
   validators: ["fixture"],
+  adr_folders: [],
   trusted_reviewers: ["alice"],
   board: "https://github.com/orgs/example-org/projects/1",
   session_app_login: "codeworks-session[bot]",
