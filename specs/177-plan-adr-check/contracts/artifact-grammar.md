@@ -24,8 +24,8 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - Deleted by `adr-plan-clear`, the first step of each iteration of the after-plan check loop, then written by the
   touches step, `adr-plan-touches`, its second (`adr-touches.md`): it reads `plan.md` as it then stands and writes
   one literal path per file the plan creates, changes or deletes. Each resume after a stop runs a new iteration of
-  the check loop, so the file follows every change to the plan, and a touches step that fails leaves no file rather
-  than the last iteration's. Not a section of `plan.md` (R4).
+  the check loop, so the file follows every change to the plan, and ask never reads the last iteration's file; a touches
+  step whose exit code is not `0` is `touches-missing`, whatever file it left. Not a section of `plan.md` (R4).
 - `TouchedPaths`: exactly the keys `v` (`1`) and `paths`; each entry a `PATH`; no entry twice.
 - Unparsable JSON or another shape: refused (`TouchesRefused`, exit 1, naming `touches.json` and the entry). No
   file, or `paths` empty: could not run, naming `touches.json`, for both artifacts (the tasks check reads its root

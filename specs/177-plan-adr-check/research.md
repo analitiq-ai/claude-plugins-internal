@@ -72,8 +72,9 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   plan creates, changes or deletes, no entry twice (artifact-grammar.md), following
   `planner/plugin/speckit/workflows/issue-spec/adr-touches.md`. Each resume after a stop runs a new iteration of
   the check loop (R6, R14), so every resume after a plan fix rebuilds the file and a departure's next step stays
-  "change `plan.md`". The iteration's first step, `adr-plan-clear` (shell), deletes the file, so a touches step that
-  fails leaves none and ask stops on it, never on the last run's paths. Read by `readTouchedPaths` in
+  "change `plan.md`". The iteration's first step, `adr-plan-clear` (shell), deletes the file, so ask never reads the
+  last iteration's paths; a touches step whose exit code is not `0` has not answered, and ask stops on it whatever
+  file it left (R6). Read by `readTouchedPaths` in
   `core/src/contracts/decision-check.ts`. Unparsable or wrong shape is refused (exit 1, naming `touches.json`); a
   missing file or an empty list is could not run, naming `touches.json`, at both checks (the tasks check reads its
   root entries). The run folder is gitignored (`.specify/.gitignore`: `workflows/runs/`). `plan.md`, its template,
@@ -120,8 +121,13 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the shell
   step's 300 s default), then `adr-<a>-report` (shell, `output_format: json`).
   - ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-<a>-stop.json` (data-model.md)
-    and print nothing else. A touches or judge step that fails or times out continues: it leaves no `touches.json`
-    or no verdict, which ask records as `touches-missing` and decide as `verdict-unread`. So every check stop, an
+    and print nothing else. A touches or judge step that fails or times out continues. One rule for both: a model step
+    that did not finish with exit code `0` has not answered, whatever file it left, since it may have written a
+    valid partial file first. ask takes `steps.adr-plan-touches.output.exit_code` and records `touches-missing`;
+    decide takes `steps.adr-<a>-judge.output.exit_code` and, when the asked record says `judge`, records
+    `verdict-unread` without reading the verdict. Only the literal `0` is answered: 1.1.3 records no `exit_code` on
+    some failure paths. Without a judge, decide ignores the value, stale from an earlier iteration or empty. The
+    tasks check has no touches step, so `ask tasks` takes no touches argument. So every check stop, an
     outcome ask or decide recorded and report showed, halts the run at `adr-<a>-report`, the one stop point.
   - A step that crashes without an answer (clear, ask, decide, report or rounds exiting non-zero) is no check stop:
     the run fails at that step and the resume runs that step alone (R14).
@@ -172,7 +178,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - Every line on stderr; ask's and report's stdout is their JSON only.
   - A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`. ask and decide record it with
     the lines in `<run>/adr-<a>-stop.json` and exit 0; `adr-<a>-report` prints the lines and exits with it (R6).
-  - A judge or touches step that does not answer continues on error and leaves no file, so its stop is the
+  - A judge or touches step that does not answer (exit code not `0`) continues on error, and its stop is the
     `verdict-unread` or `touches-missing` row decide or ask records; `drive_workflow.py` runs no `stop`.
 - **Rationale**: FR-008, FR-009, FR-018; P3; P4; exit codes as `settled_design.py` and `spec_facts.ts` (1 refused,
   2 could not run); stderr for lines as `spec_facts.ts`, since `report()` passes on only stderr. Could not run wins

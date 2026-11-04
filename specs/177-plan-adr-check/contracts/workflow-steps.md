@@ -3,8 +3,9 @@
 ## `planner/plugin/scripts/adr_check.ts`
 
 ```text
-adr_check.ts ask    <plan|tasks> <spec folder> <run folder>
-adr_check.ts decide <plan|tasks> <spec folder> <run folder> <asked digest>
+adr_check.ts ask    plan  <spec folder> <run folder> <touches exit code>
+adr_check.ts ask    tasks <spec folder> <run folder>
+adr_check.ts decide <plan|tasks> <spec folder> <run folder> <asked digest> <judge exit code>
 adr_check.ts report <plan|tasks> <run folder>
 adr_check.ts stop   <plan|tasks> rounds
 ```
@@ -23,13 +24,18 @@ outcome ask or decide recorded and report showed; each resume after one runs a n
 `stop` prints its row and exits 2. No subcommand
 formats a line of its own.
 
+A model step (touches, judge) has answered only when its exit code argument is the literal `0`. Spec Kit records a
+prompt step's `exit_code` on dispatch, but some failure paths (an invalid timeout) record none, so an empty or any
+other value is not answered, whatever file the step left.
+
 ### ask
 
 Removes `<run>/adr-<a>-verdict.json` and `<run>/adr-<a>-stop.json` first, so a stale verdict or stop is never
 read. Reads settings before the artifact: on an empty `[shared] adr_folders` it writes the asked record with no paths
 and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}` without reading the paths (decide
 then passes). Otherwise reads
-`<run>/touches.json` (both artifacts: the plan's paths, or the tasks check's root entries) and, for tasks,
+`<run>/touches.json` (both artifacts: the plan's paths, or the tasks check's root entries; on a plan check, a
+touches step that did not answer is `touches-missing`, whatever the file holds) and, for tasks,
 `tasks.md`; on a plan check, adds to the paths the path of each departure line in `<run>/review-questions.json`
 (R13), so its record is matched and the user can rule on it; then the rulings file through core's `readRulings` and the writer guard (R9 a). Resolves the folders
 (`adrFolders`), runs `checkAdrFolder` per folder, writes `<run>/adr-<a>-asked.json` (`AdrAsked`), prints
@@ -39,14 +45,17 @@ prints `{"judge": false, "decide": false, "asked": ""}`. Exit 0 either way.
 
 ### judge (prompt step, `adr-judge.md`)
 
-`continue_on_error: true`: a judge step that fails or reaches its timeout writes no verdict, so decide records the
-`verdict-unread` stop. The touches step is the same: one that fails or reaches its timeout leaves no `touches.json`
-(clear ran first), so ask records `touches-missing`. Both are shown by `adr-<a>-report`.
+`continue_on_error: true`: a judge step that fails or reaches its timeout has not answered, so decide records the
+`verdict-unread` stop, whatever verdict file it left. The touches step is the same: ask records `touches-missing`.
+Both are shown by `adr-<a>-report`.
 
 ### decide
 
 Settings first: on an empty `[shared] adr_folders` decide prints the empty-list line and exits 0, reading no path.
-Otherwise the writer guard (R9 a–c) on what ask recorded; then the verdict (when the asked record says `judge`)
+Otherwise the writer guard (R9 a–c) on what ask recorded; then the verdict (when the asked record says `judge`;
+a judge that did not answer is `verdict-unread`, the verdict file not read; when the asked record says no judge,
+decide ignores the judge exit code, since the judge was skipped and the value may be stale from an earlier
+iteration)
 and `ADR_RULING`; validates `ADR_RULING` whole (artifact-grammar.md); appends each valid new ruling to the rulings
 file and to `<run>/adr-rulings-written.json`; on a plan check, calls `checkAdrFolder(cwd, folder, [path], …)` once
 per `(folder, record, path)` of the departure lines in `<run>/review-questions.json`, concurrently with the ruling
@@ -78,11 +87,11 @@ plan, `tasks.md` for tasks. One line per departure and per broken record; titles
 | `departure-outside` | decide | FAIL | entry | as above | change `<artifact>`; change record `<id>` in the repo that holds `<entry>`; or resume with `adr_ruling` as above |
 | `broken` | decide | FAIL | entry | `<file>`: `<rule>`: `<message>` | fix that record (in the spec PR, or in the repo that holds `<entry>`) |
 | `folder` | ask, decide | COULD_NOT_RUN | entry | core's `CouldNotRun` reason | core's |
-| `verdict-unread` | decide | COULD_NOT_RUN | `adr-<a>-verdict.json` | missing (the judge did not answer), or not an `AdrVerdict` (what) | resume to run the check again |
+| `verdict-unread` | decide | COULD_NOT_RUN | `adr-<a>-verdict.json` | the judge did not answer (its exit code not `0`), or the file is missing or not an `AdrVerdict` (what) | resume to run the check again |
 | `verdict-mismatch` | decide | COULD_NOT_RUN | entry | the verdict misses governing `<id>`, names `<id>` not governing, or names `<path>` not asked | resume to run the check again |
 | `rounds` | rounds | COULD_NOT_RUN | `adr-<a>-check` | the check stopped 100 times in one run | start the run again with `/planner:issue-spec rescope <spec folder> #<issue>` |
 | `touches-refused` | ask, decide | FAIL | `touches.json` | `<entry>`: what is wrong | correct `<run>/touches.json`, then resume |
-| `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | missing (the touches step did not answer), or no path | resume to run the check again |
+| `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | the touches step did not answer (its exit code not `0`), or the file is missing or has no path | resume to run the check again |
 | `questions-refused` | ask, decide | FAIL | `review-questions.json` | what does not parse | rerun the rescope from `/planner:issue-spec rescope` |
 | `tasks-refused` | ask, decide | FAIL | `tasks.md:<line>` | `<span>`: what is wrong, or a task line above every phase heading | change `tasks.md`, then resume |
 | `tasks-empty` | ask | COULD_NOT_RUN | `tasks.md` | no task line names a path | name each task's files, one per backtick span, then resume |
@@ -108,11 +117,11 @@ No new input: a ruling reaches the run only as `ADR_RULING` from the resume that
         max_iterations: 100
         condition: "{{ steps.adr-plan-report.output.data.again }}"
         steps:
-          - id: adr-plan-clear       # a touches step that fails leaves no file, never the last iteration's paths
+          - id: adr-plan-clear       # never the last iteration's paths
             type: shell
             timeout: 60
             run: rm -f ".specify/workflows/runs/{{ context.run_id }}/touches.json"
-          - id: adr-plan-touches     # no answer: no touches.json, so ask records touches-missing
+          - id: adr-plan-touches     # exit code not 0: ask records touches-missing, whatever touches.json holds
             type: prompt
             integration: "{{ inputs.integration }}"
             timeout: 1800
@@ -122,12 +131,12 @@ No new input: a ruling reaches the run only as `ADR_RULING` from the resume that
             type: shell
             output_format: json
             timeout: 1800
-            run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-touches.output.exit_code }}"
           - id: adr-plan-judging
             type: if
             condition: "{{ steps.adr-plan-ask.output.data.judge }}"
             then:
-              - id: adr-plan-judge   # no answer: no verdict, so decide records verdict-unread
+              - id: adr-plan-judge   # exit code not 0: decide records verdict-unread, whatever verdict it left
                 type: prompt
                 integration: "{{ inputs.integration }}"
                 timeout: 1800
@@ -140,7 +149,7 @@ No new input: a ruling reaches the run only as `ADR_RULING` from the resume that
               - id: adr-plan-decide
                 type: shell
                 timeout: 1800
-                run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}"
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide plan "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-plan-ask.output.data.asked }}" "{{ steps.adr-plan-judge.output.exit_code }}"
           - id: adr-plan-report
             type: shell
             output_format: json

@@ -82,6 +82,9 @@ and decide exit 0 once they record it in `<run>/adr-<a>-stop.json`:
 | the same, `0004` superseded and no longer governing | exit 0, no line for it |
 | `<run>/review-questions.json` not `ReviewQuestions`, or with a departure line that does not read | exit 1, `FAIL: review-questions.json: …` |
 | ask | stdout is `{"judge", "decide", "asked"}` only; `decide` true when it recorded no stop |
+| `ask plan` with touches exit code `1`, empty, or `00`, and a valid `touches.json` | exit 0, `touches-missing` recorded |
+| `decide` with judge exit code other than `0` and a valid all-`WITHIN` verdict, the asked record saying `judge` | exit 0, `verdict-unread` recorded |
+| `decide` with judge exit code `1` or empty, the asked record saying no judge | argument ignored, passes |
 | ask records a stop (e.g. `touches.json` missing) | exit 0, stdout `{"judge": false, "decide": false, "asked": ""}`, the stop record written |
 | ask with a stop record left from the last iteration | removes it first |
 | `report`, stop record `shown: false` | its lines on stderr, exit its `exit`, record rewritten `shown: true` |
@@ -95,14 +98,14 @@ step, a `touches.json` from it), a stand-in judge writing the verdict, stand-in 
 adr_ruling=@<file>` exports the file's content as `ADR_RULING` to that call only, `inputs.json` gains no
 `adr_ruling`, the after-tasks check runs without it; `adr_ruling=<json>` with no `@` exits non-zero; each resume
 after a stop runs a new iteration of the check loop, so a plan changed before a resume makes the touches step
-rewrite `touches.json` from it; a touches step that fails or times out leaves no `touches.json` from the last
-iteration and the run stops at `adr-plan-report` with `adr: true` and the `touches-missing` line;
+rewrite `touches.json` from it; a touches step that writes a valid `touches.json` and then fails or times out stops
+the run at `adr-plan-report` with `adr: true` and the `touches-missing` line;
 a decide that crashes fails the run at `adr-plan-decide` and the resume runs decide again, not clear, touches or
 ask; a stop in an iteration after the first, reported under a qualified id (`adr-plan-check:adr-plan-report:1`),
 reports `adr: true`; a check that stops 100 times fails the run at `adr-plan-rounds` with `adr: true`; `rescope … questions=@<file>` lands the file as `<run>/review-questions.json`;
 an ask stop and
-a decide stop each stop the run at `adr-plan-report` and report `adr: true` with their lines; a judge that fails or times out stops the run at `adr-plan-report` with `adr: true` and the
-`verdict-unread` line, and the resume runs the whole check again; a rescope runs both checks.
+a decide stop each stop the run at `adr-plan-report` and report `adr: true` with their lines; a judge that writes a valid verdict and then fails or times out stops the run at `adr-plan-report` with
+`adr: true` and the `verdict-unread` line, and the resume runs the whole check again; a rescope runs both checks.
 
 ## End to end (manual)
 
