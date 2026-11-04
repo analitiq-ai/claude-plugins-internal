@@ -49,7 +49,7 @@ python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'
 `decide`, then `report` in a scratch spec folder with a stand-in `adr`, a stand-in GitHub, a `<run>/touches.json`
 and a verdict file written by the test in the touches step's and the judge's place. Every line is on stderr, as the
 stop table gives it. A stop's exit below is the one `report` exits with; tasks-written, stories, ask and decide exit
-0 once they record it in `<run>/adr-stop.json`, and every step but report writes its done record in
+0 once they record it in `<run>/adr-stop.json`, and tasks-due, tasks-written, stories, ask and decide each write their done record in
 `<run>/adr-steps/`:
 
 | Scenario | Expect |
