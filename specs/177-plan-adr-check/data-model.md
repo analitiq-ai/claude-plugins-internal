@@ -54,7 +54,7 @@ for the task lines). The run folder is gitignored; builders and reviewers never 
 | `<run>/touches-from.json` | `adr-clear` | ask (`touches-stale`) | `plan.md`, `spec.md`, before the touches step reads them |
 | `<run>/tasks-sources-next.json` | `adr-tasks-due` | `adr-tasks-written` | every file the tasks command reads, before it runs |
 | `<run>/tasks-sources.json` | `adr-tasks-written` (renames the one above) | `adr-tasks-due`, report | the sources the current `tasks.md` was written from |
-| `<run>/adr-inputs.json` | stories, first, every round; decide rewrites the rulings file's entry after appending | report | `roundInputPaths`: the tasks sources, `tasks.md`, the rulings file, `codeworks.toml` and every file in each listed folder, as the round read them |
+| `<run>/adr-inputs.json` | stories, first, every round; decide rewrites the rulings file's entry after appending, only when the file still hashes as stories recorded it | report | `roundInputPaths`: the tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every file in each listed folder, as the round read them |
 
 ## Artifact path (`ArtifactPath`, `core/src/contracts/decision-check.ts`)
 

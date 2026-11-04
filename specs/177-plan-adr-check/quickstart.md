@@ -97,8 +97,10 @@ record it in `<run>/adr-stop.json`:
 | `stories`: `tasks.md` breaking the story plan or a task-block label | exit 1, `tasks-refused`, next step deletes `tasks.md` |
 | `stories` on a `new` run: extra, foreign or out-of-order sub-issues / the same on a `rescope` | exit 1, `sub-issues-extra` / `-foreign` / `-misplaced` / no sub-issue check |
 | `stories`: GitHub unanswered | exit 2, `COULD_NOT_RUN: GitHub: …` |
-| `report`, a file of `adr-inputs.json` changed (`plan.md`, a tasks source, `tasks.md`, the rulings file, `codeworks.toml`, a listed folder's file), stop record `shown: false` / no stop record / `adr-inputs.json` missing / a tasks source differing from `tasks-sources.json` | stop record deleted, nothing shown, stdout `{"again": true}`, exit 0 / the same / the same / the same |
+| `report`, a file of `adr-inputs.json` changed (`plan.md`, a tasks source, `tasks.md`, the rulings file, `review-questions.json`, `codeworks.toml`, a listed folder's file), stop record `shown: false` / no stop record / `adr-inputs.json` missing / a tasks source differing from `tasks-sources.json` | stop record kept, nothing shown, stdout `{"again": true}`, exit 0 / the same / the same / the same |
+| `report` re-run after it crashed in that branch, the changed file changed back | the kept stop record shown: its lines on stderr, exit its `exit` |
 | `decide` appending a ruling | `adr-inputs.json`'s rulings-file hash is the new file's; `report` then `{"again": false}` |
+| `decide` appending a ruling, an earlier entry deleted from the rulings file after stories | `adr-inputs.json` left as stories wrote it; `report` then `{"again": true}`, and the new round stops on the deleted entry's departure |
 | `report`, stop record `shown: false` | its lines on stderr, exit its `exit`, record rewritten `shown: true` |
 | `report`, stop record `shown: true` | record kept, stdout `{"again": true}`, exit 0; `clear` then deletes it |
 | `report`, stop record that does not parse | exit 2, `COULD_NOT_RUN: adr-stop.json: does not parse. …`, record rewritten valid with `shown: true` |

@@ -62,8 +62,8 @@ again, and report, finding them changed, runs that round. Exit 0.
 ### stories
 
 First writes `<run>/adr-inputs.json` (`SourceHashes` of core's `roundInputPaths`: every file the round checks, the
-tasks sources, `tasks.md`, the rulings file, `codeworks.toml` and every file in each folder `[shared] adr_folders`
-lists that resolves), whatever follows: it is the round's first step after `tasks.md` is written, so the hashes are
+tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every
+file in each folder `[shared] adr_folders` lists that resolves), whatever follows: it is the round's first step after `tasks.md` is written, so the hashes are
 of the files every later step of the round reads. Then the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
 R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
 (extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
@@ -103,8 +103,10 @@ whose record that call names as governing as a departure the judge named, once p
 not run is could not run. Then `ADR_RULING`, validated whole (artifact-grammar.md) against this round's
 departures, before any is dropped; a ruling whose key the rulings file already holds (an earlier round of the
 same resume wrote it) is satisfied, not refused; each valid new ruling is appended to
-`<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there, and
-decide then records the rulings file's new hash in `<run>/adr-inputs.json`, being its only writer. Then drops every departure whose
+`<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there.
+Before appending, decide hashes the rulings file: when it differs from `<run>/adr-inputs.json`'s entry (changed
+after stories hashed it), decide leaves `adr-inputs.json` as it is, so report runs a new round; otherwise, after
+appending, it records the hash of the bytes it wrote there, being its only writer besides stories. Then drops every departure whose
 `(folder, record, path)` a rulings entry names, and decides each folder (data-model, Folder outcome). The
 `checkAdrFolder` calls, departure lines' and rulings' alike, run at the same time under one 1500 s deadline. A pass
 prints every folder's lines through `adrStop`; a stop writes them to the stop record. Exit 0 either way.
@@ -114,8 +116,9 @@ prints every folder's lines through `adrStop`; a stop writes them to the stop re
 The round's last step (R6). First, before anything it shows: hashes again every file of core's `roundInputPaths`
 (the folders `[shared] adr_folders` lists as it now stands) and of `tasksSourcePaths`. When the first set differs from `<run>/adr-inputs.json`, or the second from
 `<run>/tasks-sources.json` (`tasks.md` written from older sources), or `adr-inputs.json` is missing or does not
-read, it deletes the stop record, prints `{"again": true}`, exit 0, writing no stop, and the loop runs a new round
-at once: a file changed after stories hashed it, on a resume that re-ran only a failed step (stories itself included), by a model step writing
+read, it prints `{"again": true}`, exit 0, showing nothing and keeping the stop record for the new round's
+`adr-clear` to delete, and the loop runs a new round at once (a report re-run before that clear, on files changed
+back, finds the record and shows it): a file changed after stories hashed it, on a resume that re-ran only a failed step (stories itself included), by a model step writing
 what it must not, or by hand, so that round's stop is out of date and its pass is no pass. Only with every file
 unchanged does it go on. Stop record with `shown: false`: prints its lines to stderr, rewrites it with
 `shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the resume after

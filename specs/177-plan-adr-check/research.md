@@ -142,10 +142,13 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     that round is what the earlier run left: touches, the tasks, ask and the judge are not run again. So report
     trusts a round only when every file it checked is unchanged: stories, the round's first step after `tasks.md` is written, records them first (`adr-inputs.json`,
     `roundInputPaths`), and report, before it shows a stop or ends the loop, hashes them again and the tasks sources
-    against `tasks-sources.json`; any difference drops the round's stop and runs a new round at once (executed on
-    1.1.3, stand-in). One rule covers a plan edited before a resume that re-runs only decide or report (its old stop
-    not shown, its old pass no pass), a model step writing `plan.md`, a hand-deleted ruling, a newly listed folder and
-    a tasks source changed while the tasks command ran.
+    against `tasks-sources.json`; any difference runs a new round at once without showing the round's stop, which
+    `adr-clear` then deletes (executed on 1.1.3, stand-in). decide records the rulings file's hash after appending
+    only when the file still hashes as stories recorded it, so a ruling deleted mid-round is not absorbed. One rule
+    covers a plan edited before a resume that re-runs only decide or report (its old stop not shown, its old pass no
+    pass), a model step writing `plan.md` or `review-questions.json`, a hand-deleted ruling, a newly listed folder
+    and a tasks source changed while the tasks command ran; keeping the stop record means a report killed in that
+    branch and re-run on files changed back still shows it.
   - report: a stop not yet shown is printed and the run stops at `adr-report` with the stop's exit; the resume runs
     report again, which keeps the shown stop and prints `{"again": true}`, so the loop runs a new round on the
     artifacts as they then stand, with that resume's `ADR_RULING`; the round's `adr-clear` deletes it. Deleting it

@@ -106,9 +106,9 @@ export function sourceHashes(cwd: string, paths: readonly string[]): Promise<Sou
 /** Every file the tasks command reads: the spec folder's spec.md, plan.md, research.md, data-model.md,
  *  quickstart.md, every file under contracts/, and .specify/memory/constitution.md. */
 export function tasksSourcePaths(cwd: string, specDir: string): Promise<string[]>;
-/** Every file a round checks: tasksSourcePaths, tasks.md, the rulings file, codeworks.toml, and every file in
- *  each of `folderPaths`. */
-export function roundInputPaths(cwd: string, specDir: string, folderPaths: readonly string[]): Promise<string[]>;
+/** Every file a round checks: tasksSourcePaths, tasks.md, the rulings file, codeworks.toml, the run folder's
+ *  review-questions.json when it exists, and every file in each of `folderPaths`. */
+export function roundInputPaths(cwd: string, specDir: string, runDir: string, folderPaths: readonly string[]): Promise<string[]>;
 
 /** Pure: one span against the path grammar (artifact-grammar.md). `null`: the span is not a path. Throws
  *  PathRefused naming the span when it reads as a path but breaks the grammar. */

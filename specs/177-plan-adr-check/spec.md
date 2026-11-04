@@ -363,8 +363,8 @@ once ruled; a rescope with no question takes the admin's words.
 - **FR-019**: The decide step MUST compare the paths (`touches.json` and `tasks.md`) and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
   changed (the same single-writer guard as FR-016). Before it shows a stop or ends the loop on a pass, the report
   step MUST hash again every file the round checked (the tasks' sources, `tasks.md`, the rulings file,
-  `codeworks.toml`, every file in each listed folder) and, when any changed since the round read it, drop the
-  round's stop and run a new round, so the run completes and stops only on files a round checked.
+  `codeworks.toml`, `review-questions.json` on a rescope, every file in each listed folder) and, when any changed
+  since the round read it, run a new round without showing the round's stop, so the run completes and stops only on files a round checked.
 - **FR-020**: Core's `protectedPaths` (orchestrator ADR-0004 d4) MUST name each root spec folder a story PR changes
   beyond TICK_ONLY (reviewer ADR-0010 d1; root ADR-0011), told by one pure core function, `isTickOnly`, and each
   in-repo folder `[shared] adr_folders` lists that it changes (root ADR-0011 d1); a folder named `specs` below the
