@@ -73,8 +73,8 @@ after critique and after a check stops, and a check that skips what it judges un
 3. We will commit a record the plan needs into the spec PR beside the spec it governs (ADR-0010), and a
    record found late into the rescope's spec PR; it governs a story in flight as reviewer ADR-0010 decides.
 4. We will treat `tasks.md` as derived from the plan: a round writes it again with the tasks command when it is
-   missing or when a file that command reads (`spec.md`, `plan.md`, `research.md`, `data-model.md`,
-   `quickstart.md`, `contracts/`, the constitution) changed since it was last written, and never otherwise.
+   missing, when a file that command reads changed since it last finished, or when its last run did not finish,
+   and never otherwise.
    Nobody edits it by hand: a fault in it is fixed in the plan or the spec, or by deleting it so the next round
    writes it again. The checks landing makes of `tasks.md` (its story plan and, on a new spec, the spec issue's
    sub-issues, read as the planner App, as landing reads them) run in every round, so they stop while the run can
