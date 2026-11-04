@@ -432,8 +432,11 @@ describe("issueStory", () => {
 describe("the story PR's closed", () => {
   const ref = { ref: `refs/heads/${BRANCH}`, node_id: `REF_${BRANCH}`, object: { sha: sha(1), type: "commit" } };
 
-  function routes(closed: boolean, merged: boolean): FakeRoutes {
-    const node = { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, closed, merged };
+  function prNode(closed: boolean, merged: boolean) {
+    return { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, closed, merged };
+  }
+
+  function routes(node: object): FakeRoutes {
     return {
       restPages: { "/repos/acme/widgets/git/matching-refs/heads/212-us": [ref] },
       graphqlPages: [
@@ -450,24 +453,31 @@ describe("the story PR's closed", () => {
     const pr = { number: 251, head: sha(251), merged, closed };
 
     it(`storyPr reads a PR that is ${state} as closed: ${closed}, merged: ${merged}`, async () => {
-      assert.deepEqual(await storyPr(fakeGitHub(routes(closed, merged)), REPO, BRANCH), pr);
+      assert.deepEqual(await storyPr(fakeGitHub(routes(prNode(closed, merged))), REPO, BRANCH), pr);
     });
 
     it(`issueStory reads a PR that is ${state} as closed: ${closed}, merged: ${merged}`, async () => {
-      assert.deepEqual(await issueStory(fakeGitHub(routes(closed, merged)), REPO, 212), { branch: BRANCH, pr });
+      assert.deepEqual(await issueStory(fakeGitHub(routes(prNode(closed, merged))), REPO, 212), { branch: BRANCH, pr });
     });
   }
 
-  // The query specPrs sends already asks for `closed`, so the story's PR needs no query of its own to read it.
-  it("storyPr and issueStory ask for the PRs on the branch with the query specPrs asks with", async () => {
+  it("refuses a PR answer that holds no closed", async () => {
+    const node = { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, merged: false };
+    await assert.rejects(storyPr(fakeGitHub(routes(node)), REPO, BRANCH), /not the shape asked for/);
+    await assert.rejects(issueStory(fakeGitHub(routes(node)), REPO, 212), /not the shape asked for/);
+  });
+
+  it("storyPr and issueStory ask for each PR's closed, with the query specPrs asks with", async () => {
+    const story = routes(prNode(true, false));
     const reader = fakeGitHub({
-      ...routes(true, false),
-      graphqlPages: [...(routes(true, false).graphqlPages ?? []), { when: (query, vars) => query.includes("pullRequests") && vars.branch === "145-spec", answer: [] }],
+      ...story,
+      graphqlPages: [...(story.graphqlPages ?? []), { when: (query, vars) => query.includes("pullRequests") && vars.branch === "145-spec", answer: [] }],
     });
     await storyPr(reader, REPO, BRANCH);
     await issueStory(reader, REPO, 212);
     await specPrs(reader, REPO, 145);
     const [fromStoryPr, fromIssueStory, fromSpecPrs] = queries(reader.calls);
+    assert.match(fromStoryPr, /nodes \{[^}]*\bclosed\b[^}]*\}/);
     assert.equal(fromStoryPr, fromSpecPrs);
     assert.equal(fromIssueStory, fromSpecPrs);
   });
