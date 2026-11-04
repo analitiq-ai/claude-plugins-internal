@@ -440,6 +440,19 @@ describe("internalReviewAt: true only when the newest internal-review check run 
     assert.equal(await attested([own, run(INTERNAL_REVIEW, "success", { app: IMPOSTOR })]), false);
   });
 
+  it("a newer run by another App, or by one whose App is gone, leaves appLogin's App's success standing", async () => {
+    const passed = run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR });
+    for (const newer of [
+      run(INTERNAL_REVIEW, "failure", { app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, "success", { app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, null, { status: "in_progress", app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, "failure", { app: null }),
+    ]) {
+      assert.equal(await attested([passed, newer]), true, JSON.stringify(newer));
+      assert.equal(await attested([newer, passed]), true, JSON.stringify(newer));
+    }
+  });
+
   it("no run is false", async () => {
     assert.equal(await attested([]), false);
   });
