@@ -368,10 +368,9 @@ class RoundFacts(Repo):
 
     def patched_first_round(self, state):
         """Round one, on a 20-line b.py with a finding at line 5, assessed PATCH."""
-        first = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
-        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5)], first)
+        head = self.commit("b.py", "".join(f"b{i}\n" for i in range(20)), "feat: b")
+        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=5)], head)
         assess(state, "PATCH")
-        return first
 
     def fix_b(self):
         """The branch's own fix: one commit that splits b.py line 5 in two."""
@@ -380,8 +379,7 @@ class RoundFacts(Repo):
         return self.commit("b.py", "".join(lines), "fix: b")
 
     def main_edits_merged(self):
-        """Main rewrites a.py lines 11-13, one commit each, and the branch merges main. A branch takes the base by
-        merge, never rebase, so what main did is in `first..HEAD` without being the branch's fix work."""
+        """Main rewrites a.py lines 11-13, one commit each, and the branch merges main."""
         git(self.root, "checkout", "-q", "main")
         lines = [f"line{i}\n" for i in range(30)]
         for i in range(3):
@@ -467,6 +465,15 @@ class RoundFacts(Repo):
             head = self.commit("b.py", f"{i + 1}\n", f"fix {i}")
         rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], head)
         self.assertEqual(facts.round_facts(state, rnd, str(self.root))["files_at_third_edit"], ["b.py"])
+
+    def test_commits_before_the_first_reviewed_head_are_not_edits(self):
+        state = ledger.new_state("acme/demo", "feat/1-demo", pr=7)
+        self.commit("b.py", "-1\n", "feat: b, first draft")
+        first = self.commit("b.py", "0\n", "feat: b")
+        self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], first)
+        assess(state, "PATCH")
+        rnd = self.round_with(state, [finding("code-reviewer-1", file="b.py", line=1)], self.commit("b.py", "1\n", "fix"))
+        self.assertEqual(facts.round_facts(state, rnd, str(self.root))["files_at_third_edit"], [])
 
     def test_a_finding_that_names_no_line_is_measured_like_any_other(self):
         """`line` is not required of a finding, and a whole-branch judgement never carries one."""

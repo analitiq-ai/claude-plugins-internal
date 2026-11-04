@@ -25,8 +25,8 @@ def _near(line: int | None, ranges: list[tuple[int, int]], slack: int) -> bool:
 def round_facts(state: dict, rnd: dict, root: str) -> dict:
     earlier = [r for r in counted(state, rnd["stage"]) if r is not rnd]
     first_reviewed = state["rounds"][0]["head_sha"]
-    # A branch takes its base by merge, never rebase, so what the base gained since the first round is in
-    # `first_reviewed..HEAD` too: the fixes are what HEAD holds beyond that head merged with the round's base.
+    # What the base branch brought in since round one is in HEAD too and is no fix work: the fixes are what HEAD
+    # holds beyond the first reviewed head merged with the round's base.
     fixed_from = worktree.merged(root, first_reviewed, rnd["base_sha"])
     fix_lines = worktree.added_lines(root, fixed_from)
     # `line` is optional: a whole-branch judgement (history-shape) names a file and no line.
@@ -45,6 +45,8 @@ def round_facts(state: dict, rnd: dict, root: str) -> dict:
     count_not_falling = bool(counts) and len(rnd["findings"]) >= counts[-1]
     # The original change is measured from the base it was written on; a github first round records none.
     base = state["rounds"][0]["base_sha"] or rnd["base_sha"]
+    # A branch takes its base by merge, never rebase (builder ADR-0004), so the first reviewed head is in HEAD's
+    # history and excluding it leaves exactly the commits after it.
     edits = worktree.commits_per_file(root, first_reviewed, rnd["base_sha"])
     return {
         "round": rnd["n"],
