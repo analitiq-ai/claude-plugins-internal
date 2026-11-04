@@ -26,7 +26,7 @@ refs match `[A-Za-z0-9._-]+`.
 | `ruling` | `{kind, v, ruling: Ruling}` with `commits: []` | `ruling.<r>.<h(key)>.json` | its round is in `rounds`; `(round, key)` not ruled |
 | `ruling-commit` | `{kind, v, round: RoundId, key, commit: sha40}` | `ruling-commit.<r>.<h(key)>.<commit>.json` | its ruling is FIX and lacks `commit` |
 | `pushback` | `{kind, v, pushback: Pushback}` | `pushback.<r>.<h(key)>.json` | its round is in `rounds` |
-| `hold` | `{kind, v, hold: {id, kind, since, question, spec_pr}}` | `hold.<id>.<since>.json` | no row, or its row RELEASED (reopened in place) |
+| `hold` | `{kind, v, hold: {id, kind, since, question, spec_pr}}` | `hold.<id>.<since>.json` | no row, or its row RELEASED (reopened in place); a `rescope` with `spec_pr` set also when its row records another `spec_pr` or none, OPEN or not (ADR-0013 d5) |
 | `release` | `{kind, v, release: {id, since, released, released_by}}` | `release.<id>.<since>.json` | the row `id` is OPEN with that `since` |
 | `release` of a tamper | `{kind, v, release: {id: "tamper-<oid>", since: null, released, released_by}}` | `release.tamper-<oid>.json` | `tamper-<oid>` is derived and unreleased |
 | `gates` | `{kind, v, ref, gates: Gates}` | `gates.<ref>.json` | always (replaces the section) |
