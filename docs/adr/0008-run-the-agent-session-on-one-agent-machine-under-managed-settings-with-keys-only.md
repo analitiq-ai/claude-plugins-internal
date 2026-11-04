@@ -117,7 +117,7 @@ Rejected by the user on 2026-10-26: managed settings are recorded in one place.
 - Easier: the model reads GitHub only as the session App and writes nothing there.
 - Harder: setup needs admin rights and, on Linux, bubblewrap and socat.
 - **How we would know this was wrong:** a sandboxed command or file tool reads a denied path, or a
-  reviewer App state comment no hook posted.
+  reviewer App commit on `ledger` no hook made.
 - Revisit if: plugins ship sandbox settings, or a tested protection fails.
 
 ## Action items

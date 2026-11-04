@@ -1,11 +1,11 @@
 ---
 schemaVersion: 0.2.0
 id: "0003"
-title: "Keep the validator modules and the state comment behind one contract each, in core/"
+title: "Keep the validator modules and the state record behind one contract each, in core/"
 status: accepted
 date: 2026-10-20
 deciders: ["@Analitiq-Bot-Wonka"]
-tags: [validators, findings, contract, state-comment, core]
+tags: [validators, findings, contract, state-record, core]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -31,13 +31,13 @@ review:
   decidedAt: 2026-10-28T14:35:46Z
 ---
 
-# ADR-0003: Keep the validator modules and the state comment behind one contract each, in core/
+# ADR-0003: Keep the validator modules and the state record behind one contract each, in core/
 
 ## Context
 
 External reviewers and CI grade a PR, each its own way. The orchestrator needs their status at the head;
-reviewer's github stage, their findings. reviewer's state, rounds and holds, lives in a tagged issue
-comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator reads.
+reviewer's github stage, their findings. reviewer's state, rounds and holds, lives on the served repo's
+`ledger` branch (reviewer ADR-0011), which reviewer's hook writes and the orchestrator reads as a fold.
 
 ## Decision
 
@@ -50,9 +50,9 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
 2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
    thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
    (ADR-0002).
-3. We will define the Findings contract, the state comment's snapshot and the spec facts (planner
+3. We will define the Findings contract, the state record's events and snapshot, and the spec facts (planner
    ADR-0008) as Zod schemas (ADR-0009) and generate their JSON Schemas.
-4. We will have no component reach the state comment other than through `core/`'s one read and write
+4. We will have no component reach the state record other than through `core/`'s one read and write
    (ADR-0001).
 5. We will make the modules the only way a component reads an external reviewer: the orchestrator calls
    `trigger` and `status` (orchestrator ADR-0008) and reads `findings` (orchestrator ADR-0007); reviewer's
@@ -79,7 +79,7 @@ comment (reviewer ADR-0011) that reviewer's hook writes and the orchestrator rea
 
 Rejected: planner and the orchestrator would import another plugin's code.
 
-### Option C: Each consumer reads raw threads, checks and the state comment
+### Option C: Each consumer reads raw threads, checks and the state record
 
 Rejected: one source parsed per consumer, with as many answers.
 

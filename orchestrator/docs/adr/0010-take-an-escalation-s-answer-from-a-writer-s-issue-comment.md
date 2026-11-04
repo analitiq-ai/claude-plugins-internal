@@ -29,7 +29,7 @@ review:
 
 ## Context
 
-An escalation hold, `escalation-<s>` in reviewer's state comment on the story issue, keeps the card
+An escalation hold, `escalation-<s>` in reviewer's state record of the story, keeps the card
 Blocked until a writer answers the round's question (reviewer ADR-0013). The orchestrator must know when
 the answer is in, yet it parses no prose (ADR-0001).
 
@@ -39,7 +39,8 @@ comment.
 ## Decision
 
 1. We will have the orchestrator post the hold's question as an issue comment, with its App, while an
-   escalation hold is open, in any lane (ADR-0002), keyed to the hold instance (id, since).
+   escalation hold, or a rescope hold a verdict placed (reviewer ADR-0013 d5), is open, in any lane
+   (ADR-0002), keyed to the hold instance (id, since).
 2. We will take as the answer an issue comment created after that question by a writer: its author a
    `User` whose `role_name` on the repository, from GitHub's collaborator-permission endpoint, is admin,
    maintain or write. A comment an App posts as itself has the App as its author, which names no person,

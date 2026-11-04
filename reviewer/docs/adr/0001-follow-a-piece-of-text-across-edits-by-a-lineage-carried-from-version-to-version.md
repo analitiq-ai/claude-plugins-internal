@@ -87,7 +87,7 @@ similarity threshold (git pairs moves by one).
 
 ### Option E: Keep every lineage, ended ones too, and per file the text the last check saw, beside the session
 
-Rejected: lost when the session ends (ADR-0011 Option B); git holds that text at the anchor, and nothing
+Rejected: lost when the session ends (ADR-0011 Option D); git holds that text at the anchor, and nothing
 reads an ended lineage again.
 
 ### Option F: Store each count, or the count a release left
@@ -110,7 +110,7 @@ Rejected: a claim first written in an unpushed commit has no place in that text.
 ## Consequences
 
 - Easier: an amend, a rebase or other work leaves every count as it was.
-- Harder: each such gate reads the anchor's text from git, and the story's state comment carries every open
+- Harder: each such gate reads the anchor's text from git, and the story's state record carries every open
   lineage.
 - **How we would know this was wrong:** a hold on a claim with fewer failed rulings than the bound, or a
   count changed by unrelated work.

@@ -5,7 +5,7 @@ title: "Name every verdict, ruling and outcome once, as an enum in core's contra
 status: accepted
 date: 2026-10-22
 deciders: ["@Analitiq-Bot-Wonka"]
-tags: [contracts, verdicts, enums, state-comment, core, reviewer]
+tags: [contracts, verdicts, enums, state-record, core, reviewer]
 scope: component
 reversibility: two-way-door
 blastRadius: component
@@ -55,7 +55,7 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 |---|---|---|
 | Round result | CLEAN, DIRTY, INCOMPLETE | core; reviewer ADR-0021 |
 | Round verdict, of a DIRTY round | PATCH, CLASS_FIX, REDESIGN, RESCOPE, CONVERGED_PUSHBACK, ESCALATE | core; reviewer ADR-0013, ADR-0017, ADR-0018 |
-| Finding ruling | FIX, PUSH_BACK, DEFER | core; reviewer ADR-0017 |
+| Finding ruling | FIX, PUSH_BACK, DEFER, ESCALATE | core; reviewer ADR-0017 |
 | Root cause | AT_CAUSE, AT_SYMPTOM, SPEC_WRONG, CANNOT_TELL, NOT_APPLICABLE | core; reviewer ADR-0017 |
 | Check outcome | PENDING, PASS, FAIL, SILENT, COULD_NOT_RUN, WAIVED | core; ADR-0003, ADR-0004 |
 | Hold kind | rescope, escalation, pushback, claim, shim, audit | core; reviewer ADR-0013 |

@@ -49,16 +49,18 @@ model's write from an admin's and a hook's.
    can read but not write, outside `~/.claude` and the session's temp folder, and its PreToolUse hook
    mint a new one before it expires (orchestrator ADR-0001 d3).
 3. We will have hooks alone act as `codeworks-orchestrator` (every write the orchestrator's records
-   give it) and `codeworks-reviewer` (rounds, holds), each App's key read only by its plugin's hooks:
+   give it) and `codeworks-reviewer` (rounds and holds, as commits on the served repo's `ledger` branch,
+   reviewer ADR-0011), each App's key read only by its plugin's hooks:
    all hooks run as one OS user, so pinned, write-denied plugin code holds this (ADR-0008).
 4. We will have planner act on GitHub only as its own App, `codeworks-planner` (contents, pull requests
    and issues write; organization projects read; it writes no lane, planner ADR-0005), whose key exists
    only where planner runs and whose token planner's own scripts mint there for their own GitHub calls
    alone; and the session's other commands there, like the admin, act only through the admin's personal
    login, under admin supervision.
-5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), and count no codeworks App
-   (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor in any
-   predicate.
+5. We will put no App on a ruleset bypass list (orchestrator ADR-0009), but the reviewer App on the one
+   ruleset that restricts who commits to the `ledger` branch (reviewer ADR-0011 d3), and count no
+   codeworks App (session, orchestrator, reviewer, planner) as an admin, WRITER, TRUSTED or EXEMPT actor
+   in any predicate.
 6. We will count a review round only by its record: reviewer's hook writes it as the reviewer App from
    verdicts reviewer ADR-0021 counts, and the orchestrator's hook attests `internal-review` only from it
    (reviewer ADR-0011).
@@ -101,6 +103,8 @@ and refused every Bash call when a mint failed.
 
 - Every GitHub write the loop needs is a hook's: a write a hook fails to make stays undone until a hook
   runs again.
+- The reviewer App's contents write reaches every branch no ruleset protects and GitHub's merge
+  endpoint; the ruleset alone stops a merge by it, as by the orchestrator App (reviewer ADR-0011).
 - Where planner runs, the planner App's key sits on the admin's machine (ADR-0008).
 - Where planner runs, the session's commands other than planner's scripts act with the admin's gh login:
   admin supervision, not a token's permissions, bounds what they write.
