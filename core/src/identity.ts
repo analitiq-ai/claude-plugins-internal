@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CommitSha } from "./contracts/snapshot.ts";
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
 import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient, type Repository } from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
@@ -131,25 +132,25 @@ export async function specFolder(tree: Tree, p: number): Promise<string> {
   );
 }
 
-const CommitOid = z.string().regex(/^[0-9a-f]{40}$/);
-
 const PullRequestHeadAnswer = z.object({
   number: IssueNumber,
   headRefName: z.string(),
-  headRefOid: CommitOid,
+  headRefOid: CommitSha,
   isCrossRepository: z.boolean(),
   merged: z.boolean(),
 });
 export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
 
-const PullRequestStateAnswer = z.object({
-  number: IssueNumber,
-  headRefName: z.string(),
-  isCrossRepository: z.boolean(),
-  closed: z.boolean(),
-  merged: z.boolean(),
-  mergeCommit: z.object({ oid: CommitOid }).nullable(),
-});
+const PullRequestStateAnswer = z
+  .object({
+    number: IssueNumber,
+    headRefName: z.string(),
+    isCrossRepository: z.boolean(),
+    closed: z.boolean(),
+    merged: z.boolean(),
+    mergeCommit: z.object({ oid: CommitSha }).nullable(),
+  })
+  .refine((pr) => pr.mergeCommit === null || pr.merged, { path: ["mergeCommit"], message: "a PR that has not merged holds no merge commit" });
 export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 
 // Bodies and closing references are not asked for: any writer can edit them, and the branch names the story
