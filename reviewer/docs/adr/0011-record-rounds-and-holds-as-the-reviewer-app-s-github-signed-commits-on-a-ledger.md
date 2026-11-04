@@ -56,23 +56,21 @@ branch has moved past is refused.
 
 1. We will record rounds and holds on the branch `ledger` of the served repo, under `issues/<n>/` for
    story issue `<n>`: one file per event, each write one commit the reviewer App makes with
-   `createCommitOnBranch`, naming as `expectedHeadOid` the head the hook read, so a write on a stale
-   reading is refused and the hook reads and decides again. A write only adds files, named by their kind
-   and key (a round by its workflow run, a hold by its id and `since`), so a retry that finds its events
-   in the fold is complete. The record carries a `gates` section, core's `Gates` contract
-   (`core/src/contracts/gates.ts`): the story's open lineages (ADR-0001) and bugs (ADR-0008), whose counts
-   place `claim-<id>` and `shim-<id>` holds (ADR-0013 d4); it changes only together with the holds it
-   places, in one commit. The hook asserts in the mutation's answer that GitHub signed the commit, and
-   fails the write otherwise, naming the commit. Reviewer's hook alone writes as that App,
-   `codeworks-reviewer`, whose key only hooks read (root ADR-0008), and only from verdicts ADR-0021 counts.
+   `createCommitOnBranch`, naming the head the hook read, so a write on a stale reading is refused and
+   the hook reads and decides again. A write only adds files, each named by its event's key, so a retry
+   that finds its events in the fold is complete. The record carries a `gates` section, core's `Gates`
+   contract (`core/src/contracts/gates.ts`): the story's open lineages (ADR-0001) and bugs (ADR-0008),
+   whose counts place `claim-<id>` and `shim-<id>` holds (ADR-0013 d4); it changes only together with the
+   holds it places, in one commit. The hook asserts in the mutation's answer that GitHub signed the
+   commit, and fails the write otherwise, naming the commit. Reviewer's hook alone writes, as that App.
 2. We will read a story's state as the fold of its directory's history on `ledger`, oldest first, from
    GitHub's API and never from a local copy, each event read from the commit that added it. A commit that
    touches the directory is one of three:
    - an event commit: GitHub-signed and valid, authored by the reviewer App's bot login (`[shared]` names
      it, root ADR-0002), adding files only;
    - a clearance: GitHub-signed and valid, authored by a user holding the repository admin role (the one
-     d3's bypass admits), deleting files only, every one a file an invalid commit added or changed. It
-     adds nothing to the fold and removes nothing from it;
+     d3 admits), deleting files only, every one a file an invalid commit added or changed. It adds
+     nothing to the fold and removes nothing from it;
    - an invalid commit: any other. It changes nothing in the fold: a file it added or changed is no
      event, and a file it deleted stays the event its commit made it. It places the hold `tamper-<oid>`,
      named by the commit, which the fold derives and no row records (ADR-0013 d1). ADR-0013 d2 or d3
@@ -81,23 +79,13 @@ branch has moved past is refused.
    The fold yields core's `Snapshot` (`core/src/contracts/snapshot.ts`): rounds, holds, pushbacks, rulings
    and gates, a released hold keeping its row and a rescope hold the number of the spec PR that placed it
    (ADR-0013). No reader takes the newest event alone. A story with no directory has no state.
-3. We will guard `ledger` with three rulesets, one per guarantee, since a bypass exempts its actors from
-   every rule in its ruleset (orchestrator `README.md`, setup step 6): block force pushes and restrict
-   deletions, no bypass; restrict updates, bypass the reviewer App and the repository admin role; require
-   signed commits, no bypass. Only the reviewer App and a repository admin can commit there, nothing
-   unsigned lands, a commit the reviewer hook makes with a custom author is refused, and nobody rewrites or
-   deletes the branch. The reviewer App holds `contents: write` and no `issues` permission: it posts no
+3. We will guard `ledger` with one ruleset per guarantee, since a bypass exempts its actors from every
+   rule in its ruleset: only the reviewer App and a repository admin can commit there, nothing unsigned
+   lands, and nobody rewrites or deletes the branch. The served repo's setup creates them (orchestrator
+   `README.md`, step 6). The reviewer App holds `contents: write` and no `issues` permission: it posts no
    issue comment; a hold's question is the orchestrator's (orchestrator ADR-0010 d1, ADR-0013 d5), and
    whatever else an admin must read on the issue the orchestrator renders from the fold. This is the one
    exception to root ADR-0007 d5.
-4. We will read and write the record only through the state module in `core/` (root ADR-0003):
-   reviewer's hook alone writes, and the orchestrator reads all of it: attestation, holds, pushbacks and
-   rulings (orchestrator ADR-0007). Planner writes no state: reviewer's hook places a rescope hold when it
-   sees the rescope's spec PR open (ADR-0013 d5).
-5. We will keep no copy of rounds or holds between hook runs: each hook run that decides on them reads
-   the fold once, through `core/`, and uses that one reading only within the run. Nothing migrates at
-   cutover: the SQLite ledger is deleted, no tagged comment is read, and a PR open at cutover is attested
-   only after a fresh internal round. Reviewer reports stay session-scoped files.
 
 ## Options considered
 
@@ -122,41 +110,37 @@ Rejected: lost with the agent machine.
 
 Rejected: a hold has nowhere to live before the PR exists.
 
-### Option F: The state module private to reviewer's plugin
-
-Rejected: the orchestrator would need a copy.
-
-### Option G: The orchestrator's App writes the record, reviewer handing it each verdict
+### Option F: The orchestrator's App writes the record, reviewer handing it each verdict
 
 Rejected: the orchestrator would attest from a record it wrote itself (orchestrator ADR-0004 Option C),
 and that a round exists would rest on a file on the agent machine instead of GitHub's signature.
 
-### Option H: A ledger beside the session as a cache, rebuilt from the state at the session's start
+### Option G: A ledger beside the session as a cache, rebuilt from the state at the session's start
 
 Rejected: a hook run would decide on a copy missing an event, an admin's comment or a reset made since.
 
-### Option I: A ledger repository of its own
+### Option H: A ledger repository of its own
 
 Rejected: a second installation, ruleset set and token per served repo, for a branch the served repo can
 hold.
 
-### Option J: A branch per story, `ledger/<n>`
+### Option I: A branch per story, `ledger/<n>`
 
 Rejected: a branch per story accumulates in every clone and branch list and needs creating, and by
 GitHub's docs a path-filtered history bounds a story's read on one branch as well.
 
-### Option K: Hash-chained events, or a reader that trusts the newest event
+### Option J: Hash-chained events, or a reader that trusts the newest event
 
 Rejected: GitHub's history already chains commits and its signature already names the App that made
 one; the newest event alone would let a stale or stray tail stand for the story.
 
-### Option L: Recover from an invalid commit by a generation the next release starts, or by an admin's force-push
+### Option K: Recover from an invalid commit by a generation the next release starts, or by an admin's force-push
 
 Rejected: a generation asks what carries over, and a stray commit would restart counts; a force-push
 past a mid-history commit rewrites every later commit locally, where GitHub signs nothing, and on one
 branch other stories' events follow within minutes.
 
-### Option M: Hold a story that has a PR and no record
+### Option L: Hold a story that has a PR and no record
 
 Rejected: the draft PR precedes the first round (builder ADR-0003); every story would wait for an admin.
 
@@ -181,7 +165,7 @@ Rejected: the draft PR precedes the first round (builder ADR-0003); every story 
   a clearance changes nothing in the fold; a write on a stale reading is refused and made again, not
   lost; tamper is GitHub's verdict, a signature and an author, not an inference from edit marks and
   timeline events.
-- Harder: an orphan branch and three rulesets per served repo; a read grows with a story's events, since
+- Harder: an orphan branch and its rulesets per served repo; a read grows with a story's events, since
   the fold reads the directory's commits and each commit's file list; an event or snapshot format change
   is a `core/` release.
 - **How we would know this was wrong:** a round in a fold no reviewer hook wrote; a commit on `ledger`
