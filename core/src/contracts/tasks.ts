@@ -5,11 +5,12 @@ import { assertIssueNumber } from "../github.ts";
 const LABEL_PREFIX = "Story issue:";
 const LABEL = /^Story issue: #([1-9][0-9]*)$/;
 const PHASE_HEADING = /^## Phase \S/;
-// Spec Kit's task line, `- [ ] T<nnn> [P] [US<k>] <description>`, `[P]` and the story tag optional. Ticked is `[x]`:
-// reviewer ADR-0010 d1 names a tick as `[ ]` flipped to `[x]`.
-const TASK_LINE = /^- \[([ x])\] (T[0-9]{3,})(?= |$)(?: \[P\])?(?: \[US([1-9][0-9]*)\])?/;
+// `[X]` too: Spec Kit's implement ticks with it.
+const TASK_LINE = /^ *- \[([ xX])\] (T[0-9]{3,})/;
+const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
 
-export type StoryTask = { id: string; ticked: boolean; story: number | null; line: string };
+export type TaskLine = { id: string; ticked: boolean; story: number | null };
+export type StoryTask = TaskLine & { line: string };
 
 /** A line under a phase heading that opens as a label but is not one: read as no label, it would be written twice. */
 export class TaskBlockLabelRefused extends Error {
@@ -19,11 +20,24 @@ export class TaskBlockLabelRefused extends Error {
   }
 }
 
-/** The task `line` states when it matches TASK_LINE; null for any line that does not. */
-export function readTaskLine(line: string): StoryTask | null {
+/** A task line tagged with two different stories: read as either, the other's work would go unbuilt. */
+export class TaskLineRefused extends Error {
+  constructor(line: string, stories: readonly number[]) {
+    super(`tasks.md: ${JSON.stringify(line)} is tagged ${stories.map((k) => `US${k}`).join(" and ")}, where a task is one story's`);
+    this.name = "TaskLineRefused";
+  }
+}
+
+/**
+ * The task `line` states when it matches TASK_LINE; null for any line that does not. A matching line tagged with two
+ * different stories throws TaskLineRefused.
+ */
+export function readTaskLine(line: string): TaskLine | null {
   const task = TASK_LINE.exec(line);
   if (task === null) return null;
-  return { id: task[2], ticked: task[1] === "x", story: task[3] === undefined ? null : Number(task[3]), line };
+  const stories = [...new Set(Array.from(line.matchAll(STORY_TAG), (tag) => Number(tag[1])))];
+  if (stories.length > 1) throw new TaskLineRefused(line, stories);
+  return { id: task[2], ticked: task[1] !== " ", story: stories[0] ?? null };
 }
 
 /** Spec Kit's `## Phase <n>: <title>`, the heading each task block opens with. */
@@ -57,7 +71,8 @@ export function readTaskBlockLabels(text: string): ReadonlyMap<string, number> {
 }
 
 /**
- * Each task line of every phase block labelled `#<s>`, in file order. A section that is no phase ends a block.
+ * Each task line of every phase block labelled `#<s>`, with the line as written, in file order. A section that is no
+ * phase ends a block.
  * Each block's label is read under its own heading, never looked up by heading text, which two phases can share.
  */
 export function storyTasks(text: string, s: number): StoryTask[] {
@@ -70,7 +85,7 @@ export function storyTasks(text: string, s: number): StoryTask[] {
     else if (line.startsWith("## ")) inStory = false;
     else if (inStory) {
       const task = readTaskLine(line);
-      if (task !== null) tasks.push(task);
+      if (task !== null) tasks.push({ ...task, line });
     }
   });
   return tasks;

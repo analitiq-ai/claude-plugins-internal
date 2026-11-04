@@ -9,7 +9,7 @@ import type { Mint } from "../lib/github.ts";
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const { join, posix } = await import("node:path");
 const { z } = await import("zod");
-const { isPhaseHeading, readTaskBlockLabels, readTaskLine, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
+const { isPhaseHeading, readTaskBlockLabels, readTaskLine, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused } = await import("../core/contracts/tasks.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
 const { answerOf, gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
@@ -394,7 +394,7 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
       for (const line of error.lines) io.stderr(line);
       return 1;
     }
-    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused) {
+    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused || error instanceof TaskLineRefused) {
       io.stderr(`${error.message}. Next step: correct the spec folder's tasks.md, then land again.`);
       return 1;
     }
