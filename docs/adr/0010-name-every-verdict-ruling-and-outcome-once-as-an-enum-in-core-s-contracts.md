@@ -5,7 +5,7 @@ title: "Name every verdict, ruling and outcome once, as an enum in core's contra
 status: accepted
 date: 2026-10-22
 deciders: ["@Analitiq-Bot-Wonka"]
-tags: [contracts, verdicts, enums, state-comment, core, reviewer]
+tags: [contracts, verdicts, enums, state-record, core, reviewer]
 scope: component
 reversibility: two-way-door
 blastRadius: component

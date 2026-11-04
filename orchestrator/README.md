@@ -25,7 +25,8 @@ are in `docs/adr/`.
    bypass exempts its actors from every rule in its ruleset:
    - block force pushes and restrict deletions; bypass list empty;
    - restrict updates; bypass list: the `codeworks-reviewer` App and the repository admin role, the only
-     two who can commit there, the admin only to delete a file the record must not count;
+     two who can commit there, the admin only to delete what an invalid commit put there (reviewer
+     ADR-0011 d2);
    - require signed commits; bypass list empty. GitHub signs what the App commits through its API and
      refuses a commit made with a custom author.
 7. Install each external reviewer listed in `validators`, as its package in `validators/<name>/` says
