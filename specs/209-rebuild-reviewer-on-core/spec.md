@@ -215,7 +215,8 @@ made, on the first run only. Repeat with the record faked as a resume; check non
   as the reviewer App that adds files only and names the head the hook read (ADR-0011 d1, d3).
 - **FR-002**: reviewer MUST read a story's state only through core's reader, and act on its answer: a held
   state refuses what it refuses, naming the release core gives. While `tamper-<oid>` is open, reviewer MUST
-  make no state write and MUST refuse the step that needed one, naming the release (ADR-0011 d2).
+  make no state write other than FR-007's release once FR-024's condition holds, and MUST refuse the step that
+  needed one, naming the release (ADR-0011 d2).
 - **FR-003**: Rounds and holds MUST use core's value sets (`RoundStage`, `RoundResult`, `RoundVerdict`,
   `HoldKind`, `HoldState`); reviewer repeats no value's string (root ADR-0010).
 - **FR-004**: reviewer MUST keep no copy of rounds or holds between hook runs: each hook run that decides on

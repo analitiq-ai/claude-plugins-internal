@@ -88,8 +88,10 @@ reading.head`, additions only, headline `issues/<n>: <kinds>`), and returns the 
 | `recordGates(…, reading, ref, gates, openings)` | `gates` + a `hold` for each opening not OPEN | — |
 | `releaseOnClaim(…, reading)` → `ClaimRelease {released, reset}` | a `release` per releasable hold and releasable tamper | an unreleased tamper not releasable, naming its `remaining` and the release |
 
-Every write refuses while an unreleased tamper stands, naming: a repository admin's deletion on `ledger` of
-`remaining`, then a Ready move on `[shared] board` and an admin's comment after the invalid commit, then the claim.
+Every write refuses while an unreleased tamper stands, except `releaseOnClaim`'s commit when every such tamper
+is releasable, which is the write that releases them (FR-024). The refusal names: a repository admin's deletion on
+`ledger` of `remaining`, then a Ready move on `[shared] board` and an admin's comment after the invalid commit,
+then the claim.
 Events whose file is already in the fold are dropped; with none left nothing is committed (a retry, FR-016).
 
 After the mutation: `StateWriteUnsigned(oid)` unless `signature.isValid && signature.wasSignedByGitHub`; on

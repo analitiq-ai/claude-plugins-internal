@@ -9,7 +9,7 @@ both modes, and record nothing (R15).
 | commit with no session record, reviewer on | `/codeworks <issue>`, or `reviewer off` |
 | commit on a branch not starting `<s>-us` | session issue `#<s>`, allowed prefix `<s>-us` |
 | session record unreadable | could not run; the record's path; re-run after the orchestrator rewrites it |
-| unreleased `tamper-<oid>` on the story (any state write, commit or round launch) | held; the commit; its `remaining` files for a repository admin to delete on `ledger`, then a Ready move on `[shared] board` and an admin's comment on `#<s>` after it, then the claim (ADR-0011 d2, ADR-0013 d2–d3) |
+| unreleased `tamper-<oid>` on the story (any state write but its own release by `releaseOnClaim`, any commit or round launch) | held; the commit; its `remaining` files for a repository admin to delete on `ledger`, then a Ready move on `[shared] board` and an admin's comment on `#<s>` after it, then the claim (ADR-0011 d2, ADR-0013 d2–d3) |
 | served repo has no `ledger` branch | could not run; orchestrator `README.md` step 6 (FR-025) |
 | `StateStale` on the third attempt of one step | could not run; `ledger` kept moving; retry the step |
 | `StateWriteUnsigned` | could not run; the commit's oid, which holds the story as `tamper-<oid>` until cleared |

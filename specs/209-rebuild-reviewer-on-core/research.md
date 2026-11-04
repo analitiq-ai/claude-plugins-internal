@@ -136,8 +136,9 @@ named, at main 49a3d8b (reviewer ADR-0011 and ADR-0013 as merged in #290).
 ## R7: Writes are add-only commits through `createCommitOnBranch`, each asserting GitHub's signature (core PR B)
 
 - **Decision**: One private `commitEvents(writer, repo, issue, reading, events)` in `core/src/state.ts` is the
-  only path to `ledger`: it refuses when `reading` has an unreleased tamper (FR-002, naming its release), validates
-  every event, drops events whose file the fold already holds (retry, FR-016), commits nothing when none is left,
+  only path to `ledger`: it refuses when `reading` has an unreleased tamper, unless the events release every one
+  of them, which only `releaseOnClaim` sends and only when each is releasable (FR-002, FR-024; the refusal names
+  the release), validates every event, drops events whose file the fold already holds (retry, FR-016), commits nothing when none is left,
   and otherwise calls `createCommitOnBranch` (`fileChanges.additions` only, `expectedHeadOid: reading.head`,
   headline `issues/<n>: <kinds>`), asking back `commit { oid signature { isValid wasSignedByGitHub } }`. An answer
   not both true throws `StateWriteUnsigned` naming the oid (FR-016). The public writes keep their roles and gain
