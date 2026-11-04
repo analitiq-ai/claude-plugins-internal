@@ -177,6 +177,23 @@ def review_base(root: str, target: str) -> str:
     return git(root, "merge-base", tracking, "HEAD")
 
 
+_OID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+
+
+def merged(root: str, head: str, base: str) -> str:
+    """The tree `head` would hold once it merged `base`, as git merges them. A text conflict is left as git leaves
+    it, both sides between markers, so a diff from this tree shows how it was resolved; a modify/delete conflict
+    keeps the modified side and a binary conflict the head's, so a resolution that kept that side does not show.
+    A `base` the head already carries gives the head's own tree. RuntimeError when git cannot merge them."""
+    args = ("merge-tree", "--write-tree", "--no-messages", "--name-only", head, base)
+    done = _run(root, *args)
+    # git exits 1 both for a conflict, whose tree it still writes, and for a side it cannot merge, where it writes none.
+    tree = done.stdout.split("\n", 1)[0]
+    if done.returncode not in (0, 1) or not _OID.fullmatch(tree):
+        raise RuntimeError(f"git {' '.join(args)} wrote no tree id in {root}: {done.stderr.strip() or tree!r}")
+    return tree
+
+
 def files_in(root: str, rev_range: str) -> list[str]:
     """Every path `rev_range` touches, both sides of a rename."""
     return _listed(root, *_DIFF, "--no-renames", "--name-only", "-z", rev_range)
@@ -281,7 +298,7 @@ def _extend(hunk: Hunk, side: str, line: str) -> Hunk:
 
 
 def added_lines(root: str, since: str) -> dict[str, list[tuple[int, int]]]:
-    """Per file, the line ranges (in today's numbering) written after `since`."""
+    """Per file, the line ranges (in today's numbering) HEAD holds and `since`, a commit or tree, does not."""
     ranges: dict[str, list[tuple[int, int]]] = {}
     for hunk in _diff_hunks(root, f"{since}..HEAD"):
         if hunk.new_count:
@@ -372,10 +389,12 @@ def additions(root: str, since: str, until: str) -> int:
     return sum(int(r[0]) for r in rows if r[0] != "-")
 
 
-def commits_per_file(root: str, since: str) -> dict[str, int]:
+def commits_per_file(root: str, *excluded: str) -> dict[str, int]:
+    """Per file, how many commits HEAD has that none of `excluded` has. A merge commit names no file, its conflict
+    resolution included: git log writes no diff for a merge."""
     counts: dict[str, int] = {}
     # log.showSignature would write git's verdict on a signature in among the names.
     for name in _listed(root, *_PINNED_CONFIG, "log", *_PINNED_OPTIONS, "--no-show-signature", "--name-only", "-z",
-                        "--format=", f"{since}..HEAD"):
+                        "--format=", "HEAD", *(f"^{rev}" for rev in excluded)):
         counts[name] = counts.get(name, 0) + 1
     return counts

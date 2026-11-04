@@ -328,7 +328,7 @@ the new head.
 ### Key Entities
 
 - **Story issue `<s>`**: the one number the step takes; its lane, open/closed state, parent `<p>` and body.
-- **Task ticks**: the `[x]` boxes of the `tasks.md` task blocks labelled `Story issue: #<s>` at the story head; a
+- **Task ticks**: the `[x]` or `[X]` boxes of the `tasks.md` task blocks labelled `Story issue: #<s>` at the story head; a
   story's own phase, plus Setup and Foundational for the first story and Polish for the last (planner ADR-0008 d2;
   reviewer ADR-0010 d1).
 - **Spec folder `specs/<p>-*`**: on the default branch or the story head; its `spec.md` and `codeworks` keys give the

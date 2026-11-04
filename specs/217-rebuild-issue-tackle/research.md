@@ -147,8 +147,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R11: Task ticks are read from tasks.md by core
 
-- **Decision**: core gains `storyTasks(text, s)` (B2) in `contracts/tasks.ts`: every task line (`- [ ]` /
-  `- [x]` + Spec Kit's `T<nnn>` id) in each phase block whose label is `Story issue: #<s>`, with its id, tick and
+- **Decision**: core gains `storyTasks(text, s)` (B2) in `contracts/tasks.ts`: every task line (optional leading spaces, `- [ ]` /
+  `- [x]` / `- [X]` + Spec Kit's `T<nnn>` id; Spec Kit's implement ticks with `[X]`) in each phase block whose label is `Story issue: #<s>`, with its id, tick and
   `[US<k>]` tag, each line read by one exported grammar, `readTaskLine`. planner's `land.ts` reads tags through
   it too, dropping its private `TASK_LINE` and `STORY_TAG`, so one grammar answers both. The script reads `tasks.md` at HEAD; no block labelled `#<s>` gives no tasks, and an implement
   step then builds the requirement as one task (spec Edge Cases). The skill ticks a task in a commit that flips

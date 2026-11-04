@@ -12,7 +12,7 @@ import os
 import sys
 import time
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -438,6 +438,16 @@ def _review_base(where: worktree.Worktree, target: str) -> str:
                            f"not be read: {exc}") from exc
 
 
+def _delta_start(where: worktree.Worktree, decision: policy.Decision, base: str) -> policy.Decision:
+    """A delta round diffs from the last reviewed head as it would be once it merged `base`: what the base branch
+    brought in since that round is not the branch's work. RuntimeError saying why when git cannot merge them."""
+    try:
+        return replace(decision, delta_from=worktree.merged(where.root, decision.delta_from, base))
+    except RuntimeError as exc:
+        raise RuntimeError(f"The change since the last round is measured from its head {decision.delta_from[:7]} "
+                           f"merged with {base[:7]}, and that merge could not be made: {exc}") from exc
+
+
 @dataclass(frozen=True)
 class SpecStep:
     """What a launch's spec check does to its PR's binding: the fields the save that lets the launch through sets,
@@ -634,9 +644,13 @@ def on_workflow(payload: dict, deadline: adrkit.Deadline) -> dict | None:
             started = time.monotonic()
             try:
                 base = _review_base(where, merges_into)
+                spent["review-base fetch"] = time.monotonic() - started
+                if decision.scope == "delta":
+                    started = time.monotonic()
+                    decision = _delta_start(where, decision, base)
+                    spent["merge of the last reviewed head"] = time.monotonic() - started
             except RuntimeError as exc:
                 return block(payload, action, str(exc), event)
-            spent["review-base fetch"] = time.monotonic() - started
             governance = None
             if stage == "internal":
                 governance, refused = _governance(payload, action, event, where, decision, base, deadline, spent)
