@@ -201,7 +201,7 @@ setting special-cased?
 
 Source: reviewer: `reviewer/docs/adr/0014-derive-the-spec-from-the-branch-at-each-round-s-launch-and-read-the-folder-as-da.md`
 (decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
-(decision 3). planner: `planner/docs/adr/0009-check-the-plan-against-the-governing-decision-logs-before-critique.md`
+(decision 3). planner: `planner/docs/adr/0009-check-the-plan-and-its-tasks-against-the-governing-decision-logs-before-landing.md`
 (decision 1). orchestrator: `orchestrator/docs/adr/0001-drive-the-issue-loop-from-the-orchestrator-plugin-s-hooks-inside-the-agent-sessi.md`
 (decision 2). All: `docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`;
 `docs/adr/0002-keep-every-component-s-settings-in-one-toml-file-one-section-per-component.md`;

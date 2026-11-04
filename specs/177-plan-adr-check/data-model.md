@@ -33,33 +33,46 @@ Planner reads `governing` and `broken`; reviewer also reports `notices`. Read fr
 
 ## Checked artifact (`CheckedArtifact`, value set)
 
-`plan` (paths from the touches step's `<run>/touches.json`), `tasks` (paths from `tasks.md` task lines). Owner: planner
-ADR-0009.
+Which artifact named a path: `plan` (from the touches step's `<run>/touches.json`), `tasks` (from `tasks.md` task
+lines). One check reads both. Owner: planner ADR-0009.
 
 ## Touched paths (`TouchedPaths`, `<run>/touches.json`)
 
-`{v: 1, paths: PATH[]}`, no entry twice (artifact-grammar.md). Deleted by `adr-plan-clear`, the after-plan check
-loop's first step; written by the touches step `adr-plan-touches`, its second, from `plan.md` as it then stands
-(`adr-touches.md`), rebuilt in each iteration of the check loop, so at each resume after a stop. Readers: `adr_check.ts` ask and decide only (plan's paths; tasks' root entries). The run
-folder is gitignored; builders and reviewers never see it. Unparsable or wrong shape: refused; missing or empty:
-could not run, naming `touches.json`, for both artifacts.
+`{v: 1, paths: PATH[]}`, no entry twice (artifact-grammar.md). Deleted by `adr-clear` at the start of each round of
+the check loop; written by the touches step `adr-touches` from `plan.md` as it then stands (`adr-touches.md`), so
+rebuilt at each resume after a stop. Readers: `adr_check.ts` ask and decide only (the plan's paths, and root entries
+for the task lines). The run folder is gitignored; builders and reviewers never see it. Unparsable or wrong shape:
+`touches-refused`; missing or empty: `touches-missing`.
+
+## Source hashes (`SourceHashes`)
+
+`{v: 1, files: {<path>: <sha256>}}`, the path repo-relative under the checkout and absolute for a file of a listed
+folder outside it, an absent file left out (artifact-grammar.md); one core function,
+`sourceHashes`, computes it.
+
+| File | Writer | Reader | Hashes |
+|---|---|---|---|
+| `<run>/touches-from.json` | `adr-clear` | ask (`touches-stale`) | `plan.md`, `spec.md`, before the touches step reads them |
+| `<run>/tasks-sources-next.json` | `adr-tasks-due` | `adr-tasks-written` | `tasksSourcePaths` (core.md), before the tasks command runs |
+| `<run>/tasks-sources.json` | `adr-tasks-written` (renames the one above); deleted by `adr-tasks-due` when due | `adr-tasks-due`, report | the sources the current `tasks.md` was written from by a tasks command that finished |
+| `<run>/adr-inputs.json` | stories, first, every round | report | `roundInputPaths` (core.md), as the round read them |
 
 ## Artifact path (`ArtifactPath`, `core/src/contracts/decision-check.ts`)
 
 | Field | Type | Meaning |
 |---|---|---|
 | `path` | string | one literal `PATH` (artifact-grammar.md) |
+| `artifact` | `CheckedArtifact` | which artifact named it; a path both name is one entry per artifact |
 | `line` | number | line in `tasks.md`; for `touches.json`, the entry's 1-based index in `paths` |
 | `story` | string \| null | `tasks` only: `US<k>` from the tag, else the phase heading's text without `## ` |
 
-## Asked record (`AdrAsked`, `<run>/adr-<artifact>-asked.json`)
+## Asked record (`AdrAsked`, `<run>/adr-asked.json`)
 
 Writer: `adr_check.ts ask`. Readers: the judge, `adr_check.ts decide`.
 
 | Field | Type |
 |---|---|
 | `v` | `1` |
-| `artifact` | `CheckedArtifact` |
 | `paths` | `ArtifactPath[]` |
 | `folders` | per listed folder, in list order: `{entry, path, inside, outcome: CouldNotRun}` or `{entry, path, inside, governing, broken}` |
 
@@ -67,14 +80,13 @@ Stdout JSON only: `judge`, true when any folder has a governing record; `decide`
 `asked`, the sha256 of the record's bytes, which the workflow passes to decide (R9 c), empty when ask recorded a
 stop. On an empty `adr_folders` the record has no paths and no folders, no artifact is read, and `judge` is false.
 
-## Verdict (`AdrVerdict`, `<run>/adr-<artifact>-verdict.json`)
+## Verdict (`AdrVerdict`, `<run>/adr-verdict.json`)
 
 Writer: the judge (prompt step). Reader: `adr_check.ts decide`.
 
 | Field | Type | Rule |
 |---|---|---|
 | `v` | `1` | |
-| `artifact` | `CheckedArtifact` | equals the asked one |
 | `verdicts[]` | `{folder, record, judgment, paths, why}` | exactly one per governing record per folder |
 | `folder` | string | the entry as written, as the asked record gives it |
 | `judgment` | `AdrJudgment`: `WITHIN`, `DEPARTS` | owner planner ADR-0009 |
@@ -88,11 +100,14 @@ Writer: the judge (prompt step). Reader: `adr_check.ts decide`.
 
 - Rulings file: `<spec folder>/adr-rulings.json`, `AdrRulings` (`{v: 1, rulings}`, no key twice); only the user's
   rulings. Writer: `adr_check.ts decide`, from `ADR_RULING` only. Readers: the judge, every later ask and decide
-  (through core's `readRulings`), reviewer's decision check (US5). An entry honours every departure with its key, in
-  either artifact.
+  (through core's `readRulings`), reviewer's decision check (US5). An entry honours every departure with its key,
+  whichever artifact named the path.
 - One resume's ruling: `ADR_RULING`, an `AdrRuling[]` as JSON, read by `drive_workflow.py` from the file named in
   `adr_ruling=@<file>` and exported to that invocation only. Writer: the session, with the Write tool, on the user's
-  words only. Validated whole (artifact-grammar.md): one refused ruling refuses them all.
+  words only. Reaches every round that call runs; validated whole against the departures of the round whose decide
+  reads it (artifact-grammar.md): one refused ruling, a ruling naming no departure among them, refuses them all; one
+  whose key the rulings file already holds is satisfied. A ruling the call never added and never refused is named by
+  `drive_workflow.py` (`ruling_unapplied`).
 
 ## Departure found at review (`AdrDeparture`, `ReviewQuestions`)
 
@@ -106,17 +121,20 @@ question}[]}`, no `(issue, hold)` twice.
   through core's `renderAdrDeparture`. Readers: the orchestrator (posts the question as it stands), planner's
   `rescope_questions.ts` (the lines through `readAdrDepartures`).
 - `<run>/review-questions.json`: the open review questions under the spec's issue, copied by
-  `drive_workflow.py rescope … questions=@<file>`. Readers: the plan check's ask step, which adds each departure's
+  `drive_workflow.py rescope … questions=@<file>`. Readers: the check's ask step, which adds each departure's
   path to the paths it checks, and its decide step, which checks each `(folder, record, path)` with one
   `checkAdrFolder(cwd, folder, [path], …)` call, under the run's 1500 s deadline with the ruling checks, and adds
   each departure whose record that call names as governing as a departure the judge named, once per key, before
   rulings are applied (R13). A ruling is keyed
   on `(folder, record, path)`, never on a story.
 
-## Stop record (`AdrStopRecord`, `<run>/adr-<artifact>-stop.json`)
+## Stop record (`AdrStopRecord`, `<run>/adr-stop.json`)
 
-Writers: `adr_check.ts` ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, rewriting it
-`shown: true` once it printed the lines, then deleting it on the resume. Reader: `adr_check.ts report`.
+Writers: the steps the stop table's Step column names, with `shown: false`, under the round's first-stop rule
+(workflow-steps.md); `adr_check.ts report`, writing it `shown: true` once it printed the lines (one that does not
+parse, or a `step-unfinished` stop, written as its line); `adr-clear`, deleting it at each round's start. Readers:
+`adr_check.ts report`, and every round step that records a stop, which checks nothing once one is recorded this
+round (decide only through ask's `decide`).
 
 | Field | Type | Rule |
 |---|---|---|
@@ -124,12 +142,31 @@ Writers: `adr_check.ts` ask and decide, on a stop, with `shown: false`; `adr_che
 | `exit` | `1` \| `2` | 2 when any line is `COULD_NOT_RUN`, else 1 |
 | `lines` | string[] | non-empty; each a line `adrStop` rendered |
 | `shown` | boolean | `report` printed the lines |
+| `unanswered` | boolean | the stop's row has an Unanswered step (workflow-steps.md, stop table); report shows it before it compares the round's files |
+
+## Step done record (`AdrStepDone`, `<run>/adr-steps/<step>.json`)
+
+Writer: each step this union names, as its last act (workflow-steps.md); the union is the one list of them. Reader: `adr_check.ts report`, which takes a missing record as a step that did not finish
+(`step-unfinished`). Deleted with its folder by `adr-clear` (workflow-steps.md).
+
+```ts
+export const AdrStepDone = z.discriminatedUnion("step", [
+  z.object({ v: z.literal(1), step: z.literal("tasks-due"), due: z.boolean() }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("tasks-written") }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("stories") }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("ask"), decide: z.boolean() }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("decide") }).strict(),
+]);
+```
+
+`due` and `decide` tell report which steps of the `if` blocks this round expects a record from.
 
 ## Rulings written (`<run>/adr-rulings-written.json`)
 
-`AdrRulings`: every entry decide appended to the rulings file in this run. Writer: `adr_check.ts decide`. Readers:
+`AdrRulings`: every entry decide appended to the rulings file in this run, each appended here before the rulings
+file. Writer: `adr_check.ts decide`. Readers:
 the writer guard in ask and decide (R9 a): a rulings-file entry, compared whole, in neither this record nor the file
-at `HEAD` is could not run.
+at `HEAD` is could not run. A record that does not parse is deleted, and the guard names every entry the run added.
 
 ## Folder outcome (`FolderOutcome`, `planner/plugin/lib/adr-check.ts`)
 
@@ -143,11 +180,11 @@ at `HEAD` is could not run.
 | `broken` | as in adr answer; each one makes the folder `FAIL` |
 | `couldNotRun` | `CouldNotRun` or null |
 
-Per check run, computed from the asked record, the verdict and the rulings file (R8); nothing is stored between runs
+Per round, computed from the asked record, the verdict and the rulings file (R8); nothing is stored between runs
 but the rulings file.
 
 ## Check stop (`AdrStop`, `ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
 A stop is a list of `{kind, label, what}` items, `kind` a row of the stop table (workflow-steps.md); `adrStop`
-renders each as a line and the list as an exit (R8). Every subcommand's every line goes through it; ask's and
-decide's stop lines reach stderr through the stop record and `report`.
+renders each as a line and the list as an exit (R8). Every subcommand's every line goes through it; stories', ask's
+and decide's stop lines reach stderr through the stop record and `report`.

@@ -78,7 +78,7 @@ export const AdrJudgment = valueSet({
   WITHIN: "the artifact sits inside the record: it does nothing the record rejected or contradicts",
   DEPARTS: "the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to",
 });
-export const CheckedArtifact = valueSet({ plan: "the touches step's touches.json", tasks: "tasks.md's task lines" });
+export const CheckedArtifact = valueSet({ plan: "a path the touches step's touches.json lists", tasks: "a path a task line of tasks.md names" });
 ```
 
 ## `core/src/contracts/decision-check.ts`
@@ -90,11 +90,29 @@ Every file planner's check reads or writes in the run folder or the spec folder,
 export const ADR_RULINGS_FILE = "adr-rulings.json";              // in the spec folder
 export const TOUCHES_FILE = "touches.json";                      // in the run folder, written by the touches step
 export const ADR_RULINGS_WRITTEN_FILE = "adr-rulings-written.json";
-export const askedFile = (artifact: CheckedArtifactName) => `adr-${artifact}-asked.json`;
-export const verdictFile = (artifact: CheckedArtifactName) => `adr-${artifact}-verdict.json`;
-export const stopFile = (artifact: CheckedArtifactName) => `adr-${artifact}-stop.json`;
+export const ASKED_FILE = "adr-asked.json";
+export const VERDICT_FILE = "adr-verdict.json";
+export const STOP_FILE = "adr-stop.json";
+export const TOUCHES_FROM_FILE = "touches-from.json";           // plan.md and spec.md as the touches step read them
+export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources the current tasks.md was written from
+export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
+export const STEPS_DIR = "adr-steps";                          // one AdrStepDone per finished shell step of the round
+export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as stories hashed them
+/** The run-folder files one round writes; `adr-clear` deletes them all before the round. */
+export const ROUND_FILES = [STEPS_DIR, TOUCHES_FILE, INPUTS_FILE, ASKED_FILE, VERDICT_FILE, STOP_FILE] as const;
 
-export type ArtifactPath = { path: string; line: number; story: string | null };
+export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
+
+export const SourceHashes: z.ZodType;   // {v: 1, files: {<repo-relative or absolute path>: <sha256>}}
+/** The sha256 of each path given that exists, keyed repo-relative under `cwd` and absolute outside it (a listed
+ *  folder outside the repo), an absent one left out; equal sets mean unchanged sources. */
+export function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes>;
+/** Every file the tasks command reads: the spec folder's spec.md, plan.md, research.md, data-model.md,
+ *  quickstart.md, every file under contracts/, and .specify/memory/constitution.md. */
+export function tasksSourcePaths(cwd: string, specDir: string): Promise<string[]>;
+/** Every file a round checks: tasksSourcePaths, tasks.md, the rulings file, codeworks.toml, the run folder's
+ *  review-questions.json when it exists, and every file in each of `folderPaths`. */
+export function roundInputPaths(cwd: string, specDir: string, runDir: string, folderPaths: readonly string[]): Promise<string[]>;
 
 /** Pure: one span against the path grammar (artifact-grammar.md). `null`: the span is not a path. Throws
  *  PathRefused naming the span when it reads as a path but breaks the grammar. */
@@ -109,7 +127,8 @@ export const AdrVerdict: z.ZodType;     // verdict file; `folder` is the entry a
 export const AdrRuling: z.ZodType;      // {folder, record, path}, plus `reason`; `path` a PATH
 export const AdrRulings: z.ZodType;     // {v: 1, rulings: AdrRuling[]}, no (folder, record, path) twice;
                                         // the rulings file and the rulings-written record alike
-export const AdrStopRecord: z.ZodType;  // {v: 1, exit: 1 | 2, lines: string[] (non-empty), shown: boolean}
+export const AdrStopRecord: z.ZodType;  // {v: 1, exit: 1 | 2, lines: string[] (non-empty), shown: boolean, unanswered: boolean}
+export const AdrStepDone: z.ZodType;    // data-model.md
 
 /** The spec folder's rulings file; `[]` when absent; throws RulingsRefused naming the file when it does not parse. */
 export function readRulings(specDir: string): Promise<AdrRuling[]>;
