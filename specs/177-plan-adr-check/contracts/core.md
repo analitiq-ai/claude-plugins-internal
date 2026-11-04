@@ -92,6 +92,7 @@ export const TOUCHES_FILE = "touches.json";                      // in the run f
 export const ADR_RULINGS_WRITTEN_FILE = "adr-rulings-written.json";
 export const askedFile = (artifact: CheckedArtifactName) => `adr-${artifact}-asked.json`;
 export const verdictFile = (artifact: CheckedArtifactName) => `adr-${artifact}-verdict.json`;
+export const stopFile = (artifact: CheckedArtifactName) => `adr-${artifact}-stop.json`;
 
 export type ArtifactPath = { path: string; line: number; story: string | null };
 
@@ -108,6 +109,7 @@ export const AdrVerdict: z.ZodType;     // verdict file; `folder` is the entry a
 export const AdrRuling: z.ZodType;      // {folder, record, path}, plus `reason`; `path` a PATH
 export const AdrRulings: z.ZodType;     // {v: 1, rulings: AdrRuling[]}, no (folder, record, path) twice;
                                         // the rulings file and the rulings-written record alike
+export const AdrStopRecord: z.ZodType;  // {v: 1, exit: 1 | 2, lines: string[] (non-empty), shown: boolean}
 
 /** The spec folder's rulings file; `[]` when absent; throws RulingsRefused naming the file when it does not parse. */
 export function readRulings(specDir: string): Promise<AdrRuling[]>;

@@ -21,17 +21,29 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 {"v": 1, "paths": ["core/src/adr-folders.ts", "codeworks.toml"]}
 ```
 
-- Deleted by `adr-plan-clear`, the after-plan check's first step, then written by the touches step,
-  `adr-plan-touches`, its second (`adr-touches.md`): it reads `plan.md` as it then stands and writes one literal
-  path per file the plan creates, changes or deletes. Every resume re-runs both, so the file follows every change
-  to the plan, and a touches step that fails leaves no file rather than the last run's. Not a section of `plan.md`
-  (R4).
+- Deleted by `adr-plan-clear`, the first step of each iteration of the after-plan check loop, then written by the
+  touches step, `adr-plan-touches`, its second (`adr-touches.md`): it reads `plan.md` as it then stands and writes
+  one literal path per file the plan creates, changes or deletes. Each resume after a stop runs a new iteration of
+  the check loop, so the file follows every change to the plan, and ask never reads the last iteration's file; a touches
+  step whose exit code is not `0` is `touches-missing`, whatever file it left. Not a section of `plan.md` (R4).
 - `TouchedPaths`: exactly the keys `v` (`1`) and `paths`; each entry a `PATH`; no entry twice.
 - Unparsable JSON or another shape: refused (`TouchesRefused`, exit 1, naming `touches.json` and the entry). No
   file, or `paths` empty: could not run, naming `touches.json`, for both artifacts (the tasks check reads its root
   entries).
 - Read only by planner's check (`readTouchedPaths`). The run folder is gitignored (`.specify/.gitignore`:
   `workflows/runs/`); builders and reviewers never see it.
+
+## `<run folder>/adr-<artifact>-stop.json` (a check's stop, until shown and resumed)
+
+```json
+{"v": 1, "exit": 1, "lines": ["FAIL: docs/adr: 0004 on core/src/x.ts: …. Next step: …."], "shown": false}
+```
+
+- `AdrStopRecord`: exactly the keys `v` (`1`), `exit` (`1` or `2`: 2 when any line is `COULD_NOT_RUN`, else 1),
+  `lines` (non-empty, each a line `adrStop` rendered) and `shown` (boolean).
+- Written with `shown: false` by ask or decide when the check stops, which then exit 0; removed by ask at the start
+  of each iteration. `adr_check.ts report` prints the lines and rewrites it `shown: true`, then on the resume
+  deletes it and asks for a new iteration (workflow-steps.md, report).
 
 ## `tasks.md` task lines
 
