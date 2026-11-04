@@ -51,7 +51,7 @@ spec PR's merge commit, the `internal-review` and `<module>-review` check runs a
 The stop rule and that read live in core so the orchestrator's Stop hook reads the same facts, calls the same function and names builder's stop as the
 card's Blocked reason (builder ADR-0003 d2). No core addition reads a key or writes to GitHub (root ADR-0008 d4).
 
-**Why this priority**: User Stories 2–5 call these reads; builder imports nothing but core (root ADR-0009 d2), and
+**Why this priority**: User Stories 3–5 call these reads; builder imports nothing but core (root ADR-0009 d2), and
 reviewer refuses a commit on any branch but the session issue's `<s>-us*` (reviewer ADR-0015 d1), so core's
 additions need a story of their own.
 
@@ -310,7 +310,7 @@ the new head.
 
 **Core additions and step robustness (US1, critique 2026-10-30)**
 
-- **FR-024**: Every core addition builder needs MUST land in `core/` in US1's one PR (org ADR-0003, root ADR-0005),
+- **FR-024**: Every core addition builder needs MUST land in `core/` in US1's one PR (org ADR-0003),
   merged before US3, and MUST take no key reader and no writing client (root ADR-0008 d4).
 - **FR-025**: The step's stop rule MUST be a pure function in core, called by builder's step script and by the
   orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2). Its facts MUST be read by one

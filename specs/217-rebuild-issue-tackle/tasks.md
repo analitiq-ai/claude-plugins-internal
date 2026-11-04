@@ -52,14 +52,15 @@ Story issue: #245
 **Purpose**: none beyond Phase 1. Every shared prerequisite is either a governing rule (Phase 1) or a core read
 owned by US1; builder's carrier itself is US2. This phase is intentionally empty.
 
-**Checkpoint**: T001 merged, T002 posted, T003 confirmed — US1 can begin
+**Checkpoint**: T001 merged, T003 confirmed — US2 can begin; US1 needs neither
 
 ---
 
 ## Phase 3: User Story 1 - core gains the reads and the stop rule builder needs (Priority: P1)
 Story issue: #245
 
-**Goal**: every read builder's step needs that core lacks lands in core in one PR, plus the pure stop rule
+**Goal**: every read builder's step needs that core lacks lands in core in one PR, which carries `Closes #245` from
+creation (builder ADR-0003 d1), plus the pure stop rule
 the orchestrator's Stop hook shares (FR-024–FR-026)
 
 **Independent Test**: `npm test --prefix core` passes; each addition has a test against the fake GitHub or a scratch
@@ -98,7 +99,7 @@ repository; no addition's signature takes a key reader or a writing client
 ### B4 — Spec PR merge commit
 
 - [ ] T018 [P] [US1] **B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
-- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; the PR carries `Closes #245` from creation (builder ADR-0003 d1) and bumps every carrier's `plugin.json` version once
+- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes
 
 **Checkpoint**: US1's PR merged → US3 may start
 
@@ -267,15 +268,15 @@ Story issue: #249
 
 ### Core additions (US1, one PR)
 
-| Section | Tasks | First caller |
-|---|---|---|
-| B1 | T006–T007 | US3 (T034) |
-| B2 | T008–T009 | US3 (T037) |
-| B3 | T010–T011 | US3 (T033) |
-| B7 | T012–T013 (after B3) | US3 (T035, T036) |
-| B5 | T014–T015 | US4 (T048) |
-| B6 | T016–T017 | US4 (T048) |
-| B4 | T018–T019 | US5 (T058) |
+| Section | Tasks |
+|---|---|
+| B1 | T006–T007 |
+| B2 | T008–T009 |
+| B3 | T010–T011 |
+| B7 | T012–T013 (after B3) |
+| B5 | T014–T015 |
+| B6 | T016–T017 |
+| B4 | T018–T019 |
 
 ### Within each story
 

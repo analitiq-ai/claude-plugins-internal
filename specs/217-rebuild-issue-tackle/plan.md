@@ -112,26 +112,32 @@ exist, and the carrier check lists builder once the link exists; no workflow cha
 ## Delivery order and core needs
 
 Story order: US1, US2, US3, US4, US5 (spec). US1 is the core story: B1–B7 go in one PR on one US1 branch
-(`<s1>-us1-<slug>`; one issue, branch and PR per story, org ADR-0003, root ADR-0005; reviewer's fence admits only
-the session issue's `<s>-us*`), which closes US1's issue (builder ADR-0003 d1), bumps every carrier's version then
-present once, and merges before US3, the first story that calls a B addition. The "Before" column names that
-first caller.
+(`<s1>-us1-<slug>`, root ADR-0005 d1; one issue, branch and PR per story, org ADR-0003; reviewer's fence admits
+only the session issue's `<s>-us*`), which closes US1's issue (builder ADR-0003 d1), bumps every carrier's version
+then present once, and merges before US3, the first story that calls a B addition. "Before" is what each item
+merges before.
 
-| # | PR | Story | Before | Holds |
+| # | Item | Story | Before | Holds |
 |---|---|---|---|---|
 | K | Constitution amendment | — | US2 | R15 |
 | — | #174 carrier (US1 of #174) | — | US2 | spec Clarifications Q4 |
-| B1 | Story branch name | US1 | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
-| B2 | Task-line grammar and story tasks | US1 | US3 | `readTaskLine` and `storyTasks(text, s)` in `contracts/tasks.ts`; planner's `land.ts` reads tags through it (R11) |
-| B3 | Story PR closed | US1 | US3 | `StoryPr.closed`, read by the query already (R12) |
-| B7 | Stop rule and its facts | US1 | US3 | `storyStop(facts)` and `StopState`, pure; `readStoryStopFacts`, read-only, after B3; #174's Stop hook calls both (R16) |
+| — | **US1**, one PR: B1–B7 below | US1 | US3 | core additions; none reads a key or writes (FR-024) |
 | — | **US2** | US2 | US3 | carrier, guard, TypeScript test suite (skill-text tests on today's skill dropped as R2 says), Python removed |
 | — | **US3** | US3 | | script: session, lane, closed/done, branch, cut and worktree, folder, requirement; skill takes `<s>` |
-| B5 | `internal-review` read | US1 | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
-| B6 | PR findings | US1 | US4 | `prFindings(reader, …)` over required checks, `<module>-review` check runs and threads; no key, no writer (R12) |
 | — | **US4** | US4 | after #212 and #243 (reviewer ADR-0014 d1) and #244 (ADR-0017) | PR states, rounds, ticks; skill rewritten; root-cause-check retired (R13–R14) |
-| B4 | Spec PR merge commit | US1 | US5 | `SpecPr.mergeCommit` (R9) |
 | — | **US5** | US5 | | merge decision and skill's merge path |
+
+US1's sections, each with the first story that calls it:
+
+| # | Section | First caller | Holds |
+|---|---|---|---|
+| B1 | Story branch name | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
+| B2 | Task-line grammar and story tasks | US3 | `readTaskLine` and `storyTasks(text, s)` in `contracts/tasks.ts`; planner's `land.ts` reads tags through it (R11) |
+| B3 | Story PR closed | B7, US3 | `StoryPr.closed`, read by the query already (R12) |
+| B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure; `readStoryStopFacts`, read-only, after B3; #174's Stop hook calls both (R16) |
+| B5 | `internal-review` read | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
+| B6 | PR findings | US4 | `prFindings(reader, …)` over required checks, `<module>-review` check runs and threads; no key, no writer (R12) |
+| B4 | Spec PR merge commit | US5 | `SpecPr.mergeCommit` (R9) |
 
 root-cause-check's deletion and its retired-text tests ship in US4's PR: the skill invokes it until US4 rewrites the
 skill (spec FR-020).
