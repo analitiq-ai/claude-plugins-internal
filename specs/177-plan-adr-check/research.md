@@ -112,15 +112,19 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `*spec-is-written` in `workflow.yml`: `to-adr-plan` after `to-settled-design`, before `to-mark-critiques`;
   `to-adr-tasks` after `to-tasks`. Each holds a `do-while` loop, `adr-<a>-check` (`max_iterations: 100`, condition
   `steps.adr-<a>-report.output.data.again`), one iteration one whole check, then `adr-<a>-rounds`. The plan loop
-  opens with `adr-plan-clear` (shell, deletes `touches.json`) and `adr-plan-touches` (prompt, `timeout: 1800`, R4);
+  opens with `adr-plan-clear` (shell, deletes `touches.json`) and `adr-plan-touches` (prompt, `timeout: 1800`,
+  `continue_on_error: true`, R4);
   then each holds `adr-<a>-ask` (shell, `output_format: json`, `timeout: 1800`), an `if` on
   `steps.adr-<a>-ask.output.data.judge` holding `adr-<a>-judge` (Spec Kit `prompt` step following `adr-judge.md`,
-  `timeout: 1800`), an `if` on `steps.adr-<a>-ask.output.data.decide` holding `adr-<a>-decide` (shell,
+  `timeout: 1800`, `continue_on_error: true`), an `if` on `steps.adr-<a>-ask.output.data.decide` holding `adr-<a>-decide` (shell,
   `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the shell
   step's 300 s default), then `adr-<a>-report` (shell, `output_format: json`).
   - ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-<a>-stop.json` (data-model.md)
-    and print nothing else. A non-zero exit from either means only that the step itself failed; the run fails there
-    and the resume runs that step again (R14).
+    and print nothing else. A touches or judge step that fails or times out continues: it leaves no `touches.json`
+    or no verdict, which ask records as `touches-missing` and decide as `verdict-unread`. So every check stop, an
+    outcome ask or decide recorded and report showed, halts the run at `adr-<a>-report`, the one stop point.
+  - A step that crashes without an answer (clear, ask, decide, report or rounds exiting non-zero) is no check stop:
+    the run fails at that step and the resume runs that step alone (R14).
   - report: a stop not yet shown is printed and the run stops at `adr-<a>-report` with the stop's exit; the resume
     runs report again, which deletes the shown stop and prints `{"again": true}`, so the loop runs a new iteration:
     clear, touches, ask, judge, decide on the artifacts as they then stand, with that resume's `ADR_RULING`. No stop:
@@ -157,7 +161,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision**: pure `decideFolder` and `decideCheck` in `planner/plugin/lib/adr-check.ts`. Per folder:
   `COULD_NOT_RUN` (core's `CouldNotRun`, or the verdict mismatching the asked record) else `FAIL` (a broken record,
   or a `DEPARTS` no rulings entry names) else `PASS`. Empty list: passes first, before the artifact's paths are
-  read. Every stop of every check step (ask, judge, decide; plan and tasks) is a list of items rendered by one pure
+  read. Every stop of every check step (ask, decide, rounds; plan and tasks) is a list of items rendered by one pure
   function, `adrStop`, from one table as data, `ADR_STOPS` (workflow-steps.md): kind → outcome → label → what →
   next step.
   - A line reads `<OUTCOME>: <label>: <what>. Next step: <next>.` That order lets core's `CouldNotRun` reason, which
@@ -168,9 +172,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   - Every line on stderr; ask's and report's stdout is their JSON only.
   - A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when any is `FAIL`. ask and decide record it with
     the lines in `<run>/adr-<a>-stop.json` and exit 0; `adr-<a>-report` prints the lines and exits with it (R6).
-  - A failed prompt step records `exit_code`, `stderr` and `error` but writes no verdict, so the judge's stop comes
-    from `adr_check.ts stop <a> judge` (the same table), which `drive_workflow.py report` runs from the project
-    root; `stop` reads no settings, and a `stop` that cannot run makes `drive_workflow.py` exit non-zero.
+  - A judge or touches step that does not answer continues on error and leaves no file, so its stop is the
+    `verdict-unread` or `touches-missing` row decide or ask records; `drive_workflow.py` runs no `stop`.
 - **Rationale**: FR-008, FR-009, FR-018; P3; P4; exit codes as `settled_design.py` and `spec_facts.ts` (1 refused,
   2 could not run); stderr for lines as `spec_facts.ts`, since `report()` passes on only stderr. Could not run wins
   the exit: a fixed plan would still go unchecked in that folder. The table lives in planner, not core: its next
@@ -314,7 +317,9 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   step already done and re-executes only from the step the run halted at; each resume after a stop runs a new
   iteration of the check loop (R6). A step that failed is run again; a step inside a loop iteration after the first
   is reported with a qualified id, `<loop>:<step>:<n>` (observed `to-check:check-stop:1`), others possibly
-  unqualified, so `drive_workflow.py` matches an ADR step by its own id, the qualified id's middle segment.
+  unqualified, so `drive_workflow.py` matches an ADR step by its own id, the qualified id's middle segment. A step
+  with `continue_on_error: true` that fails is recorded and the run goes on, which is how touches and judge reach
+  report (R6).
 - **Rationale**: verified with a stand-in workflow on 1.0.7, 1.1.3 and 1.3.0: 1.0.7 re-runs the top-level step a
   run stopped in with everything nested in it (module `specify_cli.workflows.engine`); 1.1.3 and 1.3.0 keep an
   execution tree and replay steps whose phase is `done` (module `specify_cli.workflows._execution`), so "change

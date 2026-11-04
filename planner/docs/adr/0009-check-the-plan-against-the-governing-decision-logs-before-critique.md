@@ -67,8 +67,7 @@ The tasks, written after critique, name the paths each story touches.
    naming its story, because tasks name the paths each story touches and are written after critique.
 5. We will have a headless model step judge the checked artifact against each record `adr check` names as
    governing, one answer per record, and decide each folder's outcome in code from those answers. This
-   record owns the sets below, in core's contracts (root ADR-0010 d3). `plan` and `tasks` are lower case:
-   each is also a step argument and names a file (root ADR-0010 d2).
+   record owns the sets below, in core's contracts (root ADR-0010 d3).
 
    | Set | Value | Meaning |
    |---|---|---|

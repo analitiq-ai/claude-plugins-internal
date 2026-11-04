@@ -309,8 +309,10 @@ once ruled; a rescope with no question takes the admin's words.
   ask step.
 - **FR-009**: A failed or could-not-run outcome in any folder MUST stop the run, with distinct exit statuses for the
   two, after printing every folder's outcome; the message MUST name the next legal step.
-  Every resume after a check stops MUST run that whole check again on the artifacts as they then stand; a check
-  that stops 100 times in one run MUST stop the run as could not run, never passing it.
+  A check stop is a failed or could-not-run outcome the check recorded and showed, a touches or judge step that did
+  not answer among them. Every resume after a check stop MUST run that whole check again on the artifacts as they
+  then stand; a check that stops 100 times in one run MUST stop the run as could not run, never passing it. A step
+  that fails without an answer is no check stop: the run fails at that step, and a resume runs that step alone.
 - **FR-010**: The check steps MUST make no network call and use no GitHub credential.
 - **FR-011**: The check steps MUST be TypeScript scripts calling core (root ADR-0009 d2), with the decision of each
   outcome in a pure function (constitution P3).
@@ -340,8 +342,9 @@ once ruled; a rescope with no question takes the admin's words.
   folder, record id and path match an entry, at every planner check of the spec folder (the after-tasks check, a
   rerun, a rescope) and, after #235, at reviewer's decision check, which MUST not report such a departure.
 - **FR-018**: Every check step (ask, judge, decide, after plan and after tasks) MUST report its stop through one
-  shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge that fails or
-  does not answer is could not run, and a resume retries it.
+  shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge or touches
+  step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the check
+  again.
 - **FR-019**: The decide step MUST compare the artifact's paths (`touches.json` for the plan, `tasks.md` for tasks)
   and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
   changed (the same single-writer guard as FR-016).
