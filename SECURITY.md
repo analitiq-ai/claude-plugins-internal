@@ -64,7 +64,7 @@ branch's restrict-updates ruleset (reviewer ADR-0011 d3), and the admin's person
 |---|---|---|---|---|
 | `codeworks-session` | the model's commands, through a one-hour, one-repo installation token | metadata, contents, pull requests, issues, checks, statuses, actions: read; no write | projects: read | the orchestrator's SessionStart hook, agent machine only |
 | `codeworks-orchestrator` | the orchestrator's hooks: the claim, lanes, pushes, the draft PR and its body, the ready flip, `internal-review` and each module's `<module>-review` check runs, external review requests, thread replies and resolution, merge, Blocked reasons and moves, the status issue | contents, pull requests, issues, checks, workflows: write | projects: write | the orchestrator's hooks, agent machine only |
-| `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | issues: write | none | reviewer's hooks, agent machine only |
+| `codeworks-reviewer` | reviewer's hooks: round records, holds, rescope holds | contents: write | none | reviewer's hooks, agent machine only |
 | `codeworks-planner` | planner: story issues, sub-issues, spec PRs | contents, pull requests, issues: write | projects: read | planner's scripts, admin machine only |
 
 A hook mints the session token into a gh config folder the model can read but not write, outside
@@ -74,9 +74,6 @@ tokens (for example a DeepSource token) and the classifier key live in `~/.confi
 admin's login is the merge ruleset's only bypass; the `ledger` branch's three rulesets (orchestrator
 `README.md`, step 6) let only the reviewer App and a repository admin commit there (for an App outside the
 bypass, by GitHub's docs: §8 E2), and nobody rewrite or delete it.
-The reviewer App holds `issues: write` until #209 lands the ledger, then `contents: write` and no `issues`
-permission (reviewer ADR-0011 d3): the table is pinned to core's permission map by a test and changes with
-that code.
 
 ## 4. Boundaries per component
 

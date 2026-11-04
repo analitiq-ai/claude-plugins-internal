@@ -1,26 +1,19 @@
 import { z } from "zod";
 import { FindingRuling, HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
-
-// Whole seconds, as GitHub's clock gives them: core stamps every time from the client's `now()`, so no caller's
-// clock or precision ever reaches a snapshot.
-export const Time = z.iso.datetime({ precision: 0 });
+import { Gates } from "./gates.ts";
+import { setExactlyWhen } from "./refinements.ts";
+import { GitSha, NameSegment, Time } from "./scalars.ts";
 
 // The pair that names a round, so a pushback names its round by the same fields the round carries.
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
 
-const CommitSha = z.string().regex(/^[0-9a-f]{40}$/);
-
-export function setExactlyWhen(ctx: z.RefinementCtx, field: string, value: unknown, condition: boolean, when: string): void {
-  if ((value !== null) !== condition) {
-    ctx.addIssue({ code: "custom", path: [field], message: `${field} is set exactly when ${when}` });
-  }
-}
-
 export const Round = z
   .strictObject({
     ...RoundId.shape,
-    head: CommitSha,
+    // The round's ledger file is `round.<run>.json`.
+    run: NameSegment,
+    head: GitSha,
     result: RoundResult.schema,
     verdict: RoundVerdict.schema.nullable(),
     root_cause: RootCause.schema.nullable(),
@@ -32,32 +25,49 @@ export const Round = z
   });
 export type Round = z.infer<typeof Round>;
 
+const placementFields = {
+  id: NameSegment,
+  kind: HoldKind.schema,
+  since: Time,
+  question: z.string().min(1).nullable(),
+  spec_pr: z.int().min(1).nullable(),
+};
+
+type Placed = { id: string; kind: z.infer<typeof HoldKind.schema>; question: string | null; spec_pr: number | null };
+
+function placementRules(hold: Placed, ctx: z.RefinementCtx): void {
+  const prefix = `${hold.kind}-`;
+  if (!hold.id.startsWith(prefix)) {
+    ctx.addIssue({ code: "custom", path: ["id"], message: `a ${hold.kind} hold's id starts with "${prefix}"` });
+  }
+  // The question an admin answers (orchestrator ADR-0010 d1, reviewer ADR-0013 d4-d5); a rescope with a spec PR
+  // asks none.
+  const { escalation, claim, rescope } = HoldKind.schema.enum;
+  const asks = hold.kind === escalation || hold.kind === claim || (hold.kind === rescope && hold.spec_pr === null);
+  setExactlyWhen(ctx, "question", hold.question, asks, `kind is ${escalation} or ${claim}, or ${rescope} with no spec_pr`);
+  if (hold.spec_pr !== null && hold.kind !== rescope) {
+    ctx.addIssue({ code: "custom", path: ["spec_pr"], message: `spec_pr is null for every kind but ${rescope}` });
+  }
+}
+
+/** A hold as its ledger event places it: a row without its state and release fields. */
+export const HoldPlacement = z.strictObject(placementFields).superRefine(placementRules);
+export type HoldPlacement = z.infer<typeof HoldPlacement>;
+
+export const ReleasedBy = z.strictObject({ comment: z.int(), reset: z.boolean() });
+
 export const Hold = z
   .strictObject({
-    id: z.string(),
-    kind: HoldKind.schema,
+    ...placementFields,
     state: HoldState.schema,
-    since: Time,
     released: Time.nullable(),
-    released_by: z.strictObject({ comment: z.int(), reset: z.boolean() }).nullable(),
-    question: z.string().min(1).nullable(),
-    spec_pr: z.int().min(1).nullable(),
+    released_by: ReleasedBy.nullable(),
   })
   .superRefine((hold, ctx) => {
-    const prefix = `${hold.kind}-`;
-    if (!hold.id.startsWith(prefix)) {
-      ctx.addIssue({ code: "custom", path: ["id"], message: `a ${hold.kind} hold's id starts with "${prefix}"` });
-    }
+    placementRules(hold, ctx);
     const released = HoldState.schema.enum.RELEASED;
     setExactlyWhen(ctx, "released", hold.released, hold.state === released, `state is ${released}`);
     setExactlyWhen(ctx, "released_by", hold.released_by, hold.state === released, `state is ${released}`);
-    const escalation = HoldKind.schema.enum.escalation;
-    setExactlyWhen(ctx, "question", hold.question, hold.kind === escalation, `kind is ${escalation}`);
-    // One way only: a rescope placed by a RESCOPE verdict records no spec PR (reviewer ADR-0013 d5).
-    const rescope = HoldKind.schema.enum.rescope;
-    if (hold.spec_pr !== null && hold.kind !== rescope) {
-      ctx.addIssue({ code: "custom", path: ["spec_pr"], message: `spec_pr is null for every kind but ${rescope}` });
-    }
   });
 export type Hold = z.infer<typeof Hold>;
 
@@ -78,7 +88,7 @@ export const Ruling = z
     // has nowhere to answer.
     reply: z.string().min(1).nullable(),
     // Appended as each passes reviewer's commit check, after the round that ruled it.
-    commits: z.array(CommitSha),
+    commits: z.array(GitSha),
   })
   .superRefine((ruling, ctx) => {
     const thread = ruling.latest_trusted_comment_id !== null;
@@ -101,6 +111,7 @@ export const Snapshot = z
     holds: z.array(Hold),
     pushbacks: z.array(Pushback),
     rulings: z.array(Ruling),
+    gates: Gates.nullable(),
   })
   .superRefine((snapshot, ctx) => {
     const rounds = new Set<string>();

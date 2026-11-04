@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import { Finding } from "../src/contracts/finding.ts";
+import { sortedJsonText } from "../src/contracts/json-text.ts";
+import { LedgerEvent } from "../src/contracts/ledger.ts";
 import { PremisePick, REPORTS_WRONG_BEHAVIOUR, ROOT_CAUSE } from "../src/contracts/premise.ts";
 import { Snapshot } from "../src/contracts/snapshot.ts";
 import { SpecFacts } from "../src/contracts/spec-facts.ts";
@@ -14,29 +16,16 @@ export const schemaFiles: ReadonlyArray<{ schema: z.ZodType; file: string }> = [
   { schema: SpecFacts, file: "spec-facts.schema.json" },
   { schema: Snapshot, file: "snapshot.schema.json" },
   { schema: Finding, file: "finding.schema.json" },
+  { schema: LedgerEvent, file: "ledger-event.schema.json" },
 ];
 
-function withSortedKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withSortedKeys);
-  if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, withSortedKeys((value as Record<string, unknown>)[key])]),
-  );
-}
-
-function jsonText(value: unknown): string {
-  return `${JSON.stringify(withSortedKeys(value), null, 2)}\n`;
-}
-
 export function jsonSchemaText(schema: z.ZodType): string {
-  return jsonText(z.toJSONSchema(schema));
+  return sortedJsonText(z.toJSONSchema(schema));
 }
 
 // Planner's Python reads the premise vocabulary from here; data-model.md "Premise vocabulary" names the keys.
 function premiseJsonText(): string {
-  return jsonText({
+  return sortedJsonText({
     picks: PremisePick.schema.options,
     reports_wrong_behaviour: REPORTS_WRONG_BEHAVIOUR,
     root_cause: ROOT_CAUSE,

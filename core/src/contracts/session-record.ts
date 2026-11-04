@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { ownerAndName } from "../github.ts";
 import { Taken } from "../values.ts";
-import { Time } from "./snapshot.ts";
+import { Time } from "./scalars.ts";
 
 const Repo = z.string().superRefine((repo, ctx) => {
   try {

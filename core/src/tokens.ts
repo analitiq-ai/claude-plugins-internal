@@ -26,7 +26,7 @@ export const APP_PERMISSIONS = {
     workflows: "write",
     organization_projects: "write",
   },
-  reviewer: { issues: "write" },
+  reviewer: { contents: "write" },
   planner: { contents: "write", pull_requests: "write", issues: "write", organization_projects: "read" },
 } as const satisfies Record<string, Permissions>;
 

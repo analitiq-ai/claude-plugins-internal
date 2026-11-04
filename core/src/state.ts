@@ -2,7 +2,8 @@ import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import { Snapshot, Time, type Hold, type Round, type RoundId, type Ruling } from "./contracts/snapshot.ts";
+import { Snapshot, type Hold, type Round, type RoundId, type Ruling } from "./contracts/snapshot.ts";
+import { Time } from "./contracts/scalars.ts";
 import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState, Lane } from "./values.ts";
@@ -141,7 +142,7 @@ function snapshotOf(comment: IssueComment): SnapshotRead {
 }
 
 function emptySnapshot(): Snapshot {
-  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] };
+  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
 }
 
 function isWriter(actor: Actor | null, writers: ReadonlySet<string>): boolean {
