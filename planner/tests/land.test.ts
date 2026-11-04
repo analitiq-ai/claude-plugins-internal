@@ -411,6 +411,12 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assert.equal(tasksIn(w), w.tasks, "tasks.md was written");
   }
 
+  it("for a tasks.md line tagged with two different stories, naming it", async (t) => {
+    const w = world(t, tasksMd(3).replace("- [x] T013 [US1]", "- [x] T013 [US1] [US2]"));
+    const run = await land(w, gitHubState());
+    assertStops(w, run, [JSON.stringify("- [x] T013 [US1] [US2] Test story 1")]);
+  });
+
   it("for kind rescope, naming #178", async (t) => {
     const w = world(t);
     const run = await land(w, gitHubState(), [String(P), SPEC, "rescope"]);
