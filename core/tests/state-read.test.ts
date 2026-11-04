@@ -482,16 +482,18 @@ describe("readState: the reads it makes", () => {
     });
   }
 
-  it("takes the reviewer App's commit of a binary file as invalid, its tamper derived", async () => {
-    const ledger = fakeLedger();
-    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
-    const binary = "\u0000\u0001";
-    const oid = reviewerCommit(ledger, { "round.run-2.json": binary }, { date: at("09:30") });
-    ledger.blobAnswers.set(blobOid(binary), { text: null, isTruncated: false, isBinary: true });
-    const reading = await read(ledger);
-    assert.deepEqual(reading.snapshot, snapshot({ rounds: [ROUND_1] }));
-    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory("round.run-2.json")])]);
-  });
+  for (const isTruncated of [false, true]) {
+    it(`takes the reviewer App's commit of a binary file as invalid, its tamper derived, with isTruncated ${isTruncated}`, async () => {
+      const ledger = fakeLedger();
+      eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+      const binary = "\u0000\u0001";
+      const oid = reviewerCommit(ledger, { "round.run-2.json": binary }, { date: at("09:30") });
+      ledger.blobAnswers.set(blobOid(binary), { text: null, isTruncated, isBinary: true });
+      const reading = await read(ledger);
+      assert.deepEqual(reading.snapshot, snapshot({ rounds: [ROUND_1] }));
+      assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory("round.run-2.json")])]);
+    });
+  }
 });
 
 describe("readState: readings", () => {
