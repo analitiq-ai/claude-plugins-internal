@@ -222,8 +222,9 @@ Reviewer runs unsupervised, so it cannot ask the user to overrule a record. A de
 is ruled FIX (builder makes the code comply) or ESCALATE: the round escalates, its hold's question naming the
 departure in one line, the orchestrator posts it, and the card goes to Blocked. The admin answers; when the code is
 right and the record or plan wrong, they run planner's rescope, which takes its open decision from the open
-questions under the spec's issue, and its plan check stops on each departure as on a judged one, so the user rules,
-changes the plan or supersedes the record. The ruling reaches every story under the spec through the spec PR.
+questions under the spec's issue, and its plan check stops on each departure as on a judged one, so the user rules or
+supersedes the record: its path is checked whatever the plan says, so changing the plan does not clear it. The
+ruling reaches every story under the spec through the spec PR.
 
 **Why this priority**: without it a departure the code is right about has no path to a ruling once building
 starts. Its reviewer half waits for #235.

@@ -88,8 +88,9 @@ The tasks, written after critique, name the paths each story touches.
    `plan.md`".
 8. We will name the next steps in every stop. For a departure: change the artifact; supersede the record,
    into the spec PR when its folder is inside this repo (d3), or in the repo that holds the folder when it is
-   outside; or resume with a ruling (d6). A FAIL caused by a record's own `adr check` error names the record
-   file and adrkit's rule and message, and its next step is "fix that record".
+   outside; or resume with a ruling (d6). A departure found at review (d9) names only the last two: its path is
+   checked whatever the artifact says, so changing the artifact does not clear it. A FAIL caused by a record's own
+   `adr check` error names the record file and adrkit's rule and message, and its next step is "fix that record".
 9. We will have a rescope take its open decision from the questions of every open `escalation-<issue>` hold,
    and every open `rescope-<issue>` hold a verdict placed, on every open story issue under the spec's issue, the spec's
    issue itself when it has no sub-issues (reviewer ADR-0013 d4, d5), and from the admin's words when there

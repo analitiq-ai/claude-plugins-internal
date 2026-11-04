@@ -24,9 +24,13 @@ outcome ask or decide recorded and report showed; each resume after one runs a n
 `stop` prints its row and exits 2. No subcommand
 formats a line of its own.
 
-A model step (touches, judge) has answered only when its exit code argument is the literal `0`. Spec Kit records a
-prompt step's `exit_code` on dispatch, but some failure paths (an invalid timeout) record none, so an empty or any
-other value is not answered, whatever file the step left.
+A model step (touches, judge) has answered only when its exit code argument is the literal `0`; any other value,
+empty included, is not answered, whatever file the step left.
+
+A step reads another step's output (`steps.<id>.output…`) only when that step runs earlier in every round (clear,
+touches, ask, report) or when a record written this round shows it ran (decide reads the judge's exit code only when
+the asked record ask wrote this round says `judge`). A step skipped in a round keeps the output of the round it last
+ran, and the engine serves that value (R6); every other decision reads a run-folder file written this round.
 
 ### ask
 
@@ -83,8 +87,8 @@ plan, `tasks.md` for tasks. One line per departure and per broken record; titles
 | `empty` | ask, decide | PASS | `codeworks.toml` | No ADR folder is listed in `[shared] adr_folders` | — |
 | `governed` | decide | PASS | entry | governing: `<id> <title>`, … | — |
 | `ungoverned` | decide | PASS | entry | no record governs these paths | — |
-| `departure-inside` | decide | FAIL | entry | `<id>` on `<path>` (story `<s>`, …): `<why>`; for a departure found at review, `found at review on #<issue>, …: <what>; …`, each issue and each distinct `what` | change `<artifact>`; draft a superseding record into the spec PR (planner ADR-0009 d3); or resume with `adr_ruling` naming `<entry>`, `<id>`, `<path>` and your reason |
-| `departure-outside` | decide | FAIL | entry | as above | change `<artifact>`; change record `<id>` in the repo that holds `<entry>`; or resume with `adr_ruling` as above |
+| `departure-inside` | decide | FAIL | entry | `<id>` on `<path>` (story `<s>`, …): `<why>`; for a departure found at review, `found at review on #<issue>, …: <what>; …`, each issue and each distinct `what` | change `<artifact>`; draft a superseding record into the spec PR (planner ADR-0009 d3); or resume with `adr_ruling` naming `<entry>`, `<id>`, `<path>` and your reason. A departure found at review: the last two only (planner ADR-0009 d8) |
+| `departure-outside` | decide | FAIL | entry | as above | change `<artifact>`; change record `<id>` in the repo that holds `<entry>`; or resume with `adr_ruling` as above. A departure found at review: the last two only |
 | `broken` | decide | FAIL | entry | `<file>`: `<rule>`: `<message>` | fix that record (in the spec PR, or in the repo that holds `<entry>`) |
 | `folder` | ask, decide | COULD_NOT_RUN | entry | core's `CouldNotRun` reason | core's |
 | `verdict-unread` | decide | COULD_NOT_RUN | `adr-<a>-verdict.json` | the judge did not answer (its exit code not `0`), or the file is missing or not an `AdrVerdict` (what) | resume to run the check again |

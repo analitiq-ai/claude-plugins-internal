@@ -125,10 +125,15 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     that did not finish with exit code `0` has not answered, whatever file it left, since it may have written a
     valid partial file first. ask takes `steps.adr-plan-touches.output.exit_code` and records `touches-missing`;
     decide takes `steps.adr-<a>-judge.output.exit_code` and, when the asked record says `judge`, records
-    `verdict-unread` without reading the verdict. Only the literal `0` is answered: 1.1.3 records no `exit_code` on
-    some failure paths. Without a judge, decide ignores the value, stale from an earlier iteration or empty. The
+    `verdict-unread` without reading the verdict. Only the literal `0` is answered (on 1.1.3 a non-zero dispatch
+    records its code, a timeout `-1`, a missing CLI `1`; an invalid timeout is refused when the workflow loads). Without a judge, decide ignores the value, stale from an earlier iteration or empty. The
     tasks check has no touches step, so `ask tasks` takes no touches argument. So every check stop, an
     outcome ask or decide recorded and report showed, halts the run at `adr-<a>-report`, the one stop point.
+  - Round outputs: a step skipped in a round keeps the output of the round it last ran, and a later template reads
+    that value (executed on 1.1.3: `steps.<id>.output.data` of a step under a false `if` held the earlier round's).
+    So a step reads another step's output only when that step runs earlier in every round, or when a record written
+    this round shows it ran (contracts/workflow-steps.md); every other decision reads a run-folder file written this
+    round.
   - A step that crashes without an answer (clear, ask, decide, report or rounds exiting non-zero) is no check stop:
     the run fails at that step and the resume runs that step alone (R14).
   - report: a stop not yet shown is printed and the run stops at `adr-<a>-report` with the stop's exit; the resume
