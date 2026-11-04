@@ -130,7 +130,8 @@ question}[]}`, no `(issue, hold)` twice.
 
 ## Stop record (`AdrStopRecord`, `<run>/adr-stop.json`)
 
-Writers: `adr_check.ts` tasks-written, stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`,
+Writers: `adr_check.ts` tasks-written, stories, ask and decide, on a stop, with `shown: false`, only when none is
+recorded this round (the round's first stop is the one shown); `adr_check.ts report`,
 writing it `shown: true` once it printed the lines (one that does not parse, or a `step-unfinished` stop, written as
 its line); `adr-clear`, deleting it at each round's start. Every run-folder record is written to a temporary file,
 then renamed over it. Readers: `adr_check.ts report`, and ask (a record there was written this round by

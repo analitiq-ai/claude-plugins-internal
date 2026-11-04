@@ -20,7 +20,9 @@ engine kills the step; the folders are checked at the same time. Every line of e
 printed by one function, `adrStop` (`planner/plugin/lib/adr-check.ts`, R8), from the stop table below; the stdout of
 tasks-due, ask and report carries their JSON only. A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when
 any is `FAIL`. tasks-written, stories, ask and decide exit 0 once they reach an answer: on a stop they write it to
-`<run>/adr-stop.json` (`AdrStopRecord`) and print nothing else, and report exits with it. `stop` prints its row and
+`<run>/adr-stop.json` (`AdrStopRecord`) and print nothing else, and report exits with it. The round's first stop is
+the one shown: a step that finds a stop record already written this round checks nothing, writes no stop and
+ends with its done record (ask printing `{"judge": false, "decide": false, "asked": ""}`). `stop` prints its row and
 exits 2. No subcommand formats a line of its own. Every run-folder record a subcommand writes is written to a
 temporary file in the run folder, then renamed over the record, so a step killed mid-write leaves the old record or
 the new one, never a torn one.
@@ -78,8 +80,7 @@ changed, runs that round. Writes its done record. Exit 0.
 First writes `<run>/adr-inputs.json` (`SourceHashes` of core's `roundInputPaths`: every file the round checks, the
 tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every
 file in each folder `[shared] adr_folders` lists that resolves), whatever follows: it is the round's first step after `tasks.md` is written, so the hashes are
-of the files every later step of the round reads. A stop record already written this round (by tasks-written):
-writes its done record and checks nothing more, so the round's first stop is the one shown. Otherwise the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
+of the files every later step of the round reads. Then, unless a stop is already recorded this round, the checks landing makes of `tasks.md`, through the pure functions `land.ts` calls (`planner/plugin/lib/story-plan.ts`,
 R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
 (extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
 rescope's sub-issues are its existing stories, which its new `tasks.md` may drop or reorder; reconciling them is
@@ -88,8 +89,7 @@ either way.
 
 ### ask
 
-Every answer below ends with its done record, carrying the `decide` it prints. A stop record already written this
-round (by tasks-written or stories): prints `{"judge": false, "decide": false, "asked": ""}` and reads nothing more. Otherwise reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
+Every answer below ends with its done record, carrying the `decide` it prints. Unless a stop is already recorded this round, reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
 asked record with no paths and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}`
 without reading the paths (decide then passes). Otherwise: a touches step that did not answer is
 `touches-missing`, whatever the file holds; `plan.md` or `spec.md` hashing other than `<run>/touches-from.json`
