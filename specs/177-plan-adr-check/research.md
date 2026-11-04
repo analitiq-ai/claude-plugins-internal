@@ -122,9 +122,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   (shell, `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the
   shell step's 300 s default); `adr-report` (shell, `output_format: json`). Every step from touches to decide has
   `continue_on_error: true`; settled-design, clear and report have not. The judge reads `plan.md` and `tasks.md` together, so one verdict covers both.
-  - tasks-written, stories, ask and decide exit 0 once they reach an answer; a stop they write to
-    `<run>/adr-stop.json` (data-model.md) and print nothing else, and ask, finding one written this round, asks
-    nothing. One rule for every model step (touches, the tasks command, judge): one that did not finish with exit
+  - A step that records a stop exits 0 once it reaches an answer, and the round's first stop is the one shown
+    (contracts/workflow-steps.md). One rule for every model step (touches, the tasks command, judge): one that did not finish with exit
     code `0` has not answered, whatever file it left, since it may have written a valid partial file first. ask takes
     `steps.adr-touches.output.exit_code` and records `touches-missing`; tasks-written takes
     `steps.adr-tasks.output.exit_code` and records `tasks-unfinished`; decide takes
@@ -150,7 +149,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     report hashes them again and the tasks sources against `tasks-sources.json`; any difference runs a new round at
     once without showing the round's stop, which `adr-clear` then deletes. One rule covers a model step writing
     `plan.md` or `review-questions.json`, a hand-deleted ruling, a newly listed folder, a tasks source changed while
-    the tasks command ran, and a ruling decide appended, which costs one more round in the same resume. Executed on
+    the tasks command ran, and a ruling decide appended. Executed on
     1.1.3 with a stand-in: a crash at every step of the round, each with no edit, a plan edit, a `tasks.md` edit and
     a rulings edit before the resume, never completed the run on unchecked files.
   - report: a stop not yet shown is printed and the run stops at `adr-report` with the stop's exit; the resume runs
@@ -383,12 +382,12 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 ## R15: `tasks.md` in the round, and landing's checks of it
 
 - **Decision** (2026-11-04): `tasks.md` is derived, never edited by hand (planner ADR-0009 d4). Each round's
-  `adr-tasks-due` hashes every file the tasks command reads (the spec folder's `spec.md`, `plan.md`, `research.md`,
-  `data-model.md`, `quickstart.md`, `contracts/**`, and `.specify/memory/constitution.md`) into
+  `adr-tasks-due` hashes every file of core's `tasksSourcePaths` into
   `<run>/tasks-sources-next.json` and is due when `tasks.md` is missing, `<run>/tasks-sources.json` is missing, or
   the two differ; then the tasks command runs and `adr-tasks-written` renames the first to the second. Hashes taken
-  before the command, promoted after it, so a tasks command that did not answer (`tasks-unfinished`) or a source changed while it ran leaves the next
-  round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
+  before the command, promoted after it, and a due round deletes `tasks-sources.json` first, so a tasks command that
+  did not answer (`tasks-unfinished`), even after writing part of `tasks.md`, or a source changed while it ran leaves
+  the next round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
   extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
   `TaskBlockLabelRefused`) and, on a `new` run, the spec issue's sub-issues (extra, in another repository, out of
   story order), read as the planner App. A rescope's sub-issues are its existing stories, which its new `tasks.md`

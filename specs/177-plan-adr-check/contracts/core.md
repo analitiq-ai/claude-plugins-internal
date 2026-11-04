@@ -98,6 +98,8 @@ export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources t
 export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
 export const STEPS_DIR = "adr-steps";                          // one AdrStepDone per finished shell step of the round
 export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as stories hashed them
+/** The run-folder files one round writes; `adr-clear` deletes them all before the round. */
+export const ROUND_FILES = [STEPS_DIR, TOUCHES_FILE, INPUTS_FILE, ASKED_FILE, VERDICT_FILE, STOP_FILE] as const;
 
 export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
 

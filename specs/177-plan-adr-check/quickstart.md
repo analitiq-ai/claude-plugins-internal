@@ -48,8 +48,8 @@ python3 -m unittest discover -s planner/tests -p 'test_drive_workflow.py'
 `planner/tests/adr-check.test.ts` drives `adr_check.ts clear`, `tasks-due`, `tasks-written`, `stories`, `ask`,
 `decide`, then `report` in a scratch spec folder with a stand-in `adr`, a stand-in GitHub, a `<run>/touches.json`
 and a verdict file written by the test in the touches step's and the judge's place. Every line is on stderr, as the
-stop table gives it. A stop's exit below is the one `report` exits with; tasks-written, stories, ask and decide exit
-0 once they record it in `<run>/adr-stop.json`, and tasks-due, tasks-written, stories, ask and decide each write their done record in
+stop table gives it. A stop's exit below is the one `report` exits with; every other step exits as
+`contracts/workflow-steps.md` gives it, a stop recorded in `<run>/adr-stop.json` and each `AdrStepDone` in
 `<run>/adr-steps/`:
 
 | Scenario | Expect |
@@ -92,7 +92,8 @@ stop table gives it. A stop's exit below is the one `report` exits with; tasks-w
 | ask records a stop (e.g. `touches.json` missing) | exit 0, stdout `{"judge": false, "decide": false, "asked": ""}`, the stop record written |
 | `clear` with every round file and done record left from the last round | all deleted; `touches-from.json` written |
 | `stories` stop recorded, then `ask` | ask stdout `{"judge": false, "decide": false, "asked": ""}`, reads nothing |
-| `tasks-due`: no `tasks.md` / no `tasks-sources.json` / a source changed / none changed | `due` true / true / true / false |
+| `tasks-due`: no `tasks.md` / no `tasks-sources.json` / a source changed / none changed | `due` true / true / true / false; when true, `tasks-sources.json` deleted |
+| `tasks.md` deleted, the tasks command writes part of it and fails, then a resume | the next round's `tasks-due` `due` true (no `tasks-sources.json`), `tasks.md` written again |
 | `tasks-written` with tasks exit code `0` | `tasks-sources-next.json` renamed to `tasks-sources.json`, done record written |
 | `tasks-written` with tasks exit code `1`, empty or `-1` | exit 0, `tasks-unfinished` recorded `unanswered: true`, nothing renamed, done record written |
 | `stories` after that, the partial `tasks.md` breaking the story plan | adr-inputs.json and its done record written, no check run, the stop record still `tasks-unfinished`, `unanswered: true`; report shows it |
