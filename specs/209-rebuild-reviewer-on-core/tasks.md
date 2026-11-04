@@ -23,7 +23,7 @@ one runtime decides each hook run at every merge (plan, Delivery order).
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
-- **[Story]**: US1–US4 from spec.md
+- **[Story]**: US1–US4 from spec.md; US5 is the cutover (plan, Delivery order), its own story issue
 
 ## Path Conventions
 
@@ -206,17 +206,17 @@ Story issue: #238
 
 ## Phase 7: Cutover (CUT, R16, FR-018)
 
-Story issue: #238
+Story issue: #295
 
 **Purpose**: Register the TS hooks and delete the Python hook path in one PR, so one runtime decides each hook run.
 
-- [ ] T076 Red test `reviewer/tests/hooks-json.test.ts`: every entry in `reviewer/plugin/hooks/hooks.json` is `node ${CLAUDE_PLUGIN_ROOT}/hooks/<file>.ts`, `onFailure: block`, matchers per contracts/hooks.md; no `python3`, no `pre_merge_gate.py`, no `unlock`/`override` prompt entry; update T038's skeleton test to drop its "no `.ts` entry" assertion
-- [ ] T077 Rewrite `reviewer/plugin/hooks/hooks.json` per contracts/hooks.md (T076 green); in the same PR repoint `reviewer/plugin/agents/assessor.md`'s brief command to `node ${CLAUDE_PLUGIN_ROOT}/lib/briefs.ts --ref '<round_ref>'` (T051) and drop "the ledger" from its facts line, so the assessor reads the Python ledger exactly as long as `gate.py` grades its `brief_token` from it
-- [ ] T078 Delete `reviewer/plugin/scripts/{ledger,pre_merge_gate,gate,policy,claimgate,shimgate,hookio,config,github,lineage,claimcheck,shimcheck,reshape,specbinding,decisions,adrkit,assessment,facts,jev,briefs,worktree,shell,snapshot,sweeper_read}.py` and `reviewer/plugin/config.json`; keep `scripts/codexstate.py`; delete `test_ledger.py`, `test_pre_merge_gate.py`, `test_poller_contract.py`, `test_gate.py`, `test_policy.py`, `test_claim_gate.py`, `test_shim_gate.py`, `test_specbinding.py` and every Python test re-pinned in T048–T057; delete `reviewer/tests/{helpers,paths,replay_shim}.py` only if no kept Python test imports them; nothing migrates from the SQLite ledger (FR-018)
-- [ ] T079 Remove the inbox hand-off from `reviewer/plugin/skills/github-pr-review/poll-pr-review.sh` (the function writing `$inbox/…json`) and from `reviewer/plugin/skills/github-pr-review/SKILL.md` the "Unresolved findings" step handing findings to the `reviewer` gate and running `reviewer:assess-round` (ADR-0019 Option B); drop `drop()` and every inbox assertion from `reviewer/tests/test_poll_pr_review.py`
-- [ ] T080 Re-pin `reviewer/tests/test_shipped_tree.py` in `reviewer/tests/shipped-tree.test.ts` against the new tree (no hook-path `scripts/*.py`, `core` link present) and delete the Python test
-- [ ] T081 Rewrite `reviewer/plugin/README.md`: module table and hook section for the TS layout; drop the ledger, `unlock`, `override`, `pre_merge_gate.py`; add the tamper clearance runbook (a repository admin deletes the invalid commit's `remaining` files on `ledger` in GitHub's web UI, giving a GitHub-signed delete-only commit, then a Ready move and an admin comment, then the claim)
-- [ ] T082 Bump `reviewer/plugin/.claude-plugin/plugin.json` version; `npm --prefix reviewer test` and check-carriers green; open and merge the CUT PR. No rollback past it: a defect is fixed forward (R16)
+- [ ] T076 [US5] Red test `reviewer/tests/hooks-json.test.ts`: every entry in `reviewer/plugin/hooks/hooks.json` is `node ${CLAUDE_PLUGIN_ROOT}/hooks/<file>.ts`, `onFailure: block`, matchers per contracts/hooks.md; no `python3`, no `pre_merge_gate.py`, no `unlock`/`override` prompt entry; update T038's skeleton test to drop its "no `.ts` entry" assertion
+- [ ] T077 [US5] Rewrite `reviewer/plugin/hooks/hooks.json` per contracts/hooks.md (T076 green); in the same PR repoint `reviewer/plugin/agents/assessor.md`'s brief command to `node ${CLAUDE_PLUGIN_ROOT}/lib/briefs.ts --ref '<round_ref>'` (T051) and drop "the ledger" from its facts line, so the assessor reads the Python ledger exactly as long as `gate.py` grades its `brief_token` from it
+- [ ] T078 [US5] Delete `reviewer/plugin/scripts/{ledger,pre_merge_gate,gate,policy,claimgate,shimgate,hookio,config,github,lineage,claimcheck,shimcheck,reshape,specbinding,decisions,adrkit,assessment,facts,jev,briefs,worktree,shell,snapshot,sweeper_read}.py` and `reviewer/plugin/config.json`; keep `scripts/codexstate.py`; delete `test_ledger.py`, `test_pre_merge_gate.py`, `test_poller_contract.py`, `test_gate.py`, `test_policy.py`, `test_claim_gate.py`, `test_shim_gate.py`, `test_specbinding.py` and every Python test re-pinned in T048–T057; delete `reviewer/tests/{helpers,paths,replay_shim}.py` only if no kept Python test imports them; nothing migrates from the SQLite ledger (FR-018)
+- [ ] T079 [US5] Remove the inbox hand-off from `reviewer/plugin/skills/github-pr-review/poll-pr-review.sh` (the function writing `$inbox/…json`) and from `reviewer/plugin/skills/github-pr-review/SKILL.md` the "Unresolved findings" step handing findings to the `reviewer` gate and running `reviewer:assess-round` (ADR-0019 Option B); drop `drop()` and every inbox assertion from `reviewer/tests/test_poll_pr_review.py`
+- [ ] T080 [US5] Re-pin `reviewer/tests/test_shipped_tree.py` in `reviewer/tests/shipped-tree.test.ts` against the new tree (no hook-path `scripts/*.py`, `core` link present) and delete the Python test
+- [ ] T081 [US5] Rewrite `reviewer/plugin/README.md`: module table and hook section for the TS layout; drop the ledger, `unlock`, `override`, `pre_merge_gate.py`; add the tamper clearance runbook (a repository admin deletes the invalid commit's `remaining` files on `ledger` in GitHub's web UI, giving a GitHub-signed delete-only commit, then a Ready move and an admin comment, then the claim)
+- [ ] T082 [US5] Bump `reviewer/plugin/.claude-plugin/plugin.json` version; `npm --prefix reviewer test` and check-carriers green; open and merge the CUT PR. No rollback past it: a defect is fixed forward (R16)
 
 ---
 
