@@ -113,7 +113,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   on `*spec-is-written` in `workflow.yml`, `to-adr-check`, after `to-review-critique`, in place of `to-tasks`. It
   holds a `do-while` loop, `adr-check` (`max_iterations: 100`, condition `steps.adr-report.output.data.again`), one
   round per resume after a stop, then `adr-out-of-rounds`. A round, every part every time (workflow-steps.md):
-  `adr-settled-design`; `adr-clear` (shell: deletes `touches.json`, the asked, verdict and stop records, writes
+  `adr-settled-design`; `adr-clear` (shell: deletes `touches.json`, the asked, verdict, decided and stop records, writes
   `touches-from.json`); `adr-touches` (prompt, `timeout: 1800`, `continue_on_error: true`, R4); `adr-tasks-due`
   (shell, `output_format: json`) and an `if` on its `due` holding `adr-tasks` (`command: speckit.tasks`) and
   `adr-tasks-written` (R15); `adr-stories` (shell, R15); `adr-ask` (shell, `output_format: json`,
@@ -143,7 +143,14 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     report again, which keeps the shown stop and prints `{"again": true}`, so the loop runs a new round on the
     artifacts as they then stand, with that resume's `ADR_RULING`; the round's `adr-clear` deletes it. Deleting it
     in report would let a report killed between the delete and its print find no stop on the resume and end the
-    loop unchecked. No stop: `{"again": false}`, the loop ends. A stop record that does not parse is shown as
+    loop unchecked. No stop: report hashes again every file the round checked (the asked record's `inputs`) and
+    the tasks sources (`tasks-sources.json`); any difference is `{"again": true}` with no stop, and the loop runs a
+    new round at once, since a resume that re-ran only a failed decide or report, or a model step that wrote
+    `plan.md`, would otherwise end the loop on files no round checked (executed on 1.1.3: a decide crash, then
+    `plan.md` changed, then the resume, ran a new round in the same invocation that found the new plan's
+    departure). Otherwise `{"again": false}`, the loop ends. A ruling given on a resume whose round stops before
+    decide is neither applied nor refused: decide writes `adr-decided.json` first, and report, finding it absent
+    while `ADR_RULING` is set, adds `ruling-unapplied` to the stop. A stop record that does not parse is shown as
     `stop-unread` and rewritten valid, so the resume asks for a new round instead of failing at report again.
     Every run-folder record is written to a temporary file, then renamed.
   - `adr-rounds`, under an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
@@ -237,7 +244,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Rationale**: FR-016, FR-017, FR-019; ADR-0004's "a way past it that can succeed"; P2: the user releases the
   stop; P6: one writer. A resume after a stop runs a new round, judge included (R6), so a ruling is matched against
   the departures that round found, the judge's and review's alike; a ruling naming none rules on nothing the user
-  saw, so it is refused rather than written. A persisted input would reach every later round.
+  saw, so it is refused rather than written; a round that stops before decide says so in its stop
+  (`ruling-unapplied`), so a ruling is never lost unseen. A persisted input would reach every later round.
   The headless steps hold Write/Edit, so a file only decide writes, checked against `HEAD` and decide's run record,
   is what keeps a model from adding a ruling; an entry committed by hand is seen in spec-PR review.
 - **Existing tools**: gate `verdict_input` (a choice from fixed options; a ruling carries data, so a gate does not
@@ -368,7 +376,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `<run>/tasks-sources-next.json` and is due when `tasks.md` is missing, `<run>/tasks-sources.json` is missing, or
   the two differ; then the tasks command runs and `adr-tasks-written` renames the first to the second. Hashes taken
   before the command, promoted after it, so a halt mid-command or a source changed while it ran leaves the next
-  round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
+  round due, and report, finding the sources changed, runs that round (R6). `adr-stories` then runs the checks
+  `land.ts` makes of `tasks.md` through the same pure functions,
   extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
   `TaskBlockLabelRefused`) and, on a `new` run, the spec issue's sub-issues (extra, in another repository, out of
   story order), read as the planner App. A rescope's sub-issues are its existing stories, which its new `tasks.md`

@@ -46,6 +46,10 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - `tasks-sources-next.json`: written by `adr-tasks-due` from every file the tasks command reads (workflow-steps.md);
   renamed to `tasks-sources.json` by `adr-tasks-written` once the tasks command has written `tasks.md`. A round is
   due to write `tasks.md` when it is missing, `tasks-sources.json` is missing, or the two differ.
+- the asked record's `inputs`: written by ask from `roundInputPaths`; report, finding no stop, hashes those files
+  again and `tasksSourcePaths` against `tasks-sources.json`, and any difference runs a new round, no stop.
+- `AdrDecided` (`<run>/adr-decided.json`): exactly the key `v` (`1`); written by decide first, deleted by
+  `adr-clear`.
 
 ## `<run folder>/adr-stop.json` (a round's stop, until shown and resumed)
 
@@ -104,7 +108,8 @@ what is left of it; a call that could not run is exit 2, nothing appended. A rul
 already holds is satisfied, not refused, and not re-checked. Each valid new ruling is appended to
 `<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there, so a
 decide that fails between the two leaves no entry the writer guard refuses and a rerun appends none twice. A round
-that stops before decide applies no ruling: give it again on the resume after. Unset: no ruling.
+that stops before decide applies no ruling, and report adds the `ruling-unapplied` line to its stop: give it again
+on the resume after. Unset: no ruling.
 
 ## Departure line (in a hold's question)
 

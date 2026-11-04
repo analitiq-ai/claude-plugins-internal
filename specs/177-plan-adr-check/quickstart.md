@@ -102,6 +102,9 @@ record it in `<run>/adr-stop.json`:
 | `report`, stop record that does not parse | exit 2, `COULD_NOT_RUN: adr-stop.json: does not parse. …`, record rewritten valid with `shown: true` |
 | ask or decide, `adr-rulings-written.json` that does not parse | deleted; `guard-rulings` names each entry the run added |
 | `report`, no stop record | stdout `{"again": false}`, exit 0 |
+| `report`, no stop record, `plan.md`, a tasks source, `tasks.md` or a listed folder's file changed since ask / a tasks source changed since `tasks-sources.json` | stdout `{"again": true}`, exit 0, no stop record written / the same |
+| `report`, stop record `shown: false`, `ADR_RULING` set, no `adr-decided.json` / with one | its lines plus `COULD_NOT_RUN: adr_ruling: this round stopped before decide, …`, exit 2 / its lines only |
+| `decide`, any outcome | `adr-decided.json` written first |
 | `stop rounds new <issue> <folder>` / `stop rounds rescope …` | exit 2, `COULD_NOT_RUN: adr-check: the check stopped 100 times in one run. …`, next step removing the folder and running `/planner:issue-spec #<issue>` / restoring it and running the rescope |
 
 `test_drive_workflow.py`, with stand-in `claude` (writing a plan that passes `settled_design.py`; as the touches
@@ -114,7 +117,10 @@ stop runs a new round, so a plan changed before a resume makes the touches step 
 tasks command rewrite `tasks.md` from it; a resume with nothing changed writes `tasks.md` no second time; a touches
 step that writes a valid `touches.json` and then fails or times out stops the run at `adr-report` with `adr: true`,
 the `touches-missing` line and the touches step's error from `state.json`; a decide that crashes fails the run at `adr-decide` and the resume runs decide, then
-report, not clear, touches or ask; a tasks command that crashes leaves the next round due; a stop in a round after
+report, not clear, touches or ask, and, `plan.md` changed before that resume, report runs a new round at once that
+lists the new plan's paths and stops on its departure, not a pass; a judge that edits `plan.md` gets a new round,
+not a pass; a resume carrying `adr_ruling` whose round stops at ask shows the `ruling-unapplied` line; a tasks
+command that crashes leaves the next round due; a stop in a round after
 the first, reported under a qualified id (`adr-check:adr-report:1`), reports `adr: true`; a round that stops 100
 times fails the run at `adr-rounds` with `adr: true`; `rescope … questions=@<file>` lands the file as
 `<run>/review-questions.json`; a stories, an ask and a decide stop each stop the run at `adr-report` and report

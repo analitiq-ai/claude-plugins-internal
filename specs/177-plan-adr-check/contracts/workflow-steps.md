@@ -9,7 +9,7 @@ adr_check.ts tasks-written <run folder>
 adr_check.ts stories      <issue> <kind> <spec folder> <run folder>
 adr_check.ts ask          <spec folder> <run folder> <touches exit code>
 adr_check.ts decide       <spec folder> <run folder> <asked digest> <judge exit code>
-adr_check.ts report       <run folder>
+adr_check.ts report       <spec folder> <run folder>
 adr_check.ts stop         rounds <kind> <issue> <spec folder>
 ```
 
@@ -23,7 +23,8 @@ any is `FAIL`. stories, ask and decide exit 0 once they reach an answer: on a st
 `<run>/adr-stop.json` (`AdrStopRecord`: `{v: 1, exit, lines, shown: false}`) and print nothing else, and report
 exits with it. A non-zero exit from any subcommand but report and stop means only that the step itself failed (a
 crash, a file it cannot write): the run fails at that step and the resume runs that step alone, then the rest of
-the round; that is no check stop. A check stop is an outcome stories, ask or decide recorded and report showed;
+the round, whose report runs a new round when a file the round read changed before that resume (report); that is no
+check stop. A check stop is an outcome stories, ask or decide recorded and report showed;
 each resume after one runs a new round of the check loop. `stop` prints its row and exits 2. No subcommand formats
 a line of its own. Every run-folder record a subcommand writes is written to a temporary file in the run folder,
 then renamed over the record, so a step killed mid-write leaves the old record or the new one, never a torn one.
@@ -40,16 +41,17 @@ round.
 ### clear
 
 The round's first step after settled-design. Deletes `<run>/touches.json`, `<run>/adr-asked.json`,
-`<run>/adr-verdict.json` and `<run>/adr-stop.json` (the stop the last round showed), so no step reads an
-earlier round's, then writes
+`<run>/adr-verdict.json`, `<run>/adr-decided.json` and `<run>/adr-stop.json` (the stop the last round showed), so
+no step reads an earlier round's, then writes
 `<run>/touches-from.json` (`SourceHashes`: `plan.md` and `spec.md` as they stand, the files the touches step is
 about to read). Exit 0.
 
 ### tasks-due
 
-Writes `<run>/tasks-sources-next.json` (`SourceHashes` of every file the tasks command reads: the spec folder's
-`spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md` and every file under `contracts/`, and
-`.specify/memory/constitution.md`; an absent file is left out) and prints `{"due": <bool>}`: true when
+Writes `<run>/tasks-sources-next.json` (`SourceHashes` of every file the tasks command reads, core's
+`tasksSourcePaths`: the spec folder's `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md` and
+every file under `contracts/`, and `.specify/memory/constitution.md`; an absent file is left out) and prints
+`{"due": <bool>}`: true when
 `<spec folder>/tasks.md` is missing, `<run>/tasks-sources.json` is missing, or the two hash sets differ. Exit 0.
 
 ### tasks-written
@@ -70,14 +72,17 @@ landing a rescope's (#178, planner ADR-0010 d5). On a stop writes the stop recor
 
 A stop record already written this round (by stories): prints `{"judge": false, "decide": false, "asked": ""}` and
 reads nothing more. Otherwise reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
-asked record with no paths and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}`
+asked record with no paths and no folders (its `inputs` as below) and prints `{"judge": false, "decide": true,
+"asked": "<sha256>"}`
 without reading the paths (decide then passes). Otherwise: a touches step that did not answer is
 `touches-missing`, whatever the file holds; `plan.md` or `spec.md` hashing other than `<run>/touches-from.json`
 records is `touches-stale`. Then reads `<run>/touches.json` (the plan's paths, `artifact: plan`) and
 `<spec folder>/tasks.md` (its task lines' paths, `artifact: tasks`, each with its story), adds the path of each
 departure line in `<run>/review-questions.json` (R13), so its record is matched and the user can rule on it; then
 the rulings file through core's `readRulings` and the writer guard (R9 a). Resolves the folders (`adrFolders`),
-runs `checkAdrFolder` per folder over every asked path, writes `<run>/adr-asked.json` (`AdrAsked`), prints
+runs `checkAdrFolder` per folder over every asked path, writes `<run>/adr-asked.json` (`AdrAsked`; its `inputs`
+the `SourceHashes` of core's `roundInputPaths`, every file the round checks: the tasks sources, `tasks.md` and every
+file in each listed folder, hashed as ask read them), prints
 `{"judge": <bool>, "decide": true, "asked": "<sha256 of the asked record's bytes>"}` on stdout. `judge` is true
 when any folder has a governing record. Folder outcomes are decide's. On a stop of its own it writes the stop
 record and prints `{"judge": false, "decide": false, "asked": ""}`. Exit 0 either way.
@@ -90,7 +95,8 @@ Both are shown by `adr-report`.
 
 ### decide
 
-Settings first: on an empty `[shared] adr_folders` decide prints the empty-list line and exits 0, reading no path.
+First writes `<run>/adr-decided.json` (`AdrDecided`), so report knows decide ran this round. Then settings: on
+an empty `[shared] adr_folders` decide prints the empty-list line and exits 0, reading no path.
 Otherwise the writer guard (R9 a–c) on what ask recorded; then the verdict (when the asked record says `judge`;
 a judge that did not answer is `verdict-unread`, the verdict file not read; when the asked record says no judge,
 decide ignores the judge exit code, which may be an earlier round's); calls `checkAdrFolder(cwd, folder, [path], …)`
@@ -105,12 +111,19 @@ prints every folder's lines through `adrStop`; a stop writes them to the stop re
 
 ### report
 
-The round's last step (R6). Stop record with `shown: false`: prints its lines to stderr, rewrites it with
-`shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the resume after
-that stop): keeps it, prints `{"again": true}`, exit 0, and the loop runs a new round with that resume's
-`ADR_RULING`, whose `adr-clear` deletes it; a report re-run before that clear finds it again and asks again. No
-stop record: prints `{"again": false}`, exit 0. A record that does not parse (`stop-unread`): prints that line,
-writes a valid record of it with `shown: true`, and exits 2, so the resume after asks for a new round.
+The round's last step (R6). Stop record with `shown: false`: when `ADR_RULING` is set and `<run>/adr-decided.json`
+is absent (the round stopped before decide, so the ruling was neither applied nor refused), first adds the
+`ruling-unapplied` line to the record's lines and sets its `exit` by them; then prints its lines to stderr,
+rewrites it with `shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the
+resume after that stop): keeps it, prints `{"again": true}`, exit 0, and the loop runs a new round with that
+resume's `ADR_RULING`, whose `adr-clear` deletes it; a report re-run before that clear finds it again and asks
+again. No stop record: hashes again the files of `roundInputPaths` (the folders the asked record lists) and of
+`tasksSourcePaths`; when either set differs from what the round recorded (the asked record's `inputs`,
+`<run>/tasks-sources.json`), or the asked record does not read, prints `{"again": true}`, writing no stop, exit 0,
+and the loop runs a new round at once: a file changed after the round read it, on a resume that re-ran only the
+failed step, or by a model step writing what it must not. Otherwise prints `{"again": false}`, exit 0, and the run
+completes on files a round checked. A record that does not parse (`stop-unread`): prints that line, writes a valid
+record of it with `shown: true`, and exits 2, so the resume after asks for a new round.
 
 ## Stop table (`ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
@@ -135,6 +148,7 @@ full.
 | `verdict-mismatch` | decide | COULD_NOT_RUN | entry | the verdict misses governing `<id>`, names `<id>` not governing, or names `<path>` not asked | resume to run the check again |
 | `rounds` | rounds | COULD_NOT_RUN | `adr-check` | the check stopped 100 times in one run | discard the run's changes to `<spec folder>`, then start again: a `new` run, remove `<spec folder>` and run `/planner:issue-spec #<issue> [<dir>]`; a `rescope`, restore `<spec folder>` to the branch's last commit and run `/planner:issue-spec rescope <spec folder> #<issue>` |
 | `stop-unread` | report | COULD_NOT_RUN | `adr-stop.json` | does not parse | resume to run the check again |
+| `ruling-unapplied` | report | COULD_NOT_RUN | `adr_ruling` | this round stopped before decide, so the ruling was neither applied nor refused | do what the other lines say, then resume with it again |
 | `touches-refused` | ask | COULD_NOT_RUN | `touches.json` | `<entry>`: what is wrong | resume to run the check again |
 | `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | the touches step did not answer (its exit code not `0`), or the file is missing or has no path | resume to run the check again |
 | `touches-stale` | ask | COULD_NOT_RUN | `touches.json` | `plan.md` or `spec.md` changed after this round listed the plan's paths | resume to run the check again |
@@ -230,7 +244,7 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
             type: shell
             output_format: json
             timeout: 60
-            run: node "$PLANNER_ROOT/scripts/adr_check.ts" report ".specify/workflows/runs/{{ context.run_id }}"
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" report "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
       - id: adr-out-of-rounds        # the loop ended at max_iterations still wanting another
         type: if
         condition: "{{ steps.adr-report.output.data.again }}"

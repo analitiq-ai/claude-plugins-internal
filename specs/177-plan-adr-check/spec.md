@@ -350,7 +350,9 @@ once ruled; a rescope with no question takes the admin's words.
   script MUST accept it only when the folder is listed, the path is one the round asked, `adr check` on that folder
   with that one path names the record as governing, and its key names a departure that round found (the judge's or
   one found at review), and is then the only writer that adds it to the file, to its own run record first. A ruling
-  applies to the round of the resume that carries it only; it is not kept as a run input. An entry the check script did not write and that is not in the file at `HEAD`
+  applies to the round of the resume that carries it only; it is not kept as a run input, and a round that stops
+  before the check script reads it MUST say so in its stop. An entry the check script did not write and that is not
+  in the file at `HEAD`
   MUST make the check could not run. Only the user gives a ruling; neither the judge nor the driving session gives one.
 - **FR-017**: The rulings file MUST be given to the judge, and the check script MUST then drop every departure whose
   folder, record id and path match an entry, at every planner check of the spec folder (every later round, a
@@ -360,7 +362,9 @@ once ruled; a rescope with no question takes the admin's words.
   step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the check
   again.
 - **FR-019**: The decide step MUST compare the paths (`touches.json` and `tasks.md`) and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
-  changed (the same single-writer guard as FR-016).
+  changed (the same single-writer guard as FR-016). Before the loop ends on a pass, the report step MUST hash again
+  every file the round checked (the tasks' sources, `tasks.md`, every file in each listed folder) and, when any
+  changed since the round read it, run a new round instead, so the run completes only on files a round checked.
 - **FR-020**: Core's `protectedPaths` (orchestrator ADR-0004 d4) MUST name each root spec folder a story PR changes
   beyond TICK_ONLY (reviewer ADR-0010 d1; root ADR-0011), told by one pure core function, `isTickOnly`, and each
   in-repo folder `[shared] adr_folders` lists that it changes (root ADR-0011 d1); a folder named `specs` below the
