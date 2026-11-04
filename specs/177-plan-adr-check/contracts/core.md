@@ -100,8 +100,9 @@ export const INPUTS_FILE = "adr-inputs.json";                   // every file th
 
 export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
 
-export const SourceHashes: z.ZodType;   // {v: 1, files: {<repo-relative path>: <sha256>}}
-/** The sha256 of each path that exists under `cwd`, an absent one left out; equal sets mean unchanged sources. */
+export const SourceHashes: z.ZodType;   // {v: 1, files: {<repo-relative or absolute path>: <sha256>}}
+/** The sha256 of each path given that exists, keyed repo-relative under `cwd` and absolute outside it (a listed
+ *  folder outside the repo), an absent one left out; equal sets mean unchanged sources. */
 export function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes>;
 /** Every file the tasks command reads: the spec folder's spec.md, plan.md, research.md, data-model.md,
  *  quickstart.md, every file under contracts/, and .specify/memory/constitution.md. */

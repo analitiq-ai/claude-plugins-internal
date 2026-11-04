@@ -382,7 +382,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `<run>/tasks-sources-next.json` and is due when `tasks.md` is missing, `<run>/tasks-sources.json` is missing, or
   the two differ; then the tasks command runs and `adr-tasks-written` renames the first to the second. Hashes taken
   before the command, promoted after it, so a halt mid-command or a source changed while it ran leaves the next
-  round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
+  round due; a re-run of `adr-tasks-written` after its rename landed finds it done and exits 0. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
   extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
   `TaskBlockLabelRefused`) and, on a `new` run, the spec issue's sub-issues (extra, in another repository, out of
   story order), read as the planner App. A rescope's sub-issues are its existing stories, which its new `tasks.md`

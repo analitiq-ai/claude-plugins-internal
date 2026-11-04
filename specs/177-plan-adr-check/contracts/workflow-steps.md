@@ -57,7 +57,8 @@ Writes `<run>/tasks-sources-next.json` (`SourceHashes` of every file the tasks c
 
 After the tasks command, in the same `if`: renames `<run>/tasks-sources-next.json` to `<run>/tasks-sources.json`.
 The hashes are those taken before the command ran, so a source changed while it ran makes the next round due
-again, and report, finding them changed, runs that round. Exit 0.
+again, and report, finding them changed, runs that round. Exit 0. A resume that re-runs it after the rename landed
+finds `tasks-sources-next.json` gone and `tasks-sources.json` present: the rename is done, exit 0. Both gone: exit 1.
 
 ### stories
 

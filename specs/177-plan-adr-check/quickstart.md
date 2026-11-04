@@ -94,6 +94,7 @@ record it in `<run>/adr-stop.json`:
 | `stories` stop recorded, then `ask` | ask stdout `{"judge": false, "decide": false, "asked": ""}`, reads nothing |
 | `tasks-due`: no `tasks.md` / no `tasks-sources.json` / a source changed / none changed | `due` true / true / true / false |
 | `tasks-written` | `tasks-sources-next.json` renamed to `tasks-sources.json` |
+| `tasks-written` again after the rename landed (crash before the step was recorded) / with neither file | exit 0, files unchanged / exit 1 |
 | `stories`: `tasks.md` breaking the story plan or a task-block label | exit 1, `tasks-refused`, next step deletes `tasks.md` |
 | `stories` on a `new` run: extra, foreign or out-of-order sub-issues / the same on a `rescope` | exit 1, `sub-issues-extra` / `-foreign` / `-misplaced` / no sub-issue check |
 | `stories`: GitHub unanswered | exit 2, `COULD_NOT_RUN: GitHub: …` |

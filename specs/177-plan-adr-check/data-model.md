@@ -46,7 +46,8 @@ for the task lines). The run folder is gitignored; builders and reviewers never 
 
 ## Source hashes (`SourceHashes`)
 
-`{v: 1, files: {<repo-relative path>: <sha256>}}`, an absent file left out (artifact-grammar.md); one core function,
+`{v: 1, files: {<path>: <sha256>}}`, the path repo-relative under the checkout and absolute for a file of a listed
+folder outside it, an absent file left out (artifact-grammar.md); one core function,
 `sourceHashes`, computes it.
 
 | File | Writer | Reader | Hashes |

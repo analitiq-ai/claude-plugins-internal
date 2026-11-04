@@ -38,8 +38,8 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 {"v": 1, "files": {"specs/177-x/plan.md": "<sha256>", "specs/177-x/spec.md": "<sha256>"}}
 ```
 
-- `SourceHashes`: exactly the keys `v` (`1`) and `files`, a map from a repo-relative path to the sha256 of its
-  bytes; an absent file is left out. Two are equal when they name the same paths with the same hashes. Computed by
+- `SourceHashes`: exactly the keys `v` (`1`) and `files`, a map from a path to the sha256 of its bytes: repo-relative
+  for a file under the checkout, absolute for a file of a listed folder outside it; an absent file is left out. Two are equal when they name the same paths with the same hashes. Computed by
   one core function, `sourceHashes(cwd, paths)`.
 - `touches-from.json`: written by `adr-clear` from `plan.md` and `spec.md`, before the touches step reads them; ask
   hashes them again, and any difference is `touches-stale`.
