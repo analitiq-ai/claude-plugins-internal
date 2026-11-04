@@ -124,7 +124,7 @@ merges before.
 | — | **US1**, one PR: B1–B7 below | US1 | US3 | core additions; none reads a key or writes (FR-024) |
 | — | **US2** | US2 | US3 | carrier, guard, TypeScript test suite (skill-text tests on today's skill dropped as R2 says), Python removed |
 | — | **US3** | US3 | | script: session, lane, closed/done, branch, cut and worktree, folder, requirement; skill takes `<s>` |
-| — | **US4** | US4 | after #212 and #243 (reviewer ADR-0014 d1) and #244 (ADR-0017) | PR states, rounds, ticks; skill rewritten; root-cause-check retired (R13–R14) |
+| — | **US4** | US4 | | after #212 and #243 (reviewer ADR-0014 d1) and #244 (ADR-0017); PR states, rounds, ticks; skill rewritten; root-cause-check retired (R13–R14) |
 | — | **US5** | US5 | | merge decision and skill's merge path |
 
 US1's sections, each with the first story that calls it:

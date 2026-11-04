@@ -99,7 +99,7 @@ repository; no addition's signature takes a key reader or a writing client
 ### B4 — Spec PR merge commit
 
 - [ ] T018 [P] [US1] **B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
-- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes
+- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; then, once for the PR, bump `version` in every carrier's `.claude-plugin/plugin.json` then present and confirm `node core/scripts/check-carriers.ts --base origin/main` reports 0 failures (FR-022)
 
 **Checkpoint**: US1's PR merged → US3 may start
 
