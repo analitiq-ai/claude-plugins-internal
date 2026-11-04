@@ -55,7 +55,7 @@ folder outside it, an absent file left out (artifact-grammar.md); one core funct
 | `<run>/touches-from.json` | `adr-clear` | ask (`touches-stale`) | `plan.md`, `spec.md`, before the touches step reads them |
 | `<run>/tasks-sources-next.json` | `adr-tasks-due` | `adr-tasks-written` | every file the tasks command reads, before it runs |
 | `<run>/tasks-sources.json` | `adr-tasks-written` (renames the one above) | `adr-tasks-due`, report | the sources the current `tasks.md` was written from |
-| `<run>/adr-inputs.json` | stories, first, every round; decide rewrites the rulings file's entry after appending, only when the file still hashes as stories recorded it | report | `roundInputPaths`: the tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every file in each listed folder, as the round read them |
+| `<run>/adr-inputs.json` | stories, first, every round | report | `roundInputPaths`: the tasks sources, `tasks.md`, the rulings file, `codeworks.toml`, `<run>/review-questions.json` when it exists, and every file in each listed folder, as the round read them |
 
 ## Artifact path (`ArtifactPath`, `core/src/contracts/decision-check.ts`)
 
@@ -130,9 +130,11 @@ question}[]}`, no `(issue, hold)` twice.
 
 ## Stop record (`AdrStopRecord`, `<run>/adr-stop.json`)
 
-Writers: `adr_check.ts` stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`, rewriting it
-`shown: true` once it printed the lines (one that does not parse rewritten as its `stop-unread` line); `adr-clear`,
-deleting it at each round's start. Every run-folder record is written to a temporary file, then renamed over it. Readers: `adr_check.ts report`, and ask (a record there was written this round by stories).
+Writers: `adr_check.ts` tasks-written, stories, ask and decide, on a stop, with `shown: false`; `adr_check.ts report`,
+writing it `shown: true` once it printed the lines (one that does not parse, or a `step-unfinished` stop, written as
+its line); `adr-clear`, deleting it at each round's start. Every run-folder record is written to a temporary file,
+then renamed over it. Readers: `adr_check.ts report`, and ask (a record there was written this round by
+tasks-written or stories).
 
 | Field | Type | Rule |
 |---|---|---|
@@ -140,6 +142,25 @@ deleting it at each round's start. Every run-folder record is written to a tempo
 | `exit` | `1` \| `2` | 2 when any line is `COULD_NOT_RUN`, else 1 |
 | `lines` | string[] | non-empty; each a line `adrStop` rendered |
 | `shown` | boolean | `report` printed the lines |
+| `unanswered` | boolean | a model step did not answer: `touches-missing`, `verdict-unread` or `tasks-unfinished`; report shows it before it compares the round's files |
+
+## Step done record (`AdrStepDone`, `<run>/adr-steps/<step>.json`)
+
+Writer: each shell step of the round after `adr-clear` but report (tasks-due, tasks-written, stories, ask,
+decide), as its last act. Reader: `adr_check.ts report`, which takes a missing record as a step that did not finish
+(`step-unfinished`). Deleted with its folder by `adr-clear` (workflow-steps.md).
+
+```ts
+export const AdrStepDone = z.discriminatedUnion("step", [
+  z.object({ v: z.literal(1), step: z.literal("tasks-due"), due: z.boolean() }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("tasks-written") }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("stories") }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("ask"), decide: z.boolean() }).strict(),
+  z.object({ v: z.literal(1), step: z.literal("decide") }).strict(),
+]);
+```
+
+`due` and `decide` tell report which steps of the `if` blocks this round expects a record from.
 
 ## Rulings written (`<run>/adr-rulings-written.json`)
 

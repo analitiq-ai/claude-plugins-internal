@@ -5,7 +5,7 @@
 ```text
 adr_check.ts clear        <spec folder> <run folder>
 adr_check.ts tasks-due    <spec folder> <run folder>
-adr_check.ts tasks-written <run folder>
+adr_check.ts tasks-written <run folder> <tasks exit code>
 adr_check.ts stories      <issue> <kind> <spec folder> <run folder>
 adr_check.ts ask          <spec folder> <run folder> <touches exit code>
 adr_check.ts decide       <spec folder> <run folder> <asked digest> <judge exit code>
@@ -19,46 +19,59 @@ at the checkout's HEAD, through `readPlannerSettings`; the others read none. Eac
 engine kills the step; the folders are checked at the same time. Every line of every subcommand goes to stderr,
 printed by one function, `adrStop` (`planner/plugin/lib/adr-check.ts`, R8), from the stop table below; the stdout of
 tasks-due, ask and report carries their JSON only. A stop's exit: 2 when any line is `COULD_NOT_RUN`, else 1 when
-any is `FAIL`. stories, ask and decide exit 0 once they reach an answer: on a stop they write it to
-`<run>/adr-stop.json` (`AdrStopRecord`: `{v: 1, exit, lines, shown: false}`) and print nothing else, and report
-exits with it. A non-zero exit from any subcommand but report and stop means only that the step itself failed (a
-crash, a file it cannot write): the run fails at that step and the resume runs that step alone, then the rest of
-the round, whose report trusts it only when every file the round checked is unchanged (report); that is no check
-stop. A check stop is an outcome stories, ask or decide recorded and report showed;
-each resume after one runs a new round of the check loop. `stop` prints its row and exits 2. No subcommand formats
-a line of its own. Every run-folder record a subcommand writes is written to a temporary file in the run folder,
-then renamed over the record, so a step killed mid-write leaves the old record or the new one, never a torn one.
+any is `FAIL`. tasks-written, stories, ask and decide exit 0 once they reach an answer: on a stop they write it to
+`<run>/adr-stop.json` (`AdrStopRecord`) and print nothing else, and report exits with it. `stop` prints its row and
+exits 2. No subcommand formats a line of its own. Every run-folder record a subcommand writes is written to a
+temporary file in the run folder, then renamed over the record, so a step killed mid-write leaves the old record or
+the new one, never a torn one.
 
-A model step (touches, judge) has answered only when its exit code argument is the literal `0`; any other value,
-empty included, is not answered, whatever file the step left.
+Past clear, a round fails only at its last step. Three rules, one for every step:
+
+- Every step after `adr-clear` but `adr-report` has `continue_on_error: true`, so the round always reaches report.
+  Each shell step among them writes its done record, `<run>/adr-steps/<step>.json` (`AdrStepDone`), as its last
+  act, after every other file it writes; the outcome of a model step (touches, the tasks command, judge) is
+  recorded by the shell step after it from its exit code. A missing done record means the step did not finish.
+- `adr-clear` deletes every file of the last round first, done records included, so every record report reads was
+  written this round. clear and `adr-settled-design` before it have no `continue_on_error`: a failure halts the run
+  there, and the resume runs that step, then the whole round after it.
+- report has no `continue_on_error`, reads files only, and decides alone: a new round, a stop shown, or the end of
+  the loop. Past clear the run fails only at report or `adr-rounds`; a resume after report failed re-runs report alone, which
+  finds the stop it showed and asks for a new round.
+
+So no step but report is ever re-run alone, and no step needs to tell a re-run from a first run. A check stop is a
+stop a round recorded and report showed; each resume after one runs a new round of the check loop.
+
+A model step (touches, the tasks command, judge) has answered only when its exit code argument is the literal `0`;
+any other value, empty included, is not answered, whatever file the step left.
 
 A step reads another step's output (`steps.<id>.output…`) only when that step runs earlier in every round
-(touches, tasks-due, ask, report) or when a record written this round shows it ran (decide reads the judge's exit
-code only when the asked record ask wrote this round says `judge`). A step skipped in a round keeps the output of the
-round it last ran, and the engine serves that value (R6); every other decision reads a run-folder file written this
-round.
+(touches, tasks-due, ask, report) or when a record written this round shows it ran (tasks-written reads the tasks
+command's exit code only in the `if` on tasks-due's `due`; decide reads the judge's exit code only when the asked
+record ask wrote this round says `judge`). A step skipped in a round keeps the output of the round it last ran, and
+the engine serves that value (R6); every other decision reads a run-folder file written this round.
 
 ### clear
 
-The round's first step after settled-design. Deletes `<run>/touches.json`, `<run>/adr-inputs.json`,
-`<run>/adr-asked.json`, `<run>/adr-verdict.json` and `<run>/adr-stop.json` (the stop the last round showed), so no
-step reads an earlier round's, then writes
-`<run>/touches-from.json` (`SourceHashes`: `plan.md` and `spec.md` as they stand, the files the touches step is
-about to read). Exit 0.
+The round's first step after settled-design. Deletes `<run>/adr-steps/`, `<run>/touches.json`,
+`<run>/adr-inputs.json`, `<run>/adr-asked.json`, `<run>/adr-verdict.json` and `<run>/adr-stop.json` (the stop the
+last round showed), so no step reads an earlier round's, then writes `<run>/touches-from.json` (`SourceHashes`:
+`plan.md` and `spec.md` as they stand, the files the touches step is about to read). Exit 0; any other exit halts
+the run at clear.
 
 ### tasks-due
 
 Writes `<run>/tasks-sources-next.json` (`SourceHashes` of every file the tasks command reads: the spec folder's
 `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md` and every file under `contracts/`, and
 `.specify/memory/constitution.md`; an absent file is left out) and prints `{"due": <bool>}`: true when
-`<spec folder>/tasks.md` is missing, `<run>/tasks-sources.json` is missing, or the two hash sets differ. Exit 0.
+`<spec folder>/tasks.md` is missing, `<run>/tasks-sources.json` is missing, or the two hash sets differ. Writes its done record with `due`. Exit 0.
 
 ### tasks-written
 
-After the tasks command, in the same `if`: renames `<run>/tasks-sources-next.json` to `<run>/tasks-sources.json`.
-The hashes are those taken before the command ran, so a source changed while it ran makes the next round due
-again, and report, finding them changed, runs that round. Exit 0. A resume that re-runs it after the rename landed
-finds `tasks-sources-next.json` gone and `tasks-sources.json` present: the rename is done, exit 0. Both gone: exit 1.
+After the tasks command, in the same `if`. A tasks command that did not answer (its exit code not `0`) is
+`tasks-unfinished`, recorded as a stop, `tasks-sources-next.json` left unrenamed so the next round is due.
+Otherwise renames `<run>/tasks-sources-next.json` to `<run>/tasks-sources.json`. The hashes are those taken before
+the command ran, so a source changed while it ran makes the next round due again, and report, finding them
+changed, runs that round. Writes its done record. Exit 0.
 
 ### stories
 
@@ -69,12 +82,13 @@ of the files every later step of the round reads. Then the checks landing makes 
 R15): the story plan (`storyPlan`, task-block labels) and, when `<kind>` is `new`, the spec issue's sub-issues
 (extra, in another repository, or out of story order), read as the planner App (`planner/plugin/lib/github.ts`). A
 rescope's sub-issues are its existing stories, which its new `tasks.md` may drop or reorder; reconciling them is
-landing a rescope's (#178, planner ADR-0010 d5). On a stop writes the stop record. Exit 0 either way.
+landing a rescope's (#178, planner ADR-0010 d5). On a stop writes the stop record. Writes its done record. Exit 0
+either way.
 
 ### ask
 
-A stop record already written this round (by stories): prints `{"judge": false, "decide": false, "asked": ""}` and
-reads nothing more. Otherwise reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
+Every answer below ends with its done record, carrying the `decide` it prints. A stop record already written this
+round (by tasks-written or stories): prints `{"judge": false, "decide": false, "asked": ""}` and reads nothing more. Otherwise reads settings before the artifacts: on an empty `[shared] adr_folders` it writes the
 asked record with no paths and no folders and prints `{"judge": false, "decide": true, "asked": "<sha256>"}`
 without reading the paths (decide then passes). Otherwise: a touches step that did not answer is
 `touches-missing`, whatever the file holds; `plan.md` or `spec.md` hashing other than `<run>/touches-from.json`
@@ -89,9 +103,9 @@ record and prints `{"judge": false, "decide": false, "asked": ""}`. Exit 0 eithe
 
 ### judge (prompt step, `adr-judge.md`)
 
-`continue_on_error: true`: a judge step that fails or reaches its timeout has not answered, so decide records the
-`verdict-unread` stop, whatever verdict file it left. The touches step is the same: ask records `touches-missing`.
-Both are shown by `adr-report`.
+A judge step that fails or reaches its timeout has not answered, so decide records the `verdict-unread` stop,
+whatever verdict file it left. The touches step is the same (ask records `touches-missing`), and the tasks command
+(tasks-written records `tasks-unfinished`). report shows these three before it compares the round's files.
 
 ### decide
 
@@ -105,34 +119,42 @@ not run is could not run. Then `ADR_RULING`, validated whole (artifact-grammar.m
 departures, before any is dropped; a ruling whose key the rulings file already holds (an earlier round of the
 same resume wrote it) is satisfied, not refused; each valid new ruling is appended to
 `<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there.
-Before appending, decide hashes the rulings file: when it differs from `<run>/adr-inputs.json`'s entry (changed
-after stories hashed it), decide leaves `adr-inputs.json` as it is, so report runs a new round; otherwise, after
-appending, it records the hash of the bytes it wrote there, being its only writer besides stories. Then drops every departure whose
-`(folder, record, path)` a rulings entry names, and decides each folder (data-model, Folder outcome). The
-`checkAdrFolder` calls, departure lines' and rulings' alike, run at the same time under one 1500 s deadline. A pass
-prints every folder's lines through `adrStop`; a stop writes them to the stop record. Exit 0 either way.
+An append changes the rulings file after stories hashed it, so report runs one more round, in which the ruling is
+satisfied. Then drops every departure whose `(folder, record, path)` a rulings entry names, and decides each folder
+(data-model, Folder outcome). The `checkAdrFolder` calls, departure lines' and rulings' alike, run at the same time
+under one 1500 s deadline. A pass prints every folder's lines through `adrStop`; a stop writes them to the stop
+record. Writes its done record. Exit 0 either way.
 
 ### report
 
-The round's last step (R6). First, before anything it shows: hashes again every file of core's `roundInputPaths`
-(the folders `[shared] adr_folders` lists as it now stands) and of `tasksSourcePaths`. When the first set differs from `<run>/adr-inputs.json`, or the second from
-`<run>/tasks-sources.json` (`tasks.md` written from older sources), or `adr-inputs.json` is missing or does not
-read, it prints `{"again": true}`, exit 0, showing nothing and keeping the stop record for the new round's
-`adr-clear` to delete, and the loop runs a new round at once (a report re-run before that clear, on files changed
-back, finds the record and shows it): a file changed after stories hashed it, on a resume that re-ran only a failed step (stories itself included), by a model step writing
-what it must not, or by hand, so that round's stop is out of date and its pass is no pass. Only with every file
-unchanged does it go on. Stop record with `shown: false`: prints its lines to stderr, rewrites it with
-`shown: true`, and exits with its `exit`, so the run stops at `adr-report`. With `shown: true` (the resume after
-that stop): keeps it, prints `{"again": true}`, exit 0, and the loop runs a new round with that resume's
-`ADR_RULING`, whose `adr-clear` deletes it; a report re-run before that clear finds it again and asks again. No
-stop record: prints `{"again": false}`, exit 0. A record that does not parse (`stop-unread`): prints that line,
-writes a valid record of it with `shown: true`, and exits 2, so the resume after asks for a new round.
+The round's last step (R6), with no `continue_on_error`. It reads files only and writes only the stop
+record. In order, the first that holds decides:
+
+1. Stop record with `shown: true` (the resume after a stop): keeps it, prints `{"again": true}`, exit 0; the loop
+   runs a new round with that resume's `ADR_RULING`, whose `adr-clear` deletes it.
+2. A done record missing: the round's expected steps are tasks-due, stories and ask, plus tasks-written when
+   tasks-due's record says `due` and decide when ask's says `decide`. Any missing is `step-unfinished`, naming each,
+   shown as below.
+3. Stop record of a model step that did not answer (`unanswered: true`): shown, whatever else changed.
+4. Hashes again every file of core's `roundInputPaths` (the folders `[shared] adr_folders` lists as it now stands)
+   and of `tasksSourcePaths`. When the first set differs from `<run>/adr-inputs.json`, or the second from
+   `<run>/tasks-sources.json` (`tasks.md` written from older sources), or `adr-inputs.json` does not read: prints
+   `{"again": true}`, exit 0, showing nothing; the new round's `adr-clear` deletes the stop record. A file changed
+   after stories hashed it (by a model step writing what it must not, by decide appending a ruling, or by hand), so
+   that round's stop is out of date and its pass is no pass.
+5. Stop record: shown.
+6. No stop record: prints `{"again": false}`, exit 0.
+
+Shown: prints the lines to stderr, writes the record with `shown: true`, and exits with its `exit`, so the run
+stops at `adr-report`. A record that does not parse (`stop-unread`) is shown as that line, so the resume after asks
+for a new round. A report killed before it printed re-runs on the resume from the same files and decides again.
 
 ## Stop table (`ADR_STOPS`, `planner/plugin/lib/adr-check.ts`)
 
 A typed constant, `ADR_STOPS: Record<StopKind, {outcome: CheckOutcome; label; what; next}>`, so a stop kind with no
 row does not compile; each outcome is a value of core's `CheckOutcome`, never a string literal. Step is the step
-that finds the stop; stories', ask's and decide's stops are printed by `adr-report`. One row per stop kind;
+that finds the stop; tasks-written's, stories', ask's and decide's stops are printed by `adr-report`. The stop record of
+`touches-missing`, `verdict-unread` and `tasks-unfinished` is written `unanswered: true`, every other `false`. One row per stop kind;
 `adrStop` renders each line as `<OUTCOME>: <label>: <what>. Next step: <next>.`, the PASS rows with no next step.
 A `CouldNotRun` from core already reads `<label>: <what>. Next step: <next>.` and is printed after
 `COULD_NOT_RUN: ` as it is, so the label appears once. One line per departure and per broken record; titles in
@@ -151,6 +173,8 @@ full.
 | `verdict-mismatch` | decide | COULD_NOT_RUN | entry | the verdict misses governing `<id>`, names `<id>` not governing, or names `<path>` not asked | resume to run the check again |
 | `rounds` | rounds | COULD_NOT_RUN | `adr-check` | the check ran 100 rounds in one run | discard the run's changes to `<spec folder>`, then start again: a `new` run, remove `<spec folder>` and run `/planner:issue-spec #<issue> [<dir>]`; a `rescope`, restore `<spec folder>` to the branch's last commit and run `/planner:issue-spec rescope <spec folder> #<issue>` |
 | `stop-unread` | report | COULD_NOT_RUN | `adr-stop.json` | does not parse | resume to run the check again |
+| `step-unfinished` | report | COULD_NOT_RUN | `adr-check` | step `<id>`, … did not finish this round (no done record) | fix what the step's error names, then resume |
+| `tasks-unfinished` | tasks-written | COULD_NOT_RUN | `tasks.md` | the tasks command did not answer (its exit code not `0`) | resume to run the check again |
 | `touches-refused` | ask | COULD_NOT_RUN | `touches.json` | `<entry>`: what is wrong | resume to run the check again |
 | `touches-missing` | ask | COULD_NOT_RUN | `touches.json` | the touches step did not answer (its exit code not `0`), or the file is missing or has no path | resume to run the check again |
 | `touches-stale` | ask | COULD_NOT_RUN | `touches.json` | `plan.md` or `spec.md` changed after this round listed the plan's paths | resume to run the check again |
@@ -179,7 +203,8 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
     type: if
     condition: *spec-is-written
     then:
-      - id: adr-check                # one round works everything out again; each resume after a stop runs a new one
+      - id: adr-check                # one round works everything out again; each resume after a stop runs a new one;
+                                     # every step after adr-clear but adr-report continues on error and writes a done record
         type: do-while
         max_iterations: 100
         condition: "{{ steps.adr-report.output.data.again }}"
@@ -203,26 +228,31 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
             type: shell
             output_format: json
             timeout: 60
+            continue_on_error: true
             run: node "$PLANNER_ROOT/scripts/adr_check.ts" tasks-due "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
           - id: adr-tasks-writing
             type: if
             condition: "{{ steps.adr-tasks-due.output.data.due }}"
             then:
-              - id: adr-tasks
+              - id: adr-tasks        # exit code not 0: tasks-written records tasks-unfinished
                 command: speckit.tasks
                 integration: "{{ inputs.integration }}"
+                continue_on_error: true
               - id: adr-tasks-written
                 type: shell
                 timeout: 60
-                run: node "$PLANNER_ROOT/scripts/adr_check.ts" tasks-written ".specify/workflows/runs/{{ context.run_id }}"
+                continue_on_error: true
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" tasks-written ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-tasks.output.exit_code }}"
           - id: adr-stories
             type: shell
             timeout: 300
+            continue_on_error: true
             run: node "$PLANNER_ROOT/scripts/adr_check.ts" stories "$ISSUE" "{{ inputs.kind }}" "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
           - id: adr-ask
             type: shell
             output_format: json
             timeout: 1800
+            continue_on_error: true
             run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-touches.output.exit_code }}"
           - id: adr-judging
             type: if
@@ -241,8 +271,9 @@ new input: a ruling reaches the run only as `ADR_RULING` from the resume that ca
               - id: adr-decide
                 type: shell
                 timeout: 1800
+                continue_on_error: true
                 run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-ask.output.data.asked }}" "{{ steps.adr-judge.output.exit_code }}"
-          - id: adr-report
+          - id: adr-report           # no continue_on_error: the round's one stop point
             type: shell
             output_format: json
             timeout: 60
@@ -308,15 +339,16 @@ GitHub unanswered or a settings error: exit 2 naming it. Not a check step: it ru
 - `rescope <spec file> <issue> <spec dir> questions=@<file>` copies the file to
   `<run>/review-questions.json` once the run has started, before it resumes past grill; a file it cannot read
   exits non-zero.
-- `report` sets `adr: true` when the failed step is any of `adr-clear`, `adr-tasks-due`, `adr-tasks-written`,
-  `adr-stories`, `adr-ask`, `adr-decide`, `adr-report`, `adr-rounds` (touches and judge continue on error, so the
-  run never fails there; `adr-settled-design` and `adr-tasks` report as the step they are), matched by the step's
+- `report` sets `adr: true` when the failed step is any of `adr-clear`, `adr-report`, `adr-rounds` (every other
+  step of the round continues on error, so the run never fails there; `adr-settled-design` reports as the step it
+  is), matched by the step's
   own id: in a loop round after the first, specify reports a qualified id, `<loop>:<step>:<n>` (e.g.
   `adr-check:adr-report:1`), whose middle segment is it. `stderr` is the step's own; `drive_workflow.py` runs no
-  `stop`. A stop at `adr-report` whose lines hold `touches-missing` or `verdict-unread` also gets the model step's
-  own error: `state.json`'s `step_results` entry for `adr-touches`, or for `adr-judge` only when this round's
-  `<run>/adr-asked.json` names a governing record (ask's `judge`), keyed by the bare id, which holds the step's
-  latest round; a skipped judge's entry is an earlier round's and is not shown.
+  `stop`. A stop at `adr-report` whose lines hold `touches-missing`, `tasks-unfinished`, `verdict-unread` or
+  `step-unfinished` also gets each named step's own error: `state.json`'s `step_results` entry for `adr-touches`,
+  `adr-tasks`, `adr-judge` (only when this round's `<run>/adr-asked.json` names a governing record, ask's `judge`),
+  or each step `step-unfinished` names, keyed by the bare id, which holds the step's latest round; a skipped
+  judge's entry is an earlier round's and is not shown.
 
 ## Skill (`SKILL.md`)
 

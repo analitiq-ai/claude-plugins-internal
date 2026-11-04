@@ -96,6 +96,7 @@ export const STOP_FILE = "adr-stop.json";
 export const TOUCHES_FROM_FILE = "touches-from.json";           // plan.md and spec.md as the touches step read them
 export const TASKS_SOURCES_FILE = "tasks-sources.json";         // the sources the current tasks.md was written from
 export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
+export const STEPS_DIR = "adr-steps";                          // one AdrStepDone per finished shell step of the round
 export const INPUTS_FILE = "adr-inputs.json";                   // every file the round checks, as stories hashed them
 
 export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
@@ -124,7 +125,8 @@ export const AdrVerdict: z.ZodType;     // verdict file; `folder` is the entry a
 export const AdrRuling: z.ZodType;      // {folder, record, path}, plus `reason`; `path` a PATH
 export const AdrRulings: z.ZodType;     // {v: 1, rulings: AdrRuling[]}, no (folder, record, path) twice;
                                         // the rulings file and the rulings-written record alike
-export const AdrStopRecord: z.ZodType;  // {v: 1, exit: 1 | 2, lines: string[] (non-empty), shown: boolean}
+export const AdrStopRecord: z.ZodType;  // {v: 1, exit: 1 | 2, lines: string[] (non-empty), shown: boolean, unanswered: boolean}
+export const AdrStepDone: z.ZodType;    // data-model.md
 
 /** The spec folder's rulings file; `[]` when absent; throws RulingsRefused naming the file when it does not parse. */
 export function readRulings(specDir: string): Promise<AdrRuling[]>;

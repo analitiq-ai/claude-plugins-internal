@@ -46,24 +46,24 @@ glob, no brace group, no trailing `/`. A path with no `/` is a file at the check
 - `tasks-sources-next.json`: written by `adr-tasks-due` from every file the tasks command reads (workflow-steps.md);
   renamed to `tasks-sources.json` by `adr-tasks-written` once the tasks command has written `tasks.md`. A round is
   due to write `tasks.md` when it is missing, `tasks-sources.json` is missing, or the two differ.
-- `adr-inputs.json`: written by stories first, every round, from core's `roundInputPaths` (every file the round checks);
-  decide, when the rulings file still hashes as recorded, records the hash of the file it wrote after appending, and
-  otherwise leaves it. report hashes them again, and `tasksSourcePaths` against `tasks-sources.json`, before it
-  shows a stop or ends the loop: any difference runs a new round, the stop record kept for `adr-clear`.
+- `adr-inputs.json`: written by stories first, every round, from core's `roundInputPaths` (every file the round checks).
+  report hashes them again, and `tasksSourcePaths` against `tasks-sources.json`, before it shows a stop of a step
+  that answered or ends the loop: any difference runs a new round, the stop record left for `adr-clear`. A ruling
+  decide appends is such a difference, so the round after it finds the ruling satisfied.
 
 ## `<run folder>/adr-stop.json` (a round's stop, until shown and resumed)
 
 ```json
-{"v": 1, "exit": 1, "lines": ["FAIL: docs/adr: 0004 on core/src/x.ts: …. Next step: …."], "shown": false}
+{"v": 1, "exit": 1, "lines": ["FAIL: docs/adr: 0004 on core/src/x.ts: …. Next step: …."], "shown": false, "unanswered": false}
 ```
 
 - `AdrStopRecord`: exactly the keys `v` (`1`), `exit` (`1` or `2`: 2 when any line is `COULD_NOT_RUN`, else 1),
-  `lines` (non-empty, each a line `adrStop` rendered) and `shown` (boolean).
-- Written with `shown: false` by stories, ask or decide when the round stops, which then exit 0; deleted by
-  `adr-clear` at the start of each round, so one that is there was written this round. `adr_check.ts report`
-  prints the lines and rewrites it `shown: true`, then on the resume keeps it and asks for a new round, whose
-  `adr-clear` deletes it; one that does not parse is shown as `stop-unread` and rewritten valid (workflow-steps.md,
-  report).
+  `lines` (non-empty, each a line `adrStop` rendered), `shown` (boolean) and `unanswered` (boolean: the stop is
+  `touches-missing`, `verdict-unread` or `tasks-unfinished`).
+- Written with `shown: false` by tasks-written, stories, ask or decide when the round stops, which then exit 0;
+  deleted by `adr-clear` at the start of each round, so one that is there was written this round. `adr_check.ts
+  report` prints the lines and writes it `shown: true`, then on the resume keeps it and asks for a new round, whose
+  `adr-clear` deletes it; one that does not parse is shown as `stop-unread` (workflow-steps.md, report).
 
 ## `tasks.md` task lines
 
@@ -107,9 +107,9 @@ before any departure is dropped. Decide makes those calls concurrently under one
 what is left of it; a call that could not run is exit 2, nothing appended. A ruling whose key the rulings file
 already holds is satisfied, not refused, and not re-checked. Each valid new ruling is appended to
 `<run>/adr-rulings-written.json` first, then to the rulings file, each append skipping an entry already there, so a
-decide that fails between the two leaves no entry the writer guard refuses and a rerun appends none twice. A ruling a
-later round of the same call finds in the rulings file is satisfied there. A resume whose rounds never apply it
-(they stop before decide, or report fails after a pass) leaves it out of the rulings file, and `drive_workflow.py`
+decide that fails between the two leaves no entry the writer guard refuses. A ruling a later round of the same call
+finds in the rulings file is satisfied there. A resume whose rounds never apply it (they stop before decide, or a
+decide that failed before appending, or report fails after a pass) leaves it out of the rulings file, and `drive_workflow.py`
 names it in `ruling_unapplied` (workflow-steps.md). Unset: no ruling.
 
 ## Departure line (in a hold's question)

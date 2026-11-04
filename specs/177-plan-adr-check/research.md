@@ -113,20 +113,21 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   on `*spec-is-written` in `workflow.yml`, `to-adr-check`, after `to-review-critique`, in place of `to-tasks`. It
   holds a `do-while` loop, `adr-check` (`max_iterations: 100`, condition `steps.adr-report.output.data.again`), one
   round per resume after a stop, then `adr-out-of-rounds`. A round, every part every time (workflow-steps.md):
-  `adr-settled-design`; `adr-clear` (shell: deletes `touches.json`, the asked, verdict and stop records, writes
-  `touches-from.json`); `adr-touches` (prompt, `timeout: 1800`, `continue_on_error: true`, R4); `adr-tasks-due`
-  (shell, `output_format: json`) and an `if` on its `due` holding `adr-tasks` (`command: speckit.tasks`) and
+  `adr-settled-design`; `adr-clear` (shell: deletes the done records, `touches.json`, the asked, verdict and stop
+  records, writes `touches-from.json`); `adr-touches` (prompt, `timeout: 1800`, R4); `adr-tasks-due` (shell,
+  `output_format: json`) and an `if` on its `due` holding `adr-tasks` (`command: speckit.tasks`) and
   `adr-tasks-written` (R15); `adr-stories` (shell, R15); `adr-ask` (shell, `output_format: json`,
   `timeout: 1800`); an `if` on `steps.adr-ask.output.data.judge` holding `adr-judge` (Spec Kit `prompt` step
-  following `adr-judge.md`, `timeout: 1800`, `continue_on_error: true`); an `if` on
-  `steps.adr-ask.output.data.decide` holding `adr-decide` (shell, `timeout: 1800`: decide calls `adr` once per new
-  ruling, concurrently under one 1500 s deadline, past the shell step's 300 s default); `adr-report` (shell,
-  `output_format: json`). The judge reads `plan.md` and `tasks.md` together, so one verdict covers both.
-  - stories, ask and decide exit 0 once they reach an answer; a stop they write to `<run>/adr-stop.json`
-    (data-model.md) and print nothing else, and ask, finding one stories wrote, asks nothing. A touches or judge
-    step that fails or times out continues. One rule for both: a model step that did not finish with exit code `0`
-    has not answered, whatever file it left, since it may have written a valid partial file first. ask takes
-    `steps.adr-touches.output.exit_code` and records `touches-missing`; decide takes
+  following `adr-judge.md`, `timeout: 1800`); an `if` on `steps.adr-ask.output.data.decide` holding `adr-decide`
+  (shell, `timeout: 1800`: decide calls `adr` once per new ruling, concurrently under one 1500 s deadline, past the
+  shell step's 300 s default); `adr-report` (shell, `output_format: json`). Every step from touches to decide has
+  `continue_on_error: true`; settled-design, clear and report have not. The judge reads `plan.md` and `tasks.md` together, so one verdict covers both.
+  - tasks-written, stories, ask and decide exit 0 once they reach an answer; a stop they write to
+    `<run>/adr-stop.json` (data-model.md) and print nothing else, and ask, finding one written this round, asks
+    nothing. One rule for every model step (touches, the tasks command, judge): one that did not finish with exit
+    code `0` has not answered, whatever file it left, since it may have written a valid partial file first. ask takes
+    `steps.adr-touches.output.exit_code` and records `touches-missing`; tasks-written takes
+    `steps.adr-tasks.output.exit_code` and records `tasks-unfinished`; decide takes
     `steps.adr-judge.output.exit_code` and, when the asked record says `judge`, records `verdict-unread` without
     reading the verdict. Only the literal `0` is answered (on 1.1.3 a non-zero dispatch records its code, a timeout
     `-1`, a missing CLI `1`; an invalid timeout is refused when the workflow loads). Without a judge, decide ignores
@@ -137,25 +138,29 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     So a step reads another step's output only when that step runs earlier in every round, or when a record written
     this round shows it ran (contracts/workflow-steps.md); every other decision reads a run-folder file written this
     round.
-  - A step that crashes without an answer (any shell step of the round exiting non-zero, or rounds) is no check
-    stop: the run fails at that step and the resume runs that step, then the rest of its round (R14). The rest of
-    that round is what the earlier run left: touches, the tasks, ask and the judge are not run again. So report
-    trusts a round only when every file it checked is unchanged: stories, the round's first step after `tasks.md` is written, records them first (`adr-inputs.json`,
-    `roundInputPaths`), and report, before it shows a stop or ends the loop, hashes them again and the tasks sources
-    against `tasks-sources.json`; any difference runs a new round at once without showing the round's stop, which
-    `adr-clear` then deletes (executed on 1.1.3, stand-in). decide records the rulings file's hash after appending
-    only when the file still hashes as stories recorded it, so a ruling deleted mid-round is not absorbed. One rule
-    covers a plan edited before a resume that re-runs only decide or report (its old stop not shown, its old pass no
-    pass), a model step writing `plan.md` or `review-questions.json`, a hand-deleted ruling, a newly listed folder
-    and a tasks source changed while the tasks command ran; keeping the stop record means a report killed in that
-    branch and re-run on files changed back still shows it.
+  - Crashes: Spec Kit 1.1.x re-runs a failed step, then the rest of its round (R14), so a step re-run alone would
+    have to tell a re-run from a first run, one special case per step. Instead, three rules (workflow-steps.md):
+    every step after clear but report continues on error and writes a done record (`AdrStepDone`) as its last act,
+    a model step's outcome recorded by the shell step after it; clear deletes the last round's files first, done
+    records included; report alone can fail the run, reads files only, and decides. A missing done record is
+    `step-unfinished`, a shown stop, so a step that fails every round stops at each resume rather than running 100
+    rounds unseen; a stop with `unanswered` (a model step that did not answer) is shown before the files are
+    compared, for the same reason. Then report trusts a round only when every file it checked is unchanged: stories,
+    the round's first step after `tasks.md` is written, records them (`adr-inputs.json`, `roundInputPaths`), and
+    report hashes them again and the tasks sources against `tasks-sources.json`; any difference runs a new round at
+    once without showing the round's stop, which `adr-clear` then deletes. One rule covers a model step writing
+    `plan.md` or `review-questions.json`, a hand-deleted ruling, a newly listed folder, a tasks source changed while
+    the tasks command ran, and a ruling decide appended, which costs one more round in the same resume. Executed on
+    1.1.3 with a stand-in: a crash at every step of the round, each with no edit, a plan edit, a `tasks.md` edit and
+    a rulings edit before the resume, never completed the run on unchecked files.
   - report: a stop not yet shown is printed and the run stops at `adr-report` with the stop's exit; the resume runs
     report again, which keeps the shown stop and prints `{"again": true}`, so the loop runs a new round on the
     artifacts as they then stand, with that resume's `ADR_RULING`; the round's `adr-clear` deletes it. Deleting it
     in report would let a report killed between the delete and its print find no stop on the resume and end the
-    loop unchecked. No stop: `{"again": false}`, the loop ends. A stop record that does not parse is shown as
-    `stop-unread` and rewritten valid, so the resume asks for a new round instead of failing at report again.
-    Every run-folder record is written to a temporary file, then renamed.
+    loop unchecked; a report killed before it printed decides again from the same files. No stop:
+    `{"again": false}`, the loop ends. A stop record that does not parse is shown as `stop-unread`, so the resume
+    asks for a new round instead of failing at report again. Every run-folder record is written to a temporary
+    file, then renamed.
   - `adr-rounds`, under an `if` on `again` after the loop: a loop that ended at `max_iterations` still wanting
     another stops the run as could not run (`stop rounds`), never walking past the check. Its next step discards the
     run's changes to the spec folder and starts again with the run's own kind: a `new` run cannot start over an
@@ -234,7 +239,7 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
     `<run>/adr-rulings-written.json`, then to the rulings file, each append skipping an entry already there.
     `ADR_RULING` reaches every round of the resume that carries it; a later round finds the applied ruling in the
     rulings file, satisfied. A resume none of whose rounds applies it (they stop before decide, or report fails after
-    a pass and the resume re-runs report only) is seen once the call returns: `drive_workflow.py` names every ruling
+    a pass and the resume re-runs report only, the one step a resume re-runs alone) is seen once the call returns: `drive_workflow.py` names every ruling
     the rulings file does not hold and no `ruling-refused` line refused (`ruling_unapplied`), so a ruling is never
     lost unseen. The driver, not a step, checks it, because the ruling's life is the resume, not a round.
   - Honouring: the judge is given the file (`adr-judge.md`), and decide drops every departure whose
@@ -360,11 +365,12 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
 - **Decision** (2026-11-04): Spec Kit `>=1.1.3,<1.2.0` for the `issue-spec` workflow and the settled-design preset
   (`requires: speckit_version`), CI pinned at `specify-cli==1.1.3`. On 1.1.x a resume replays the result of every
   step already done and re-executes only from the step the run halted at; each resume after a stop runs a new
-  round of the check loop (R6). A step that failed is run again, then the rest of its round; a step inside a loop iteration after the first
+  round of the check loop (R6). A step that failed is run again, then the rest of its round, so only settled-design,
+  clear and report, the steps without `continue_on_error`, can be; a step inside a loop iteration after the first
   is reported with a qualified id, `<loop>:<step>:<n>` (observed `to-check:check-stop:1`), others possibly
   unqualified, so `drive_workflow.py` matches an ADR step by its own id, the qualified id's middle segment. A step
-  with `continue_on_error: true` that fails is recorded and the run goes on, which is how touches and judge reach
-  report (R6).
+  with `continue_on_error: true` that fails is recorded and the run goes on, exposing no `output.data` (executed on
+  1.1.3), which is how every step after clear reaches report (R6).
 - **Rationale**: verified with a stand-in workflow on 1.0.7, 1.1.3 and 1.3.0: 1.0.7 re-runs the top-level step a
   run stopped in with everything nested in it (module `specify_cli.workflows.engine`); 1.1.3 and 1.3.0 keep an
   execution tree and replay steps whose phase is `done` (module `specify_cli.workflows._execution`), so "change
@@ -381,8 +387,8 @@ Each decision below settles one mechanism `plan.md` lists under `## Mechanisms`.
   `data-model.md`, `quickstart.md`, `contracts/**`, and `.specify/memory/constitution.md`) into
   `<run>/tasks-sources-next.json` and is due when `tasks.md` is missing, `<run>/tasks-sources.json` is missing, or
   the two differ; then the tasks command runs and `adr-tasks-written` renames the first to the second. Hashes taken
-  before the command, promoted after it, so a halt mid-command or a source changed while it ran leaves the next
-  round due; a re-run of `adr-tasks-written` after its rename landed finds it done and exits 0. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
+  before the command, promoted after it, so a tasks command that did not answer (`tasks-unfinished`) or a source changed while it ran leaves the next
+  round due. `adr-stories` then runs the checks `land.ts` makes of `tasks.md` through the same pure functions,
   extracted to `planner/plugin/lib/story-plan.ts`: the story plan (`storyPlan`, `TasksRefused`,
   `TaskBlockLabelRefused`) and, on a `new` run, the spec issue's sub-issues (extra, in another repository, out of
   story order), read as the planner App. A rescope's sub-issues are its existing stories, which its new `tasks.md`

@@ -319,9 +319,10 @@ once ruled; a rescope with no question takes the admin's words.
   two, after printing every folder's outcome; the message MUST name the next legal step.
   A check stop is a failed or could-not-run outcome a round recorded and showed, a touches or judge step that did
   not answer among them. Every resume after a check stop MUST run a new round on the artifacts as they then stand;
-  a loop that runs 100 rounds in one run MUST stop the run as could not run, never passing it. A step that fails
-  without an answer is no check stop: the run fails at that step, and a resume runs that step, then the rest of
-  its round. No next step MUST send the user to edit `tasks.md`: a `tasks.md` refused is deleted, and the next
+  a loop that runs 100 rounds in one run MUST stop the run as could not run, never passing it. Every step of a
+  round after it clears the last round's files, but the last, MUST go on when it fails and record that it finished;
+  the last step alone MUST stop the run, and a step of the round that did not finish MUST be a check stop, as could
+  not run, naming the step. No next step MUST send the user to edit `tasks.md`: a `tasks.md` refused is deleted, and the next
   round writes it again.
 - **FR-010**: The ADR check steps (ask, judge, decide) MUST make no network call and use no GitHub credential;
   landing's story checks read the spec issue's sub-issues as the planner App, as landing does (FR-025).
@@ -356,10 +357,10 @@ once ruled; a rescope with no question takes the admin's words.
 - **FR-017**: The rulings file MUST be given to the judge, and the check script MUST then drop every departure whose
   folder, record id and path match an entry, at every planner check of the spec folder (every later round, a
   rescope) and, after #235, at reviewer's decision check, which MUST not report such a departure.
-- **FR-018**: Every check step (stories, ask, judge, decide, rounds) MUST report its stop through one
-  shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge or touches
-  step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the check
-  again.
+- **FR-018**: Every check step (tasks-written, stories, ask, judge, decide, report, rounds) MUST report its stop through one
+  shared function that maps the stop to its outcome and next step; no step formats its own stop. A judge, touches or
+  tasks step that fails or does not answer MUST be recorded as could not run, a check stop, and the resume runs the
+  check again.
 - **FR-019**: The decide step MUST compare the paths (`touches.json` and `tasks.md`) and the asked record with what the ask step saw, and any difference MUST make the check could not run, naming what
   changed (the same single-writer guard as FR-016). Before it shows a stop or ends the loop on a pass, the report
   step MUST hash again every file the round checked (the tasks' sources, `tasks.md`, the rulings file,
