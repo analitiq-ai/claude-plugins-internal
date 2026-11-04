@@ -114,8 +114,7 @@ exist, and the carrier check lists builder once the link exists; no workflow cha
 Story order: US1, US2, US3, US4, US5 (spec). US1 is the core story: B1–B7 go in one PR on one US1 branch
 (`<s1>-us1-<slug>`, root ADR-0005 d1; one issue, branch and PR per story, org ADR-0003; reviewer's fence admits
 only the session issue's `<s>-us*`), which closes US1's issue (builder ADR-0003 d1), bumps every carrier's version
-then present once, and merges before US3, the first story that calls a B addition. "Before" is what each item
-merges before.
+then present once, and merges before US3, the first story that calls a B addition.
 
 | # | Item | Story | Before | Holds |
 |---|---|---|---|---|

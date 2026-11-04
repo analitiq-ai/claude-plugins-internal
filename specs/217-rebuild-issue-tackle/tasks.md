@@ -16,9 +16,7 @@ task is run and seen to fail for the stated reason before its implementation tas
 
 **Organization**: One phase per user story, in the spec's delivery order: US1, US2, US3, US4, US5. Every task marked
 **Bn** lands in `core/` in US1's one PR on one US1 branch `<s1>-us1-<slug>`, merged before US3 (plan: Delivery
-order); that PR bumps the `version` in every carrier's `.claude-plugin/plugin.json` then present once
-(`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged; FR-022). Task numbers are
-execution order within a PR.
+order). Task numbers are execution order within a PR.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -59,9 +57,8 @@ owned by US1; builder's carrier itself is US2. This phase is intentionally empty
 ## Phase 3: User Story 1 - core gains the reads and the stop rule builder needs (Priority: P1)
 Story issue: #245
 
-**Goal**: every read builder's step needs that core lacks lands in core in one PR, which carries `Closes #245` from
-creation (builder ADR-0003 d1), plus the pure stop rule
-the orchestrator's Stop hook shares (FR-024–FR-026)
+**Goal**: every read builder's step needs that core lacks, and the pure stop rule the orchestrator's Stop hook
+shares, land in core in one PR carrying `Closes #245` from creation (builder ADR-0003 d1; FR-024–FR-026)
 
 **Independent Test**: `npm test --prefix core` passes; each addition has a test against the fake GitHub or a scratch
 repository; no addition's signature takes a key reader or a writing client
@@ -99,7 +96,7 @@ repository; no addition's signature takes a key reader or a writing client
 ### B4 — Spec PR merge commit
 
 - [ ] T018 [P] [US1] **B4.** Add failing cases to `core/tests/identity.test.ts`: `specPr`'s `SpecPr` carries `mergeCommit: {oid} | null`, the oid read from the PR's `mergeCommit` in the same query; non-null only when `state` is `merged` (R9)
-- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; then, once for the PR, bump `version` in every carrier's `.claude-plugin/plugin.json` then present and confirm `node core/scripts/check-carriers.ts --base origin/main` reports 0 failures (FR-022)
+- [ ] T019 [US1] **B4.** Add `mergeCommit` to `SpecPr`, its query and `pickSpecPr` in `core/src/identity.ts`; T018 passes; then, once for the PR, bump `version` in every carrier's `.claude-plugin/plugin.json` then present (`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged) and confirm `node core/scripts/check-carriers.ts --base origin/main` reports 0 failures (FR-022)
 
 **Checkpoint**: US1's PR merged → US3 may start
 
@@ -266,18 +263,6 @@ Story issue: #249
 - **US5 (Phase 7)**: after US4 (shares `step.ts`, `facts.ts`, `SKILL.md`)
 - **Polish (Phase 8)**: after US5
 
-### Core additions (US1, one PR)
-
-| Section | Tasks |
-|---|---|
-| B1 | T006–T007 |
-| B2 | T008–T009 |
-| B3 | T010–T011 |
-| B7 | T012–T013 (after B3) |
-| B5 | T014–T015 |
-| B6 | T016–T017 |
-| B4 | T018–T019 |
-
 ### Within each story
 
 - Test tasks are written and seen to fail before their implementation task
@@ -332,6 +317,5 @@ Task: "facts.test.ts: reads against fake GitHub and scratch repos"
 
 ## Notes
 
-- US1's PR bumps every carrier's plugin version present at the time, once (FR-022)
 - builder writes only commits, ticks and, on a cut, a local branch and worktree (P6); a task that would push, open a PR or write a lane is wrong
 - Planner adds the `Story issue: #<s>` label lines under each phase heading when it lands this file; do not add them by hand
