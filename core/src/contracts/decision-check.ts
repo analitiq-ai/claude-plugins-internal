@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, realpath } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { z } from "zod";
 
-import { isReadableFolder, liesUnder } from "../adr-folders.ts";
+import { checkoutToplevel, isReadableFolder, liesUnder } from "../adr-folders.ts";
 import { textIfPresent } from "../files.ts";
-import { runGit } from "../git.ts";
 import { listedOnce } from "../listed-once.ts";
 import { SETTINGS_FILE } from "../settings.ts";
 import { isPlainPath } from "../tree.ts";
@@ -35,19 +34,16 @@ export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: 
 export const SourceHashes = z.strictObject({ v: z.literal(1), files: z.record(z.string(), z.string()) });
 export type SourceHashes = z.infer<typeof SourceHashes>;
 
-/** The checkout's top, relative to `cwd`: empty at the top. GitFailed when `cwd` is in no git checkout. */
-async function checkoutTopFrom(cwd: string): Promise<string> {
-  return (await runGit(cwd, ["rev-parse", "--show-cdup"])).stdout.trim();
-}
-
 /** The sha256 of each path given that exists, relative to `cwd` or absolute, keyed repo-relative from the top of the
  *  checkout `cwd` is in, whichever project of it `cwd` is, and absolute outside it (a listed folder outside the repo);
  *  an absent one left out. Equal sets mean unchanged sources. GitFailed when `cwd` is in no git checkout. */
 export async function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes> {
-  const top = resolve(cwd, await checkoutTopFrom(cwd));
+  // checkoutToplevel answers a realpath: a path relative to cwd is resolved from cwd's realpath to compare with it.
+  const top = await checkoutToplevel(cwd);
+  const here = await realpath(cwd);
   const files: Record<string, string> = {};
   for (const path of paths) {
-    const absolute = resolve(cwd, path);
+    const absolute = resolve(here, path);
     const bytes = await bytesIfPresent(absolute);
     if (bytes === null) continue;
     const key = liesUnder(top, absolute) ? relative(top, absolute) : absolute;
@@ -90,12 +86,12 @@ export async function tasksSourcePaths(cwd: string, specDir: string): Promise<st
 export async function roundInputPaths(cwd: string, specDir: string, runDir: string, folderPaths: readonly string[]): Promise<string[]> {
   const folderFiles = await Promise.all(folderPaths.map((folder) => filesUnder(cwd, folder)));
   // The settings are the checkout's, read at its top, whichever project of it the run is in.
-  const toTop = await checkoutTopFrom(cwd);
+  const top = await checkoutToplevel(cwd);
   return [
     ...(await tasksSourcePaths(cwd, specDir)),
     join(specDir, "tasks.md"),
     join(specDir, ADR_RULINGS_FILE),
-    join(toTop, SETTINGS_FILE),
+    join(top, SETTINGS_FILE),
     // Listed whether or not this run has one: sourceHashes leaves an absent file out.
     join(runDir, REVIEW_QUESTIONS_FILE),
     ...folderFiles.flat(),

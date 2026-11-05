@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
@@ -467,6 +467,16 @@ describe("sourceHashes", () => {
     });
   });
 
+  it("keys a file repo-relative by its realpath or through cwd when cwd reaches the checkout through a symlink", async (t) => {
+    const { cwd } = await checkout(t);
+    const link = join(dirname(cwd), "link");
+    symlinkSync(cwd, link);
+    assert.deepEqual(await sourceHashes(link, ["specs/7-x/plan.md", join(cwd, "specs", "7-x", "spec.md")]), {
+      v: 1,
+      files: { "specs/7-x/plan.md": sha256("# Plan\n"), "specs/7-x/spec.md": sha256("# Spec\n") },
+    });
+  });
+
   it("is GitFailed outside a git checkout", async (t) => {
     const folder = tempFolder(t);
     const ceiling = process.env.GIT_CEILING_DIRECTORIES;
@@ -529,7 +539,8 @@ describe("tasksSourcePaths and roundInputPaths", () => {
     ".specify/memory/constitution.md",
   ];
 
-  async function project(t: TestContext, path: string): Promise<string> {
+  /** cwd `path` of a checkout; `settings` the realpath of its top's codeworks.toml. */
+  async function project(t: TestContext, path: string): Promise<{ cwd: string; settings: string }> {
     const top = tempFolder(t);
     await runGit(top, ["init", "-q", "-b", "main"]);
     const cwd = join(top, path);
@@ -537,21 +548,22 @@ describe("tasksSourcePaths and roundInputPaths", () => {
     for (const file of [`${SPEC}/contracts/a.md`, `${SPEC}/contracts/nested/b.md`, "docs/adr/0004-x.md", "docs/adr/drafts/0005-y.md"]) {
       writeFileSync(join(cwd, file), "# x\n");
     }
-    return cwd;
+    return { cwd, settings: join(realpathSync(top), "codeworks.toml") };
   }
 
   it("lists every file the tasks command reads, each spec-folder file whether or not it exists", async (t) => {
-    const cwd = await project(t, ".");
+    const { cwd } = await project(t, ".");
     for (const file of ["spec.md", "plan.md"]) writeFileSync(join(cwd, SPEC, file), "# x\n");
     assert.deepEqual(await tasksSourcePaths(cwd, SPEC), TASKS_SOURCES);
   });
 
-  for (const [where, path, settings] of [
-    ["at the checkout's top", ".", "codeworks.toml"],
-    ["in a project below the checkout's top, the checkout's settings file", "planner", "../codeworks.toml"],
+  for (const [where, path] of [
+    ["at the checkout's top", "."],
+    ["in a project below the checkout's top", "planner"],
   ] as const) {
-    it(`lists the tasks sources, tasks.md, the rulings file, settings, review questions and each listed folder's files: ${where}`, async (t) => {
-      assert.deepEqual(await roundInputPaths(await project(t, path), SPEC, RUN, ["docs/adr"]), [
+    it(`lists the tasks sources, tasks.md, the rulings file, the checkout's settings, review questions and each listed folder's files: ${where}`, async (t) => {
+      const { cwd, settings } = await project(t, path);
+      assert.deepEqual(await roundInputPaths(cwd, SPEC, RUN, ["docs/adr"]), [
         ...TASKS_SOURCES,
         `${SPEC}/tasks.md`,
         `${SPEC}/adr-rulings.json`,
@@ -568,13 +580,13 @@ describe("tasksSourcePaths and roundInputPaths", () => {
     ["a symlink loop", (folder: string) => symlinkSync("unreachable", folder)],
   ] as const) {
     it(`lists no file of a listed folder that is ${what}`, async (t) => {
-      const cwd = await project(t, ".");
+      const { cwd, settings } = await project(t, ".");
       make(join(cwd, "docs", "unreachable"));
       assert.deepEqual(await roundInputPaths(cwd, SPEC, RUN, ["docs/unreachable"]), [
         ...TASKS_SOURCES,
         `${SPEC}/tasks.md`,
         `${SPEC}/adr-rulings.json`,
-        "codeworks.toml",
+        settings,
         `${RUN}/review-questions.json`,
       ]);
     });
@@ -584,7 +596,7 @@ describe("tasksSourcePaths and roundInputPaths", () => {
     "lists no file of a listed folder it can read but not search",
     { skip: process.getuid?.() === 0 && "root searches a chmod 444 folder" },
     async (t) => {
-      const cwd = await project(t, ".");
+      const { cwd, settings } = await project(t, ".");
       const unsearchable = join(cwd, "docs", "adr");
       chmodSync(unsearchable, 0o444);
       try {
@@ -592,7 +604,7 @@ describe("tasksSourcePaths and roundInputPaths", () => {
           ...TASKS_SOURCES,
           `${SPEC}/tasks.md`,
           `${SPEC}/adr-rulings.json`,
-          "codeworks.toml",
+          settings,
           `${RUN}/review-questions.json`,
         ]);
       } finally {
@@ -605,7 +617,7 @@ describe("tasksSourcePaths and roundInputPaths", () => {
     "refuses a listed folder holding a folder it cannot read, naming that folder",
     { skip: process.getuid?.() === 0 && "root reads a chmod 000 folder" },
     async (t) => {
-      const cwd = await project(t, ".");
+      const { cwd } = await project(t, ".");
       const locked = join(cwd, "docs", "adr", "locked");
       mkdirSync(locked);
       chmodSync(locked, 0o000);
