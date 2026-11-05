@@ -43,8 +43,7 @@ export function recordCommitPasses(session: Session, range: PassedRange): void {
   const head = range.shas.at(-1);
   if (head === undefined) throw new CommitPassesRefused(path, "a range of no commit has no head to pass");
   const record = recordFor(session, range.repository);
-  // Own keys only: an absent branch named constructor would otherwise read as Object's constructor.
-  const entry = Object.hasOwn(record.branches, range.branch) ? record.branches[range.branch] : undefined;
+  const entry = record.branches[range.branch];
   if (entry !== undefined && entry.issue !== range.issue) {
     throw new CommitPassesRefused(path, `branch ${range.branch} is #${entry.issue}'s, not #${range.issue}'s`);
   }
@@ -63,7 +62,7 @@ export function setReviewerOff(session: Session, repository: string, off: boolea
 
 function recordFor(session: Session, repository: string): CommitPasses {
   const record = readCommitPasses(session);
-  if (record === null) return { v: 1, repository, off: false, branches: {} };
+  if (record === null) return CommitPasses.parse({ v: 1, repository, off: false, branches: {} });
   if (record.repository !== repository) throw new CommitPassesRefused(fileOf(session), `it is ${record.repository}'s, not ${repository}'s`);
   return record;
 }
