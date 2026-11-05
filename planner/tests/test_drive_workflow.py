@@ -450,6 +450,44 @@ class GivenKeys(unittest.TestCase):
         self.assertEqual(drive_workflow._given_keys(text), [text])
 
 
+class CheckOutcomes(unittest.TestCase):
+    """The outcomes the stop lines start with are core's, read from the CheckOutcome schema beside the plugin's
+    scripts."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+
+    def drive_with(self, schema):
+        """drive_workflow.py in a plugin folder under the test's own, `schema` its core's check-outcome.schema.json,
+        or no such file when it is None."""
+        scripts = self.root / "plugin" / "skills" / "issue-spec" / "scripts"
+        scripts.mkdir(parents=True)
+        shutil.copy(DRIVER, scripts)
+        generated = self.root / "plugin" / "core" / "generated"
+        generated.mkdir(parents=True)
+        if schema is not None:
+            (generated / "check-outcome.schema.json").write_text(json.dumps(schema))
+        return subprocess.run([sys.executable, str(scripts / DRIVER.name), "resume", "r1"], cwd=self.root,
+                              capture_output=True, text=True, check=False)
+
+    def test_the_schema_beside_the_plugin_is_the_file_core_writes(self):
+        self.assertTrue(drive_workflow.CHECK_OUTCOMES.samefile(
+            REPO / "core" / "src" / "generated" / "check-outcome.schema.json"))
+
+    def test_a_schema_lacking_an_outcome_the_lines_start_with_stops_the_driver_naming_it(self):
+        done = self.drive_with({"enum": ["PENDING", "PASS", "FAIL"], "type": "string"})
+        self.assertEqual((done.returncode, done.stdout), (1, ""))
+        self.assertIn(str(self.root / "plugin" / "core" / "generated" / "check-outcome.schema.json"), done.stderr)
+        self.assertIn("COULD_NOT_RUN", done.stderr)
+
+    def test_a_missing_schema_stops_the_driver_naming_it(self):
+        done = self.drive_with(None)
+        self.assertEqual((done.returncode, done.stdout), (1, ""))
+        self.assertIn(str(self.root / "plugin" / "core" / "generated" / "check-outcome.schema.json"), done.stderr)
+
+
 class NonUtf8Bytes(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()

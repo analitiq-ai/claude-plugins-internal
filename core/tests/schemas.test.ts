@@ -32,9 +32,9 @@ for (const { file, text } of generatedFiles) {
   });
 }
 
-test("the generated files include premise.json", () => {
+test("the generated files are premise.json and the CheckOutcome schema planner's Python reads", () => {
   assert.deepEqual(
     generatedFiles.map(({ file }) => file),
-    ["premise.json"],
+    ["premise.json", "check-outcome.schema.json"],
   );
 });

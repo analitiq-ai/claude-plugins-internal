@@ -54,12 +54,7 @@ export const ADR_STOPS = {
   },
   "stop-unread": { outcome: COULD_NOT_RUN, label: STOP_FILE, what: "does not parse", next: CHECK_AGAIN },
   "step-unfinished": { outcome: COULD_NOT_RUN, label: "adr-check", what: null, next: "fix what the step's error names, then resume" },
-  "tasks-unfinished": {
-    outcome: COULD_NOT_RUN,
-    label: "tasks.md",
-    what: "the tasks command did not answer (its exit code not 0)",
-    next: CHECK_AGAIN,
-  },
+  "tasks-unfinished": { outcome: COULD_NOT_RUN, label: "tasks.md", what: null, next: CHECK_AGAIN },
   "touches-refused": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: null, next: CHECK_AGAIN },
   "touches-missing": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: null, next: CHECK_AGAIN },
   "touches-stale": {

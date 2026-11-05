@@ -62,9 +62,9 @@ folder that the default branch lacks.
 
    Planning uses three third-party Spec Kit community extensions, part of neither Spec Kit nor planner: grill
    and critique in the `issue-spec` workflow's steps of those names, and ADR Kit, whose `speckit-adrkit-draft`
-   drafts a superseding record when the plan's ADR check stops on a departure. Spec Kit's catalog lists all
-   three as discovery-only, not vetted, so `specify` will not install them from it. Vet each yourself, then
-   install it with
+   drafts the superseding record the ADR check offers when a plan departs from a record in the spec's own
+   repository. Spec Kit's catalog lists all three as discovery-only, not vetted, so `specify` will not install
+   them from it. Vet each yourself, then install it with
    `specify extension add <id> --from <archive-url>`, or `--dev <folder>` from a local copy:
 
    | Extension | Author | Skills it adds |

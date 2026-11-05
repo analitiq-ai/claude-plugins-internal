@@ -40,12 +40,29 @@ RULINGS_FILE = "adr-rulings.json"
 # adr_check.ts's run-folder records the report reads (core's decision-check.ts names them).
 STOP_FILE = "adr-stop.json"
 ASKED_FILE = "adr-asked.json"
+CHECK_OUTCOMES = PLUGIN / "core" / "generated" / "check-outcome.schema.json"
+
+
+def _check_outcomes(path, *names):
+    """`names`, each a value of CheckOutcome's schema at `path`; exits naming `path` when the schema cannot be read
+    as core writes it or lacks one of them."""
+    try:
+        values = json.loads(path.read_text())["enum"]
+        lacking = [name for name in names if name not in values]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        sys.exit(f"CheckOutcome could not be read from {path}: {type(exc).__name__}: {exc}")
+    if lacking:
+        sys.exit(f"CheckOutcome at {path} has no {', '.join(lacking)}")
+    return names
+
+
+FAIL, COULD_NOT_RUN = _check_outcomes(CHECK_OUTCOMES, "FAIL", "COULD_NOT_RUN")
 # The stop table's lines this report reads: the step-unfinished line, the ruling-refused label, and the label of each
 # stop whose Unanswered step is a model step, with that step.
-STEP_UNFINISHED = re.compile(r"^COULD_NOT_RUN: adr-check: step (.+) did not finish this round")
-RULING_REFUSED = "FAIL: adr_ruling: "
+STEP_UNFINISHED = re.compile(rf"^{COULD_NOT_RUN}: adr-check: step (.+) did not finish this round")
+RULING_REFUSED = f"{FAIL}: adr_ruling: "
 UNANSWERED = {"touches.json": "adr-touches", "tasks.md": "adr-tasks", "adr-verdict.json": "adr-judge"}
-UNANSWERED_LINE = re.compile(r"^COULD_NOT_RUN: (touches\.json|tasks\.md|adr-verdict\.json): ")
+UNANSWERED_LINE = re.compile(rf"^{COULD_NOT_RUN}: (touches\.json|tasks\.md|adr-verdict\.json): ")
 
 
 def _own_id(step):

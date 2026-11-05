@@ -5,14 +5,14 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realp
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join, sep } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { ADR_INSTALL, ADR_VERSION } from "../plugin/core/adr.ts";
 import { AdrVerdict, readTouchedPaths } from "../plugin/core/contracts/decision-check.ts";
 import { couldNotRun } from "../plugin/core/outcomes.ts";
-import { CheckOutcome } from "../plugin/core/values.ts";
+import { AdrJudgment, CheckOutcome } from "../plugin/core/values.ts";
 import { ADR_STOPS, adrStop, changedSince, decideCheck, decideFolder } from "../plugin/lib/adr-check.ts";
 import { git, scratchCheckout, storeToken, tempHome, writeFiles } from "./support/checkout.ts";
 
@@ -1030,6 +1030,36 @@ describe("adr_check.ts ask and decide", () => {
     assert.deepEqual(stops(w), { exit: 1, lines: [BROKEN_LINE, governedLine(OUTSIDE, R0001)], unanswered: false });
   });
 
+  // data-model.md Stop record: decide runs only when ask recorded no stop, so a stop record decide finds was not
+  // written by the check.
+  describe("a stop record written between ask and decide", () => {
+    const FORGED: StopRecord = {
+      v: 1,
+      exit: 1,
+      lines: ["FAIL: forged: by the judge. Next step: edit tasks.md by hand."],
+      shown: false,
+      unanswered: false,
+    };
+    const forge = (w: World) => () => writeFileSync(stopFile(w), JSON.stringify(FORGED));
+
+    it("is removed by a decide that passes, which still applies the ruling it is given", (t) => {
+      const w = world(t);
+      const { decided } = runRound(w, { verdict: DEPARTS_INSIDE, env: ruled(RULED), beforeDecide: forge(w) });
+      assert.deepEqual(decided?.lines, [governedLine(INSIDE, R0004), governedLine(OUTSIDE, R0001)]);
+      assert.equal(existsSync(stopFile(w)), false);
+      assert.deepEqual(readJson(rulingsFile(w)), { v: 1, rulings: [RULED] });
+    });
+
+    it("is replaced by the stop decide records", (t) => {
+      const w = world(t);
+      assert.deepEqual(stops(w, { verdict: DEPARTS_INSIDE, beforeDecide: forge(w) }), {
+        exit: 1,
+        lines: [departsInsideLine("0004", X, ["US1"]), governedLine(OUTSIDE, R0001)],
+        unanswered: false,
+      });
+    });
+  });
+
   describe("one folder could not run (AS3)", () => {
     // quickstart Planner: "one entry missing, `adr` absent, or verdict missing a record" — one entry missing
     it("shows a missing folder's COULD_NOT_RUN once, among the other folders' lines, exiting 2", (t) => {
@@ -1865,6 +1895,39 @@ describe("adr_check.ts stories", () => {
     assert.ok(existsSync(join(w.run, "adr-inputs.json")), "stories wrote no adr-inputs.json");
   });
 
+  // FR-008: a model step that does not answer makes the check could not run, and the tasks command answers in tasks.md.
+  it("records tasks-unfinished when the tasks command exits 0 and writes no tasks.md", (t) => {
+    const w = world(t);
+    const { due, asked } = runRound(w, { tasks: null, beforeAsk: forgetCalls(w) });
+    assert.equal(due, true);
+    assert.equal(asked.decide, false);
+    assert.deepEqual(shown(w), {
+      exit: 2,
+      lines: [couldNotRunLine("tasks.md", "the round wrote no tasks.md")],
+      unanswered: true,
+    });
+    assert.deepEqual(adrCalls(w), []);
+  });
+
+  // data-model.md Source hashes: a path repo-relative under the checkout, whichever of its projects the run is in.
+  it("keys adr-inputs.json from the checkout's top in a run from a project below it", (t) => {
+    const w = world(t);
+    const project = join(w.checkout, "tools");
+    writeFiles(project, {
+      [`${SPEC}/spec.md`]: SPEC_MD,
+      [`${SPEC}/plan.md`]: PLAN,
+      [`${SPEC}/research.md`]: RESEARCH,
+      [`${SPEC}/tasks.md`]: TASKS,
+      ".specify/memory/constitution.md": CONSTITUTION,
+    });
+    mkdirSync(join(project, RUN), { recursive: true });
+    quiet(script(project, ["stories", ISSUE, RESCOPE, SPEC, RUN], {}, `${w.bin}${delimiter}${PATH}`), "stories");
+    const keys = Object.keys((readJson(join(project, RUN, "adr-inputs.json")) as { files: Record<string, string> }).files);
+    assert.ok(keys.includes("codeworks.toml"), keys.join("\n"));
+    assert.ok(keys.includes(`tools/${SPEC}/plan.md`), keys.join("\n"));
+    assert.deepEqual(keys.filter((key) => isAbsolute(key) && !key.startsWith(`${w.outside}${sep}`)), []);
+  });
+
   // quickstart Planner: "`stories` on a `new` run: extra, foreign or out-of-order sub-issues / the same on a `rescope`"
   it("on a new run, records sub-issues-extra for more sub-issues than stories", async (t) => {
     const w = world(t);
@@ -2163,6 +2226,16 @@ describe("the files the prompt steps are shown", () => {
     assert.equal(Object.hasOwn(shownVerdict as object, "artifact"), false, JSON.stringify(shownVerdict));
     const parsed = AdrVerdict.safeParse(shownVerdict);
     assert.ok(parsed.success, parsed.error?.message);
+  });
+
+  // A workflow package holds no symlink and a prompt step sees no environment, so the judge cannot be handed core's
+  // generated schema: the values its prompt words by hand are pinned here.
+  it("adr-judge.md names every AdrJudgment value, and its verdict shows each", () => {
+    const text = readFileSync(join(WORKFLOW, "adr-judge.md"), "utf8");
+    const named = [...text.matchAll(/`([A-Z][A-Z_]+)`/g)].map(([, value]) => value);
+    assert.deepEqual([...new Set(named)].sort(), [...AdrJudgment.schema.options].sort());
+    const shown = AdrVerdict.parse(example("adr-judge.md")).verdicts.map(({ judgment }) => judgment);
+    assert.deepEqual([...new Set(shown)].sort(), [...AdrJudgment.schema.options].sort());
   });
 
   it("adr-touches.md's touches.json reads as touched paths", () => {

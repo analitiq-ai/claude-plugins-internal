@@ -4,6 +4,7 @@ import { Finding } from "../src/contracts/finding.ts";
 import { PremisePick, REPORTS_WRONG_BEHAVIOUR, ROOT_CAUSE } from "../src/contracts/premise.ts";
 import { Snapshot } from "../src/contracts/snapshot.ts";
 import { SpecFacts } from "../src/contracts/spec-facts.ts";
+import { CheckOutcome } from "../src/values.ts";
 
 export const schemasDir = new URL("../schemas/", import.meta.url);
 // Under src/, unlike schemas/: only src/ reaches a plugin that carries core.
@@ -46,6 +47,8 @@ function premiseJsonText(): string {
 // The drift test regenerates from this list too.
 export const generatedFiles: ReadonlyArray<{ file: string; text: () => string }> = [
   { file: "premise.json", text: premiseJsonText },
+  // Planner's Python reads the outcomes its ADR check's stop lines start with from here (root ADR-0010 d1).
+  { file: "check-outcome.schema.json", text: () => jsonSchemaText(CheckOutcome.schema) },
 ];
 
 if (import.meta.main) {

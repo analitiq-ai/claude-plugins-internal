@@ -1,6 +1,6 @@
 ---
 name: issue-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the issue-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/planner:issue-spec #<issue>`), a spec folder that needs re-scoping (`/planner:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/planner:issue-spec untracked "<what changes>"`).
+description: Scope or re-scope a change in a spec folder before it is built, by running the issue-spec Spec Kit workflow (premise → specify → grill → plan → critique → the ADR check, which writes the tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/planner:issue-spec #<issue>`), a spec folder that needs re-scoping (`/planner:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/planner:issue-spec untracked "<what changes>"`).
 argument-hint: '#<issue> [<dir>] | rescope <spec folder> #<issue> | untracked "<what changes>" [<dir>]'
 ---
 

@@ -214,21 +214,28 @@ async function roundSettingsOrStop(): Promise<Round | Stopped> {
   }
 }
 
+/** `paths`, relative to the run's project or absolute, hashed under keys relative to the checkout's top, or absolute
+ *  for a path outside it. */
+async function hashedFromTop(paths: readonly string[]): Promise<SourceHashes> {
+  return sourceHashes(await checkoutToplevel(CWD), paths.map((path) => resolve(CWD, path)));
+}
+
 function touchesSources(specDir: string): Promise<SourceHashes> {
-  return sourceHashes(CWD, [join(specDir, "plan.md"), join(specDir, "spec.md")]);
+  return hashedFromTop([join(specDir, "plan.md"), join(specDir, "spec.md")]);
 }
 
 async function tasksSources(specDir: string): Promise<SourceHashes> {
-  return sourceHashes(CWD, await tasksSourcePaths(CWD, specDir));
+  return hashedFromTop(await tasksSourcePaths(CWD, specDir));
 }
 
 async function roundInputs(specDir: string, run: string, folders: readonly ResolvedAdrFolder[]): Promise<SourceHashes> {
-  return sourceHashes(CWD, await roundInputPaths(CWD, specDir, run, folders.map(({ path }) => path)));
+  return hashedFromTop(await roundInputPaths(CWD, specDir, run, folders.map(({ path }) => path)));
 }
 
 function readTasks(specDir: string): string {
   const text = textIfPresent(join(specDir, TASKS_MD));
-  if (text === null) throw new Stopped([{ kind: "tasks-refused", label: TASKS_MD, what: "the file is missing" }]);
+  // tasks-due finds a round without tasks.md due, so a missing one went unwritten this round.
+  if (text === null) throw new Stopped([{ kind: "tasks-unfinished", what: "the round wrote no tasks.md" }]);
   return text;
 }
 
@@ -346,7 +353,9 @@ async function tasksDue(specDir: string, run: string): Promise<number> {
 function tasksWritten(run: string, tasksExit: string): number {
   // The hashes tasks-due took before the command ran: a source changed while it ran makes the next round due.
   if (tasksExit === ANSWERED) renameSync(join(run, TASKS_SOURCES_NEXT_FILE), join(run, TASKS_SOURCES_FILE));
-  else if (!stopRecorded(run)) recordStop(run, [{ kind: "tasks-unfinished" }]);
+  else if (!stopRecorded(run)) {
+    recordStop(run, [{ kind: "tasks-unfinished", what: "the tasks command did not answer (its exit code not 0)" }]);
+  }
   writeDone(run, { v: 1, step: "tasks-written" });
   return 0;
 }
@@ -596,6 +605,8 @@ async function deciding(specDir: string, run: string, digest: string, judgeExit:
 }
 
 async function decide(specDir: string, run: string, digest: string, judgeExit: string): Promise<number> {
+  // decide runs only when ask recorded no stop, so a stop record here was not written by the check.
+  rmSync(join(run, STOP_FILE), { force: true });
   const lines = await checked(run, () => deciding(specDir, run, digest, judgeExit));
   if (lines !== null) printLines(lines);
   writeDone(run, { v: 1, step: "decide" });
