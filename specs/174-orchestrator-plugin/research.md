@@ -47,23 +47,22 @@ plan has not executed, and names the task that runs it first.
 - **Existing tools**: `core/src/keys.ts` (`readKey`, its managed-settings check; fits);
   `core/tests/keys.test.ts` already reads `session-app.pem` for `orchestrator`.
 
-## R5: Settings are bootstrapped from HEAD and settled on GitHub
+## R5: Settings are read once, at the checkout's HEAD
 
 - **Decision**: `lib/settings.ts` defines `OrchestratorSettings` as a strict Zod object (contracts/
-  orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings`. A hook first
-  reads the checkout's `HEAD` only for `app_id` and `session_app_id`, mints, then reads the whole file through
-  `gitHubTree` with the orchestrator App's token at the ref root ADR-0002 d4 names (the default branch for the
-  claim; the PR's head for that PR's work in Stories 2–5) and refuses, naming both values, when either App ID
-  differs from the one it minted with. Every other key is taken from the GitHub read only. PreToolUse reads
+  orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings` over
+  `gitTree(checkout, "HEAD")`, the one read every component makes (root ADR-0002 d4: the branch the work is on;
+  #217 R7 reads the same).
+  Every key, the App IDs among them, comes from that read. PreToolUse reads
   settings only when `needsMint` holds; otherwise it reads the gh folder and the repository alone.
-- **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source; the model can rewrite its local
-  refs, so a local read is not that ref. The App IDs need no trust: a key signs only for its own App, so a forged
-  ID makes the mint fail loud, and the post-mint compare makes it fail loud even when it did not. Story 1 adds
+- **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source, and one read keeps one source for
+  every hook and builder. The model's writes to the file are refused (reviewer ADR-0012 d1); a branch switch in
+  the checkout is not, and is refused only once a session is seen doing it. A forged App ID makes the mint fail
+  loud: a key signs only for its own App. Story 1 adds
   `app_id`, `session_app_id`, `status_issue`; Story 3 `exempt_labels`; Story 4 `review_timeout` (≤ 3600,
   FR-021); Story 5 `max_turns`, `k_deaths`.
-- **Existing tools**: `core/src/settings.ts` (`readSettings`; fits); `core/src/tree.ts` (`gitTree`, `gitHubTree`;
-  fit); `planner/plugin/lib/settings.ts` (the section-validation pattern; reads HEAD alone, which fits planner's
-  trusted admin machine, not the agent machine).
+- **Existing tools**: `core/src/settings.ts` (`readSettings`; fits); `core/src/tree.ts` (`gitTree`; fits);
+  `planner/plugin/lib/settings.ts` (the section-validation pattern and the same HEAD read).
 
 ## R6: The session's gh config folder
 

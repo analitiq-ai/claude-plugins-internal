@@ -64,7 +64,8 @@ addition's signature takes a key reader or a writing client.
    **Then** the slug is `[a-z0-9-]`, length-capped, with no leading, trailing or doubled `-`, `story` when empty,
    and the name parses back through `parseBranch`.
 2. **Given** a head with `<module>-review` check runs written by the orchestrator's App, **When** core reads the
-   head's findings, **Then** it reads them from those check runs and the threads, and loads no validator package.
+   head's findings, **Then** it reads the required checks and the threads, a failed check run as its module's one
+   finding, and loads no validator package.
 3. **Given** the facts of each stop state, **When** the orchestrator's Stop hook and builder's step script read
    them through core and call core's stop rule, **Then** both get the same state and reason.
 
@@ -315,8 +316,9 @@ the new head.
 - **FR-025**: The step's stop rule MUST be a pure function in core, called by builder's step script and by the
   orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2). Its facts MUST be read by one
   read-only core function both call; builder cuts or adds the worktree itself (FR-027), then reads them again.
-- **FR-026**: The PR's findings MUST be read from the `<module>-review` check runs the orchestrator's App writes at
-  the head and from the PR's threads, never by loading validator packages in builder.
+- **FR-026**: The PR's findings MUST be read from its required checks and threads and, when those have none, from
+  the `<module>-review` check runs the orchestrator's App writes at the head, a failed run being its module's one
+  finding and a pending or absent run none, never by loading validator packages in builder.
 - **FR-027**: A story branch on GitHub with no local branch MUST get its worktree from `origin/<branch>`; a local
   branch with no worktree MUST get its worktree on that branch. `BRANCH_MISMATCH` MUST stop only when both exist and
   differ.
@@ -343,8 +345,8 @@ the new head.
 ### Measurable Outcomes
 
 - **SC-001**: The carrier check on the default branch lists builder among its carriers with 0 failures.
-- **SC-002**: For each of the 16 stop states of data-model.md's `StopState` enum, a step leaves the repository,
-  worktree and GitHub unchanged and its message names the state: 16 of 16.
+- **SC-002**: For each of the 16 stop states of data-model.md's `StopState` enum, a step leaves branches,
+  worktrees and GitHub unchanged (its fetch of the default branch aside) and its message names the state: 16 of 16.
 - **SC-003**: For each of the 4 PR states (none, unattested, findings, attested clean), the step names the one action
   FR-012 gives it: 4 of 4, and the same answer when run twice with no change on GitHub.
 - **SC-004**: After any sequence of steps, every head pushed to a story branch is an ancestor of its current head: 0

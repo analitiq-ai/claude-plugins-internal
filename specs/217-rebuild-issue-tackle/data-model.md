@@ -14,19 +14,19 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `origin` | `owner/name` | main checkout's origin |
 | `issue` | `{state: open\|closed, title, body}` | REST issue |
 | `done` | boolean | `isDone` |
-| `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `[shared]` at the default branch |
+| `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `[shared]` at the checkout's HEAD (R7) |
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
 | `worktree` | `{path, branch: string\|null, mergeInProgress: boolean, dirty: string[]}` \| `null` | `git worktree list --porcelain` at `../<repo>.worktrees/<branch>`; `MERGE_HEAD`; `git status --porcelain` |
-| `merge` | `{needed: boolean, why: string[]}` | R9: spec PR merge commit, `governingDiff`, `merge-tree` |
-| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD |
+| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7), R9: spec PR merge commit, `governingDiff`, `merge-tree` |
+| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD; with no branch anywhere, at `refs/remotes/origin/<default>`, the tip a cut starts from (R10) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
 | `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
 | `head` | sha | `git rev-parse HEAD` in the worktree |
 | `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
 | `attested` | boolean | `internalReviewAt(pr.head)` (B5) |
-| `findings` | `Finding[]` | `prFindings` (B6): `<module>-review` check runs and threads, no validator package loaded |
+| `findings` | `Finding[]` | `prFindings` (B6): required checks and threads, then a failed `<module>-review` check run as its module's one finding; no validator package loaded |
 
 A read that does not answer is no field: the script exits 2 naming it (R3).
 
@@ -72,7 +72,8 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 2. `done` → `DONE`; closed → `CLOSED`
 3. lane null → `NO_CARD`; Backlog/Blocked → `LANE`; parent in another repository → `SPEC_ISSUE_ELSEWHERE`
 4. branch: several → `SEVERAL_BRANCHES`; github and local both present and different → `BRANCH_MISMATCH`;
-   worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; none anywhere → the script cuts (R8) and re-reads;
+   worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; none anywhere → stages 5–6 have no worktree to read, stage 7 is decided on the default tip, and only when it stops
+   nothing does the script cut (R8) and re-read;
    GitHub only, or local with no worktree → the script adds the worktree on that branch (R8) and re-reads
 5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
 6. `merge.needed` → `merge`
@@ -81,9 +82,10 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 9. local head behind or diverged from pr head → `HEAD_BEHIND_PR`; ahead, or not attested → `internal_round`
 10. findings → `github_round`; else `nothing_to_do`
 
-Stages 1–4, 7 and the stop half of 5 and 9 are core's stop rule (B7); builder's `decideStep` calls it first.
-Their facts (`session` through `worktree`, `folder`, `pr`, `head`, `headVsPr`) are read by core's
-`readStoryStopFacts` (B7); builder reads `merge`, `requirement`, `tasks`, `attested` and `findings` itself.
+Stages 1–4, 6, 7 and the stop half of 5 and 9 are core's stop rule (B7), stage 6 returning `null` when a merge
+is due; builder's `decideStep` calls it first. Their facts (`session` through `worktree`, `merge`, `folder`, `pr`,
+`head`, `headVsPr`) are read by core's `readStoryStopFacts` (B7); builder reads `requirement`, `tasks`, `attested`
+and `findings` itself.
 
 ## State transitions across steps
 

@@ -44,8 +44,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `StepFacts` value, calls the pure `decideStep(facts)` in `lib/step.ts`, and prints the `Step` it returns as one
   JSON line on stdout (contracts/step-script.md). Exit 0: work to do; 1: a stop, its reason in the JSON; 2: a read
   did not answer, or the arguments are refused (P4). Facts are read in the order the decision needs them, and a
-  stop decided early reads nothing more. The one write the script makes is the cut (R8); every other change is
-  the skill's.
+  stop decided early reads nothing more. The script's writes are the every-run fetch of the default branch (R9) and the cut
+  (R8); every other change is the skill's.
 - **Rationale**: spec "the skill does what the script names and nothing it does not"; P3's split followed (pure
   rule, I/O at the edge), so every acceptance scenario of US3–US5 is a `decideStep` unit test over facts, and the
   reads are tested once against the fake GitHub and a scratch repository.
@@ -89,13 +89,15 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R7: Lane, closed and done are read through core at every step
 
-- **Decision**: settings come from `codeworks.toml` on the default branch through `gitHubTree` and
-  `readSettings`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
+- **Decision**: settings come from `codeworks.toml` at the checkout's HEAD through `gitTree(checkout, "HEAD")`
+  and `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
+  builder passes the same `shared` to `prFindings` and `internalReviewAt`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
   /repos/{o}/{n}/issues/{s}`; done from `isDone`. Backlog or Blocked → stop naming the lane (FR-006); no card →
   stop naming the board; closed or done → stop (FR-007); `LaneRefused`, `GitHubUnanswered`, `GitHubRefused` →
   exit 2 naming the read (FR-009). Read at the start of every step, before anything is cut or merged.
-- **Rationale**: builder ADR-0002 d4, root ADR-0006 d1/d3, ADR-0005 d5, root ADR-0004.
-- **Existing tools**: core `board.ts` `laneOf`, `identity.ts` `isDone`, `settings.ts`, `tree.ts` `gitHubTree`
+- **Rationale**: root ADR-0002 d4; builder ADR-0002 d4, root ADR-0006 d1/d3, ADR-0005 d5, root ADR-0004. The
+  model's writes to the file are refused (reviewer ADR-0012 d1).
+- **Existing tools**: core `board.ts` `laneOf`, `identity.ts` `isDone`, `settings.ts`, `tree.ts` `gitTree`
   (fit); planner's `preflight.ts` does the same lane and closed read (its shape is reused).
 
 ## R8: The story branch is found on GitHub or locally, else cut by the script
@@ -105,7 +107,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`. One branch,
   GitHub's or the local one (crash before push, spec Edge Cases), names the worktree `../<repo>.worktrees/<branch>`;
   a worktree there on another branch → stop naming it. With none anywhere, the script fetches the default branch
-  and runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
+  and, once the folder there gives no stop (R10), runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
   title)` (B1): `<k>` from the `[US<k>]` tag of the story's tasks (R11), else 1; `<slug>` from the issue title,
   lowercased to `[a-z0-9-]`, runs of `-` collapsed, trimmed, capped at 40 characters, `story` when empty (titles
   are untrusted: they become a ref and a path). A branch on GitHub only: fetch it and `git worktree add -B <branch>
@@ -120,12 +122,16 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
-- **Decision**: after fetching the default branch to `refs/remotes/origin/<default>`, the script names
-  "merge" when the default branch's tip is not an ancestor of HEAD and any of: the newest merged spec PR of `<p>`
-  has a merge commit not in HEAD's history (`specPr` with B4's `mergeCommit`, then `git merge-base --is-ancestor`);
-  `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty (spec.md of the folder the default branch
-  names, `**/docs/adr/`, `.specify/memory/`); or `git merge-tree --write-tree origin/<default> HEAD` exits 1
-  (conflict, whether or not a PR exists). It runs before the folder check (R10). The skill then runs the printed
+- **Decision**: core's `readStoryStopFacts` (B7) reads `merge` against `refs/remotes/origin/<default>` as it
+  stands, fetching nothing; builder fetches the default branch there before each read, a write like the cut (R8).
+  `merge` is needed when the newest merged spec PR of `<p>` has a merge commit not in HEAD's history (the first
+  `merged` of `specPrs`, with B4's `mergeCommit`; `git cat-file -e`, then `git merge-base --is-ancestor`), or when the default branch's
+  tip is not an ancestor of HEAD and either `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty
+  (spec.md of the folder the default branch names, `**/docs/adr/`, `.specify/memory/`) or `git merge-tree
+  --write-tree origin/<default> HEAD` exits 1 (conflict, whether or not a PR exists). The spec PR test stands
+  alone, and a merge commit absent from the clone is not in HEAD's history, so the Stop hook, which fetches
+  nothing and may hold a stale default tip, still sees the due merge of a spec PR as builder does. It runs before
+  the folder check (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named. The skill then runs the printed
   `git merge --no-ff --no-edit refs/remotes/origin/<default>` in the worktree, resolves any conflict in that merge
   commit, and runs the script again (FR-017).
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
@@ -138,7 +144,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R10: The spec folder and requirement are read at HEAD after any merge
 
 - **Decision**: `specFolder(gitTree(worktree, "HEAD"), p)`; its `DerivationError` maps to the three stops
-  (no `specs/`, none, several), each naming the open story PR if one (FR-008); `requirement(tree, folder, body)`
+  (no `specs/`, none, several), each naming the open story PR if one (FR-008). With no branch anywhere the folder
+  is read at `refs/remotes/origin/<default>`, the tip the cut would start from, so it gives the same answer and a
+  folder stop leaves nothing cut (SC-002); `requirement(tree, folder, body)`
   gives the requirement, the story issue body for `no_spec`. `codeworks.root_cause.observed` is read from the
   spec facts for the skill (FR-015). No planning command is named in any stop.
 - **Rationale**: builder ADR-0002 d3, root ADR-0005 d2/d4, ADR-0004 d2 (folder check after the merge).
@@ -165,18 +173,24 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   done (R7 already stopped). Open → the `internal-review` check run at the PR head by the orchestrator's App
   (`shared.orchestrator_app_login`) through core's `internalReviewAt` (B5): not `success` → internal round; a local
   HEAD ahead of the PR head (commits not yet pushed) → internal round at HEAD. Attested → `prFindings` (B6): the
-  findings of `requiredChecks`, the `<module>-review` check runs the orchestrator's App writes at the head
-  (orchestrator ADR-0008; #174 FR-020a) and `threadsModule`; non-empty → github round; a module's check run
-  pending or absent → exit 2 naming the module; empty → nothing to do. No validator package is loaded: their deps
-  read keys only hooks may read (`validation/contract.ts` `readKey`; root ADR-0008 d4). B6 takes a reader only.
+  findings of `requiredChecks` and `threadsModule`; only when both are empty, the `<module>-review` check runs the
+  orchestrator's App writes at the head (orchestrator ADR-0008; #174 FR-020a). A run carries its module's status
+  only (ADR-0008 d3), so `failure` is one finding naming the module, and `success`, pending or absent none: modules
+  are triggered only once the head is GREEN without findings (ADR-0008 d2), and a pending module is the
+  orchestrator's wait (ADR-0007 d2). Non-empty → github round; empty → nothing to do. A failed run whose findings
+  were all pushed back is held by reviewer's `pushback-<issue>` hold (reviewer ADR-0013 d4), and one that lists no
+  finding is moved to Blocked (orchestrator ADR-0002 d5); neither is builder's to tell apart. No validator package
+  is loaded: their deps read keys only hooks may read (`validation/contract.ts` `readKey`; root ADR-0008 d4). B6
+  takes a reader only.
 - **Rationale**: builder ADR-0003 d3, orchestrator ADR-0004 d1–d3 (the check run is the attestation, pinned to
   the orchestrator's App), reviewer ADR-0016 d1 (findings only through core). The orchestrator's hooks compose the
   modules' findings with their keys and record each module's outcome as its check run; builder reads that record.
 - **Existing tools**: core `identity.ts` `issueStory`/`storyPr` (fit once B3 returns `closed`, which the query
   already reads); `validation/required-checks.ts` (its private `checkRuns` read fits B5; its `internal-review`
   name is the one constant); `validation/threads.ts` `threadsModule` (fits); `validation/contract.ts` `loadValidators`,
-  `findings` (do not fit: their deps read keys); `attest.ts` `attests` (recomputes from reviewer's state: does not fit, the
-  check run is the record).
+  `findings` (do not fit: their deps read keys); `required-checks.ts` `findingOf` (the one shape of a failed check,
+  which a failed `<module>-review` follows; private, exported taking `source` and `key`); `attest.ts` `attests`
+  (recomputes from reviewer's state: does not fit, the check run is the record).
 
 ## R13: The skill is rewritten to run the script and act on the one step it prints
 
@@ -205,9 +219,12 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R16: The step's stop rule lives in core, so the Stop hook names builder's stop
 
-- **Decision**: B7 puts the stop half of the decision order (data-model stages 1–5, 7, 9) in core as a pure
-  `storyStop(facts)` with the `StopState` enum, and the read of its facts as `readStoryStopFacts(s, sessionId,
-  deps)`: read-only, through core's readers and `git.ts` `runGit`, writing nothing. builder cuts or adds the
+- **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
+  `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
+  `readStoryStopFacts(s, sessionId, deps)`: read-only, through core's readers and `git.ts` `runGit`, writing
+  nothing. A due merge at stage 6 returns `null`, as a merge in progress at stage 5 does: no stop, so the Stop
+  hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.
+  builder cuts or adds the
   worktree when those facts show none (R8), then reads again. builder's `decideStep` calls it first; the orchestrator's Stop hook
   reads the same facts through the same function, calls the rule and, on a stop, moves the card to Blocked with its reason instead of re-naming
   `issue-tackle <s>` until REPEAT. No file is written for the hook to read: the model may not write a hook's
