@@ -8,43 +8,82 @@
     },
     "verdicts": {
       "items": {
-        "additionalProperties": false,
-        "properties": {
-          "folder": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "judgment": {
-            "enum": [
-              "WITHIN",
-              "DEPARTS"
-            ],
-            "type": "string"
-          },
-          "paths": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "folder": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "judgment": {
+                "const": "DEPARTS",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "record": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "why": {
+                "minLength": 1,
+                "type": "string"
+              }
             },
-            "type": "array"
+            "required": [
+              "folder",
+              "record",
+              "judgment",
+              "paths",
+              "why"
+            ],
+            "type": "object"
           },
-          "record": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "why": {
-            "minLength": 1,
-            "type": "string"
+          {
+            "additionalProperties": false,
+            "properties": {
+              "folder": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "judgment": {
+                "const": "WITHIN",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 0,
+                "type": "array"
+              },
+              "record": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "why": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "folder",
+              "record",
+              "judgment",
+              "paths",
+              "why"
+            ],
+            "type": "object"
           }
-        },
-        "required": [
-          "folder",
-          "record",
-          "judgment",
-          "paths",
-          "why"
-        ],
-        "type": "object"
+        ]
       },
       "type": "array"
     }

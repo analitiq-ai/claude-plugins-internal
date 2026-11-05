@@ -7,7 +7,6 @@ import { checkoutToplevel, isReadableFolder, liesUnder } from "../adr-folders.ts
 import { textIfPresent } from "../files.ts";
 import { listedOnce } from "../listed-once.ts";
 import { SETTINGS_FILE } from "../settings.ts";
-import { isPlainPath } from "../tree.ts";
 import { AdrJudgment, CheckedArtifact, CheckOutcome } from "../values.ts";
 
 // Every file planner's ADR check reads or writes in the run folder or the spec folder (planner ADR-0009).
@@ -34,11 +33,11 @@ export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: 
 export const SourceHashes = z.strictObject({ v: z.literal(1), files: z.record(z.string(), z.string()) });
 export type SourceHashes = z.infer<typeof SourceHashes>;
 
-/** The sha256 of each path given that exists, relative to `cwd` or absolute, keyed repo-relative from the top of the
- *  checkout `cwd` is in, whichever project of it `cwd` is, and absolute outside it (a listed folder outside the repo);
- *  an absent one left out. Equal sets mean unchanged sources. GitFailed when `cwd` is in no git checkout. */
+/** The sha256 of each path given that exists, an absent one left out: a relative path resolved from `cwd`'s realpath,
+ *  an absolute one taken as given. Keyed repo-relative when it lies under the realpath of the top of the checkout `cwd`
+ *  is in, whichever project of it `cwd` is, else absolute (a listed folder outside the repo). Equal sets mean
+ *  unchanged sources. GitFailed when `cwd` is in no git checkout. */
 export async function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes> {
-  // checkoutToplevel answers a realpath: a path relative to cwd is resolved from cwd's realpath to compare with it.
   const top = await checkoutToplevel(cwd);
   const here = await realpath(cwd);
   const files: Record<string, string> = {};
@@ -113,12 +112,9 @@ export class PathRefused extends Error {
   }
 }
 
-const PATH = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+// Each segment one or more of these characters, and neither `.` nor `..`.
+const PATH = /^(?!\.\.?(?:\/|$))[A-Za-z0-9._-]+(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9._-]+)*$/;
 const GLOB_OR_BRACE = /[*?[\]{}]/;
-
-function isPath(span: string): boolean {
-  return PATH.test(span) && isPlainPath(span);
-}
 
 /** Why a glob, brace group, `.` or `..` segment in `span` makes it name paths the check cannot list; null when it
  *  has none. */
@@ -136,26 +132,22 @@ function unlistable(span: string): string | null {
  *  segment; else null. */
 export function artifactPath(span: string, rootFiles: ReadonlySet<string> | "any"): string | null {
   if (rootFiles === "any") {
-    if (!isPath(span)) {
-      throw new PathRefused(span, unlistable(span) ?? "not one literal repo-relative file path", null);
-    }
+    if (!PATH.test(span)) throw notAPath(span);
     return span;
   }
-  if (isPath(span)) return span.includes("/") || rootFiles.has(span) ? span : null;
+  if (PATH.test(span)) return span.includes("/") || rootFiles.has(span) ? span : null;
   // A space makes the span a command, whatever path it names.
   const why = span.includes("/") && !span.includes(" ") ? unlistable(span) : null;
   if (why !== null) throw new PathRefused(span, why, null);
   return null;
 }
 
-const Path = z.string().superRefine((span, ctx) => {
-  try {
-    artifactPath(span, "any");
-  } catch (error) {
-    if (!(error instanceof PathRefused)) throw error;
-    ctx.addIssue({ code: "custom", message: error.message });
-  }
-});
+function notAPath(span: string): PathRefused {
+  return new PathRefused(span, unlistable(span) ?? "not one literal repo-relative file path", null);
+}
+
+// A regex, not a refinement, so the generated JSON Schema carries the grammar (root ADR-0010).
+const Path = z.string().regex(PATH, { error: (issue) => notAPath(String(issue.input)).message });
 
 export const TouchedPaths = z.strictObject({ v: z.literal(1), paths: listedOnce(Path) });
 
@@ -202,22 +194,23 @@ export type AdrAsked = z.infer<typeof AdrAsked>;
 
 const { WITHIN, DEPARTS } = AdrJudgment.schema.enum;
 
-const Judged = z
-  .strictObject({
+// One branch per judgment, not a refinement, so the generated JSON Schema carries the rule (root ADR-0010).
+const Judged = z.discriminatedUnion("judgment", [
+  z.strictObject({
     folder: NonEmpty,
     record: NonEmpty,
-    judgment: AdrJudgment.schema,
-    paths: z.array(NonEmpty),
+    judgment: z.literal(DEPARTS),
+    paths: z.array(NonEmpty).min(1, { error: `a ${DEPARTS} verdict names the paths that depart` }),
     why: NonEmpty,
-  })
-  .superRefine(({ judgment, paths }, ctx) => {
-    if (judgment === DEPARTS && paths.length === 0) {
-      ctx.addIssue({ code: "custom", path: ["paths"], message: `a ${DEPARTS} verdict names the paths that depart` });
-    }
-    if (judgment === WITHIN && paths.length > 0) {
-      ctx.addIssue({ code: "custom", path: ["paths"], message: `a ${WITHIN} verdict names no path` });
-    }
-  });
+  }),
+  z.strictObject({
+    folder: NonEmpty,
+    record: NonEmpty,
+    judgment: z.literal(WITHIN),
+    paths: z.array(NonEmpty).max(0, { error: `a ${WITHIN} verdict names no path` }),
+    why: NonEmpty,
+  }),
+]);
 
 /** One verdict per governing record per folder, `folder` the entry as written; it judges plan.md and tasks.md
  *  together, so it names no artifact. */

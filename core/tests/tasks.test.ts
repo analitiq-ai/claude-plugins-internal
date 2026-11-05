@@ -81,7 +81,7 @@ describe("readTaskBlockLabels", () => {
   });
 });
 
-// Spec 177, US3 (T030): artifact-grammar.md's tasks.md task lines.
+// Spec 177, US3 (T030): artifact-grammar.md's tasks.md task lines, each story per core.md's readTaskPaths.
 describe("readTaskPaths", () => {
   const ROOT_FILES: ReadonlySet<string> = new Set(["codeworks.toml", "README.md"]);
 

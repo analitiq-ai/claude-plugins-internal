@@ -29,8 +29,7 @@ Write `<run folder>/adr-verdict.json`, valid against `.specify/workflows/issue-s
 - One verdict per governing record per folder, and no other: `folder` is the entry as the asked record gives it,
   `record` the record's `recordId`.
 - `judgment` is `DEPARTS` when the plan or its tasks depart from the record on an asked path that no ruling with the
-  same `folder` and `record` rules on, else `WITHIN`. `paths` lists, for `DEPARTS`, each such path; for `WITHIN`,
-  none.
+  same `folder` and `record` rules on, else `WITHIN`. For `DEPARTS`, `paths` lists each such path.
 - `why` is one line, with no period at its end.
 
 Write no other file, change no artifact, and give no ruling: a ruling is the user's.

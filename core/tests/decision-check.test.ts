@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
@@ -26,11 +26,14 @@ import {
 import { GitFailed, runGit } from "../src/git.ts";
 import { couldNotRun } from "../src/outcomes.ts";
 import { AdrJudgment, CheckedArtifact } from "../src/values.ts";
+import { generatedDir } from "../scripts/write-schemas.ts";
 
 // Spec 177, US3 (T016): contracts/artifact-grammar.md's path grammar, then each run-folder and spec-folder file's
 // schema as data-model.md gives it.
 
 const ROOT_FILES: ReadonlySet<string> = new Set(["codeworks.toml", "README.md"]);
+
+const PATHS = ["core/src/adr-folders.ts", "codeworks.toml", "planner/plugin/scripts/adr_check.ts", ".specify/x.md"];
 
 // Path-shaped spans naming files the check cannot list: a glob or brace character, or a `.`/`..` segment.
 const UNLISTABLE = [
@@ -76,7 +79,7 @@ describe("CheckedArtifact", () => {
 
 describe("artifactPath", () => {
   describe('a touches.json entry ("any")', () => {
-    for (const span of ["core/src/adr-folders.ts", "codeworks.toml", "planner/plugin/scripts/adr_check.ts", ".specify/x.md"]) {
+    for (const span of PATHS) {
       it(`returns the PATH ${span}`, () => {
         assert.equal(artifactPath(span, "any"), span);
       });
@@ -160,6 +163,29 @@ describe("readTouchedPaths", () => {
       assert.throws(() => readTouchedPaths(json), refusedNaming(TouchesRefused, "touches.json"));
     });
   }
+});
+
+describe("the generated answer schemas", () => {
+  const generated = (file: string) => JSON.parse(readFileSync(new URL(file, generatedDir), "utf8"));
+
+  it("touched-paths.schema.json's path pattern refuses each span that is no PATH and takes each PATH", () => {
+    const pattern = new RegExp(generated("touched-paths.schema.json").properties.paths.items.pattern);
+    assert.deepEqual(NOT_PATHS.filter((span) => pattern.test(span)), []);
+    assert.deepEqual(PATHS.filter((span) => !pattern.test(span)), []);
+  });
+
+  it("touched-paths.schema.json lists each path once (uniqueItems)", () => {
+    assert.equal(generated("touched-paths.schema.json").properties.paths.uniqueItems, true);
+  });
+
+  it("adr-verdict.schema.json gives a DEPARTS verdict one path at least and a WITHIN verdict none", () => {
+    const judged: { properties: { judgment: { const: string }; paths: { minItems?: number; maxItems?: number } } }[] =
+      generated("adr-verdict.schema.json").properties.verdicts.items.oneOf;
+    assert.deepEqual(
+      Object.fromEntries(judged.map(({ properties: { judgment, paths } }) => [judgment.const, [paths.minItems, paths.maxItems]])),
+      { DEPARTS: [1, undefined], WITHIN: [undefined, 0] },
+    );
+  });
 });
 
 describe("AdrAsked", () => {
@@ -436,7 +462,7 @@ describe("SourceHashes", () => {
 describe("sourceHashes", () => {
   /** cwd `project` of a checkout, its top by default; `outside` a folder outside the checkout. */
   async function checkout(t: TestContext, project = "."): Promise<{ cwd: string; outside: string }> {
-    const root = tempFolder(t);
+    const root = realpathSync(tempFolder(t));
     const top = join(root, "widgets");
     const cwd = join(top, project);
     const outside = join(root, "org", "docs", "adr");

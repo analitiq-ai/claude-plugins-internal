@@ -75,7 +75,7 @@ export function readTaskBlockLabels(text: string): ReadonlyMap<string, number> {
 }
 
 /** Pure: each task line's paths (artifact-grammar.md), `story` its `[US<k>]` tag, else the text, without `## `, of the
- *  last phase heading above it. Throws PathRefused at `tasks.md:<line>`, and TaskLineRefused for a task line above
+ *  last phase heading above it (core.md, data-model.md). Throws PathRefused at `tasks.md:<line>`, and TaskLineRefused for a task line above
  *  every phase heading. */
 export function readTaskPaths(tasksText: string, rootFiles: ReadonlySet<string>): ArtifactPath[] {
   const paths: ArtifactPath[] = [];
