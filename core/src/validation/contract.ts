@@ -9,7 +9,7 @@ import { Time } from "../contracts/scalars.ts";
 import { Round } from "../contracts/snapshot.ts";
 import { assertIssueNumber, ownerAndName, type GitHubClient } from "../github.ts";
 import { type Machine, readKey } from "../keys.ts";
-import { couldNotRun, couldNotRunIfUnanswered, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
+import { couldNotRun, couldNotRunIfUnread, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome, ModuleName } from "../values.ts";
 import { appLogins, providerThreadFindings, reviewThreads } from "./threads.ts";
@@ -158,8 +158,8 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Every throw from a package is COULD_NOT_RUN: a package's errors are its own, while `GitHubUnanswered` and
-// `GitHubRefused` are core's.
+// Whatever a package's check call throws is that package's COULD_NOT_RUN, a GitHub failure it met through its `deps`
+// included: a package's errors are its own.
 
 /**
  * The time of the module's request for the head, null for a provider that takes none, or COULD_NOT_RUN: the `since`
@@ -219,7 +219,7 @@ export async function status(
     now = await module.deps.reader.now();
   } catch (error) {
     // Without GitHub's clock, PENDING and SILENT cannot be told apart.
-    return couldNotRunIfUnanswered(`${module.name}: GitHub's time`, error);
+    return couldNotRunIfUnread(`${module.name}: GitHub's time`, error);
   }
   const elapsed = (Date.parse(now) - Date.parse(since)) / 1000;
   if (elapsed >= timeoutSeconds) {

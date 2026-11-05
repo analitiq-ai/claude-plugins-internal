@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import type { Finding } from "../contracts/finding.ts";
-import { answerOf, GitHubMisanswered, ownerAndName, type GitHubClient } from "../github.ts";
-import { couldNotRun, couldNotRunIfUnanswered, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
+import { answerOf, GitHubPartlyAnswered, ownerAndName, type GitHubClient } from "../github.ts";
+import { couldNotRun, couldNotRunIfUnread, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome, REQUIRED_CHECKS_SOURCE as SOURCE } from "../values.ts";
 import { assertAsked } from "./contract.ts";
@@ -117,7 +117,7 @@ async function checkRuns(reader: GitHubClient, at: string, head: string, name: s
   // The client's restPages reads lists, and check runs come wrapped. One name at one head, latest only, is a run
   // per check suite, well inside a page; past one, a part read as the whole could pass a head a run failed.
   if (answer.check_runs.length < answer.total_count) {
-    throw new GitHubMisanswered(`GET ${path}: ${answer.total_count} check runs, more than the ${answer.check_runs.length} one page gave`);
+    throw new GitHubPartlyAnswered(`GET ${path}: ${answer.total_count} check runs, more than the ${answer.check_runs.length} one page gave`);
   }
   return answer.check_runs;
 }
@@ -167,13 +167,13 @@ export function requiredChecks(_shared: Shared, reader: GitHubClient, validators
     return { pullRequest, checks: [atHead(first), ...rest.map(atHead)] };
   }
 
-  // GitHub's no-answer is this reader's check outcome at its own boundary.
+  // GitHub's no answer, or its answer in part, is this reader's check outcome at its own boundary.
   async function read(repo: string, pr: number, head: string): Promise<PullRequestReading | CouldNotRun> {
     assertAsked(repo, pr, head);
     try {
       return await readChecks(repo, pr, head);
     } catch (error) {
-      return couldNotRunIfUnanswered(SOURCE, error);
+      return couldNotRunIfUnread(SOURCE, error);
     }
   }
 

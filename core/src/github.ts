@@ -13,11 +13,22 @@ export class GitHubUnanswered extends Error {
   }
 }
 
-/** An answer that is not the shape asked is no answer either: every caller takes it as one and reads none of it. */
+/**
+ * An answer not of the shape asked, or one another read disagrees with, is no answer either: every caller takes it as
+ * one and reads none of it.
+ */
 export class GitHubMisanswered extends GitHubUnanswered {
   constructor(reason: string, options?: ErrorOptions) {
     super(reason, options);
     this.name = "GitHubMisanswered";
+  }
+}
+
+/** GitHub answered only part of what was asked, the same part on every run, so no retry alone reads the rest. */
+export class GitHubPartlyAnswered extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "GitHubPartlyAnswered";
   }
 }
 
@@ -214,7 +225,7 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
         items.push(...page.body);
         url = nextPage(page.headers.get("link"));
         if (url !== null && new URL(url).origin !== apiOrigin) {
-          throw new GitHubMisanswered(`GET ${path}: the next page is on another host (${url}); the token goes only to ${apiOrigin}`);
+          throw new GitHubPartlyAnswered(`GET ${path}: the next page is on another host (${url}); the token goes only to ${apiOrigin}`);
         }
       }
       return items;

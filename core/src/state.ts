@@ -13,6 +13,7 @@ import {
   assertIssueNumber,
   connectionNodes,
   GitHubMisanswered,
+  GitHubPartlyAnswered,
   GitHubRefused,
   GitHubUnanswered,
   isWriterRole,
@@ -517,8 +518,8 @@ const BlobAnswer = z.union([
 function blobText(answer: z.infer<typeof BlobAnswer> | null, blob: string, where: string): string | null {
   if (answer === null) throw new GitHubUnanswered(`GitHub has no object ${blob} in ${where}`);
   if (!("text" in answer) || answer.isBinary === true) return null;
-  if (answer.isTruncated) throw new GitHubUnanswered(`GitHub truncated the text of blob ${blob} in ${where}`);
-  if (answer.text === null) throw new GitHubUnanswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
+  if (answer.isTruncated) throw new GitHubPartlyAnswered(`GitHub truncated the text of blob ${blob} in ${where}`);
+  if (answer.text === null) throw new GitHubPartlyAnswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
   return answer.text;
 }
 
