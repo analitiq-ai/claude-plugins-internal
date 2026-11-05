@@ -91,7 +91,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 - **Decision**: settings come from `codeworks.toml` at the checkout's HEAD through `gitTree(checkout, "HEAD")`
   and `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
-  builder passes the same `shared` to `prFindings` and `internalReviewAt`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
+  `readStoryStopFacts` returns that `shared`, which builder passes to `prFindings` and `internalReviewAt`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
   /repos/{o}/{n}/issues/{s}`; done from `isDone`. Backlog or Blocked → stop naming the lane (FR-006); no card →
   stop naming the board; closed or done → stop (FR-007); `LaneRefused`, `GitHubUnanswered`, `GitHubRefused` →
   exit 2 naming the read (FR-009). Read at the start of every step, before anything is cut or merged.
@@ -106,8 +106,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   The main checkout is the parent of `git rev-parse --path-format=absolute --git-common-dir`; local branches
   `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`. One branch,
   GitHub's or the local one (crash before push, spec Edge Cases), names the worktree `../<repo>.worktrees/<branch>`;
-  a worktree there on another branch → stop naming it. With none anywhere, the script fetches the default branch
-  and, once the folder there gives no stop (R10), runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
+  a worktree there on another branch → stop naming it. With none anywhere, once the folder at the default tip `readStoryStopFacts`
+  fetched gives no stop (R10), the script runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
   title)` (B1): `<k>` from the `[US<k>]` tag of the story's tasks (R11), else 1; `<slug>` from the issue title,
   lowercased to `[a-z0-9-]`, runs of `-` collapsed, trimmed, capped at 40 characters, `story` when empty (titles
   are untrusted: they become a ref and a path). A branch on GitHub only: fetch it and `git worktree add -B <branch>
@@ -122,8 +122,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
-- **Decision**: core's `readStoryStopFacts` (B7) first fetches the default branch to
-  `refs/remotes/origin/<default>` through its caller's `fetchDefault`, then reads every fact, so builder and the
+- **Decision**: core's `readStoryStopFacts` (B7) first reads the default branch's name from GitHub (core
+  `defaultBranch`, moved from the orchestrator) and fetches it to `refs/remotes/origin/<default>` through its
+  caller's `fetchDefault(branch)`, then reads every fact, so builder and the
   Stop hook decide on the same fresh tip. `merge` is needed when that tip is not an ancestor of HEAD and any of:
   the newest merged spec PR of `<p>` (the first `merged` of `specPrs`, with B4's `mergeCommit`) has a merge commit
   not in HEAD's history (`git merge-base --is-ancestor`; any git failure throws); `governingDiff(ls-tree default,
@@ -137,7 +138,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
   head not yet pushed; GitHub's `mergeable` is of the PR's head only and may be UNKNOWN.
 - **Existing tools**: core `attest.ts` `governingDiff` (the same governing set orchestrator ADR-0004 d1 uses:
-  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as `fetchDefault`); `identity.ts` `specPr` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
+  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as `fetchDefault`); `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
   merge-tree --write-tree` the same way (fits); `required-checks.ts` conflict finding (GitHub's `mergeable`,
   PR head only: does not fit before a PR).
 

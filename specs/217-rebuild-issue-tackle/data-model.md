@@ -14,17 +14,18 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `origin` | `owner/name` | main checkout's origin |
 | `issue` | `{state: open\|closed, title, body}` | REST issue |
 | `done` | boolean | `isDone` |
-| `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `[shared]` at the checkout's HEAD (R7) |
+| `shared` | `Shared` | `codeworks.toml` at the checkout's HEAD (R7), returned for `prFindings` and `internalReviewAt` |
+| `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `shared` (R7) |
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
 | `worktree` | `{path, branch: string\|null, mergeInProgress: boolean, dirty: string[]}` \| `null` | `git worktree list --porcelain` at `../<repo>.worktrees/<branch>`; `MERGE_HEAD`; `git status --porcelain` |
+| `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
+| `head` | sha | `git rev-parse HEAD` in the worktree |
+| `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
 | `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) after its `fetchDefault`, R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
 | `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD; with no branch anywhere, at `refs/remotes/origin/<default>`, the tip a cut starts from (R10) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
-| `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
-| `head` | sha | `git rev-parse HEAD` in the worktree |
-| `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
 | `attested` | boolean | `internalReviewAt(pr.head)` (B5) |
 | `findings` | `Finding[]` | `prFindings` (B6): required checks and threads, then a failed `<module>-review` check run as its module's one finding; no validator package loaded |
 

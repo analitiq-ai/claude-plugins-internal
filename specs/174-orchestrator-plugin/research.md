@@ -217,8 +217,8 @@ plan has not executed, and names the task that runs it first.
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 
 - **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
-  session's issue through core's `readStoryStopFacts`, passing core `fetchWithGhCredential` of the default branch
-  as its `fetchDefault`, so it decides on the same fresh tip builder does, and calls `storyStop`. A stop pushes nothing and names no step, and the session
+  session's issue through core's `readStoryStopFacts`, passing core `fetchWithGhCredential` of the branch it is
+  given as its `fetchDefault`, so it decides on the same fresh tip builder does, and calls `storyStop`. A stop pushes nothing and names no step, and the session
   ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
   is posted keyed (R11) and the card moves to Blocked first.
 - **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only
@@ -243,4 +243,4 @@ plan has not executed, and names the task that runs it first.
   and builder (#217 B6) both read the required checks (root ADR-0002 d2; ADR-0009 d2).
 - **Rejected**: a refused rules read taken as no required checks: a head would merge with no CI check read, and
   telling the plan apart from another refusal means reading the error text (P7).
-- **Existing tools**: core `validation/required-checks.ts` (fits, with the list as a parameter: C14).
+- **Existing tools**: core `validation/required-checks.ts` and `settings.ts` `Shared` (fit, with the key: C14, landed by #217's US1 PR since builder reads it too).
