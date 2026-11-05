@@ -14,7 +14,7 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `origin` | `owner/name` | main checkout's origin |
 | `issue` | `{state: open\|closed, title, body}` | REST issue |
 | `done` | boolean | `isDone` |
-| `shared` | `Shared` | `codeworks.toml` at the checkout's HEAD (R7), returned for `prFindings` and `internalReviewAt` |
+| `shared` | `Shared` | `codeworks.toml` at the main checkout's HEAD (R7, R16), returned for `prFindings` and `internalReviewAt` |
 | `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `shared` (R7) |
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
@@ -22,8 +22,8 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
 | `head` | sha | `git rev-parse HEAD` in the worktree |
 | `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
-| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) after its fetch of `trackingRefspec(default)`, R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
-| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD; with no branch anywhere, at `refs/remotes/origin/<default>`, the tip a cut starts from (R10) |
+| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) against the default tip it fetched (R16), R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
+| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at the worktree's HEAD; with no worktree, at the ref it would start from (R10) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
 | `attested` | boolean | `internalReviewAt(pr.head)` (B5) |

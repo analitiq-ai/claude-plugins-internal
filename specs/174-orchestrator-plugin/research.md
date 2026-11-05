@@ -47,12 +47,13 @@ plan has not executed, and names the task that runs it first.
 - **Existing tools**: `core/src/keys.ts` (`readKey`, its managed-settings check; fits);
   `core/tests/keys.test.ts` already reads `session-app.pem` for `orchestrator`.
 
-## R5: Settings are read once, at the checkout's HEAD
+## R5: Settings are read once, at the main checkout's HEAD
 
 - **Decision**: `lib/settings.ts` defines `OrchestratorSettings` as a strict Zod object (contracts/
   orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings` over
-  `gitTree(checkout, "HEAD")`, the one read every component makes (root ADR-0002 d4: the branch the work is on;
-  #217 R7 reads the same).
+  `gitTree(mainCheckout(checkout), "HEAD")`, the one read every component makes (root ADR-0002 d4), core
+  `mainCheckout` resolving the main checkout from the hook's `cwd`, so a hook run from a worktree reads what
+  builder reads (#217 R7, R16).
   Every key, the App IDs among them, comes from that read. PreToolUse reads
   settings only when `needsMint` holds; otherwise it reads the gh folder and the repository alone.
 - **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source, and one read keeps one source for
@@ -217,10 +218,10 @@ plan has not executed, and names the task that runs it first.
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 
 - **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
-  session's issue through core's `readStoryStopFacts`, passing as its `fetch` `(refspecs) => fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`, `checkout` the hook's `cwd`
-  (core resolves the main checkout from it, #217 R8), so it decides on the same fresh tip builder does, and calls `storyStop`. The gh folder holds the session App's token,
-  so no orchestrator token is written (R12); the fetch updates only `refs/remotes/origin/<default>` in the
-  checkout, the remote-tracking ref builder's own run fetches, no branch, worktree or index. A stop pushes nothing and names no step, and the session
+  session's issue through core's `readStoryStopFacts`, passing the hook's `cwd` as `checkout` and
+  `fetchWithGhCredential` over the gh folder as `fetch` (#217 R16), so it reads the same facts builder does, and
+  calls `storyStop`. The gh folder holds the session App's token, so no orchestrator token is written (R12); the
+  read writes only remote-tracking refs (#217 R16). A stop pushes nothing and names no step, and the session
   ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
   is posted keyed (R11) and the card moves to Blocked first.
 - **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only

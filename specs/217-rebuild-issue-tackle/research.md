@@ -10,8 +10,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   (statically imports only `../core/guard.ts`), and a bumped `version` in `.claude-plugin/plugin.json`
   (`0.2.1` → `0.3.0`). The step script imports `../lib/guarded.ts` first and loads everything else with
   `await import(...)`. The files are copied from the orchestrator's carrier once #174 lands it (spec
-  Clarifications Q4); until then nothing of builder's carrier is written. When the orchestrator's carrier links
-  `validators/`, builder's links it the same way (R12).
+  Clarifications Q4); until then nothing of builder's carrier is written. The change that links the orchestrator's
+  `validators/` links builder's the same way; `validatorLogins` reads it (R12).
 - **Rationale**: FR-018–FR-019, root ADR-0001 d2, ADR-0009 d3–d4. `check-carriers.ts` finds any `*/plugin/core`
   entry, so the carrier check lists builder the moment the link exists (SC-001). The manifest declares no plugin
   dependency (builder ADR-0002 d1).
@@ -44,8 +44,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `StepFacts` value, calls the pure `decideStep(facts)` in `lib/step.ts`, and prints the `Step` it returns as one
   JSON line on stdout (contracts/step-script.md). Exit 0: work to do; 1: a stop, its reason in the JSON; 2: a read
   did not answer, or the arguments are refused (P4). Facts are read in the order the decision needs them, and a
-  stop decided early reads nothing more. The script's writes are the fetch of the default branch core's fact read makes (R9) and
-  the cut (R8); every other change is the skill's.
+  stop decided early reads nothing more. The script's writes are core's fetches (R16) and the worktree add (R8); every other change is the skill's.
 - **Rationale**: spec "the skill does what the script names and nothing it does not"; P3's split followed (pure
   rule, I/O at the edge), so every acceptance scenario of US3–US5 is a `decideStep` unit test over facts, and the
   reads are tested once against the fake GitHub and a scratch repository.
@@ -89,8 +88,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R7: Lane, closed and done are read through core at every step
 
-- **Decision**: settings come from `codeworks.toml` at the checkout's HEAD through `gitTree(checkout, "HEAD")`
-  and `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
+- **Decision**: settings come from `codeworks.toml` at the main checkout's HEAD (R16) through `gitTree` and
+  `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
   `readStoryStopFacts` returns that `shared`, which builder passes to `prFindings` and `internalReviewAt`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
   /repos/{o}/{n}/issues/{s}`; done from `isDone`. Backlog or Blocked → stop naming the lane (FR-006); no card →
   stop naming the board; closed or done → stop (FR-007); `LaneRefused`, `GitHubUnanswered`, `GitHubRefused` →
@@ -102,21 +101,19 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R8: The story branch is found on GitHub or locally, else cut by the script
 
-- **Decision**: `issueStory(reader, repo, s)` gives the branch on GitHub (several → stop, `DerivationError`).
-  `readStoryStopFacts` resolves the main checkout, the parent of `git rev-parse --path-format=absolute
-  --git-common-dir`, from whatever checkout it is given (core `mainCheckout`), so builder and the Stop hook read
-  the same; local branches
-  `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`. One branch,
-  GitHub's or the local one (crash before push, spec Edge Cases), names the worktree `../<repo>.worktrees/<branch>`;
-  a worktree there on another branch → stop naming it. With none anywhere, once the folder at the default tip `readStoryStopFacts`
-  fetched gives no stop (R10), the script runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
-  title)` (B1): `<k>` from the `[US<k>]` tag of the story's tasks (R11), else 1; `<slug>` from the issue title,
+- **Decision**: `issueStory(reader, repo, s)` gives the branch on GitHub (several → stop, `DerivationError`);
+  local branches `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`
+  in the main checkout (R16). One branch, GitHub's or the local one (crash before push, spec Edge Cases), names the
+  worktree `../<repo>.worktrees/<branch>`; a worktree there on another branch → stop naming it. With no worktree
+  and no stop from `storyStop` (its folder read at the ref the worktree would start from, R10), the script adds
+  it (spec FR-027): no branch anywhere → `git worktree add -b <branch> <path> <default-sha>`, the fetched default
+  tip; a branch on GitHub only → `git worktree add -B <branch> <path> refs/remotes/origin/<branch>`; a local
+  branch → `git worktree add <path> <branch>`. The new branch is named by core's `storyBranchName(s, k, title)`
+  (B1): `<k>` from the `[US<k>]` tag of the story's tasks (R11), else 1; `<slug>` from the issue title,
   lowercased to `[a-z0-9-]`, runs of `-` collapsed, trimmed, capped at 40 characters, `story` when empty (titles
-  are untrusted: they become a ref and a path). A branch on GitHub only: `readStoryStopFacts` fetches it with `trackingRefspec(branch)`, then `git worktree add -B <branch>
-  <path> refs/remotes/origin/<branch>`; a local branch with no worktree: `git worktree add <path> <branch>`
-  (spec FR-027). A GitHub branch and a different local one, both present → stop naming both. In the worktree,
-  `MERGE_HEAD` present → the merge step to finish; uncommitted changes otherwise → stop naming the files; the
-  local head behind or diverged from the PR head → stop naming both (FR-028).
+  are untrusted: they become a ref and a path). A GitHub branch and a different local one, both present → stop
+  naming both. In the worktree, `MERGE_HEAD` present → the merge step to finish; uncommitted changes otherwise →
+  stop naming the files; the local head behind or diverged from the PR head → stop naming both (FR-028).
 - **Rationale**: FR-003–FR-004, builder ADR-0002 d2, root ADR-0005 d1 (the grammar's one home is core). The cut
   is git's own deterministic answer, so the script makes it rather than handing the model a command to type.
 - **Existing tools**: core `identity.ts` `issueStory`, `pickStoryBranch`, `parseBranch` (fit; B1 adds the
@@ -124,10 +121,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
-- **Decision**: core's `readStoryStopFacts` (B7) first reads the default branch's name from GitHub (core
-  `defaultBranch`, moved from the orchestrator) and fetches it to `refs/remotes/origin/<default>` with core
-  `trackingRefspec(branch)` through its caller's `fetch(refspecs)`, then reads every fact, so builder and the
-  Stop hook decide on the same fresh tip. `merge` is needed when that tip is not an ancestor of HEAD and any of:
+- **Decision**: `readStoryStopFacts` (B7) reads `merge` against the default tip it fetched (R16), so builder and
+  the Stop hook decide on the same tip. `merge` is needed when that tip is not an ancestor of HEAD and any of:
   the newest merged spec PR of `<p>` (the first `merged` of `specPrs`, with B4's `mergeCommit`) has a merge commit
   not in HEAD's history (`git merge-base --is-ancestor`; any git failure throws); `governingDiff(ls-tree default,
   ls-tree HEAD, folders)` is non-empty, `folders` every `specs/<p>-*` on either side, so a folder added, removed,
@@ -140,9 +135,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
   head not yet pushed; GitHub's `mergeable` is of the PR's head only and may be UNKNOWN.
 - **Existing tools**: core `attest.ts` `governingDiff` (the same governing set orchestrator ADR-0004 d1 uses:
-  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as the `fetch` builder and the Stop hook pass, the shape of planner
-  `land.ts`'s `io.fetch`); the `+refs/heads/<b>:refs/remotes/origin/<b>` refspec, written twice in `land.ts` and
-  once in reviewer's `worktree.py` (Python: stays), defined once as core `trackingRefspec`; `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
+  fits, its one folder made a list); `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `governingLapse` uses `git
   merge-tree --write-tree` the same way (fits); `required-checks.ts` conflict finding (GitHub's `mergeable`,
   PR head only: does not fit before a PR).
 
@@ -231,21 +224,37 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R16: The step's stop rule lives in core, so the Stop hook names builder's stop
 
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
-  `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
-  `readStoryStopFacts(s, sessionId, deps)`: through core's readers and `git.ts` `runGit`, its only writes the
-  fetches of `trackingRefspec` (the default branch, and a branch on GitHub only) through the injected `fetch`
-  before any read (R8, R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
-  it could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6 then returns `null`, as a merge
-  in progress at stage 5 does: no stop, so the Stop
-  hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.
-  builder cuts or adds the
-  worktree when those facts show none (R8), then reads again. builder's `decideStep` calls it first; the orchestrator's Stop hook
-  reads the same facts through the same function, calls the rule and, on a stop, moves the card to Blocked with its reason instead of re-naming
-  `issue-tackle <s>` until REPEAT. No file is written for the hook to read: the model may not write a hook's
-  folder (root ADR-0008 d6).
+  `storyStop(facts)` with the `StopState` enum, and the read of its facts as `readStoryStopFacts(s, sessionId,
+  {reader, home, checkout, fetch})`, the one place that says how they are read and what the read writes:
+  1. `checkout` is any checkout of the repository. The main checkout is resolved from it by core `mainCheckout`
+     (the parent of `git rev-parse --path-format=absolute --git-common-dir`), so builder and the Stop hook read the
+     same facts wherever they run; settings are read at the main checkout's HEAD (R7).
+  2. Once the main checkout's origin is read, the default branch's name comes from core `defaultBranch` and the
+     branch is fetched, `fetch([trackingRefspec(default)])`, before any other git read.
+  3. The session record, issue, lane and branches are read (R6–R8). A branch on GitHub only is then fetched,
+     `fetch([trackingRefspec(branch)])`.
+  4. With a worktree: its merge state, its changes, its head against the PR head, `merge` (R9) and the folder at
+     its HEAD (R10). With none: the folder at the ref the worktree would start from (R10).
+
+  Those two fetches are its only writes, both of remote-tracking refs; it writes no branch, worktree or index.
+  `fetch(refspecs)` is the caller's transport: `fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`
+  for builder and the Stop hook, a local fetch in tests. Reading stops early in data-model order; it returns the
+  facts, the `shared` it read and the main checkout. The rule decides stage 9's `HEAD_BEHIND_PR` before stage 6,
+  since a merge onto that head could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6
+  returns `null`, as a merge in progress at stage 5 does: no stop, so the Stop hook names builder's step and
+  builder names `merge`, and the folder stops of stage 7 are decided only after it. With no worktree and no stop,
+  builder adds the worktree (R8) and reads again. builder's `decideStep` calls the rule first; the orchestrator's
+  Stop hook reads the same facts through the same function, calls the rule and, on a stop, moves the card to
+  Blocked with its reason instead of re-naming `issue-tackle <s>` until REPEAT. No file is written for the hook to
+  read: the model may not write a hook's folder (root ADR-0008 d6).
 - **Rationale**: builder ADR-0003 d2 (a stop's message reaches the admin through the Blocked reason); P3 (rule in
   a pure function, one home); critique P1.
-- **Existing tools**: #174's `decideStart` (pure over gathered facts, same split). #174 R21 and T076 call both.
+- **Existing tools**: #174's `decideStart` (pure over gathered facts, same split; #174 R21 and T076 call both);
+  `adr-folders.ts`'s inline main checkout (moved to `git.ts` `mainCheckout`, which `adrFolders` calls);
+  `git.ts` `fetchWithGhCredential` (fits as the transport, the shape of planner `land.ts`'s `io.fetch`); the
+  `+refs/heads/<b>:refs/remotes/origin/<b>` refspec, written twice in `land.ts` and once in reviewer's
+  `worktree.py` (Python: stays), defined once as `git.ts` `trackingRefspec`; the default branch's name, read by
+  the orchestrator's `defaultBranch` and inline in `land.ts`, defined once as core `identity.ts` `defaultBranch`.
 
 ## R15: The constitution's builder line changes first, in its own PR
 
