@@ -22,7 +22,7 @@ FIXED_PATHS = ("hooks/hooks.json", "core", "package.json", "package-lock.json")
 # lib/ and one hook file per event: the paths at which carriers each ship their own module under one name
 # (lib/settings.ts, hooks/pre-tool-use.ts).
 CARRIER_MODULES = ("lib/*", "hooks/*.ts")
-LINK = "120000"
+REGULAR_FILE_MODES = ("100644", "100755")
 
 
 def index(plugin: Path = PLUGIN) -> dict[str, tuple[str, str]]:
@@ -77,15 +77,18 @@ class ShippedTree(unittest.TestCase):
         self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
 
     # The overlap guard, against planner and builder, over what content() keeps: outside CARRIER_MODULES reviewer ships
-    # no path they ship, and in CARRIER_MODULES no path where it holds their bytes. It ships no link but `core`: a
-    # link's blob holds only where it points, and a link to a folder keeps the files under it out of the index.
+    # no path they ship, and in CARRIER_MODULES no path where it holds their bytes.
     def test_ships_no_file_alq_plan_or_alq_build_ships(self):
         theirs = owned(REPO / "planner" / "plugin") | owned(REPO / "builder" / "plugin")
         self.assertIn(("skills/issue-spec/SKILL.md", None), theirs)
         self.assertIn(("skills/issue-tackle/SKILL.md", None), theirs)
         self.assertIn("lib/settings.ts", {f for f, _ in theirs})
         self.assertEqual(sorted(theirs & owned(PLUGIN)), [])
-        self.assertEqual([f for f, (mode, _) in index().items() if mode == LINK and f != "core"], [])
+
+    # The overlap guard sees a file only through an index entry of its own: a link's blob holds only where it points,
+    # and a link or gitlink keeps the files it stands for out of the index.
+    def test_every_entry_but_core_is_a_regular_file(self):
+        self.assertEqual([f for f, (mode, _) in index().items() if mode not in REGULAR_FILE_MODES and f != "core"], [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
