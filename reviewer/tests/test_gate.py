@@ -2491,7 +2491,7 @@ class ReviewRoundResult(unittest.TestCase):
 class HookDeadline(unittest.TestCase):
     def test_the_deadline_is_measured_from_the_timeout_hooks_json_gives_the_gate(self):
         hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]["PreToolUse"]
-        timeouts = [h["timeout"] for entry in hooks for h in entry["hooks"] if h["command"].endswith("scripts/gate.py")]
+        timeouts = [h["timeout"] for entry in hooks for h in entry["hooks"] if h["command"] == 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"']
         self.assertEqual(timeouts, [gate.HOOK_SECONDS])
 
     def test_main_hands_on_the_deadline_taken_when_the_payload_arrives(self):
