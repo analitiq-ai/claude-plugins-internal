@@ -33,7 +33,7 @@ support; `core/scripts/check-carriers.ts` in CI
 
 **Performance Goals**: a step read finishes well inside one Bash call (< 60 s); no polling
 
-**Constraints**: GitHub read-only (session token); writes only the cut's local branch and worktree; imports only
+**Constraints**: GitHub read-only (session token); writes only core's fetches of remote-tracking refs (R16) and the worktree add with its branch (R8); imports only
 core; no Python
 
 **Scale/Scope**: one story per session, one step per invocation
@@ -46,12 +46,12 @@ core; no Python
 |---|---|
 | I. Contract-first | Shared shapes stay core's: session record, spec facts, task-block label, `Finding`; B2 adds the task-line read beside the label grammar, B6 the findings composite three callers need. The `Step` JSON is builder's own, read only by its skill (contracts/step-script.md). No second validator. **Pass** |
 | II. Ownership & trust | builder code in `builder/`; reads and grammars in `core/` by US1's own PR; the auditor and planner edits only drop a retired name. Arguments, session record, settings and GitHub answers validated where they enter (R3, R5–R7). No key read. **Pass** |
-| III. Fail loud | Every unanswered read exits 2 naming it; a refused record or token is never read as absent; a module's check run pending or absent exits 2, never a pass (R12). The skill repairs no folder (ADR-0002 d3); a dirty worktree or a head behind the PR stops (R8). **Pass** |
+| III. Fail loud | Every unanswered read exits 2 naming it; a refused record or token is never read as absent; a check that could not run exits 2, never a pass; a module's run pending or absent is the orchestrator's wait, not a finding (R12). The skill repairs no folder (ADR-0002 d3); a dirty worktree or a head behind the PR stops (R8). **Pass** |
 | IV. Test-first | `decideStep` is pure, so each acceptance scenario starts as a failing unit test; reads tested against the fake GitHub and a scratch repo; R4's substitution is run on the agent machine before step code. **Pass** |
 | V. Smallest complete change | One script, one skill; core additions only where builder needs a read core lacks; the stale `alq-` pattern in the carried guard test is fixed, not copied (R2). **Pass** |
 | VI. Rule apart from code | The constitution's builder line changes in its own PR first (R15). `check-carriers.ts` and `tests.yml` unchanged. **Pass** |
-| P6. One writer | builder writes commits (ticks included) and, on a cut, a local branch and worktree; pushes, PRs, lanes, check runs: the orchestrator; rounds and holds: reviewer; the session record: the orchestrator's hook. **Pass** |
-| P8. Generic | Repository from origin; board, Apps and validators from `codeworks.toml`; default branch from GitHub; nothing repo-specific. **Pass** |
+| P6. One writer | builder writes commits, ticks, the worktree add of R8 (with its branch) and core's remote-tracking fetches (R16); pushes, PRs, lanes, check runs: the orchestrator; rounds and holds: reviewer; the session record: the orchestrator's hook. **Pass** |
+| P8. Generic | Repository from origin; board, Apps and validators from `codeworks.toml` at the checkout's HEAD (R7); default branch from GitHub; nothing repo-specific. **Pass** |
 | P9. Named identities | The attestation and each `<module>-review` count only a check run by `orchestrator_app_login`'s App (R12). **Pass** |
 | P1, P3, P4, P7 | Apply to reviewer, planner, orchestrator; followed anyway: rule in a pure function (P3), could-not-run as exit 2 (P4), facts from keys, grammars and check runs, never headings (P7: `observed` from front matter, `<k>` from `[US<k>]`). **N/A** |
 | P2, P5 | No hold added or released (P2 N/A); every mechanism below cites a research decision (P5). **Pass** |
@@ -122,9 +122,9 @@ then present once, and merges before US3, the first story that calls a B additio
 | — | #174 carrier (US1 of #174) | — | US2 | spec Clarifications Q4 |
 | — | **US1**, one PR: B1–B7 below | US1 | US3 | core additions; none reads a key or writes (FR-024) |
 | — | **US2** | US2 | US3 | carrier, guard, TypeScript test suite (skill-text tests on today's skill dropped as R2 says), Python removed |
-| — | **US3** | US3 | | script: session, lane, closed/done, branch, cut and worktree, folder, requirement; skill takes `<s>` |
+| — | **US3** | US3 | | script: session, lane, closed/done, branch, cut and worktree, merge decision, folder, requirement; skill takes `<s>` and runs the merge |
 | — | **US4** | US4 | | after #212 and #243 (reviewer ADR-0014 d1) and #244 (ADR-0017); PR states, rounds, ticks; skill rewritten; root-cause-check retired (R13–R14) |
-| — | **US5** | US5 | | merge decision and skill's merge path |
+| — | **US5** | US5 | | the merge path run end to end on the agent machine (SC-004) |
 
 US1's sections, each with the first story that calls it:
 
@@ -133,10 +133,10 @@ US1's sections, each with the first story that calls it:
 | B1 | Story branch name | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
 | B2 | Task-line grammar and story tasks | US3 | `readTaskLine` and `storyTasks(text, s)` in `contracts/tasks.ts`; planner's `land.ts` reads tags through it (R11) |
 | B3 | Story PR closed | B7, US3 | `StoryPr.closed`, read by the query already (R12) |
-| B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure; `readStoryStopFacts`, read-only, after B3; #174's Stop hook calls both (R16) |
+| B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure, stage 6's due merge before the folder stops; `readStoryStopFacts`, its reads and writes as R16 lists, `merge` among its facts, after B1, B2, B3 and B4; #174's Stop hook calls both (R9, R16) |
 | B5 | `internal-review` read | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
-| B6 | PR findings | US4 | `prFindings(reader, …)` over required checks, `<module>-review` check runs and threads; no key, no writer (R12) |
-| B4 | Spec PR merge commit | US5 | `SpecPr.mergeCommit` (R9) |
+| B6 | PR findings | US4 | `prFindings(reader, …, logins)` over required checks, `<module>-review` check runs and threads; provider logins from `validatorLogins`; no key, no writer (R12) |
+| B4 | Spec PR merge commit | B7, US3 | `SpecPr.mergeCommit` (R9) |
 
 root-cause-check's deletion and its retired-text tests ship in US4's PR: the skill invokes it until US4 rewrites the
 skill (spec FR-020).

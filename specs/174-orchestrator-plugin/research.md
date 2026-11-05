@@ -47,23 +47,22 @@ plan has not executed, and names the task that runs it first.
 - **Existing tools**: `core/src/keys.ts` (`readKey`, its managed-settings check; fits);
   `core/tests/keys.test.ts` already reads `session-app.pem` for `orchestrator`.
 
-## R5: Settings are bootstrapped from HEAD and settled on GitHub
+## R5: Settings are read once, at the checkout's HEAD
 
 - **Decision**: `lib/settings.ts` defines `OrchestratorSettings` as a strict Zod object (contracts/
-  orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings`. A hook first
-  reads the checkout's `HEAD` only for `app_id` and `session_app_id`, mints, then reads the whole file through
-  `gitHubTree` with the orchestrator App's token at the ref root ADR-0002 d4 names (the default branch for the
-  claim; the PR's head for that PR's work in Stories 2–5) and refuses, naming both values, when either App ID
-  differs from the one it minted with. Every other key is taken from the GitHub read only. PreToolUse reads
+  orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings` over
+  `gitTree(checkout, "HEAD")`, the one read every component makes (root ADR-0002 d4: the branch the work is on;
+  #217 R7 reads the same).
+  Every key, the App IDs among them, comes from that read. PreToolUse reads
   settings only when `needsMint` holds; otherwise it reads the gh folder and the repository alone.
-- **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source; the model can rewrite its local
-  refs, so a local read is not that ref. The App IDs need no trust: a key signs only for its own App, so a forged
-  ID makes the mint fail loud, and the post-mint compare makes it fail loud even when it did not. Story 1 adds
+- **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source, and one read keeps one source for
+  every hook and builder. The model's writes to the file are refused (reviewer ADR-0012 d1); a branch switch in
+  the checkout is not, and is refused only once a session is seen doing it. A forged App ID makes the mint fail
+  loud: a key signs only for its own App. Story 1 adds
   `app_id`, `session_app_id`, `status_issue`; Story 3 `exempt_labels`; Story 4 `review_timeout` (≤ 3600,
   FR-021); Story 5 `max_turns`, `k_deaths`.
-- **Existing tools**: `core/src/settings.ts` (`readSettings`; fits); `core/src/tree.ts` (`gitTree`, `gitHubTree`;
-  fit); `planner/plugin/lib/settings.ts` (the section-validation pattern; reads HEAD alone, which fits planner's
-  trusted admin machine, not the agent machine).
+- **Existing tools**: `core/src/settings.ts` (`readSettings`; fits); `core/src/tree.ts` (`gitTree`; fits);
+  `planner/plugin/lib/settings.ts` (the section-validation pattern and the same HEAD read).
 
 ## R6: The session's gh config folder
 
@@ -218,8 +217,11 @@ plan has not executed, and names the task that runs it first.
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 
 - **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
-  session's issue through core and calls `storyStop`. A stop pushes nothing and names no step, and the session
-  ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
+  session's issue through core's `readStoryStopFacts`, passing the hook's `cwd` as `checkout` and
+  `fetchWithGhCredential` over the gh folder as `fetch` (#217 R16), so it reads the same facts builder does, and
+  calls `storyStop`. The gh folder holds the session App's token, so no orchestrator token is written (R12); the
+  read writes only remote-tracking refs (#217 R16). A stop pushes nothing and names no step, and the session
+  ends; when the card is In progress or In review and the stop is neither `DONE` nor `CLOSED`, the rule's reason
   is posted keyed (R11) and the card moves to Blocked first.
 - **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only
   the Blocked reason carries it to the admin. Without the rule, Stop names `issue-tackle <s>` again after every
@@ -229,18 +231,18 @@ plan has not executed, and names the task that runs it first.
 - **Rejected**: a file builder writes for the hook to read: the model may not write a hook's folder (root ADR-0008
   d6). Parsing the turn's last message: a fact read from prose (P7).
 
-## R22: Required checks from `[orchestrator]` where the plan offers no rulesets (Story 4)
+## R22: Required checks from `[shared]` where the plan offers no rulesets (Story 4)
 
-- **Decision**: `required_checks`, a non-empty list of distinct check names under `[orchestrator]`. When it is set,
-  the orchestrator hands it to core's `requiredChecks`, which takes it in place of the rules' required status checks
+- **Decision**: `required_checks`, a non-empty list of distinct check names under `[shared]`. When it is set,
+  core's `requiredChecks` reads it from the `[shared]` it is given and takes it in place of the rules' required status checks
   and makes no rules read; every step after is unchanged: the orchestrator's own checks dropped, could not run when
   nothing is left, each name read at the head from any App, the conflict finding. When it is not set, the reader
   reads the rules as now, and a refused read is could not run.
 - **Rationale**: GitHub refuses rulesets, branch protection and the rules read on a private repo of a free plan
   (`403 Upgrade to GitHub Pro or make this repository public to enable this feature`, seen on this repo on
   2026-10-31). With no list, core's reader is could not run at every head, by design, so that nothing merges with
-  no CI check read; nothing would merge. A key is data (constitution P7); it is `[orchestrator]`'s because only the
-  orchestrator reads it (root ADR-0002 d2).
+  no CI check read; nothing would merge. A key is data (constitution P7); it is `[shared]`'s because the orchestrator
+  and builder (#217 B6) both read the required checks (root ADR-0002 d2; ADR-0009 d2).
 - **Rejected**: a refused rules read taken as no required checks: a head would merge with no CI check read, and
   telling the plan apart from another refusal means reading the error text (P7).
-- **Existing tools**: core `validation/required-checks.ts` (fits, with the list as a parameter: C14).
+- **Existing tools**: core `validation/required-checks.ts` and `settings.ts` `Shared` (fit, with the key: C14, landed by #217's US1 PR since builder reads it too).
