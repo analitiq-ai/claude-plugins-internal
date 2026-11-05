@@ -18,13 +18,17 @@ const AT_1 = "2026-10-30T12:00:00Z";
 const AT_2 = "2026-10-30T12:05:00Z";
 const AT_3 = "2026-10-30T12:10:00Z";
 
+function withoutPrototype(entries: CommitPasses["branches"]): CommitPasses["branches"] {
+  return Object.assign(Object.create(null), entries);
+}
+
 const EXAMPLE: CommitPasses = {
   v: 1,
   repository: REPO,
   off: false,
-  branches: {
+  branches: withoutPrototype({
     "42-us1-login": { issue: 42, head: { sha: B, range_from: A, at: AT_1 }, passes: [{ sha: B, range_from: A, at: AT_1 }] },
-  },
+  }),
 };
 
 function session(t: TestContext): Session {
@@ -90,6 +94,17 @@ describe("readCommitPasses", () => {
       assert.throws(() => readCommitPasses(each), (error: unknown) => error instanceof CommitPassesRefused && error.path === fileOf(each));
     });
   }
+
+  it("reads a branch the record lacks as undefined, even one named like an Object member", (t) => {
+    const each = session(t);
+    recordCommitPasses(each, { repository: REPO, issue: 42, branch: "42-us1-login", from: A, shas: [B], at: AT_1 });
+    const record = readCommitPasses(each);
+    assert.ok(record !== null);
+    assert.deepEqual(Object.keys(record.branches), ["42-us1-login"]);
+    for (const name of ["constructor", "toString", "hasOwnProperty", "__proto__"]) {
+      assert.equal(record.branches[name], undefined, name);
+    }
+  });
 
   for (const id of ["not-a-uuid", "../x"]) {
     it(`refuses the session id ${id}, which is not a UUID`, (t) => {
@@ -173,9 +188,10 @@ describe("recordCommitPasses", () => {
     const each = session(t);
     recordCommitPasses(each, { repository: REPO, issue: 42, branch: "constructor", from: A, shas: [B], at: AT_1 });
     recordCommitPasses(each, { repository: REPO, issue: 42, branch: "constructor", from: A, shas: [C], at: AT_2 });
-    assert.deepEqual(readCommitPasses(each)?.branches, {
-      constructor: { issue: 42, head: pass(C, A, AT_2), passes: [pass(B, A, AT_1), pass(C, A, AT_2)] },
-    });
+    assert.deepEqual(
+      readCommitPasses(each)?.branches,
+      withoutPrototype({ constructor: { issue: 42, head: pass(C, A, AT_2), passes: [pass(B, A, AT_1), pass(C, A, AT_2)] } }),
+    );
   });
 
   const malformed: [string, Partial<PassedRange>][] = [
@@ -246,7 +262,7 @@ describe("setReviewerOff", () => {
   it("creates the session's record with no branch when it has none", (t) => {
     const each = session(t);
     setReviewerOff(each, REPO, true);
-    assert.deepEqual(readCommitPasses(each), { v: 1, repository: REPO, off: true, branches: {} });
+    assert.deepEqual(readCommitPasses(each), { v: 1, repository: REPO, off: true, branches: withoutPrototype({}) });
     assert.equal(modeOf(fileOf(each)), 0o600);
   });
 

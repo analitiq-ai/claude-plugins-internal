@@ -97,6 +97,27 @@ describe("writeGhToken and readGhToken", () => {
     });
   }
 
+  for (const [what, text] of [
+    ["text that is not JSON", "{"],
+    ["JSON that is not its contract's", '{"repo":1}'],
+  ]) {
+    it(`refuse a ${STORED} of ${what}, without the token, and leave both files as they are`, (t) => {
+      const folder = join(scratch(t), "gh");
+      writeGhToken(folder, minted("ghs_dummy0000000000000000000000000011"), LOGIN);
+      writeFileSync(join(folder, STORED), text, { mode: 0o600 });
+      const hosts = readFileSync(join(folder, HOSTS), "utf8");
+      assert.throws(() => readGhToken(folder), (error: unknown) => {
+        assert.ok(error instanceof GhFolderRefused);
+        assert.ok(error.message.includes(folder), error.message);
+        assert.ok(error.message.includes(STORED), error.message);
+        assert.equal(error.message.includes("ghs_dummy"), false, "the refusal shows the token");
+        return true;
+      });
+      assert.equal(readFileSync(join(folder, HOSTS), "utf8"), hosts);
+      assert.equal(readFileSync(join(folder, STORED), "utf8"), text);
+    });
+  }
+
   // The shape gh 2.100 rewrites hosts.yml to, pinned apart from the gh on PATH, which may not rewrite it.
   it("read the hosts.yml gh rewrites, with its users map", (t) => {
     const folder = join(scratch(t), "gh");
