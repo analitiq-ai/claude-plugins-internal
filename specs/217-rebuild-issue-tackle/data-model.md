@@ -59,25 +59,26 @@ the model a command.
 
 ### Stop states (`state`)
 
-`no_session_record`, `other_session_issue`, `other_repository`, `closed`, `done`, `lane` (Backlog, Blocked),
-`no_card`, `spec_issue_elsewhere`, `several_branches`, `branch_mismatch`, `worktree_on_other_branch`,
-`no_specs`, `no_spec_folder`, `several_spec_folders`, `head_behind_pr`, `uncommitted_changes`. One enum, defined
+`NO_SESSION_RECORD`, `OTHER_SESSION_ISSUE`, `OTHER_REPOSITORY`, `CLOSED`, `DONE`, `LANE` (Backlog, Blocked),
+`NO_CARD`, `SPEC_ISSUE_ELSEWHERE`, `SEVERAL_BRANCHES`, `BRANCH_MISMATCH`, `WORKTREE_ON_OTHER_BRANCH`,
+`NO_SPECS`, `NO_SPEC_FOLDER`, `SEVERAL_SPEC_FOLDERS`, `HEAD_BEHIND_PR`, `UNCOMMITTED_CHANGES`, in upper snake case (root ADR-0010 d2), so no value equals a GitHub state string
+such as `closed` that core quotes elsewhere. One enum, defined
 once in core beside the stop rule and the read of its facts (B7), which builder's step script and the orchestrator's Stop hook both call
 (spec FR-025).
 
 ### Decision order (pure)
 
-1. session: none → `no_session_record`; issue ≠ s → `other_session_issue`; repo ≠ origin → `other_repository`
-2. `done` → `done`; closed → `closed`
-3. lane null → `no_card`; Backlog/Blocked → `lane`; parent in another repository → `spec_issue_elsewhere`
-4. branch: several → `several_branches`; github and local both present and different → `branch_mismatch`;
-   worktree on another branch → `worktree_on_other_branch`; none anywhere → the script cuts (R8) and re-reads;
+1. session: none → `NO_SESSION_RECORD`; issue ≠ s → `OTHER_SESSION_ISSUE`; repo ≠ origin → `OTHER_REPOSITORY`
+2. `done` → `DONE`; closed → `CLOSED`
+3. lane null → `NO_CARD`; Backlog/Blocked → `LANE`; parent in another repository → `SPEC_ISSUE_ELSEWHERE`
+4. branch: several → `SEVERAL_BRANCHES`; github and local both present and different → `BRANCH_MISMATCH`;
+   worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; none anywhere → the script cuts (R8) and re-reads;
    GitHub only, or local with no worktree → the script adds the worktree on that branch (R8) and re-reads
-5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `uncommitted_changes`
+5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
 6. `merge.needed` → `merge`
-7. folder → `no_specs` / `no_spec_folder` / `several_spec_folders`
+7. folder → `NO_SPECS` / `NO_SPEC_FOLDER` / `SEVERAL_SPEC_FOLDERS`
 8. pr null or closed unmerged → `implement`
-9. local head behind or diverged from pr head → `head_behind_pr`; ahead, or not attested → `internal_round`
+9. local head behind or diverged from pr head → `HEAD_BEHIND_PR`; ahead, or not attested → `internal_round`
 10. findings → `github_round`; else `nothing_to_do`
 
 Stages 1–4, 7 and the stop half of 5 and 9 are core's stop rule (B7); builder's `decideStep` calls it first.

@@ -318,7 +318,7 @@ the new head.
 - **FR-026**: The PR's findings MUST be read from the `<module>-review` check runs the orchestrator's App writes at
   the head and from the PR's threads, never by loading validator packages in builder.
 - **FR-027**: A story branch on GitHub with no local branch MUST get its worktree from `origin/<branch>`; a local
-  branch with no worktree MUST get its worktree on that branch. `branch_mismatch` MUST stop only when both exist and
+  branch with no worktree MUST get its worktree on that branch. `BRANCH_MISMATCH` MUST stop only when both exist and
   differ.
 - **FR-028**: A local head behind or diverged from the PR head MUST stop naming both heads; an unfinished merge MUST
   name the merge step to resolve and commit it; uncommitted changes with no merge in progress MUST stop naming the
