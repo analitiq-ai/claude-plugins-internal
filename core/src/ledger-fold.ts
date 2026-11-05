@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { EVENT_KIND, eventFile, inApplyOrder, LedgerEvent, tamperId } from "./contracts/ledger.ts";
 import { Snapshot, type Hold, type RoundId } from "./contracts/snapshot.ts";
+import { jsonOf } from "./files.ts";
 import { isAdminRole } from "./github.ts";
 import { FindingRuling, HoldKind, HoldState } from "./values.ts";
 
@@ -168,24 +169,12 @@ export function mayClear(commit: StoryCommit, reviewerLogin: string): commit is 
   );
 }
 
-function parsedEvent(text: string): LedgerEvent | null {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return null;
-  }
-  const parsed = LedgerEvent.safeParse(value);
-  return parsed.success ? parsed.data : null;
-}
-
 function eventsOf(commit: StoryCommit, texts: ReadonlyMap<string, string>, reviewerLogin: string): LedgerEvent[] | null {
   if (!mayHoldEvents(commit, reviewerLogin)) return null;
   const events: LedgerEvent[] = [];
   for (const file of commit.added) {
     const text = texts.get(file.blob);
-    const event = text === undefined ? null : parsedEvent(text);
+    const event = text === undefined ? null : jsonOf(text, LedgerEvent, () => null);
     if (event === null || eventFile(event) !== file.name) return null;
     events.push(event);
   }

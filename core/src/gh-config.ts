@@ -1,9 +1,8 @@
-import { chmodSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { parse, stringify, YAMLParseError } from "yaml";
 import { z } from "zod";
 
-import { textIfPresent, writeWhole } from "./files.ts";
+import { jsonOf, textIfPresent, writePrivate } from "./files.ts";
 import type { MintedToken } from "./tokens.ts";
 
 // Longer than any planner script runs, so a token checked as one starts outlives its GitHub calls.
@@ -36,13 +35,10 @@ const HostsFile = z.object({ [HOST]: z.object({ oauth_token: z.string().min(1) }
 const TokenFile = z.strictObject({ repo: z.string(), expires_at: z.iso.datetime() });
 
 export function writeGhToken(folder: string, token: MintedToken, login: string): void {
-  mkdirSync(folder, { recursive: true, mode: 0o700 });
-  // mkdir's mode does not reach a folder that already exists.
-  chmodSync(folder, 0o700);
   // hosts.yml first: a crash between the two leaves the earlier expiry beside the newer token, which mints early,
   // never late.
-  writeWhole(join(folder, HOSTS_FILE), stringify({ [HOST]: { oauth_token: token.value, user: login, git_protocol: "https" } }), renameSync);
-  writeWhole(join(folder, TOKEN_FILE), `${JSON.stringify({ repo: token.repo, expires_at: token.expires_at })}\n`, renameSync);
+  writePrivate(folder, HOSTS_FILE, stringify({ [HOST]: { oauth_token: token.value, user: login, git_protocol: "https" } }));
+  writePrivate(folder, TOKEN_FILE, `${JSON.stringify({ repo: token.repo, expires_at: token.expires_at })}\n`);
 }
 
 export function readGhToken(folder: string): StoredToken | null {
@@ -51,7 +47,9 @@ export function readGhToken(folder: string): StoredToken | null {
   if (hosts === null && stored === null) return null;
   if (hosts === null) throw new GhFolderRefused(folder, `it holds ${TOKEN_FILE} without ${HOSTS_FILE}`);
   if (stored === null) throw new GhFolderRefused(folder, `it holds ${HOSTS_FILE} without ${TOKEN_FILE}`);
-  const { repo, expires_at } = tokenFileOf(folder, stored);
+  const { repo, expires_at } = jsonOf(stored, TokenFile, (why) => {
+    throw new GhFolderRefused(folder, `${TOKEN_FILE}: ${why}`);
+  });
   return { value: hostsFileOf(folder, hosts)[HOST].oauth_token, repo, expires_at };
 }
 
@@ -66,19 +64,6 @@ function hostsFileOf(folder: string, text: string): z.infer<typeof HostsFile> {
   }
   const parsed = HostsFile.safeParse(document);
   if (!parsed.success) throw new GhFolderRefused(folder, `${HOSTS_FILE} holds no ${HOST} oauth_token`);
-  return parsed.data;
-}
-
-function tokenFileOf(folder: string, text: string): z.infer<typeof TokenFile> {
-  let document: unknown;
-  try {
-    document = JSON.parse(text);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    throw new GhFolderRefused(folder, `${TOKEN_FILE} is not JSON: ${error.message}`);
-  }
-  const parsed = TokenFile.safeParse(document);
-  if (!parsed.success) throw new GhFolderRefused(folder, `${TOKEN_FILE}: ${z.prettifyError(parsed.error)}`);
   return parsed.data;
 }
 

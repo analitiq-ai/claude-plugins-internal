@@ -290,6 +290,25 @@ for (const [name, call] of CALLS) {
       });
     });
   }
+
+  const unread: Array<[string, number, string, typeof GitHubUnanswered | typeof GitHubRefused]> = [
+    ["a 502 whose body is not JSON", 502, "<html><body>502 Bad Gateway</body></html>", GitHubUnanswered],
+    ["a 404 whose body is not JSON", 404, "<html><body>404 Not Found</body></html>", GitHubRefused],
+    ["a 422 whose JSON has no message", 422, '{"errors":[{"code":"invalid"}]}', GitHubRefused],
+  ];
+  for (const [label, status, body, kind] of unread) {
+    test(`${name}: ${label} throws ${kind.name} carrying the body as sent`, async (t) => {
+      const { api } = await serve(t, (_seen, res) => {
+        res.writeHead(status);
+        res.end(body);
+      });
+      await assert.rejects(call(gitHub(TOKEN, api)), (error: unknown) => {
+        assert.ok(error instanceof kind);
+        assert.ok(error.message.includes(body), error.message);
+        return true;
+      });
+    });
+  }
 }
 
 const GRAPHQL_CALLS = CALLS.filter(([name]) => name.startsWith("graphql"));

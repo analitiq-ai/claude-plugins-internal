@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { jsonOf } from "./files.ts";
+
 // GitHub ends a request itself after 10 s; the margin lets its own answer arrive before ours gives up.
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -235,16 +237,9 @@ function failure(what: string, answer: Exchange): GitHubUnanswered | GitHubRefus
   return new GitHubUnanswered(message);
 }
 
+// A body that is not GitHub's message, such as a proxy's error page, is reported as it came.
 function messageOf(text: string): string {
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    // Not JSON, such as a proxy's error page: reported as it came.
-    return text;
-  }
-  const parsed = GitHubMessage.safeParse(body);
-  return parsed.success ? parsed.data.message : text;
+  return jsonOf(text, GitHubMessage, () => null)?.message ?? text;
 }
 
 function nextPage(link: string | null): string | null {
