@@ -33,26 +33,38 @@ import { generatedDir } from "../scripts/write-schemas.ts";
 
 const ROOT_FILES: ReadonlySet<string> = new Set(["codeworks.toml", "README.md"]);
 
-const PATHS = ["core/src/adr-folders.ts", "codeworks.toml", "planner/plugin/scripts/adr_check.ts", ".specify/x.md"];
-
-// Path-shaped spans naming files the check cannot list: a glob or brace character, or a `.`/`..` segment.
-const UNLISTABLE = [
-  "a/*.ts",
-  "a/b?.ts",
-  "a/[ab].ts",
-  "a/{b,c}.ts",
-  "core/src/**",
-  "a/./b.ts",
-  "a/../b.ts",
-  "../a/b.ts",
-  "./a/b.ts",
-  "core/src/.",
-  "a/..",
+// artifact-grammar.md's PATH, clause by clause: the segments each clause refuses and the nearest ones it takes.
+// `unlistable`: the segment names paths the check cannot list.
+const PATH_CLAUSES = [
+  // A `.` or `..` segment.
+  { refused: [".", ".."], taken: [".x", "x.", "..x", "x.."], unlistable: true },
+  // A glob or brace group.
+  { refused: ["*", "**", "b?.ts", "[ab].ts", "{b,c}.ts"], taken: ["b.ts"], unlistable: true },
+  // An empty segment: leading, an absolute path; final, a trailing `/`.
+  { refused: [""], taken: [], unlistable: false },
+  // A character outside the grammar.
+  { refused: ["a b", "<run>", "x:y"], taken: ["A-z_0.9"], unlistable: false },
 ];
 
-// No PATH, each for a reason the grammar names: the unlistable spans, a lone `.` or `..`, a trailing `/`, an absolute
-// path, an empty segment, a space, a character outside the grammar, a URL, nothing at all.
-const NOT_PATHS = [...UNLISTABLE, ".", "..", "core/src/", "/abs/x.ts", "a//b.ts", "a b.ts", "<run>/x", "https://example.test/a", ""];
+// The segment leading, middle, final and lone in a span.
+const placed = (segment: string) => [`${segment}/b.ts`, `a/${segment}/b.ts`, `a/${segment}`, segment];
+
+const PATHS = [
+  ...new Set([
+    "core/src/adr-folders.ts",
+    "codeworks.toml",
+    "planner/plugin/scripts/adr_check.ts",
+    ".specify/x.md",
+    ...PATH_CLAUSES.flatMap((clause) => clause.taken.flatMap(placed)),
+  ]),
+];
+
+const NOT_PATHS = [...new Set(PATH_CLAUSES.flatMap((clause) => clause.refused.flatMap(placed)))];
+
+// tasks.md refuses an unlistable span only when it has a `/`; one without reads as no path.
+const TASKS_REFUSED = PATH_CLAUSES.filter((clause) => clause.unlistable)
+  .flatMap((clause) => clause.refused.flatMap(placed))
+  .filter((span) => span.includes("/"));
 
 function refusedNaming<E extends Error>(kind: new (...args: never[]) => E, ...named: string[]): (error: unknown) => true {
   return (error) => {
@@ -95,9 +107,11 @@ describe("artifactPath", () => {
   });
 
   describe("a tasks.md span", () => {
-    it("returns a PATH with a /", () => {
-      assert.equal(artifactPath("core/src/contracts/decision-check.ts", ROOT_FILES), "core/src/contracts/decision-check.ts");
-    });
+    for (const span of PATHS.filter((path) => path.includes("/"))) {
+      it(`returns the PATH ${span}, which has a /`, () => {
+        assert.equal(artifactPath(span, ROOT_FILES), span);
+      });
+    }
 
     it("returns a PATH with no / that rootFiles holds", () => {
       assert.equal(artifactPath("codeworks.toml", ROOT_FILES), "codeworks.toml");
@@ -107,9 +121,15 @@ describe("artifactPath", () => {
       assert.equal(artifactPath("package.json", ROOT_FILES), null);
     });
 
-    for (const span of UNLISTABLE) {
+    for (const span of TASKS_REFUSED) {
       it(`refuses ${JSON.stringify(span)}, which names paths the check cannot list, naming it`, () => {
         assert.throws(() => artifactPath(span, ROOT_FILES), refusedNaming(PathRefused, span));
+      });
+    }
+
+    for (const span of NOT_PATHS.filter((span) => !TASKS_REFUSED.includes(span))) {
+      it(`reads ${JSON.stringify(span)}, no PATH, as no path`, () => {
+        assert.equal(artifactPath(span, ROOT_FILES), null);
       });
     }
 
@@ -134,6 +154,13 @@ describe("readTouchedPaths", () => {
       { path: "core/src/adr-folders.ts", artifact: "plan", line: 1, story: null },
       { path: "codeworks.toml", artifact: "plan", line: 2, story: null },
     ]);
+  });
+
+  it("reads each PATH", () => {
+    assert.deepEqual(
+      readTouchedPaths({ v: 1, paths: PATHS }).map((entry) => entry.path),
+      PATHS,
+    );
   });
 
   // No path is the script's to stop on, as could not run, not the reader's to refuse.
@@ -318,6 +345,12 @@ describe("AdrRuling", () => {
 
     it(`refuses a ${key} that is not text`, () => {
       assert.equal(AdrRuling.safeParse({ ...RULING, [key]: 4 }).success, false);
+    });
+  }
+
+  for (const path of PATHS) {
+    it(`reads the path ${path}`, () => {
+      assert.equal(AdrRuling.parse({ ...RULING, path }).path, path);
     });
   }
 
