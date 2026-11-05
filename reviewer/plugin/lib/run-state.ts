@@ -1,29 +1,16 @@
-import { tamperId } from "../core/contracts/ledger.ts";
-import { GitHubUnanswered, type GitHubClient } from "../core/github.ts";
+import type { GitHubClient } from "../core/github.ts";
 import type { Shared } from "../core/settings.ts";
-import { BoardNotVisible, LedgerMissing, readState, StateStale, StateWriteUnsigned, storyTouched, type StateReading } from "../core/state.ts";
-import { CouldNotRun, FIX_THEN_RETRY, RETRY } from "./hook-io.ts";
+import { readState, StateStale, storyTouched, type StateReading } from "../core/state.ts";
+import { CouldNotRun, couldNotRunOf, RETRY } from "./hook-io.ts";
 
 /** What a run reads its story's state from; `attempts` bounds one step's writes while `ledger` keeps moving. */
 export type StateSource = { reader: GitHubClient; repo: string; issue: number; shared: Shared; attempts: number };
-
-// Without the reading or an answer from GitHub, or after a write that may have tampered the story, the step cannot be
-// decided.
-function undecided(error: unknown): unknown {
-  if (error instanceof LedgerMissing) return new CouldNotRun(error.message, "retry the step once it exists", { cause: error });
-  if (error instanceof StateWriteUnsigned) {
-    return new CouldNotRun(error.message, `the story is held as ${tamperId(error.oid)} until a repository admin clears it`, { cause: error });
-  }
-  if (error instanceof BoardNotVisible) return new CouldNotRun(error.message, FIX_THEN_RETRY, { cause: error });
-  if (error instanceof GitHubUnanswered) return new CouldNotRun(error.message, RETRY, { cause: error });
-  return error;
-}
 
 async function deciding<T>(call: Promise<T>): Promise<T> {
   try {
     return await call;
   } catch (error) {
-    throw undecided(error);
+    throw couldNotRunOf(error);
   }
 }
 

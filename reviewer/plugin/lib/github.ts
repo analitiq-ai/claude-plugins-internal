@@ -1,9 +1,8 @@
-import { GhFolderRefused, readGhToken } from "../core/gh-config.ts";
-import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../core/github.ts";
-import { KeyReadRefused } from "../core/keys.ts";
+import { GhFolderRefused, needsMint, readGhToken } from "../core/gh-config.ts";
+import type { GitHubClient } from "../core/github.ts";
 import { ghFolder } from "../core/orchestrator-paths.ts";
-import { MintError, type mintToken } from "../core/tokens.ts";
-import { CouldNotRun, FIX_THEN_RETRY, RETRY } from "./hook-io.ts";
+import type { mintToken } from "../core/tokens.ts";
+import { CouldNotRun, couldNotRunOf } from "./hook-io.ts";
 
 export type Connect = (token: string) => GitHubClient;
 
@@ -17,21 +16,18 @@ function storedToken(folder: string) {
   }
 }
 
-/** The session App's client, on the token the orchestrator's hooks keep in its gh folder. */
-export function sessionReader({ home, connect }: { home: string; connect: Connect }): GitHubClient {
+// The orchestrator's hooks mint the session token on a prompt and a Bash call, when core's needsMint says it must.
+const AFTER_SESSION_MINT = "make a Bash call or send a prompt, on which the orchestrator mints the session token, then retry the step";
+
+/** The session App's client, on the token the orchestrator's hooks keep in its gh folder, refused by their rule. */
+export function sessionReader({ home, repo, now, connect }: { home: string; repo: string; now: Date; connect: Connect }): GitHubClient {
   const folder = ghFolder(home);
   const stored = storedToken(folder);
   // Claude Code runs the plugins' hooks on one call side by side, so the orchestrator's mint may not have landed yet.
-  if (stored === null) throw new CouldNotRun(`${folder} holds no session token`, RETRY);
+  if (stored === null || needsMint(stored, repo, now)) {
+    throw new CouldNotRun(`${folder} holds no session token for ${repo} that outlasts core's refresh margin`, AFTER_SESSION_MINT);
+  }
   return connect(stored.value);
-}
-
-// The next step after a mint core names as failed: an unanswered call may pass on a later run, the others hold until
-// what they name is fixed. Null for anything else, which fails the hook.
-function nextAfterMint(error: unknown): string | null {
-  if (error instanceof GitHubUnanswered) return RETRY;
-  if (error instanceof MintError || error instanceof KeyReadRefused || error instanceof GitHubRefused) return FIX_THEN_RETRY;
-  return null;
 }
 
 export type WriterDeps = { mintToken: typeof mintToken; connect: Connect };
@@ -47,9 +43,7 @@ export function reviewerWriter(repo: string, appId: number, deps: WriterDeps): (
       const token = await deps.mintToken("reviewer", appId, "reviewer-app.pem", "reviewer", repo);
       return deps.connect(token.value);
     } catch (error) {
-      const next = nextAfterMint(error);
-      if (next === null) throw error;
-      throw new CouldNotRun(`the reviewer App's token for ${repo} was not minted: ${(error as Error).message}`, next, { cause: error });
+      throw couldNotRunOf(error, `the reviewer App's token for ${repo} was not minted`);
     }
   }
   return () => (minting ??= mint());

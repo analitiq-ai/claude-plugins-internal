@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { GitHubUnanswered } from "./github.ts";
+import { GitHubMisanswered, GitHubUnanswered } from "./github.ts";
 import { CheckOutcome } from "./values.ts";
 
 type Outcome = z.infer<typeof CheckOutcome.schema>;
@@ -57,6 +57,6 @@ export function outcomeOf(checkRunOrStatus: CheckRun | CommitStatus | undefined)
   else return PENDING;
   const outcome = state === null ? undefined : OUTCOME_OF_STATE.get(state);
   // Read as any outcome, a state GitHub has added could pass or fail a head nobody graded.
-  if (outcome === undefined) throw new Error(`GitHub's check state ${JSON.stringify(state)} has no check outcome`);
+  if (outcome === undefined) throw new GitHubMisanswered(`GitHub's check state ${JSON.stringify(state)} has no check outcome`);
   return outcome;
 }

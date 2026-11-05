@@ -4,6 +4,11 @@ import { text } from "node:stream/consumers";
 import { z } from "zod";
 
 import type { Session } from "../core/commit-pass.ts";
+import { tamperId } from "../core/contracts/ledger.ts";
+import { GitHubRefused, GitHubUnanswered } from "../core/github.ts";
+import { KeyReadRefused } from "../core/keys.ts";
+import { BoardNotVisible, LedgerMissing, StateWriteUnsigned } from "../core/state.ts";
+import { MintError } from "../core/tokens.ts";
 import { appendGateLog, type GateLogEntry } from "./session.ts";
 import type { ReviewerSettings } from "./settings.ts";
 
@@ -20,6 +25,27 @@ export const RETRY = "retry the step";
 
 /** The next step of a could-not-run that holds until what it names is fixed. */
 export const FIX_THEN_RETRY = "fix what it names, then retry the step";
+
+const HELD_UNTIL_FIXED = [GitHubRefused, MintError, KeyReadRefused, BoardNotVisible];
+
+/**
+ * The next step of a failure core names that a hook run cannot get past, or null for any other, which fails the
+ * hook. A stale write is not one: the run retries it.
+ */
+export function nextStepOf(failure: unknown): string | null {
+  if (failure instanceof GitHubUnanswered) return RETRY;
+  if (failure instanceof LedgerMissing) return "retry the step once it exists";
+  if (failure instanceof StateWriteUnsigned) return `${tamperId(failure.oid)} holds the story until ${failure.release}`;
+  return HELD_UNTIL_FIXED.some((named) => failure instanceof named) ? FIX_THEN_RETRY : null;
+}
+
+/** `failure` as a could-not-run, its cause put after `what` when given; `failure` itself when it has no next step. */
+export function couldNotRunOf(failure: unknown, what?: string): unknown {
+  const next = nextStepOf(failure);
+  if (next === null) return failure;
+  const { message } = failure as Error;
+  return new CouldNotRun(what === undefined ? message : `${what}: ${message}`, next, { cause: failure });
+}
 
 /** The hook input is not one this hook can read. */
 export class HookInputRefused extends Error {
@@ -61,8 +87,7 @@ export type HookAnswer = { code: 0 | 2; stdout: string; stderr: string };
 
 export const PASS: HookAnswer = { code: 0, stdout: "", stderr: "" };
 
-// Exit 2 blocks on every event a refusal answers, and Claude Code shows its stderr as one message, so a reason of
-// several lines is folded into one.
+// Claude Code shows a refusal's stderr as one message, so a reason of several lines is folded into one.
 function deny(reason: string): HookAnswer {
   return { code: 2, stdout: "", stderr: `reviewer: ${reason.trim().replace(/\s*\n\s*/g, " ")}\n` };
 }
@@ -101,14 +126,17 @@ export function refuseDecision(run: HookRun, modes: Modes, call: string, reason:
   return refuseUnder(["mode", "decision_checks"], run, modes, call, reason);
 }
 
-/** A refusal in every mode: a tamper, a missing ledger, a could-not-run, and every refusal of a GitHub write. */
+/** A refusal in every mode: a tamper, a missing ledger, every could-not-run and every ADR-0012 d1 refusal. */
 export function block(run: HookRun, call: string, reason: string): HookAnswer {
   log(run, run.started, { call, outcome: "deny", reason });
   return deny(reason);
 }
 
-/** `write`, a core write, with the oid it wrote or what it threw logged with its latency. */
-export async function traced<T>(run: HookRun, call: string, write: () => Promise<T>, oidOf: (done: T) => string): Promise<T> {
+/**
+ * `write`, a core write, logged with its latency and the oid it committed, as unchanged when `oidOf` gives null for
+ * a write that committed nothing, or with what it threw.
+ */
+export async function traced<T>(run: HookRun, call: string, write: () => Promise<T>, oidOf: (done: T) => string | null): Promise<T> {
   const before = run.now();
   let done: T;
   try {
@@ -118,7 +146,8 @@ export async function traced<T>(run: HookRun, call: string, write: () => Promise
     log(run, before, { call, outcome: failure.name, reason: failure.message });
     throw error;
   }
-  log(run, before, { call, outcome: "written", oid: oidOf(done) });
+  const oid = oidOf(done);
+  log(run, before, oid === null ? { call, outcome: "unchanged" } : { call, outcome: "written", oid });
   return done;
 }
 

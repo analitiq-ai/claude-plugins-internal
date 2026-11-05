@@ -1,8 +1,8 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 
 import { sessionFolder, type Session } from "../core/commit-pass.ts";
+import { Time } from "../core/contracts/scalars.ts";
 import { makePrivateFolder } from "../core/files.ts";
 import { assertIssueNumber } from "../core/github.ts";
 import type { HookEvent } from "./hook-io.ts";
@@ -12,7 +12,10 @@ export type GateLogEntry = {
   at: string;
   event: HookEvent;
   call: string;
-  /** `deny` or `would_deny` for a refusal, `written` for a write that landed, else the name of what the write threw. */
+  /**
+   * `deny` or `would_deny` for a refusal. For a write: `written` when it committed,
+   * `unchanged` when it committed nothing, else the `name` of the error it threw, `Error` for a thrown non-error.
+   */
   outcome: string;
   oid?: string;
   reason?: string;
@@ -28,12 +31,10 @@ export function appendGateLog(session: Session, entry: GateLogEntry): void {
   appendFileSync(join(folder, GATE_LOG), `${JSON.stringify(entry)}\n`, { mode: 0o600 });
 }
 
-const At = z.iso.datetime();
-
 /** The path of the marker a hook leaves once it released `issue`'s holds on the claim at `at`. */
 export function releasedMarker(session: Session, issue: number, at: string): string {
   assertIssueNumber(issue);
   // `at` is part of a file name, so only a time, which holds no path separator, is taken.
-  if (!At.safeParse(at).success) throw new TypeError(`not a time: ${JSON.stringify(at)}`);
+  if (!Time.safeParse(at).success) throw new TypeError(`not a time: ${JSON.stringify(at)}`);
   return join(sessionFolder(session), `released-${issue}-${at}`);
 }

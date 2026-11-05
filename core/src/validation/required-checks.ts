@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Finding } from "../contracts/finding.ts";
-import { answerOf, ownerAndName, type GitHubClient } from "../github.ts";
+import { answerOf, GitHubMisanswered, ownerAndName, type GitHubClient } from "../github.ts";
 import { couldNotRun, couldNotRunIfUnanswered, outcomeOf, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome, REQUIRED_CHECKS_SOURCE as SOURCE } from "../values.ts";
@@ -117,7 +117,7 @@ async function checkRuns(reader: GitHubClient, at: string, head: string, name: s
   // The client's restPages reads lists, and check runs come wrapped. One name at one head, latest only, is a run
   // per check suite, well inside a page; past one, a part read as the whole could pass a head a run failed.
   if (answer.check_runs.length < answer.total_count) {
-    throw new Error(`GET ${path}: ${answer.total_count} check runs, more than the ${answer.check_runs.length} one page gave`);
+    throw new GitHubMisanswered(`GET ${path}: ${answer.total_count} check runs, more than the ${answer.check_runs.length} one page gave`);
   }
   return answer.check_runs;
 }
