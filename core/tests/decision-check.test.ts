@@ -1,28 +1,34 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
 import {
   AdrAsked,
   AdrRuling,
   AdrRulings,
+  AdrStepDone,
   AdrStopRecord,
   AdrVerdict,
   artifactPath,
   PathRefused,
   readRulings,
   readTouchedPaths,
+  roundInputPaths,
   RulingsRefused,
-  stopFile,
+  SourceHashes,
+  sourceHashes,
+  tasksSourcePaths,
   TouchesRefused,
 } from "../src/contracts/decision-check.ts";
+import { GitFailed, runGit } from "../src/git.ts";
 import { couldNotRun } from "../src/outcomes.ts";
-import { AdrJudgment } from "../src/values.ts";
+import { AdrJudgment, CheckedArtifact } from "../src/values.ts";
 
-// Spec 177, US3: contracts/artifact-grammar.md's path grammar, then each run-folder and spec-folder file's schema
-// as data-model.md gives it.
+// Spec 177, US3 (T016): contracts/artifact-grammar.md's path grammar, then each run-folder and spec-folder file's
+// schema as data-model.md gives it.
 
 const ROOT_FILES: ReadonlySet<string> = new Set(["codeworks.toml", "README.md"]);
 
@@ -51,14 +57,22 @@ function refusedNaming<E extends Error>(kind: new (...args: never[]) => E, ...na
   };
 }
 
-function specFolder(t: TestContext): string {
+function tempFolder(t: TestContext): string {
   const folder = mkdtempSync(join(tmpdir(), "core-decision-check-"));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
   return folder;
 }
 
+const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
+
 const RULING = { folder: "docs/adr", record: "0004", path: "core/src/adr.ts", reason: "the user keeps tracked discovery here" };
 const OTHER_RULING = { folder: "../org/docs/adr", record: "0001", path: "codeworks.toml", reason: "an org record the user overrules" };
+
+describe("CheckedArtifact", () => {
+  it("names the two artifacts a path can come from: plan and tasks", () => {
+    assert.deepEqual(new Set(CheckedArtifact.schema.options), new Set(["plan", "tasks"]));
+  });
+});
 
 describe("artifactPath", () => {
   describe('a touches.json entry ("any")', () => {
@@ -96,7 +110,7 @@ describe("artifactPath", () => {
 
     for (const [what, span] of [
       ["a command", "adr check"],
-      ["a command naming a path", "node planner/plugin/scripts/adr_check.ts ask plan"],
+      ["a command naming a path", "node planner/plugin/scripts/adr_check.ts ask"],
       ["a command naming a glob", "rm -f a/*.ts"],
       ["a URL", "https://github.com/acme/widgets/issues/7"],
       ["a placeholder", "<run>/x"],
@@ -110,10 +124,10 @@ describe("artifactPath", () => {
 });
 
 describe("readTouchedPaths", () => {
-  it("reads each entry with its 1-based index as its line and no story", () => {
+  it("reads each entry as the plan's, with its 1-based index as its line and no story", () => {
     assert.deepEqual(readTouchedPaths({ v: 1, paths: ["core/src/adr-folders.ts", "codeworks.toml"] }), [
-      { path: "core/src/adr-folders.ts", line: 1, story: null },
-      { path: "codeworks.toml", line: 2, story: null },
+      { path: "core/src/adr-folders.ts", artifact: "plan", line: 1, story: null },
+      { path: "codeworks.toml", artifact: "plan", line: 2, story: null },
     ]);
   });
 
@@ -168,7 +182,9 @@ describe("AdrAsked", () => {
         "the entry from [shared] adr_folders.",
     ),
   };
-  const asked = { v: 1, artifact: "plan", paths: [{ path: "core/src/x.ts", line: 1, story: null }], folders: [answered, notRun] };
+  const planPath = { path: "core/src/x.ts", artifact: "plan", line: 1, story: null };
+  const taskPath = { path: "core/src/x.ts", artifact: "tasks", line: 12, story: "US2" };
+  const asked = { v: 1, paths: [planPath, taskPath], folders: [answered, notRun] };
 
   it("reads each folder, answered or not run, with whether it lies inside the checkout", () => {
     const read = AdrAsked.parse(asked) as typeof asked;
@@ -182,21 +198,29 @@ describe("AdrAsked", () => {
     assert.deepEqual(read, asked);
   });
 
-  it("reads the record an empty adr_folders writes: no path and no folder", () => {
-    const empty = { v: 1, artifact: "plan", paths: [], folders: [] };
-    assert.deepEqual(AdrAsked.parse(empty), empty);
+  it("reads one path named by both artifacts as one entry per artifact, a task's with its story", () => {
+    const read = AdrAsked.parse(asked) as typeof asked;
+    assert.deepEqual(
+      read.paths.map(({ path, artifact, story }) => [path, artifact, story]),
+      [
+        ["core/src/x.ts", "plan", null],
+        ["core/src/x.ts", "tasks", "US2"],
+      ],
+    );
   });
 
-  it("reads a tasks record, each path with its story", () => {
-    const tasks = { ...asked, artifact: "tasks", paths: [{ path: "core/src/x.ts", line: 12, story: "US2" }] };
-    assert.deepEqual(AdrAsked.parse(tasks), tasks);
+  it("reads the record an empty adr_folders writes: no path and no folder", () => {
+    const empty = { v: 1, paths: [], folders: [] };
+    assert.deepEqual(AdrAsked.parse(empty), empty);
   });
 
   for (const [what, record] of [
     ["an answered folder with no inside", { ...asked, folders: [{ ...answered, inside: undefined }] }],
     ["a folder not run with no inside", { ...asked, folders: [{ ...notRun, inside: undefined }] }],
     ["an inside that is not a boolean", { ...asked, folders: [{ ...answered, inside: "yes" }] }],
-    ["an artifact that is no CheckedArtifact", { ...asked, artifact: "spec" }],
+    ["a path with no artifact", { ...asked, paths: [{ ...planPath, artifact: undefined }] }],
+    ["a path whose artifact is no CheckedArtifact", { ...asked, paths: [{ ...planPath, artifact: "spec" }] }],
+    ["a key the record does not hold", { ...asked, artifact: "plan" }],
     ["a v other than 1", { ...asked, v: 2 }],
   ] as const) {
     it(`refuses ${what}`, () => {
@@ -214,7 +238,7 @@ describe("AdrVerdict", () => {
     why: "it reads the folders from tracked discovery",
   };
   const within = { folder: "../org/docs/adr", record: "0001", judgment: "WITHIN", paths: [], why: "it keeps the org records where they are" };
-  const verdict = { v: 1, artifact: "plan", verdicts: [departs, within] };
+  const verdict = { v: 1, verdicts: [departs, within] };
 
   it("reads one verdict per record, each folder the entry as written", () => {
     assert.deepEqual(AdrVerdict.parse(verdict), verdict);
@@ -241,7 +265,8 @@ describe("AdrVerdict", () => {
     ["an empty why", { ...verdict, verdicts: [{ ...within, why: "" }] }],
     ["no why", { ...verdict, verdicts: [{ ...within, why: undefined }] }],
     ["a v other than 1", { ...verdict, v: 2 }],
-    ["an artifact that is no CheckedArtifact", { ...verdict, artifact: "spec" }],
+    // One verdict covers plan.md and tasks.md together, so it names no artifact.
+    ["an artifact key", { ...verdict, artifact: "plan" }],
   ] as const) {
     it(`refuses ${what}`, () => {
       assert.equal(AdrVerdict.safeParse(record).success, false);
@@ -307,22 +332,24 @@ describe("AdrRulings", () => {
   });
 });
 
-describe("stopFile", () => {
-  it("names each check's stop record in the run folder", () => {
-    assert.deepEqual([stopFile("plan"), stopFile("tasks")], ["adr-plan-stop.json", "adr-tasks-stop.json"]);
-  });
-});
-
 describe("AdrStopRecord", () => {
   const record = {
     v: 1,
     exit: 1,
     lines: ["FAIL: docs/adr: 0004 on core/src/x.ts: it reads the folders from discovery. Next step: change plan.md."],
     shown: false,
+    unanswered: false,
   };
 
-  it("reads a stop not yet shown, and one shown, exiting 1 or 2", () => {
-    for (const read of [record, { ...record, exit: 2, shown: true }]) assert.deepEqual(AdrStopRecord.parse(read), read);
+  it("reads an exit of 1 or 2, shown or not, unanswered or not", () => {
+    for (const exit of [1, 2]) {
+      for (const shown of [false, true]) {
+        for (const unanswered of [false, true]) {
+          const read = { ...record, exit, shown, unanswered };
+          assert.deepEqual(AdrStopRecord.parse(read), read);
+        }
+      }
+    }
   });
 
   for (const [what, value] of [
@@ -334,8 +361,10 @@ describe("AdrStopRecord", () => {
     ["a line that is not text", { ...record, lines: [1] }],
     ["no shown", { ...record, shown: undefined }],
     ["a shown that is not a boolean", { ...record, shown: "no" }],
+    ["no unanswered", { ...record, unanswered: undefined }],
+    ["an unanswered that is not a boolean", { ...record, unanswered: "no" }],
     ["a v other than 1", { ...record, v: 2 }],
-    ["another key", { ...record, step: "adr-plan-decide" }],
+    ["another key", { ...record, step: "adr-decide" }],
   ] as const) {
     it(`refuses ${what}`, () => {
       assert.equal(AdrStopRecord.safeParse(value).success, false);
@@ -343,13 +372,251 @@ describe("AdrStopRecord", () => {
   }
 });
 
+describe("AdrStepDone", () => {
+  const records = [
+    { v: 1, step: "tasks-due", due: true },
+    { v: 1, step: "tasks-due", due: false },
+    { v: 1, step: "tasks-written" },
+    { v: 1, step: "stories" },
+    { v: 1, step: "ask", decide: true },
+    { v: 1, step: "ask", decide: false },
+    { v: 1, step: "decide" },
+  ];
+  for (const record of records) {
+    it(`reads ${JSON.stringify(record)}`, () => {
+      assert.deepEqual(AdrStepDone.parse(record), record);
+    });
+  }
+
+  for (const [what, value] of [
+    ["tasks-due with no due", { v: 1, step: "tasks-due" }],
+    ["tasks-due with a due that is not a boolean", { v: 1, step: "tasks-due", due: "yes" }],
+    ["ask with no decide", { v: 1, step: "ask" }],
+    ["ask with a decide that is not a boolean", { v: 1, step: "ask", decide: 1 }],
+    ["tasks-written with a due", { v: 1, step: "tasks-written", due: true }],
+    ["stories with another key", { v: 1, step: "stories", story: "US1" }],
+    ["decide with a decide", { v: 1, step: "decide", decide: true }],
+    // clear and report write no done record, and a model step's outcome is recorded by the shell step after it.
+    ["clear", { v: 1, step: "clear" }],
+    ["report", { v: 1, step: "report" }],
+    ["a model step", { v: 1, step: "touches" }],
+    ["no step", { v: 1 }],
+    ["a v other than 1", { v: 2, step: "stories" }],
+  ] as const) {
+    it(`refuses ${what}`, () => {
+      assert.equal(AdrStepDone.safeParse(value).success, false);
+    });
+  }
+});
+
+describe("SourceHashes", () => {
+  const hashes = { v: 1, files: { "specs/7-x/plan.md": sha256("plan"), "/elsewhere/org/docs/adr/0001-x.md": sha256("record") } };
+
+  it("reads v 1 and a map from each path to its sha256", () => {
+    assert.deepEqual(SourceHashes.parse(hashes), hashes);
+  });
+
+  it("reads no file as an empty map", () => {
+    assert.deepEqual(SourceHashes.parse({ v: 1, files: {} }), { v: 1, files: {} });
+  });
+
+  for (const [what, value] of [
+    ["no files", { v: 1 }],
+    ["files that are a list", { v: 1, files: ["specs/7-x/plan.md"] }],
+    ["a hash that is not text", { v: 1, files: { "specs/7-x/plan.md": 7 } }],
+    ["another key", { ...hashes, at: "2026-11-04" }],
+    ["a v other than 1", { ...hashes, v: 2 }],
+  ] as const) {
+    it(`refuses ${what}`, () => {
+      assert.equal(SourceHashes.safeParse(value).success, false);
+    });
+  }
+});
+
+describe("sourceHashes", () => {
+  function checkout(t: TestContext): { cwd: string; outside: string } {
+    const root = tempFolder(t);
+    const cwd = join(root, "widgets");
+    const outside = join(root, "org", "docs", "adr");
+    mkdirSync(join(cwd, "specs", "7-x"), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan\n");
+    writeFileSync(join(cwd, "specs", "7-x", "spec.md"), "# Spec\n");
+    writeFileSync(join(outside, "0001-x.md"), "# ADR-0001\n");
+    return { cwd, outside };
+  }
+
+  it("keys each file under cwd repo-relative and one outside it by its absolute path, each the sha256 of its bytes", async (t) => {
+    const { cwd, outside } = checkout(t);
+    const record = join(outside, "0001-x.md");
+    assert.deepEqual(await sourceHashes(cwd, ["specs/7-x/plan.md", join(cwd, "specs", "7-x", "spec.md"), record]), {
+      v: 1,
+      files: { "specs/7-x/plan.md": sha256("# Plan\n"), "specs/7-x/spec.md": sha256("# Spec\n"), [record]: sha256("# ADR-0001\n") },
+    });
+  });
+
+  it("leaves an absent file out", async (t) => {
+    const { cwd } = checkout(t);
+    assert.deepEqual(await sourceHashes(cwd, ["specs/7-x/plan.md", "specs/7-x/research.md"]), {
+      v: 1,
+      files: { "specs/7-x/plan.md": sha256("# Plan\n") },
+    });
+  });
+
+  it("is equal for files whose bytes are unchanged", async (t) => {
+    const { cwd, outside } = checkout(t);
+    const paths = ["specs/7-x/plan.md", "specs/7-x/spec.md", join(outside, "0001-x.md")];
+    const before = await sourceHashes(cwd, paths);
+    writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan\n");
+    assert.deepEqual(await sourceHashes(cwd, paths), before);
+  });
+
+  it("is unequal once a file changes, inside cwd or out", async (t) => {
+    const { cwd, outside } = checkout(t);
+    const paths = ["specs/7-x/plan.md", join(outside, "0001-x.md")];
+    const before = await sourceHashes(cwd, paths);
+    writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan, changed\n");
+    assert.notDeepEqual(await sourceHashes(cwd, paths), before);
+    writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan\n");
+    writeFileSync(join(outside, "0001-x.md"), "# ADR-0001, changed\n");
+    assert.notDeepEqual(await sourceHashes(cwd, paths), before);
+  });
+
+  it("is unequal once a file is removed", async (t) => {
+    const { cwd } = checkout(t);
+    const paths = ["specs/7-x/plan.md", "specs/7-x/spec.md"];
+    const before = await sourceHashes(cwd, paths);
+    rmSync(join(cwd, "specs", "7-x", "spec.md"));
+    assert.notDeepEqual(await sourceHashes(cwd, paths), before);
+  });
+});
+
+describe("tasksSourcePaths and roundInputPaths", () => {
+  const SPEC = "specs/7-x";
+  const RUN = ".specify/workflows/runs/r1";
+  const TASKS_SOURCES = [
+    `${SPEC}/spec.md`,
+    `${SPEC}/plan.md`,
+    `${SPEC}/research.md`,
+    `${SPEC}/data-model.md`,
+    `${SPEC}/quickstart.md`,
+    `${SPEC}/contracts/a.md`,
+    `${SPEC}/contracts/nested/b.md`,
+    ".specify/memory/constitution.md",
+  ];
+
+  async function project(t: TestContext, path: string): Promise<string> {
+    const top = tempFolder(t);
+    await runGit(top, ["init", "-q", "-b", "main"]);
+    const cwd = join(top, path);
+    for (const folder of [join(SPEC, "contracts", "nested"), join("docs", "adr", "drafts")]) mkdirSync(join(cwd, folder), { recursive: true });
+    for (const file of [`${SPEC}/contracts/a.md`, `${SPEC}/contracts/nested/b.md`, "docs/adr/0004-x.md", "docs/adr/drafts/0005-y.md"]) {
+      writeFileSync(join(cwd, file), "# x\n");
+    }
+    return cwd;
+  }
+
+  it("lists every file the tasks command reads, each spec-folder file whether or not it exists", async (t) => {
+    const cwd = await project(t, ".");
+    for (const file of ["spec.md", "plan.md"]) writeFileSync(join(cwd, SPEC, file), "# x\n");
+    assert.deepEqual(await tasksSourcePaths(cwd, SPEC), TASKS_SOURCES);
+  });
+
+  for (const [where, path, settings] of [
+    ["at the checkout's top", ".", "codeworks.toml"],
+    ["in a project below the checkout's top, the checkout's settings file", "planner", "../codeworks.toml"],
+  ] as const) {
+    it(`lists the tasks sources, tasks.md, the rulings file, settings, review questions and each listed folder's files: ${where}`, async (t) => {
+      assert.deepEqual(await roundInputPaths(await project(t, path), SPEC, RUN, ["docs/adr"]), [
+        ...TASKS_SOURCES,
+        `${SPEC}/tasks.md`,
+        `${SPEC}/adr-rulings.json`,
+        settings,
+        `${RUN}/review-questions.json`,
+        "docs/adr/0004-x.md",
+        "docs/adr/drafts/0005-y.md",
+      ]);
+    });
+  }
+
+  for (const [what, make] of [
+    ["missing", () => {}],
+    ["a symlink loop", (folder: string) => symlinkSync("unreachable", folder)],
+  ] as const) {
+    it(`lists no file of a listed folder that is ${what}`, async (t) => {
+      const cwd = await project(t, ".");
+      make(join(cwd, "docs", "unreachable"));
+      assert.deepEqual(await roundInputPaths(cwd, SPEC, RUN, ["docs/unreachable"]), [
+        ...TASKS_SOURCES,
+        `${SPEC}/tasks.md`,
+        `${SPEC}/adr-rulings.json`,
+        "codeworks.toml",
+        `${RUN}/review-questions.json`,
+      ]);
+    });
+  }
+
+  it(
+    "lists no file of a listed folder it can read but not search",
+    { skip: process.getuid?.() === 0 && "root searches a chmod 444 folder" },
+    async (t) => {
+      const cwd = await project(t, ".");
+      const unsearchable = join(cwd, "docs", "adr");
+      chmodSync(unsearchable, 0o444);
+      try {
+        assert.deepEqual(await roundInputPaths(cwd, SPEC, RUN, ["docs/adr"]), [
+          ...TASKS_SOURCES,
+          `${SPEC}/tasks.md`,
+          `${SPEC}/adr-rulings.json`,
+          "codeworks.toml",
+          `${RUN}/review-questions.json`,
+        ]);
+      } finally {
+        chmodSync(unsearchable, 0o755);
+      }
+    },
+  );
+
+  it(
+    "refuses a listed folder holding a folder it cannot read, naming that folder",
+    { skip: process.getuid?.() === 0 && "root reads a chmod 000 folder" },
+    async (t) => {
+      const cwd = await project(t, ".");
+      const locked = join(cwd, "docs", "adr", "locked");
+      mkdirSync(locked);
+      chmodSync(locked, 0o000);
+      try {
+        await assert.rejects(roundInputPaths(cwd, SPEC, RUN, ["docs/adr"]), (error: NodeJS.ErrnoException) => {
+          assert.equal(error.code, "EACCES", String(error));
+          assert.equal(error.path, locked);
+          return true;
+        });
+      } finally {
+        chmodSync(locked, 0o755);
+      }
+    },
+  );
+
+  it("is GitFailed outside a git checkout", async (t) => {
+    const folder = tempFolder(t);
+    const ceiling = process.env.GIT_CEILING_DIRECTORIES;
+    // git stops looking for a checkout at the folder's parent, wherever the temp folder lies.
+    process.env.GIT_CEILING_DIRECTORIES = dirname(folder);
+    t.after(() => {
+      if (ceiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+      else process.env.GIT_CEILING_DIRECTORIES = ceiling;
+    });
+    await assert.rejects(roundInputPaths(folder, SPEC, RUN, []), GitFailed);
+  });
+});
+
 describe("readRulings", () => {
   it("reads no file as no ruling", async (t) => {
-    assert.deepEqual(await readRulings(specFolder(t)), []);
+    assert.deepEqual(await readRulings(tempFolder(t)), []);
   });
 
   it("reads the spec folder's adr-rulings.json", async (t) => {
-    const folder = specFolder(t);
+    const folder = tempFolder(t);
     writeFileSync(join(folder, "adr-rulings.json"), JSON.stringify({ v: 1, rulings: [RULING, OTHER_RULING] }));
     assert.deepEqual(await readRulings(folder), [RULING, OTHER_RULING]);
   });
@@ -361,7 +628,7 @@ describe("readRulings", () => {
     ["one key twice", JSON.stringify({ v: 1, rulings: [RULING, RULING] })],
   ]) {
     it(`refuses ${what}, never reading it as empty, naming the file`, async (t) => {
-      const folder = specFolder(t);
+      const folder = tempFolder(t);
       writeFileSync(join(folder, "adr-rulings.json"), text);
       await assert.rejects(readRulings(folder), refusedNaming(RulingsRefused, "adr-rulings.json"));
     });

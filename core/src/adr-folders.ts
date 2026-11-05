@@ -39,7 +39,7 @@ async function realPathIfPresent(path: string): Promise<string> {
   }
 }
 
-async function isReadableFolder(path: string): Promise<boolean> {
+export async function isReadableFolder(path: string): Promise<boolean> {
   try {
     if (!(await stat(path)).isDirectory()) return false;
     await access(path, constants.R_OK | constants.X_OK);

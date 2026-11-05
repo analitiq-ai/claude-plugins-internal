@@ -34,3 +34,8 @@ provides:
       file: "commands/speckit.plan.md"
       description: "Research decisions follow the plan template's format"
       strategy: "append"
+    - type: "command"
+      name: "speckit.tasks"
+      file: "commands/speckit.tasks.md"
+      description: "Each file a task touches is one literal path per backtick span, as planner's ADR check reads it"
+      strategy: "append"

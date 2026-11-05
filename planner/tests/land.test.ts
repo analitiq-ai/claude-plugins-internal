@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { runGit } from "../plugin/core/git.ts";
@@ -378,6 +379,8 @@ describe("land.ts mints planner's token", () => {
   });
 });
 
+const TASKS_NOT_AS_WRITTEN = "tasks.md is not as the run wrote it";
+
 describe("land.ts stops before its first write, exiting 1 and naming the next step", () => {
   function assertStops(w: World, run: Run, named: readonly string[]): void {
     assert.equal(run.code, 1, `exit ${run.code}: ${run.stderr.join("\n")}`);
@@ -386,6 +389,11 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assert.ok(run.stderr.length > 0, "no line names the next step");
     for (const line of run.stderr) assert.match(line, /Next step: /);
     for (const part of named) assert.ok(run.stderr.join("\n").includes(part), `stderr does not name ${part}: ${run.stderr.join("\n")}`);
+    // tasks.md is derived (planner ADR-0009 d4): a stop may send the admin to remove it, never to edit it.
+    for (const line of run.stderr) {
+      const next = line.slice(line.indexOf("Next step: ")).replaceAll(TASKS_NOT_AS_WRITTEN, "");
+      assert.ok(!next.includes("tasks.md"), `a next step sends the admin to tasks.md: ${line}`);
+    }
     assert.equal(git(w.checkout, "rev-list", "--count", "HEAD").trim(), "1", "a commit was made");
     assert.equal(git(w.checkout, "diff", "--cached", "--name-only"), "", "a path was staged");
     assert.equal(tasksIn(w), w.tasks, "tasks.md was written");
@@ -447,13 +455,13 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
   it("for more sub-issues than stories, naming the extra ones", async (t) => {
     const w = world(t);
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102), issue(103), issue(104), issue(105)] }));
-    assertStops(w, run, ["#104", "#105"]);
+    assertStops(w, run, ["#104", "#105", "Next step: remove them from #7's sub-issues."]);
   });
 
   it("for a one-story spec whose #p has sub-issues, naming them", async (t) => {
     const w = world(t, tasksMd(1));
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102)] }));
-    assertStops(w, run, ["#101", "#102"]);
+    assertStops(w, run, ["#101", "#102", "Next step: remove them from #7's sub-issues."]);
   });
 
   it("for a sub-issue in another repository, naming it", async (t) => {
@@ -466,8 +474,73 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
   it("for a sub-issue at position i other than the issue tasks.md labels US<i+1> with, naming both", async (t) => {
     const w = world(t, tasksMd(3, [101, 101, 101, 102, 103, 103]));
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(120), issue(103)] }));
-    assertStops(w, run, ["#120", "#102", "US2"]);
+    assertStops(w, run, ["#120", "#102", "US2", "Next step: order #7's sub-issues so sub-issue 2 is US2's issue."]);
   });
+
+  // The spec is not on the default branch, so no rescope can run on it: the run starts again.
+  for (const [what, tasks] of [
+    ["no story tag", tasksMd(0)],
+    ["two stories in one phase", tasksMd(2).replace("[US2] Do story 2", "[US1] Do story 2")],
+    ["a task-block label that names no issue", tasksMd(3).replace("## Phase 1: Setup\n", "## Phase 1: Setup\nStory issue: #x\n")],
+  ] as const) {
+    it(`for a tasks.md with ${what}, sending the admin to remove the spec folder and run the spec again`, async (t) => {
+      const w = world(t, tasks);
+      const run = await land(w, gitHubState());
+      assertStops(w, run, []);
+      assert.equal(run.stderr.length, 1, run.stderr.join("\n"));
+      const [line] = run.stderr;
+      const next = `. Next step: ${TASKS_NOT_AS_WRITTEN}; remove ${SPEC}, then run /planner:issue-spec #7 again.`;
+      assert.ok(line.startsWith("tasks.md: ") && line.endsWith(next), line);
+    });
+  }
+
+  // Starting the run again is the next step only for a spec that has not landed; one that has is rescoped.
+  for (const [what, landed] of [
+    ["already on the default branch", (w: World) => (pushFromElsewhere(w, "main", "main", { "specs/7-earlier/spec.md": "# earlier\n" }), gitHubState())],
+    ["whose spec PR merged", () => gitHubState({ prs: [pr(40, { closed: true, merged: true })] })],
+  ] as const) {
+    it(`for a spec ${what} with a tasks.md it refuses, naming the rescope, never the removal of the spec folder`, async (t) => {
+      const w = world(t, tasksMd(0));
+      const run = await land(w, landed(w));
+      assertStops(w, run, ["#178"]);
+      const said = run.stderr.join("\n");
+      assert.ok(!said.includes(TASKS_NOT_AS_WRITTEN), said);
+      assert.ok(!said.includes(`remove ${SPEC}`), said);
+    });
+  }
+});
+
+// stories, a check round's step, makes landing's checks of tasks.md through the same functions (R15).
+describe("land.ts's checks of tasks.md", () => {
+  const script = (name: string) => readFileSync(fileURLToPath(new URL(`../plugin/scripts/${name}`, import.meta.url)), "utf8");
+  const CHECKS = ["readStoryPlan", "extraSubIssues", "foreignSubIssues", "misplacedSubIssues"];
+
+  /** The names of the one destructured `await import` of story-plan.ts in `source`. */
+  function storyPlanImports(source: string): string[] {
+    const imports = [...source.matchAll(/const \{([^}]*)\} = await import\(\s*"\.\.\/lib\/story-plan\.ts"\s*\)/g)];
+    assert.equal(imports.length, 1, "not one destructured `await import` of story-plan.ts");
+    return imports[0][1].split(",").map((name) => name.trim());
+  }
+
+  it("readStoryPlan reads US1 to US3, and throws TasksRefused on no story tag or a task-block label that names no issue", async () => {
+    const storyPlanModule = await import("../plugin/lib/story-plan.ts");
+    assert.deepEqual(storyPlanModule.readStoryPlan(tasksMd(3)).stories.map(({ k }: { k: number }) => k), [1, 2, 3]);
+    for (const tasks of [tasksMd(0), tasksMd(3).replace("## Phase 1: Setup\n", "## Phase 1: Setup\nStory issue: #x\n")]) {
+      assert.throws(() => storyPlanModule.readStoryPlan(tasks), storyPlanModule.TasksRefused);
+    }
+  });
+
+  for (const name of ["land.ts", "adr_check.ts"]) {
+    it(`are the ones ${name} imports and does not define`, () => {
+      const source = script(name);
+      const imported = storyPlanImports(source);
+      for (const check of CHECKS) assert.ok(imported.includes(check), `${name} does not import ${check} from story-plan.ts`);
+      for (const own of [...CHECKS, "storyPlan", "phasesOf"].map((check) => `function ${check}(`)) {
+        assert.ok(!source.includes(own), `${name} defines ${own}`);
+      }
+      assert.ok(!source.includes("class TasksRefused"), `${name} defines TasksRefused`);
+    });
+  }
 });
 
 describe("land.ts could not run, exiting 2", () => {

@@ -98,8 +98,8 @@ export const AdrJudgment = valueSet({
 
 // planner ADR-0009 (root ADR-0010).
 export const CheckedArtifact = valueSet({
-  plan: "the touches step's touches.json",
-  tasks: "tasks.md's task lines",
+  plan: "a path the touches step's touches.json lists",
+  tasks: "a path a task line of tasks.md names",
 });
 
 export const CoreSource = z.enum(["threads", "required-checks"]);

@@ -7,14 +7,17 @@
     drive_workflow.py resume <run id> adr_ruling=@<file>    the file's rulings, to this resume's ADR check only
 
 Inputs reach specify as argv, never through a shell: issue text routinely carries backticks. An ADR ruling is no
-input and reaches no command line: it goes to that one resume's environment.
+input and reaches no command line: it goes to that one resume's environment, and the report's `ruling_unapplied`
+names each of its rulings the spec folder's rulings file does not hold once the resume returns, unless the resume's
+stderr holds a ruling-refused line.
 The report is read from the run's state.json because the specify CLI prints only a generic error for a
-failed step; the step's own stderr is recorded nowhere else. A failed step of ADR_STEPS also reports `adr: true`. The
-touches and judge steps are not among them: they continue on error, and ask or decide is given their exit code.
+failed step; the step's own stderr is recorded nowhere else. A failed adr-clear, adr-report or adr-rounds also
+reports `adr: true`; a failed adr-settled-design reports as the step it is.
 """
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -30,15 +33,78 @@ AGENT_ARGS = ('--setting-sources project --allowedTools "Read Grep Glob Write Ed
               'Bash(.specify/*) Bash(ls:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*)"')
 OPEN_MARKERS = "Open clarification markers remain"
 KIND = {"start": "new", "rescope": "rescope"}
-ADR_STEPS = {"adr-plan-clear", "adr-plan-ask", "adr-plan-decide", "adr-plan-report", "adr-plan-rounds"}
+ADR_STEPS = {"adr-clear", "adr-report", "adr-rounds"}
 ADR_RULING = "adr_ruling="
 RULING_ENV = "ADR_RULING"
+RULINGS_FILE = "adr-rulings.json"
+# adr_check.ts's run-folder records the report reads (core's decision-check.ts names them).
+STOP_FILE = "adr-stop.json"
+ASKED_FILE = "adr-asked.json"
+# The stop table's lines this report reads: the step-unfinished line, the ruling-refused label, and the label of each
+# stop whose Unanswered step is a model step, with that step.
+STEP_UNFINISHED = re.compile(r"^COULD_NOT_RUN: adr-check: step (.+) did not finish this round")
+RULING_REFUSED = "FAIL: adr_ruling: "
+UNANSWERED = {"touches.json": "adr-touches", "tasks.md": "adr-tasks", "adr-verdict.json": "adr-judge"}
+UNANSWERED_LINE = re.compile(r"^COULD_NOT_RUN: (touches\.json|tasks\.md|adr-verdict\.json): ")
 
 
 def _own_id(step):
     """In a loop iteration after the first, specify names a step `<loop>:<step>:<n>`."""
     parts = step.split(":")
     return parts[1] if len(parts) == 3 else step
+
+
+def _refuse_constant(name):
+    raise ValueError(f"{name} is not JSON")
+
+
+def _json_parse(text):
+    """JSON.parse's reading of `text`, which adr_check.ts parses with: Python's json also takes NaN and Infinity."""
+    return json.loads(text, parse_constant=_refuse_constant)
+
+
+def _json_as_the_check_reads_it(path):
+    """adr_check.ts reads with Node's utf8 decoding, which replaces a byte that is not UTF-8 rather than failing, so
+    both sides see the same value."""
+    return _json_parse(path.read_bytes().decode("utf-8", errors="replace"))
+
+
+def _record(run_id, name):
+    """A record the round left in the run folder; None when it is missing or does not parse, as when the round
+    never reached the step that writes it."""
+    try:
+        return _json_as_the_check_reads_it(RUNS / run_id / name)
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _judged(run_id):
+    """Whether this round's ask named a governing record, so a judge ran this round."""
+    asked = _record(run_id, ASKED_FILE)
+    return isinstance(asked, dict) and any(folder.get("governing") for folder in asked.get("folders", []))
+
+
+def _named_steps(run_id, stderr):
+    """The steps a stop's lines name: each a step-unfinished line names, and the Unanswered step of a stop whose
+    record says it is one; the judge only when this round ran it, so an earlier round's error is never shown."""
+    lines = stderr.splitlines()
+    steps = [step for line in lines if (found := STEP_UNFINISHED.match(line)) for step in found[1].split(", ")]
+    labels = [found[1] for line in lines if (found := UNANSWERED_LINE.match(line))]
+    if labels:
+        stop = _record(run_id, STOP_FILE)
+        if isinstance(stop, dict) and stop.get("unanswered") is True:
+            steps += [UNANSWERED[label] for label in labels
+                      if UNANSWERED[label] != "adr-judge" or _judged(run_id)]
+    return list(dict.fromkeys(steps))
+
+
+def _step_said(step_results, step):
+    """A step's error and its stderr: a shell step's error is only its exit code, so what to fix is in its stderr."""
+    record = step_results.get(step)
+    if record is None:
+        return ""
+    said = (record.get("error") or "", (record.get("output") or {}).get("stderr") or "")
+    return "".join(f"{step}: {text}\n" for text in dict.fromkeys(text.strip() for text in said if text.strip()))
 
 
 def report(state):
@@ -53,6 +119,10 @@ def report(state):
         out["stderr"] = record["output"].get("stderr", "") if current else ""
         out["open_markers"] = step == "no-open-markers" and OPEN_MARKERS in out["stderr"]
         out["adr"] = _own_id(step) in ADR_STEPS
+        if _own_id(step) == "adr-report":
+            # Keyed by the bare id, which holds the step's latest round: this round's, for a step the stop names.
+            named = _named_steps(state["run_id"], out["stderr"])
+            out["stderr"] += "".join(_step_said(state["step_results"], name) for name in named)
     if state["status"] == "paused" and record is not None and record["output"].get("show_file"):
         out["critique"] = record["output"]["show_file"]
     # The close is the admin's to make (planner ADR-0006 d1), and the session reads nothing of the run but this
@@ -61,6 +131,44 @@ def report(state):
     if state["status"] == "completed" and named is not None:
         out["close"] = named["output"]["stdout"].strip()
     return out
+
+
+def _ruling_key(ruling):
+    """`<folder> <record> <path>`, a ruling's key; None for an entry that has none."""
+    fields = [ruling.get(name) for name in ("folder", "record", "path")] if isinstance(ruling, dict) else [None]
+    return " ".join(fields) if all(isinstance(field, str) for field in fields) else None
+
+
+def _given_keys(ruling):
+    try:
+        given = _json_parse(ruling)
+    except ValueError:
+        return [ruling.strip()]
+    if not isinstance(given, list):
+        return [json.dumps(given)]
+    return [_ruling_key(entry) or json.dumps(entry) for entry in given]
+
+
+def _held_keys(spec_dir):
+    """The keys the spec folder's rulings file holds; a file that is not JSON holds none, the run's own lines
+    naming it."""
+    try:
+        held = _json_as_the_check_reads_it(Path(spec_dir) / RULINGS_FILE)
+    except (FileNotFoundError, ValueError):
+        return set()
+    rulings = held.get("rulings") if isinstance(held, dict) else None
+    return {_ruling_key(entry) for entry in rulings} - {None} if isinstance(rulings, list) else set()
+
+
+def ruling_unapplied(state, ruling, out):
+    """Each ruling of `ruling` whose key the rulings file does not hold once the resume returns; none when `out`'s
+    stderr holds a ruling-refused line."""
+    if any(line.startswith(RULING_REFUSED) for line in out.get("stderr", "").splitlines()):
+        return []
+    held = _held_keys(_inputs(state["run_id"])["spec_dir"])
+    after = (": the run completed with no departure on it." if state["status"] == "completed"
+             else ". Next step: resume with it again.")
+    return [f"ruling not applied: {key}{after}" for key in _given_keys(ruling) if key not in held]
 
 
 def _specify(args, env):
@@ -95,17 +203,21 @@ def install():
 
 
 def _state(run_id):
-    return json.loads((RUNS / run_id / "state.json").read_text())
+    return json.loads((RUNS / run_id / "state.json").read_text(encoding="utf-8"))
+
+
+def _inputs(run_id):
+    return json.loads((RUNS / run_id / "inputs.json").read_text(encoding="utf-8"))["inputs"]
 
 
 def _step_env(inputs):
-    """The inputs a shell step reads from its environment. A resume runs every step from the one the run halted at,
-    the check loop's next iterations among them, so it needs them as much as the start does."""
+    """The inputs a shell step reads from its environment. A resume re-executes from the step the run halted at, so
+    it needs them as much as the start does."""
     return {"ISSUE": inputs["issue"], "SPECIFY_FEATURE_DIRECTORY": inputs["spec_dir"]}
 
 
 def start(kind, spec_file, issue, spec_dir):
-    spec = Path(spec_file).read_text()
+    spec = Path(spec_file).read_text(encoding="utf-8")
     if not spec.strip():
         sys.exit(f"{spec_file} is empty")
     if not issue:
@@ -128,28 +240,30 @@ def _ruling(value):
     if not value.startswith("@"):
         sys.exit(f"{ADR_RULING} takes @<file>, a file holding the rulings, not {value!r}")
     try:
-        return Path(value[1:]).read_text()
-    except OSError as e:
+        return Path(value[1:]).read_text(encoding="utf-8")
+    except (OSError, ValueError) as e:
         sys.exit(f"{ADR_RULING}{value}: cannot read the file: {e}")
 
 
 def resume(run_id, verdict):
+    """The run's state once specify returns, and the ruling the resume carried, or None."""
     if not (RUNS / run_id / "state.json").is_file():
         sys.exit(f"no run {run_id} under {RUNS}")
-    inputs = json.loads((RUNS / run_id / "inputs.json").read_text())["inputs"]
+    inputs = _inputs(run_id)
     if not (inputs.get("spec_dir") and inputs.get("kind")):
         sys.exit(f"run {run_id} was started before every run took its spec folder and kind, so no step can tell "
                  "which folder it is for. Next step: start the scope again with /planner:issue-spec.")
     env = _step_env(inputs)
+    ruling = None
     # Not an input: specify would keep it in inputs.json, and every later resume would rule again.
     if verdict and verdict.startswith(ADR_RULING):
-        env[RULING_ENV] = _ruling(verdict.removeprefix(ADR_RULING))
+        ruling = env[RULING_ENV] = _ruling(verdict.removeprefix(ADR_RULING))
         verdict = None
     proc = _specify(["resume", run_id, *(["-i", verdict] if verdict else [])], env)
     state = _state(run_id)
     if proc.returncode != 0 and state["status"] not in ("failed", "aborted"):
         sys.exit(f"specify resume failed:\n{proc.stdout}{proc.stderr}")
-    return state
+    return state, ruling
 
 
 def main():
@@ -164,11 +278,15 @@ def main():
     r.add_argument("run_id")
     r.add_argument("verdict", nargs="?")
     args = parser.parse_args()
+    ruling = None
     if args.action == "resume":
-        state = resume(args.run_id, args.verdict)
+        state, ruling = resume(args.run_id, args.verdict)
     else:
         state = start(KIND[args.action], args.spec_file, args.issue, args.spec_dir)
-    print(json.dumps(report(state)))
+    out = report(state)
+    if ruling is not None:
+        out["ruling_unapplied"] = ruling_unapplied(state, ruling, out)
+    print(json.dumps(out))
 
 
 if __name__ == "__main__":

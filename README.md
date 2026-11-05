@@ -73,9 +73,10 @@ folder that the default branch lacks.
    | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
    | `adrkit` | [mbeacom/adrkit](https://github.com/mbeacom/adrkit) | `speckit-adrkit-check`, `speckit-adrkit-context`, `speckit-adrkit-draft` |
 
-   The plan's ADR check is planner's own `adr-plan-*` steps of the `issue-spec` workflow, run after plan and
-   before critique (planner ADR-0009, #177), against the folders `codeworks.toml` lists in `[shared] adr_folders`.
-   They run the `adr` CLI at the version core pins, 0.20.0: `npm install -g @adrkit/cli@0.20.0`.
+   The ADR check is planner's own `adr-check` loop of the `issue-spec` workflow, run after the critique gate in
+   place of the tasks step (planner ADR-0009, #177): it writes `tasks.md` and checks the plan and its tasks against
+   the folders `codeworks.toml` lists in `[shared] adr_folders`.
+   It runs the `adr` CLI at the version core pins, 0.20.0: `npm install -g @adrkit/cli@0.20.0`.
 
    The workflow's other steps, `speckit.specify`, `speckit.plan` and `speckit.tasks`, come with
    `specify init`, and planner installs its own preset (`settled-design`) and workflow (`issue-spec`) at each

@@ -1,8 +1,13 @@
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import { z } from "zod";
 
+import { isReadableFolder, liesUnder } from "../adr-folders.ts";
 import { textIfPresent } from "../files.ts";
+import { runGit } from "../git.ts";
 import { listedOnce } from "../listed-once.ts";
+import { SETTINGS_FILE } from "../settings.ts";
 import { isPlainPath } from "../tree.ts";
 import { AdrJudgment, CheckedArtifact, CheckOutcome } from "../values.ts";
 
@@ -13,21 +18,95 @@ export type CheckedArtifactName = z.infer<typeof CheckedArtifact.schema>;
 export const ADR_RULINGS_FILE = "adr-rulings.json";
 export const TOUCHES_FILE = "touches.json";
 export const ADR_RULINGS_WRITTEN_FILE = "adr-rulings-written.json";
-export const askedFile = (artifact: CheckedArtifactName) => `adr-${artifact}-asked.json`;
-export const verdictFile = (artifact: CheckedArtifactName) => `adr-${artifact}-verdict.json`;
-export const stopFile = (artifact: CheckedArtifactName) => `adr-${artifact}-stop.json`;
+export const ASKED_FILE = "adr-asked.json";
+export const VERDICT_FILE = "adr-verdict.json";
+export const STOP_FILE = "adr-stop.json";
+export const TOUCHES_FROM_FILE = "touches-from.json";
+export const TASKS_SOURCES_FILE = "tasks-sources.json";
+export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
+export const STEPS_DIR = "adr-steps";
+export const INPUTS_FILE = "adr-inputs.json";
+export const REVIEW_QUESTIONS_FILE = "review-questions.json";
+/** The run-folder records `adr-clear` deletes as a round starts. */
+export const ROUND_FILES = [STEPS_DIR, TOUCHES_FILE, INPUTS_FILE, ASKED_FILE, VERDICT_FILE, STOP_FILE] as const;
 
-export type ArtifactPath = { path: string; line: number; story: string | null };
+export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: number; story: string | null };
 
+export const SourceHashes = z.strictObject({ v: z.literal(1), files: z.record(z.string(), z.string()) });
+export type SourceHashes = z.infer<typeof SourceHashes>;
+
+/** The sha256 of each path given that exists, keyed repo-relative under `cwd` and absolute outside it (a listed
+ *  folder outside the repo), an absent one left out; equal sets mean unchanged sources. */
+export async function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes> {
+  const files: Record<string, string> = {};
+  for (const path of paths) {
+    const absolute = resolve(cwd, path);
+    const bytes = await bytesIfPresent(absolute);
+    if (bytes === null) continue;
+    const key = liesUnder(cwd, absolute) ? relative(cwd, absolute) : absolute;
+    files[key] = createHash("sha256").update(bytes).digest("hex");
+  }
+  return { v: 1, files };
+}
+
+async function bytesIfPresent(path: string): Promise<Buffer | null> {
+  try {
+    return await readFile(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return null;
+  }
+}
+
+async function filesUnder(cwd: string, folder: string): Promise<string[]> {
+  const root = resolve(cwd, folder);
+  if (!(await isReadableFolder(root))) return [];
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(folder, relative(root, join(entry.parentPath, entry.name))))
+    .sort();
+}
+
+const TASKS_SOURCES = ["spec.md", "plan.md", "research.md", "data-model.md", "quickstart.md"];
+const CONSTITUTION = ".specify/memory/constitution.md";
+
+/** Every file the tasks command reads: the spec folder's spec.md, plan.md, research.md, data-model.md,
+ *  quickstart.md, every regular file under contracts/, and .specify/memory/constitution.md. */
+export async function tasksSourcePaths(cwd: string, specDir: string): Promise<string[]> {
+  return [...TASKS_SOURCES.map((file) => join(specDir, file)), ...(await filesUnder(cwd, join(specDir, "contracts"))), CONSTITUTION];
+}
+
+/** Every file a round checks: tasksSourcePaths, tasks.md, the rulings file, the checkout's codeworks.toml, the run
+ *  folder's review-questions.json, and every regular file under each of `folderPaths`, none under one that is not a
+ *  readable folder. GitFailed when `cwd` is in no git checkout. */
+export async function roundInputPaths(cwd: string, specDir: string, runDir: string, folderPaths: readonly string[]): Promise<string[]> {
+  const folderFiles = await Promise.all(folderPaths.map((folder) => filesUnder(cwd, folder)));
+  // The settings are the checkout's, read at its top, whichever project of it the run is in.
+  const toTop = (await runGit(cwd, ["rev-parse", "--show-cdup"])).stdout.trim();
+  return [
+    ...(await tasksSourcePaths(cwd, specDir)),
+    join(specDir, "tasks.md"),
+    join(specDir, ADR_RULINGS_FILE),
+    join(toTop, SETTINGS_FILE),
+    // Listed whether or not this run has one: sourceHashes leaves an absent file out.
+    join(runDir, REVIEW_QUESTIONS_FILE),
+    ...folderFiles.flat(),
+  ];
+}
+
+/** `at`: where the span was read, such as `tasks.md:<line>`; null for a span read on its own. */
 export class PathRefused extends Error {
   readonly span: string;
   readonly why: string;
+  readonly at: string | null;
 
-  constructor(span: string, why: string) {
-    super(`${JSON.stringify(span)}: ${why}`);
+  constructor(span: string, why: string, at: string | null) {
+    super(`${at === null ? "" : `${at}: `}${JSON.stringify(span)}: ${why}`);
     this.name = "PathRefused";
     this.span = span;
     this.why = why;
+    this.at = at;
   }
 }
 
@@ -55,14 +134,14 @@ function unlistable(span: string): string | null {
 export function artifactPath(span: string, rootFiles: ReadonlySet<string> | "any"): string | null {
   if (rootFiles === "any") {
     if (!isPath(span)) {
-      throw new PathRefused(span, unlistable(span) ?? "not one literal repo-relative file path");
+      throw new PathRefused(span, unlistable(span) ?? "not one literal repo-relative file path", null);
     }
     return span;
   }
   if (isPath(span)) return span.includes("/") || rootFiles.has(span) ? span : null;
   // A space makes the span a command, whatever path it names.
   const why = span.includes("/") && !span.includes(" ") ? unlistable(span) : null;
-  if (why !== null) throw new PathRefused(span, why);
+  if (why !== null) throw new PathRefused(span, why, null);
   return null;
 }
 
@@ -87,23 +166,28 @@ export class TouchesRefused extends Error {
   }
 }
 
-/** Pure: parsed `touches.json`, each entry's line its 1-based index; throws TouchesRefused naming `touches.json` and
- *  the entry. */
+/** Pure: parsed `touches.json`, each entry the plan's, its line its 1-based index; throws TouchesRefused naming
+ *  `touches.json` and the entry. */
 export function readTouchedPaths(json: unknown): ArtifactPath[] {
   const parsed = TouchedPaths.safeParse(json);
   if (!parsed.success) throw new TouchesRefused(z.prettifyError(parsed.error));
-  return parsed.data.paths.map((path, i) => ({ path, line: i + 1, story: null }));
+  return parsed.data.paths.map((path, i) => ({ path, artifact: CheckedArtifact.schema.enum.plan, line: i + 1, story: null }));
 }
 
 const NonEmpty = z.string().min(1);
 const Governing = z.strictObject({ recordId: z.string(), title: z.string() });
 const Broken = z.strictObject({ file: z.string(), id: z.string().optional(), rule: z.string(), message: z.string() });
 const NotRun = z.strictObject({ outcome: z.literal(CheckOutcome.schema.enum.COULD_NOT_RUN), reason: NonEmpty });
+const AskedPath = z.strictObject({
+  path: Path,
+  artifact: CheckedArtifact.schema,
+  line: z.number().int().positive(),
+  story: NonEmpty.nullable(),
+});
 
 export const AdrAsked = z.strictObject({
   v: z.literal(1),
-  artifact: CheckedArtifact.schema,
-  paths: z.array(z.strictObject({ path: Path, line: z.number().int().positive(), story: NonEmpty.nullable() })),
+  paths: z.array(AskedPath),
   folders: z.array(
     z.union([
       z.strictObject({ entry: NonEmpty, path: NonEmpty, inside: z.boolean(), outcome: NotRun }),
@@ -132,10 +216,10 @@ const Judged = z
     }
   });
 
-/** One verdict per governing record per folder, `folder` the entry as written. */
+/** One verdict per governing record per folder, `folder` the entry as written; it judges plan.md and tasks.md
+ *  together, so it names no artifact. */
 export const AdrVerdict = z.strictObject({
   v: z.literal(1),
-  artifact: CheckedArtifact.schema,
   verdicts: listedOnce(Judged, ({ folder, record }) => `${folder} ${record}`),
 });
 export type AdrVerdict = z.infer<typeof AdrVerdict>;
@@ -150,14 +234,24 @@ export const AdrRulings = z.strictObject({
 });
 export type AdrRulings = z.infer<typeof AdrRulings>;
 
-/** A check's stop: ask or decide writes it, report shows it once, then on the resume deletes it. */
 export const AdrStopRecord = z.strictObject({
   v: z.literal(1),
   exit: z.literal([1, 2]),
   lines: z.array(NonEmpty).min(1),
   shown: z.boolean(),
+  unanswered: z.boolean(),
 });
 export type AdrStopRecord = z.infer<typeof AdrStopRecord>;
+
+/** The one list of the round steps that write a done record. */
+export const AdrStepDone = z.discriminatedUnion("step", [
+  z.strictObject({ v: z.literal(1), step: z.literal("tasks-due"), due: z.boolean() }),
+  z.strictObject({ v: z.literal(1), step: z.literal("tasks-written") }),
+  z.strictObject({ v: z.literal(1), step: z.literal("stories") }),
+  z.strictObject({ v: z.literal(1), step: z.literal("ask"), decide: z.boolean() }),
+  z.strictObject({ v: z.literal(1), step: z.literal("decide") }),
+]);
+export type AdrStepDone = z.infer<typeof AdrStepDone>;
 
 export class RulingsRefused extends Error {
   readonly file: string;
