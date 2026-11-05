@@ -76,14 +76,14 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
    nothing does the script cut (R8) and re-read;
    GitHub only, or local with no worktree → the script adds the worktree on that branch (R8) and re-reads
 5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
-6. `merge.needed` → `merge`
+6. `merge.needed` → `merge`, after stage 9's `HEAD_BEHIND_PR`, which is decided first
 7. folder → `NO_SPECS` / `NO_SPEC_FOLDER` / `SEVERAL_SPEC_FOLDERS`
 8. pr null or closed unmerged → `implement`
 9. local head behind or diverged from pr head → `HEAD_BEHIND_PR`; ahead, or not attested → `internal_round`
 10. findings → `github_round`; else `nothing_to_do`
 
-Stages 1–4, 6, 7 and the stop half of 5 and 9 are core's stop rule (B7), stage 6 returning `null` when a merge
-is due; builder's `decideStep` calls it first. Their facts (`session` through `worktree`, `merge`, `folder`, `pr`,
+Stages 1–4, 6, 7 and the stop half of 5 and 9 are core's stop rule (B7), the stop half of 9 decided before stage 6
+and stage 6 returning `null` when a merge is due; builder's `decideStep` calls it first. Their facts (`session` through `worktree`, `merge`, `folder`, `pr`,
 `head`, `headVsPr`) are read by core's `readStoryStopFacts` (B7); builder reads `requirement`, `tasks`, `attested`
 and `findings` itself.
 

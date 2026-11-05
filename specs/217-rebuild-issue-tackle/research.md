@@ -127,7 +127,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `merge` is needed when the newest merged spec PR of `<p>` has a merge commit not in HEAD's history (the first
   `merged` of `specPrs`, with B4's `mergeCommit`; `git cat-file -e`, then `git merge-base --is-ancestor`), or when the default branch's
   tip is not an ancestor of HEAD and either `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty
-  (spec.md of the folder the default branch names, `**/docs/adr/`, `.specify/memory/`) or `git merge-tree
+  (spec.md of the folder the default tip names, else of the one HEAD names, `**/docs/adr/`, `.specify/memory/`;
+  with neither naming exactly one, no spec.md, the folder argument made optional) or `git merge-tree
   --write-tree origin/<default> HEAD` exits 1 (conflict, whether or not a PR exists). The spec PR test stands
   alone, and a merge commit absent from the clone is not in HEAD's history, so the Stop hook, which fetches
   nothing and may hold a stale default tip, still sees the due merge of a spec PR as builder does. It runs before
@@ -222,7 +223,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
   `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
   `readStoryStopFacts(s, sessionId, deps)`: read-only, through core's readers and `git.ts` `runGit`, writing
-  nothing. A due merge at stage 6 returns `null`, as a merge in progress at stage 5 does: no stop, so the Stop
+  nothing. A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
+  it could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6 then returns `null`, as a merge
+  in progress at stage 5 does: no stop, so the Stop
   hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.
   builder cuts or adds the
   worktree when those facts show none (R8), then reads again. builder's `decideStep` calls it first; the orchestrator's Stop hook
