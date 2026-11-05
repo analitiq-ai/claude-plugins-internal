@@ -5,7 +5,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { runGit } from "../plugin/core/git.ts";
-import { GitHubMisanswered, GitHubUnanswered, type Repository } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubUnanswered, type Repository } from "../plugin/core/github.ts";
 import { labelTasks, main } from "../plugin/scripts/land.ts";
 import {
   git,
@@ -84,8 +84,8 @@ type GitHubState = {
   blockedBy: { issue: number; blocker: number }[];
   prs: Pr[];
   next: number;
-  /** The error a sub_issues or blocked_by write meets, for a landing GitHub stops answering partway through. */
-  unanswered?: (call: FakeCall) => GitHubUnanswered | undefined;
+  /** The error a sub_issues read or write or a blocked_by write meets, for a landing GitHub fails partway through. */
+  failing?: (call: FakeCall) => Error | undefined;
 };
 
 function gitHubState(over: Partial<GitHubState> = {}): GitHubState {
@@ -116,8 +116,8 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
       return { id: created.id, number: created.number, html_url: `https://github.com/acme/widgets/issues/${created.number}` };
     },
     [`POST ${API_REPO}/issues/${P}/sub_issues`]: (call: FakeCall) => {
-      const unanswered = state.unanswered?.(call);
-      if (unanswered !== undefined) throw unanswered;
+      const failure = state.failing?.(call);
+      if (failure !== undefined) throw failure;
       const child = state.issues.find((one) => one.id === bodyOf(call).sub_issue_id);
       assert.ok(child, `sub_issue_id ${String(bodyOf(call).sub_issue_id)} is no issue`);
       state.subIssues.push(child);
@@ -131,8 +131,8 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
   };
   for (let number = 101; number < 110; number++) {
     rest[`POST ${API_REPO}/issues/${number}/dependencies/blocked_by`] = (call: FakeCall) => {
-      const unanswered = state.unanswered?.(call);
-      if (unanswered !== undefined) throw unanswered;
+      const failure = state.failing?.(call);
+      if (failure !== undefined) throw failure;
       const blocker = [...state.issues, ...state.subIssues].find((one) => one.id === bodyOf(call).issue_id);
       assert.ok(blocker, `issue_id ${String(bodyOf(call).issue_id)} is no issue`);
       state.blockedBy.push({ issue: number, blocker: blocker.number });
@@ -153,7 +153,11 @@ function githubOf(state: GitHubState, bare: string): FakeGitHub {
       },
     ],
     restPages: {
-      [`${API_REPO}/issues/${P}/sub_issues`]: () => state.subIssues.map(({ id, number, title, repository_url }) => ({ id, number, title, repository_url })),
+      [`${API_REPO}/issues/${P}/sub_issues`]: (call: FakeCall) => {
+        const failure = state.failing?.(call);
+        if (failure !== undefined) throw failure;
+        return state.subIssues.map(({ id, number, title, repository_url }) => ({ id, number, title, repository_url }));
+      },
     },
     graphqlPages: [
       {
@@ -471,10 +475,14 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
 });
 
 describe("land.ts could not run, exiting 2", () => {
-  for (const failure of [new GitHubUnanswered("dummy: the connection closed"), new GitHubMisanswered("dummy: not the shape asked")]) {
+  for (const failure of [
+    new GitHubUnanswered("dummy: the connection closed"),
+    new GitHubMisanswered("dummy: not the shape asked"),
+    new GitHubPartlyAnswered("dummy: answered in part"),
+  ]) {
     it(`when a story issue was created but not added to #p's sub-issues (${failure.name}), naming the issue and both links to make`, async (t) => {
       const w = world(t);
-      const state = gitHubState({ unanswered: (call) => (bodyOf(call).sub_issue_id === 9102 ? failure : undefined) });
+      const state = gitHubState({ failing: (call) => (call.kind === "rest" && bodyOf(call).sub_issue_id === 9102 ? failure : undefined) });
       const run = await land(w, state);
       assert.equal(run.code, 2, run.stderr.join("\n"));
       assert.deepEqual(state.issues.map((one) => one.number), [101, 102]);
@@ -487,9 +495,20 @@ describe("land.ts could not run, exiting 2", () => {
     });
   }
 
+  it("when GitHub gives #p's sub-issues only in part, creating no issue", async (t) => {
+    const w = world(t);
+    const failure = new GitHubPartlyAnswered("dummy: answered in part");
+    const state = gitHubState({ failing: (call) => (call.kind === "restPages" ? failure : undefined) });
+    const run = await land(w, state);
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.ok(run.stderr.join("\n").includes(failure.message), run.stderr.join("\n"));
+    assert.deepEqual(state.issues, []);
+    assert.deepEqual(run.pushes, []);
+  });
+
   it("when a story issue is #p's sub-issue but not blocked by the story before it, naming both", async (t) => {
     const w = world(t);
-    const state = gitHubState({ unanswered: (call) => (call.kind === "rest" && call.path === `${API_REPO}/issues/102/dependencies/blocked_by` ? new GitHubUnanswered("dummy: the connection closed") : undefined) });
+    const state = gitHubState({ failing: (call) => (call.kind === "rest" && call.path === `${API_REPO}/issues/102/dependencies/blocked_by` ? new GitHubUnanswered("dummy: the connection closed") : undefined) });
     const run = await land(w, state);
     assert.equal(run.code, 2, run.stderr.join("\n"));
     assert.deepEqual(state.subIssues.map((one) => one.number), [101, 102]);

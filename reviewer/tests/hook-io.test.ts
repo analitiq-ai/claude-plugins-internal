@@ -5,7 +5,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import { sessionFolder } from "../plugin/core/commit-pass.ts";
 import { tamperId } from "../plugin/core/contracts/ledger.ts";
-import { GitHubMisanswered, GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { BoardNotVisible, LedgerMissing, StateStale, StateWriteRefused, StateWriteUnsigned } from "../plugin/core/state.ts";
 import { MintError } from "../plugin/core/tokens.ts";
@@ -157,6 +157,7 @@ describe("nextStepOf", () => {
   for (const [failure, next] of [
     [new GitHubUnanswered("POST /graphql: no answer within 15000 ms"), RETRY],
     [new GitHubMisanswered("GitHub's answer for the ref of ledger is not the shape asked for"), RETRY],
+    [new GitHubPartlyAnswered("GET /repos/acme/widgets/commits: the next page is on another host"), FIX_THEN_RETRY],
     [new GitHubRefused(401, "POST /graphql: 401 Bad credentials"), FIX_THEN_RETRY],
     [new MintError("the reviewer App is not installed on acme/widgets"), FIX_THEN_RETRY],
     [new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]), FIX_THEN_RETRY],

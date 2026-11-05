@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
-import { GitHubMisanswered, GitHubUnanswered } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubUnanswered } from "../plugin/core/github.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { main } from "../plugin/scripts/preflight.ts";
 import { BOARD, fakeMint, output, scratchCheckout, storedToken, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
@@ -92,7 +92,11 @@ describe("preflight.ts <issue>", () => {
     assert.equal(run.stderr.length, 2);
   });
 
-  for (const failure of [new GitHubUnanswered("dummy: no answer"), new GitHubMisanswered("dummy: not the shape asked")]) {
+  for (const failure of [
+    new GitHubUnanswered("dummy: no answer"),
+    new GitHubMisanswered("dummy: not the shape asked"),
+    new GitHubPartlyAnswered("dummy: answered in part"),
+  ]) {
     it(`exits 2 on a ${failure.name}, printing its message`, async (t) => {
       const run = await preflight(t, githubOf(failure, []));
       assert.equal(run.code, 2, run.stderr.join("\n"));

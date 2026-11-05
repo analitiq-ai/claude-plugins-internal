@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { GitFailed, runGit } from "../src/git.ts";
-import { GitHubMisanswered, GitHubRefused, GitHubUnanswered } from "../src/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered } from "../src/github.ts";
 import { gitHubTree, gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
 import { fakeGitHub, type FakeRoutes } from "./support/fake-github.ts";
 
@@ -184,6 +184,15 @@ function misanswered(pattern: RegExp): (error: unknown) => true {
   };
 }
 
+// No GitHubUnanswered: GitHub gives the same part on every run, so a retry alone never reads the rest.
+function partlyAnswered(pattern: RegExp): (error: unknown) => true {
+  return (error) => {
+    assert.ok(error instanceof GitHubPartlyAnswered && !(error instanceof GitHubUnanswered), `expected GitHubPartlyAnswered, got ${String(error)}`);
+    assert.match(error.message, pattern);
+    return true;
+  };
+}
+
 function treeOver(rest: FakeRoutes["rest"]): { tree: Tree; calls: ReturnType<typeof fakeGitHub>["calls"] } {
   const client = fakeGitHub({ rest });
   return { tree: gitHubTree(client, REPO, REF), calls: client.calls };
@@ -268,13 +277,13 @@ describe("gitHubTree", () => {
     const { tree } = treeOver({
       [`GET ${CONTENTS}/specs/huge.md${AT_REF}`]: { type: "file", encoding: "none", content: "", path: "specs/huge.md" },
     });
-    await assert.rejects(tree.readText("specs/huge.md"), misanswered(/specs\/huge\.md/));
+    await assert.rejects(tree.readText("specs/huge.md"), partlyAnswered(/specs\/huge\.md/));
   });
 
   it("refuses a listing at the contents API's 1000-entry cap, which may be cut short", async () => {
     const full = Array.from({ length: 1000 }, (_, i): [string, string] => [`${i}-dummy`, "dir"]);
     const { tree } = treeOver({ [`GET ${CONTENTS}/specs${AT_REF}`]: listing(full) });
-    await assert.rejects(tree.listDir("specs"), misanswered(/1000/));
+    await assert.rejects(tree.listDir("specs"), partlyAnswered(/1000/));
   });
 
   it("refuses a listing whose entry is not the shape asked as GitHubMisanswered", async () => {

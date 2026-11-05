@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { LaneRefused } from "../plugin/core/board.ts";
 import { GhFolderRefused } from "../plugin/core/gh-config.ts";
 import { GitFailed } from "../plugin/core/git.ts";
-import { GitHubMisanswered, GitHubRefused, GitHubUnanswered, RemoteRefused } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } from "../plugin/core/github.ts";
 import { DerivationError } from "../plugin/core/identity.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { SessionRecordRefused } from "../plugin/core/session-record.ts";
@@ -114,6 +114,7 @@ describe("refusalOf", () => {
     new GitHubRefused(403, "dummy refusal"),
     new GitHubUnanswered("dummy: no answer"),
     new GitHubMisanswered("dummy: not the shape asked"),
+    new GitHubPartlyAnswered("dummy: answered in part"),
     new SettingsError("codeworks.toml [orchestrator]", "dummy why"),
     new RemoteRefused("https://example.invalid/acme/widgets", "dummy why"),
     new HookInputRefused("dummy why"),

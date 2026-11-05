@@ -10,6 +10,7 @@ import {
   answerOf,
   gitHub,
   GitHubMisanswered,
+  GitHubPartlyAnswered,
   GitHubRefused,
   GitHubUnanswered,
   httpsUrl,
@@ -57,6 +58,15 @@ function reply(res: ServerResponse, status: number, body: unknown, headers: Reco
 function misanswered(pattern: RegExp): (error: unknown) => true {
   return (error) => {
     assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${inspect(error)}`);
+    assert.match(error.message, pattern);
+    return true;
+  };
+}
+
+// No GitHubUnanswered: GitHub gives the same part on every run, so a retry alone never reads the rest.
+function partlyAnswered(pattern: RegExp): (error: unknown) => true {
+  return (error) => {
+    assert.ok(error instanceof GitHubPartlyAnswered && !(error instanceof GitHubUnanswered), `expected GitHubPartlyAnswered, got ${inspect(error)}`);
     assert.match(error.message, pattern);
     return true;
   };
@@ -131,7 +141,7 @@ test("restPages follows Link rel=next to the last page", async (t) => {
 test("restPages never sends the token to a next page on another host", async (t) => {
   const other = await serve(t, (_seen, res) => reply(res, 200, []));
   const { api } = await serve(t, (_seen, res) => reply(res, 200, [1], { link: `<${other.api}/steal?page=2>; rel="next"` }));
-  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/issues"), misanswered(/another host/));
+  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/issues"), partlyAnswered(/another host/));
   assert.equal(other.seen.length, 0);
 });
 
