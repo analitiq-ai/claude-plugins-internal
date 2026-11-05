@@ -257,7 +257,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `git.ts` `fetchWithGhCredential` (fits as the transport, the shape of planner `land.ts`'s `io.fetch`); the
   `+refs/heads/<b>:refs/remotes/origin/<b>` refspec, written twice in `land.ts` and once in reviewer's
   `worktree.py` (Python: stays), defined once as `git.ts` `trackingRefspec`; the default branch's name, read by
-  the orchestrator's `defaultBranch` and inline in `land.ts`, defined once as core `identity.ts` `defaultBranch`.
+  the orchestrator's `defaultBranch`, moved to core `identity.ts` (planner `land.ts` reads it with `url` in
+  its one repository read, which stays).
 
 ## R15: The constitution's builder line changes first, in its own PR
 
