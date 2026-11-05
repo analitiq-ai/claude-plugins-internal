@@ -13,26 +13,42 @@ from paths import PLUGIN, REPO, tracked_text
 COMMAND = re.compile(r"\b(?:reviewer|planner|builder):[\w-]+")
 # Paths reviewer must never ship, whatever another plugin ships at them: the planning and building skills under
 # their names before the move, speclocation.py, deleted with them, and speckit/, the tree every Spec Kit preset and
-# workflow lives under. The overlap guard below covers only the paths planner and builder ship today.
+# workflow lives under. The overlap guard below compares reviewer with what planner and builder ship today, so a name
+# they no longer ship is refused only here.
 NEVER_IN_REVIEW = ("skills/issue-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/",
                    "scripts/speclocation.py", "speckit/")
 # Paths whose place is fixed rather than chosen by the plugin: the plugin format's hook config, and a core carrier's
 # link and pinned packages (root ADR-0001). Two plugins sharing one is not one shipping the other's file.
 FIXED_PATHS = ("hooks/hooks.json", "core", "package.json", "package-lock.json")
+# lib/ and one hook file per event: the paths at which carriers each ship their own module under one name
+# (lib/settings.ts, hooks/pre-tool-use.ts).
+CARRIER_MODULES = ("lib/*", "hooks/*.ts")
+LINK = "120000"
 
 
-def blobs(plugin: Path = PLUGIN) -> dict[str, str]:
-    """The plugin's tracked files, relative to it, each with the id of the blob git holds for it."""
+def index(plugin: Path = PLUGIN) -> dict[str, tuple[str, str]]:
+    """The plugin's tracked files, relative to it, each with its mode and the id of the blob git holds for it."""
     out = subprocess.run(["git", "ls-files", "-s", "-z", "--", str(plugin)], cwd=REPO, capture_output=True, text=True,
                          check=True).stdout
     # Each entry is `<mode> <blob> <stage>\t<path>`.
     entries = (entry.split("\t", 1) for entry in out.split("\0") if entry)
-    return {str(Path(path).relative_to(plugin.relative_to(REPO))): meta.split()[1] for meta, path in entries}
+    return {str(Path(path).relative_to(plugin.relative_to(REPO))): (meta.split()[0], meta.split()[1])
+            for meta, path in entries}
 
 
 def shipped(plugin: Path = PLUGIN) -> list[str]:
     """The plugin's tracked files, relative to it."""
-    return list(blobs(plugin))
+    return list(index(plugin))
+
+
+def carrier_module(path: str) -> bool:
+    return any(fnmatch(path, pattern) for pattern in CARRIER_MODULES)
+
+
+def owned(plugin: Path) -> set[tuple[str, str | None]]:
+    """The plugin's content, each file as what makes it the plugin's: its path, and in CARRIER_MODULES its blob too."""
+    held = index(plugin)
+    return {(f, held[f][1] if carrier_module(f) else None) for f in content(list(held))}
 
 
 def content(files: list[str]) -> set[str]:
@@ -61,17 +77,15 @@ class ShippedTree(unittest.TestCase):
     def test_ships_no_path_alq_review_must_never_ship(self):
         self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
 
-    # A file is its path and its bytes: carriers each ship their own module at a path another carrier also uses
-    # (lib/settings.ts, hooks/pre-tool-use.ts), and that is not one plugin shipping the other's file.
+    # A carrier's module at a path another carrier also uses is its own unless the bytes are the other's. A link
+    # there is refused: its blob holds only where it points, so its bytes cannot be compared.
     def test_ships_no_file_alq_plan_or_alq_build_ships(self):
-        def files(plugin: Path) -> set[tuple[str, str]]:
-            held = blobs(plugin)
-            return {(f, held[f]) for f in content(list(held))}
-
-        theirs = files(REPO / "planner" / "plugin") | files(REPO / "builder" / "plugin")
-        self.assertIn("skills/issue-spec/SKILL.md", {f for f, _ in theirs})
-        self.assertIn("skills/issue-tackle/SKILL.md", {f for f, _ in theirs})
-        self.assertEqual(sorted(theirs & files(PLUGIN)), [])
+        theirs = owned(REPO / "planner" / "plugin") | owned(REPO / "builder" / "plugin")
+        self.assertIn(("skills/issue-spec/SKILL.md", None), theirs)
+        self.assertIn(("skills/issue-tackle/SKILL.md", None), theirs)
+        self.assertIn("lib/settings.ts", {f for f, _ in theirs})
+        self.assertEqual(sorted(theirs & owned(PLUGIN)), [])
+        self.assertEqual([f for f, (mode, _) in index().items() if mode == LINK and carrier_module(f)], [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
