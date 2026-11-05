@@ -5,7 +5,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { runGit } from "../plugin/core/git.ts";
-import { GitHubUnanswered, type Repository } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubUnanswered, type Repository } from "../plugin/core/github.ts";
 import { labelTasks, main } from "../plugin/scripts/land.ts";
 import {
   git,
@@ -471,19 +471,21 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
 });
 
 describe("land.ts could not run, exiting 2", () => {
-  it("when a story issue was created but not added to #p's sub-issues, naming the issue and both links to make", async (t) => {
-    const w = world(t);
-    const state = gitHubState({ unanswered: (call) => (bodyOf(call).sub_issue_id === 9102 ? new GitHubUnanswered("dummy: the connection closed") : undefined) });
-    const run = await land(w, state);
-    assert.equal(run.code, 2, run.stderr.join("\n"));
-    assert.deepEqual(state.issues.map((one) => one.number), [101, 102]);
-    assert.deepEqual(state.subIssues.map((one) => one.number), [101]);
-    const said = run.stderr.join("\n");
-    for (const part of ["#102", "US2", "#7's sub-issues", "blocked by #101", "dummy: the connection closed", "Next step:"]) {
-      assert.ok(said.includes(part), `stderr does not name ${part}: ${said}`);
-    }
-    assert.deepEqual(run.pushes, []);
-  });
+  for (const failure of [new GitHubUnanswered("dummy: the connection closed"), new GitHubMisanswered("dummy: not the shape asked")]) {
+    it(`when a story issue was created but not added to #p's sub-issues (${failure.name}), naming the issue and both links to make`, async (t) => {
+      const w = world(t);
+      const state = gitHubState({ unanswered: (call) => (bodyOf(call).sub_issue_id === 9102 ? failure : undefined) });
+      const run = await land(w, state);
+      assert.equal(run.code, 2, run.stderr.join("\n"));
+      assert.deepEqual(state.issues.map((one) => one.number), [101, 102]);
+      assert.deepEqual(state.subIssues.map((one) => one.number), [101]);
+      const said = run.stderr.join("\n");
+      for (const part of ["#102", "US2", "#7's sub-issues", "blocked by #101", failure.message, "Next step:"]) {
+        assert.ok(said.includes(part), `stderr does not name ${part}: ${said}`);
+      }
+      assert.deepEqual(run.pushes, []);
+    });
+  }
 
   it("when a story issue is #p's sub-issue but not blocked by the story before it, naming both", async (t) => {
     const w = world(t);

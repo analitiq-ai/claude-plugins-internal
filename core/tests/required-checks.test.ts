@@ -3,7 +3,7 @@ import { before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { Finding } from "../src/contracts/finding.ts";
-import { GitHubMisanswered, GitHubRefused } from "../src/github.ts";
+import { GitHubRefused } from "../src/github.ts";
 import type { CouldNotRun, StatusAnswer } from "../src/outcomes.ts";
 import type { Shared } from "../src/settings.ts";
 import { loadValidators, type Validators } from "../src/validation/contract.ts";
@@ -212,17 +212,13 @@ describe("a required check is matched at the head asked", () => {
     assert.deepEqual(findings, []);
   });
 
-  it("refuses a check-runs answer holding more runs than it gave, never reading part as the whole", async () => {
+  it("is COULD_NOT_RUN on a check-runs answer holding more runs than it gave, never reading part as the whole", async () => {
     const client = fakeGitHub({
       graphql: [{ when: (query) => query.includes("baseRefName"), answer: pullRequest("main") }],
       restPages: { [rulesPath("main")]: [requiring({ context: "ci" })], [STATUSES_PATH]: [] },
       rest: { [`GET ${runsPath("ci")}`]: { total_count: 101, check_runs: [run("ci", "success")] } },
     });
-    await assert.rejects(requiredChecks(SHARED, client, validators).status(REPO, PR, HEAD), (error: unknown) => {
-      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
-      assert.match(error.message, /101/);
-      return true;
-    });
+    assertCouldNotRun(await requiredChecks(SHARED, client, validators).status(REPO, PR, HEAD), /101 check runs/);
   });
 });
 
@@ -346,13 +342,9 @@ describe("a conflict with the PR's base branch is one finding, read from GitHub 
     assertCouldNotRun(findings, new RegExp(other));
   });
 
-  it("throws on a mergeability GitHub has added, read as neither a conflict nor none", async () => {
+  it("is COULD_NOT_RUN on a mergeability GitHub has added, read as neither a conflict nor none", async () => {
     const client = reader({ mergeable: "MAYBE", rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "success")] } });
-    await assert.rejects(requiredChecks(SHARED, client, validators).findings(REPO, PR, HEAD), (error: unknown) => {
-      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
-      assert.match(error.message, /mergeable/);
-      return true;
-    });
+    assertCouldNotRun(await requiredChecks(SHARED, client, validators).findings(REPO, PR, HEAD), /mergeable/);
   });
 });
 
