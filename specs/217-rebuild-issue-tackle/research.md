@@ -173,7 +173,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   done (R7 already stopped). Open → the `internal-review` check run at the PR head by the orchestrator's App
   (`shared.orchestrator_app_login`) through core's `internalReviewAt` (B5): not `success` → internal round; a local
   HEAD ahead of the PR head (commits not yet pushed) → internal round at HEAD. Attested → `prFindings` (B6): the
-  findings of `requiredChecks` and `threadsModule`; only when both are empty, the `<module>-review` check runs the
+  findings of `requiredChecks` (its list from `[shared] required_checks` where set, #174 R22) and
+  `threadsModule`; only when both are empty, the `<module>-review` check runs the
   orchestrator's App writes at the head (orchestrator ADR-0008; #174 FR-020a). A run carries its module's status
   only (ADR-0008 d3), so `failure` is one finding naming the module, and `success`, pending or absent none: modules
   are triggered only once the head is GREEN without findings (ADR-0008 d2), and a pending module is the

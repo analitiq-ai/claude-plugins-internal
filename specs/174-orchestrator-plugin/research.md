@@ -229,18 +229,18 @@ plan has not executed, and names the task that runs it first.
 - **Rejected**: a file builder writes for the hook to read: the model may not write a hook's folder (root ADR-0008
   d6). Parsing the turn's last message: a fact read from prose (P7).
 
-## R22: Required checks from `[orchestrator]` where the plan offers no rulesets (Story 4)
+## R22: Required checks from `[shared]` where the plan offers no rulesets (Story 4)
 
-- **Decision**: `required_checks`, a non-empty list of distinct check names under `[orchestrator]`. When it is set,
-  the orchestrator hands it to core's `requiredChecks`, which takes it in place of the rules' required status checks
+- **Decision**: `required_checks`, a non-empty list of distinct check names under `[shared]`. When it is set,
+  core's `requiredChecks` reads it from the `[shared]` it is given and takes it in place of the rules' required status checks
   and makes no rules read; every step after is unchanged: the orchestrator's own checks dropped, could not run when
   nothing is left, each name read at the head from any App, the conflict finding. When it is not set, the reader
   reads the rules as now, and a refused read is could not run.
 - **Rationale**: GitHub refuses rulesets, branch protection and the rules read on a private repo of a free plan
   (`403 Upgrade to GitHub Pro or make this repository public to enable this feature`, seen on this repo on
   2026-10-31). With no list, core's reader is could not run at every head, by design, so that nothing merges with
-  no CI check read; nothing would merge. A key is data (constitution P7); it is `[orchestrator]`'s because only the
-  orchestrator reads it (root ADR-0002 d2).
+  no CI check read; nothing would merge. A key is data (constitution P7); it is `[shared]`'s because the orchestrator
+  and builder (#217 B6) both read the required checks (root ADR-0002 d2; ADR-0009 d2).
 - **Rejected**: a refused rules read taken as no required checks: a head would merge with no CI check read, and
   telling the plan apart from another refusal means reading the error text (P7).
 - **Existing tools**: core `validation/required-checks.ts` (fits, with the list as a parameter: C14).
