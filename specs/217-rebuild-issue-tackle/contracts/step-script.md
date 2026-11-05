@@ -23,14 +23,13 @@ Reads (research R5–R12, R16): the stop rule's facts through core's `readStoryS
 ## Writes
 
 Only these, each idempotent:
-- no branch on GitHub or locally: `git fetch` of the default branch to `refs/remotes/origin/<default>`, then
-  `git worktree add -b <branch> ../<repo>.worktrees/<branch> <sha>`;
-- a branch on GitHub only: `git fetch` of it to `refs/remotes/origin/<branch>`, then `git worktree add -B <branch>
-  ../<repo>.worktrees/<branch> refs/remotes/origin/<branch>`;
-- a local branch with no worktree: `git worktree add ../<repo>.worktrees/<branch> <branch>`.
+- every run, core's `readStoryStopFacts` fetches remote-tracking refs as R16 lists;
+- with no worktree and no stop (R8, R10), one `git worktree add` at `../<repo>.worktrees/<branch>`: no branch →
+  `-b <branch> <path> <sha>`, `<sha>` the fetched default tip; a branch on GitHub only → `-B <branch> <path>
+  refs/remotes/origin/<branch>`; a local branch → `<path> <branch>`.
 
-A fetch of the default branch also runs before the merge decision (R9). Nothing else: no commit, no push, no GitHub
-write. Every stop leaves the repository, worktrees and GitHub unchanged (SC-002).
+Nothing else: no commit, no push, no GitHub write. Every stop leaves branches, worktrees and GitHub unchanged; its
+only writes are core's fetches (SC-002).
 
 ## Output
 
@@ -38,7 +37,7 @@ stdout: one JSON line, the `Step` of data-model.md; stderr: nothing on exit 0 or
 
 ```json
 {"v":1,"kind":"implement","story":231,"worktree":"/home/a/repo.worktrees/231-us3-lane-check","branch":"231-us3-lane-check","requirement":{"kind":"defect","source":"specs/217-rebuild-issue-tackle/spec.md","observed":"hypothesis"},"tasks":[{"id":"T012","line":"- [ ] T012 [US3] ..."}]}
-{"v":1,"kind":"stop","story":231,"state":"lane","reason":"#231's card is in Blocked: builder builds nothing there (root ADR-0006 d1)","pr":null}
+{"v":1,"kind":"stop","story":231,"state":"LANE","reason":"#231's card is in Blocked: builder builds nothing there (root ADR-0006 d1)","pr":null}
 {"v":1,"kind":"merge","story":231,"worktree":"…","ref":"refs/remotes/origin/main","why":["docs/adr differs between origin/main and HEAD"],"argv":["git","merge","--no-ff","--no-edit","refs/remotes/origin/main"]}
 ```
 

@@ -147,7 +147,7 @@ found that the spec's list does not name.
 | C10 | Protected-path matcher | US3 | spec Assumptions |
 | — | **US3** | | attest, exempt, ready |
 | C8, C9, C11 | Rulings/replies/FIX commits in the snapshot; conflict-with-main finding; validator request time | US4 | spec Assumptions |
-| C14 | Required checks from a list | in US4 | `requiredChecks` grades a given list in place of the rules (R22) |
+| C14 | Required checks from a list | #217's US1 PR | `[shared] required_checks` in core's `Shared`; `requiredChecks` grades it in place of the rules (R22) |
 | — | **US4** | | In review, modules, replies, stage-2 push, merge, Stop's wait |
 | C6 † | Tagged-snapshot channel | in US5 | `state.ts` read/post parameterised by tag, App and schema (R17) |
 | — | **US5** | | bound counts |
@@ -166,7 +166,7 @@ None.
 - Test harness and CI wiring: R2
 - Hook entry files, I/O, exit codes: R3
 - Key file names: R4
-- Settings read (bootstrap from HEAD, settle on GitHub): R5
+- Settings read (once, at the checkout's HEAD): R5
 - Session gh config folder: R6
 - Token refresh within a long turn: R7
 - Session's issue record (write-once file, core contract): R8

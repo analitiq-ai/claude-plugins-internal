@@ -25,7 +25,7 @@ the carrier check lists orchestrator."
 ### Session 2026-10-31
 
 - Q: Where are the required checks read in a repo whose GitHub plan offers no rulesets? → A: From
-  `required_checks` under `[orchestrator]`: when it is set, core's required-checks reader grades the listed checks
+  `required_checks` under `[shared]`: when it is set, core's required-checks reader grades the listed checks
   and reads no GitHub rules; when it is not, it reads the rules. GitHub then enforces nothing, and a listed check
   counts from whichever App posts it (orchestrator ADR-0009 d2).
 
@@ -148,7 +148,7 @@ and the card is in Blocked with the stop rule's reason.
    identity or its change touches a `.github/` folder, refusing the stop naming the commit and the cause.
 7. **Given** core's stop rule finds a stop on the session's story, **When** the Stop hook runs, **Then** it pushes
    nothing, names no step and lets the session end; when the card is In progress or In review and the stop is
-   neither `done` nor `closed`, the card first goes to Blocked with the rule's reason.
+   neither `DONE` nor `CLOSED`, the card first goes to Blocked with the rule's reason.
 
 ---
 
@@ -210,7 +210,7 @@ naming its head; with a module silent past `review_timeout`, the card goes to Bl
 5. **Given** a module SILENT or a required check missing or pending, **When** the Stop hook runs before
    `review_timeout`, **Then** it waits within its own run, polling GitHub, and the session stays open; past
    `review_timeout`, the card goes to Blocked naming the reporter.
-6. **Given** `required_checks` set under `[orchestrator]`, **When** a hook reads the required checks, **Then** it
+6. **Given** `required_checks` set under `[shared]`, **When** a hook reads the required checks, **Then** it
    grades the listed checks at the head and reads no GitHub rules.
 
 ---
@@ -280,10 +280,10 @@ next one finds not marked ended counts toward `k_deaths`.
   convention (`planner-app.pem` in `core/src/keys.ts`; `session-app.pem` and `reviewer-app.pem` in its tests).
 - **FR-007**: The orchestrator MUST read `[shared]` and its own `[orchestrator]` section of `codeworks.toml`
   through core's settings reader and MUST refuse, naming the file and key, when one is missing or invalid.
-  `[orchestrator]` holds `app_id`, `session_app_id`, `status_issue`, `exempt_labels`, `max_turns`, `k_deaths`,
-  `review_timeout` and `required_checks`; each story adds the keys it reads: Story 1 `app_id`, `session_app_id` and
-  `status_issue`, Story 3 `exempt_labels`, Story 4 `review_timeout` and `required_checks`, Story 5 `max_turns` and
-  `k_deaths`.
+  `[orchestrator]` holds `app_id`, `session_app_id`, `status_issue`, `exempt_labels`, `max_turns`, `k_deaths`
+  and `review_timeout`; each story adds the keys it reads: Story 1 `app_id`, `session_app_id` and `status_issue`,
+  Story 3 `exempt_labels`, Story 4 `review_timeout`, Story 5 `max_turns` and `k_deaths`. `required_checks` is a
+  `[shared]` key (FR-020c).
 - **FR-008**: A failure that names no issue (a SessionStart failure) MUST be posted on `status_issue` with the
   orchestrator App, keyed by its cause and posted only when no orchestrator App comment with that key exists.
 
@@ -350,7 +350,7 @@ next one finds not marked ended counts toward `k_deaths`.
 - **FR-016c** *(decides how Stop sees builder's stop, builder ADR-0003 d2)*: After FR-016b and before it pushes,
   the Stop hook MUST call core's stop rule (`storyStop`, #217) on the facts builder's step reads for the session's
   issue. On a stop it MUST push nothing, name no step and let the session end. When the card is In progress or In
-  review and the stop is neither `done` nor `closed`, it MUST first post the rule's reason and move the card to
+  review and the stop is neither `DONE` nor `CLOSED`, it MUST first post the rule's reason and move the card to
   Blocked (ADR-0002 d5); a card outside those lanes is an admin's (ADR-0002 d6).
 - **FR-017** *(decides how the agent identity is read, root ADR-0008 d8)*: The agent identity MUST be `user.name`
   and `user.email` read from `~/.gitconfig` as data with `git config --file`, following no include, through core's
@@ -373,7 +373,7 @@ next one finds not marked ended counts toward `k_deaths`.
   resolve threads, and merge exactly as ADR-0007 d2–d4, d6–d7, ADR-0008 d2–d4 and ADR-0009 d1, d4 decide.
 - **FR-020b**: At stage 2 the Stop hook MUST push only commits a FIX ruling names or a merge of the default branch
   (FR-016).
-- **FR-020c**: The required checks MUST be the names `required_checks` lists under `[orchestrator]` when it is set,
+- **FR-020c**: The required checks MUST be the names `required_checks` lists under `[shared]` when it is set,
   read with no GitHub rules read, and GitHub's rules for the PR's base branch otherwise, as ADR-0009 d2 decides. A
   listed name MUST match a check run or status of that name from any App.
 - **FR-021** *(decides how Stop waits, ADR-0001 d3)*: While a module or required check is pending and
