@@ -1,17 +1,16 @@
 import assert from "node:assert/strict";
 
-import type { Hold, Round, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
+import type { Gates, Lineage } from "../../../src/contracts/gates.ts";
+import type { Hold, HoldPlacement, Round, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
 import type { Shared } from "../../../src/settings.ts";
-import type { CommentDeletion, IssueComment, StatusChange } from "../../../src/state.ts";
+import type { IssueComment, StatusChange } from "../../../src/state.ts";
 import { fakeGitHub, type FakeGitHub } from "../../support/fake-github.ts";
+import type { FakeLedger } from "./ledger.ts";
 
 export const REPO = "acme/widgets";
 export const ISSUE = 212;
-export const COMMENTS_PATH = "/repos/acme/widgets/issues/212/comments";
 export const BOARD = "https://github.com/orgs/example-org/projects/1";
 export const OTHER_PROJECT = "https://github.com/orgs/example-org/projects/7";
-// The state comment contract's tag, spelt out here so core is graded against the contract, not its own constants.
-export const TAG = "<!-- codeworks:reviewer-state -->";
 
 export const SHARED: Shared = {
   validators: ["fixture"],
@@ -44,18 +43,36 @@ export function sha(n: number): string {
 }
 
 export function round(n: number, fields: Partial<Round> = {}): Round {
-  return { stage: "INTERNAL", n, head: sha(n), result: "CLEAN", verdict: null, root_cause: null, at: at("09:00"), ...fields };
+  return { stage: "INTERNAL", n, run: `run-${n}`, head: sha(n), result: "CLEAN", verdict: null, root_cause: null, at: at("09:00"), ...fields };
 }
 
-/** An OPEN row; an escalation gets a question, as its contract needs one. */
+export const QUESTION_TEXT = "Which reading of FR-3 holds?";
+
+/** An OPEN row, with a question where its contract asks one: an escalation, a claim, a rescope with no spec PR. */
 export function hold(id: string, fields: Partial<Hold> = {}): Hold {
   const kind = id.slice(0, id.indexOf("-")) as Hold["kind"];
-  const question = kind === "escalation" ? "Which reading of FR-3 holds?" : null;
-  return { id, kind, state: "OPEN", since: at("10:00"), released: null, released_by: null, question, spec_pr: null, ...fields };
+  const specPr = fields.spec_pr ?? null;
+  const asks = kind === "escalation" || kind === "claim" || (kind === "rescope" && specPr === null);
+  return {
+    id,
+    kind,
+    state: "OPEN",
+    since: at("10:00"),
+    released: null,
+    released_by: null,
+    question: asks ? QUESTION_TEXT : null,
+    spec_pr: null,
+    ...fields,
+  };
 }
 
 export function releasedHold(id: string, comment: number, fields: Partial<Hold> = {}): Hold {
   return hold(id, { state: "RELEASED", released: at("09:55"), released_by: { comment, reset: false }, ...fields });
+}
+
+/** The `hold` event's payload of `row`: the row without its state and release fields. */
+export function placementOf({ id, kind, since, question, spec_pr }: Hold): HoldPlacement {
+  return { id, kind, since, question, spec_pr };
 }
 
 export function pushbackRuling(key: string, n: number): Ruling {
@@ -73,12 +90,22 @@ export function fixRuling(key: string, n: number, commits: string[]): Ruling {
   return { ...pushbackRuling(key, n), ruling: "FIX", reply: "Fixed at the cause: the parser now refuses null.", commits };
 }
 
-export function snapshot(fields: Partial<Snapshot> = {}): Snapshot {
-  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], rulings: [], ...fields };
+export function lineage(id: string, fields: Partial<Lineage> = {}): Lineage {
+  return {
+    id,
+    file: "src/parse.ts",
+    places: [{ start: 120, end: 168, claim: "c1" }],
+    chain: [{ ref: sha(1), claim: "c1", line: 4, words: "refuses a null header", ruling: "WRONG", at: at("09:00") }],
+    ...fields,
+  };
 }
 
-export function stateBody(state: Snapshot): string {
-  return `${TAG}\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\`\n`;
+export function gates(fields: Partial<Gates> = {}): Gates {
+  return { branch: "212-us1-ledger", anchor: sha(4096), lineages: [], bugs: [], ...fields };
+}
+
+export function snapshot(fields: Partial<Snapshot> = {}): Snapshot {
+  return { v: 1, rounds: [round(1)], holds: [], pushbacks: [], rulings: [], gates: null, ...fields };
 }
 
 export function url(databaseId: number): string {
@@ -97,22 +124,19 @@ export function comment(databaseId: number, author: IssueComment["author"], body
   };
 }
 
-export function stateComment(databaseId: number, state: Snapshot, fields: Partial<IssueComment> = {}): IssueComment {
-  return comment(databaseId, REVIEWER_APP, stateBody(state), fields);
-}
-
 export function adminComment(databaseId: number, clock: string, body = "Go ahead.", fields: Partial<IssueComment> = {}): IssueComment {
   return comment(databaseId, ADMIN, body, { createdAt: at(clock), ...fields });
 }
 
-/** The state comment contract's question tag, spelt out, as the orchestrator App posts it. */
-export function questionComment(databaseId: number, of: Hold, clock: string, fields: Partial<IssueComment> = {}): IssueComment {
+/** The hold question's tag, spelt out, as the orchestrator App posts it. */
+export function questionComment(
+  databaseId: number,
+  of: Pick<Hold, "id" | "since" | "question">,
+  clock: string,
+  fields: Partial<IssueComment> = {},
+): IssueComment {
   const body = `<!-- codeworks:hold-question ${of.id} ${of.since} -->\n\n${of.question ?? ""}\n`;
   return comment(databaseId, ORCHESTRATOR_APP, body, { createdAt: at(clock), ...fields });
-}
-
-export function deletion(clock: string, deletedCommentAuthor: CommentDeletion["deletedCommentAuthor"] = REVIEWER_APP): CommentDeletion {
-  return { createdAt: at(clock), deletedCommentAuthor };
 }
 
 /** The read takes no actor: one is carried here only to show it changes nothing. */
@@ -123,71 +147,70 @@ export function move(clock: string, fields: Partial<Move> = {}): Move {
 }
 
 export type Issue = {
-  comments: IssueComment[];
-  deletions?: CommentDeletion[];
+  comments?: IssueComment[];
   moves?: Move[];
   /** The issue's project items' URLs; the board alone unless a test says otherwise. */
   items?: string[];
-  /** Each commenter's `role_name` on the repository; ADMIN's alone unless a test says otherwise. */
+  /** Each login's `role_name` on the repository; ADMIN's alone by default. */
   roles?: Record<string, string>;
 };
 
 const ADMIN_ROLES: Record<string, string> = { [ADMIN.login]: "admin" };
 
-// The state comment contract's writer roles, spelt out here so core is graded against the contract.
-const WRITER_ROLES = ["admin", "maintain", "write"];
-
-/** The logins `stateFrom` takes as writers: those whose role is a writer's. */
-export function writersOf({ roles = ADMIN_ROLES }: Issue): Set<string> {
-  return new Set(Object.entries(roles).flatMap(([login, role]) => (WRITER_ROLES.includes(role) ? [login] : [])));
-}
-
 function onIssue(vars: Record<string, unknown>): boolean {
   return vars.owner === "acme" && vars.name === "widgets" && vars.number === ISSUE;
 }
 
-/** The session App's client: it reads the issue, the board and each commenter's role, and answers nothing else. */
-export function reader({ comments, deletions = [], moves = [], items = [BOARD], roles = ADMIN_ROLES }: Issue): FakeGitHub {
-  const timeline = [
-    ...deletions.map((event) => ({ __typename: "CommentDeletedEvent", ...event })),
-    ...moves.map((event) => ({ __typename: "ProjectV2ItemStatusChangedEvent", ...event })),
-  ];
+/** The session App's client: it reads the issue, the board, each login's role and `ledger`, and answers nothing else. */
+export function reader({ comments = [], moves = [], items = [BOARD], roles = ADMIN_ROLES }: Issue, ledger: FakeLedger): FakeGitHub {
+  const routes = ledger.readRoutes();
   return fakeGitHub({
+    graphql: routes.graphql,
     graphqlPages: [
       { when: (query, vars) => /\bcomments\(/.test(query) && onIssue(vars), answer: comments },
-      { when: (query, vars) => /\btimelineItems\(/.test(query) && onIssue(vars), answer: timeline },
+      {
+        when: (query, vars) => /\btimelineItems\(/.test(query) && onIssue(vars),
+        answer: moves.map((each) => ({ __typename: "ProjectV2ItemStatusChangedEvent", ...each })),
+      },
       {
         when: (query, vars) => /\bprojectItems\(/.test(query) && onIssue(vars),
         answer: items.map((project) => ({ project: { url: project } })),
       },
+      ...routes.graphqlPages,
     ],
     rest: Object.fromEntries(
       Object.entries(roles).map(([login, role]) => [`GET /repos/acme/widgets/collaborators/${login}/permission`, { role_name: role }]),
     ),
+    restPagesMatching: routes.restPagesMatching,
   });
 }
 
-/** The reviewer App's client: it tells GitHub's time and posts comments on the issue, and answers nothing else. */
-export function writer(now: string = NOW): FakeGitHub {
-  return fakeGitHub({ now, rest: { [`POST ${COMMENTS_PATH}`]: { id: 9001, html_url: url(9001) } } });
+/** The reviewer App's client: it tells GitHub's time and commits to `ledger`, and answers nothing else. */
+export function writer(ledger: FakeLedger, now: string = NOW): FakeGitHub {
+  return fakeGitHub({ now, graphql: ledger.writeRoutes().graphql });
 }
 
-/** The bodies a writer posted; any other REST call it received fails the test. */
-export function posts(client: FakeGitHub): string[] {
+export type CommitInput = {
+  branch: { repositoryNameWithOwner: string; branchName: string };
+  expectedHeadOid: string;
+  message: { headline: string; body?: string };
+  fileChanges: { additions?: { path: string; contents: string }[]; deletions?: { path: string }[] };
+};
+
+/** The commits `client` asked for; any call but a commit or the clock fails the test, so it posted no comment. */
+export function commitsAsked(client: FakeGitHub): CommitInput[] {
   return client.calls.flatMap((call) => {
-    if (call.kind !== "rest") return [];
-    assert.equal(`${call.method} ${call.path}`, `POST ${COMMENTS_PATH}`, "a state write only ever posts an issue comment");
-    const { body } = call.body as { body: unknown };
-    assert.equal(typeof body, "string");
-    return [body as string];
+    if (call.kind === "now") return [];
+    assert.ok(call.kind === "graphql" && /\bcreateCommitOnBranch\(/.test(call.query), `a state write only ever commits: ${JSON.stringify(call)}`);
+    const input = call.vars.input as CommitInput;
+    assert.deepEqual(input.branch, { repositoryNameWithOwner: REPO, branchName: "ledger" }, "a state write only ever commits to ledger");
+    return [input];
   });
 }
 
-/** The snapshot of a posted body, read as the state comment contract writes it. */
-export function postedSnapshot(body: string): Snapshot {
-  const opening = `${TAG}\n\`\`\`json\n`;
-  const closing = "\n```\n";
-  assert.ok(body.startsWith(opening), `the body does not open with the tag line and a json fence:\n${body}`);
-  assert.ok(body.endsWith(closing), `the body does not end with the closing fence:\n${body}`);
-  return JSON.parse(body.slice(opening.length, -closing.length)) as Snapshot;
+/** A commit's added files, path to text. */
+export function addedFiles(input: CommitInput): Record<string, string> {
+  return Object.fromEntries(
+    (input.fileChanges.additions ?? []).map(({ path, contents }) => [path, Buffer.from(contents, "base64").toString("utf8")]),
+  );
 }

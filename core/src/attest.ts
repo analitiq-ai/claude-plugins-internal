@@ -52,12 +52,13 @@ export function governingDiff(atBase: string, atRound: string, specFolder: strin
   return [...new Set([...base.keys(), ...round.keys()])].filter((path) => base.get(path) !== round.get(path)).sort();
 }
 
-/** A hold an admin's comment released after the round was recorded; a reset lapses nothing. */
-export function releasedByComment(snapshot: Snapshot, round: Round): Hold | null {
+type Release = Pick<Hold, "id" | "released" | "released_by">;
+
+/** A hold or tamper an admin's comment released after the round was recorded; a reset lapses nothing. */
+export function releasedByComment(rows: readonly Release[], round: Round): Release | null {
   return (
-    snapshot.holds.find(
-      (hold) =>
-        hold.released_by !== null && !hold.released_by.reset && hold.released !== null && secondOf(hold.released) > secondOf(round.at),
+    rows.find(
+      (row) => row.released_by !== null && !row.released_by.reset && row.released !== null && secondOf(row.released) > secondOf(round.at),
     ) ?? null
   );
 }
@@ -67,9 +68,9 @@ function roundName(round: Round): string {
 }
 
 function causeText(cause: StateCause): string {
-  if ("id" in cause) return `${cause.cause} ${cause.id}`;
-  if ("error" in cause) return `${cause.cause}: ${cause.error}`;
-  return cause.cause;
+  const named = `${cause.cause} ${cause.id}`;
+  if (cause.cause === "open_hold") return named;
+  return `${named}, leaving ${cause.remaining.length === 0 ? "no file" : cause.remaining.join(", ")}`;
 }
 
 // Resolved once, so a revision the clone lacks throws here, not as "not in history" from `merge-base`, and no
@@ -121,10 +122,10 @@ async function mergeLapse(checkout: string, round: Round, head: string): Promise
   return null;
 }
 
-function commentLapse(snapshot: Snapshot, round: Round): string | null {
-  const hold = releasedByComment(snapshot, round);
-  if (hold === null) return null;
-  return `hold ${hold.id} was released by an admin's comment at ${hold.released}, after ${roundName(round)}`;
+function commentLapse(rows: readonly Release[], round: Round): string | null {
+  const row = releasedByComment(rows, round);
+  if (row === null) return null;
+  return `${row.id} was released by an admin's comment at ${row.released}, after ${roundName(round)}`;
 }
 
 /**
@@ -133,7 +134,7 @@ function commentLapse(snapshot: Snapshot, round: Round): string | null {
  */
 export async function attests(
   checkout: string,
-  reading: Pick<StateReading, "snapshot" | "held" | "causes">,
+  reading: Pick<StateReading, "snapshot" | "held" | "causes" | "tamper">,
   head: string,
   base: string,
   specFolder: string,
@@ -150,6 +151,6 @@ export async function attests(
   const lapse =
     (await governingLapse(checkout, round, base, baseCommit, specFolder)) ??
     (await mergeLapse(checkout, round, headCommit)) ??
-    commentLapse(reading.snapshot, round);
+    commentLapse([...reading.snapshot.holds, ...reading.tamper], round);
   return lapse === null ? { attested: true, reason: null } : { attested: false, reason: lapse };
 }

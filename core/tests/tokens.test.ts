@@ -196,6 +196,10 @@ async function refusal(minting: Promise<unknown>, seen: Seen[], ...parts: (strin
 }
 
 describe("mintToken's request", () => {
+  it("the reviewer App's permission set is contents: write and nothing else", () => {
+    assert.deepEqual(APP_PERMISSIONS.reviewer, { contents: "write" });
+  });
+
   it("signs an RS256 JWT with the App's key: iat now - 60 s, exp now + 9 min, iss the App ID", async (t) => {
     const { api, seen } = await serve(t);
     const before = Math.floor(Date.now() / 1000);
@@ -236,7 +240,7 @@ describe("mintToken's request", () => {
       token: (asked) => ({ ...granted(asked), permissions: { ...asked.permissions, metadata: "read" } }),
     });
     const minted = await mint("reviewer", api);
-    assert.deepEqual(minted.permissions, { issues: "write", metadata: "read" });
+    assert.deepEqual(minted.permissions, { contents: "write", metadata: "read" });
   });
 
   it("takes the repository named in GitHub's own case", async (t) => {
@@ -338,9 +342,9 @@ describe("mintToken refuses an answer", () => {
 
   it("adding a permission not asked for", async (t) => {
     const { api, seen } = await serve(t, {
-      token: (asked) => ({ ...granted(asked), permissions: { ...asked.permissions, contents: "read" } }),
+      token: (asked) => ({ ...granted(asked), permissions: { ...asked.permissions, issues: "read" } }),
     });
-    await refusal(mint("reviewer", api), seen, /adds contents: read/);
+    await refusal(mint("reviewer", api), seen, /adds issues: read/);
   });
 
   it("adding metadata at any level but read", async (t) => {
@@ -357,10 +361,10 @@ describe("mintToken refuses an answer", () => {
         ...granted(asked),
         expires_at: late,
         repositories: [{ name: "other", full_name: "acme/other" }],
-        permissions: { contents: "write" },
+        permissions: { issues: "write" },
       }),
     });
-    await refusal(mint("reviewer", api), seen, "acme/other", late, /lacks issues: write/, /adds contents: write/);
+    await refusal(mint("reviewer", api), seen, "acme/other", late, /lacks contents: write/, /adds issues: write/);
   });
 });
 

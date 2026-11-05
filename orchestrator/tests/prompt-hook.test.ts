@@ -10,7 +10,7 @@ import { run } from "../plugin/hooks/prompt.ts";
 import { context, PASS, type HookAnswer } from "../plugin/lib/hook-io.ts";
 import { REPO, scratchCheckout } from "./support/checkout.ts";
 import { hookDeps, hookInput, storeSessionToken } from "./support/hook-run.ts";
-import { EDITED_STATE, GITHUB_NOW, READY_STORY, storyGitHub, writes, type Story } from "./support/story.ts";
+import { GITHUB_NOW, READY_STORY, missingLedger, storyGitHub, tamperedLedger, writes, type Story } from "./support/story.ts";
 
 const { session_id: SESSION_ID } = JSON.parse(readFileSync(new URL("./fixtures/hooks/user-prompt-submit.json", import.meta.url), "utf8")) as {
   session_id: string;
@@ -109,9 +109,10 @@ describe("the UserPromptSubmit hook", () => {
       /#33/,
     ],
     ["no merged spec PR", { ...READY_STORY, specPrs: [] }, ["comment <!-- codeworks:orchestrator-reason spec-pr-unmerged-200 -->", "lane Blocked"], /#200/],
-    ["a held state", { ...READY_STORY, comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
-    ["a held state In progress", { ...READY_STORY, lane: "In progress", comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
-    ["a held state In review", { ...READY_STORY, lane: "In review", comments: [EDITED_STATE] }, ["lane Blocked"], /edited reviewer state/],
+    ["a tampered ledger", { ...READY_STORY, ledger: tamperedLedger() }, ["lane Blocked"], /tamper-[0-9a-f]{40}/],
+    ["a tampered ledger In progress", { ...READY_STORY, lane: "In progress", ledger: tamperedLedger() }, ["lane Blocked"], /tamper-[0-9a-f]{40}/],
+    ["a tampered ledger In review", { ...READY_STORY, lane: "In review", ledger: tamperedLedger() }, ["lane Blocked"], /tamper-[0-9a-f]{40}/],
+    ["no ledger branch", { ...READY_STORY, ledger: missingLedger() }, [], /has no ledger branch.*step 6/],
   ];
 
   for (const [why, story, written, reason] of refusals) {

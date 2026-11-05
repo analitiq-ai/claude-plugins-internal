@@ -1,0 +1,63 @@
+{
+  "commits": [
+    {
+      "date": "2026-10-28T09:05:00Z",
+      "files": {
+        "round.run-21.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000015\",\n    \"n\": 1,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-21\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T09:30:00Z",
+      "by": "invalid",
+      "files": {
+        "round.run-22.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000016\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-22\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+      }
+    },
+    {
+      "date": "2026-10-28T10:00:00Z",
+      "by": "clearance",
+      "remove": [
+        "round.run-22.json"
+      ]
+    },
+    {
+      "date": "2026-10-28T10:45:00Z",
+      "files": {
+        "release.tamper-6e6f725efea73c819aa8b96864922d1c07dc293f.json": "{\n  \"kind\": \"release\",\n  \"release\": {\n    \"id\": \"tamper-6e6f725efea73c819aa8b96864922d1c07dc293f\",\n    \"released\": \"2026-10-28T10:45:00Z\",\n    \"released_by\": {\n      \"comment\": 201,\n      \"reset\": false\n    },\n    \"since\": null\n  },\n  \"v\": 1\n}\n"
+      }
+    }
+  ],
+  "snapshot": {
+    "v": 1,
+    "rounds": [
+      {
+        "stage": "INTERNAL",
+        "n": 1,
+        "run": "run-21",
+        "head": "0000000000000000000000000000000000000015",
+        "result": "CLEAN",
+        "verdict": null,
+        "root_cause": null,
+        "at": "2026-10-28T09:00:00Z"
+      }
+    ],
+    "holds": [],
+    "pushbacks": [],
+    "rulings": [],
+    "gates": null
+  },
+  "tamper": [
+    {
+      "id": "tamper-6e6f725efea73c819aa8b96864922d1c07dc293f",
+      "commit": "6e6f725efea73c819aa8b96864922d1c07dc293f",
+      "at": "2026-10-28T09:30:00Z",
+      "remaining": [],
+      "released": "2026-10-28T10:45:00Z",
+      "released_by": {
+        "comment": 201,
+        "reset": false
+      },
+      "releasable": null
+    }
+  ]
+}

@@ -89,8 +89,9 @@ describe("tokens.ts's permission sets against SECURITY.md §3", () => {
   });
 
   it("reads the level §3 writes, so a changed level differs from tokens.ts's", () => {
-    const changed = markdown.replace("| issues: write | none |", "| issues: read | none |");
+    const changed = markdown.replace("| contents: write | none |", "| contents: read | none |");
     assert.notEqual(changed, markdown, "§3's reviewer row changed: the fixture edit no longer applies");
-    assert.deepEqual(section3Sets(changed).reviewer, { issues: "read" });
+    assert.deepEqual(section3Sets(changed).reviewer, { contents: "read" });
+    assert.notDeepEqual(section3Sets(changed).reviewer, APP_PERMISSIONS.reviewer);
   });
 });

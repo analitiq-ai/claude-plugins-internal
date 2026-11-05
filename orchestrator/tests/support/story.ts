@@ -1,5 +1,7 @@
+import { event, eventCommit, fakeLedger, invalidCommit, type FakeLedger } from "../../../core/tests/fixtures/state/ledger.ts";
 import { fakeGitHub, type FakeCall, type FakeGitHub } from "../../../core/tests/support/fake-github.ts";
 import type { Shared } from "../../plugin/core/settings.ts";
+import { round } from "../../../core/tests/fixtures/state/issue.ts";
 import type { IssueComment } from "../../plugin/core/state.ts";
 import { Lane } from "../../plugin/core/values.ts";
 import { BOARD, contentsAnswer, ORCHESTRATOR_LOGIN, SESSION_LOGIN, SETTINGS } from "./checkout.ts";
@@ -31,7 +33,16 @@ export type Story = {
   subIssues: number[];
   doneIssues: number[];
   comments: IssueComment[];
+  /** The repository's `ledger` branch. */
+  ledger: FakeLedger;
 };
+
+/** A `ledger` that holds another story's round and nothing of this one's. */
+export function quietLedger(): FakeLedger {
+  const ledger = fakeLedger();
+  eventCommit(ledger, [event.round(round(1))], { issue: 7 });
+  return ledger;
+}
 
 export const READY_STORY: Story = {
   story: 212,
@@ -42,17 +53,20 @@ export const READY_STORY: Story = {
   subIssues: [],
   doneIssues: [201],
   comments: [],
+  ledger: quietLedger(),
 };
 
-/** A reviewer state comment edited since it was posted, which core reads as tampered: held, and not startable. */
-export const EDITED_STATE: IssueComment = {
-  databaseId: 900,
-  author: { __typename: "Bot", login: "codeworks-reviewer" },
-  body: "<!-- codeworks:reviewer-state -->\n{}",
-  createdAt: "2026-10-29T10:00:00Z",
-  lastEditedAt: "2026-10-29T11:00:00Z",
-  url: "https://github.com/acme/widgets/issues/212#issuecomment-900",
-};
+/** A repository with no `ledger` branch: setup step 6 never ran. */
+export function missingLedger(): FakeLedger {
+  return fakeLedger({ exists: false });
+}
+
+/** A `ledger` with an unsigned commit to story 212. */
+export function tamperedLedger(): FakeLedger {
+  const ledger = quietLedger();
+  invalidCommit(ledger, { put: { "round.run-1.json": "{}\n" } });
+  return ledger;
+}
 
 const optionId = (lane: Lane) => `option-${lane}`;
 
@@ -76,8 +90,10 @@ const isStory = (story: Story) => (vars: Record<string, unknown>) =>
 export function storyGitHub(story: Story, overrides: { moveCard?: unknown } = {}): FakeGitHub {
   const ofStory = isStory(story);
   const p = story.parent ?? story.story;
+  const ledger = story.ledger.readRoutes();
   return fakeGitHub({
     graphql: [
+      ...ledger.graphql,
       { when: (query) => query.includes("{ repository(owner: $owner, name: $name) { id } }"), answer: { repository: { id: REPO_ID } } },
       {
         when: (query, vars) => query.includes("parent {") && ofStory(vars),
@@ -109,7 +125,7 @@ export function storyGitHub(story: Story, overrides: { moveCard?: unknown } = {}
         answer: story.lane === null ? [] : [{ project: { url: BOARD } }],
       },
       { when: (query, vars) => query.includes("comments(") && ofStory(vars), answer: story.comments },
-      { when: (query, vars) => query.includes("COMMENT_DELETED_EVENT") && ofStory(vars), answer: [] },
+      { when: (query, vars) => query.includes("PROJECT_V2_ITEM_STATUS_CHANGED_EVENT") && ofStory(vars), answer: [] },
       {
         when: (query) => query.includes("CLOSED_EVENT"),
         answer: ({ vars }: { vars: Record<string, unknown> }) => (story.doneIssues.includes(vars.number as number) ? doneTimeline(vars.number as number) : []),
@@ -120,7 +136,9 @@ export function storyGitHub(story: Story, overrides: { moveCard?: unknown } = {}
         when: (query, vars) => query.includes("pullRequests(headRefName:") && vars.branch === `${p}-spec`,
         answer: story.specPrs.map((pr) => ({ ...pr, headRefName: `${p}-spec`, headRefOid: "a".repeat(40), isCrossRepository: false })),
       },
+      ...ledger.graphqlPages,
     ],
+    restPagesMatching: ledger.restPagesMatching,
     rest: {
       "GET /repos/acme/widgets": { default_branch: "main" },
       "GET /repos/acme/widgets/contents/codeworks.toml?ref=main": contentsAnswer(SETTINGS),

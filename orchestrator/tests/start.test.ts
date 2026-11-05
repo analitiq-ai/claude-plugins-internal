@@ -6,28 +6,44 @@ import type { StateReading } from "../plugin/core/state.ts";
 import type { Lane } from "../plugin/core/values.ts";
 import { decideStart, gatherStartFacts, type CardFacts, type StartDecision } from "../plugin/lib/start.ts";
 import { REPO } from "./support/checkout.ts";
-import { EDITED_STATE, READY_STORY, SHARED, storyGitHub } from "./support/story.ts";
+import { READY_STORY, SHARED, storyGitHub, tamperedLedger } from "./support/story.ts";
 
 const S = 212;
 
 const NO_STATE: StateReading = {
+  head: "c".repeat(40),
   snapshot: null,
-  comment_url: null,
-  rebuilt: false,
   held: false,
   causes: [],
+  tamper: [],
   newest_round: null,
   pushed_back: new Map(),
   releasable: [],
-  tamper_released: false,
   startable: true,
   reset: null,
 };
 
+const TAMPER_COMMIT = "d".repeat(40);
+const LEFT_ON_LEDGER = "issues/212/round.run-2.json";
+
 const HELD: StateReading = {
   ...NO_STATE,
   held: true,
-  causes: [{ cause: "tampered" }, { cause: "open_hold", id: "h1" }],
+  causes: [
+    { cause: "tampered", id: `tamper-${TAMPER_COMMIT}`, commit: TAMPER_COMMIT, remaining: [LEFT_ON_LEDGER] },
+    { cause: "open_hold", id: "h1" },
+  ],
+  tamper: [
+    {
+      id: `tamper-${TAMPER_COMMIT}`,
+      commit: TAMPER_COMMIT,
+      at: "2026-10-29T11:00:00Z",
+      remaining: [LEFT_ON_LEDGER],
+      released: null,
+      released_by: null,
+      releasable: null,
+    },
+  ],
   startable: false,
 };
 
@@ -75,9 +91,22 @@ describe("decideStart", () => {
       assert.equal(decision.blocked, true);
       assert.equal(decision.key, null);
       assert.match(decision.reason, /h1/);
-      assert.match(decision.reason, /edited/);
     });
   }
+
+  it("names a tamper by its id and the files it left on ledger, with an admin's deletion of them as its release", () => {
+    const { reason } = refusal(decide({ state: HELD }));
+    assert.ok(reason.includes(`tamper-${TAMPER_COMMIT}`), reason);
+    assert.ok(reason.includes(LEFT_ON_LEDGER), reason);
+    assert.match(reason, /admin deletes .*from ledger/);
+  });
+
+  it("names a tamper that left no file on ledger by its id, with no deletion to make", () => {
+    const cleared: StateReading = { ...HELD, causes: [{ cause: "tampered", id: `tamper-${TAMPER_COMMIT}`, commit: TAMPER_COMMIT, remaining: [] }] };
+    const { reason } = refusal(decide({ state: cleared }));
+    assert.ok(reason.includes(`tamper-${TAMPER_COMMIT}`), reason);
+    assert.doesNotMatch(reason, /delet/);
+  });
 
   it("refuses a Ready story that is not startable, moving it to Blocked with no comment and naming the holds", () => {
     const decision = refusal(decide({ state: HELD }));
@@ -178,7 +207,7 @@ describe("gatherStartFacts", () => {
   });
 
   it("reads the state once, held when core reads it so", async () => {
-    const client = storyGitHub({ ...READY_STORY, comments: [EDITED_STATE] });
+    const client = storyGitHub({ ...READY_STORY, ledger: tamperedLedger() });
     const facts = (await gatherStartFacts(client, REPO, 212, SHARED)) as CardFacts;
     assert.deepEqual([facts.state.held, facts.state.startable], [true, false]);
     assert.equal(stateReads(client), 1);

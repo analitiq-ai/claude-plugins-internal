@@ -1,0 +1,805 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "round",
+          "type": "string"
+        },
+        "round": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+              "type": "string"
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "n": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "result": {
+              "enum": [
+                "CLEAN",
+                "DIRTY",
+                "INCOMPLETE"
+              ],
+              "type": "string"
+            },
+            "root_cause": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "AT_CAUSE",
+                    "AT_SYMPTOM",
+                    "SPEC_WRONG",
+                    "CANNOT_TELL",
+                    "NOT_APPLICABLE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "run": {
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "INTERNAL",
+                "AUDIT",
+                "GITHUB"
+              ],
+              "type": "string"
+            },
+            "verdict": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PATCH",
+                    "CLASS_FIX",
+                    "REDESIGN",
+                    "RESCOPE",
+                    "CONVERGED_PUSHBACK",
+                    "ESCALATE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "stage",
+            "n",
+            "run",
+            "head",
+            "result",
+            "verdict",
+            "root_cause",
+            "at"
+          ],
+          "type": "object"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "round"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "ruling",
+          "type": "string"
+        },
+        "ruling": {
+          "additionalProperties": false,
+          "properties": {
+            "commits": {
+              "items": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "key": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "latest_trusted_comment_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reply": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "round": {
+              "additionalProperties": false,
+              "properties": {
+                "n": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "stage": {
+                  "enum": [
+                    "INTERNAL",
+                    "AUDIT",
+                    "GITHUB"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "stage",
+                "n"
+              ],
+              "type": "object"
+            },
+            "ruling": {
+              "enum": [
+                "FIX",
+                "PUSH_BACK",
+                "DEFER",
+                "ESCALATE"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "round",
+            "ruling",
+            "latest_trusted_comment_id",
+            "reply",
+            "commits"
+          ],
+          "type": "object"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "ruling"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "const": "ruling-commit",
+          "type": "string"
+        },
+        "round": {
+          "additionalProperties": false,
+          "properties": {
+            "n": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "stage": {
+              "enum": [
+                "INTERNAL",
+                "AUDIT",
+                "GITHUB"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "stage",
+            "n"
+          ],
+          "type": "object"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "round",
+        "key",
+        "commit"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "pushback",
+          "type": "string"
+        },
+        "pushback": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "round": {
+              "additionalProperties": false,
+              "properties": {
+                "n": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "stage": {
+                  "enum": [
+                    "INTERNAL",
+                    "AUDIT",
+                    "GITHUB"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "stage",
+                "n"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "key",
+            "round"
+          ],
+          "type": "object"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "pushback"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "hold": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "rescope",
+                "escalation",
+                "pushback",
+                "claim",
+                "shim",
+                "audit"
+              ],
+              "type": "string"
+            },
+            "question": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "since": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+              "type": "string"
+            },
+            "spec_pr": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "since",
+            "question",
+            "spec_pr"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "const": "hold",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "hold"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "release",
+          "type": "string"
+        },
+        "release": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "type": "string"
+            },
+            "released": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+              "type": "string"
+            },
+            "released_by": {
+              "additionalProperties": false,
+              "properties": {
+                "comment": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                },
+                "reset": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "comment",
+                "reset"
+              ],
+              "type": "object"
+            },
+            "since": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "since",
+            "released",
+            "released_by"
+          ],
+          "type": "object"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "release"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "gates": {
+          "additionalProperties": false,
+          "properties": {
+            "anchor": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "branch": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "bugs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "absorbed": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+                          "type": "string"
+                        },
+                        "tree": {
+                          "pattern": "^[0-9a-f]{40}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tree",
+                        "at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "deep": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "callers": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "does": {
+                                  "type": "string"
+                                },
+                                "file": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "function": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "line": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "file",
+                                "line",
+                                "function",
+                                "does"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "same_operation": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "does": {
+                                  "type": "string"
+                                },
+                                "file": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "function": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "line": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "file",
+                                "line",
+                                "function",
+                                "does"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "same_operation",
+                          "callers"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "members": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+                          "type": "string"
+                        },
+                        "tree": {
+                          "pattern": "^[0-9a-f]{40}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tree",
+                        "at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "ranges": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "file": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "old_count": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "old_start": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "file",
+                        "old_start",
+                        "old_count"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "rulings": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "issue": {
+                          "anyOf": [
+                            {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "ruling": {
+                          "enum": [
+                            "SHARES",
+                            "NOT_SHARED",
+                            "DEFERRED"
+                          ],
+                          "type": "string"
+                        },
+                        "site": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "site",
+                        "ruling",
+                        "issue"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "id",
+                  "members",
+                  "absorbed",
+                  "ranges",
+                  "deep",
+                  "rulings"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "lineages": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "chain": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:Z))$",
+                          "type": "string"
+                        },
+                        "claim": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "line": {
+                          "maximum": 9007199254740991,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "ref": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "ruling": {
+                          "enum": [
+                            "CORRECT",
+                            "WRONG",
+                            "UNSURE"
+                          ],
+                          "type": "string"
+                        },
+                        "words": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "claim",
+                        "line",
+                        "words",
+                        "ruling",
+                        "at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "file": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "places": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "claim": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "end": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "start": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end",
+                        "claim"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "id",
+                  "file",
+                  "places",
+                  "chain"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "branch",
+            "anchor",
+            "lineages",
+            "bugs"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "const": "gates",
+          "type": "string"
+        },
+        "ref": {
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "v",
+        "ref",
+        "gates"
+      ],
+      "type": "object"
+    }
+  ]
+}

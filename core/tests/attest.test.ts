@@ -7,7 +7,7 @@ import { after, before, describe, it } from "node:test";
 import { attests, governingDiff, passingRounds, releasedByComment } from "../src/attest.ts";
 import type { Hold, Round, Snapshot } from "../src/contracts/snapshot.ts";
 import { GitFailed, runGit } from "../src/git.ts";
-import type { StateCause } from "../src/state.ts";
+import type { StateCause, Tamper } from "../src/state.ts";
 
 const SPEC = "specs/212-widgets";
 const COMMITTER = ["-c", "user.name=Dummy Author", "-c", "user.email=dummy@example.invalid"];
@@ -22,7 +22,7 @@ function sha(n: number): string {
 }
 
 function round(fields: Partial<Round> = {}): Round {
-  return { stage: "INTERNAL", n: 1, head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), ...fields };
+  return { stage: "INTERNAL", n: 1, run: "run-1", head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), ...fields };
 }
 
 function releasedHold(fields: Partial<Hold> = {}): Hold {
@@ -40,11 +40,24 @@ function releasedHold(fields: Partial<Hold> = {}): Hold {
 }
 
 function snapshot(rounds: Round[], holds: Hold[] = []): Snapshot {
-  return { v: 1, rounds, holds, pushbacks: [], rulings: [] };
+  return { v: 1, rounds, holds, pushbacks: [], rulings: [], gates: null };
 }
 
-function reading(state: Snapshot | null, causes: StateCause[] = []) {
-  return { snapshot: state, held: causes.length > 0, causes };
+function reading(state: Snapshot | null, causes: StateCause[] = [], tamper: Tamper[] = []) {
+  return { snapshot: state, held: causes.length > 0, causes, tamper };
+}
+
+function releasedTamper(fields: Partial<Tamper> = {}): Tamper {
+  return {
+    id: `tamper-${sha(99)}`,
+    commit: sha(99),
+    at: at("09:30"),
+    remaining: [],
+    released: at("10:05"),
+    released_by: { comment: 9002, reset: false },
+    releasable: null,
+    ...fields,
+  };
 }
 
 describe("passingRounds", () => {
@@ -172,23 +185,29 @@ describe("releasedByComment", () => {
 
   it("names a hold released by a comment after the round's at", () => {
     const hold = releasedHold({ released: at("10:01") });
-    assert.deepEqual(releasedByComment(snapshot([atTen], [hold]), atTen), hold);
+    assert.deepEqual(releasedByComment([hold], atTen), hold);
   });
 
-  it("names none for a hold released by a reset", () => {
-    const hold = releasedHold({ released: at("10:01"), released_by: { comment: 9001, reset: true } });
-    assert.equal(releasedByComment(snapshot([atTen], [hold]), atTen), null);
+  it("names a tamper released by a comment after the round's at", () => {
+    const tamper = releasedTamper({ released: at("10:01") });
+    assert.deepEqual(releasedByComment([tamper], atTen), tamper);
+  });
+
+  it("names none for a hold or a tamper released by a reset", () => {
+    const reset = { comment: 9001, reset: true };
+    assert.equal(releasedByComment([releasedHold({ released: at("10:01"), released_by: reset })], atTen), null);
+    assert.equal(releasedByComment([releasedTamper({ released: at("10:01"), released_by: reset })], atTen), null);
   });
 
   it("names none for a release in the round's second or before it", () => {
     for (const released of [at("10:00"), at("09:59")]) {
-      assert.equal(releasedByComment(snapshot([atTen], [releasedHold({ released })]), atTen), null, released);
+      assert.equal(releasedByComment([releasedHold({ released }), releasedTamper({ released })], atTen), null, released);
     }
   });
 
-  it("names none for an open hold", () => {
+  it("names none for an open hold or an unreleased tamper", () => {
     const open = releasedHold({ state: "OPEN", since: at("10:30"), released: null, released_by: null });
-    assert.equal(releasedByComment(snapshot([atTen], [open]), atTen), null);
+    assert.equal(releasedByComment([open, releasedTamper({ released: null, released_by: null })], atTen), null);
   });
 });
 
@@ -395,6 +414,12 @@ describe("attests, in a scratch repository", () => {
     assert.match(answer.reason ?? "", /pushback-212/);
   });
 
+  it("does not attest after a tamper released by a comment after A's round, naming the tamper", async () => {
+    const answer = await attests(repo, reading(snapshot([cleanAtA()]), [], [releasedTamper()]), commits.b, "main", SPEC);
+    assert.equal(answer.attested, false);
+    assert.match(answer.reason ?? "", new RegExp(`tamper-${sha(99)}`));
+  });
+
   it("attests after a hold released by a reset", async () => {
     const state = snapshot([cleanAtA()], [releasedHold({ released: at("10:05"), released_by: { comment: 9001, reset: true } })]);
     assert.deepEqual(await attests(repo, reading(state), commits.b, "main", SPEC), { attested: true, reason: null });
@@ -410,6 +435,14 @@ describe("attests, in a scratch repository", () => {
     );
     assert.equal(answer.attested, false);
     assert.match(answer.reason ?? "", /escalation-212/);
+  });
+
+  it("does not attest a tampered story, naming the tamper and the files it left", async () => {
+    const tampered: StateCause = { cause: "tampered", id: `tamper-${sha(99)}`, commit: sha(99), remaining: ["issues/212/round.run-2.json"] };
+    const answer = await attests(repo, reading(snapshot([cleanAtA()]), [tampered]), commits.b, "main", SPEC);
+    assert.equal(answer.attested, false);
+    assert.match(answer.reason ?? "", new RegExp(`tamper-${sha(99)}`));
+    assert.match(answer.reason ?? "", /issues\/212\/round\.run-2\.json/);
   });
 
   it("does not attest with no state", async () => {

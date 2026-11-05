@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FindingSource } from "../values.ts";
-import { setExactlyWhen } from "./snapshot.ts";
+import { setExactlyWhen } from "./refinements.ts";
 
 // Only trusted reviewers' comments are carried, so a brief never holds text from anyone else (reviewer ADR-0016 d2).
 export const TrustedComment = z.strictObject({ id: z.string(), author: z.string(), body: z.string() });

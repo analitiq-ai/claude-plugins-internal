@@ -1,25 +1,52 @@
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import { z } from "zod";
 
-import { Snapshot, Time, type Hold, type Round, type RoundId, type Ruling } from "./contracts/snapshot.ts";
-import { Actor, answerOf, assertIssueNumber, isWriterRole, ownerAndName, restLogin, roleOf, USER_TYPE, type GitHubClient } from "./github.ts";
+import { chainEntryKey, Gates } from "./contracts/gates.ts";
+import { byFileName, EVENT_KIND, eventFile, eventText, inApplyOrder, LedgerEvent } from "./contracts/ledger.ts";
+import { GitSha, NameSegment, Time } from "./contracts/scalars.ts";
+import { HoldRequest, type Hold, type Round, type RoundId, type Ruling, type Snapshot } from "./contracts/snapshot.ts";
+import {
+  Actor,
+  answerOf,
+  assertIssueNumber,
+  connectionNodes,
+  GitHubRefused,
+  GitHubUnanswered,
+  isWriterRole,
+  ownerAndName,
+  restLogin,
+  roleOf,
+  USER_TYPE,
+  type GitHubClient,
+  type Repository,
+} from "./github.ts";
+import {
+  applyEvents,
+  emptySnapshot,
+  foldStory,
+  mayClear,
+  mayHoldEvents,
+  type DerivedTamper,
+  type StoryCommit,
+  type StoryFile,
+  type StoryFold,
+} from "./ledger-fold.ts";
 import type { Shared } from "./settings.ts";
 import { HoldKind, HoldState, Lane } from "./values.ts";
 
-// The state comment's first line, byte for byte, then one json fence that ends the body.
-const STATE_TAG = "<!-- codeworks:reviewer-state -->";
-const OPENING_FENCE = "```json";
-const CLOSING_FENCE = "```";
-
-// GitHub refuses a longer comment, and trimming history to fit would drop rows, which no write may do.
-const COMMENT_LIMIT = 65_536;
+const LEDGER_BRANCH = "ledger";
 
 // For the release rule: the one command an admin resets with.
 const RESET_COMMAND = "/codeworks reset";
 
-// Times are read as `Time`, whole seconds in UTC, as GitHub writes them and core stamps them, so a snapshot's
-// `since` and a comment's `createdAt` are compared on one scale.
+function storyDir(issue: number): string {
+  return `issues/${issue}`;
+}
+
+// Times are read as `Time`, whole seconds in UTC, as GitHub writes them and core stamps them, so a hold's floor and
+// a comment's `createdAt` are compared on one scale.
 const IssueCommentNode = z.object({
   databaseId: z.int().min(1),
   author: Actor.nullable(),
@@ -30,9 +57,6 @@ const IssueCommentNode = z.object({
 });
 export type IssueComment = z.infer<typeof IssueCommentNode>;
 
-const CommentDeletionNode = z.object({ createdAt: Time, deletedCommentAuthor: Actor.nullable() });
-export type CommentDeletion = z.infer<typeof CommentDeletionNode>;
-
 // `project` is null for a project the reader cannot see, which is then no board's.
 const StatusChangeNode = z.object({
   createdAt: Time,
@@ -41,46 +65,62 @@ const StatusChangeNode = z.object({
 });
 export type StatusChange = z.infer<typeof StatusChangeNode>;
 
-const DELETED_EVENT = "CommentDeletedEvent";
-const STATUS_CHANGED_EVENT = "ProjectV2ItemStatusChangedEvent";
-
-const TimelineItem = z.discriminatedUnion("__typename", [
-  CommentDeletionNode.extend({ __typename: z.literal(DELETED_EVENT) }),
-  StatusChangeNode.extend({ __typename: z.literal(STATUS_CHANGED_EVENT) }),
-]);
-
 const ProjectItem = z.object({ project: z.object({ url: z.string() }) });
 
-/** Why a story is held. Not a value set: no component but core writes or compares one. */
-export type StateCause =
-  | { cause: "tampered" }
-  | { cause: "deleted" }
-  | { cause: "invalid"; error: string }
-  | { cause: "open_hold"; id: string };
-
-export type StateReading = {
-  /** The working snapshot every answer is over; null only when there is no state. */
-  snapshot: Snapshot | null;
-  comment_url: string | null;
-  /** The snapshot came from the newest unedited, tagged, valid comment because a tamper cause stands. */
-  rebuilt: boolean;
-  held: boolean;
-  causes: StateCause[];
-  newest_round: Round | null;
-  pushed_back: ReadonlyMap<string, RoundId>;
-  /** Each open hold a start releases, with the comment that releases it. */
-  releasable: Releasable[];
-  /** A tamper cause stands, and a Ready move and an admin's comment both follow it. */
-  tamper_released: boolean;
-  startable: boolean;
-  /** The newest admin `/codeworks reset`, from which reviewer and the orchestrator restart their counts. */
-  reset: CommentAt | null;
-};
+/** Why a story is held. A union tag, not a value set: no agent answers in it (root ADR-0010 d1). */
+export type StateCause = { cause: "tampered"; id: string; commit: string; remaining: string[] } | { cause: "open_hold"; id: string };
 
 export type CommentAt = { url: string; at: string };
 
-/** `comment.id` is the comment's `databaseId`, which the released row records. */
+/** `comment.id` is the comment's `databaseId`, which the release records. */
 export type Releasable = { id: string; comment: CommentAt & { id: number }; reset: boolean };
+
+/**
+ * An invalid commit to the story: `at` is its release floor; `remaining`, its files at the head, from the root;
+ * `released` and `released_by`, null until its release, as a hold row's are.
+ */
+export type Tamper = Pick<Hold, "released" | "released_by"> & {
+  id: string;
+  commit: string;
+  at: string;
+  remaining: string[];
+  releasable: Releasable | null;
+};
+
+/** What a reading is folded from, so a write folds its own commit onto it as a read at that commit would. */
+export type Folded = {
+  /** The commits touching the story's directory at the reading's head, oldest first. */
+  commits: StoryCommit[];
+  /** Blob to text, for every file an event commit could have added. */
+  texts: ReadonlyMap<string, string>;
+  /** Login to `role_name`, for every User commenter and every author a clearance could be by. */
+  roles: ReadonlyMap<string, string>;
+  /** Per tamper's commit, the committedDate of the first GitHub-signed commit after it on `ledger`, if one is. */
+  successors: ReadonlyMap<string, string | null>;
+  comments: IssueComment[];
+  moves: StatusChange[];
+};
+
+export type StateReading = {
+  /** The `ledger` oid the fold was read at; every write names it. */
+  head: string;
+  /** Null only when no commit touches the story's directory. */
+  snapshot: Snapshot | null;
+  held: boolean;
+  causes: StateCause[];
+  /** Oldest first. */
+  tamper: Tamper[];
+  newest_round: Round | null;
+  pushed_back: ReadonlyMap<string, RoundId>;
+  /** Each open hold the release rule releases now, with the comment that releases it. */
+  releasable: Releasable[];
+  /** Every open hold and every unreleased tamper releasable. */
+  startable: boolean;
+  /** The newest admin `/codeworks reset`, from which reviewer and the orchestrator restart their counts. */
+  reset: CommentAt | null;
+  /** Absent only from a reading built by hand, which no write takes. */
+  folded?: Folded;
+};
 
 /** The reader sees no item of the issue on `[shared] board`, so a missing Ready move would read as "no Ready". */
 export class BoardNotVisible extends Error {
@@ -90,6 +130,35 @@ export class BoardNotVisible extends Error {
     super(`the issue has no item on ${board} that this reader can see`);
     this.name = "BoardNotVisible";
     this.board = board;
+  }
+}
+
+export class LedgerMissing extends Error {
+  constructor(repo: string) {
+    super(`${repo} has no ${LEDGER_BRANCH} branch: an admin creates it with its three rulesets, as orchestrator README.md step 6 sets out`);
+    this.name = "LedgerMissing";
+  }
+}
+
+/** `ledger` moved from the reading's head, so the write committed nothing. */
+export class StateStale extends Error {
+  readonly head: string;
+
+  constructor(from: string, head: string) {
+    super(`${LEDGER_BRANCH} moved from ${from} to ${head}, so nothing was committed`);
+    this.name = "StateStale";
+    this.head = head;
+  }
+}
+
+/** The write's commit landed without GitHub's signature, so the fold takes it as a tamper. */
+export class StateWriteUnsigned extends Error {
+  readonly oid: string;
+
+  constructor(oid: string) {
+    super(`commit ${oid} on ${LEDGER_BRANCH} is not signed by GitHub, so it tampers its story`);
+    this.name = "StateWriteUnsigned";
+    this.oid = oid;
   }
 }
 
@@ -116,34 +185,6 @@ export function secondOf(time: string): number {
   return Math.floor(ms / 1000);
 }
 
-type SnapshotRead = { ok: true; snapshot: Snapshot } | { ok: false; error: string };
-
-function snapshotOf(comment: IssueComment): SnapshotRead {
-  const { body, url } = comment;
-  if (body.split("\n", 1)[0] !== STATE_TAG) return { ok: false, error: `${url}: its first line is not ${STATE_TAG}` };
-  const opening = `${STATE_TAG}\n${OPENING_FENCE}\n`;
-  const closing = [`\n${CLOSING_FENCE}\n`, `\n${CLOSING_FENCE}`].find((end) => body.endsWith(end));
-  if (!body.startsWith(opening) || closing === undefined || body.length < opening.length + closing.length) {
-    return { ok: false, error: `${url}: the tag line is not followed by one ${OPENING_FENCE} fence that ends the body` };
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(body.slice(opening.length, body.length - closing.length));
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return { ok: false, error: `${url}: the fenced text is not JSON: ${error.message}` };
-  }
-  const parsed = Snapshot.safeParse(value);
-  if (!parsed.success) {
-    return { ok: false, error: `${url}: the snapshot breaks its contract: ${z.prettifyError(parsed.error)}` };
-  }
-  return { ok: true, snapshot: parsed.data };
-}
-
-function emptySnapshot(): Snapshot {
-  return { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [] };
-}
-
 function isWriter(actor: Actor | null, writers: ReadonlySet<string>): boolean {
   return actor !== null && actor.__typename === USER_TYPE && writers.has(actor.login);
 }
@@ -152,12 +193,12 @@ function firstLine(body: string): string {
   return body.split("\n", 1)[0];
 }
 
-/** The first line of the comment the orchestrator App asks an escalation hold's question with. */
+/** The first line of the comment the orchestrator App asks a hold's question with. */
 export function questionTag(hold: Pick<Hold, "id" | "since">): string {
   return `<!-- codeworks:hold-question ${hold.id} ${hold.since} -->`;
 }
 
-// The comments and moves the release rule reads, picked once per read.
+// The comments and moves the release rule reads, picked once per reading.
 type ReleaseTerms = {
   /** Newest first. */
   adminComments: IssueComment[];
@@ -199,143 +240,93 @@ function adminCommentAfter(terms: ReleaseTerms, second: number, afterComment = 0
   return terms.adminComments.find((comment) => secondOf(comment.createdAt) > second && comment.databaseId > afterComment);
 }
 
-function releaseOf(hold: Hold, terms: ReleaseTerms): Releasable | null {
-  const since = secondOf(hold.since);
+function resetAfter(terms: ReleaseTerms, second: number): IssueComment | null {
   const { reset } = terms;
-  if (reset !== null && secondOf(reset.createdAt) > since) {
-    return { id: hold.id, comment: { id: reset.databaseId, url: reset.url, at: reset.createdAt }, reset: true };
-  }
-  if (!readyAfter(terms, since)) return null;
-  // An escalation's answer is a writer's comment after its question (orchestrator ADR-0010 d2); with no question
-  // posted, only a reset releases it.
+  return reset !== null && secondOf(reset.createdAt) > second ? reset : null;
+}
+
+function releasedBy(id: string, comment: IssueComment, reset: boolean): Releasable {
+  return { id, comment: { id: comment.databaseId, url: comment.url, at: comment.createdAt }, reset };
+}
+
+function holdRelease(hold: Hold, floor: string, terms: ReleaseTerms): Releasable | null {
+  const second = secondOf(floor);
+  const reset = resetAfter(terms, second);
+  if (reset !== null) return releasedBy(hold.id, reset, true);
+  if (!readyAfter(terms, second)) return null;
+  // An escalation, or a rescope a verdict placed, asks a question (orchestrator ADR-0010 d1), and its answer is a
+  // writer's comment after it (d2); with no question posted, only a reset releases the hold.
+  const { escalation, rescope } = HoldKind.schema.enum;
   let answeredAfter = 0;
-  if (hold.kind === HoldKind.schema.enum.escalation) {
+  if (hold.kind === escalation || (hold.kind === rescope && hold.spec_pr === null)) {
     const tag = questionTag(hold);
     const question = terms.orchestratorComments.find((comment) => firstLine(comment.body) === tag);
     if (question === undefined) return null;
     answeredAfter = question.databaseId;
   }
-  const answer = adminCommentAfter(terms, since, answeredAfter);
-  if (answer === undefined) return null;
-  return { id: hold.id, comment: { id: answer.databaseId, url: answer.url, at: answer.createdAt }, reset: false };
+  const answer = adminCommentAfter(terms, second, answeredAfter);
+  return answer === undefined ? null : releasedBy(hold.id, answer, false);
 }
 
-function newestTime(times: readonly string[]): string | null {
-  return times.reduce<string | null>((newest, time) => (newest === null || secondOf(time) > secondOf(newest) ? time : newest), null);
+// Unlike a hold's, a tamper's release needs the Ready move even for a reset (FR-024).
+function tamperRelease(id: string, at: string, terms: ReleaseTerms): Releasable | null {
+  const second = secondOf(at);
+  if (!readyAfter(terms, second)) return null;
+  const reset = resetAfter(terms, second);
+  if (reset !== null) return releasedBy(id, reset, true);
+  const answer = adminCommentAfter(terms, second);
+  return answer === undefined ? null : releasedBy(id, answer, false);
 }
 
-type Judgement = {
-  reading: StateReading;
-  /** The newest of the state comment's edit, a reviewer App deletion and the invalid comment, when any stands. */
-  tamperedAt: string | null;
-};
+function earlier(a: string, b: string | null): string {
+  return b !== null && secondOf(b) < secondOf(a) ? b : a;
+}
 
-function judge(
-  comments: readonly IssueComment[],
-  deletions: readonly CommentDeletion[],
-  moves: readonly StatusChange[],
-  writers: ReadonlySet<string>,
-  shared: Shared,
-): Judgement {
-  // Every reviewer App comment, whatever its body: an edit that removes the tag must hold the story, not hand
-  // the state to the comment before it (reviewer ADR-0011 d2).
-  const reviewerComments = comments
-    .filter((comment) => isApp(comment.author, shared.reviewer_app_login))
-    .toSorted((a, b) => b.databaseId - a.databaseId);
-  const reviewerDeletions = deletions.filter((deletion) => isApp(deletion.deletedCommentAuthor, shared.reviewer_app_login));
-  const stateComment = reviewerComments.at(0) ?? null;
-  const terms = releaseTerms(comments, moves, writers, shared);
-  const reset = terms.reset === null ? null : { url: terms.reset.url, at: terms.reset.createdAt };
+function tamperOf(derived: DerivedTamper, issue: number, folded: Folded, story: StoryFold, terms: ReleaseTerms): Tamper {
+  const { oid, committedDate } = derived.commit;
+  const successor = folded.successors.get(oid);
+  if (successor === undefined) throw new Error(`no commit after tamper ${oid} on ${LEDGER_BRANCH} was read`);
+  // An invalid commit's date is its author's to set; the first GitHub-signed commit after it, if one is, bounds it.
+  const at = earlier(committedDate, successor);
+  const remaining = derived.touched.filter((name) => story.headFiles.has(name)).map((name) => `${storyDir(issue)}/${name}`);
+  const release = story.tamperReleases.get(derived.id);
+  // While a file it left stays on `ledger`, the release rule does not reach it.
+  const releasable = release !== undefined || remaining.length > 0 ? null : tamperRelease(derived.id, at, terms);
+  return { id: derived.id, commit: oid, at, remaining, released: release?.released ?? null, released_by: release?.released_by ?? null, releasable };
+}
 
-  if (stateComment === null && reviewerDeletions.length === 0) {
-    const reading: StateReading = {
-      snapshot: null,
-      comment_url: null,
-      rebuilt: false,
-      held: false,
-      causes: [],
-      newest_round: null,
-      pushed_back: new Map(),
-      releasable: [],
-      tamper_released: false,
-      startable: true,
-      reset,
-    };
-    return { reading, tamperedAt: null };
-  }
+function holdFloor(story: StoryFold, id: string): string {
+  const floor = story.placed.get(id);
+  if (floor === undefined) throw new Error(`the fold holds no placing commit of hold ${id}`);
+  return floor;
+}
 
-  const causes: StateCause[] = [];
-  const tamperTimes: string[] = [];
-  if (stateComment !== null && stateComment.lastEditedAt !== null) {
-    causes.push({ cause: "tampered" });
-    tamperTimes.push(stateComment.lastEditedAt);
-  }
-  // A deletion in the state comment's own second may have come after it, so it holds.
-  const deleted = reviewerDeletions.some(
-    (deletion) => stateComment === null || secondOf(deletion.createdAt) >= secondOf(stateComment.createdAt),
-  );
-  if (deleted) {
-    causes.push({ cause: "deleted" });
-    tamperTimes.push(...reviewerDeletions.map((deletion) => deletion.createdAt));
-  }
-  const stateRead = stateComment === null ? null : snapshotOf(stateComment);
-  if (stateComment !== null && stateRead !== null && !stateRead.ok) {
-    causes.push({ cause: "invalid", error: stateRead.error });
-    tamperTimes.push(stateComment.createdAt);
-  }
-  const tamperedAt = newestTime(tamperTimes);
-
-  // Only tamper causes are in `causes` yet; open holds are read from the snapshot this picks.
-  const rebuilt = causes.length > 0;
-  let snapshot: Snapshot;
-  if (!rebuilt && stateRead?.ok) {
-    snapshot = stateRead.snapshot;
-  } else {
-    // The release path posts this snapshot, so it is never one that could have been tampered with.
-    const fallback = reviewerComments
-      .filter((comment) => comment.lastEditedAt === null)
-      .map(snapshotOf)
-      .find((read) => read.ok);
-    snapshot = fallback?.ok ? fallback.snapshot : emptySnapshot();
-  }
-
-  const openHolds = snapshot.holds.filter((hold) => hold.state === HoldState.schema.enum.OPEN);
-  for (const hold of openHolds) causes.push({ cause: "open_hold", id: hold.id });
-  // The start is decided and the release written over this one snapshot, so neither acts on rows the
-  // other did not judge.
-  const releasable = openHolds.map((hold) => releaseOf(hold, terms)).filter((release) => release !== null);
-  const tamperReleased =
-    tamperedAt !== null && readyAfter(terms, secondOf(tamperedAt)) && adminCommentAfter(terms, secondOf(tamperedAt)) !== undefined;
-
-  const reading: StateReading = {
+// The one place a reading is built, for readState and for every write's commit alike.
+function readingOf(head: string, issue: number, folded: Folded, story: StoryFold, shared: Shared): StateReading {
+  const writers = new Set([...folded.roles].flatMap(([login, role]) => (isWriterRole(role) ? [login] : [])));
+  const terms = releaseTerms(folded.comments, folded.moves, writers, shared);
+  const snapshot = folded.commits.length === 0 ? null : story.snapshot;
+  const openHolds = (snapshot?.holds ?? []).filter((row) => row.state === HoldState.schema.enum.OPEN);
+  const releasable = openHolds.flatMap((row) => holdRelease(row, holdFloor(story, row.id), terms) ?? []);
+  const tamper = story.tampers.map((derived) => tamperOf(derived, issue, folded, story, terms));
+  const causes: StateCause[] = [
+    ...unreleased(tamper).map(({ id, commit, remaining }): StateCause => ({ cause: "tampered", id, commit, remaining })),
+    ...openHolds.map((row): StateCause => ({ cause: "open_hold", id: row.id })),
+  ];
+  return {
+    head,
     snapshot,
-    comment_url: stateComment?.url ?? null,
-    rebuilt,
     held: causes.length > 0,
     causes,
-    newest_round: snapshot.rounds.at(-1) ?? null,
-    // Pushbacks are appended, so a key pushed back again is named by its newest round.
-    pushed_back: new Map(snapshot.pushbacks.map((pushback) => [pushback.key, pushback.round])),
+    tamper,
+    newest_round: snapshot?.rounds.at(-1) ?? null,
+    // A key pushed back more than once is named by its last pushback's round.
+    pushed_back: new Map((snapshot?.pushbacks ?? []).map((pushback) => [pushback.key, pushback.round])),
     releasable,
-    tamper_released: tamperReleased,
-    startable: (tamperedAt === null || tamperReleased) && releasable.length === openHolds.length,
-    reset,
+    startable: unreleased(tamper).every((each) => each.releasable !== null) && releasable.length === openHolds.length,
+    reset: terms.reset === null ? null : { url: terms.reset.url, at: terms.reset.createdAt },
+    folded,
   };
-  return { reading, tamperedAt };
-}
-
-/**
- * The one answer every reader and writer of a story's state acts on. Pure: GitHub is read by the caller,
- * `writers` included, the logins whose role on the repository is a writer's.
- */
-export function stateFrom(
-  comments: readonly IssueComment[],
-  deletions: readonly CommentDeletion[],
-  moves: readonly StatusChange[],
-  writers: ReadonlySet<string>,
-  shared: Shared,
-): StateReading {
-  return judge(comments, deletions, moves, writers, shared).reading;
 }
 
 const COMMENTS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
@@ -352,12 +343,8 @@ const COMMENTS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $c
 const TIMELINE_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
-      timelineItems(itemTypes: [COMMENT_DELETED_EVENT, PROJECT_V2_ITEM_STATUS_CHANGED_EVENT], first: 100, after: $cursor) {
-        nodes {
-          __typename
-          ... on ${DELETED_EVENT} { createdAt deletedCommentAuthor { __typename login } }
-          ... on ${STATUS_CHANGED_EVENT} { createdAt status project { url } }
-        }
+      timelineItems(itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT], first: 100, after: $cursor) {
+        nodes { ... on ProjectV2ItemStatusChangedEvent { createdAt status project { url } } }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -382,50 +369,238 @@ export async function issueComments(reader: GitHubClient, repo: string, issue: n
   return answerOf(z.array(IssueCommentNode), pages, `the comments of ${repo}#${issue}`);
 }
 
-// Every read and write of a story's state starts here, so one check covers the issue each of them asks about.
-async function judgeIssue(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<Judgement> {
-  assertIssueNumber(issue);
+// The issue's status moves on every project the reader sees, refused when it sees no item of the issue on the board.
+async function boardMoves(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<StatusChange[]> {
   const where = { ...ownerAndName(repo), number: issue };
-  const [comments, timelineNodes, itemNodes] = await Promise.all([
-    issueComments(reader, repo, issue),
+  const [timelineNodes, itemNodes] = await Promise.all([
     reader.graphqlPages(TIMELINE_QUERY, where, ["repository", "issue", "timelineItems"]),
     reader.graphqlPages(PROJECT_ITEMS_QUERY, where, ["repository", "issue", "projectItems"]),
   ]);
-  const timeline = answerOf(z.array(TimelineItem), timelineNodes, `the timeline of ${repo}#${issue}`);
   const items = answerOf(z.array(ProjectItem), itemNodes, `the project items of ${repo}#${issue}`);
-
   if (!items.some((item) => item.project.url === shared.board)) throw new BoardNotVisible(shared.board);
+  return answerOf(z.array(StatusChangeNode), timelineNodes, `the timeline of ${repo}#${issue}`);
+}
 
-  // The role, not `authorAssociation`: GitHub hides a private org membership from an App's token, so a member's
-  // comment reads as CONTRIBUTOR to it (orchestrator ADR-0010 d2).
-  const commenters = new Set(comments.flatMap((comment) => (comment.author?.__typename === USER_TYPE ? [comment.author.login] : [])));
-  const roles = await Promise.all([...commenters].map(async (login) => [login, await roleOf(reader, where, login)] as const));
-  const writers = new Set(roles.flatMap(([login, role]) => (isWriterRole(role) ? [login] : [])));
-
-  const deletions: CommentDeletion[] = [];
-  const moves: StatusChange[] = [];
-  for (const item of timeline) {
-    if (item.__typename === DELETED_EVENT) deletions.push(item);
-    else moves.push(item);
+const LEDGER_REF_QUERY = `query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    ref(qualifiedName: "refs/heads/${LEDGER_BRANCH}") { target { oid } }
   }
-  return judge(comments, deletions, moves, writers, shared);
+}`;
+
+const LedgerRef = z.object({ repository: z.object({ ref: z.object({ target: z.object({ oid: GitSha }) }).nullable() }) });
+
+async function ledgerHead(reader: GitHubClient, repo: string): Promise<string> {
+  const answer = answerOf(LedgerRef, await reader.graphql(LEDGER_REF_QUERY, ownerAndName(repo)), `the ${LEDGER_BRANCH} ref of ${repo}`);
+  if (answer.repository.ref === null) throw new LedgerMissing(repo);
+  return answer.repository.ref.target.oid;
 }
 
-/** `reader` reads issues and the board: the session App's or the orchestrator App's client. */
+const DIRECTORY = "file(path: $path) { object { ... on Tree { entries { name oid } } } }";
+const SIGNATURE = "signature { isValid wasSignedByGitHub }";
+const HISTORY_PATH = ["repository", "object", "history"];
+
+const STORY_HISTORY_QUERY = `query($owner: String!, $name: String!, $head: GitObjectID!, $path: String!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $head) {
+      ... on Commit {
+        history(first: 100, after: $cursor, path: $path) {
+          nodes { oid committedDate ${SIGNATURE} ${DIRECTORY} parents(first: 1) { nodes { ${DIRECTORY} } } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+}`;
+
+const BRANCH_HISTORY_QUERY = `query($owner: String!, $name: String!, $head: GitObjectID!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $head) {
+      ... on Commit {
+        history(first: 100, after: $cursor) {
+          nodes { oid committedDate ${SIGNATURE} }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+}`;
+
+const TOUCHED_QUERY = `query($owner: String!, $name: String!, $from: GitObjectID!, $to: GitObjectID!, $path: String!) {
+  repository(owner: $owner, name: $name) {
+    from: object(oid: $from) { ... on Commit { history(first: 1, path: $path) { nodes { oid } } } }
+    to: object(oid: $to) { ... on Commit { history(first: 1, path: $path) { nodes { oid } } } }
+  }
+}`;
+
+const Signature = z.object({ isValid: z.boolean(), wasSignedByGitHub: z.boolean() }).nullable();
+type Signature = z.infer<typeof Signature>;
+
+function isSigned(signature: Signature): boolean {
+  return signature !== null && signature.isValid && signature.wasSignedByGitHub;
+}
+
+// Null where the directory has no entry, as git keeps no empty tree.
+const Directory = z.object({ object: z.object({ entries: z.array(z.object({ name: z.string(), oid: GitSha })) }) }).nullable();
+type Directory = z.infer<typeof Directory>;
+
+const StoryHistoryNode = z.object({
+  oid: GitSha,
+  committedDate: Time,
+  signature: Signature,
+  file: Directory,
+  parents: z.object({ nodes: z.array(z.object({ file: Directory })).max(1) }),
+});
+type StoryHistoryNode = z.infer<typeof StoryHistoryNode>;
+
+const BranchNode = z.object({ oid: GitSha, committedDate: Time, signature: Signature });
+
+const RestCommit = z.object({ sha: GitSha, author: z.object({ login: z.string() }).nullable() });
+
+function entriesOf(directory: Directory): Map<string, string> {
+  return new Map((directory?.object.entries ?? []).map(({ name, oid }) => [name, oid]));
+}
+
+function byName(a: StoryFile, b: StoryFile): number {
+  return byFileName(a.name, b.name);
+}
+
+function storyCommitOf(node: StoryHistoryNode, author: string | null): StoryCommit {
+  const after = entriesOf(node.file);
+  const before = entriesOf(node.parents.nodes[0]?.file ?? null);
+  const files = [...after].map(([name, blob]) => ({ name, blob }));
+  return {
+    oid: node.oid,
+    committedDate: node.committedDate,
+    signed: isSigned(node.signature),
+    author,
+    added: files.filter(({ name }) => !before.has(name)).toSorted(byName),
+    changed: files.filter(({ name, blob }) => before.has(name) && before.get(name) !== blob).toSorted(byName),
+    removed: [...before.keys()].filter((name) => !after.has(name)).toSorted(byFileName),
+  };
+}
+
+// GraphQL names no App's login on a commit, so each author is REST's; the two lists must be one.
+async function storyCommits(reader: GitHubClient, repo: string, issue: number, head: string): Promise<StoryCommit[]> {
+  const repository = ownerAndName(repo);
+  const dir = storyDir(issue);
+  const query = new URLSearchParams({ sha: head, path: dir, per_page: "100" });
+  const [nodes, listed] = await Promise.all([
+    reader.graphqlPages(STORY_HISTORY_QUERY, { ...repository, head, path: dir }, HISTORY_PATH),
+    reader.restPages(`/repos/${repository.owner}/${repository.name}/commits?${query}`),
+  ]);
+  const history = answerOf(z.array(StoryHistoryNode), nodes, `GraphQL's history of ${dir} on ${LEDGER_BRANCH} at ${head}`);
+  const authors = answerOf(z.array(RestCommit), listed, `REST's commit list of ${dir} on ${LEDGER_BRANCH} at ${head}`);
+  const graphqlOids = history.map(({ oid }) => oid);
+  const restOids = authors.map(({ sha }) => sha);
+  if (!isDeepStrictEqual(graphqlOids, restOids)) {
+    throw new Error(
+      `GitHub lists different commits touching ${dir} at ${head}: GraphQL [${graphqlOids.join(", ")}], REST [${restOids.join(", ")}]`,
+    );
+  }
+  return history.map((node, i) => storyCommitOf(node, authors[i].author?.login ?? null)).toReversed();
+}
+
+// Anything not a Blob, such as a tree, has no text, so the commit adding it holds no event.
+const BlobAnswer = z.union([
+  z.strictObject({ text: z.string().nullable(), isTruncated: z.boolean(), isBinary: z.boolean().nullable() }),
+  z.strictObject({}),
+]);
+
+// Null for a binary or a non-Blob, neither of which is an event's text. A text GitHub does not give whole is unread, so
+// it fails the read rather than make the commit invalid.
+function blobText(answer: z.infer<typeof BlobAnswer> | null, blob: string, where: string): string | null {
+  if (answer === null) throw new GitHubUnanswered(`GitHub has no object ${blob} in ${where}`);
+  if (!("text" in answer) || answer.isBinary === true) return null;
+  if (answer.isTruncated) throw new GitHubUnanswered(`GitHub truncated the text of blob ${blob} in ${where}`);
+  if (answer.text === null) throw new GitHubUnanswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
+  return answer.text;
+}
+
+async function blobTexts(reader: GitHubClient, repo: string, blobs: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(blobs)];
+  if (unique.length === 0) return new Map();
+  const aliases = unique.map((_, i) => `b${i}`);
+  const query = `query($owner: String!, $name: String!, ${aliases.map((alias) => `$${alias}: GitObjectID!`).join(", ")}) {
+  repository(owner: $owner, name: $name) {
+    ${aliases.map((alias) => `${alias}: object(oid: $${alias}) { ... on Blob { text isTruncated isBinary } }`).join("\n    ")}
+  }
+}`;
+  const vars = Object.fromEntries(aliases.map((alias, i) => [alias, unique[i]]));
+  const where = `${repo}'s ${LEDGER_BRANCH}`;
+  const Blobs = z.object({ repository: z.record(z.string(), BlobAnswer.nullable()) });
+  const answer = answerOf(Blobs, await reader.graphql(query, { ...ownerAndName(repo), ...vars }), `the blobs of ${where}`);
+  return new Map(
+    aliases.flatMap((alias, i) => {
+      const text = blobText(answer.repository[alias] ?? null, unique[i], where);
+      return text === null ? [] : [[unique[i], text] as const];
+    }),
+  );
+}
+
+// The role, not `authorAssociation`: GitHub hides a private org membership from an App's token, so a member's
+// comment reads as CONTRIBUTOR to it (orchestrator ADR-0010 d2).
+async function rolesOf(reader: GitHubClient, repository: Repository, logins: Iterable<string>): Promise<Map<string, string>> {
+  const unique = [...new Set(logins)];
+  return new Map(await Promise.all(unique.map(async (login) => [login, await roleOf(reader, repository, login)] as const)));
+}
+
+async function successorsOf(reader: GitHubClient, repo: string, head: string, oids: readonly string[]): Promise<Map<string, string | null>> {
+  const nodes = await connectionNodes((query, vars) => reader.graphql(query, vars), BRANCH_HISTORY_QUERY, { ...ownerAndName(repo), head }, HISTORY_PATH);
+  // Newest first.
+  const branch = answerOf(z.array(BranchNode), nodes, `the history of ${LEDGER_BRANCH} at ${head}`);
+  return new Map(
+    oids.map((oid) => {
+      const at = branch.findIndex((commit) => commit.oid === oid);
+      if (at === -1) throw new Error(`the history of ${LEDGER_BRANCH} at ${head} lacks ${oid}, which its story's history holds`);
+      const first = branch.slice(0, at).findLast((commit) => isSigned(commit.signature));
+      return [oid, first?.committedDate ?? null];
+    }),
+  );
+}
+
+/**
+ * The one answer every reader and writer of a story's state acts on: the fold of `ledger`'s commits to
+ * `issues/<issue>/` at the head read first, with the issue's comments and board moves the release rule reads.
+ * `reader` is a client that can read the issue, the board, collaborators' roles and `ledger`.
+ */
 export async function readState(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<StateReading> {
-  return (await judgeIssue(reader, repo, issue, shared)).reading;
+  assertIssueNumber(issue);
+  const repository = ownerAndName(repo);
+  const head = await ledgerHead(reader, repo);
+  const [comments, moves, commits] = await Promise.all([
+    issueComments(reader, repo, issue),
+    boardMoves(reader, repo, issue, shared),
+    storyCommits(reader, repo, issue, head),
+  ]);
+  const reviewer = shared.reviewer_app_login;
+  const commenters = comments.flatMap(({ author }) => (author?.__typename === USER_TYPE ? [author.login] : []));
+  const clearers = commits.flatMap((commit) => (mayClear(commit, reviewer) ? [commit.author] : []));
+  const [texts, roles] = await Promise.all([
+    blobTexts(reader, repo, commits.flatMap((commit) => (mayHoldEvents(commit, reviewer) ? commit.added.map(({ blob }) => blob) : []))),
+    rolesOf(reader, repository, [...commenters, ...clearers]),
+  ]);
+  const story = foldStory(commits, texts, roles, reviewer);
+  const successors =
+    story.tampers.length === 0 ? new Map<string, string | null>() : await successorsOf(reader, repo, head, story.tampers.map(({ commit }) => commit.oid));
+  return readingOf(head, issue, { commits, texts, roles, successors, comments, moves }, story, shared);
 }
 
-// A plain object's keys in sorted order, so one snapshot always renders as one text.
-function sortedKeys(_key: string, value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
-  const object = value as Record<string, unknown>;
-  return Object.fromEntries(Object.keys(object).toSorted().map((key) => [key, object[key]]));
-}
+const Newest = z.object({ history: z.object({ nodes: z.array(z.object({ oid: GitSha })).max(1) }) });
+const TouchedAnswer = z.object({ repository: z.object({ from: Newest, to: Newest }) });
 
-/** The state comment's body for `snapshot`. */
-export function renderState(snapshot: Snapshot): string {
-  return `${STATE_TAG}\n${OPENING_FENCE}\n${JSON.stringify(snapshot, sortedKeys, 2)}\n${CLOSING_FENCE}\n`;
+/**
+ * Whether the newest commit touching `issues/<issue>/` differs at `from` and at `to`: with `to` a later head of
+ * `ledger`, whether a commit to the story landed after `from`.
+ */
+export async function storyTouched(reader: GitHubClient, repo: string, issue: number, from: string, to: string): Promise<boolean> {
+  assertIssueNumber(issue);
+  for (const oid of [from, to]) {
+    if (!GitSha.safeParse(oid).success) throw new TypeError(`not a commit oid: ${JSON.stringify(oid)}`);
+  }
+  const dir = storyDir(issue);
+  const answer = await reader.graphql(TOUCHED_QUERY, { ...ownerAndName(repo), from, to, path: dir });
+  const { repository } = answerOf(TouchedAnswer, answer, `the newest commits touching ${dir} at ${from} and ${to}`);
+  return repository.from.history.nodes[0]?.oid !== repository.to.history.nodes[0]?.oid;
 }
 
 function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
@@ -435,11 +610,16 @@ function keepsRuling(old: Ruling, next: Ruling | undefined): boolean {
   return isDeepStrictEqual(ruled, nextRuled) && isDeepStrictEqual(commits, nextCommits.slice(0, commits.length));
 }
 
+function roundEvent(round: Round): LedgerEvent {
+  return { kind: EVENT_KIND.round, v: 1, round };
+}
+
 /**
- * `writeState`'s transition: rounds, pushbacks and rulings only appended, and a ruling's commits only appended to;
- * every hold row as it was.
+ * `writeState`'s transition, as the events that make it, in the contract's kind order: rounds, rulings, a FIX's
+ * commits, pushbacks. Rounds, rulings and pushbacks are only appended, and a FIX's commits only appended to; every
+ * hold row and the gates section stay as they were.
  */
-export function checkTransition(old: Snapshot, next: Snapshot): void {
+export function checkTransition(old: Snapshot, next: Snapshot): LedgerEvent[] {
   const rewrittenRound = old.rounds.find((round, i) => !isDeepStrictEqual(round, next.rounds[i]));
   if (rewrittenRound !== undefined) {
     throw new StateWriteRefused(`the snapshot drops or rewrites round ${rewrittenRound.stage} ${rewrittenRound.n}`, null);
@@ -459,64 +639,164 @@ export function checkTransition(old: Snapshot, next: Snapshot): void {
   if (changed.length > 0) {
     throw new StateWriteRefused(
       `the snapshot changes hold rows ${changed.join(", ")}`,
-      "placeHold, placeRescopeHold or releaseOnClaim, the one call that changes each",
+      "writeState's placements, placeRescopeHold, recordGates's openings or releaseOnClaim, the calls that change hold rows",
     );
   }
+  if (!isDeepStrictEqual(old.gates, next.gates)) {
+    throw new StateWriteRefused("the snapshot changes the gates section", "recordGates, which replaces it");
+  }
+  return [
+    ...next.rounds.slice(old.rounds.length).map(roundEvent),
+    ...next.rulings.slice(old.rulings.length).map((ruling): LedgerEvent => ({ kind: EVENT_KIND.ruling, v: 1, ruling: { ...ruling, commits: [] } })),
+    ...next.rulings.flatMap(({ round, key, commits }, i) =>
+      commits.slice(old.rulings[i]?.commits.length ?? 0).map((commit): LedgerEvent => ({ kind: EVENT_KIND["ruling-commit"], v: 1, round, key, commit })),
+    ),
+    ...next.pushbacks.slice(old.pushbacks.length).map((pushback): LedgerEvent => ({ kind: EVENT_KIND.pushback, v: 1, pushback })),
+  ];
 }
 
-const CAUSE_TEXT = {
-  tampered: "tampered state: the state comment was edited",
-  deleted: "deleted state: a reviewer App comment was deleted",
-};
+function contracted<Schema extends z.ZodType>(schema: Schema, value: unknown, what: string): z.output<Schema> {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new StateWriteRefused(`${what} breaks its contract: ${z.prettifyError(parsed.error)}`, null);
+  return parsed.data;
+}
 
-function tamperRefusal({ reading, tamperedAt }: Judgement, shared: Shared): StateWriteRefused | null {
-  if (tamperedAt === null) return null;
-  const held = reading.causes.flatMap((cause) => {
-    if (cause.cause === "invalid") return [`invalid state: ${cause.error}`];
-    return cause.cause === "open_hold" ? [] : [CAUSE_TEXT[cause.cause]];
+// A release names its steps in order: an admin's deletion of the files the tamper left, when it left any, then the
+// release rule.
+function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
+  if (tampers.length === 0) return;
+  const held = tampers.map(({ id, commit, at, remaining }) => {
+    const left = remaining.length === 0 ? "no file" : remaining.join(", ");
+    return `${id}, invalid commit ${commit} at ${at}, leaves ${left} on ${LEDGER_BRANCH}`;
   });
-  return new StateWriteRefused(
-    `the story is held for ${held.join("; ")}`,
-    `a Ready move on ${shared.board} and an admin's comment, both after ${tamperedAt}, then the release on the claim`,
-  );
+  const releases = tampers.map(({ at, remaining }) => {
+    const answered = `a Ready move on ${shared.board} and an admin's comment, both after ${at}, then the claim`;
+    return remaining.length === 0 ? answered : `a repository admin's deletion on ${LEDGER_BRANCH} of ${remaining.join(", ")}, then ${answered}`;
+  });
+  throw new StateWriteRefused(`the story is held for ${held.join("; ")}`, releases.join("; "));
 }
 
-// Every write but the release path: none may build on state that could have been tampered with.
-async function untamperedSnapshot(reader: GitHubClient, repo: string, issue: number, shared: Shared): Promise<Snapshot> {
-  const judgement = await judgeIssue(reader, repo, issue, shared);
-  const refusal = tamperRefusal(judgement, shared);
-  if (refusal !== null) throw refusal;
-  return judgement.reading.snapshot ?? emptySnapshot();
+function unreleased(tampers: readonly Tamper[]): Tamper[] {
+  return tampers.filter((each) => each.released === null);
 }
 
-// The one place a state comment is posted: never one a reader would take as invalid, never an edit.
-async function post(writer: GitHubClient, repo: string, issue: number, snapshot: Snapshot): Promise<void> {
-  const parsed = Snapshot.safeParse(snapshot);
-  if (!parsed.success) {
-    throw new StateWriteRefused(`the snapshot breaks its contract: ${z.prettifyError(parsed.error)}`, null);
+function writable(issue: number, reading: StateReading): Folded {
+  assertIssueNumber(issue);
+  if (reading.folded === undefined) throw new TypeError("the reading carries no fold: a write takes readState's or a write's reading");
+  return reading.folded;
+}
+
+function isOpen(reading: StateReading, id: string): boolean {
+  return reading.snapshot?.holds.some((row) => row.id === id && row.state === HoldState.schema.enum.OPEN) ?? false;
+}
+
+function holdEvent(request: HoldRequest, since: string): LedgerEvent {
+  return { kind: EVENT_KIND.hold, v: 1, hold: { ...request, since } };
+}
+
+// Git's object id of a blob of `text`: the name GitHub's tree entries give the file.
+function blobOid(text: string): string {
+  const body = Buffer.from(text, "utf8");
+  return createHash("sha1").update(`blob ${body.length}\0`).update(body).digest("hex");
+}
+
+// The same file with the same text is a retried write's; with other text it is another event, which dropping would
+// lose.
+function isWritten(story: StoryFold, issue: number, event: LedgerEvent): boolean {
+  const file = eventFile(event);
+  const blob = story.eventBlobs.get(file);
+  if (blob === undefined) return false;
+  if (blob !== blobOid(eventText(event))) throw new StateWriteRefused(`${storyDir(issue)}/${file} is on ${LEDGER_BRANCH} with other text`, null);
+  return true;
+}
+
+const COMMIT_MUTATION = `mutation($input: CreateCommitOnBranchInput!) {
+  createCommitOnBranch(input: $input) {
+    commit { oid committedDate ${SIGNATURE} }
   }
-  const body = renderState(parsed.data);
-  // GitHub counts characters; a string's length counts UTF-16 units.
-  const size = [...body].length;
-  if (size > COMMENT_LIMIT) {
-    throw new StateWriteRefused(`the state comment would be ${size} characters, over GitHub's limit of ${COMMENT_LIMIT}`, null);
+}`;
+
+const CommitAnswer = z.object({ createCommitOnBranch: z.object({ commit: BranchNode }) });
+
+/**
+ * The one commit every write makes: the `events` not yet in the fold, at the reading's head, adding only. Returns
+ * the reading as it is when every event is in the fold already, else the reading a read at the commit gives, folded
+ * from the reading's own.
+ */
+async function commitEvents(
+  reader: GitHubClient,
+  writer: GitHubClient,
+  repo: string,
+  issue: number,
+  shared: Shared,
+  reading: StateReading,
+  events: readonly LedgerEvent[],
+  now: string,
+): Promise<StateReading> {
+  const folded = writable(issue, reading);
+  const reviewer = shared.reviewer_app_login;
+  const story = foldStory(folded.commits, folded.texts, folded.roles, reviewer);
+  const fresh = events.map((event) => contracted(LedgerEvent, event, `the ${event.kind} event`)).filter((event) => !isWritten(story, issue, event));
+  if (fresh.length === 0) return reading;
+  const ordered = inApplyOrder(fresh);
+  const applied = applyEvents(story, ordered, now, new Set(story.tampers.map(({ id }) => id)));
+  if (!applied.ok) throw new StateWriteRefused(`the events do not apply to the story: ${applied.why}`, null);
+
+  const dir = storyDir(issue);
+  const files = ordered.map((event) => ({ name: eventFile(event), text: eventText(event) }));
+  const kinds = new Set(ordered.map(({ kind }) => kind));
+  const input = {
+    branch: { repositoryNameWithOwner: repo, branchName: LEDGER_BRANCH },
+    expectedHeadOid: reading.head,
+    message: { headline: `${dir}: ${[...kinds].join(", ")}` },
+    fileChanges: { additions: files.map(({ name, text }) => ({ path: `${dir}/${name}`, contents: Buffer.from(text, "utf8").toString("base64") })) },
+  };
+  let answer: unknown;
+  try {
+    answer = await writer.graphql(COMMIT_MUTATION, { input });
+  } catch (error) {
+    if (!(error instanceof GitHubRefused)) throw error;
+    const head = await ledgerHead(reader, repo);
+    if (head !== reading.head) throw new StateStale(reading.head, head);
+    throw error;
   }
-  const { owner, name } = ownerAndName(repo);
-  await writer.rest("POST", `/repos/${owner}/${name}/issues/${issue}/comments`, { body });
+  const { commit } = answerOf(CommitAnswer, answer, `the commit to ${dir} on ${LEDGER_BRANCH}`).createCommitOnBranch;
+  if (!isSigned(commit.signature)) throw new StateWriteUnsigned(commit.oid);
+
+  const own: StoryCommit = {
+    oid: commit.oid,
+    committedDate: commit.committedDate,
+    signed: true,
+    author: reviewer,
+    added: files.map(({ name, text }) => ({ name, blob: blobOid(text) })).toSorted(byName),
+    changed: [],
+    removed: [],
+  };
+  const advanced: Folded = {
+    ...folded,
+    commits: [...folded.commits, own],
+    texts: new Map([...folded.texts, ...files.map(({ text }) => [blobOid(text), text] as const)]),
+    // The commit is GitHub-signed, so it is the first after every tamper that had none.
+    successors: new Map([...folded.successors].map(([oid, after]) => [oid, after ?? commit.committedDate])),
+  };
+  return readingOf(commit.oid, issue, advanced, foldStory(advanced.commits, advanced.texts, advanced.roles, reviewer), shared);
 }
 
-function withRow(snapshot: Snapshot, row: Hold): Snapshot {
-  const at = snapshot.holds.findIndex((held) => held.id === row.id);
-  return { ...snapshot, holds: at === -1 ? [...snapshot.holds, row] : snapshot.holds.with(at, row) };
-}
+/** A hold a round's report places; `since` is core's to stamp. */
+export type Placement = { id: string; kind: Hold["kind"]; question: string | null };
 
-function openRow(id: string, kind: Hold["kind"], since: string, question: string | null, specPr: number | null): Hold {
-  return { id, kind, state: HoldState.schema.enum.OPEN, since, released: null, released_by: null, question, spec_pr: specPr };
+function placementRequest({ id, kind, question }: Placement): HoldRequest {
+  const { claim, shim } = HoldKind.schema.enum;
+  if (kind === claim || kind === shim) {
+    throw new StateWriteRefused(`writeState does not place the ${kind} hold ${id}`, "recordGates, which places it with the gates count that reaches it");
+  }
+  return contracted(HoldRequest, { id, kind, question, spec_pr: null }, `the placement of ${id}`);
 }
 
 /**
- * Posts `snapshot`, which may only append to the state as `checkTransition` lets it; core stamps each appended round's
- * `at` from GitHub's clock. `writer` is the reviewer App's client.
+ * Commits what `next` appends to the reading's snapshot, as `checkTransition` lets it, each new round's `at` from
+ * GitHub's clock, and a hold per placement whose row is not OPEN, `since` from GitHub's clock: one commit. `writer`
+ * is the reviewer App's client.
  */
 export async function writeState(
   reader: GitHubClient,
@@ -524,44 +804,27 @@ export async function writeState(
   repo: string,
   issue: number,
   shared: Shared,
-  snapshot: Snapshot,
-): Promise<void> {
-  const working = await untamperedSnapshot(reader, repo, issue, shared);
-  checkTransition(working, snapshot);
-  const at = await writer.now();
-  const rounds = snapshot.rounds.map((round, i) => (i < working.rounds.length ? round : { ...round, at }));
-  await post(writer, repo, issue, { ...snapshot, rounds });
-}
-
-export type HoldPlacement = { id: string; kind: Hold["kind"]; question: string | null };
-
-/** Opens a hold of any kind but `rescope`, stamping `since` from GitHub's clock; an OPEN row is left as it is. */
-export async function placeHold(
-  reader: GitHubClient,
-  writer: GitHubClient,
-  repo: string,
-  issue: number,
-  shared: Shared,
-  { id, kind, question }: HoldPlacement,
-): Promise<void> {
-  const { rescope, escalation } = HoldKind.schema.enum;
-  if (kind === rescope) {
-    throw new StateWriteRefused(`placeHold does not place a ${rescope} hold`, "placeRescopeHold, which records its spec PR");
-  }
-  if (kind === escalation && (question === null || question === "")) {
-    throw new StateWriteRefused(`an ${escalation} hold needs its question (orchestrator ADR-0010 d1)`, null);
-  }
-  const working = await untamperedSnapshot(reader, repo, issue, shared);
-  const row = working.holds.find((held) => held.id === id);
-  if (row?.state === HoldState.schema.enum.OPEN) return;
-  const since = await writer.now();
-  await post(writer, repo, issue, withRow(working, openRow(id, kind, since, question, null)));
+  reading: StateReading,
+  next: Snapshot,
+  placements: readonly Placement[],
+): Promise<StateReading> {
+  writable(issue, reading);
+  refuseTampers(unreleased(reading.tamper), shared);
+  const transition = checkTransition(reading.snapshot ?? emptySnapshot(), next);
+  for (const event of transition) contracted(LedgerEvent, event, `the ${event.kind} event`);
+  const placing = placements.map(placementRequest).filter((request) => !isOpen(reading, request.id));
+  if (transition.length === 0 && placing.length === 0) return reading;
+  const now = await writer.now();
+  const events = [
+    ...transition.map((event) => (event.kind === EVENT_KIND.round ? roundEvent({ ...event.round, at: now }) : event)),
+    ...placing.map((request) => holdEvent(request, now)),
+  ];
+  return commitEvents(reader, writer, repo, issue, shared, reading, events, now);
 }
 
 /**
- * Opens `rescope-<issue>` recording `specPr`, or null on a RESCOPE verdict. A spec PR's number keys the row, so a
- * hook deriving it at each run never places it twice for one PR; a verdict has none and places as `placeHold`
- * does (reviewer ADR-0013 d5).
+ * Opens `rescope-<issue>` recording `specPr`, `since` from GitHub's clock, unless its row records `specPr` already,
+ * OPEN or RELEASED: a spec PR's number keys the row (reviewer ADR-0013 d5). `writer` is the reviewer App's client.
  */
 export async function placeRescopeHold(
   reader: GitHubClient,
@@ -569,23 +832,93 @@ export async function placeRescopeHold(
   repo: string,
   issue: number,
   shared: Shared,
-  specPr: number | null,
-): Promise<void> {
-  const working = await untamperedSnapshot(reader, repo, issue, shared);
+  reading: StateReading,
+  specPr: number,
+): Promise<StateReading> {
+  writable(issue, reading);
+  refuseTampers(unreleased(reading.tamper), shared);
   const { rescope } = HoldKind.schema.enum;
-  const id = `${rescope}-${issue}`;
-  const row = working.holds.find((held) => held.id === id);
-  const placed = specPr === null ? row?.state === HoldState.schema.enum.OPEN : row?.spec_pr === specPr;
-  if (placed) return;
-  const since = await writer.now();
-  await post(writer, repo, issue, withRow(working, openRow(id, rescope, since, null, specPr)));
+  const request = contracted(
+    HoldRequest,
+    { id: `${rescope}-${issue}`, kind: rescope, question: null, spec_pr: specPr },
+    `the ${rescope} hold of spec PR ${specPr}`,
+  );
+  if (reading.snapshot?.holds.some((row) => row.id === request.id && row.spec_pr === specPr)) return reading;
+  const now = await writer.now();
+  return commitEvents(reader, writer, repo, issue, shared, reading, [holdEvent(request, now)], now);
 }
 
-export type ClaimRelease = { released: Releasable[]; rebuilt: boolean; reset: CommentAt | null };
+/** A hold a gates count reaches: `claim-` or `shim-`, its kind its id's prefix. */
+export type Opening = { id: string; question: string | null };
+
+// The writes that place each other kind, so a refused opening names them.
+const PLACER: Partial<Record<Hold["kind"], string>> = {
+  escalation: "writeState, whose placements are a round's holds",
+  pushback: "writeState, whose placements are a round's holds",
+  audit: "writeState, whose placements are a round's holds",
+  rescope: "placeRescopeHold for a spec PR, or writeState's placements for a RESCOPE verdict",
+};
+
+function openingRequest({ id, question }: Opening): HoldRequest {
+  const kind = HoldKind.schema.safeParse(id.slice(0, id.indexOf("-")));
+  if (!kind.success) throw new StateWriteRefused(`the opening ${id} breaks its contract: its id names no hold kind`, null);
+  const placer = PLACER[kind.data];
+  if (placer !== undefined) throw new StateWriteRefused(`recordGates does not place ${id}`, placer);
+  return contracted(HoldRequest, { id, kind: kind.data, question, spec_pr: null }, `the opening ${id}`);
+}
+
+// A time is its entry's: a chain entry or a tree the reading holds keeps that time, a tree a merge moved included,
+// and any other takes `now`.
+function stamped(read: Gates | null, gates: Gates, now: string): Gates {
+  const entries = new Map<string, string>(read?.lineages.flatMap((lineage) => lineage.chain.map((entry) => [chainEntryKey(entry), entry.at] as const)));
+  const trees = new Map<string, string>(read?.bugs.flatMap((bug) => [...bug.members, ...bug.absorbed].map(({ tree, at }) => [tree, at] as const)));
+  const timed = <Entry extends { tree: string }>(entry: Entry): Entry => ({ ...entry, at: trees.get(entry.tree) ?? now });
+  return {
+    ...gates,
+    lineages: gates.lineages.map((lineage) => ({ ...lineage, chain: lineage.chain.map((entry) => ({ ...entry, at: entries.get(chainEntryKey(entry)) ?? now })) })),
+    bugs: gates.bugs.map((bug) => ({ ...bug, members: bug.members.map(timed), absorbed: bug.absorbed.map(timed) })),
+  };
+}
 
 /**
- * On the orchestrator's claim: releases every releasable hold and a released tamper cause, deciding and writing
- * over one read. `writer` is the reviewer App's client.
+ * Commits `gates.<ref>.json`, every time in it stamped as `stamped` keeps or sets it, and a hold per opening whose
+ * row is not OPEN, `since` from GitHub's clock: one commit, so no count is on `ledger` without the hold it reached.
+ * `writer` is the reviewer App's client.
+ */
+export async function recordGates(
+  reader: GitHubClient,
+  writer: GitHubClient,
+  repo: string,
+  issue: number,
+  shared: Shared,
+  reading: StateReading,
+  ref: string,
+  gates: Gates,
+  openings: readonly Opening[],
+): Promise<StateReading> {
+  writable(issue, reading);
+  refuseTampers(unreleased(reading.tamper), shared);
+  const requests = openings.map(openingRequest);
+  const checked = contracted(Gates, gates, "the gates section");
+  contracted(NameSegment, ref, `the gates ref ${JSON.stringify(ref)}`);
+  const now = await writer.now();
+  const events: LedgerEvent[] = [
+    ...requests.filter((request) => !isOpen(reading, request.id)).map((request) => holdEvent(request, now)),
+    { kind: EVENT_KIND.gates, v: 1, ref, gates: stamped(reading.snapshot?.gates ?? null, checked, now) },
+  ];
+  return commitEvents(reader, writer, repo, issue, shared, reading, events, now);
+}
+
+export type ClaimRelease = { released: Releasable[]; reset: CommentAt | null; reading: StateReading };
+
+function releaseEvent({ id, comment, reset }: Releasable, since: string | null, released: string): LedgerEvent {
+  return { kind: EVENT_KIND.release, v: 1, release: { id, since, released, released_by: { comment: comment.id, reset } } };
+}
+
+/**
+ * On the orchestrator's claim: releases every releasable hold and every unreleased tamper, deciding from the
+ * reading and committing once. Refused while a tamper stands that is not releasable. `writer` is the reviewer App's
+ * client.
  */
 export async function releaseOnClaim(
   reader: GitHubClient,
@@ -593,24 +926,22 @@ export async function releaseOnClaim(
   repo: string,
   issue: number,
   shared: Shared,
+  reading: StateReading,
 ): Promise<ClaimRelease> {
-  const judgement = await judgeIssue(reader, repo, issue, shared);
-  const { snapshot, releasable, rebuilt, reset, tamper_released } = judgement.reading;
-  if (!tamper_released) {
-    const refusal = tamperRefusal(judgement, shared);
-    if (refusal !== null) throw refusal;
-  }
-  const answer = { released: releasable, rebuilt, reset };
-  if (snapshot === null || (releasable.length === 0 && !tamper_released)) return answer;
-
-  const released = await writer.now();
-  const releases = new Map(releasable.map((release) => [release.id, release]));
-  const holds = snapshot.holds.map((row) => {
-    const release = releases.get(row.id);
-    if (release === undefined) return row;
-    const released_by = { comment: release.comment.id, reset: release.reset };
-    return { ...row, state: HoldState.schema.enum.RELEASED, released, released_by };
-  });
-  await post(writer, repo, issue, { ...snapshot, holds });
-  return answer;
+  writable(issue, reading);
+  const tampers = unreleased(reading.tamper);
+  refuseTampers(
+    tampers.filter((each) => each.releasable === null),
+    shared,
+  );
+  const tamperReleases = tampers.flatMap((each) => each.releasable ?? []);
+  const released = [...reading.releasable, ...tamperReleases];
+  if (released.length === 0) return { released, reset: reading.reset, reading };
+  const now = await writer.now();
+  const since = new Map((reading.snapshot?.holds ?? []).map((row) => [row.id, row.since]));
+  const events = [
+    ...reading.releasable.map((release) => releaseEvent(release, since.get(release.id) ?? null, now)),
+    ...tamperReleases.map((release) => releaseEvent(release, null, now)),
+  ];
+  return { released, reset: reading.reset, reading: await commitEvents(reader, writer, repo, issue, shared, reading, events, now) };
 }

@@ -29,6 +29,7 @@ export const FindingRuling = valueSet({
   FIX: "real, and this change is where it belongs",
   PUSH_BACK: "not real, or not worth the change",
   DEFER: "real, but independent of this change; it moves to an issue",
+  ESCALATE: "the assessor cannot rule the finding; an admin decides",
 });
 
 // The root-cause reviewer's verdict on a round; reviewer ADR-0017.
@@ -58,6 +59,20 @@ export const HoldKind = valueSet({
   claim: "a lineage reached its count of WRONG claim rulings; refuses commits touching its file",
   shim: "a bug reached its hold count; refuses commits touching its lines",
   audit: "escalation audits not ruled CONVERGED_PUSHBACK reached their count; refuses rounds",
+});
+
+// A claim judge's verdict on one claim, kept in its lineage's chain (reviewer ADR-0001).
+export const ClaimVerdict = valueSet({
+  CORRECT: "every assertion of the claim is confirmed by the code",
+  WRONG: "an assertion of the claim is false or has a failing case",
+  UNSURE: "the judge could not read the code that settles an assertion",
+});
+
+// A shim check's ruling on one site its sweep of a bug listed.
+export const ShimRuling = valueSet({
+  SHARES: "the site shares the bug's defect",
+  NOT_SHARED: "the site does not share the bug's defect",
+  DEFERRED: "the site shares the bug's defect, and an open issue tracks its fix",
 });
 
 // reviewer ADR-0011, ADR-0013.
