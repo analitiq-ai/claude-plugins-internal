@@ -37,9 +37,9 @@ const ROOT_FILES: ReadonlySet<string> = new Set(["codeworks.toml", "README.md"])
 // `unlistable`: the segment names paths the check cannot list.
 const PATH_CLAUSES = [
   // A `.` or `..` segment.
-  { refused: [".", ".."], taken: [".x", "x.", "..x", "x.."], unlistable: true },
-  // A glob or brace group.
-  { refused: ["*", "**", "b?.ts", "[ab].ts", "{b,c}.ts"], taken: ["b.ts"], unlistable: true },
+  { refused: [".", ".."], taken: ["...", ".x", "x.", "..x", "x.."], unlistable: true },
+  // A glob or brace group: each character artifact-grammar.md lists, alone and in a whole group.
+  { refused: ["*", "?", "[", "]", "{", "}", "**", "b?.ts", "[ab].ts", "{b,c}.ts"], taken: ["b.ts"], unlistable: true },
   // An empty segment: leading, an absolute path; final, a trailing `/`.
   { refused: [""], taken: [], unlistable: false },
   // A character outside the grammar.

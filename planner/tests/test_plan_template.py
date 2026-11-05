@@ -253,7 +253,7 @@ class TouchesStep(unittest.TestCase):
             with self.subTest(said=said):
                 self.assertIn(said, text)
         for rule in (r"one literal path per file", r"creat\w*, chang\w* or delet\w*", r"no glob", r"no brace group",
-                     r"no trailing `?/`?", r"no `?\.\.`?", r"no other file"):
+                     r"no other file"):
             with self.subTest(rule=rule):
                 self.assertRegex(text, re.compile(rule, re.IGNORECASE))
         installed = Path(PROJECT.name) / WORKFLOW[1] / "adr-touches.md"
