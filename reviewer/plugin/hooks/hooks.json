@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\"",
             "timeout": 60
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/sweeper_read.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/sweeper_read.py\""
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py\"",
             "timeout": 45
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\"",
             "timeout": 60
           }
         ]
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\""
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\""
           }
         ]
       }
@@ -68,11 +68,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\""
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py\""
           }
         ]
       }
@@ -83,7 +83,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate.py\""
           }
         ]
       }

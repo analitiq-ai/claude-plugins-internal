@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\"",
             "timeout": 60,
             "onFailure": "block"
           }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/prompt.ts",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt.ts\"",
             "timeout": 120,
             "onFailure": "block"
           }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use.ts",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use.ts\"",
             "timeout": 60,
             "onFailure": "block"
           }

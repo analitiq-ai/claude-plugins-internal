@@ -433,7 +433,7 @@ class SessionStart(Switch, Gate):
         [entry] = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]["SessionStart"]
         self.assertEqual(entry["matcher"], "resume|compact")
         [command] = [h["command"] for h in entry["hooks"]]
-        self.assertTrue(command.endswith("scripts/gate.py"), command)
+        self.assertEqual(command, 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py"')
 
 
 class OffAndOnAgain(Switch, Gate):
