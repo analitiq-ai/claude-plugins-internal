@@ -21,11 +21,18 @@ NEVER_IN_REVIEW = ("skills/issue-spec/", "skills/alq-issue-tackle/", "skills/alq
 FIXED_PATHS = ("hooks/hooks.json", "core", "package.json", "package-lock.json")
 
 
+def blobs(plugin: Path = PLUGIN) -> dict[str, str]:
+    """The plugin's tracked files, relative to it, each with the id of the blob git holds for it."""
+    out = subprocess.run(["git", "ls-files", "-s", "-z", "--", str(plugin)], cwd=REPO, capture_output=True, text=True,
+                         check=True).stdout
+    # Each entry is `<mode> <blob> <stage>\t<path>`.
+    entries = (entry.split("\t", 1) for entry in out.split("\0") if entry)
+    return {str(Path(path).relative_to(plugin.relative_to(REPO))): meta.split()[1] for meta, path in entries}
+
+
 def shipped(plugin: Path = PLUGIN) -> list[str]:
     """The plugin's tracked files, relative to it."""
-    out = subprocess.run(["git", "ls-files", "-z", "--", str(plugin)], cwd=REPO, capture_output=True, text=True,
-                         check=True).stdout
-    return [str(Path(f).relative_to(plugin.relative_to(REPO))) for f in out.split("\0") if f]
+    return list(blobs(plugin))
 
 
 def content(files: list[str]) -> set[str]:
@@ -54,11 +61,17 @@ class ShippedTree(unittest.TestCase):
     def test_ships_no_path_alq_review_must_never_ship(self):
         self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
 
+    # A file is its path and its bytes: carriers each ship their own module at a path another carrier also uses
+    # (lib/settings.ts, hooks/pre-tool-use.ts), and that is not one plugin shipping the other's file.
     def test_ships_no_file_alq_plan_or_alq_build_ships(self):
-        theirs = {f for name in ("planner", "builder") for f in content(shipped(REPO / name / "plugin"))}
-        self.assertIn("skills/issue-spec/SKILL.md", theirs)
-        self.assertIn("skills/issue-tackle/SKILL.md", theirs)
-        self.assertEqual(sorted(theirs & content(shipped())), [])
+        def files(plugin: Path) -> set[tuple[str, str]]:
+            held = blobs(plugin)
+            return {(f, held[f]) for f in content(list(held))}
+
+        theirs = files(REPO / "planner" / "plugin") | files(REPO / "builder" / "plugin")
+        self.assertIn("skills/issue-spec/SKILL.md", {f for f, _ in theirs})
+        self.assertIn("skills/issue-tackle/SKILL.md", {f for f, _ in theirs})
+        self.assertEqual(sorted(theirs & files(PLUGIN)), [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
