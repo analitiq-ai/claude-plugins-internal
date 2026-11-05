@@ -166,7 +166,7 @@ None.
 - Test harness and CI wiring: R2
 - Hook entry files, I/O, exit codes: R3
 - Key file names: R4
-- Settings read (once, at the main checkout's HEAD): R5
+- Settings read (once, at the checkout's HEAD): R5
 - Session gh config folder: R6
 - Token refresh within a long turn: R7
 - Session's issue record (write-once file, core contract): R8

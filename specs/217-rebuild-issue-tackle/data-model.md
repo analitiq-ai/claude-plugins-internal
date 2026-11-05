@@ -14,7 +14,7 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `origin` | `owner/name` | main checkout's origin |
 | `issue` | `{state: open\|closed, title, body}` | REST issue |
 | `done` | boolean | `isDone` |
-| `shared` | `Shared` | `codeworks.toml` at the main checkout's HEAD (R7, R16), returned for `prFindings` and `internalReviewAt` |
+| `shared` | `Shared` | `codeworks.toml` at the HEAD of the checkout given (R7, R16), returned for `prFindings` and `internalReviewAt` |
 | `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `shared` (R7) |
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
@@ -23,7 +23,7 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `head` | sha | `git rev-parse HEAD` in the worktree |
 | `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
 | `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) against the default tip it fetched (R16), R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
-| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at the worktree's HEAD; with no worktree, at the ref it would start from (R10) |
+| `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at the head the work is on: the worktree's HEAD, or the ref it would start from (R10, R16) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
 | `attested` | boolean | `internalReviewAt(pr.head)` (B5) |
@@ -74,8 +74,8 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 3. lane null → `NO_CARD`; Backlog/Blocked → `LANE`; parent in another repository → `SPEC_ISSUE_ELSEWHERE`
 4. branch: several → `SEVERAL_BRANCHES`; github and local both present and different → `BRANCH_MISMATCH`;
    worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; no worktree (no branch anywhere, a branch on GitHub
-   only, or a local branch) → stages 5–6 have no worktree to read, stage 7 is decided at the ref the worktree would
-   start from (R10), and only when it stops nothing does the script add the worktree, cutting the branch when
+   only, or a local branch) → stage 5 has no worktree to read, stages 6–7 are decided at the ref the worktree would
+   start from (R16), and only when no stage stops does the script add the worktree, cutting the branch when
    there is none (R8), and re-read
 5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
 6. `merge.needed` → `merge`, after stage 9's `HEAD_BEHIND_PR`, which is decided first

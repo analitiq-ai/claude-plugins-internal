@@ -88,8 +88,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R7: Lane, closed and done are read through core at every step
 
-- **Decision**: settings come from `codeworks.toml` at the main checkout's HEAD (R16) through `gitTree` and
-  `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
+- **Decision**: settings come from `codeworks.toml` at the HEAD of the checkout given (R16) through `gitTree`
+  and `readSettings`, the one read every component makes (root ADR-0002 d4: the branch the work is on), and
   `readStoryStopFacts` returns that `shared`, which builder passes to `prFindings` and `internalReviewAt`; the lane from `laneOf(reader, repo, s, shared.board)`; closed from `GET
   /repos/{o}/{n}/issues/{s}`; done from `isDone`. Backlog or Blocked → stop naming the lane (FR-006); no card →
   stop naming the board; closed or done → stop (FR-007); `LaneRefused`, `GitHubUnanswered`, `GitHubRefused` →
@@ -105,7 +105,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   local branches `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`
   in the main checkout (R16). One branch, GitHub's or the local one (crash before push, spec Edge Cases), names the
   worktree `../<repo>.worktrees/<branch>`; a worktree there on another branch → stop naming it. With no worktree
-  and no stop from `storyStop` (its folder read at the ref the worktree would start from, R10), the script adds
+  and no stop from `storyStop` (its merge and folder read at the ref the worktree would start from, R16), the script adds
   it (spec FR-027): no branch anywhere → `git worktree add -b <branch> <path> <default-sha>`, the fetched default
   tip; a branch on GitHub only → `git worktree add -B <branch> <path> refs/remotes/origin/<branch>`; a local
   branch → `git worktree add <path> <branch>`. The new branch is named by core's `storyBranchName(s, k, title)`
@@ -128,14 +128,14 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   ls-tree HEAD, folders)` is non-empty, `folders` every `specs/<p>-*` on either side, so a folder added, removed,
   renamed or doubled is a difference (their spec.md, `**/docs/adr/`, `.specify/memory/`); or `git merge-tree
   --write-tree origin/<default> HEAD` exits 1 (conflict, whether or not a PR exists). It runs before the folder
-  check (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named. The skill then
+  check (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named, with or without a worktree (R16 step 5). The skill then
   runs the printed
   `git merge --no-ff --no-edit refs/remotes/origin/<default>` in the worktree, resolves any conflict in that merge
   commit, and runs the script again (FR-017).
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
   head not yet pushed; GitHub's `mergeable` is of the PR's head only and may be UNKNOWN.
 - **Existing tools**: core `attest.ts` `governingDiff` (the same governing set orchestrator ADR-0004 d1 uses:
-  fits, its one folder made a list); `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `governingLapse` uses `git
+  fits, its one folder made a list); `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
   merge-tree --write-tree` the same way (fits); `required-checks.ts` conflict finding (GitHub's `mergeable`,
   PR head only: does not fit before a PR).
 
@@ -226,15 +226,16 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
   `storyStop(facts)` with the `StopState` enum, and the read of its facts as `readStoryStopFacts(s, sessionId,
   {reader, home, checkout, fetch})`, the one place that says how they are read and what the read writes:
-  1. `checkout` is any checkout of the repository. The main checkout is resolved from it by core `mainCheckout`
-     (the parent of `git rev-parse --path-format=absolute --git-common-dir`), so builder and the Stop hook read the
-     same facts wherever they run; settings are read at the main checkout's HEAD (R7).
-  2. Once the main checkout's origin is read, the default branch's name comes from core `defaultBranch` and the
-     branch is fetched, `fetch([trackingRefspec(default)])`, before any other git read.
-  3. The session record, issue, lane and branches are read (R6–R8). A branch on GitHub only is then fetched,
-     `fetch([trackingRefspec(branch)])`.
-  4. With a worktree: its merge state, its changes, its head against the PR head, `merge` (R9) and the folder at
-     its HEAD (R10). With none: the folder at the ref the worktree would start from (R10).
+  1. The session record (R6), before any git or GitHub read.
+  2. `checkout` is the session's working checkout, which builder and the Stop hook both pass; settings are read
+     at its HEAD (R7), origin from it. The main checkout is resolved from it by core `mainCheckout` (the parent
+     of `git rev-parse --path-format=absolute --git-common-dir`) for the branch and worktree reads.
+  3. The default branch's name from core `defaultBranch`, then `fetch([trackingRefspec(default)])`, before any
+     read of a ref other than HEAD.
+  4. Issue, lane and branches (R7, R8); a branch on GitHub only is then fetched, `fetch([trackingRefspec(branch)])`.
+  5. At the head the work is on, the worktree's HEAD, or with no worktree the ref it would start from (the default
+     tip for a cut, `refs/remotes/origin/<branch>`, `<branch>`): with a worktree its merge state, its changes and
+     its head against the PR head; then `merge` (R9) and the folder (R10), so stage 6 precedes stage 7 in every case.
 
   Those two fetches are its only writes, both of remote-tracking refs; it writes no branch, worktree or index.
   `fetch(refspecs)` is the caller's transport: `fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`

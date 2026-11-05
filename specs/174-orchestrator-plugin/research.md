@@ -47,13 +47,12 @@ plan has not executed, and names the task that runs it first.
 - **Existing tools**: `core/src/keys.ts` (`readKey`, its managed-settings check; fits);
   `core/tests/keys.test.ts` already reads `session-app.pem` for `orchestrator`.
 
-## R5: Settings are read once, at the main checkout's HEAD
+## R5: Settings are read once, at the checkout's HEAD
 
 - **Decision**: `lib/settings.ts` defines `OrchestratorSettings` as a strict Zod object (contracts/
   orchestrator-settings.md) and reads `[shared]` and `[orchestrator]` with core's `readSettings` over
-  `gitTree(mainCheckout(checkout), "HEAD")`, the one read every component makes (root ADR-0002 d4), core
-  `mainCheckout` resolving the main checkout from the hook's `cwd`, so a hook run from a worktree reads what
-  builder reads (#217 R7, R16).
+  `gitTree(checkout, "HEAD")`, the one read every component makes (root ADR-0002 d4: the branch the work is on;
+  #217 R7 reads the same).
   Every key, the App IDs among them, comes from that read. PreToolUse reads
   settings only when `needsMint` holds; otherwise it reads the gh folder and the repository alone.
 - **Rationale**: root ADR-0002 d3–d4 make the file at the ref the one source, and one read keeps one source for
