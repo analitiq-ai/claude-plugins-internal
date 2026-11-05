@@ -16,6 +16,8 @@ import { tempHome } from "./support/session.ts";
 
 const REPO = "acme/widgets";
 const APP_ID = 7654321;
+const RETRY = "retry the step";
+const FIX_THEN_RETRY = "fix what it names, then retry the step";
 
 type MintCall = { app: App; appId: number; keyFile: string; plugin: string; repo: string };
 
@@ -45,6 +47,15 @@ function couldNotRunNaming(...named: string[]): (error: unknown) => true {
   return (error) => {
     assert.ok(error instanceof CouldNotRun, String(error));
     for (const part of named) assert.ok(error.message.includes(part), error.message);
+    return true;
+  };
+}
+
+/** As couldNotRunNaming, and its next step is `next`. */
+function couldNotRunThen(next: string, ...named: string[]): (error: unknown) => true {
+  return (error) => {
+    couldNotRunNaming(...named)(error);
+    assert.ok((error as Error).message.endsWith(`; ${next}`), (error as Error).message);
     return true;
   };
 }
@@ -114,15 +125,16 @@ describe("reviewerWriter (R2)", () => {
     assert.notEqual(recorded.tokens[0], recorded.tokens[1]);
   });
 
-  for (const failure of [
-    new MintError("the reviewer App is not installed on acme/widgets"),
-    new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]),
-    new GitHubRefused(401, "POST /app/installations/1/access_tokens: A JSON web token could not be decoded"),
-    new GitHubUnanswered("POST /app/installations/1/access_tokens: timed out"),
-  ]) {
-    it(`refuses as could not run on a mint that throws ${failure.name}, naming its message`, async () => {
+  // Only an unanswered call can pass on a later run as it stands; the others hold until what they name is fixed.
+  for (const [failure, next] of [
+    [new MintError("the reviewer App is not installed on acme/widgets"), FIX_THEN_RETRY],
+    [new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]), FIX_THEN_RETRY],
+    [new GitHubRefused(401, "POST /app/installations/1/access_tokens: A JSON web token could not be decoded"), FIX_THEN_RETRY],
+    [new GitHubUnanswered("POST /app/installations/1/access_tokens: timed out"), RETRY],
+  ] as const) {
+    it(`refuses as could not run on a mint that throws ${failure.name}, naming its message, next "${next}"`, async () => {
       const { recorded, writer } = writerOf(failure);
-      await assert.rejects(writer(), couldNotRunNaming(failure.message));
+      await assert.rejects(writer(), couldNotRunThen(next, failure.message));
       assert.deepEqual(recorded.tokens, []);
     });
   }

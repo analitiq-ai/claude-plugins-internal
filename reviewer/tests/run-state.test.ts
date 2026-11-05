@@ -70,6 +70,15 @@ function couldNotRunNaming(...named: string[]): (error: unknown) => true {
   };
 }
 
+/** As couldNotRunNaming, and its next step is `next`. */
+function couldNotRunThen(next: string, ...named: string[]): (error: unknown) => true {
+  return (error) => {
+    couldNotRunNaming(...named)(error);
+    assert.ok((error as Error).message.endsWith(`; ${next}`), (error as Error).message);
+    return true;
+  };
+}
+
 describe("RunState (R3, data-model State write step)", () => {
   it("reads state once for the run and decides each later step on the reading the last write returned", async () => {
     const h = harness();
@@ -134,9 +143,9 @@ describe("RunState (R3, data-model State write step)", () => {
     assert.equal(h.decided.length, 0);
   });
 
-  it("refuses as could not run when the reader sees no item of the issue on the board, naming the board", async () => {
+  it("refuses as could not run when the reader sees no item of the issue on the board, naming the board, next fix it", async () => {
     const h = harness({ issue: { items: [OTHER_PROJECT] } });
-    await assert.rejects(h.state.reading(), couldNotRunNaming(SHARED.board));
+    await assert.rejects(h.state.reading(), couldNotRunThen("fix what it names, then retry the step", SHARED.board));
   });
 
   it("refuses as could not run when the write's commit is not GitHub-signed, naming the commit and the tamper hold it places", async () => {
@@ -152,7 +161,7 @@ describe("RunState (R3, data-model State write step)", () => {
     const h = harness();
     const unanswered = new GitHubUnanswered("POST /graphql: no answer within 30 s");
     h.ledger.refuseNext = unanswered;
-    await assert.rejects(h.state.step(nextRound(h), writeRound(h)), couldNotRunNaming(unanswered.message, "retry the step"));
+    await assert.rejects(h.state.step(nextRound(h), writeRound(h)), couldNotRunThen("retry the step", unanswered.message));
   });
 
   it("writes nothing to disk: run-state.ts imports no file system module", () => {
