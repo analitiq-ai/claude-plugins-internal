@@ -158,7 +158,7 @@ reason.
 
 - [ ] T045 [US2] Add Stop → `stop.ts` to `orchestrator/plugin/hooks/hooks.json` with `"timeout": 3900` and no `onFailure` (fails open)
 - [ ] T046 [P] [US2] Write failing `orchestrator/tests/stop-hook.test.ts`: a running `workflow` in `background_tasks` → no push, no step, exit 0 (US2 #4); no `background_tasks` field → no push, card to Blocked naming the missing field via `postKeyed` then `moveCard`, exit 0; commits the record names under the story branch → pushed and draft PR opened (US2 #1); the record's `off` → the agent identity's commits pushed with no pass (US2 #6); a failing commit → exit 2 naming commit and cause; a thrown error → exit 1; repository and issue come from the session record, passes and `off` from `readCommitPasses` for the hook's session; core's stop rule returning a stop → no push, no step, exit 0, and only for a card In progress or In review on a stop other than `done` or `closed` the rule's reason via `postKeyed` then `moveCard` to Blocked (US2 #7, FR-016c)
-- [ ] T047 [US2] Implement `orchestrator/plugin/hooks/stop.ts` (guard first, dynamic imports) calling core's stop rule, then `lib/push.ts`; T046 and T007 pass
+- [ ] T047 [US2] Implement `orchestrator/plugin/hooks/stop.ts` (guard first, dynamic imports) calling core's `readStoryStopFacts` with `fetchDefault` core `fetchWithGhCredential` of the default branch (R21), then core's stop rule, then `lib/push.ts`; T046 and T007 pass
 - [ ] T048 [P] [US2] Edit `builder/plugin/skills/issue-tackle/SKILL.md` (R19, FR-024): Step 4 (line 58) reads "commit, then end the turn; the orchestrator pushes and opens the draft PR"; remove Step 6's "Mark the PR ready"
 
 **Checkpoint**: a session on the agent machine pushes and opens the draft PR (live once #209 lands)

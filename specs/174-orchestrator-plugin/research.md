@@ -217,7 +217,8 @@ plan has not executed, and names the task that runs it first.
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 
 - **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
-  session's issue through core and calls `storyStop`. A stop pushes nothing and names no step, and the session
+  session's issue through core's `readStoryStopFacts`, passing core `fetchWithGhCredential` of the default branch
+  as its `fetchDefault`, so it decides on the same fresh tip builder does, and calls `storyStop`. A stop pushes nothing and names no step, and the session
   ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
   is posted keyed (R11) and the card moves to Blocked first.
 - **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only

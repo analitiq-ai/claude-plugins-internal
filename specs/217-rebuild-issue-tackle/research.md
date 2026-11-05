@@ -44,8 +44,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   `StepFacts` value, calls the pure `decideStep(facts)` in `lib/step.ts`, and prints the `Step` it returns as one
   JSON line on stdout (contracts/step-script.md). Exit 0: work to do; 1: a stop, its reason in the JSON; 2: a read
   did not answer, or the arguments are refused (P4). Facts are read in the order the decision needs them, and a
-  stop decided early reads nothing more. The script's writes are the every-run fetch of the default branch (R9) and the cut
-  (R8); every other change is the skill's.
+  stop decided early reads nothing more. The script's writes are the fetch of the default branch core's fact read makes (R9) and
+  the cut (R8); every other change is the skill's.
 - **Rationale**: spec "the skill does what the script names and nothing it does not"; P3's split followed (pure
   rule, I/O at the edge), so every acceptance scenario of US3–US5 is a `decideStep` unit test over facts, and the
   reads are tested once against the fake GitHub and a scratch repository.
@@ -122,23 +122,22 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
-- **Decision**: core's `readStoryStopFacts` (B7) reads `merge` against `refs/remotes/origin/<default>` as it
-  stands, fetching nothing; builder fetches the default branch there before each read, a write like the cut (R8).
-  `merge` is needed when the newest merged spec PR of `<p>` has a merge commit not in HEAD's history (the first
-  `merged` of `specPrs`, with B4's `mergeCommit`; `git cat-file -e`, then `git merge-base --is-ancestor`), or when the default branch's
-  tip is not an ancestor of HEAD and either `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty
-  (spec.md of the folder the default tip names, else of the one HEAD names, `**/docs/adr/`, `.specify/memory/`;
-  with neither naming exactly one, no spec.md, the folder argument made optional) or `git merge-tree
-  --write-tree origin/<default> HEAD` exits 1 (conflict, whether or not a PR exists). The spec PR test stands
-  alone, and a merge commit absent from the clone is not in HEAD's history, so the Stop hook, which fetches
-  nothing and may hold a stale default tip, still sees the due merge of a spec PR as builder does. It runs before
-  the folder check (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named. The skill then runs the printed
+- **Decision**: core's `readStoryStopFacts` (B7) first fetches the default branch to
+  `refs/remotes/origin/<default>` through its caller's `fetchDefault`, then reads every fact, so builder and the
+  Stop hook decide on the same fresh tip. `merge` is needed when that tip is not an ancestor of HEAD and any of:
+  the newest merged spec PR of `<p>` (the first `merged` of `specPrs`, with B4's `mergeCommit`) has a merge commit
+  not in HEAD's history (`git merge-base --is-ancestor`; any git failure throws); `governingDiff(ls-tree default,
+  ls-tree HEAD, folders)` is non-empty, `folders` every `specs/<p>-*` on either side, so a folder added, removed,
+  renamed or doubled is a difference (their spec.md, `**/docs/adr/`, `.specify/memory/`); or `git merge-tree
+  --write-tree origin/<default> HEAD` exits 1 (conflict, whether or not a PR exists). It runs before the folder
+  check (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named. The skill then
+  runs the printed
   `git merge --no-ff --no-edit refs/remotes/origin/<default>` in the worktree, resolves any conflict in that merge
   commit, and runs the script again (FR-017).
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
   head not yet pushed; GitHub's `mergeable` is of the PR's head only and may be UNKNOWN.
 - **Existing tools**: core `attest.ts` `governingDiff` (the same governing set orchestrator ADR-0004 d1 uses:
-  fits); `identity.ts` `specPr` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
+  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as `fetchDefault`); `identity.ts` `specPr` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
   merge-tree --write-tree` the same way (fits); `required-checks.ts` conflict finding (GitHub's `mergeable`,
   PR head only: does not fit before a PR).
 
@@ -222,8 +221,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
   `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
-  `readStoryStopFacts(s, sessionId, deps)`: read-only, through core's readers and `git.ts` `runGit`, writing
-  nothing. A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
+  `readStoryStopFacts(s, sessionId, deps)`: through core's readers and `git.ts` `runGit`, its one write the
+  injected `fetchDefault` before any read (R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
   it could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6 then returns `null`, as a merge
   in progress at stage 5 does: no stop, so the Stop
   hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.

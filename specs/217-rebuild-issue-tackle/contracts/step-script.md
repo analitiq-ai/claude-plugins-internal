@@ -23,7 +23,8 @@ Reads (research R5–R12, R16): the stop rule's facts through core's `readStoryS
 ## Writes
 
 Only these, each idempotent:
-- every run, before the facts are read: `git fetch` of the default branch to `refs/remotes/origin/<default>` (R9);
+- every run, by core's `readStoryStopFacts` before it reads: `git fetch` of the default branch to
+  `refs/remotes/origin/<default>` (R9);
 - no branch on GitHub or locally: `git worktree add -b <branch> ../<repo>.worktrees/<branch> <sha>`, `<sha>` the
   fetched default tip, run only when the folder at that tip gives no stop (R10);
 - a branch on GitHub only: `git fetch` of it to `refs/remotes/origin/<branch>`, then `git worktree add -B <branch>

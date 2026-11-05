@@ -315,7 +315,7 @@ the new head.
   merged before US3, and MUST take no key reader and no writing client (root ADR-0008 d4).
 - **FR-025**: The step's stop rule MUST be a pure function in core, called by builder's step script and by the
   orchestrator's Stop hook, so the card's Blocked reason names builder's stop (builder ADR-0003 d2). Its facts MUST be read by one
-  read-only core function both call; builder cuts or adds the worktree itself (FR-027), then reads them again.
+  core function both call, which fetches the default branch before it reads and writes nothing else; builder cuts or adds the worktree itself (FR-027), then reads them again.
 - **FR-026**: The PR's findings MUST be read from its required checks and threads and, when those have none, from
   the `<module>-review` check runs the orchestrator's App writes at the head, a failed run being its module's one
   finding and a pending or absent run none, never by loading validator packages in builder.

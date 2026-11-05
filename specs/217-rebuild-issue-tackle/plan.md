@@ -33,7 +33,7 @@ support; `core/scripts/check-carriers.ts` in CI
 
 **Performance Goals**: a step read finishes well inside one Bash call (< 60 s); no polling
 
-**Constraints**: GitHub read-only (session token); writes only the cut's local branch and worktree; imports only
+**Constraints**: GitHub read-only (session token); writes only the fetch of the default branch and the cut's local branch and worktree; imports only
 core; no Python
 
 **Scale/Scope**: one story per session, one step per invocation
@@ -133,7 +133,7 @@ US1's sections, each with the first story that calls it:
 | B1 | Story branch name | US3 | `storyBranchName(s, k, title)` beside `parseBranch`, slug grammar pinned, round-trip asserted (R8) |
 | B2 | Task-line grammar and story tasks | US3 | `readTaskLine` and `storyTasks(text, s)` in `contracts/tasks.ts`; planner's `land.ts` reads tags through it (R11) |
 | B3 | Story PR closed | B7, US3 | `StoryPr.closed`, read by the query already (R12) |
-| B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure, stage 6's due merge before the folder stops; `readStoryStopFacts`, read-only, `merge` among its facts, after B3 and B4; #174's Stop hook calls both (R9, R16) |
+| B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure, stage 6's due merge before the folder stops; `readStoryStopFacts`, its one write the default branch's fetch before it reads, `merge` among its facts, after B3 and B4; #174's Stop hook calls both (R9, R16) |
 | B5 | `internal-review` read | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
 | B6 | PR findings | US4 | `prFindings(reader, …)` over required checks, `<module>-review` check runs and threads; no key, no writer (R12) |
 | B4 | Spec PR merge commit | B7, US3 | `SpecPr.mergeCommit` (R9) |

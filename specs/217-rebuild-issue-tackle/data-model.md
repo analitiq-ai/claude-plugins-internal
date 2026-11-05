@@ -18,7 +18,7 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
 | `worktree` | `{path, branch: string\|null, mergeInProgress: boolean, dirty: string[]}` \| `null` | `git worktree list --porcelain` at `../<repo>.worktrees/<branch>`; `MERGE_HEAD`; `git status --porcelain` |
-| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7), R9: spec PR merge commit, `governingDiff`, `merge-tree` |
+| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) after its `fetchDefault`, R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
 | `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD; with no branch anywhere, at `refs/remotes/origin/<default>`, the tip a cut starts from (R10) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
