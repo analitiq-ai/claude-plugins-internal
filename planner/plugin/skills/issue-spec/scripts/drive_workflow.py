@@ -58,11 +58,11 @@ def _check_outcomes(path, *names):
 
 FAIL, COULD_NOT_RUN = _check_outcomes(CHECK_OUTCOMES, "FAIL", "COULD_NOT_RUN")
 # The stop table's lines this report reads: the step-unfinished line, the ruling-refused label, and the label of each
-# stop whose Unanswered step is a model step, with that step.
+# stop whose Unanswered step is a model step, with that step (adr-check.test.ts pins it to UNANSWERED_STEPS).
 STEP_UNFINISHED = re.compile(rf"^{COULD_NOT_RUN}: adr-check: step (.+) did not finish this round")
 RULING_REFUSED = f"{FAIL}: adr_ruling: "
 UNANSWERED = {"touches.json": "adr-touches", "tasks.md": "adr-tasks", "adr-verdict.json": "adr-judge"}
-UNANSWERED_LINE = re.compile(rf"^{COULD_NOT_RUN}: (touches\.json|tasks\.md|adr-verdict\.json): ")
+UNANSWERED_LINE = re.compile(rf"^{COULD_NOT_RUN}: ({'|'.join(map(re.escape, UNANSWERED))}): ")
 
 
 def _own_id(step):

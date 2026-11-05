@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "const": 1,
+      "type": "number"
+    },
+    "verdicts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "folder": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "judgment": {
+            "enum": [
+              "WITHIN",
+              "DEPARTS"
+            ],
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "record": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "why": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder",
+          "record",
+          "judgment",
+          "paths",
+          "why"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "v",
+    "verdicts"
+  ],
+  "type": "object"
+}

@@ -54,7 +54,12 @@ export const ADR_STOPS = {
   },
   "stop-unread": { outcome: COULD_NOT_RUN, label: STOP_FILE, what: "does not parse", next: CHECK_AGAIN },
   "step-unfinished": { outcome: COULD_NOT_RUN, label: "adr-check", what: null, next: "fix what the step's error names, then resume" },
-  "tasks-unfinished": { outcome: COULD_NOT_RUN, label: "tasks.md", what: null, next: CHECK_AGAIN },
+  "tasks-unfinished": {
+    outcome: COULD_NOT_RUN,
+    label: "tasks.md",
+    what: "the tasks command did not answer (its exit code not 0)",
+    next: CHECK_AGAIN,
+  },
   "touches-refused": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: null, next: CHECK_AGAIN },
   "touches-missing": { outcome: COULD_NOT_RUN, label: TOUCHES_FILE, what: null, next: CHECK_AGAIN },
   "touches-stale": {
@@ -101,6 +106,14 @@ export const ADR_STOPS = {
 
 type Stops = typeof ADR_STOPS;
 export type StopKind = keyof Stops;
+
+/** The stop table's Unanswered column: the model step that did not answer, for each kind that has one. ADR_STOPS'
+ *  row type is the table's outcome, label, what and next (workflow-steps.md). */
+export const UNANSWERED_STEPS = {
+  "verdict-unread": "adr-judge",
+  "tasks-unfinished": "adr-tasks",
+  "touches-missing": "adr-touches",
+} as const satisfies Partial<Record<StopKind, string>>;
 
 type Placeholders<Text> = Text extends `${string}<${infer Name}>${infer Rest}` ? Name | Placeholders<Rest> : never;
 type Given<Kind extends StopKind> = (Stops[Kind]["label"] extends string ? unknown : { label: string }) &

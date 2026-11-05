@@ -17,7 +17,7 @@ decision rejected, contradicts what it chose, or breaks a consequence it commits
 speak to is not yours to judge, however you would have done it. Name no departure on a path that a ruling with the
 same `folder` and `record` already rules on.
 
-Write `<run folder>/adr-verdict.json`:
+Write `<run folder>/adr-verdict.json`, valid against `.specify/workflows/issue-spec/adr-verdict.schema.json`:
 
 ```json
 {"v": 1, "verdicts": [
@@ -32,6 +32,5 @@ Write `<run folder>/adr-verdict.json`:
   same `folder` and `record` rules on, else `WITHIN`. `paths` lists, for `DEPARTS`, each such path; for `WITHIN`,
   none.
 - `why` is one line, with no period at its end.
-- `v` is `1`; the file has no key but `v` and `verdicts`.
 
 Write no other file, change no artifact, and give no ruling: a ruling is the user's.

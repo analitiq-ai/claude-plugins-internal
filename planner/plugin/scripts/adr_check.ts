@@ -65,7 +65,9 @@ const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
 const { gitTree, NotInTree } = await import("../core/tree.ts");
 const { CheckedArtifact } = await import("../core/values.ts");
-const { adrStop, changedSince, decideCheck, decideFolder, isRuled, roundsStop, stopWords } = await import("../lib/adr-check.ts");
+const { adrStop, changedSince, decideCheck, decideFolder, isRuled, roundsStop, stopWords, UNANSWERED_STEPS } = await import(
+  "../lib/adr-check.ts"
+);
 const { mintPlannerToken, originRepository, plannerGitHub, readRepository, readSubIssues } = await import("../lib/github.ts");
 const { readPlannerSettings } = await import("../lib/settings.ts");
 const { extraSubIssues, foreignSubIssues, misplacedSubIssues, readStoryPlan, TasksRefused } = await import("../lib/story-plan.ts");
@@ -88,8 +90,6 @@ const ANSWERED = "0";
 const TASKS_MD = "tasks.md";
 const RUN_KINDS: ReadonlySet<string> = new Set(["new", "rescope"] satisfies RunKind[]);
 const ISSUE_NUMBER = /^[1-9][0-9]*$/;
-// The stop table's Unanswered column (workflow-steps.md).
-const UNANSWERED: ReadonlySet<StopItem["kind"]> = new Set(["touches-missing", "tasks-unfinished", "verdict-unread"]);
 const { plan: PLAN, tasks: TASKS } = CheckedArtifact.schema.enum;
 
 const CWD = process.cwd();
@@ -167,20 +167,24 @@ function stopRecorded(run: string): boolean {
 
 function recordStop(run: string, items: readonly StopItem[]): void {
   const { lines, exit } = adrStop(items);
-  const unanswered = items.some((item) => UNANSWERED.has(item.kind));
+  const unanswered = items.some((item) => Object.hasOwn(UNANSWERED_STEPS, item.kind));
   // AdrStopRecord refuses an exit of 0 and an empty list, so a stop that says nothing fails the step, never passes.
   writeJson(join(run, STOP_FILE), AdrStopRecord.parse({ v: 1, exit, lines, shown: false, unanswered }));
 }
 
-/** `check`'s answer, or null on a stop: its own, which it records, or one the round already recorded, the one shown. */
-async function checked<Answer>(run: string, check: () => Promise<Answer>): Promise<Answer | null> {
-  if (stopRecorded(run)) return null;
+/** `check`'s answer, or null on its stop, which it records over any the round holds. */
+async function recording<Answer>(run: string, check: () => Promise<Answer>): Promise<Answer | null> {
   try {
     return await check();
   } catch (error) {
     recordStop(run, stopsOf(error));
     return null;
   }
+}
+
+/** `check`'s answer, or null on a stop: its own, which it records, or one the round already recorded, the one shown. */
+async function checked<Answer>(run: string, check: () => Promise<Answer>): Promise<Answer | null> {
+  return stopRecorded(run) ? null : recording(run, check);
 }
 
 /** The step's last act: report takes a missing one for a step that did not finish. */
@@ -214,29 +218,21 @@ async function roundSettingsOrStop(): Promise<Round | Stopped> {
   }
 }
 
-/** `paths`, relative to the run's project or absolute, hashed under keys relative to the checkout's top, or absolute
- *  for a path outside it. */
-async function hashedFromTop(paths: readonly string[]): Promise<SourceHashes> {
-  return sourceHashes(await checkoutToplevel(CWD), paths.map((path) => resolve(CWD, path)));
-}
-
 function touchesSources(specDir: string): Promise<SourceHashes> {
-  return hashedFromTop([join(specDir, "plan.md"), join(specDir, "spec.md")]);
+  return sourceHashes(CWD, [join(specDir, "plan.md"), join(specDir, "spec.md")]);
 }
 
 async function tasksSources(specDir: string): Promise<SourceHashes> {
-  return hashedFromTop(await tasksSourcePaths(CWD, specDir));
+  return sourceHashes(CWD, await tasksSourcePaths(CWD, specDir));
 }
 
 async function roundInputs(specDir: string, run: string, folders: readonly ResolvedAdrFolder[]): Promise<SourceHashes> {
-  return hashedFromTop(await roundInputPaths(CWD, specDir, run, folders.map(({ path }) => path)));
+  return sourceHashes(CWD, await roundInputPaths(CWD, specDir, run, folders.map(({ path }) => path)));
 }
 
-function readTasks(specDir: string): string {
-  const text = textIfPresent(join(specDir, TASKS_MD));
-  // tasks-due finds a round without tasks.md due, so a missing one went unwritten this round.
-  if (text === null) throw new Stopped([{ kind: "tasks-unfinished", what: "the round wrote no tasks.md" }]);
-  return text;
+/** tasks.md as it stands; null when the round left none, which names no path (FR-008). */
+function readTasks(specDir: string): string | null {
+  return textIfPresent(join(specDir, TASKS_MD));
 }
 
 /** touches.json's paths, each the plan's. */
@@ -261,6 +257,8 @@ function readPlanPaths(run: string): ArtifactPath[] {
 /** tasks.md's task paths; a span naming a root file is one only when git tracks that file or `plan` lists it. */
 async function readTasksPaths(toplevel: string, specDir: string, plan: readonly ArtifactPath[]): Promise<ArtifactPath[]> {
   const text = readTasks(specDir);
+  // A missing tasks.md names no path (FR-008): ask stops on tasks-empty, decide's guard on each path ask held of it.
+  if (text === null) return [];
   const tracked = (await runGit(toplevel, ["ls-files", "-z"])).stdout.split("\0");
   const rootFiles = new Set([...tracked, ...plan.map(({ path }) => path)].filter((path) => path !== "" && !path.includes("/")));
   try {
@@ -353,9 +351,7 @@ async function tasksDue(specDir: string, run: string): Promise<number> {
 function tasksWritten(run: string, tasksExit: string): number {
   // The hashes tasks-due took before the command ran: a source changed while it ran makes the next round due.
   if (tasksExit === ANSWERED) renameSync(join(run, TASKS_SOURCES_NEXT_FILE), join(run, TASKS_SOURCES_FILE));
-  else if (!stopRecorded(run)) {
-    recordStop(run, [{ kind: "tasks-unfinished", what: "the tasks command did not answer (its exit code not 0)" }]);
-  }
+  else if (!stopRecorded(run)) recordStop(run, [{ kind: "tasks-unfinished" }]);
   writeDone(run, { v: 1, step: "tasks-written" });
   return 0;
 }
@@ -412,7 +408,10 @@ async function stories(issue: string, kind: RunKind, specDir: string, run: strin
   writeJson(join(run, INPUTS_FILE), await roundInputs(specDir, run, round instanceof Stopped ? [] : round.folders));
   await checked(run, async () => {
     if (round instanceof Stopped) throw round;
-    const plan = storyPlanOf(readTasks(specDir));
+    const tasks = readTasks(specDir);
+    // A missing tasks.md has no story plan: it names no path, ask's stop (FR-008).
+    if (tasks === null) return;
+    const plan = storyPlanOf(tasks);
     // A rescope's sub-issues are its existing stories, which its new tasks.md may drop or reorder (#178).
     if (kind === "rescope") return;
     const items = await subIssueStops(issue, round, plan);
@@ -605,10 +604,12 @@ async function deciding(specDir: string, run: string, digest: string, judgeExit:
 }
 
 async function decide(specDir: string, run: string, digest: string, judgeExit: string): Promise<number> {
-  // decide runs only when ask recorded no stop, so a stop record here was not written by the check.
-  rmSync(join(run, STOP_FILE), { force: true });
-  const lines = await checked(run, () => deciding(specDir, run, digest, judgeExit));
-  if (lines !== null) printLines(lines);
+  const lines = await recording(run, () => deciding(specDir, run, digest, judgeExit));
+  if (lines !== null) {
+    // decide runs only on ask's `decide`, so ask recorded no stop: one here was not written by the check.
+    rmSync(join(run, STOP_FILE), { force: true });
+    printLines(lines);
+  }
   writeDone(run, { v: 1, step: "decide" });
   return 0;
 }

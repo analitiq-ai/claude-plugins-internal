@@ -434,20 +434,23 @@ describe("SourceHashes", () => {
 });
 
 describe("sourceHashes", () => {
-  function checkout(t: TestContext): { cwd: string; outside: string } {
+  /** cwd `project` of a checkout, its top by default; `outside` a folder outside the checkout. */
+  async function checkout(t: TestContext, project = "."): Promise<{ cwd: string; outside: string }> {
     const root = tempFolder(t);
-    const cwd = join(root, "widgets");
+    const top = join(root, "widgets");
+    const cwd = join(top, project);
     const outside = join(root, "org", "docs", "adr");
     mkdirSync(join(cwd, "specs", "7-x"), { recursive: true });
     mkdirSync(outside, { recursive: true });
+    await runGit(top, ["init", "-q", "-b", "main"]);
     writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan\n");
     writeFileSync(join(cwd, "specs", "7-x", "spec.md"), "# Spec\n");
     writeFileSync(join(outside, "0001-x.md"), "# ADR-0001\n");
     return { cwd, outside };
   }
 
-  it("keys each file under cwd repo-relative and one outside it by its absolute path, each the sha256 of its bytes", async (t) => {
-    const { cwd, outside } = checkout(t);
+  it("keys each file in the checkout repo-relative and one outside it by its absolute path, each the sha256 of its bytes", async (t) => {
+    const { cwd, outside } = await checkout(t);
     const record = join(outside, "0001-x.md");
     assert.deepEqual(await sourceHashes(cwd, ["specs/7-x/plan.md", join(cwd, "specs", "7-x", "spec.md"), record]), {
       v: 1,
@@ -455,8 +458,29 @@ describe("sourceHashes", () => {
     });
   });
 
+  // data-model.md Source hashes: "the path repo-relative under the checkout".
+  it("keys a file repo-relative from the checkout's top when cwd is a project below it", async (t) => {
+    const { cwd } = await checkout(t, "tools");
+    assert.deepEqual(await sourceHashes(cwd, ["specs/7-x/plan.md"]), {
+      v: 1,
+      files: { "tools/specs/7-x/plan.md": sha256("# Plan\n") },
+    });
+  });
+
+  it("is GitFailed outside a git checkout", async (t) => {
+    const folder = tempFolder(t);
+    const ceiling = process.env.GIT_CEILING_DIRECTORIES;
+    // git stops looking for a checkout at the folder's parent, wherever the temp folder lies.
+    process.env.GIT_CEILING_DIRECTORIES = dirname(folder);
+    t.after(() => {
+      if (ceiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+      else process.env.GIT_CEILING_DIRECTORIES = ceiling;
+    });
+    await assert.rejects(sourceHashes(folder, []), GitFailed);
+  });
+
   it("leaves an absent file out", async (t) => {
-    const { cwd } = checkout(t);
+    const { cwd } = await checkout(t);
     assert.deepEqual(await sourceHashes(cwd, ["specs/7-x/plan.md", "specs/7-x/research.md"]), {
       v: 1,
       files: { "specs/7-x/plan.md": sha256("# Plan\n") },
@@ -464,7 +488,7 @@ describe("sourceHashes", () => {
   });
 
   it("is equal for files whose bytes are unchanged", async (t) => {
-    const { cwd, outside } = checkout(t);
+    const { cwd, outside } = await checkout(t);
     const paths = ["specs/7-x/plan.md", "specs/7-x/spec.md", join(outside, "0001-x.md")];
     const before = await sourceHashes(cwd, paths);
     writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan\n");
@@ -472,7 +496,7 @@ describe("sourceHashes", () => {
   });
 
   it("is unequal once a file changes, inside cwd or out", async (t) => {
-    const { cwd, outside } = checkout(t);
+    const { cwd, outside } = await checkout(t);
     const paths = ["specs/7-x/plan.md", join(outside, "0001-x.md")];
     const before = await sourceHashes(cwd, paths);
     writeFileSync(join(cwd, "specs", "7-x", "plan.md"), "# Plan, changed\n");
@@ -483,7 +507,7 @@ describe("sourceHashes", () => {
   });
 
   it("is unequal once a file is removed", async (t) => {
-    const { cwd } = checkout(t);
+    const { cwd } = await checkout(t);
     const paths = ["specs/7-x/plan.md", "specs/7-x/spec.md"];
     const before = await sourceHashes(cwd, paths);
     rmSync(join(cwd, "specs", "7-x", "spec.md"));

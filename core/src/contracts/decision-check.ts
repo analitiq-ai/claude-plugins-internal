@@ -35,15 +35,22 @@ export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: 
 export const SourceHashes = z.strictObject({ v: z.literal(1), files: z.record(z.string(), z.string()) });
 export type SourceHashes = z.infer<typeof SourceHashes>;
 
-/** The sha256 of each path given that exists, keyed repo-relative under `cwd` and absolute outside it (a listed
- *  folder outside the repo), an absent one left out; equal sets mean unchanged sources. */
+/** The checkout's top, relative to `cwd`: empty at the top. GitFailed when `cwd` is in no git checkout. */
+async function checkoutTopFrom(cwd: string): Promise<string> {
+  return (await runGit(cwd, ["rev-parse", "--show-cdup"])).stdout.trim();
+}
+
+/** The sha256 of each path given that exists, relative to `cwd` or absolute, keyed repo-relative from the top of the
+ *  checkout `cwd` is in, whichever project of it `cwd` is, and absolute outside it (a listed folder outside the repo);
+ *  an absent one left out. Equal sets mean unchanged sources. GitFailed when `cwd` is in no git checkout. */
 export async function sourceHashes(cwd: string, paths: readonly string[]): Promise<SourceHashes> {
+  const top = resolve(cwd, await checkoutTopFrom(cwd));
   const files: Record<string, string> = {};
   for (const path of paths) {
     const absolute = resolve(cwd, path);
     const bytes = await bytesIfPresent(absolute);
     if (bytes === null) continue;
-    const key = liesUnder(cwd, absolute) ? relative(cwd, absolute) : absolute;
+    const key = liesUnder(top, absolute) ? relative(top, absolute) : absolute;
     files[key] = createHash("sha256").update(bytes).digest("hex");
   }
   return { v: 1, files };
@@ -83,7 +90,7 @@ export async function tasksSourcePaths(cwd: string, specDir: string): Promise<st
 export async function roundInputPaths(cwd: string, specDir: string, runDir: string, folderPaths: readonly string[]): Promise<string[]> {
   const folderFiles = await Promise.all(folderPaths.map((folder) => filesUnder(cwd, folder)));
   // The settings are the checkout's, read at its top, whichever project of it the run is in.
-  const toTop = (await runGit(cwd, ["rev-parse", "--show-cdup"])).stdout.trim();
+  const toTop = await checkoutTopFrom(cwd);
   return [
     ...(await tasksSourcePaths(cwd, specDir)),
     join(specDir, "tasks.md"),

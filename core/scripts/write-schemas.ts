@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { z } from "zod";
+import { AdrVerdict, TouchedPaths } from "../src/contracts/decision-check.ts";
 import { Finding } from "../src/contracts/finding.ts";
 import { PremisePick, REPORTS_WRONG_BEHAVIOUR, ROOT_CAUSE } from "../src/contracts/premise.ts";
 import { Snapshot } from "../src/contracts/snapshot.ts";
@@ -49,6 +50,10 @@ export const generatedFiles: ReadonlyArray<{ file: string; text: () => string }>
   { file: "premise.json", text: premiseJsonText },
   // Planner's Python reads the outcomes its ADR check's stop lines start with from here (root ADR-0010 d1).
   { file: "check-outcome.schema.json", text: () => jsonSchemaText(CheckOutcome.schema) },
+  // The answers the ADR check's prompt steps write, per root ADR-0010's generated answer schemas. Planner's workflow
+  // package carries a copy: it holds no symlink.
+  { file: "adr-verdict.schema.json", text: () => jsonSchemaText(AdrVerdict) },
+  { file: "touched-paths.schema.json", text: () => jsonSchemaText(TouchedPaths) },
 ];
 
 if (import.meta.main) {

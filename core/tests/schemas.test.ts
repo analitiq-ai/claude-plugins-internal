@@ -32,9 +32,9 @@ for (const { file, text } of generatedFiles) {
   });
 }
 
-test("the generated files are premise.json and the CheckOutcome schema planner's Python reads", () => {
+test("the generated files are premise.json, the CheckOutcome schema and the ADR check's answer schemas planner reads", () => {
   assert.deepEqual(
     generatedFiles.map(({ file }) => file),
-    ["premise.json", "check-outcome.schema.json"],
+    ["premise.json", "check-outcome.schema.json", "adr-verdict.schema.json", "touched-paths.schema.json"],
   );
 });

@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 import { ADR_INSTALL, ADR_VERSION } from "../plugin/core/adr.ts";
 import { AdrVerdict, readTouchedPaths } from "../plugin/core/contracts/decision-check.ts";
 import { couldNotRun } from "../plugin/core/outcomes.ts";
-import { AdrJudgment, CheckOutcome } from "../plugin/core/values.ts";
-import { ADR_STOPS, adrStop, changedSince, decideCheck, decideFolder } from "../plugin/lib/adr-check.ts";
+import { CheckOutcome } from "../plugin/core/values.ts";
+import { ADR_STOPS, adrStop, changedSince, decideCheck, decideFolder, UNANSWERED_STEPS } from "../plugin/lib/adr-check.ts";
 import { git, scratchCheckout, storeToken, tempHome, writeFiles } from "./support/checkout.ts";
 
 // Spec 177, US3 (with US4's tasks.md): the stop table and the pure decisions first, then each round step of the
@@ -22,6 +22,7 @@ import { git, scratchCheckout, storeToken, tempHome, writeFiles } from "./suppor
 // the rows of review questions (US6).
 
 const SCRIPT = fileURLToPath(new URL("../plugin/scripts/adr_check.ts", import.meta.url));
+const DRIVER = fileURLToPath(new URL("../plugin/skills/issue-spec/scripts/drive_workflow.py", import.meta.url));
 const GITHUB_AT = fileURLToPath(new URL("./support/github-at.ts", import.meta.url));
 const PATH = process.env.PATH ?? "";
 const { PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
@@ -196,6 +197,20 @@ describe("ADR_STOPS", () => {
   // quickstart Planner: "any stop line" — no next step names an edit to `tasks.md`
   it("has no row whose next step sends the admin to edit tasks.md", () => {
     assertNoTasksEdit(Object.values(ADR_STOPS).flatMap((row) => (row.next === null ? [] : [String(row.next)])));
+  });
+});
+
+describe("UNANSWERED_STEPS", () => {
+  it("names adr-judge, adr-tasks and adr-touches for verdict-unread, tasks-unfinished and touches-missing, no other kind", () => {
+    assert.deepEqual(UNANSWERED_STEPS, { "verdict-unread": "adr-judge", "tasks-unfinished": "adr-tasks", "touches-missing": "adr-touches" });
+  });
+
+  // drive_workflow.py keys the Unanswered steps by label.
+  it("is drive_workflow.py's UNANSWERED, keyed by each row's label", () => {
+    const found = /^UNANSWERED = (\{.*\})$/m.exec(readFileSync(DRIVER, "utf8"));
+    assert.ok(found, "drive_workflow.py has no one-line `UNANSWERED = {…}`");
+    const byLabel = Object.entries(UNANSWERED_STEPS).map(([kind, step]) => [ADR_STOPS[kind as StopKind].label, step]);
+    assert.deepEqual(JSON.parse(found[1]), Object.fromEntries(byLabel));
   });
 });
 
@@ -1404,6 +1419,19 @@ describe("adr_check.ts ask and decide", () => {
       });
     }
 
+    // FR-008: a tasks.md naming no path, a missing one too, has lost every path ask recorded of it. report then asks
+    // for a new round, tasks.md being a round input, so the stop is read from its record.
+    for (const [what, change] of [
+      ["removed", (w: World) => rmSync(join(w.spec, "tasks.md"))],
+      ["emptied", (w: World) => writeTasks(w, tasksMd({ us1: "Read the folders" }))],
+    ] as const) {
+      it(`decide records tasks.md ${what} after ask as each path it held removed`, (t) => {
+        const w = world(t);
+        runRound(w, { beforeDecide: () => change(w) });
+        assert.deepEqual(stopRecord(w).lines, [couldNotRunLine("tasks.md", `changed after ask: removed ${X}`)]);
+      });
+    }
+
     it("could not run when touches.json gained a path it refuses after ask, naming the refusal", (t) => {
       const w = world(t);
       const { exit, lines } = stops(w, { beforeDecide: () => writeTouches(w, { v: 1, paths: [X, "core/src/{a,b}.ts"] }) });
@@ -1578,6 +1606,20 @@ describe("adr_check.ts, the paths a round asks about", () => {
       unanswered: false,
     });
   });
+
+  // FR-008: a tasks.md naming no path, reported by the ask step; a tasks command that exits 0 has answered, whatever
+  // file it left (workflow-steps.md), so stories finds no tasks.md to check.
+  for (const kind of [NEW, RESCOPE]) {
+    it(`on a ${kind} run, ask records tasks-empty when the tasks command exits 0 and writes no tasks.md`, (t) => {
+      const w = world(t);
+      assert.deepEqual(askStops(w, { kind, tasks: null, beforeAsk: forgetCalls(w) }), {
+        exit: 2,
+        lines: [TASKS_EMPTY_LINE],
+        unanswered: false,
+      });
+      assert.deepEqual(adrCalls(w), []);
+    });
+  }
 
   // quickstart Planner: "`touches.json` unparsable, an extra key, an entry not a `PATH`, or an entry twice". The stop
   // table's touches-refused row is COULD_NOT_RUN: the touches step writes the file again in the next round.
@@ -1868,6 +1910,36 @@ async function roundReachingGitHub(
 
 const answering = (...issues: ReturnType<typeof subIssue>[]) => (res: ServerResponse) => reply(res, 200, issues);
 
+// data-model.md Source hashes: a path repo-relative under the checkout, whichever of its projects the run is in.
+describe("the source hashes of a run from a project below the checkout's top", () => {
+  const CONSTITUTION_MD = ".specify/memory/constitution.md";
+  const PROJECT_FILES = {
+    [`${SPEC}/spec.md`]: SPEC_MD,
+    [`${SPEC}/plan.md`]: PLAN,
+    [`${SPEC}/research.md`]: RESEARCH,
+    [`${SPEC}/tasks.md`]: TASKS,
+    [CONSTITUTION_MD]: CONSTITUTION,
+  };
+  for (const [file, args, hashed] of [
+    ["touches-from.json", ["clear", SPEC, RUN], [`${SPEC}/plan.md`, `${SPEC}/spec.md`]],
+    ["tasks-sources-next.json", ["tasks-due", SPEC, RUN], [`${SPEC}/spec.md`, `${SPEC}/plan.md`, `${SPEC}/research.md`, CONSTITUTION_MD]],
+    ["adr-inputs.json", ["stories", ISSUE, RESCOPE, SPEC, RUN], Object.keys(PROJECT_FILES)],
+  ] as const) {
+    it(`key each project file ${file} hashes from the checkout's top, and no file in the checkout by an absolute path`, (t) => {
+      const w = world(t);
+      const project = join(w.checkout, "tools");
+      writeFiles(project, PROJECT_FILES);
+      mkdirSync(join(project, RUN), { recursive: true });
+      const ran = script(project, [...args], {}, `${w.bin}${delimiter}${PATH}`);
+      assert.equal(ran.exit, 0, ran.lines.join("\n"));
+      const keys = Object.keys((readJson(join(project, RUN, file)) as { files: Record<string, string> }).files);
+      for (const path of hashed) assert.ok(keys.includes(`tools/${path}`), `no tools/${path} in\n${keys.join("\n")}`);
+      assert.deepEqual(keys.filter((key) => Object.hasOwn(PROJECT_FILES, key)), []);
+      assert.deepEqual(keys.filter((key) => isAbsolute(key) && !key.startsWith(`${w.outside}${sep}`)), []);
+    });
+  }
+});
+
 describe("adr_check.ts stories", () => {
   // quickstart Planner: "`stories`: `tasks.md` breaking the story plan or a task-block label"
   for (const [what, tasks] of [
@@ -1893,39 +1965,6 @@ describe("adr_check.ts stories", () => {
     runRound(w, { tasks: tasksMd().replaceAll(/\[US\d\] /g, "") });
     assert.match(stopRecord(w).lines[0], /^FAIL: tasks\.md/);
     assert.ok(existsSync(join(w.run, "adr-inputs.json")), "stories wrote no adr-inputs.json");
-  });
-
-  // FR-008: a model step that does not answer makes the check could not run, and the tasks command answers in tasks.md.
-  it("records tasks-unfinished when the tasks command exits 0 and writes no tasks.md", (t) => {
-    const w = world(t);
-    const { due, asked } = runRound(w, { tasks: null, beforeAsk: forgetCalls(w) });
-    assert.equal(due, true);
-    assert.equal(asked.decide, false);
-    assert.deepEqual(shown(w), {
-      exit: 2,
-      lines: [couldNotRunLine("tasks.md", "the round wrote no tasks.md")],
-      unanswered: true,
-    });
-    assert.deepEqual(adrCalls(w), []);
-  });
-
-  // data-model.md Source hashes: a path repo-relative under the checkout, whichever of its projects the run is in.
-  it("keys adr-inputs.json from the checkout's top in a run from a project below it", (t) => {
-    const w = world(t);
-    const project = join(w.checkout, "tools");
-    writeFiles(project, {
-      [`${SPEC}/spec.md`]: SPEC_MD,
-      [`${SPEC}/plan.md`]: PLAN,
-      [`${SPEC}/research.md`]: RESEARCH,
-      [`${SPEC}/tasks.md`]: TASKS,
-      ".specify/memory/constitution.md": CONSTITUTION,
-    });
-    mkdirSync(join(project, RUN), { recursive: true });
-    quiet(script(project, ["stories", ISSUE, RESCOPE, SPEC, RUN], {}, `${w.bin}${delimiter}${PATH}`), "stories");
-    const keys = Object.keys((readJson(join(project, RUN, "adr-inputs.json")) as { files: Record<string, string> }).files);
-    assert.ok(keys.includes("codeworks.toml"), keys.join("\n"));
-    assert.ok(keys.includes(`tools/${SPEC}/plan.md`), keys.join("\n"));
-    assert.deepEqual(keys.filter((key) => isAbsolute(key) && !key.startsWith(`${w.outside}${sep}`)), []);
   });
 
   // quickstart Planner: "`stories` on a `new` run: extra, foreign or out-of-order sub-issues / the same on a `rescope`"
@@ -2228,17 +2267,22 @@ describe("the files the prompt steps are shown", () => {
     assert.ok(parsed.success, parsed.error?.message);
   });
 
-  // A workflow package holds no symlink and a prompt step sees no environment, so the judge cannot be handed core's
-  // generated schema: the values its prompt words by hand are pinned here.
-  it("adr-judge.md names every AdrJudgment value, and its verdict shows each", () => {
-    const text = readFileSync(join(WORKFLOW, "adr-judge.md"), "utf8");
-    const named = [...text.matchAll(/`([A-Z][A-Z_]+)`/g)].map(([, value]) => value);
-    assert.deepEqual([...new Set(named)].sort(), [...AdrJudgment.schema.options].sort());
-    const shown = AdrVerdict.parse(example("adr-judge.md")).verdicts.map(({ judgment }) => judgment);
-    assert.deepEqual([...new Set(shown)].sort(), [...AdrJudgment.schema.options].sort());
-  });
-
   it("adr-touches.md's touches.json reads as touched paths", () => {
     assert.notDeepEqual(readTouchedPaths(example("adr-touches.md")), []);
   });
+
+  // root ADR-0010: an agent's answer schema is generated. A workflow package holds no symlink, so it carries a copy of
+  // the schema core generates, named by the prompt where the package is installed.
+  const CORE_GENERATED = fileURLToPath(new URL("../plugin/core/generated/", import.meta.url));
+  for (const [prompt, schema] of [
+    ["adr-judge.md", "adr-verdict.schema.json"],
+    ["adr-touches.md", "touched-paths.schema.json"],
+  ] as const) {
+    it(`${prompt} answers per ${schema}, the package's copy of core's generated schema`, () => {
+      const copy = join(WORKFLOW, schema);
+      assert.ok(existsSync(copy), `copy core/src/generated/${schema} into the workflow package`);
+      assert.equal(readFileSync(copy, "utf8"), readFileSync(join(CORE_GENERATED, schema), "utf8"), `copy core/src/generated/${schema} again`);
+      assert.ok(readFileSync(join(WORKFLOW, prompt), "utf8").includes(`.specify/workflows/issue-spec/${schema}`), prompt);
+    });
+  }
 });
