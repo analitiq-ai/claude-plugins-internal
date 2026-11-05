@@ -13,19 +13,50 @@ from paths import PLUGIN, REPO, tracked_text
 COMMAND = re.compile(r"\b(?:reviewer|planner|builder):[\w-]+")
 # Paths reviewer must never ship, whatever another plugin ships at them: the planning and building skills under
 # their names before the move, speclocation.py, deleted with them, and speckit/, the tree every Spec Kit preset and
-# workflow lives under. The overlap guard below covers only the paths planner and builder ship today.
+# workflow lives under. Unlike the overlap guard below, this refusal holds whatever planner and builder ship.
 NEVER_IN_REVIEW = ("skills/issue-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/",
                    "scripts/speclocation.py", "speckit/")
 # Paths whose place is fixed rather than chosen by the plugin: the plugin format's hook config, and a core carrier's
 # link and pinned packages (root ADR-0001). Two plugins sharing one is not one shipping the other's file.
 FIXED_PATHS = ("hooks/hooks.json", "core", "package.json", "package-lock.json")
+# lib/ and one hook file per event: the paths at which carriers each ship their own module under one name
+# (lib/settings.ts, hooks/pre-tool-use.ts).
+CARRIER_MODULES = ("lib/*", "hooks/*.ts")
+# Every plugin's folder and everything under it. A glob pathspec does not match a path's parent folders, so the
+# folder needs a pathspec of its own.
+PLUGIN_TREES = (":(glob)*/plugin", ":(glob)*/plugin/**")
+REGULAR_FILE_MODES = ("100644", "100755")
+LINK = "120000"
+
+
+def entries(*pathspecs: str) -> dict[str, tuple[str, str]]:
+    """The index entries the pathspecs match, by path from the repo root, each with its mode and object id."""
+    out = subprocess.run(["git", "ls-files", "-s", "-z", "--", *pathspecs], cwd=REPO, capture_output=True, text=True,
+                         check=True).stdout
+    # Each entry is `<mode> <blob> <stage>\t<path>`.
+    split = (entry.split("\t", 1) for entry in out.split("\0") if entry)
+    return {path: (meta.split()[0], meta.split()[1]) for meta, path in split}
+
+
+def index(plugin: Path = PLUGIN) -> dict[str, tuple[str, str]]:
+    """The plugin's tracked files, relative to it, each with its mode and object id."""
+    root = plugin.relative_to(REPO)
+    return {str(Path(path).relative_to(root)): held for path, held in entries(str(root)).items()}
 
 
 def shipped(plugin: Path = PLUGIN) -> list[str]:
     """The plugin's tracked files, relative to it."""
-    out = subprocess.run(["git", "ls-files", "-z", "--", str(plugin)], cwd=REPO, capture_output=True, text=True,
-                         check=True).stdout
-    return [str(Path(f).relative_to(plugin.relative_to(REPO))) for f in out.split("\0") if f]
+    return list(index(plugin))
+
+
+def carrier_module(path: str) -> bool:
+    return any(fnmatch(path, pattern) for pattern in CARRIER_MODULES)
+
+
+def owned(plugin: Path) -> set[tuple[str, str | None]]:
+    """The plugin's content, each file as what makes it the plugin's: its path, and in CARRIER_MODULES its blob too."""
+    held = index(plugin)
+    return {(f, held[f][1] if carrier_module(f) else None) for f in content(list(held))}
 
 
 def content(files: list[str]) -> set[str]:
@@ -46,19 +77,30 @@ def commands(files: list[str]) -> set[str]:
 
 class ShippedTree(unittest.TestCase):
     def test_no_tracked_file_under_plugins_is_in_a_tests_folder_or_named_test_underscore_py(self):
-        tracked = subprocess.run(["git", "ls-files", "-z", ":(glob)*/plugin/**"], cwd=REPO, capture_output=True, text=True,
-                                 check=True).stdout.split("\0")
-        tests = [f for f in tracked if f and ("tests" in PurePosixPath(f).parts or fnmatch(PurePosixPath(f).name, "test_*.py"))]
+        tests = [f for f in entries(*PLUGIN_TREES)
+                 if "tests" in PurePosixPath(f).parts or fnmatch(PurePosixPath(f).name, "test_*.py")]
         self.assertEqual(tests, [])
+
+    # A guard that lists a plugin's files from the index sees a file only through an entry of its own, and a link or
+    # gitlink stands for files the index does not list. The one link a plugin holds is its `core`, whose target
+    # check-carriers.ts pins.
+    def test_every_entry_in_a_plugin_tree_but_its_core_link_is_a_regular_file(self):
+        held = entries(*PLUGIN_TREES)
+        self.assertEqual(held["planner/plugin/core"][0], LINK)
+        self.assertEqual([path for path, (mode, _) in held.items() if mode not in REGULAR_FILE_MODES
+                          and not (mode == LINK and PurePosixPath(path).parts[1:] == ("plugin", "core"))], [])
 
     def test_ships_no_path_alq_review_must_never_ship(self):
         self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
 
+    # The overlap guard, against planner and builder, over what content() keeps: outside CARRIER_MODULES reviewer ships
+    # no path they ship, and in CARRIER_MODULES no path where it holds their bytes.
     def test_ships_no_file_alq_plan_or_alq_build_ships(self):
-        theirs = {f for name in ("planner", "builder") for f in content(shipped(REPO / name / "plugin"))}
-        self.assertIn("skills/issue-spec/SKILL.md", theirs)
-        self.assertIn("skills/issue-tackle/SKILL.md", theirs)
-        self.assertEqual(sorted(theirs & content(shipped())), [])
+        theirs = owned(REPO / "planner" / "plugin") | owned(REPO / "builder" / "plugin")
+        self.assertIn(("skills/issue-spec/SKILL.md", None), theirs)
+        self.assertIn(("skills/issue-tackle/SKILL.md", None), theirs)
+        self.assertIn("lib/settings.ts", {f for f, _ in theirs})
+        self.assertEqual(sorted(theirs & owned(PLUGIN)), [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
