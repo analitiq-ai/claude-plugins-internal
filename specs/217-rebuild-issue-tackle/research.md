@@ -232,12 +232,13 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
      of `git rev-parse --path-format=absolute --git-common-dir`) for the branch and worktree reads.
   3. The default branch's name from core `defaultBranch`, then `fetch([trackingRefspec(default)])`, before any
      read of a ref other than HEAD.
-  4. Issue, lane and branches (R7, R8); a branch on GitHub only is then fetched, `fetch([trackingRefspec(branch)])`.
+  4. Issue, lane and branches (R7, R8); a branch on GitHub is then fetched, `fetch([trackingRefspec(branch)])`, so its PR head is known locally.
   5. At the head the work is on, the worktree's HEAD, or with no worktree the ref it would start from (the default
      tip for a cut, `refs/remotes/origin/<branch>`, `<branch>`): with a worktree its merge state, its changes and
      its head against the PR head; then `merge` (R9) and the folder (R10), so stage 6 precedes stage 7 in every case.
 
-  Those two fetches are its only writes, both of remote-tracking refs; it writes no branch, worktree or index.
+  Those fetches are its only ref writes, both of remote-tracking refs; it writes no branch, worktree or index
+  (`git --no-optional-locks status`), only the objects `merge-tree --write-tree` stores.
   `fetch(refspecs)` is the caller's transport: `fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`
   for builder and the Stop hook, a local fetch in tests. Reading stops early in data-model order; it returns the
   facts, the `shared` it read and the main checkout. The rule decides stage 9's `HEAD_BEHIND_PR` before stage 6,

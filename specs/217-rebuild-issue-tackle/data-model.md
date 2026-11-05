@@ -5,16 +5,16 @@ core (research R5–R12). Core additions B1–B7 are listed in `plan.md`.
 
 ## StepFacts (input of `decideStep`)
 
-Gathered in this order; a stop decided at one stage reads nothing after it, so a later field may be absent.
+Gathered in this order, the default branch fetched after `shared` (R16 step 3); a stop decided at one stage reads nothing after it, so a later field may be absent.
 
 | Field | Type | From |
 |---|---|---|
 | `story` | issue number `s` | argument |
 | `session` | `{repo, issue}` \| `null` | `readSessionRecord` (R6) |
 | `origin` | `owner/name` | main checkout's origin |
+| `shared` | `Shared` | `codeworks.toml` at the HEAD of the checkout given (R7, R16), returned for `prFindings` and `internalReviewAt` |
 | `issue` | `{state: open\|closed, title, body}` | REST issue |
 | `done` | boolean | `isDone` |
-| `shared` | `Shared` | `codeworks.toml` at the HEAD of the checkout given (R7, R16), returned for `prFindings` and `internalReviewAt` |
 | `lane` | `Lane` \| `null` (no card) | `laneOf`, board from `shared` (R7) |
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |

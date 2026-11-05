@@ -50,7 +50,7 @@ core; no Python
 | IV. Test-first | `decideStep` is pure, so each acceptance scenario starts as a failing unit test; reads tested against the fake GitHub and a scratch repo; R4's substitution is run on the agent machine before step code. **Pass** |
 | V. Smallest complete change | One script, one skill; core additions only where builder needs a read core lacks; the stale `alq-` pattern in the carried guard test is fixed, not copied (R2). **Pass** |
 | VI. Rule apart from code | The constitution's builder line changes in its own PR first (R15). `check-carriers.ts` and `tests.yml` unchanged. **Pass** |
-| P6. One writer | builder writes commits (ticks included) and, on a cut, a local branch and worktree; pushes, PRs, lanes, check runs: the orchestrator; rounds and holds: reviewer; the session record: the orchestrator's hook. **Pass** |
+| P6. One writer | builder writes commits, ticks, the worktree add of R8 (with its branch) and core's remote-tracking fetches (R16); pushes, PRs, lanes, check runs: the orchestrator; rounds and holds: reviewer; the session record: the orchestrator's hook. **Pass** |
 | P8. Generic | Repository from origin; board, Apps and validators from `codeworks.toml` at the checkout's HEAD (R7); default branch from GitHub; nothing repo-specific. **Pass** |
 | P9. Named identities | The attestation and each `<module>-review` count only a check run by `orchestrator_app_login`'s App (R12). **Pass** |
 | P1, P3, P4, P7 | Apply to reviewer, planner, orchestrator; followed anyway: rule in a pure function (P3), could-not-run as exit 2 (P4), facts from keys, grammars and check runs, never headings (P7: `observed` from front matter, `<k>` from `[US<k>]`). **N/A** |
