@@ -12,10 +12,18 @@ const BranchPasses = z
     if (!shas.includes(head.sha)) ctx.addIssue({ code: "custom", path: ["head", "sha"], message: "head's sha is in no pass" });
   });
 
+// Zod's record skips a key named __proto__ before its key schema sees it, so that branch would be dropped, not refused.
+const Branches = z.preprocess((input, ctx) => {
+  if (typeof input === "object" && input !== null && Object.hasOwn(input, "__proto__")) {
+    ctx.addIssue({ code: "custom", message: "a branch named __proto__ cannot be held", input });
+  }
+  return input;
+}, z.record(z.string().min(1), BranchPasses));
+
 export const CommitPasses = z.strictObject({
   v: z.literal(1),
   repository: Repo,
   off: z.boolean(),
-  branches: z.record(z.string().min(1), BranchPasses),
+  branches: Branches,
 });
 export type CommitPasses = z.infer<typeof CommitPasses>;

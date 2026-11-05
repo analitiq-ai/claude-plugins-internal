@@ -1,9 +1,7 @@
-import { chmodSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 
 import { CommitPasses } from "./contracts/commit-pass.ts";
-import { textIfPresent, writeWhole } from "./files.ts";
+import { checkSessionId, jsonOf, textIfPresent, writePrivate } from "./files.ts";
 import { HOME_FOLDERS } from "./keys.ts";
 
 export type Session = { home: string; id: string };
@@ -21,31 +19,23 @@ export class CommitPassesRefused extends Error {
   }
 }
 
-const SessionId = z.uuid();
+const FILE = "commit-passes.json";
 
 function folderOf({ home, id }: Session): string {
-  if (!SessionId.safeParse(id).success) throw new TypeError(`not a session id: ${JSON.stringify(id)}`);
+  checkSessionId(id);
   return join(home, HOME_FOLDERS["<S>"], "sessions", id);
 }
 
 function fileOf(session: Session): string {
-  return join(folderOf(session), "commit-passes.json");
+  return join(folderOf(session), FILE);
 }
 
 export function readCommitPasses(session: Session): CommitPasses | null {
   const path = fileOf(session);
   const text = textIfPresent(path);
-  if (text === null) return null;
-  let document: unknown;
-  try {
-    document = JSON.parse(text);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    throw new CommitPassesRefused(path, `not JSON: ${error.message}`);
-  }
-  const parsed = CommitPasses.safeParse(document);
-  if (!parsed.success) throw new CommitPassesRefused(path, z.prettifyError(parsed.error));
-  return parsed.data;
+  return text === null ? null : jsonOf(text, CommitPasses, (why) => {
+    throw new CommitPassesRefused(path, why);
+  });
 }
 
 export function recordCommitPasses(session: Session, range: PassedRange): void {
@@ -53,7 +43,7 @@ export function recordCommitPasses(session: Session, range: PassedRange): void {
   const head = range.shas.at(-1);
   if (head === undefined) throw new CommitPassesRefused(path, "a range of no commit has no head to pass");
   const record = recordFor(session, range.repository);
-  // Own keys only: a branch named like an Object.prototype member is still a branch.
+  // Own keys only: an absent branch named constructor would otherwise read as Object's constructor.
   const entry = Object.hasOwn(record.branches, range.branch) ? record.branches[range.branch] : undefined;
   if (entry !== undefined && entry.issue !== range.issue) {
     throw new CommitPassesRefused(path, `branch ${range.branch} is #${entry.issue}'s, not #${range.issue}'s`);
@@ -79,10 +69,5 @@ function recordFor(session: Session, repository: string): CommitPasses {
 }
 
 function write(session: Session, record: CommitPasses): void {
-  const folder = folderOf(session);
-  const text = `${JSON.stringify(CommitPasses.parse(record))}\n`;
-  mkdirSync(folder, { recursive: true, mode: 0o700 });
-  // mkdir's mode does not reach a folder that already exists.
-  chmodSync(folder, 0o700);
-  writeWhole(fileOf(session), text, renameSync);
+  writePrivate(folderOf(session), FILE, `${JSON.stringify(CommitPasses.parse(record))}\n`);
 }
