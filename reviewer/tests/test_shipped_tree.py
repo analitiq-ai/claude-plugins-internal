@@ -13,8 +13,7 @@ from paths import PLUGIN, REPO, tracked_text
 COMMAND = re.compile(r"\b(?:reviewer|planner|builder):[\w-]+")
 # Paths reviewer must never ship, whatever another plugin ships at them: the planning and building skills under
 # their names before the move, speclocation.py, deleted with them, and speckit/, the tree every Spec Kit preset and
-# workflow lives under. The overlap guard below compares reviewer with what planner and builder ship today, so a name
-# they no longer ship is refused only here.
+# workflow lives under. Unlike the overlap guard below, this refusal holds whatever planner and builder ship.
 NEVER_IN_REVIEW = ("skills/issue-spec/", "skills/alq-issue-tackle/", "skills/alq-root-cause-check/",
                    "scripts/speclocation.py", "speckit/")
 # Paths whose place is fixed rather than chosen by the plugin: the plugin format's hook config, and a core carrier's
@@ -77,15 +76,16 @@ class ShippedTree(unittest.TestCase):
     def test_ships_no_path_alq_review_must_never_ship(self):
         self.assertEqual([f for f in shipped() if f.startswith(NEVER_IN_REVIEW)], [])
 
-    # A carrier's module at a path another carrier also uses is its own unless the bytes are the other's. A link
-    # there is refused: its blob holds only where it points, so its bytes cannot be compared.
+    # The overlap guard, against planner and builder, over what content() keeps: outside CARRIER_MODULES reviewer ships
+    # no path they ship, and in CARRIER_MODULES no path where it holds their bytes. It ships no link but `core`: a
+    # link's blob holds only where it points, and a link to a folder keeps the files under it out of the index.
     def test_ships_no_file_alq_plan_or_alq_build_ships(self):
         theirs = owned(REPO / "planner" / "plugin") | owned(REPO / "builder" / "plugin")
         self.assertIn(("skills/issue-spec/SKILL.md", None), theirs)
         self.assertIn(("skills/issue-tackle/SKILL.md", None), theirs)
         self.assertIn("lib/settings.ts", {f for f, _ in theirs})
         self.assertEqual(sorted(theirs & owned(PLUGIN)), [])
-        self.assertEqual([f for f, (mode, _) in index().items() if mode == LINK and carrier_module(f)], [])
+        self.assertEqual([f for f, (mode, _) in index().items() if mode == LINK and f != "core"], [])
 
     def test_every_script_imports_from_a_copy_holding_only_this_plugin(self):
         scripts = [f for f in shipped() if f.endswith(".py")]
