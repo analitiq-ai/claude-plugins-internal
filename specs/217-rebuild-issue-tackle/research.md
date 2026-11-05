@@ -123,8 +123,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
 - **Decision**: core's `readStoryStopFacts` (B7) first reads the default branch's name from GitHub (core
-  `defaultBranch`, moved from the orchestrator) and fetches it to `refs/remotes/origin/<default>` through its
-  caller's `fetchDefault(branch)`, then reads every fact, so builder and the
+  `defaultBranch`, moved from the orchestrator) and fetches it to `refs/remotes/origin/<default>` with core
+  `trackingRefspec(branch)` through its caller's `fetch(refspecs)`, then reads every fact, so builder and the
   Stop hook decide on the same fresh tip. `merge` is needed when that tip is not an ancestor of HEAD and any of:
   the newest merged spec PR of `<p>` (the first `merged` of `specPrs`, with B4's `mergeCommit`) has a merge commit
   not in HEAD's history (`git merge-base --is-ancestor`; any git failure throws); `governingDiff(ls-tree default,
@@ -138,7 +138,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
   head not yet pushed; GitHub's `mergeable` is of the PR's head only and may be UNKNOWN.
 - **Existing tools**: core `attest.ts` `governingDiff` (the same governing set orchestrator ADR-0004 d1 uses:
-  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as `fetchDefault`); `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
+  fits, its one folder made a list); `git.ts` `fetchWithGhCredential` (fits, as the `fetch` builder and the Stop hook pass, the shape of planner
+  `land.ts`'s `io.fetch`); the `+refs/heads/<b>:refs/remotes/origin/<b>` refspec, written twice in `land.ts` and
+  once in reviewer's `worktree.py` (Python: stays), defined once as core `trackingRefspec`; `identity.ts` `specPrs` (fits once B4 adds `mergeCommit { oid }`); `attest.ts` `mergeLapse` uses `git
   merge-tree --write-tree` the same way (fits); `required-checks.ts` conflict finding (GitHub's `mergeable`,
   PR head only: does not fit before a PR).
 
@@ -182,15 +184,19 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   orchestrator's wait (ADR-0007 d2). Non-empty → github round; empty → nothing to do. A failed run whose findings
   were all pushed back is held by reviewer's `pushback-<issue>` hold (reviewer ADR-0013 d4), and one that lists no
   finding is moved to Blocked (orchestrator ADR-0002 d5); neither is builder's to tell apart. No validator package
-  is loaded: their deps read keys only hooks may read (`validation/contract.ts` `readKey`; root ADR-0008 d4). B6
-  takes a reader only.
+  is opened: `open`'s deps read keys only hooks may read (`validation/contract.ts` `readKey`; root ADR-0008
+  d4). B6 takes a reader and the provider logins, the static `logins` export of each package `[shared]
+  validators` lists, read through core `validatorLogins(shared, dir)`, the import half of `loadValidators`, which
+  `loadValidators` then calls; its module names are `[shared] validators`, the names `loadValidators` loads. So
+  builder trusts and attributes a provider's threads as the orchestrator does at the same head.
 - **Rationale**: builder ADR-0003 d3, orchestrator ADR-0004 d1–d3 (the check run is the attestation, pinned to
   the orchestrator's App), reviewer ADR-0016 d1 (findings only through core). The orchestrator's hooks compose the
   modules' findings with their keys and record each module's outcome as its check run; builder reads that record.
 - **Existing tools**: core `identity.ts` `issueStory`/`storyPr` (fit once B3 returns `closed`, which the query
   already reads); `validation/required-checks.ts` (its private `checkRuns` read fits B5; its `internal-review`
   name is the one constant); `validation/threads.ts` `threadsModule` (fits); `validation/contract.ts` `loadValidators`,
-  `findings` (do not fit: their deps read keys); `required-checks.ts` `findingOf` (the one shape of a failed check,
+  `findings` (do not fit: their deps read keys), its private `importPackage` (fits: reads `logins` with no
+  deps, as `validatorLogins`); `required-checks.ts` `findingOf` (the one shape of a failed check,
   which a failed `<module>-review` follows; private, exported taking `source` and `key`, its own call passing them); `attest.ts` `attests`
   (recomputes from reviewer's state: does not fit, the check run is the record).
 
@@ -224,7 +230,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
   `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
   `readStoryStopFacts(s, sessionId, deps)`: through core's readers and `git.ts` `runGit`, its one write the
-  injected `fetchDefault` before any read (R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
+  fetch of `trackingRefspec(default)` through the injected `fetch` before any read (R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
   it could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6 then returns `null`, as a merge
   in progress at stage 5 does: no stop, so the Stop
   hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.

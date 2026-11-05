@@ -65,7 +65,7 @@ addition's signature takes a key reader or a writing client.
    and the name parses back through `parseBranch`.
 2. **Given** a head with `<module>-review` check runs written by the orchestrator's App, **When** core reads the
    head's findings, **Then** it reads the required checks and the threads, a failed check run as its module's one
-   finding, and loads no validator package.
+   finding, and opens no validator package, reading only each package's provider logins.
 3. **Given** the facts of each stop state, **When** the orchestrator's Stop hook and builder's step script read
    them through core and call core's stop rule, **Then** both get the same state and reason.
 
@@ -318,7 +318,7 @@ the new head.
   core function both call, which fetches the default branch before it reads and writes nothing else; builder cuts or adds the worktree itself (FR-027), then reads them again.
 - **FR-026**: The PR's findings MUST be read from its required checks and threads and, when those have none, from
   the `<module>-review` check runs the orchestrator's App writes at the head, a failed run being its module's one
-  finding and a pending or absent run none, never by loading validator packages in builder.
+  finding and a pending or absent run none, never by opening validator packages in builder.
 - **FR-027**: A story branch on GitHub with no local branch MUST get its worktree from `origin/<branch>`; a local
   branch with no worktree MUST get its worktree on that branch. `BRANCH_MISMATCH` MUST stop only when both exist and
   differ.

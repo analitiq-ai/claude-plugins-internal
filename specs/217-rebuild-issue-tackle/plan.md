@@ -135,7 +135,7 @@ US1's sections, each with the first story that calls it:
 | B3 | Story PR closed | B7, US3 | `StoryPr.closed`, read by the query already (R12) |
 | B7 | Stop rule and its facts | US3 | `storyStop(facts)` and `StopState`, pure, stage 6's due merge before the folder stops; `readStoryStopFacts`, its one write the default branch's fetch before it reads, `merge` among its facts, after B3 and B4; #174's Stop hook calls both (R9, R16) |
 | B5 | `internal-review` read | US4 | `internalReviewAt(reader, repo, head, appLogin)` from `required-checks.ts`'s run read (R12) |
-| B6 | PR findings | US4 | `prFindings(reader, …)` over required checks, `<module>-review` check runs and threads; no key, no writer (R12) |
+| B6 | PR findings | US4 | `prFindings(reader, …, logins)` over required checks, `<module>-review` check runs and threads; provider logins from `validatorLogins`; no key, no writer (R12) |
 | B4 | Spec PR merge commit | B7, US3 | `SpecPr.mergeCommit` (R9) |
 
 root-cause-check's deletion and its retired-text tests ship in US4's PR: the skill invokes it until US4 rewrites the

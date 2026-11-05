@@ -22,12 +22,12 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
 | `head` | sha | `git rev-parse HEAD` in the worktree |
 | `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
-| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) after its `fetchDefault`, R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
+| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) after its fetch of `trackingRefspec(default)`, R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
 | `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD; with no branch anywhere, at `refs/remotes/origin/<default>`, the tip a cut starts from (R10) |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
 | `attested` | boolean | `internalReviewAt(pr.head)` (B5) |
-| `findings` | `Finding[]` | `prFindings` (B6): required checks and threads, then a failed `<module>-review` check run as its module's one finding; no validator package loaded |
+| `findings` | `Finding[]` | `prFindings` (B6): required checks and threads, then a failed `<module>-review` check run as its module's one finding; no validator package opened, provider logins from core `validatorLogins` |
 
 A read that does not answer is no field: the script exits 2 naming it (R3).
 
