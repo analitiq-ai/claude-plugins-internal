@@ -1,17 +1,7 @@
 import { z } from "zod";
 
-import { ownerAndName } from "../github.ts";
 import { Taken } from "../values.ts";
-import { Time } from "./scalars.ts";
-
-const Repo = z.string().superRefine((repo, ctx) => {
-  try {
-    ownerAndName(repo);
-  } catch (error) {
-    if (!(error instanceof TypeError)) throw error;
-    ctx.addIssue({ code: "custom", message: error.message });
-  }
-});
+import { Repo, Time } from "./scalars.ts";
 
 // The session's issue, in a file because it lasts one session (orchestrator ADR-0003 d1).
 export const SessionRecord = z.strictObject({
