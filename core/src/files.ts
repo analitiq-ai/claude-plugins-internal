@@ -38,10 +38,14 @@ export function jsonOf<S extends z.ZodType, F>(text: string, schema: S, otherwis
 }
 
 /** writeWhole of `name` in `folder`, replacing a file there, with the folder made 0700 whether or not it existed. */
-export function writePrivate(folder: string, name: string, text: string): void {
+export function makePrivateFolder(folder: string): void {
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   // mkdir's mode does not reach a folder that already exists.
   chmodSync(folder, 0o700);
+}
+
+export function writePrivate(folder: string, name: string, text: string): void {
+  makePrivateFolder(folder);
   writeWhole(join(folder, name), text, renameSync);
 }
 

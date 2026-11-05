@@ -14,3 +14,20 @@ app_id = 5510825
 app_id = 5412829
 session_app_id = 5411132
 status_issue = 255
+
+[reviewer]
+app_id = 5412894
+mode = "enforce"
+claim_checks = "enforce"
+shim_checks = "enforce"
+decision_checks = "enforce"
+claim_warn_over = 20
+max_review_files = 50
+escalate_to = "Analitiq-Bot-Wonka"
+max_rounds = 4
+max_audits = 2
+k_topic = 3
+claim_hold_at = 3
+shim_deep_at = 3
+shim_hold_at = 4
+state_write_attempts = 3
