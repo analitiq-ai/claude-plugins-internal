@@ -57,6 +57,10 @@ function entriesOf(tree: ReadonlyMap<string, string>, dir: string): Entry[] {
   );
 }
 
+function dirsOf(tree: ReadonlyMap<string, string>): Set<string> {
+  return new Set([...tree.keys()].flatMap((path) => path.split("/").slice(0, -1).map((_, i, dirs) => dirs.slice(0, i + 1).join("/"))));
+}
+
 /** GitHub's `file(path:)` answer for a directory: null where it has no entry, as git keeps no empty tree. */
 function dirAnswer(tree: ReadonlyMap<string, string> | null, dir: string): unknown {
   const entries = tree === null ? [] : entriesOf(tree, dir);
@@ -154,6 +158,10 @@ export class FakeLedger {
     return null;
   }
 
+  private holdsTree(oid: unknown): boolean {
+    return this.commits.some(({ tree }) => [...dirsOf(tree)].some((dir) => entriesOf(tree, dir).some((entry) => entry.oid === oid)));
+  }
+
   /** The routes of a client that reads `ledger`: the session App's, or the orchestrator App's. */
   readRoutes(): Required<Pick<FakeRoutes, "graphql" | "graphqlPages" | "restPagesMatching">> {
     return {
@@ -221,7 +229,9 @@ export class FakeLedger {
         blobs.map(([alias, oid]) => {
           if (this.blobAnswers.has(String(oid))) return [alias, this.blobAnswers.get(String(oid))];
           const text = this.blob(oid);
-          return [alias, text === null ? null : { text, isTruncated: false, isBinary: false }];
+          if (text !== null) return [alias, { text, isTruncated: false, isBinary: false }];
+          // A tree matches no field of the query's Blob fragment.
+          return [alias, this.holdsTree(oid) ? {} : null];
         }),
       ),
     };

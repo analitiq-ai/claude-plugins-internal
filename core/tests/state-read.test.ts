@@ -494,6 +494,27 @@ describe("readState: the reads it makes", () => {
       assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory("round.run-2.json")])]);
     });
   }
+
+  it("takes the reviewer App's commit of a directory as invalid, its tamper derived", async () => {
+    const ledger = fakeLedger();
+    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+    const oid = reviewerCommit(ledger, { [`sub/${fileOf(ROUND_2)}`]: eventText(ROUND_2) }, { date: at("09:30") });
+    const reading = await read(ledger);
+    assert.deepEqual(reading.snapshot, snapshot({ rounds: [ROUND_1] }));
+    assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory("sub")])]);
+  });
+
+  for (const [what, answer] of UNREAD) {
+    it(`derives an unsigned commit's tamper, not failing the read, when GitHub answers ${what} for its file`, async () => {
+      const ledger = fakeLedger();
+      eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+      const text = eventText(ROUND_2);
+      const oid = invalidCommit(ledger, { put: files(ROUND_2), signature: null, author: SHARED.reviewer_app_login, date: at("09:30") });
+      ledger.blobAnswers.set(blobOid(text), answer(text));
+      const reading = await read(ledger);
+      assert.deepEqual(reading.tamper, [unreleasedTamper(oid, at("09:30"), [inStory(fileOf(ROUND_2))])]);
+    });
+  }
 });
 
 describe("readState: readings", () => {
