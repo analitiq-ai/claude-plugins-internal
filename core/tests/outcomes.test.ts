@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { GitHubMisanswered } from "../src/github.ts";
 import { outcomeOf } from "../src/outcomes.ts";
 import { CheckOutcome } from "../src/values.ts";
 
@@ -50,9 +51,17 @@ describe("outcomeOf", () => {
     assert.equal(outcomeOf(undefined), PENDING);
   });
 
-  it("a state outside GitHub's throws naming it, never read as an outcome", () => {
-    assert.throws(() => outcomeOf(completedRun("exploded")), /"exploded"/);
-    assert.throws(() => outcomeOf({ state: "constructor" }), /"constructor"/);
-    assert.throws(() => outcomeOf({ status: "completed", conclusion: null }), /null/);
+  it("a check run's conclusion or a commit status's state outside GitHub's throws GitHubMisanswered naming it, never read as an outcome", () => {
+    for (const [answer, named] of [
+      [completedRun("exploded"), /"exploded"/],
+      [{ state: "constructor" }, /"constructor"/],
+      [{ status: "completed", conclusion: null }, /null/],
+    ] as const) {
+      assert.throws(() => outcomeOf(answer), (error: unknown) => {
+        assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
+        assert.match(error.message, named);
+        return true;
+      });
+    }
   });
 });

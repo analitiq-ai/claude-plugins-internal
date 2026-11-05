@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
+import { Time } from "../plugin/core/contracts/scalars.ts";
 import { writeGhToken } from "../plugin/core/gh-config.ts";
-import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../plugin/core/github.ts";
+import { answerOf, GitHubRefused, GitHubUnanswered, type GitHubClient } from "../plugin/core/github.ts";
 import { KeyReadRefused } from "../plugin/core/keys.ts";
 import { ghFolder } from "../plugin/core/orchestrator-paths.ts";
 import { MintError, type App, type MintedToken } from "../plugin/core/tokens.ts";
@@ -18,6 +19,10 @@ const REPO = "acme/widgets";
 const APP_ID = 7654321;
 const RETRY = "retry the step";
 const FIX_THEN_RETRY = "fix what it names, then retry the step";
+const AFTER_SESSION_MINT = "make a Bash call or send a prompt, on which the orchestrator mints the session token, then retry the step";
+const EXPIRES_AT = "2026-10-30T13:00:00Z";
+// An hour before the stored token expires: well inside what core lets a token be used for.
+const NOW = new Date("2026-10-30T12:00:00Z");
 
 type MintCall = { app: App; appId: number; keyFile: string; plugin: string; repo: string };
 
@@ -37,10 +42,20 @@ function recordingConnect() {
   return { tokens, connect: (token: string): GitHubClient => (tokens.push(token), client), client };
 }
 
-function storeSessionToken(home: string): string {
+function storeSessionToken(home: string, repo = REPO): string {
   const value = randomUUID();
-  writeGhToken(ghFolder(home), { value, app: "session", repo: REPO, expires_at: "2026-10-30T13:00:00Z", permissions: {} }, "codeworks-session[bot]");
+  writeGhToken(ghFolder(home), { value, app: "session", repo, expires_at: EXPIRES_AT, permissions: {} }, "codeworks-session[bot]");
   return value;
+}
+
+/** What core throws for a GitHub answer that is not the shape asked. */
+function misanswer(): Error {
+  try {
+    answerOf(Time, {}, "the expires_at of POST /app/installations/1/access_tokens");
+  } catch (error) {
+    return error as Error;
+  }
+  throw new Error("answerOf took an answer not of the shape asked");
 }
 
 function couldNotRunNaming(...named: string[]): (error: unknown) => true {
@@ -65,23 +80,45 @@ describe("sessionReader (R2)", () => {
     const home = tempHome(t);
     const value = storeSessionToken(home);
     const { tokens, connect, client } = recordingConnect();
-    assert.equal(sessionReader({ home, connect }), client);
+    assert.equal(sessionReader({ home, repo: REPO, now: NOW, connect }), client);
     assert.deepEqual(tokens, [value]);
   });
 
-  it("refuses as could not run when the gh folder holds no token, naming the folder", (t) => {
+  // The orchestrator mints the session token on a Bash call or a prompt, when core's needsMint says it must.
+  it("refuses as could not run when the gh folder holds no token, naming the folder, next a call on which the orchestrator mints it", (t) => {
     const home = tempHome(t);
     const { tokens, connect } = recordingConnect();
-    assert.throws(() => sessionReader({ home, connect }), couldNotRunNaming(ghFolder(home)));
+    assert.throws(() => sessionReader({ home, repo: REPO, now: NOW, connect }), couldNotRunThen(AFTER_SESSION_MINT, ghFolder(home)));
     assert.deepEqual(tokens, []);
   });
+
+  it("refuses as could not run when the stored token is for another repository, naming the folder and this repository, next a call on which the orchestrator mints it", (t) => {
+    const home = tempHome(t);
+    storeSessionToken(home, "acme/other");
+    const { tokens, connect } = recordingConnect();
+    assert.throws(() => sessionReader({ home, repo: REPO, now: NOW, connect }), couldNotRunThen(AFTER_SESSION_MINT, ghFolder(home), REPO));
+    assert.deepEqual(tokens, []);
+  });
+
+  for (const [what, now] of [
+    ["expires within core's refresh margin", new Date(Date.parse(EXPIRES_AT) - 60_000)],
+    ["has expired", new Date(Date.parse(EXPIRES_AT) + 60_000)],
+  ] as const) {
+    it(`refuses as could not run when the stored token ${what}, naming the folder, next a call on which the orchestrator mints it`, (t) => {
+      const home = tempHome(t);
+      storeSessionToken(home);
+      const { tokens, connect } = recordingConnect();
+      assert.throws(() => sessionReader({ home, repo: REPO, now, connect }), couldNotRunThen(AFTER_SESSION_MINT, ghFolder(home)));
+      assert.deepEqual(tokens, []);
+    });
+  }
 
   it("refuses as could not run when the gh folder holds hosts.yml without codeworks-token.json, naming the folder", (t) => {
     const home = tempHome(t);
     mkdirSync(ghFolder(home), { recursive: true });
     writeFileSync(join(ghFolder(home), "hosts.yml"), "github.com:\n  oauth_token: dummy\n");
     const { tokens, connect } = recordingConnect();
-    assert.throws(() => sessionReader({ home, connect }), couldNotRunNaming(ghFolder(home)));
+    assert.throws(() => sessionReader({ home, repo: REPO, now: NOW, connect }), couldNotRunNaming(ghFolder(home)));
     assert.deepEqual(tokens, []);
   });
 
@@ -90,7 +127,7 @@ describe("sessionReader (R2)", () => {
     storeSessionToken(home);
     writeFileSync(join(ghFolder(home), "codeworks-token.json"), "{");
     const { tokens, connect } = recordingConnect();
-    assert.throws(() => sessionReader({ home, connect }), couldNotRunNaming(ghFolder(home)));
+    assert.throws(() => sessionReader({ home, repo: REPO, now: NOW, connect }), couldNotRunNaming(ghFolder(home)));
     assert.deepEqual(tokens, []);
   });
 });
@@ -125,14 +162,14 @@ describe("reviewerWriter (R2)", () => {
     assert.notEqual(recorded.tokens[0], recorded.tokens[1]);
   });
 
-  // Only an unanswered call can pass on a later run as it stands; the others hold until what they name is fixed.
-  for (const [failure, next] of [
-    [new MintError("the reviewer App is not installed on acme/widgets"), FIX_THEN_RETRY],
-    [new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]), FIX_THEN_RETRY],
-    [new GitHubRefused(401, "POST /app/installations/1/access_tokens: A JSON web token could not be decoded"), FIX_THEN_RETRY],
-    [new GitHubUnanswered("POST /app/installations/1/access_tokens: timed out"), RETRY],
+  for (const [what, failure, next] of [
+    ["MintError", new MintError("the reviewer App is not installed on acme/widgets"), FIX_THEN_RETRY],
+    ["KeyReadRefused", new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]), FIX_THEN_RETRY],
+    ["GitHubRefused", new GitHubRefused(401, "POST /app/installations/1/access_tokens: A JSON web token could not be decoded"), FIX_THEN_RETRY],
+    ["GitHubUnanswered", new GitHubUnanswered("POST /app/installations/1/access_tokens: timed out"), RETRY],
+    ["an answer not of the shape asked", misanswer(), RETRY],
   ] as const) {
-    it(`refuses as could not run on a mint that throws ${failure.name}, naming its message, next "${next}"`, async () => {
+    it(`refuses as could not run on a mint that throws ${what}, naming its message, next "${next}"`, async () => {
       const { recorded, writer } = writerOf(failure);
       await assert.rejects(writer(), couldNotRunThen(next, failure.message));
       assert.deepEqual(recorded.tokens, []);

@@ -59,7 +59,7 @@ describe("the session folder (data-model Session folder)", () => {
   it("refuses a release marker for an issue that is not a whole number above 0, or an at that is not a time", (t) => {
     const session = tempSession(t);
     for (const issue of [0, -1, 1.5]) assert.throws(() => releasedMarker(session, issue, "2026-10-30T12:00:00Z"), TypeError, String(issue));
-    for (const at of ["", "yesterday", "../../escape", "2026-10-30T12:00:00Z/x"]) {
+    for (const at of ["", "yesterday", "../../escape", "2026-10-30T12:00:00Z/x", "2026-10-30T12:00:00.5Z", "2026-10-30T12:00:00+01:00"]) {
       assert.throws(() => releasedMarker(session, 212, at), TypeError, at);
     }
   });

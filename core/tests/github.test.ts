@@ -4,8 +4,12 @@ import { randomUUID } from "node:crypto";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { inspect } from "node:util";
+import { z } from "zod";
+
 import {
+  answerOf,
   gitHub,
+  GitHubMisanswered,
   GitHubRefused,
   GitHubUnanswered,
   httpsUrl,
@@ -50,6 +54,14 @@ function reply(res: ServerResponse, status: number, body: unknown, headers: Reco
   res.end(JSON.stringify(body));
 }
 
+function misanswered(pattern: RegExp): (error: unknown) => true {
+  return (error) => {
+    assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${inspect(error)}`);
+    assert.match(error.message, pattern);
+    return true;
+  };
+}
+
 function variablesOf(seen: Seen): Record<string, unknown> {
   return (JSON.parse(seen.body) as { variables: Record<string, unknown> }).variables;
 }
@@ -70,6 +82,15 @@ const CALLS: Array<[string, (client: GitHubClient) => Promise<unknown>]> = [
   ["graphqlPages", (client) => client.graphqlPages(QUERY, {}, CONNECTION_PATH)],
   ["now", (client) => client.now()],
 ];
+
+// The request each of CALLS makes first, as the client names it.
+const REQUEST_OF: Record<string, string> = {
+  rest: "GET /repos/o/r",
+  restPages: "GET /repos/o/r/issues",
+  graphql: "POST /graphql",
+  graphqlPages: "POST /graphql",
+  now: "GET /rate_limit",
+};
 
 test("no token, no client", () => {
   assert.throws(() => gitHub(""), /token/);
@@ -110,13 +131,13 @@ test("restPages follows Link rel=next to the last page", async (t) => {
 test("restPages never sends the token to a next page on another host", async (t) => {
   const other = await serve(t, (_seen, res) => reply(res, 200, []));
   const { api } = await serve(t, (_seen, res) => reply(res, 200, [1], { link: `<${other.api}/steal?page=2>; rel="next"` }));
-  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/issues"), /another host/);
+  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/issues"), misanswered(/another host/));
   assert.equal(other.seen.length, 0);
 });
 
 test("restPages refuses a page that is not a list", async (t) => {
   const { api } = await serve(t, (_seen, res) => reply(res, 200, { total_count: 0, check_runs: [] }));
-  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/commits/abc/check-runs"), /not a list/);
+  await assert.rejects(gitHub(TOKEN, api).restPages("/repos/o/r/commits/abc/check-runs"), misanswered(/not a list/));
 });
 
 test("graphql posts the query and variables and returns data", async (t) => {
@@ -157,13 +178,13 @@ test("graphqlPages refuses an answer with no connection at the path", async (t) 
   const { api } = await serve(t, (_seen, res) => reply(res, 200, { data: { repository: { issue: null } } }));
   await assert.rejects(
     gitHub(TOKEN, api).graphqlPages(QUERY, {}, CONNECTION_PATH),
-    /repository\.issue\.comments/,
+    misanswered(/repository\.issue\.comments/),
   );
 });
 
 test("graphqlPages refuses a next page with no cursor rather than stop short", async (t) => {
   const { api } = await serve(t, (_seen, res) => reply(res, 200, connectionPage([{ id: "a" }], null, true)));
-  await assert.rejects(gitHub(TOKEN, api).graphqlPages(QUERY, {}, CONNECTION_PATH), /endCursor/);
+  await assert.rejects(gitHub(TOKEN, api).graphqlPages(QUERY, {}, CONNECTION_PATH), misanswered(/endCursor/));
 });
 
 test("graphqlPages never returns part of the list when a later page fails", async (t) => {
@@ -199,7 +220,7 @@ test("now refuses an answer with no Date header", async (t) => {
     res.sendDate = false;
     reply(res, 200, RATE_LIMIT);
   });
-  await assert.rejects(gitHub(TOKEN, api).now(), /Date/);
+  await assert.rejects(gitHub(TOKEN, api).now(), misanswered(/Date/));
 });
 
 // asctime's form names no zone, so `Date` would read it in the machine's zone: a wrong time, not GitHub's.
@@ -207,15 +228,32 @@ for (const date of ["Wed Oct 28 23:05:07 2026", "soon"]) {
   test(`now refuses a Date header that is not an HTTP date in GMT: ${date}`, async (t) => {
     const { api } = await serve(t, (_seen, res) => reply(res, 200, RATE_LIMIT, { date }));
     await assert.rejects(gitHub(TOKEN, api).now(), (error: unknown) => {
+      misanswered(/Date/)(error);
       assert.ok(error instanceof Error);
-      assert.match(error.message, /Date/);
       assert.ok(error.message.includes(date), error.message);
       return true;
     });
   });
 }
 
+test("answerOf refuses an answer not of the shape asked as GitHubMisanswered, naming what was asked", () => {
+  assert.throws(() => answerOf(z.object({ id: z.number() }), { id: "7" }, "the issue"), misanswered(/the issue/));
+});
+
+test("graphql refuses a 200 whose body is not a GraphQL answer as GitHubMisanswered", async (t) => {
+  const { api } = await serve(t, (_seen, res) => reply(res, 200, { errors: "dummy" }));
+  await assert.rejects(gitHub(TOKEN, api).graphql(QUERY, {}), misanswered(/POST \/graphql/));
+});
+
 for (const [name, call] of CALLS) {
+  test(`${name}: a 200 whose body is not JSON throws GitHubMisanswered, naming the request`, async (t) => {
+    const { api } = await serve(t, (_seen, res) => {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end("<html>dummy</html>");
+    });
+    await assert.rejects(call(gitHub(TOKEN, api)), misanswered(new RegExp(`^${REQUEST_OF[name]}: `)));
+  });
+
   test(`${name}: a request that gets no answer in time throws GitHubUnanswered`, async (t) => {
     const { api } = await serve(t, () => {});
     const started = Date.now();

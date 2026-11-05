@@ -5,17 +5,19 @@ import { describe, it } from "node:test";
 import { commitsAsked, ISSUE, OTHER_PROJECT, REPO, reader, round, SHARED, writer, type Issue } from "../../core/tests/fixtures/state/issue.ts";
 import { event, eventCommit, fakeLedger, type FakeLedger } from "../../core/tests/fixtures/state/ledger.ts";
 import { importSpecifiers } from "../../core/tests/source-scan.ts";
-import type { FakeGitHub } from "../../core/tests/support/fake-github.ts";
+import { fakeGitHub, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import type { Snapshot } from "../plugin/core/contracts/snapshot.ts";
-import { GitHubUnanswered } from "../plugin/core/github.ts";
+import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../plugin/core/github.ts";
 import { emptySnapshot } from "../plugin/core/ledger-fold.ts";
 import { tamperId } from "../plugin/core/contracts/ledger.ts";
-import { writeState, type StateReading } from "../plugin/core/state.ts";
+import { StateWriteUnsigned, writeState, type StateReading } from "../plugin/core/state.ts";
 import { CouldNotRun } from "../plugin/lib/hook-io.ts";
 import { RunState } from "../plugin/lib/run-state.ts";
 
 const ELSEWHERE = 7;
 const ATTEMPTS = 3;
+const RETRY = "retry the step";
+const FIX_THEN_RETRY = "fix what it names, then retry the step";
 
 type Harness = { ledger: FakeLedger; read: FakeGitHub; out: FakeGitHub; state: RunState; decided: StateReading[] };
 
@@ -24,6 +26,29 @@ function harness({ issue = {}, attempts = ATTEMPTS, ledger = seeded() }: { issue
   const read = reader(issue, ledger);
   const state = new RunState({ reader: read, repo: REPO, issue: ISSUE, shared: SHARED, attempts });
   return { ledger, read, out: writer(ledger), state, decided: [] };
+}
+
+/** The run's state over a reader other than the ledger's. */
+function over(reader: GitHubClient): RunState {
+  return new RunState({ reader, repo: REPO, issue: ISSUE, shared: SHARED, attempts: ATTEMPTS });
+}
+
+/** A reader every call of which throws `failure`. */
+function failing(failure: Error): GitHubClient {
+  const fail = async (): Promise<never> => {
+    throw failure;
+  };
+  return { rest: fail, restPages: fail, graphql: fail, graphqlPages: fail, now: fail };
+}
+
+/** A reader whose every answer is not the shape asked. */
+function misanswering(): GitHubClient {
+  const any = () => true;
+  return fakeGitHub({
+    graphql: [{ when: any, answer: { repository: "dummy" } }],
+    graphqlPages: [{ when: any, answer: "dummy" }],
+    restPagesMatching: [{ when: any, answer: "dummy" }],
+  });
 }
 
 function seeded(): FakeLedger {
@@ -145,23 +170,53 @@ describe("RunState (R3, data-model State write step)", () => {
 
   it("refuses as could not run when the reader sees no item of the issue on the board, naming the board, next fix it", async () => {
     const h = harness({ issue: { items: [OTHER_PROJECT] } });
-    await assert.rejects(h.state.reading(), couldNotRunThen("fix what it names, then retry the step", SHARED.board));
+    await assert.rejects(h.state.reading(), couldNotRunThen(FIX_THEN_RETRY, SHARED.board));
   });
 
-  it("refuses as could not run when the write's commit is not GitHub-signed, naming the commit and the tamper hold it places", async () => {
+  it("refuses as could not run when the write's commit is not GitHub-signed, naming the commit, next the release of the tamper it is", async () => {
     const h = harness();
     h.ledger.nextSignature = null;
     await assert.rejects(h.state.step(nextRound(h), writeRound(h)), (error: unknown) => {
       const oid = String(h.ledger.head);
-      return couldNotRunNaming(oid, tamperId(oid))(error);
+      couldNotRunNaming(oid)(error);
+      const unsigned = (error as Error).cause;
+      assert.ok(unsigned instanceof StateWriteUnsigned, `expected the cause StateWriteUnsigned, got ${String(unsigned)}`);
+      assert.match(unsigned.release, new RegExp(`Ready move on ${SHARED.board}`));
+      return couldNotRunThen(`${tamperId(oid)} holds the story until ${unsigned.release}`)(error);
     });
+  });
+
+  it("refuses as could not run when GitHub refuses the reader, on the reading and on a step, next fix it", async () => {
+    const refused = new GitHubRefused(401, "POST /graphql: 401 Bad credentials");
+    const state = over(failing(refused));
+    await assert.rejects(state.reading(), couldNotRunThen(FIX_THEN_RETRY, refused.message));
+    await assert.rejects(
+      state.step(() => assert.fail("decided with no reading"), () => assert.fail("wrote with no reading")),
+      couldNotRunThen(FIX_THEN_RETRY, refused.message),
+    );
+  });
+
+  it("refuses as could not run when GitHub refuses the write's commit and ledger has not moved, next fix it", async () => {
+    const h = harness();
+    const refused = new GitHubRefused(403, "POST /graphql: Resource not accessible by integration");
+    h.ledger.refuseNext = refused;
+    await assert.rejects(h.state.step(nextRound(h), writeRound(h)), couldNotRunThen(FIX_THEN_RETRY, refused.message));
+  });
+
+  it("refuses as could not run when GitHub's answer is not the shape asked, on the reading and on a step, next retry", async () => {
+    const state = over(misanswering());
+    await assert.rejects(state.reading(), couldNotRunThen(RETRY, "not the shape asked"));
+    await assert.rejects(
+      state.step(() => assert.fail("decided with no reading"), () => assert.fail("wrote with no reading")),
+      couldNotRunThen(RETRY, "not the shape asked"),
+    );
   });
 
   it("refuses as could not run when GitHub does not answer, naming what it was asked", async () => {
     const h = harness();
     const unanswered = new GitHubUnanswered("POST /graphql: no answer within 30 s");
     h.ledger.refuseNext = unanswered;
-    await assert.rejects(h.state.step(nextRound(h), writeRound(h)), couldNotRunThen("retry the step", unanswered.message));
+    await assert.rejects(h.state.step(nextRound(h), writeRound(h)), couldNotRunThen(RETRY, unanswered.message));
   });
 
   it("writes nothing to disk: run-state.ts imports no file system module", () => {

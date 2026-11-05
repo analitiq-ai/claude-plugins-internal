@@ -4,10 +4,17 @@ import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
 import { sessionFolder } from "../plugin/core/commit-pass.ts";
+import { tamperId } from "../plugin/core/contracts/ledger.ts";
+import { GitHubMisanswered, GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
+import { KeyReadRefused } from "../plugin/core/keys.ts";
+import { BoardNotVisible, LedgerMissing, StateStale, StateWriteRefused, StateWriteUnsigned } from "../plugin/core/state.ts";
+import { MintError } from "../plugin/core/tokens.ts";
 import {
   block,
   CouldNotRun,
+  FIX_THEN_RETRY,
   HookInputRefused,
+  nextStepOf,
   PASS,
   readInput,
   refuse,
@@ -15,6 +22,7 @@ import {
   refuseDecision,
   refuseShim,
   refusing,
+  RETRY,
   traced,
   type HookAnswer,
   type HookEvent,
@@ -122,6 +130,13 @@ describe("traced: every core write", () => {
     assert.deepEqual(gateLog(run.session), [{ at: tick(2), event: "PostToolUse", call: "writeState", outcome: "written", oid: OID, ms: TICK_MS }]);
   });
 
+  it("logs a write that committed nothing as unchanged, with no oid", async (t) => {
+    const run = hookRun(t, "PostToolUse");
+    const reading = { head: OID };
+    assert.equal(await traced(run, "writeState", async () => reading, () => null), reading);
+    assert.deepEqual(gateLog(run.session), [{ at: tick(2), event: "PostToolUse", call: "writeState", outcome: "unchanged", ms: TICK_MS }]);
+  });
+
   it("logs a failed write's error name and message as its outcome, and rethrows the error", async (t) => {
     const run = hookRun(t, "PostToolUse");
     const failure = new CouldNotRun("ledger moved", "retry the step");
@@ -133,6 +148,33 @@ describe("traced: every core write", () => {
       { at: tick(2), event: "PostToolUse", call: "recordGates", outcome: "CouldNotRun", reason: failure.message, ms: TICK_MS },
     ]);
   });
+});
+
+describe("nextStepOf", () => {
+  const OID = "d".repeat(40);
+  const RELEASE = "a Ready move on the board and an admin's comment, both after 2026-10-30T12:00:00Z, then the claim";
+
+  for (const [failure, next] of [
+    [new GitHubUnanswered("POST /graphql: no answer within 15000 ms"), RETRY],
+    [new GitHubMisanswered("GitHub's answer for the ref of ledger is not the shape asked for"), RETRY],
+    [new GitHubRefused(401, "POST /graphql: 401 Bad credentials"), FIX_THEN_RETRY],
+    [new MintError("the reviewer App is not installed on acme/widgets"), FIX_THEN_RETRY],
+    [new KeyReadRefused("/home/dummy/.config/codeworks/reviewer-app.pem", ["no managed settings name reviewer"]), FIX_THEN_RETRY],
+    [new BoardNotVisible("https://github.com/orgs/example-org/projects/1"), FIX_THEN_RETRY],
+    [new LedgerMissing("acme/widgets"), "retry the step once it exists"],
+    [new StateWriteUnsigned(OID, RELEASE), `${tamperId(OID)} holds the story until ${RELEASE}`],
+  ] as const) {
+    it(`${failure.name}: ${next}`, () => {
+      assert.equal(nextStepOf(failure), next);
+    });
+  }
+
+  // A stale write is the run's own to retry, a refused write the step's own to answer, and anything else core's defect.
+  for (const failure of [new StateStale("a".repeat(40), "b".repeat(40)), new StateWriteRefused("dummy", null), new TypeError("dummy"), "dummy"]) {
+    it(`${failure instanceof Error ? failure.name : typeof failure}: no next step`, () => {
+      assert.equal(nextStepOf(failure), null);
+    });
+  }
 });
 
 describe("refusing", () => {

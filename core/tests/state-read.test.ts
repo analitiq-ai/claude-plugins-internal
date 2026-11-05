@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import { eventText, tamperId, type LedgerEvent } from "../src/contracts/ledger.ts";
 import type { Snapshot } from "../src/contracts/snapshot.ts";
-import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
+import { GitHubMisanswered, GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
 import { BoardNotVisible, issueComments, LedgerMissing, readState, storyTouched, type Releasable, type StateReading, type Tamper } from "../src/state.ts";
 import {
   ADMIN,
@@ -414,9 +414,31 @@ describe("readState: the reads it makes", () => {
     const oid = eventCommit(ledger, [event.round(round(2))], { date: at("09:30") });
     ledger.restOmits = [oid];
     await assert.rejects(read(ledger), (error: unknown) => {
-      assert.ok(error instanceof Error);
+      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
       assert.match(error.message, /GraphQL/);
       assert.match(error.message, /REST/);
+      return true;
+    });
+  });
+
+  it("refuses the read as GitHubMisanswered when the branch's history lacks a tamper its story's history holds, naming it", async () => {
+    const ledger = fakeLedger();
+    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+    const tamper = invalidCommit(ledger, { remove: [], put: files(ROUND_2), date: at("09:30") });
+    const base = reader({}, ledger);
+    const client: GitHubClient = {
+      ...base,
+      async graphql(query, vars) {
+        const answer = await base.graphql(query, vars);
+        if (!/\bhistory\(first: \d+, after: \$cursor\)/.test(query)) return answer;
+        const page = answer as { repository: { object: { history: { nodes: { oid: string }[] } } } };
+        const { history } = page.repository.object;
+        return { repository: { object: { history: { ...history, nodes: history.nodes.filter(({ oid }) => oid !== tamper) } } } };
+      },
+    };
+    await assert.rejects(readState(client, REPO, ISSUE, SHARED), (error: unknown) => {
+      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
+      assert.ok(error.message.includes(tamper), error.message);
       return true;
     });
   });

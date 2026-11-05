@@ -163,15 +163,27 @@ describe("writeState, placeRescopeHold, recordGates and releaseOnClaim commit al
       await assert.rejects(call(reader(RELEASING_ISSUE, ledger), writer(ledger), reading), (error: unknown) => error === refused);
     });
 
-    it(`${write} throws StateWriteUnsigned naming its commit when GitHub's answer is not GitHub-signed`, async () => {
+    it(`${write} throws StateWriteUnsigned naming its commit, and the release the next write's refusal names for the tamper it is, when GitHub's answer is not GitHub-signed`, async () => {
       for (const signature of [null, { isValid: true, wasSignedByGitHub: false }, { isValid: false, wasSignedByGitHub: true }]) {
         const ledger = ledgerOf(COMMITTING_STATE);
         const reading = await readingOf(ledger, RELEASING_ISSUE);
         ledger.nextSignature = signature;
+        let release: string | undefined;
         await assert.rejects(call(reader(RELEASING_ISSUE, ledger), writer(ledger), reading), (error: unknown) => {
           assert.ok(error instanceof StateWriteUnsigned, `expected StateWriteUnsigned, got ${String(error)}`);
           assert.equal(error.oid, ledger.head);
           assert.ok(error.message.includes(String(ledger.head)), error.message);
+          release = error.release;
+          return true;
+        });
+        const oid = String(ledger.head);
+        assert.match(String(release), new RegExp(`^a repository admin's deletion on ledger of ${storyDir()}/.*, then a Ready move on ${BOARD}`));
+        const [, writeState] = WRITES[0];
+        const next = await readingOf(ledger, RELEASING_ISSUE);
+        await assert.rejects(writeState(reader(RELEASING_ISSUE, ledger), writer(ledger), next), (error: unknown) => {
+          assert.ok(error instanceof StateWriteRefused, `expected StateWriteRefused, got ${String(error)}`);
+          assert.ok(error.message.includes(tamperId(oid)), error.message);
+          assert.equal(release, error.release);
           return true;
         });
       }
