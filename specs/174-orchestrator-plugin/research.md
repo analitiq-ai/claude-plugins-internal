@@ -221,7 +221,7 @@ plan has not executed, and names the task that runs it first.
   `fetchWithGhCredential` over the gh folder as `fetch` (#217 R16), so it reads the same facts builder does, and
   calls `storyStop`. The gh folder holds the session App's token, so no orchestrator token is written (R12); the
   read writes only remote-tracking refs (#217 R16). A stop pushes nothing and names no step, and the session
-  ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason
+  ends; when the card is In progress or In review and the stop is neither `DONE` nor `CLOSED`, the rule's reason
   is posted keyed (R11) and the card moves to Blocked first.
 - **Rationale**: FR-016c; builder ADR-0003 d2: builder ends its turn at a stop with a message naming why, and only
   the Blocked reason carries it to the admin. Without the rule, Stop names `issue-tackle <s>` again after every

@@ -113,7 +113,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   lowercased to `[a-z0-9-]`, runs of `-` collapsed, trimmed, capped at 40 characters, `story` when empty (titles
   are untrusted: they become a ref and a path). A GitHub branch and a different local one, both present → stop
   naming both. In the worktree, `MERGE_HEAD` present → the merge step to finish; uncommitted changes otherwise →
-  stop naming the files; the local head behind or diverged from the PR head → stop naming both (FR-028).
+  stop naming the files; the head the work is on (R16 step 5) behind or diverged from the PR head → stop naming both (FR-028).
 - **Rationale**: FR-003–FR-004, builder ADR-0002 d2, root ADR-0005 d1 (the grammar's one home is core). The cut
   is git's own deterministic answer, so the script makes it rather than handing the model a command to type.
 - **Existing tools**: core `identity.ts` `issueStory`, `pickStoryBranch`, `parseBranch` (fit; B1 adds the
@@ -234,8 +234,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
      read of a ref other than HEAD.
   4. Issue, lane and branches (R7, R8); a branch on GitHub is then fetched, `fetch([trackingRefspec(branch)])`, so its PR head is known locally.
   5. At the head the work is on, the worktree's HEAD, or with no worktree the ref it would start from (the default
-     tip for a cut, `refs/remotes/origin/<branch>`, `<branch>`): with a worktree its merge state, its changes and
-     its head against the PR head; then `merge` (R9) and the folder (R10), so stage 6 precedes stage 7 in every case.
+     tip for a cut, `refs/remotes/origin/<branch>`, `<branch>`): with a worktree its merge state and its changes;
+     that head against the PR head; then `merge` (R9) and the folder (R10). So stage 9's head check, then stage 6,
+     then stage 7 are decided before any worktree is added, in every case.
 
   Those fetches are its only ref writes, both of remote-tracking refs; it writes no branch, worktree or index
   (`git --no-optional-locks status`), only the objects `merge-tree --write-tree` stores.

@@ -20,7 +20,7 @@ Gathered in this order, the default branch fetched after `shared` (R16 step 3); 
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
 | `worktree` | `{path, branch: string\|null, mergeInProgress: boolean, dirty: string[]}` \| `null` | `git worktree list --porcelain` at `../<repo>.worktrees/<branch>`; `MERGE_HEAD`; `git status --porcelain` |
 | `pr` | `{number, head, merged, closed}` \| `null` | `issueStory` (B3) |
-| `head` | sha | `git rev-parse HEAD` in the worktree |
+| `head` | sha | `git rev-parse` of the head the work is on: the worktree's HEAD, or the ref it would start from (R16) |
 | `headVsPr` | `same` \| `ahead` \| `behind` \| `diverged` | `git merge-base --is-ancestor` both ways |
 | `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7) against the default tip it fetched (R16), R9: spec PR merge commit, `governingDiff` over every `specs/<p>-*`, `merge-tree` |
 | `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at the head the work is on: the worktree's HEAD, or the ref it would start from (R10, R16) |
@@ -74,8 +74,8 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 3. lane null → `NO_CARD`; Backlog/Blocked → `LANE`; parent in another repository → `SPEC_ISSUE_ELSEWHERE`
 4. branch: several → `SEVERAL_BRANCHES`; github and local both present and different → `BRANCH_MISMATCH`;
    worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; no worktree (no branch anywhere, a branch on GitHub
-   only, or a local branch) → stage 5 has no worktree to read, stages 6–7 are decided at the ref the worktree would
-   start from (R16), and only when no stage stops does the script add the worktree, cutting the branch when
+   only, or a local branch) → stage 5 has no worktree to read, stage 9's head check and stages 6–7 are decided at the ref
+   the worktree would start from (R16), and only when no stage stops does the script add the worktree, cutting the branch when
    there is none (R8), and re-read
 5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
 6. `merge.needed` → `merge`, after stage 9's `HEAD_BEHIND_PR`, which is decided first

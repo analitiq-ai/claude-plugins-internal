@@ -148,7 +148,7 @@ and the card is in Blocked with the stop rule's reason.
    identity or its change touches a `.github/` folder, refusing the stop naming the commit and the cause.
 7. **Given** core's stop rule finds a stop on the session's story, **When** the Stop hook runs, **Then** it pushes
    nothing, names no step and lets the session end; when the card is In progress or In review and the stop is
-   neither `done` nor `closed`, the card first goes to Blocked with the rule's reason.
+   neither `DONE` nor `CLOSED`, the card first goes to Blocked with the rule's reason.
 
 ---
 
@@ -350,7 +350,7 @@ next one finds not marked ended counts toward `k_deaths`.
 - **FR-016c** *(decides how Stop sees builder's stop, builder ADR-0003 d2)*: After FR-016b and before it pushes,
   the Stop hook MUST call core's stop rule (`storyStop`, #217) on the facts builder's step reads for the session's
   issue. On a stop it MUST push nothing, name no step and let the session end. When the card is In progress or In
-  review and the stop is neither `done` nor `closed`, it MUST first post the rule's reason and move the card to
+  review and the stop is neither `DONE` nor `CLOSED`, it MUST first post the rule's reason and move the card to
   Blocked (ADR-0002 d5); a card outside those lanes is an admin's (ADR-0002 d6).
 - **FR-017** *(decides how the agent identity is read, root ADR-0008 d8)*: The agent identity MUST be `user.name`
   and `user.email` read from `~/.gitconfig` as data with `git config --file`, following no include, through core's
