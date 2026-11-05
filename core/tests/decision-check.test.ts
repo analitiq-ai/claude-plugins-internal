@@ -46,11 +46,13 @@ const UNLISTABLE = [
   "a/../b.ts",
   "../a/b.ts",
   "./a/b.ts",
+  "core/src/.",
+  "a/..",
 ];
 
-// No PATH, each for a reason the grammar names: the unlistable spans, a trailing `/`, an absolute path, an empty
-// segment, a space, a character outside the grammar, a URL, nothing at all.
-const NOT_PATHS = [...UNLISTABLE, "core/src/", "/abs/x.ts", "a//b.ts", "a b.ts", "<run>/x", "https://example.test/a", ""];
+// No PATH, each for a reason the grammar names: the unlistable spans, a lone `.` or `..`, a trailing `/`, an absolute
+// path, an empty segment, a space, a character outside the grammar, a URL, nothing at all.
+const NOT_PATHS = [...UNLISTABLE, ".", "..", "core/src/", "/abs/x.ts", "a//b.ts", "a b.ts", "<run>/x", "https://example.test/a", ""];
 
 function refusedNaming<E extends Error>(kind: new (...args: never[]) => E, ...named: string[]): (error: unknown) => true {
   return (error) => {
