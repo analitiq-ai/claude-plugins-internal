@@ -43,12 +43,15 @@ The merge waits on each external reviewer's verdict, which counts only for the h
    posted by the orchestrator's App (ADR-0003); reviewer's hook refuses the request from the model's
    commands (reviewer ADR-0012).
 3. We will have the orchestrator write each module's `<module>-review` as a check run at the head with
-   its App, from that module's `status`: PASS is success, WAIVED success marked so, FAIL failure, PENDING
-   pending. Every module listed in `validators` is required alike (root ADR-0003).
+   its App, from that module's `status` and the findings ADR-0007 d2 counts: PASS is success, WAIVED
+   success marked so, PENDING pending; FAIL is failure while one of its findings counts, and success marked
+   so once reviewer's state records every one as pushed back (root ADR-0003 d7). The check run is thus the
+   verdict the merge (ADR-0009 d1) and builder read. Every module listed in `validators` is required alike
+   (root ADR-0003).
    No other service writes it, so while no agent session runs no PR has a verdict and none merges.
 4. We will move the card to Blocked, naming the reporter, when a module reports SILENT past `review_timeout`
-   (ADR-0001), timed from its request where it posted one, or a required check (ADR-0007) is missing or
-   pending past it. Until then the session waits (ADR-0001). We never ask twice for one head; the second ask
+   (ADR-0001), timed from its request where it posted one, or could not run, a FAIL that lists no finding
+   among them (root ADR-0003 d1), or a required check (ADR-0007) is missing or pending past it. Until then the session waits (ADR-0001). We never ask twice for one head; the second ask
    is an admin's.
 
 ## Options considered

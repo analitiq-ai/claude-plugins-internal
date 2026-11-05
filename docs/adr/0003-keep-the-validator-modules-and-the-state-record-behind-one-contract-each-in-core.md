@@ -46,7 +46,9 @@ reviewer's github stage, their findings. reviewer's state, rounds and holds, liv
    FAIL · WAIVED · SILENT; `findings(pr, head)` → a list in the Findings schema (source, author, file,
    line, text, thread id if any, resolvable on GitHub). PASS and FAIL come only from the provider's
    reading of that head; until one exists, a head the provider skipped included, the status is PENDING,
-   and SILENT once `review_timeout` (orchestrator ADR-0001) passes.
+   and SILENT once `review_timeout` (orchestrator ADR-0001) passes. A FAIL names what failed: its
+   `findings` for that head list at least one finding, and core reads a FAIL with none as a module that
+   could not run (ADR-0004), since builder would have nothing to fix.
 2. We will put a threads module in `core/` behind the same `findings` contract: an unresolved review
    thread is a finding only if a trusted reviewer started it; `trusted_reviewers` is a `[shared]` key
    (ADR-0002).
