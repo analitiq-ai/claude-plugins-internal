@@ -1,0 +1,11 @@
+{
+  "session_id": "315ad922-f2f9-4e13-8101-acdad2093cfc",
+  "transcript_path": "/home/agent/.claude/projects/-home-agent-work-repo/315ad922-f2f9-4e13-8101-acdad2093cfc.jsonl",
+  "cwd": "/home/agent/work/repo",
+  "permission_mode": "default",
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_id": "a1b2c3d4e5f6",
+  "agent_type": "reviewer:claim-judge",
+  "agent_transcript_path": "/home/agent/.claude/projects/-home-agent-work-repo/315ad922-f2f9-4e13-8101-acdad2093cfc/subagents/agent-a1b2c3d4e5f6.jsonl"
+}
