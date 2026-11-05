@@ -736,12 +736,21 @@ class Registration(unittest.TestCase):
 
     def test_the_plugin_registers_the_gate_for_bash_calls_and_prompts(self):
         hooks = json.loads((GATE.parent.parent / "hooks" / "hooks.json").read_text())["hooks"]
-        command = "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py"
+        command = 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pre_merge_gate.py"'
         def runs_gate(event, tool=None):
             return any(h["command"] == command for group in hooks.get(event, [])
                        if tool is None or tool in group.get("matcher", "").split("|") for h in group["hooks"])
         self.assertTrue(runs_gate("PreToolUse", "Bash"))
         self.assertTrue(runs_gate("UserPromptSubmit"))
+
+    def test_every_hook_command_quotes_the_plugin_root(self):
+        """A plugin path holding a space would otherwise split the command, and no hook of the plugin could start."""
+        hooks = json.loads((GATE.parent.parent / "hooks" / "hooks.json").read_text())["hooks"]
+        commands = [h["command"] for groups in hooks.values() for group in groups for h in group["hooks"]]
+        self.assertTrue(commands)
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertRegex(command, r'^python3 "\$\{CLAUDE_PLUGIN_ROOT\}/scripts/[a-z_]+\.py"$')
 
 
 class Marker(unittest.TestCase):

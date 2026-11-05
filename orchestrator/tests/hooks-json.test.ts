@@ -4,7 +4,9 @@ import { it } from "node:test";
 
 const HOOKS = new URL("../plugin/hooks/hooks.json", import.meta.url);
 
-const command = (file: string) => ({ type: "command", command: `node \${CLAUDE_PLUGIN_ROOT}/hooks/${file}`, onFailure: "block" });
+// The root is quoted: a plugin path holding a space would otherwise split the command, and with onFailure block
+// the hook that cannot start holds every call it is registered on.
+const command = (file: string) => ({ type: "command", command: `node "\${CLAUDE_PLUGIN_ROOT}/hooks/${file}"`, onFailure: "block" });
 
 // contracts/hooks.md's table, Story 1's rows.
 it("registers each Story 1 hook with the contract's matcher, file, timeout and onFailure", () => {
