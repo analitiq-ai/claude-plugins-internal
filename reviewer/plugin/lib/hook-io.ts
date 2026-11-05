@@ -28,10 +28,7 @@ export const FIX_THEN_RETRY = "fix what it names, then retry the step";
 
 const HELD_UNTIL_FIXED = [GitHubPartlyAnswered, GitHubRefused, MintError, KeyReadRefused, BoardNotVisible];
 
-/**
- * The next step of a failure core names that a hook run cannot get past, or null for any other: the run retries a
- * stale write, and any other fails the hook.
- */
+/** The next step of the could-not-run `failure` makes, or null when it makes none. */
 export function nextStepOf(failure: unknown): string | null {
   if (failure instanceof GitHubUnanswered) return RETRY;
   if (failure instanceof LedgerMissing) return "retry the step once it exists";
