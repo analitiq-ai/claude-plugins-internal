@@ -4,8 +4,9 @@ import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, s
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
+import { z } from "zod";
 
-import { readCommitPasses, recordCommitPasses, CommitPassesRefused, setReviewerOff, type Session } from "../src/commit-pass.ts";
+import { CommitPassesRefused, type PassedRange, readCommitPasses, recordCommitPasses, type Session, setReviewerOff } from "../src/commit-pass.ts";
 import { CommitPasses } from "../src/contracts/commit-pass.ts";
 
 const REPO = "acme/widgets";
@@ -64,6 +65,7 @@ describe("CommitPasses", () => {
     ["a time with milliseconds", { ...EXAMPLE, branches: { "42-us1-login": { ...branch, head: pass(B, A, "2026-10-30T12:00:00.000Z") } } }],
     ["a sha twice in passes", { ...EXAMPLE, branches: { "42-us1-login": { ...branch, passes: [pass(B, A, AT_1), pass(B, A, AT_2)] } } }],
     ["a head whose sha is not in passes", { ...EXAMPLE, branches: { "42-us1-login": { ...branch, head: pass(C, A, AT_1) } } }],
+    ["a branch named __proto__", { ...EXAMPLE, branches: JSON.parse(`{"__proto__": ${JSON.stringify(branch)}}`) }],
   ];
   for (const [what, record] of refused) {
     it(`refuses ${what}`, () => {
@@ -161,6 +163,44 @@ describe("recordCommitPasses", () => {
     assert.equal(readCommitPasses(each), null);
   });
 
+  it("refuses a branch named __proto__, writing no file", (t) => {
+    const each = session(t);
+    assert.throws(() => recordCommitPasses(each, { repository: REPO, issue: 42, branch: "__proto__", from: A, shas: [B], at: AT_1 }), z.ZodError);
+    assert.equal(readCommitPasses(each), null);
+  });
+
+  it("keeps a branch named constructor, a name Object.prototype also holds", (t) => {
+    const each = session(t);
+    recordCommitPasses(each, { repository: REPO, issue: 42, branch: "constructor", from: A, shas: [B], at: AT_1 });
+    recordCommitPasses(each, { repository: REPO, issue: 42, branch: "constructor", from: A, shas: [C], at: AT_2 });
+    assert.deepEqual(readCommitPasses(each)?.branches, {
+      constructor: { issue: 42, head: pass(C, A, AT_2), passes: [pass(B, A, AT_1), pass(C, A, AT_2)] },
+    });
+  });
+
+  const malformed: [string, Partial<PassedRange>][] = [
+    ["a base that is no sha", { from: "main" }],
+    ["a sha of 39 characters", { shas: [B.slice(1)] }],
+    ["a time with no zone", { at: "2026-10-30T12:00:00" }],
+    ["issue 0", { issue: 0 }],
+    ["a repository without its owner", { repository: "widgets" }],
+  ];
+  for (const [what, change] of malformed) {
+    it(`refuses a pass with ${what}, writing no file`, (t) => {
+      const each = session(t);
+      assert.throws(() => recordCommitPasses(each, { repository: REPO, issue: 42, branch: "42-us1-login", from: A, shas: [B], at: AT_1, ...change }), z.ZodError);
+      assert.equal(readCommitPasses(each), null);
+    });
+  }
+
+  it("refuses a malformed pass over a record, leaving the file's bytes as they were", (t) => {
+    const each = session(t);
+    recordCommitPasses(each, { repository: REPO, issue: 42, branch: "42-us1-login", from: A, shas: [B], at: AT_1 });
+    const before = readFileSync(fileOf(each), "utf8");
+    assert.throws(() => recordCommitPasses(each, { repository: REPO, issue: 42, branch: "42-us1-login", from: "main", shas: [C], at: AT_2 }), z.ZodError);
+    assert.equal(readFileSync(fileOf(each), "utf8"), before);
+  });
+
   it("writes the file 0600 in a folder made 0700 even when it exists, replacing the file by rename and leaving no temp file", (t) => {
     const each = session(t);
     mkdirSync(folderOf(each), { recursive: true, mode: 0o755 });
@@ -175,7 +215,34 @@ describe("recordCommitPasses", () => {
   });
 });
 
+const writers: [string, (each: Session) => void][] = [
+  ["recordCommitPasses", (each) => recordCommitPasses(each, { repository: REPO, issue: 42, branch: "42-us1-login", from: A, shas: [B], at: AT_1 })],
+  ["setReviewerOff", (each) => setReviewerOff(each, REPO, true)],
+];
+for (const [name, write] of writers) {
+  describe(name, () => {
+    for (const [what, text] of [
+      ["text that is not JSON", "{"],
+      ["JSON that is not the contract's", JSON.stringify({ ...EXAMPLE, v: 2 })],
+    ]) {
+      it(`throws CommitPassesRefused over a file of ${what}, leaving its bytes as they were`, (t) => {
+        const each = session(t);
+        mkdirSync(folderOf(each), { recursive: true });
+        writeFileSync(fileOf(each), text);
+        assert.throws(() => write(each), CommitPassesRefused);
+        assert.equal(readFileSync(fileOf(each), "utf8"), text);
+      });
+    }
+  });
+}
+
 describe("setReviewerOff", () => {
+  it("refuses a repository without its owner, writing no file", (t) => {
+    const each = session(t);
+    assert.throws(() => setReviewerOff(each, "widgets", true), z.ZodError);
+    assert.equal(readCommitPasses(each), null);
+  });
+
   it("creates the session's record with no branch when it has none", (t) => {
     const each = session(t);
     setReviewerOff(each, REPO, true);
