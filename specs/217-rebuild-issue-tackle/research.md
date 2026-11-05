@@ -189,7 +189,7 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
   already reads); `validation/required-checks.ts` (its private `checkRuns` read fits B5; its `internal-review`
   name is the one constant); `validation/threads.ts` `threadsModule` (fits); `validation/contract.ts` `loadValidators`,
   `findings` (do not fit: their deps read keys); `required-checks.ts` `findingOf` (the one shape of a failed check,
-  which a failed `<module>-review` follows; private, exported taking `source` and `key`); `attest.ts` `attests`
+  which a failed `<module>-review` follows; private, exported taking `source` and `key`, its own call passing them); `attest.ts` `attests`
   (recomputes from reviewer's state: does not fit, the check run is the record).
 
 ## R13: The skill is rewritten to run the script and act on the one step it prints

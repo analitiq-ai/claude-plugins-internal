@@ -75,7 +75,7 @@ repository; no addition's signature takes a key reader or a writing client
 
 ### B3 — Story PR closed
 
-- [ ] T008 [P] [US1] **B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; the GraphQL query text is unchanged (R12)
+- [ ] T008 [P] [US1] **B3.** Add failing cases to `core/tests/identity.test.ts`: `issueStory`'s and `storyPr`'s `StoryPr` carries `closed: boolean` from the query's existing `closed` field; open → `closed: false, merged: false`; closed unmerged → `closed: true, merged: false`; merged → `closed: true, merged: true`; B3 adds no field to the GraphQL query (R12)
 - [ ] T009 [US1] **B3.** Add `closed` to the `StoryPr` type and its construction in `core/src/identity.ts`; T008 passes; existing `identity.test.ts` cases pass unchanged
 
 ### B4 — Spec PR merge commit
@@ -96,7 +96,7 @@ repository; no addition's signature takes a key reader or a writing client
 ### B6 — PR findings
 
 - [ ] T016 [P] [US1] **B6.** Write failing `core/tests/pr-findings.test.ts` against the fake GitHub for `prFindings(reader, repo, pr, head, settings)` (R12; FR-026; US1 #2): returns `Finding[]` (core `contracts/finding.ts`) from `requiredChecks` and `threadsModule`, and only when both are empty from each `<module>-review` check run at `head` written by `[shared] orchestrator_app_login`'s App: `failure` is one finding of source `<module>`, keyed `module-review:<module>`, with no thread, shaped as `requiredChecks` shapes a failed check; `success`, pending or absent gives none; a red required check with no module run returns its finding; a `COULD_NOT_RUN` from either reader throws naming it, never returns `[]`; a check run by another App is ignored; the module set comes from `settings` only; the test asserts no validator package is imported (source-scan of `core/src/validation/pr-findings.ts`: no import of `validation/contract.ts` `loadValidators` or `readKey`)
-- [ ] T017 [US1] **B6.** Create `core/src/validation/pr-findings.ts` exporting `prFindings`, its failed-run finding built by `required-checks.ts`'s `findingOf`, exported taking the finding's `source` and `key` (its own calls unchanged); T016 and existing `required-checks.test.ts` cases pass; then, once for the PR, bump `version` in every carrier's `.claude-plugin/plugin.json` then present (`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged) and confirm `node core/scripts/check-carriers.ts --base origin/main` reports 0 failures (FR-022)
+- [ ] T017 [US1] **B6.** Create `core/src/validation/pr-findings.ts` exporting `prFindings`, its failed-run finding built by `required-checks.ts`'s `findingOf`, exported taking the finding's `source` and `key` (its own call passes `SOURCE` and `required-check:<name>`); T016 and existing `required-checks.test.ts` cases pass; then, once for the PR, bump `version` in every carrier's `.claude-plugin/plugin.json` then present (`planner/plugin`, `orchestrator/plugin`, and `builder/plugin` once US2 has merged) and confirm `node core/scripts/check-carriers.ts --base origin/main` reports 0 failures (FR-022)
 
 **Checkpoint**: US1's PR merged → US3 may start
 
