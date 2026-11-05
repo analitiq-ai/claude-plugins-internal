@@ -346,7 +346,7 @@ the new head.
 
 - **SC-001**: The carrier check on the default branch lists builder among its carriers with 0 failures.
 - **SC-002**: For each of the 16 stop states of data-model.md's `StopState` enum, a step leaves branches,
-  worktrees and GitHub unchanged (its fetch of the default branch aside) and its message names the state: 16 of 16.
+  worktrees and GitHub unchanged (its fetches of remote-tracking refs aside) and its message names the state: 16 of 16.
 - **SC-003**: For each of the 4 PR states (none, unattested, findings, attested clean), the step names the one action
   FR-012 gives it: 4 of 4, and the same answer when run twice with no change on GitHub.
 - **SC-004**: After any sequence of steps, every head pushed to a story branch is an ancestor of its current head: 0

@@ -24,15 +24,16 @@ Reads (research R5–R12, R16): the stop rule's facts through core's `readStoryS
 
 Only these, each idempotent:
 - every run, by core's `readStoryStopFacts` before it reads: `git fetch` of the default branch to
-  `refs/remotes/origin/<default>` (R9);
+  `refs/remotes/origin/<default>` (R9), and of a branch on GitHub only to `refs/remotes/origin/<branch>` (R8);
 - no branch on GitHub or locally: `git worktree add -b <branch> ../<repo>.worktrees/<branch> <sha>`, `<sha>` the
-  fetched default tip, run only when the folder at that tip gives no stop (R10);
-- a branch on GitHub only: `git fetch` of it to `refs/remotes/origin/<branch>`, then `git worktree add -B <branch>
-  ../<repo>.worktrees/<branch> refs/remotes/origin/<branch>`;
+  fetched default tip;
+- a branch on GitHub only: `git worktree add -B <branch> ../<repo>.worktrees/<branch> refs/remotes/origin/<branch>`;
 - a local branch with no worktree: `git worktree add ../<repo>.worktrees/<branch> <branch>`.
 
+Each `worktree add` runs only when the folder at the ref it starts from gives no stop (R10).
+
 Nothing else: no commit, no push, no GitHub write. Every stop leaves branches, worktrees and GitHub unchanged; its
-only write is the every-run fetch (SC-002).
+only writes are the fetches of remote-tracking refs (SC-002).
 
 ## Output
 

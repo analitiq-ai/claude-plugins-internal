@@ -217,8 +217,8 @@ plan has not executed, and names the task that runs it first.
 ## R21: Stop reads builder's stop through core's stop rule (Story 2)
 
 - **Decision**: after FR-016b's check and before the push, Stop reads the facts of #217's stop rule for the
-  session's issue through core's `readStoryStopFacts`, passing as its `fetch` `(refspecs) => fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`, so it
-  decides on the same fresh tip builder does, and calls `storyStop`. The gh folder holds the session App's token,
+  session's issue through core's `readStoryStopFacts`, passing as its `fetch` `(refspecs) => fetchWithGhCredential(checkout, ghFolder(home), repo, refspecs)`, `checkout` the hook's `cwd`
+  (core resolves the main checkout from it, #217 R8), so it decides on the same fresh tip builder does, and calls `storyStop`. The gh folder holds the session App's token,
   so no orchestrator token is written (R12); the fetch updates only `refs/remotes/origin/<default>` in the
   checkout, the remote-tracking ref builder's own run fetches, no branch, worktree or index. A stop pushes nothing and names no step, and the session
   ends; when the card is In progress or In review and the stop is neither `done` nor `closed`, the rule's reason

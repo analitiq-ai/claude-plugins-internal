@@ -103,14 +103,16 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R8: The story branch is found on GitHub or locally, else cut by the script
 
 - **Decision**: `issueStory(reader, repo, s)` gives the branch on GitHub (several → stop, `DerivationError`).
-  The main checkout is the parent of `git rev-parse --path-format=absolute --git-common-dir`; local branches
+  `readStoryStopFacts` resolves the main checkout, the parent of `git rev-parse --path-format=absolute
+  --git-common-dir`, from whatever checkout it is given (core `mainCheckout`), so builder and the Stop hook read
+  the same; local branches
   `<s>-us*` and the worktree list come from `git branch --list` and `git worktree list --porcelain`. One branch,
   GitHub's or the local one (crash before push, spec Edge Cases), names the worktree `../<repo>.worktrees/<branch>`;
   a worktree there on another branch → stop naming it. With none anywhere, once the folder at the default tip `readStoryStopFacts`
   fetched gives no stop (R10), the script runs `git worktree add -b <branch> <path> <default-sha>`, the branch named by core's `storyBranchName(s, k,
   title)` (B1): `<k>` from the `[US<k>]` tag of the story's tasks (R11), else 1; `<slug>` from the issue title,
   lowercased to `[a-z0-9-]`, runs of `-` collapsed, trimmed, capped at 40 characters, `story` when empty (titles
-  are untrusted: they become a ref and a path). A branch on GitHub only: fetch it and `git worktree add -B <branch>
+  are untrusted: they become a ref and a path). A branch on GitHub only: `readStoryStopFacts` fetches it with `trackingRefspec(branch)`, then `git worktree add -B <branch>
   <path> refs/remotes/origin/<branch>`; a local branch with no worktree: `git worktree add <path> <branch>`
   (spec FR-027). A GitHub branch and a different local one, both present → stop naming both. In the worktree,
   `MERGE_HEAD` present → the merge step to finish; uncommitted changes otherwise → stop naming the files; the
@@ -147,9 +149,10 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 ## R10: The spec folder and requirement are read at HEAD after any merge
 
 - **Decision**: `specFolder(gitTree(worktree, "HEAD"), p)`; its `DerivationError` maps to the three stops
-  (no `specs/`, none, several), each naming the open story PR if one (FR-008). With no branch anywhere the folder
-  is read at `refs/remotes/origin/<default>`, the tip the cut would start from, so it gives the same answer and a
-  folder stop leaves nothing cut (SC-002); `requirement(tree, folder, body)`
+  (no `specs/`, none, several), each naming the open story PR if one (FR-008). With no worktree yet the folder
+  is read at the ref the worktree would start from (`refs/remotes/origin/<default>` for a cut,
+  `refs/remotes/origin/<branch>` for a branch on GitHub only, `<branch>` for a local one), so it gives the same
+  answer and a folder stop adds no branch or worktree (SC-002); `requirement(tree, folder, body)`
   gives the requirement, the story issue body for `no_spec`. `codeworks.root_cause.observed` is read from the
   spec facts for the skill (FR-015). No planning command is named in any stop.
 - **Rationale**: builder ADR-0002 d3, root ADR-0005 d2/d4, ADR-0004 d2 (folder check after the merge).
@@ -229,8 +232,9 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 - **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
   `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
-  `readStoryStopFacts(s, sessionId, deps)`: through core's readers and `git.ts` `runGit`, its one write the
-  fetch of `trackingRefspec(default)` through the injected `fetch` before any read (R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
+  `readStoryStopFacts(s, sessionId, deps)`: through core's readers and `git.ts` `runGit`, its only writes the
+  fetches of `trackingRefspec` (the default branch, and a branch on GitHub only) through the injected `fetch`
+  before any read (R8, R9). A local head behind or diverged from the PR head (stage 9's stop) is decided before stage 6, since a merge onto
   it could not be pushed without force (builder ADR-0004 d1). A due merge at stage 6 then returns `null`, as a merge
   in progress at stage 5 does: no stop, so the Stop
   hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.

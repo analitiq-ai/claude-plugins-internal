@@ -73,9 +73,10 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 2. `done` → `DONE`; closed → `CLOSED`
 3. lane null → `NO_CARD`; Backlog/Blocked → `LANE`; parent in another repository → `SPEC_ISSUE_ELSEWHERE`
 4. branch: several → `SEVERAL_BRANCHES`; github and local both present and different → `BRANCH_MISMATCH`;
-   worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; none anywhere → stages 5–6 have no worktree to read, stage 7 is decided on the default tip, and only when it stops
-   nothing does the script cut (R8) and re-read;
-   GitHub only, or local with no worktree → the script adds the worktree on that branch (R8) and re-reads
+   worktree on another branch → `WORKTREE_ON_OTHER_BRANCH`; no worktree (no branch anywhere, a branch on GitHub
+   only, or a local branch) → stages 5–6 have no worktree to read, stage 7 is decided at the ref the worktree would
+   start from (R10), and only when it stops nothing does the script add the worktree, cutting the branch when
+   there is none (R8), and re-read
 5. worktree: merge in progress → `merge` (resolve and commit); uncommitted changes → `UNCOMMITTED_CHANGES`
 6. `merge.needed` → `merge`, after stage 9's `HEAD_BEHIND_PR`, which is decided first
 7. folder → `NO_SPECS` / `NO_SPEC_FOLDER` / `SEVERAL_SPEC_FOLDERS`
