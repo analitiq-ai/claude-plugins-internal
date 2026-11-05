@@ -18,7 +18,7 @@ Gathered in this order; a stop decided at one stage reads nothing after it, so a
 | `spec` | `p` | `specIssue` |
 | `branch` | `{github: string\|null, local: string\|null}` | `issueStory`; `git branch --list '<s>-us*'` |
 | `worktree` | `{path, branch: string\|null, mergeInProgress: boolean, dirty: string[]}` \| `null` | `git worktree list --porcelain` at `../<repo>.worktrees/<branch>`; `MERGE_HEAD`; `git status --porcelain` |
-| `merge` | `{needed: boolean, why: string[]}` | R9: spec PR merge commit, `governingDiff`, `merge-tree` |
+| `merge` | `{needed: boolean, why: string[]}` | `readStoryStopFacts` (B7), R9: spec PR merge commit, `governingDiff`, `merge-tree` |
 | `folder` | `SpecFolderAnswer` \| `{noSpecs: true}` | `specFolder` at HEAD |
 | `requirement` | `{kind, source, observed}` | `requirement`, `readSpecFacts` |
 | `tasks` | `StoryTask[]` | `storyTasks(tasks.md at HEAD, s)` (B2) |
@@ -81,9 +81,10 @@ once in core beside the stop rule and the read of its facts (B7), which builder'
 9. local head behind or diverged from pr head → `HEAD_BEHIND_PR`; ahead, or not attested → `internal_round`
 10. findings → `github_round`; else `nothing_to_do`
 
-Stages 1–4, 7 and the stop half of 5 and 9 are core's stop rule (B7); builder's `decideStep` calls it first.
-Their facts (`session` through `worktree`, `folder`, `pr`, `head`, `headVsPr`) are read by core's
-`readStoryStopFacts` (B7); builder reads `merge`, `requirement`, `tasks`, `attested` and `findings` itself.
+Stages 1–4, 6, 7 and the stop half of 5 and 9 are core's stop rule (B7), stage 6 returning `null` when a merge
+is due; builder's `decideStep` calls it first. Their facts (`session` through `worktree`, `merge`, `folder`, `pr`,
+`head`, `headVsPr`) are read by core's `readStoryStopFacts` (B7); builder reads `requirement`, `tasks`, `attested`
+and `findings` itself.
 
 ## State transitions across steps
 

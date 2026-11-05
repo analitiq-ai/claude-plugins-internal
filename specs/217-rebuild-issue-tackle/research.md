@@ -120,12 +120,15 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R9: The merge of the default branch is decided from git and one spec PR read
 
-- **Decision**: after fetching the default branch to `refs/remotes/origin/<default>`, the script names
-  "merge" when the default branch's tip is not an ancestor of HEAD and any of: the newest merged spec PR of `<p>`
-  has a merge commit not in HEAD's history (`specPr` with B4's `mergeCommit`, then `git merge-base --is-ancestor`);
-  `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty (spec.md of the folder the default branch
-  names, `**/docs/adr/`, `.specify/memory/`); or `git merge-tree --write-tree origin/<default> HEAD` exits 1
-  (conflict, whether or not a PR exists). It runs before the folder check (R10). The skill then runs the printed
+- **Decision**: core's `readStoryStopFacts` (B7) reads `merge` against `refs/remotes/origin/<default>` as it
+  stands, fetching nothing; builder fetches the default branch there before each read, a write like the cut (R8).
+  `merge` is needed when the default branch's tip is not an ancestor of HEAD and any of: the newest merged spec PR
+  of `<p>` has a merge commit not in HEAD's history (`specPr` with B4's `mergeCommit`, then `git merge-base
+  --is-ancestor`); `governingDiff(ls-tree default, ls-tree HEAD, folder)` is non-empty (spec.md of the folder the
+  default branch names, `**/docs/adr/`, `.specify/memory/`); or `git merge-tree --write-tree origin/<default> HEAD`
+  exits 1 (conflict, whether or not a PR exists). A merge commit absent from the clone is not in HEAD's history, so
+  the Stop hook, which fetches nothing, still sees the due merge of a spec PR. It runs before the folder check
+  (R10), in core's stop rule (R16), so a folder stop a due merge would clear is never named. The skill then runs the printed
   `git merge --no-ff --no-edit refs/remotes/origin/<default>` in the worktree, resolves any conflict in that merge
   commit, and runs the script again (FR-017).
 - **Rationale**: builder ADR-0004 d1–d2. A local merge-tree answers for the head the merge is about, including a
@@ -205,9 +208,12 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R16: The step's stop rule lives in core, so the Stop hook names builder's stop
 
-- **Decision**: B7 puts the stop half of the decision order (data-model stages 1–5, 7, 9) in core as a pure
-  `storyStop(facts)` with the `StopState` enum, and the read of its facts as `readStoryStopFacts(s, sessionId,
-  deps)`: read-only, through core's readers and `git.ts` `runGit`, writing nothing. builder cuts or adds the
+- **Decision**: B7 puts the stop half of the decision order (data-model stages 1–7, 9) in core as a pure
+  `storyStop(facts)` with the `StopState` enum, and the read of its facts, `merge` (R9) among them, as
+  `readStoryStopFacts(s, sessionId, deps)`: read-only, through core's readers and `git.ts` `runGit`, writing
+  nothing. A due merge at stage 6 returns `null`, as a merge in progress at stage 5 does: no stop, so the Stop
+  hook names builder's step and builder names `merge`, and the folder stops of stage 7 are decided only after it.
+  builder cuts or adds the
   worktree when those facts show none (R8), then reads again. builder's `decideStep` calls it first; the orchestrator's Stop hook
   reads the same facts through the same function, calls the rule and, on a stop, moves the card to Blocked with its reason instead of re-naming
   `issue-tackle <s>` until REPEAT. No file is written for the hook to read: the model may not write a hook's

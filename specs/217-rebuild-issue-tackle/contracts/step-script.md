@@ -23,6 +23,7 @@ Reads (research R5–R12, R16): the stop rule's facts through core's `readStoryS
 ## Writes
 
 Only these, each idempotent:
+- every run, before the facts are read: `git fetch` of the default branch to `refs/remotes/origin/<default>` (R9);
 - no branch on GitHub or locally: `git fetch` of the default branch to `refs/remotes/origin/<default>`, then
   `git worktree add -b <branch> ../<repo>.worktrees/<branch> <sha>`;
 - a branch on GitHub only: `git fetch` of it to `refs/remotes/origin/<branch>`, then `git worktree add -B <branch>
