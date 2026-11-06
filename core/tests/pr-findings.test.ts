@@ -155,8 +155,13 @@ const CI_PASSED = run("ci", "success", { app: ACTIONS });
 const CI_FAILED = run("ci", "failure", { app: ACTIONS });
 const CI_FINDING = requiredCheckFinding("ci", `${ACTIONS.slug}[bot]`);
 
-function findingsCouldNotRun(reason: RegExp): (thrown: unknown) => boolean {
-  return (thrown) => thrown instanceof FindingsCouldNotRun && reason.test(thrown.message);
+/** `cause`, when given, must be the very error GitHub's read threw. */
+function findingsCouldNotRun(source: string, reason: RegExp, cause?: Error): (thrown: unknown) => boolean {
+  return (thrown) =>
+    thrown instanceof FindingsCouldNotRun &&
+    thrown.source === source &&
+    reason.test(thrown.message) &&
+    (cause === undefined || thrown.cause === cause);
 }
 
 describe("prFindings: the required checks' and the threads' findings first", () => {
@@ -242,17 +247,26 @@ describe("prFindings: with no required-check or thread finding, each [shared] va
   });
 });
 
-describe("prFindings: throws FindingsCouldNotRun naming the read, never returning []", () => {
+describe("prFindings: throws FindingsCouldNotRun naming its source, never returning []", () => {
   for (const conclusion of ["cancelled", "timed_out", "stale"]) {
     it(`throws a module's reason when its <module>-review run concluded ${conclusion}, never reading it as a pass`, async () => {
       const runs = { ci: [CI_PASSED], "codex-review": [run("codex-review", conclusion)], "coderabbit-review": [] };
-      await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(new RegExp(`^codex: codex-review concluded ${conclusion}$`)));
+      await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("codex", new RegExp(`^codex: codex-review concluded ${conclusion}$`)));
     });
   }
 
-  it("throws a module's reason when GitHub gives no answer for its check runs, never reading it as no finding", async () => {
-    const runs = { ci: [CI_PASSED], "codex-review": new GitHubUnanswered("the check runs"), "coderabbit-review": [] };
-    await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^codex: the check runs$/));
+  it("throws a module's reason when its <module>-review run concluded a state core has no outcome for", async () => {
+    const runs = { ci: [CI_PASSED], "codex-review": [run("codex-review", "brand_new_state")], "coderabbit-review": [] };
+    await assert.rejects(
+      prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS),
+      findingsCouldNotRun("codex", /^codex: GitHub's check state "brand_new_state" has no check outcome$/),
+    );
+  });
+
+  it("throws a module's reason, GitHub's error its cause, when GitHub gives no answer for its check runs, never reading it as no finding", async () => {
+    const unanswered = new GitHubUnanswered("the check runs");
+    const runs = { ci: [CI_PASSED], "codex-review": unanswered, "coderabbit-review": [] };
+    await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("codex", /^codex: the check runs$/, unanswered));
   });
 
   it("throws required-checks' reason when the rules require no check but its own", async () => {
@@ -266,12 +280,13 @@ describe("prFindings: throws FindingsCouldNotRun naming the read, never returnin
       graphqlPages: [{ when: (query) => query.includes("reviewThreads"), answer: [] }],
       restPages: { [RULES_PATH]: [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "internal-review" }] } }] },
     });
-    await assert.rejects(prFindings(onlyOwn, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^required-checks: the rules of main require no check but internal-review/));
+    await assert.rejects(prFindings(onlyOwn, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("required-checks", /^required-checks: the rules of main require no check but internal-review/));
   });
 
-  it("throws threads' reason when GitHub gives no answer for the threads", async () => {
-    const client = reader({ ci: [CI_PASSED] }, new GitHubUnanswered("the review threads"));
-    await assert.rejects(prFindings(client, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^threads: the review threads$/));
+  it("throws threads' reason, GitHub's error its cause, when GitHub gives no answer for the threads", async () => {
+    const unanswered = new GitHubUnanswered("the review threads");
+    const client = reader({ ci: [CI_PASSED] }, unanswered);
+    await assert.rejects(prFindings(client, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("threads", /^threads: the review threads$/, unanswered));
   });
 });
 

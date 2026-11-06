@@ -127,19 +127,29 @@ function askedCheck(): boolean {
   return loggedCalls().some((call) => call.args.startsWith("check "));
 }
 
-/** `result` is `folder`'s COULD_NOT_RUN, never an answer: its reason opens with the folder's entry, names neither the
- *  entry nor the path again before the next step, and ends with `next` as the next step, which may name the path. */
-function couldNotRunOf(result: unknown, folder: ResolvedAdrFolder, next: string): string {
-  assert.deepEqual(Object.keys(result as object).sort(), ["outcome", "reason"], JSON.stringify(result));
-  const { outcome, reason } = result as CouldNotRun;
+/** Asserts `result` is `folder`'s COULD_NOT_RUN, never an answer: its source is the folder's entry, and its reason opens
+ *  with it, names neither the entry nor the path again before the next step, and ends with `next` as the next step,
+ *  which may name the path. With `causeIs`, it also asserts the result has a cause `causeIs` accepts; without, that it
+ *  has none. Returns the reason. */
+function couldNotRunOf(result: unknown, folder: ResolvedAdrFolder, next: string, causeIs?: (cause: unknown) => boolean): string {
+  const keys = causeIs === undefined ? ["outcome", "reason", "source"] : ["cause", "outcome", "reason", "source"];
+  assert.deepEqual(Object.keys(result as object).sort(), keys, JSON.stringify(result));
+  const { outcome, source, reason, cause } = result as CouldNotRun;
   assert.equal(outcome, "COULD_NOT_RUN");
-  const source = `${folder.entry}: `;
+  assert.equal(source, folder.entry);
+  const named = `${folder.entry}: `;
   const nextStep = ` Next step: ${next}.`;
-  assert.ok(reason.startsWith(source), reason);
+  assert.ok(reason.startsWith(named), reason);
   assert.ok(reason.endsWith(nextStep), reason);
-  const why = reason.slice(source.length, reason.length - nextStep.length);
+  const why = reason.slice(named.length, reason.length - nextStep.length);
   assert.ok(!why.includes(folder.entry) && !why.includes(folder.path), `the folder is named more than once: ${reason}`);
+  if (causeIs !== undefined) assert.ok(causeIs(cause), `a cause causeIs refuses: ${String(cause)}`);
   return reason;
+}
+
+/** The error node gives when it cannot start a command, by its errno name. */
+function spawnFailed(code: string): (cause: unknown) => boolean {
+  return (cause) => cause instanceof Error && (cause as NodeJS.ErrnoException).code === code;
 }
 
 before(async () => {
@@ -429,19 +439,19 @@ describe("checkAdrFolder", () => {
   }
 
   // test_adrkit.py Outcomes.test_without_adr_every_corpus_could_not_run_with_the_install_step
-  it("could not run, with the install step, when adr is not on PATH", async () => {
+  it("could not run, with the install step, when adr is not on PATH, node's spawn error its cause", async () => {
     process.env.PATH = noAdr;
-    const reason = couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL);
+    const reason = couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL, spawnFailed("ENOENT"));
     assert.match(reason, /the adr command was not found/);
   });
 
   // adrkit.py check's OSError branch, which no Python test reaches.
-  it("could not run, with the install step, when adr cannot be started", async () => {
+  it("could not run, with the install step, when adr cannot be started, node's spawn error its cause", async () => {
     rmSync(calls, { force: true });
     writeFileSync(join(bin, "adr"), "#!/bin/sh\necho never\n", { mode: 0o644 });
     chmodSync(join(bin, "adr"), 0o644);
     process.env.PATH = bin;
-    const reason = couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL);
+    const reason = couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL, spawnFailed("EACCES"));
     assert.match(reason, /could not be started/);
   });
 
@@ -462,23 +472,24 @@ describe("checkAdrFolder", () => {
   });
 
   // test_adrkit.py Outcomes.test_an_answer_in_a_shape_the_plugin_does_not_read_could_not_run_with_the_install_step
-  for (const [what, check] of [
-    ["not json", "echo nope"],
-    ["no ok", printing(null)],
-    ["no governing", printing({ ok: true, findings: [] })],
-    ["a notice with no id", printing({ ok: true, governing: [], findings: [{ rule: "affects-unresolvable", severity: "info", message: "m" }] })],
-    ["failed with no error", printing({ ok: false, governing: [], findings: [] }, 1)],
-  ]) {
-    it(`could not run, with the install step, for an answer in a shape adrkit ${ADR_VERSION} does not give: ${what}`, async () => {
+  for (const [what, check, refusedBy] of [
+    ["not json", "echo nope", SyntaxError],
+    ["no ok", printing(null), AdrAnswerUnread],
+    ["no governing", printing({ ok: true, findings: [] }), AdrAnswerUnread],
+    ["a notice with no id", printing({ ok: true, governing: [], findings: [{ rule: "affects-unresolvable", severity: "info", message: "m" }] }), AdrAnswerUnread],
+    ["failed with no error", printing({ ok: false, governing: [], findings: [] }, 1), AdrAnswerUnread],
+  ] as const) {
+    it(`could not run, with the install step, for an answer in a shape adrkit ${ADR_VERSION} does not give: ${what}, the refusal its cause`, async () => {
       standIn(answering(ADR_VERSION, check));
-      couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL);
+      couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL, (cause) => cause instanceof refusedBy);
     });
   }
 
   // test_adrkit.py Outcomes.test_an_answer_that_is_not_json_says_so
-  it("says an answer on exit 0 is not JSON", async () => {
+  it("says an answer on exit 0 is not JSON, JSON's error its cause", async () => {
     standIn(answering(ADR_VERSION, "echo nope"));
-    assert.match(couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL), /is not valid JSON/);
+    const reason = couldNotRunOf(await checkAdrFolder(repo, inside, PATHS, FAR), inside, ADR_INSTALL, (cause) => cause instanceof SyntaxError);
+    assert.match(reason, /is not valid JSON/);
   });
 
   // test_adrkit.py Outcomes.test_any_other_adrkit_failure_could_not_run_with_adrkits_error (exits 1 and 2), and
