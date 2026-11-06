@@ -11,7 +11,7 @@ const AT = "2026-10-28T10:00:00Z";
 const LATER = "2026-10-28T11:00:00Z";
 
 function round(fields: Fields = {}): Fields {
-  return { stage: "INTERNAL", n: 1, run: "18342197301", head: HEAD, result: "CLEAN", verdict: null, root_cause: null, at: AT, ...fields };
+  return { stage: "INTERNAL", n: 1, run: "18342197301", head: HEAD, result: "CLEAN", verdict: null, root_cause: null, at: AT, findings: [], ...fields };
 }
 
 function finding(fields: Fields = {}): Fields {
@@ -66,7 +66,7 @@ function ruling(fields: Fields = {}): Fields {
 const THREADLESS = { key: "required-check:ci", latest_trusted_comment_id: null, reply: null };
 
 function snapshot(fields: Fields = {}): Fields {
-  return { v: 1, rounds: [round()], holds: [], pushbacks: [], rulings: [], gates: null, ...fields };
+  return { v: 1, rounds: [dirtyRound()], holds: [], pushbacks: [], rulings: [], gates: null, ...fields };
 }
 
 function accepted(value: Fields): void {
@@ -91,9 +91,16 @@ test("a snapshot holding every stage, kind and state is accepted as written", ()
     snapshot({
       rounds: [
         round(),
-        round({ n: 2, run: "18342197302", result: "DIRTY", verdict: "CONVERGED_PUSHBACK", root_cause: "AT_CAUSE", at: LATER }),
+        dirtyRound({
+          n: 2,
+          run: "18342197302",
+          verdict: "CONVERGED_PUSHBACK",
+          root_cause: "AT_CAUSE",
+          at: LATER,
+          findings: [finding(), finding({ key: "thread:PRRT_2", line: 57 }), finding({ key: "thread:PRRT_3", file: "src/read.ts", line: 9 })],
+        }),
         round({ stage: "AUDIT", n: 1, run: "18342197303", result: "INCOMPLETE" }),
-        round({ stage: "GITHUB", n: 1, run: "18342197304", result: "DIRTY", verdict: "PATCH" }),
+        dirtyRound({ stage: "GITHUB", run: "18342197304", findings: [finding({ key: "required-check:ci", file: null, line: null })] }),
       ],
       holds: [
         hold(),
@@ -106,8 +113,8 @@ test("a snapshot holding every stage, kind and state is accepted as written", ()
       pushbacks: [{ key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 2 } }],
       rulings: [
         ruling({ round: { stage: "INTERNAL", n: 2 } }),
-        ruling({ key: "thread:PRRT_2", ruling: "FIX", commits: [HEAD, FIX_COMMIT] }),
-        ruling({ key: "thread:PRRT_3", ruling: "DEFER", reply: "Real, and separate: moved to #301." }),
+        ruling({ key: "thread:PRRT_2", round: { stage: "INTERNAL", n: 2 }, ruling: "FIX", commits: [HEAD, FIX_COMMIT] }),
+        ruling({ key: "thread:PRRT_3", round: { stage: "INTERNAL", n: 2 }, ruling: "DEFER", reply: "Real, and separate: moved to #301." }),
         ruling({ ...THREADLESS, round: { stage: "GITHUB", n: 1 }, ruling: "FIX", commits: [FIX_COMMIT] }),
       ],
     }),
@@ -169,9 +176,9 @@ test("head is 40 lower-case hex digits", () => {
 
 test("verdict is set on a DIRTY round", () => {
   for (const verdict of ["PATCH", "CLASS_FIX", "REDESIGN", "RESCOPE", "CONVERGED_PUSHBACK", "ESCALATE"]) {
-    accepted(snapshot({ rounds: [round({ result: "DIRTY", verdict })] }));
+    accepted(snapshot({ rounds: [dirtyRound({ verdict })] }));
   }
-  refusedAt(snapshot({ rounds: [round({ result: "DIRTY" })] }), ["rounds", 0, "verdict"]);
+  refusedAt(snapshot({ rounds: [dirtyRound({ verdict: null })] }), ["rounds", 0, "verdict"]);
 });
 
 test("verdict is null on a round that is not DIRTY", () => {
@@ -211,7 +218,7 @@ test("a round lists each finding's key once", () => {
 test("a value field takes only its set's values", () => {
   refusedAt(snapshot({ rounds: [round({ stage: "internal" })] }), ["rounds", 0, "stage"]);
   refusedAt(snapshot({ rounds: [round({ result: "PASS" })] }), ["rounds", 0, "result"]);
-  refusedAt(snapshot({ rounds: [round({ result: "DIRTY", verdict: "FIX" })] }), ["rounds", 0, "verdict"]);
+  refusedAt(snapshot({ rounds: [dirtyRound({ verdict: "FIX" })] }), ["rounds", 0, "verdict"]);
   refusedAt(snapshot({ holds: [hold({ id: "Pushback-212", kind: "Pushback" })] }), ["holds", 0, "kind"]);
   refusedAt(snapshot({ holds: [hold({ state: "open" })] }), ["holds", 0, "state"]);
 });
@@ -361,7 +368,7 @@ test("each pushback's key is one of its round's findings", () => {
 });
 
 test("a finding is ruled once per round, and again in a later round", () => {
-  const rounds = [round(), round({ n: 2 })];
+  const rounds = [dirtyRound(), dirtyRound({ n: 2 })];
   refusedAt(snapshot({ rounds, rulings: [ruling(), ruling({ ruling: "DEFER" })] }), ["rulings", 1]);
   accepted(snapshot({ rounds, rulings: [ruling(), ruling({ round: { stage: "INTERNAL", n: 2 }, ruling: "FIX" })] }));
   accepted(snapshot({ rounds, rulings: [ruling(), ruling({ key: "thread:PRRT_2" })] }));
@@ -374,7 +381,8 @@ test("a ruling takes only a finding ruling's values", () => {
 });
 
 test("a ruling's key is a finding's key, never empty", () => {
-  refusedAt(snapshot({ rulings: [ruling({ key: "" })] }), ["rulings", 0, "key"]);
+  // Empty, and so no finding's: refused twice at the key.
+  refusedAt(snapshot({ rulings: [ruling({ key: "" })] }), ["rulings", 0, "key"], ["rulings", 0, "key"]);
 });
 
 test("reply is set and non-empty exactly when latest_trusted_comment_id is, so a thread always has one", () => {

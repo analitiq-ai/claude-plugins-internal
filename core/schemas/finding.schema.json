@@ -87,9 +87,9 @@
   "required": [
     "source",
     "key",
-    "author",
     "file",
     "line",
+    "author",
     "text",
     "thread_id",
     "resolvable",

@@ -26,6 +26,7 @@ const round = {
   verdict: null,
   root_cause: null,
   at: AT,
+  findings: [],
 };
 
 const EVENTS = {

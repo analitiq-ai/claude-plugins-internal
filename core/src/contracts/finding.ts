@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FindingSource } from "../values.ts";
 import { setExactlyWhen } from "./refinements.ts";
+import { RoundFinding } from "./snapshot.ts";
 
 // Only trusted reviewers' comments are carried, so a brief never holds text from anyone else (reviewer ADR-0016 d2).
 export const TrustedComment = z.strictObject({ id: z.string(), author: z.string(), body: z.string() });
@@ -9,12 +10,9 @@ export type TrustedComment = z.infer<typeof TrustedComment>;
 export const Finding = z
   .strictObject({
     source: FindingSource,
-    // Stable across heads, so a pushback recorded at one head names the same item at the next.
-    key: z.string().min(1),
+    ...RoundFinding.shape,
     // REST form, `<slug>[bot]` for an App, so one login compares equal however GitHub gave it.
     author: z.string(),
-    file: z.string().nullable(),
-    line: z.int().min(1).nullable(),
     text: z.string(),
     thread_id: z.string().nullable(),
     resolvable: z.boolean(),

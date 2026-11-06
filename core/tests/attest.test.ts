@@ -22,7 +22,11 @@ function sha(n: number): string {
 }
 
 function round(fields: Partial<Round> = {}): Round {
-  return { stage: "INTERNAL", n: 1, run: "run-1", head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), ...fields };
+  return { stage: "INTERNAL", n: 1, run: "run-1", head: sha(1), result: "CLEAN", verdict: null, root_cause: null, at: at("10:00"), findings: [], ...fields };
+}
+
+function dirty(verdict: Round["verdict"], fields: Partial<Round> = {}): Round {
+  return round({ result: "DIRTY", verdict, findings: [{ key: "thread:PRRT_1", file: "src/parse.ts", line: 42 }], ...fields });
 }
 
 function releasedHold(fields: Partial<Hold> = {}): Hold {
@@ -64,19 +68,19 @@ describe("passingRounds", () => {
   it("lists INTERNAL and AUDIT rounds CLEAN, or DIRTY with CONVERGED_PUSHBACK, newest first, never GITHUB", () => {
     const passing = [
       round({ stage: "INTERNAL", n: 1 }),
-      round({ stage: "INTERNAL", n: 3, result: "DIRTY", verdict: "CONVERGED_PUSHBACK" }),
+      dirty("CONVERGED_PUSHBACK", { stage: "INTERNAL", n: 3 }),
       round({ stage: "AUDIT", n: 1 }),
-      round({ stage: "AUDIT", n: 2, result: "DIRTY", verdict: "CONVERGED_PUSHBACK" }),
+      dirty("CONVERGED_PUSHBACK", { stage: "AUDIT", n: 2 }),
     ];
     const rounds = [
       passing[0],
-      round({ stage: "INTERNAL", n: 2, result: "DIRTY", verdict: "PATCH" }),
+      dirty("PATCH", { stage: "INTERNAL", n: 2 }),
       passing[1],
       round({ stage: "GITHUB", n: 1 }),
       round({ stage: "INTERNAL", n: 4, result: "INCOMPLETE" }),
       passing[2],
-      round({ stage: "GITHUB", n: 2, result: "DIRTY", verdict: "CONVERGED_PUSHBACK" }),
-      round({ stage: "AUDIT", n: 3, result: "DIRTY", verdict: "ESCALATE" }),
+      dirty("CONVERGED_PUSHBACK", { stage: "GITHUB", n: 2 }),
+      dirty("ESCALATE", { stage: "AUDIT", n: 3 }),
       passing[3],
     ];
     assert.deepEqual(passingRounds(snapshot(rounds)), passing.toReversed());
@@ -321,7 +325,7 @@ describe("attests, in a scratch repository", () => {
   }
 
   it("attests an INTERNAL CLEAN round at A with B on top, a later GITHUB DIRTY round at B counting against nothing", async () => {
-    const githubDirtyAtB = round({ stage: "GITHUB", head: commits.b, result: "DIRTY", verdict: "PATCH", at: at("10:10") });
+    const githubDirtyAtB = dirty("PATCH", { stage: "GITHUB", head: commits.b, at: at("10:10") });
     assert.deepEqual(await attests(repo, reading(snapshot([cleanAtA(), githubDirtyAtB])), commits.b, "main", SPEC), {
       attested: true,
       reason: null,

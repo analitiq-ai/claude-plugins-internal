@@ -3,14 +3,14 @@
     {
       "date": "2026-10-28T09:05:00Z",
       "files": {
-        "round.run-21.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000015\",\n    \"n\": 1,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-21\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+        "round.run-21.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"findings\": [],\n    \"head\": \"0000000000000000000000000000000000000015\",\n    \"n\": 1,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-21\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
       }
     },
     {
       "date": "2026-10-28T09:30:00Z",
       "by": "invalid",
       "files": {
-        "round.run-22.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000016\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-22\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+        "round.run-22.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"findings\": [],\n    \"head\": \"0000000000000000000000000000000000000016\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-22\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
       }
     },
     {
@@ -38,7 +38,8 @@
         "result": "CLEAN",
         "verdict": null,
         "root_cause": null,
-        "at": "2026-10-28T09:00:00Z"
+        "at": "2026-10-28T09:00:00Z",
+        "findings": []
       }
     ],
     "holds": [],

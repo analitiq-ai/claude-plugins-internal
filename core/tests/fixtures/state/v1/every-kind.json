@@ -3,7 +3,7 @@
     {
       "date": "2026-10-28T09:05:00Z",
       "files": {
-        "round.run-11.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"head\": \"0000000000000000000000000000000000000001\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": \"AT_CAUSE\",\n    \"run\": \"run-11\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": \"PATCH\"\n  },\n  \"v\": 1\n}\n",
+        "round.run-11.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:00:00Z\",\n    \"findings\": [\n      {\n        \"file\": \"src/parse.ts\",\n        \"key\": \"thread:PRRT_1\",\n        \"line\": 42\n      },\n      {\n        \"file\": \"src/parse.ts\",\n        \"key\": \"thread:PRRT_2\",\n        \"line\": 57\n      }\n    ],\n    \"head\": \"0000000000000000000000000000000000000001\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": \"AT_CAUSE\",\n    \"run\": \"run-11\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": \"PATCH\"\n  },\n  \"v\": 1\n}\n",
         "ruling.INTERNAL-1.041ca3516f506b0b0323357b721c9b271f3f853ab28eaa5b79707d253314a480.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"thread:PRRT_1\",\n    \"latest_trusted_comment_id\": \"PRRC_1\",\n    \"reply\": \"Fixed at the cause.\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    },\n    \"ruling\": \"FIX\"\n  },\n  \"v\": 1\n}\n",
         "ruling.INTERNAL-1.e24c3bb40f00dbb409814efefcc5f679e4664a48a4da76243dd4aebfd2696687.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"thread:PRRT_2\",\n    \"latest_trusted_comment_id\": \"PRRC_2\",\n    \"reply\": \"Not real.\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    },\n    \"ruling\": \"PUSH_BACK\"\n  },\n  \"v\": 1\n}\n",
         "pushback.INTERNAL-1.e24c3bb40f00dbb409814efefcc5f679e4664a48a4da76243dd4aebfd2696687.json": "{\n  \"kind\": \"pushback\",\n  \"pushback\": {\n    \"key\": \"thread:PRRT_2\",\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"INTERNAL\"\n    }\n  },\n  \"v\": 1\n}\n",
@@ -25,13 +25,13 @@
     {
       "date": "2026-10-28T09:30:00Z",
       "files": {
-        "round.run-12.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:30:00Z\",\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-12\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
+        "round.run-12.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:30:00Z\",\n    \"findings\": [],\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 2,\n    \"result\": \"CLEAN\",\n    \"root_cause\": null,\n    \"run\": \"run-12\",\n    \"stage\": \"INTERNAL\",\n    \"verdict\": null\n  },\n  \"v\": 1\n}\n"
       }
     },
     {
       "date": "2026-10-28T09:40:00Z",
       "files": {
-        "round.run-13.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:40:00Z\",\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": null,\n    \"run\": \"run-13\",\n    \"stage\": \"AUDIT\",\n    \"verdict\": \"ESCALATE\"\n  },\n  \"v\": 1\n}\n",
+        "round.run-13.json": "{\n  \"kind\": \"round\",\n  \"round\": {\n    \"at\": \"2026-10-28T09:40:00Z\",\n    \"findings\": [\n      {\n        \"file\": null,\n        \"key\": \"check:lint\",\n        \"line\": null\n      }\n    ],\n    \"head\": \"0000000000000000000000000000000000000002\",\n    \"n\": 1,\n    \"result\": \"DIRTY\",\n    \"root_cause\": null,\n    \"run\": \"run-13\",\n    \"stage\": \"AUDIT\",\n    \"verdict\": \"ESCALATE\"\n  },\n  \"v\": 1\n}\n",
         "ruling.AUDIT-1.93478a24d3cc071cac034120d5d9ef35c9bc24050b6f63181047d330baf61214.json": "{\n  \"kind\": \"ruling\",\n  \"ruling\": {\n    \"commits\": [],\n    \"key\": \"check:lint\",\n    \"latest_trusted_comment_id\": null,\n    \"reply\": null,\n    \"round\": {\n      \"n\": 1,\n      \"stage\": \"AUDIT\"\n    },\n    \"ruling\": \"ESCALATE\"\n  },\n  \"v\": 1\n}\n",
         "hold.escalation-212.20261028T094000Z.json": "{\n  \"hold\": {\n    \"id\": \"escalation-212\",\n    \"kind\": \"escalation\",\n    \"question\": \"Which reading of FR-3 holds?\",\n    \"since\": \"2026-10-28T09:40:00Z\",\n    \"spec_pr\": null\n  },\n  \"kind\": \"hold\",\n  \"v\": 1\n}\n"
       }
@@ -69,7 +69,19 @@
         "result": "DIRTY",
         "verdict": "PATCH",
         "root_cause": "AT_CAUSE",
-        "at": "2026-10-28T09:00:00Z"
+        "at": "2026-10-28T09:00:00Z",
+        "findings": [
+          {
+            "file": "src/parse.ts",
+            "key": "thread:PRRT_1",
+            "line": 42
+          },
+          {
+            "file": "src/parse.ts",
+            "key": "thread:PRRT_2",
+            "line": 57
+          }
+        ]
       },
       {
         "stage": "INTERNAL",
@@ -79,7 +91,8 @@
         "result": "CLEAN",
         "verdict": null,
         "root_cause": null,
-        "at": "2026-10-28T09:30:00Z"
+        "at": "2026-10-28T09:30:00Z",
+        "findings": []
       },
       {
         "stage": "AUDIT",
@@ -89,7 +102,14 @@
         "result": "DIRTY",
         "verdict": "ESCALATE",
         "root_cause": null,
-        "at": "2026-10-28T09:40:00Z"
+        "at": "2026-10-28T09:40:00Z",
+        "findings": [
+          {
+            "file": null,
+            "key": "check:lint",
+            "line": null
+          }
+        ]
       }
     ],
     "holds": [

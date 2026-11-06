@@ -8,6 +8,15 @@ import { GitSha, NameSegment, Time } from "./scalars.ts";
 export const RoundId = z.strictObject({ stage: RoundStage.schema, n: z.int().min(1) });
 export type RoundId = z.infer<typeof RoundId>;
 
+// Stable across heads, so a pushback recorded at one head names the same item at the next. A round records each
+// finding's key and position and no text (reviewer ADR-0016 d2).
+export const RoundFinding = z.strictObject({
+  key: z.string().min(1),
+  file: z.string().nullable(),
+  line: z.int().min(1).nullable(),
+});
+export type RoundFinding = z.infer<typeof RoundFinding>;
+
 export const Round = z
   .strictObject({
     ...RoundId.shape,
@@ -18,10 +27,22 @@ export const Round = z
     verdict: RoundVerdict.schema.nullable(),
     root_cause: RootCause.schema.nullable(),
     at: Time,
+    findings: z.array(RoundFinding),
   })
   .superRefine((round, ctx) => {
     const dirty = RoundResult.schema.enum.DIRTY;
     setExactlyWhen(ctx, "verdict", round.verdict, round.result === dirty, `result is ${dirty}`);
+    const keys = new Set<string>();
+    round.findings.forEach((finding, i) => {
+      if (keys.has(finding.key)) {
+        ctx.addIssue({ code: "custom", path: ["findings", i, "key"], message: `${finding.key} is already a finding of this round` });
+      }
+      keys.add(finding.key);
+    });
+    const listed = round.findings.length > 0;
+    if (listed !== (round.result === dirty)) {
+      ctx.addIssue({ code: "custom", path: ["findings"], message: `findings is non-empty exactly when result is ${dirty}` });
+    }
   });
 export type Round = z.infer<typeof Round>;
 
@@ -118,13 +139,15 @@ export const Snapshot = z
     gates: Gates.nullable(),
   })
   .superRefine((snapshot, ctx) => {
-    const rounds = new Set<string>();
+    // Per round, its findings' keys: what a pushback or a ruling on it names.
+    const rounds = new Map<string, ReadonlySet<string>>();
     snapshot.rounds.forEach((round, i) => {
       const name = roundName(round);
       if (rounds.has(name)) {
         ctx.addIssue({ code: "custom", path: ["rounds", i], message: `round ${name} is already in rounds` });
+        return;
       }
-      rounds.add(name);
+      rounds.set(name, new Set(round.findings.map((finding) => finding.key)));
     });
     // One row per id: placing a released hold again reopens its own row (reviewer ADR-0013 d1).
     const holds = new Set<string>();
@@ -134,19 +157,22 @@ export const Snapshot = z
       }
       holds.add(hold.id);
     });
-    snapshot.pushbacks.forEach((pushback, i) => {
-      const name = roundName(pushback.round);
-      if (!rounds.has(name)) {
-        ctx.addIssue({ code: "custom", path: ["pushbacks", i, "round"], message: `round ${name} is not in rounds` });
+    // A round not in rounds has no findings to name, so the item is refused once, at its round.
+    const namesFinding = (path: Array<string | number>, { key, round }: Pushback): void => {
+      const name = roundName(round);
+      const keys = rounds.get(name);
+      if (keys === undefined) {
+        ctx.addIssue({ code: "custom", path: [...path, "round"], message: `round ${name} is not in rounds` });
+      } else if (!keys.has(key)) {
+        ctx.addIssue({ code: "custom", path: [...path, "key"], message: `${key} is not a finding of round ${name}` });
       }
-    });
+    };
+    snapshot.pushbacks.forEach((pushback, i) => namesFinding(["pushbacks", i], pushback));
     // A round's assessment rules each of its findings once.
     const ruled = new Set<string>();
     snapshot.rulings.forEach((ruling, i) => {
+      namesFinding(["rulings", i], ruling);
       const name = roundName(ruling.round);
-      if (!rounds.has(name)) {
-        ctx.addIssue({ code: "custom", path: ["rulings", i, "round"], message: `round ${name} is not in rounds` });
-      }
       const finding = `${name} ${ruling.key}`;
       if (ruled.has(finding)) {
         ctx.addIssue({ code: "custom", path: ["rulings", i], message: `${ruling.key} is already ruled in round ${name}` });

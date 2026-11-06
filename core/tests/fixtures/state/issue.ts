@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import type { Gates, Lineage } from "../../../src/contracts/gates.ts";
-import type { Hold, HoldPlacement, Round, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
+import type { Hold, HoldPlacement, Round, RoundFinding, Ruling, Snapshot } from "../../../src/contracts/snapshot.ts";
 import type { Shared } from "../../../src/settings.ts";
 import type { IssueComment, StatusChange } from "../../../src/state.ts";
 import { fakeGitHub, type FakeGitHub } from "../../support/fake-github.ts";
@@ -43,7 +43,16 @@ export function sha(n: number): string {
 }
 
 export function round(n: number, fields: Partial<Round> = {}): Round {
-  return { stage: "INTERNAL", n, run: `run-${n}`, head: sha(n), result: "CLEAN", verdict: null, root_cause: null, at: at("09:00"), ...fields };
+  return { stage: "INTERNAL", n, run: `run-${n}`, head: sha(n), result: "CLEAN", verdict: null, root_cause: null, at: at("09:00"), findings: [], ...fields };
+}
+
+function finding(key: string): RoundFinding {
+  return { key, file: "src/parse.ts", line: 42 };
+}
+
+/** A DIRTY round whose findings are `keys`, so a ruling or pushback on it names one of them. */
+export function dirtyRound(n: number, keys: readonly string[], fields: Partial<Round> = {}): Round {
+  return round(n, { result: "DIRTY", verdict: "PATCH", findings: keys.map((key) => finding(key)), ...fields });
 }
 
 export const QUESTION_TEXT = "Which reading of FR-3 holds?";

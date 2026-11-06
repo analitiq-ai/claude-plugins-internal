@@ -30,6 +30,7 @@ import {
   adminComment,
   at,
   commitsAsked,
+  dirtyRound,
   fixRuling,
   gates,
   hold,
@@ -60,7 +61,7 @@ import {
 import type { FakeGitHub } from "./support/fake-github.ts";
 
 const EMPTY: Snapshot = { v: 1, rounds: [], holds: [], pushbacks: [], rulings: [], gates: null };
-const ROUND_1 = round(1, { result: "DIRTY", verdict: "PATCH" });
+const ROUND_1 = dirtyRound(1, ["PRRC_1"]);
 const ROUND_1_ID = { stage: "INTERNAL", n: 1 } as const;
 const ROUND_2_ID = { stage: "INTERNAL", n: 2 } as const;
 
@@ -268,21 +269,22 @@ describe("writeState", () => {
   it("commits a round, its rulings, a FIX's commits and its pushbacks as one commit, the headline's kinds in the contract's order", async () => {
     const fix = fixRuling("PRRC_1", 2, [sha(5)]);
     const pushback = { key: "PRRC_2", round: ROUND_2_ID };
-    const next = { ...base, rounds: [ROUND_1, round(2)], rulings: [fix, pushbackRuling("PRRC_2", 2)], pushbacks: [pushback] };
+    const second = dirtyRound(2, ["PRRC_1", "PRRC_2"]);
+    const next = { ...base, rounds: [ROUND_1, second], rulings: [fix, pushbackRuling("PRRC_2", 2)], pushbacks: [pushback] };
     const { out, advanced } = await write(base, next);
     const input = onlyCommit(out);
     assert.equal(input.message.headline, "issues/212: round, ruling, ruling-commit, pushback");
     assert.deepEqual(
       addedFiles(input),
       filesOf(
-        event.round(round(2, { at: NOW })),
+        event.round({ ...second, at: NOW }),
         event.ruling(fix),
         event.ruling(pushbackRuling("PRRC_2", 2)),
         event.rulingCommit(ROUND_2_ID, "PRRC_1", sha(5)),
         event.pushback(pushback),
       ),
     );
-    assert.deepEqual(advanced.snapshot, { ...next, rounds: [ROUND_1, round(2, { at: NOW })] });
+    assert.deepEqual(advanced.snapshot, { ...next, rounds: [ROUND_1, { ...second, at: NOW }] });
   });
 
   it("commits a FIX's new commit as a ruling-commit, after those it named", async () => {
@@ -375,7 +377,7 @@ describe("writeState", () => {
 
 describe("checkTransition", () => {
   const old = snapshot({
-    rounds: [round(1), round(2)],
+    rounds: [dirtyRound(1, ["thread:PRRT_1"]), dirtyRound(2, ["thread:PRRT_2", "thread:PRRT_4"])],
     holds: [hold("pushback-212"), releasedHold("escalation-212", 90)],
     pushbacks: [
       { key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } },
@@ -388,13 +390,14 @@ describe("checkTransition", () => {
   it("gives no event for nothing changed, and an event per appended round, ruling and pushback in the contract's kind order", () => {
     assert.deepEqual(checkTransition(old, old), []);
     const pushback = { key: "thread:PRRT_3", round: { stage: "INTERNAL", n: 3 } } as const;
+    const third = dirtyRound(3, ["thread:PRRT_3"]);
     const next = {
       ...old,
-      rounds: [...old.rounds, round(3)],
+      rounds: [...old.rounds, third],
       pushbacks: [...old.pushbacks, pushback],
       rulings: [...old.rulings, pushbackRuling("thread:PRRT_3", 3)],
     };
-    assert.deepEqual(checkTransition(old, next), [event.round(round(3)), event.ruling(pushbackRuling("thread:PRRT_3", 3)), event.pushback(pushback)]);
+    assert.deepEqual(checkTransition(old, next), [event.round(third), event.ruling(pushbackRuling("thread:PRRT_3", 3)), event.pushback(pushback)]);
   });
 
   it("gives a ruling-commit event per commit a FIX names after those it named", () => {
@@ -623,7 +626,7 @@ describe("releaseOnClaim", () => {
     hold("audit-212", { since: at("10:00") }),
     releasedHold("claim-L7", 80, { since: at("08:00"), released: at("08:30") }),
   ];
-  const state = snapshot({ holds, pushbacks: [{ key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } }] });
+  const state = snapshot({ rounds: [dirtyRound(1, ["thread:PRRT_1"])], holds, pushbacks: [{ key: "thread:PRRT_1", round: { stage: "INTERNAL", n: 1 } }] });
 
   async function release(ledger: FakeLedger, issue: Issue) {
     const reading = await readingOf(ledger, issue);

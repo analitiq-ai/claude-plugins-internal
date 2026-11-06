@@ -17,6 +17,7 @@ import {
   adminComment,
   at,
   comment,
+  dirtyRound,
   fixRuling,
   gates,
   hold,
@@ -54,7 +55,7 @@ function files(...events: LedgerEvent[]): Record<string, string> {
   return Object.fromEntries(events.map((each) => [fileOf(each), eventText(each)]));
 }
 
-const ROUND_1 = round(1, { result: "DIRTY", verdict: "PATCH" });
+const ROUND_1 = dirtyRound(1, ["PRRC_1"]);
 const ROUND_1_ID = { stage: "INTERNAL", n: 1 } as const;
 const BY_THE_APP = { signature: GITHUB_SIGNED, author: SHARED.reviewer_app_login };
 
@@ -93,10 +94,11 @@ describe("readState: the fold of the story's event commits", () => {
     const ledger = fakeLedger();
     const fix = sha(77);
     const pushback = hold("pushback-212", { since: at("09:40") });
+    const second = dirtyRound(2, ["PRRC_2"]);
     eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
     eventCommit(ledger, [event.ruling(fixRuling("PRRC_1", 1, []))], { date: at("09:10") });
     eventCommit(ledger, [event.rulingCommit(ROUND_1_ID, "PRRC_1", fix)], { date: at("09:20") });
-    eventCommit(ledger, [event.round(round(2))], { date: at("09:30") });
+    eventCommit(ledger, [event.round(second)], { date: at("09:30") });
     eventCommit(ledger, [event.pushback({ key: "PRRC_2", round: { stage: "INTERNAL", n: 2 } })], { date: at("09:35") });
     eventCommit(ledger, [event.hold(placementOf(pushback))], { date: at("09:40") });
     eventCommit(ledger, [event.release("pushback-212", at("09:40"), at("09:50"), 201)], { date: at("09:50") });
@@ -109,14 +111,14 @@ describe("readState: the fold of the story's event commits", () => {
     assert.deepEqual(
       reading.snapshot,
       snapshot({
-        rounds: [ROUND_1, round(2)],
+        rounds: [ROUND_1, second],
         rulings: [fixRuling("PRRC_1", 1, [fix])],
         pushbacks: [{ key: "PRRC_2", round: { stage: "INTERNAL", n: 2 } }],
         holds: [{ ...pushback, state: "RELEASED", released: at("09:50"), released_by: { comment: 201, reset: false } }],
         gates: gates(),
       }),
     );
-    assert.deepEqual(reading.newest_round, round(2));
+    assert.deepEqual(reading.newest_round, second);
     assert.deepEqual([...reading.pushed_back], [["PRRC_2", { stage: "INTERNAL", n: 2 }]]);
     assert.deepEqual([reading.held, reading.causes, reading.tamper, reading.startable], [false, [], [], true]);
   });
@@ -124,9 +126,10 @@ describe("readState: the fold of the story's event commits", () => {
   it("folds one commit's events to one snapshot, with no tamper, whether it lists them in reverse kind order, by file name or in kind order", async () => {
     const fix = sha(77);
     const third = { stage: "INTERNAL", n: 3 } as const;
+    const dirtyThird = dirtyRound(3, ["PRRC_3", "PRRC_9"]);
     const audit = hold("audit-212", { since: at("10:00") });
     const kindOrder: LedgerEvent[] = [
-      event.round(round(3, { result: "DIRTY", verdict: "PATCH" })),
+      event.round(dirtyThird),
       event.ruling(fixRuling("PRRC_3", 3, [])),
       event.rulingCommit(third, "PRRC_3", fix),
       event.pushback({ key: "PRRC_9", round: third }),
@@ -148,7 +151,7 @@ describe("readState: the fold of the story's event commits", () => {
       assert.deepEqual(
         reading.snapshot,
         snapshot({
-          rounds: [round(3, { result: "DIRTY", verdict: "PATCH" })],
+          rounds: [dirtyThird],
           rulings: [fixRuling("PRRC_3", 3, [fix])],
           pushbacks: [{ key: "PRRC_9", round: third }],
           holds: [{ ...audit, state: "RELEASED", released: at("10:00"), released_by: { comment: 201, reset: false } }],
