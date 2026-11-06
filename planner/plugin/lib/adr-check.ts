@@ -13,6 +13,7 @@ import {
   VERDICT_FILE,
 } from "../core/contracts/decision-check.ts";
 import type { CouldNotRun } from "../core/outcomes.ts";
+import { oneLine } from "../core/one-line.ts";
 import { AdrJudgment, CheckOutcome } from "../core/values.ts";
 
 const { PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
@@ -127,11 +128,12 @@ export const ADR_STOPS: Readonly<Record<StopKind, StopRow>> = {
 
 export type StopItem = { kind: "folder"; couldNotRun: CouldNotRun } | { kind: Exclude<StopKind, "folder">; fill: Readonly<Record<string, string>> };
 
+// A stop is read line by line, and its values carry text from git, Zod and the judge that may span lines.
 function filled(template: string, fill: Readonly<Record<string, string>>): string {
   return template.replace(/\{([a-z]+)\}/g, (_, name: string) => {
     const value = fill[name];
     if (value === undefined) throw new TypeError(`the stop template ${JSON.stringify(template)} needs ${name}`);
-    return value;
+    return oneLine(value);
   });
 }
 
@@ -140,7 +142,7 @@ const EXIT: Readonly<Record<Outcome, number>> = { [PASS]: 0, [FAIL]: 1, [COULD_N
 /** Each item as its line, and the stop's exit: 2 when any line could not run, else 1 when any fails, else 0. */
 export function adrStop(items: readonly StopItem[]): { lines: string[]; exit: number } {
   const lines = items.map((item) => {
-    if (item.kind === "folder") return `${COULD_NOT_RUN}: ${item.couldNotRun.reason}`;
+    if (item.kind === "folder") return `${COULD_NOT_RUN}: ${oneLine(item.couldNotRun.reason)}`;
     const { outcome, label, what, next } = ADR_STOPS[item.kind];
     const said = `${outcome}: ${filled(label, item.fill)}: ${filled(what, item.fill).replace(/\.$/, "")}`;
     return next === null ? `${said}.` : `${said}. Next step: ${filled(next, item.fill)}.`;

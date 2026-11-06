@@ -218,6 +218,17 @@ describe("adrStop", () => {
     assert.deepEqual(lines, ["COULD_NOT_RUN: docs/adr: adr was not found. Next step: install it."]);
   });
 
+  it("renders a value that spans lines, from a fill or core's CouldNotRun, on its item's one line", () => {
+    const { lines } = adrStop([
+      { kind: "ruling-refused", fill: { what: "not rulings: ✖ Invalid input\n  → at [0].reason" } },
+      { kind: "folder", couldNotRun: couldNotRun("docs/adr", "git failed:\nfatal: bad object\n") },
+    ]);
+    assert.deepEqual(lines, [
+      "FAIL: adr_ruling: not rulings: ✖ Invalid input → at [0].reason. Next step: resume with a corrected adr_ruling, or without one.",
+      "COULD_NOT_RUN: docs/adr: git failed: fatal: bad object",
+    ]);
+  });
+
   it("refuses an item that leaves a placeholder of its row unfilled", () => {
     assert.throws(() => adrStop([{ kind: "governed", fill: {} }]), /entry/);
   });

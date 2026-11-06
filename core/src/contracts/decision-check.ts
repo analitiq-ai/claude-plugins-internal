@@ -22,7 +22,9 @@ export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
 export const STEPS_DIR = "adr-steps";
 export const INPUTS_FILE = "adr-inputs.json";
 export const REVIEW_QUESTIONS_FILE = "review-questions.json";
-/** `adr-clear` deletes these before each round. */
+/** What `adr-clear` deletes before each round. The tasks sources' hashes and the rulings the check wrote stay: a later
+ *  round reads them to decide whether tasks.md is written again and which rulings the guard allows. `adr-clear`
+ *  writes the touches sources' hashes itself. */
 export const ROUND_FILES = [STEPS_DIR, TOUCHES_FILE, INPUTS_FILE, ASKED_FILE, VERDICT_FILE, STOP_FILE] as const;
 
 type CheckedArtifactName = z.infer<typeof CheckedArtifact.schema>;

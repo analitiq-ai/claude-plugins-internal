@@ -9,6 +9,7 @@ import { GitFailed } from "../core/git.ts";
 import { gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused, type GitHubClient } from "../core/github.ts";
 import { DerivationError } from "../core/identity.ts";
 import { KeyReadRefused } from "../core/keys.ts";
+import { oneLine } from "../core/one-line.ts";
 import { SessionRecordRefused } from "../core/session-record.ts";
 import { SettingsError } from "../core/settings.ts";
 import { BoardNotVisible, LedgerMissing } from "../core/state.ts";
@@ -59,7 +60,7 @@ export const PASS: HookAnswer = { code: 0, stdout: "", stderr: "" };
 
 // Claude Code shows a refusal's stderr as one message, so a reason of several lines is folded into one.
 export function refuse(reason: string): HookAnswer {
-  return { code: 2, stdout: "", stderr: `orchestrator: ${reason.trim().replace(/\s*\n\s*/g, " ")}\n` };
+  return { code: 2, stdout: "", stderr: `orchestrator: ${oneLine(reason)}\n` };
 }
 
 export function context(event: HookEvent, text: string): HookAnswer {

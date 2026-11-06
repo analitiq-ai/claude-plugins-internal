@@ -425,6 +425,12 @@ class CheckLoop(unittest.TestCase):
         self.assertStopped(report, "FAIL: adr_ruling: ")
         self.assertNotIn("ruling_unapplied", report)
 
+    def test_a_ruling_the_schema_refuses_is_not_named_unapplied(self):
+        unreasoned = {key: value for key, value in RULED.items() if key != "reason"}
+        report = self.project.resume(self.departing()["run_id"], self.ruling_file([unreasoned]))
+        self.assertStopped(report, "FAIL: adr_ruling: not rulings: ")
+        self.assertNotIn("ruling_unapplied", report)
+
     def test_an_adr_ruling_without_a_file_exits_before_resuming(self):
         run_id = self.departing()["run_id"]
         before = self.project.state(run_id)

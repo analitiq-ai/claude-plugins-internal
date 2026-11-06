@@ -7,6 +7,7 @@ import type { Session } from "../core/commit-pass.ts";
 import { tamperId } from "../core/contracts/ledger.ts";
 import { GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered } from "../core/github.ts";
 import { KeyReadRefused } from "../core/keys.ts";
+import { oneLine } from "../core/one-line.ts";
 import { BoardNotVisible, LedgerMissing, StateWriteUnsigned } from "../core/state.ts";
 import { MintError } from "../core/tokens.ts";
 import { appendGateLog, type GateLogEntry } from "./session.ts";
@@ -86,7 +87,7 @@ export const PASS: HookAnswer = { code: 0, stdout: "", stderr: "" };
 
 // Claude Code shows a refusal's stderr as one message, so a reason of several lines is folded into one.
 function deny(reason: string): HookAnswer {
-  return { code: 2, stdout: "", stderr: `reviewer: ${reason.trim().replace(/\s*\n\s*/g, " ")}\n` };
+  return { code: 2, stdout: "", stderr: `reviewer: ${oneLine(reason)}\n` };
 }
 
 /** One hook run: the event it answers, the session whose folder holds its gate.log, when it started, and its clock. */
