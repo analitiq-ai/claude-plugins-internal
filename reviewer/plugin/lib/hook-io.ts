@@ -44,6 +44,15 @@ export function couldNotRunOf(failure: unknown, what?: string): unknown {
   return new CouldNotRun(what === undefined ? message : `${what}: ${message}`, next, { cause: failure });
 }
 
+/** `call`'s value; its failure as `couldNotRunOf` makes it. */
+export async function orCouldNotRun<T>(call: Promise<T>, what?: string): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    throw couldNotRunOf(error, what);
+  }
+}
+
 /** The hook input is not one this hook can read. */
 export class HookInputRefused extends Error {
   constructor(why: string) {

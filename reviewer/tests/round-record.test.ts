@@ -381,11 +381,13 @@ describe("recordRound: a github round's rulings, pushbacks and holds (ADR-0016, 
     await recordRound(h.recorder, githubRound([T1, CI, LINT], { [T1.key]: PUSH_BACK, [CI.key]: PUSH_BACK, [LINT.key]: FIX }, PATCH));
     const reading = await readStory(h.ledger);
     const ruledAt = { stage: GITHUB, n: 1 };
-    assert.deepEqual(reading.snapshot?.rulings, [
+    // The ledger files a ruling under its key's hash, so a reading lists one round's rulings in no key order.
+    const byKey = (rulings: readonly Ruling[]) => rulings.toSorted((a, b) => a.key.localeCompare(b.key));
+    assert.deepEqual(byKey(reading.snapshot?.rulings ?? []), byKey([
       { key: T1.key, round: ruledAt, ruling: PUSH_BACK, latest_trusted_comment_id: "IC_1", reply: `ruled ${PUSH_BACK} on the evidence`, commits: [] },
       { key: CI.key, round: ruledAt, ruling: PUSH_BACK, latest_trusted_comment_id: null, reply: null, commits: [] },
       { key: LINT.key, round: ruledAt, ruling: FIX, latest_trusted_comment_id: null, reply: null, commits: [] },
-    ]);
+    ]));
     assert.deepEqual(reading.snapshot?.pushbacks, [{ key: CI.key, round: ruledAt }]);
     assert.deepEqual(holdsOf(reading), []);
   });
