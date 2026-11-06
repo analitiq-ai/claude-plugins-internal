@@ -21,8 +21,16 @@ export type AssessorVerdict = (typeof ASSESSOR_VERDICTS)[number];
 type FixingVerdict = typeof PATCH | typeof CLASS_FIX | typeof REDESIGN;
 const FIXING: readonly AssessorVerdict[] = [PATCH, CLASS_FIX, REDESIGN];
 
-function isFixing(verdict: AssessorVerdict): verdict is FixingVerdict {
+export function isFixing(verdict: AssessorVerdict): verdict is FixingVerdict {
   return FIXING.includes(verdict);
+}
+
+// The verdicts that change the file a finding names in place, where a REDESIGN rewrites it (ADR-0018 d1).
+const IN_PLACE: readonly AssessorVerdict[] = [PATCH, CLASS_FIX];
+
+/** The round verdicts offered to the assessor: none that changes a file in place to a round `churned` by edits (facts.ts). */
+export function admissibleVerdicts(churned: boolean): AssessorVerdict[] {
+  return ASSESSOR_VERDICTS.filter((verdict) => !churned || !IN_PLACE.includes(verdict));
 }
 
 /** What the assessor finds a finding to be. */
@@ -109,6 +117,15 @@ export type Launched = Pick<Round, "stage" | "run" | "head">;
 export function roundOf(snapshot: Snapshot | null, launched: Launched, result: Round["result"], raised: Raised | null, at: string): Round {
   const n = 1 + (snapshot?.rounds.filter((round) => round.stage === launched.stage).length ?? 0);
   return { ...launched, n, result, verdict: raised?.verdict ?? null, root_cause: null, at };
+}
+
+/** The rounds of `stage` that completed, CLEAN or DIRTY, after `floor`, `adminFloor`'s time. */
+export function completedSince<Recorded extends Pick<Round, "stage" | "result" | "at">>(
+  rounds: readonly Recorded[],
+  stage: Round["stage"],
+  floor: string | null,
+): Recorded[] {
+  return rounds.filter((round) => round.stage === stage && (round.result === CLEAN || round.result === DIRTY) && isAfter(round.at, floor));
 }
 
 /**

@@ -1,14 +1,12 @@
 import type { Hold, Round } from "../../core/contracts/snapshot.ts";
 import type { Shared } from "../../core/settings.ts";
 import { tamperHold, type StateReading } from "../../core/state.ts";
-import { HoldKind, HoldState, Lane, RoundResult, RoundStage } from "../../core/values.ts";
+import { HoldKind, HoldState, Lane, RoundStage } from "../../core/values.ts";
 import type { ReviewerSettings } from "../settings.ts";
-import { adminFloor } from "./rounds.ts";
-import { isAfter } from "./time.ts";
+import { adminFloor, completedSince } from "./rounds.ts";
 
 const { escalation, pushback, audit } = HoldKind.schema.enum;
 const { OPEN } = HoldState.schema.enum;
-const { CLEAN, DIRTY } = RoundResult.schema.enum;
 const { AUDIT } = RoundStage.schema.enum;
 const { Blocked, Backlog } = Lane.schema.enum;
 
@@ -42,9 +40,6 @@ export function launchDecision(
     return { refused: `${ids} refuses rounds: an admin's comment and a move of ${story} to Ready on ${shared.board} release it` };
   }
   if (stage === AUDIT) return { stage };
-  const floor = adminFloor(reading);
-  const completed = (reading.snapshot?.rounds ?? []).filter(
-    (round) => round.stage === stage && (round.result === CLEAN || round.result === DIRTY) && isAfter(round.at, floor),
-  );
+  const completed = completedSince(reading.snapshot?.rounds ?? [], stage, adminFloor(reading));
   return { stage: completed.length >= settings.max_rounds ? AUDIT : stage };
 }

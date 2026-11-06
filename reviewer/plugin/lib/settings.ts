@@ -23,6 +23,9 @@ export const ReviewerSettings = z
     shim_hold_at: Count,
     state_write_attempts: Count,
     char_diff_budget: Count,
+    edits_before_redesign: Count,
+    near_fix_lines: Count,
+    same_unit_lines: Count,
   })
   .refine((settings) => settings.shim_deep_at < settings.shim_hold_at, {
     path: ["shim_deep_at"],

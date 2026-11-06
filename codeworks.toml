@@ -32,3 +32,6 @@ shim_deep_at = 3
 shim_hold_at = 4
 state_write_attempts = 3
 char_diff_budget = 50000000
+edits_before_redesign = 3
+near_fix_lines = 3
+same_unit_lines = 10
