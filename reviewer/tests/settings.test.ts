@@ -29,6 +29,7 @@ const SECTION = {
   shim_deep_at: 2,
   shim_hold_at: 10,
   state_write_attempts: 12,
+  char_diff_budget: 13,
 };
 
 const MODES = ["mode", "claim_checks", "shim_checks", "decision_checks"] as const;
@@ -43,6 +44,7 @@ const COUNTS = [
   "shim_deep_at",
   "shim_hold_at",
   "state_write_attempts",
+  "char_diff_budget",
 ] as const;
 
 function settingsWith(section: unknown): Settings {
