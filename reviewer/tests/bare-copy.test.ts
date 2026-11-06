@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { sessionFolder } from "../plugin/core/commit-pass.ts";
-import { GitFailed } from "../plugin/core/git.ts";
 import { GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
 import { bareCopy, fetchFromClone, fileAt, fromGitHub, holdsCommit } from "../plugin/lib/check/bare-copy.ts";
 import { cloneWith, git } from "./support/git.ts";
@@ -12,6 +13,31 @@ import { tempHome, tempSession } from "./support/session.ts";
 
 const REPO = { owner: "acme", name: "widgets" };
 const ABSENT = "1234567890123456789012345678901234567890";
+
+type GitRun = { pwd: string; gitDir: string; args: string[] };
+
+/** The git commands `run` starts itself, through a `git` first on PATH that logs each; git's own children are not among them. */
+async function gitRunsOf(t: TestContext, run: () => Promise<unknown>): Promise<GitRun[]> {
+  const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+  const folder = tempHome(t);
+  const log = join(folder, "git.log");
+  writeFileSync(join(folder, "git"), `#!/bin/sh\nprintf '%s\\t' "$PWD" "\${GIT_DIR-}" "$@" >> '${log}'\nprintf '\\n' >> '${log}'\nexec '${real}' "$@"\n`, { mode: 0o700 });
+  const path = process.env.PATH;
+  process.env.PATH = `${folder}:${path}`;
+  try {
+    await run();
+  } finally {
+    process.env.PATH = path;
+  }
+  return readFileSync(log, "utf8")
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => {
+      const [pwd, gitDir, ...args] = line.split("\t");
+      // Every field ends in a tab, so the last split is empty.
+      return { pwd, gitDir, args: args.slice(0, -1) };
+    });
+}
 
 describe("bareCopy (R13)", () => {
   it("is created on first use at <session>/repo.git, bare, and kept by the next use", async (t) => {
@@ -46,12 +72,28 @@ describe("fetchFromClone and holdsCommit", () => {
     assert.equal(await holdsCommit(copy, later), true);
   });
 
-  it("answers false for a sha the clone lacks, and fails as git fails for a clone that is no repository", async (t) => {
+  it("answers false for a sha the clone lacks, and throws CloneFetchFailed naming the clone and the sha for a clone that is no repository", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const { clone } = cloneWith(t, { "a.md": "a\n" });
     assert.equal(await fetchFromClone(copy, clone, ABSENT), false);
-    await assert.rejects(fetchFromClone(copy, tempHome(t), ABSENT), GitFailed);
+    const noRepository = tempHome(t);
+    await assert.rejects(fetchFromClone(copy, noRepository, ABSENT), (error: unknown) => {
+      assert.ok(error instanceof Error && error.name === "CloneFetchFailed", String(error));
+      assert.ok(error.message.includes(noRepository) && error.message.includes(ABSENT), error.message);
+      return true;
+    });
     assert.equal(await holdsCommit(copy, ABSENT), false);
+  });
+
+  it("runs each git command of its own in the copy, naming the clone only as the fetch's remote, whether the clone has the sha or not (ADR-0021 d6)", async (t) => {
+    const copy = await bareCopy(tempSession(t));
+    const { clone, head } = cloneWith(t, { "a.md": "a\n" });
+    const runs = await gitRunsOf(t, async () => [await fetchFromClone(copy, clone, head), await fetchFromClone(copy, clone, ABSENT)]);
+    const fetchInCopy = { inClone: false, gitDir: "", at: ["-C", copy], fetch: true, namingClone: [clone] };
+    assert.deepEqual(
+      runs.map(({ pwd, gitDir, args }) => ({ inClone: pwd.startsWith(clone), gitDir, at: args.slice(0, 2), fetch: args.includes("fetch"), namingClone: args.filter((arg) => arg.includes(clone)) })),
+      [fetchInCopy, fetchInCopy],
+    );
   });
 
   it("holds no commit for a sha that names another kind of object", async (t) => {

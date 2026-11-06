@@ -10,8 +10,9 @@ import type { Bug, Lineage } from "../plugin/core/contracts/gates.ts";
 import type { Hold, Snapshot } from "../plugin/core/contracts/snapshot.ts";
 import { readState, type StateReading } from "../plugin/core/state.ts";
 import { HoldKind, HoldState, RoundStage } from "../plugin/core/values.ts";
-import type { AnchorSources } from "../plugin/lib/check/bare-copy.ts";
+import { bareCopy, fetchFromClone, type AnchorSources } from "../plugin/lib/check/bare-copy.ts";
 import { Words } from "../plugin/lib/check/lineage.ts";
+import { CouldNotRun, FIX_THEN_RETRY } from "../plugin/lib/hook-io.ts";
 import { GatesBranchMismatch, recordCheck, type CompletedCheck, type GatesRecorder } from "../plugin/lib/round/gates.ts";
 import { recordRound } from "../plugin/lib/round/record.ts";
 import { AnchorMissing } from "../plugin/lib/rules/anchor.ts";
@@ -20,6 +21,7 @@ import { lineageCount } from "../plugin/lib/rules/counts.ts";
 import type { ShimCheck } from "../plugin/lib/rules/shim.ts";
 import { RunState } from "../plugin/lib/run-state.ts";
 import { cloneWith, git } from "./support/git.ts";
+import { tempHome, tempSession } from "./support/session.ts";
 
 const { claim, shim } = HoldKind.schema.enum;
 const { OPEN } = HoldState.schema.enum;
@@ -217,6 +219,29 @@ describe("recordCheck: a completed check's counts and the holds they reach, in o
     assert.equal(commitsAsked(retry.out).length, 0);
   });
 
+  it("asks a split lineage's claim-<id> question with one claim's words, failing case and evidence: of two claims on one line, the one with the larger id", async (t) => {
+    const r = repo(t);
+    const ledger = seeded(snapshot({ gates: gates({ anchor: r.a, lineages: [wrongLineage(sha(11))] }) }));
+    const halves = ["The parser refuses", "a null header."].map((quote, i): [Claim, Verdict] => [
+      { id: claimId(FILE, quote), hunk: "h1", file: FILE, line: QUOTE_LINE_H, quote, category: "K1" },
+      { ...WRONG_VERDICT, failing_case: `failing case ${i}`, assertions: [{ text: "it refuses", confirmed: false, evidence: `src/parse.ts:${10 + i}` }] },
+    ]);
+    const check = claimCheck(r, {
+      claim: { claims: Object.fromEntries(halves.map(([read]) => [read.id, read])), verdicts: Object.fromEntries(halves.map(([read, verdict]) => [read.id, verdict])) },
+    });
+    await recordCheck(harness(r, ledger).recorder, check);
+
+    const [row, ...rows] = (await readStory(ledger)).snapshot?.holds ?? [];
+    assert.equal(rows.length, 0);
+    assert.equal(row.id, `${claim}-${CLAIM_ID}`);
+    const [[first, firstVerdict], [last, lastVerdict]] = halves.toSorted(([a], [b]) => (a.id < b.id ? -1 : 1));
+    const question = row.question ?? "";
+    for (const part of [`"${last.quote}"`, `Failing case: ${lastVerdict.failing_case}`, `Evidence: ${lastVerdict.assertions[0].evidence}`]) {
+      assert.ok(question.includes(part), question);
+    }
+    for (const part of [`"${first.quote}"`, firstVerdict.failing_case ?? "", firstVerdict.assertions[0].evidence]) assert.ok(!question.includes(part), question);
+  });
+
   it("places a released shim-<id> again with the bug's new member, both in one commit", async (t) => {
     const r = repo(t);
     const released = releasedHold(`${shim}-${BUG_ID}`, 901, { since: at("09:30") });
@@ -277,6 +302,20 @@ describe("recordCheck: refusals (contracts/refusals.md)", () => {
     const r = repo(t);
     const h = harness(r, seeded(snapshot({ gates: gates({ anchor: sha(4096), lineages: [wrongLineage(sha(11))] }) })));
     await assert.rejects(recordCheck(h.recorder, claimCheck(r)), AnchorMissing);
+    assert.equal(commitsAsked(h.out).length, 0);
+  });
+
+  it("refuses as could not run naming the clone, the branch and the anchor when the fetch from the clone fails; nothing committed", async (t) => {
+    const r = repo(t);
+    const h = harness(r, seeded(snapshot({ gates: gates({ anchor: sha(4096), lineages: [wrongLineage(sha(11))] }) })));
+    const copy = await bareCopy(tempSession(t));
+    const noRepository = tempHome(t);
+    const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, noRepository, anchor), github: async () => false };
+    await assert.rejects(recordCheck({ ...h.recorder, sources }, claimCheck(r)), (error: unknown) => {
+      assert.ok(error instanceof CouldNotRun, String(error));
+      for (const named of [noRepository, BRANCH, sha(4096), FIX_THEN_RETRY]) assert.ok(error.message.includes(named), error.message);
+      return true;
+    });
     assert.equal(commitsAsked(h.out).length, 0);
   });
 });

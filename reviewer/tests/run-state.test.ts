@@ -183,6 +183,17 @@ describe("RunState (R3, data-model State write step)", () => {
       await assert.rejects(h.state.step(decide, writeRound(h)), couldNotRunThen(RETRY, "the anchor read went unanswered"));
       assert.equal(commitsAsked(h.out).length, 0);
     });
+
+    it(`refuses as could not run when decide ${how} GitHub's failure deciding again on a story touched under the write`, async () => {
+      const h = harness();
+      const first = nextRound(h);
+      let calls = 0;
+      await assert.rejects(
+        h.state.step((reading) => (calls++ === 0 ? (eventCommit(h.ledger, [event.round(round(1))]), first(reading)) : decide()), writeRound(h)),
+        couldNotRunThen(RETRY, "the anchor read went unanswered"),
+      );
+      assert.equal(commitsAsked(h.out).length, 1);
+    });
   }
 
   it("refuses as could not run when the served repo has no ledger branch, naming orchestrator README.md step 6", async () => {

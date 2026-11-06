@@ -373,6 +373,22 @@ function failingCheck(name: string): Finding {
   };
 }
 
+/** A module's finding with no thread, as core reads the module `deepsource`. */
+function moduleFinding(code: string): Finding {
+  return {
+    source: "deepsource",
+    key: `deepsource:${code}`,
+    author: "deepsource-io[bot]",
+    file: "src/parse.ts",
+    line: 4,
+    text: `${code}: an unused import`,
+    thread_id: null,
+    resolvable: false,
+    trusted_comments: [],
+    latest_trusted_comment_id: null,
+  };
+}
+
 /** A github round opened on `findings`, each ruled as `rulings` says, with its key as its id in the assessment. */
 function githubRound(findings: Finding[], rulings: Record<string, AssessedFinding["verdict"]>, verdict: AssessorVerdict): DecidedRun {
   const assessed = findings.map(({ key }) => ({ id: key, verdict: rulings[key], reason: `ruled ${rulings[key]} on the evidence` }));
@@ -415,6 +431,19 @@ describe("recordRound: a github round's rulings, pushbacks and holds (ADR-0016, 
     const h = harness();
     await recordRound(h.recorder, githubRound([T1], { [T1.key]: PUSH_BACK }, CONVERGED_PUSHBACK));
     assert.deepEqual(holdsOf(await readStory(h.ledger)), []);
+  });
+
+  it("places pushback-<issue> for a module finding with no thread ruled DEFER, and none for one pushed back, which its pushback closes", async () => {
+    const MODULE = moduleFinding("PY-W2000");
+    const deferred = harness();
+    await recordRound(deferred.recorder, githubRound([T1, MODULE], { [T1.key]: PUSH_BACK, [MODULE.key]: DEFER }, CONVERGED_PUSHBACK));
+    assert.deepEqual(holdsOf(await readStory(deferred.ledger)).map(({ id }) => id), [`${pushback}-${ISSUE}`]);
+
+    const pushed = harness();
+    await recordRound(pushed.recorder, githubRound([T1, MODULE], { [T1.key]: PUSH_BACK, [MODULE.key]: PUSH_BACK }, CONVERGED_PUSHBACK));
+    const reading = await readStory(pushed.ledger);
+    assert.deepEqual(holdsOf(reading), []);
+    assert.deepEqual(reading.snapshot?.pushbacks, [{ key: MODULE.key, round: { stage: GITHUB, n: 1 } }]);
   });
 
   it("escalates, naming the thread, when a trusted reply comes after k_topic rulings of it", async () => {

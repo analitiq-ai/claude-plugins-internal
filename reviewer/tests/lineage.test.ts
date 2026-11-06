@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 
 import { at, gates, lineage as lineageFixture, sha } from "../../core/tests/fixtures/state/issue.ts";
 import { Gates, type Bug, type Lineage } from "../plugin/core/contracts/gates.ts";
-import { GitFailed } from "../plugin/core/git.ts";
 import { ClaimVerdict } from "../plugin/core/values.ts";
 import { anchoredSection, bareCopy, fetchFromClone, fileAt, holdsCommit } from "../plugin/lib/check/bare-copy.ts";
 import { carry, differ, lineSpan, lines, linesOf, SpanNotFound, succeed, Words, type ReadClaim, type Span } from "../plugin/lib/check/lineage.ts";
@@ -508,12 +507,12 @@ describe("anchoredSection (contracts/gates-snapshot.md §Anchor)", () => {
     assert.equal(await holdsCommit(copy, pushed.head), true);
   });
 
-  it("throws the clone's own git failure, asking GitHub nothing, when the clone is no repository", async (t) => {
+  it("throws CloneFetchFailed, asking GitHub nothing, when the clone is no repository", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const section = gates({ branch: BRANCH, anchor: sha(4096), lineages: [lineageFixture("L1")] });
     const fromGitHub = recorded(noGitHub);
     const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, tempHome(t), anchor), github: fromGitHub.ask };
-    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), GitFailed);
+    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), { name: "CloneFetchFailed" });
     assert.deepEqual(fromGitHub.asks, []);
   });
 

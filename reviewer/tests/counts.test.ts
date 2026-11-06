@@ -88,6 +88,14 @@ describe("claimOpening", () => {
     const after = lineage("L1", { chain: [...twice.chain, entry("check-3", "10:10")] });
     assert.equal(claimOpening(after, undefined, at("09:30"), LAST_WRONG, SETTINGS)?.id, `${claim}-L1`);
   });
+
+  it("places a hold released by `/codeworks reset` again only once its count after the reset reaches claim_hold_at", () => {
+    const released = releasedHold(`${claim}-L1`, 9, { released: at("10:30"), released_by: { comment: 9, reset: true } });
+    const once = lineage("L1", { chain: [...twice.chain, entry("check-3", "10:45")] });
+    assert.equal(claimOpening(once, released, at("10:30"), LAST_WRONG, SETTINGS), null);
+    const again = lineage("L1", { chain: [...once.chain, entry("check-4", "10:50")] });
+    assert.equal(claimOpening(again, released, at("10:30"), LAST_WRONG, SETTINGS)?.id, `${claim}-L1`);
+  });
 });
 
 describe("bugCount and deepDue (ADR-0008, ADR-0013 d4)", () => {
@@ -119,6 +127,13 @@ describe("shimOpening", () => {
     assert.equal(shimOpening(bug("B1", { members: members(5) }), released, null, SETTINGS), null);
     const touched = bug("B1", { members: [...members(5), tree(9, "10:45")] });
     assert.deepEqual(shimOpening(touched, released, null, SETTINGS), { id: `${shim}-B1`, question: null });
+  });
+
+  it("places a hold released by `/codeworks reset` again only once the members after the reset reach shim_hold_at", () => {
+    const released = releasedHold(`${shim}-B1`, 9, { released: at("10:30"), released_by: { comment: 9, reset: true } });
+    const after = (count: number): Bug["members"] => Array.from({ length: count }, (_, i) => tree(20 + i, `10:4${i}`));
+    assert.equal(shimOpening(bug("B1", { members: [...members(5), ...after(1)] }), released, at("10:30"), SETTINGS), null);
+    assert.deepEqual(shimOpening(bug("B1", { members: [...members(5), ...after(5)] }), released, at("10:30"), SETTINGS), { id: `${shim}-B1`, question: null });
   });
 });
 
