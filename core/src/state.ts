@@ -675,17 +675,24 @@ function releaseSteps({ at, remaining }: Pick<Tamper, "at" | "remaining">, share
   return remaining.length === 0 ? answered : `a repository admin's deletion on ${LEDGER_BRANCH} of ${remaining.join(", ")}, then ${answered}`;
 }
 
-function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
-  if (tampers.length === 0) return;
-  const held = tampers.map(({ id, commit, at, remaining }) => {
+function unreleased(tampers: readonly Tamper[]): Tamper[] {
+  return tampers.filter((each) => each.released === null);
+}
+
+/** Why the unreleased of `tampers` hold the story and what releases them; null when none is unreleased. */
+export function tamperHold(tampers: readonly Tamper[], shared: Shared): { cause: string; release: string } | null {
+  const holding = unreleased(tampers);
+  if (holding.length === 0) return null;
+  const held = holding.map(({ id, commit, at, remaining }) => {
     const left = remaining.length === 0 ? "no file" : remaining.join(", ");
     return `${id}, invalid commit ${commit} at ${at}, leaves ${left} on ${LEDGER_BRANCH}`;
   });
-  throw new StateWriteRefused(`the story is held for ${held.join("; ")}`, tampers.map((tamper) => releaseSteps(tamper, shared)).join("; "));
+  return { cause: `the story is held for ${held.join("; ")}`, release: holding.map((tamper) => releaseSteps(tamper, shared)).join("; ") };
 }
 
-function unreleased(tampers: readonly Tamper[]): Tamper[] {
-  return tampers.filter((each) => each.released === null);
+function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
+  const held = tamperHold(tampers, shared);
+  if (held !== null) throw new StateWriteRefused(held.cause, held.release);
 }
 
 function writable(issue: number, reading: StateReading): Folded {
@@ -822,7 +829,7 @@ export async function writeState(
   placements: readonly Placement[],
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleased(reading.tamper), shared);
+  refuseTampers(reading.tamper, shared);
   const transition = checkTransition(reading.snapshot ?? emptySnapshot(), next);
   for (const event of transition) contracted(LedgerEvent, event, `the ${event.kind} event`);
   const placing = placements.map(placementRequest).filter((request) => !isOpen(reading, request.id));
@@ -849,7 +856,7 @@ export async function placeRescopeHold(
   specPr: number,
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleased(reading.tamper), shared);
+  refuseTampers(reading.tamper, shared);
   const { rescope } = HoldKind.schema.enum;
   const request = contracted(
     HoldRequest,
@@ -910,7 +917,7 @@ export async function recordGates(
   openings: readonly Opening[],
 ): Promise<StateReading> {
   writable(issue, reading);
-  refuseTampers(unreleased(reading.tamper), shared);
+  refuseTampers(reading.tamper, shared);
   const requests = openings.map(openingRequest);
   const checked = contracted(Gates, gates, "the gates section");
   contracted(NameSegment, ref, `the gates ref ${JSON.stringify(ref)}`);
