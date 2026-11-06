@@ -6,7 +6,10 @@ import type { Round, Ruling } from "../plugin/core/contracts/snapshot.ts";
 import { FindingRuling, HoldKind, RoundResult, RoundStage, RoundVerdict } from "../plugin/core/values.ts";
 import {
   adminFloor,
+  admissibleVerdicts,
+  ASSESSOR_VERDICTS,
   deadlocks,
+  RESHAPE_SPEC,
   placements,
   roundOf,
   roundResult,
@@ -322,5 +325,15 @@ describe("specPrHold: a rescope's spec PR seen open (ADR-0013 d5)", () => {
     assert.equal(specPrHold({ number: 77, state: "closed" }), null);
     assert.equal(specPrHold({ number: 77, state: "merged" }), null);
     assert.equal(specPrHold(null), null);
+  });
+});
+
+describe("admissibleVerdicts: the round verdicts the assessor is offered (ADR-0018 d1)", () => {
+  it("offers every assessor verdict to a round whose findings name no file over the edit bar", () => {
+    assert.deepEqual(admissibleVerdicts(false), [...ASSESSOR_VERDICTS]);
+  });
+
+  it("offers no PATCH or CLASS_FIX to a round whose findings name a file over the edit bar", () => {
+    assert.deepEqual(admissibleVerdicts(true), [REDESIGN, RESHAPE_SPEC, CONVERGED_PUSHBACK, ESCALATE]);
   });
 });
