@@ -5,7 +5,7 @@ import "../lib/guarded.ts";
 
 const { spawnSync } = await import("node:child_process");
 const { GH_TOKEN_VARIABLES, GhFolderRefused } = await import("../core/gh-config.ts");
-const { GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
@@ -22,6 +22,7 @@ try {
   if (
     !(
       error instanceof GitHubUnanswered ||
+      error instanceof GitHubPartlyAnswered ||
       error instanceof GitHubRefused ||
       error instanceof SettingsError ||
       error instanceof RemoteRefused ||

@@ -12,6 +12,8 @@ import {
   answerOf,
   assertIssueNumber,
   connectionNodes,
+  GitHubMisanswered,
+  GitHubPartlyAnswered,
   GitHubRefused,
   GitHubUnanswered,
   isWriterRole,
@@ -151,14 +153,19 @@ export class StateStale extends Error {
   }
 }
 
-/** The write's commit landed without GitHub's signature, so the fold takes it as a tamper. */
+/**
+ * The write's commit landed without GitHub's signature, so the fold takes it as a tamper; `release` is what clears
+ * it, as the next write's refusal names it.
+ */
 export class StateWriteUnsigned extends Error {
   readonly oid: string;
+  readonly release: string;
 
-  constructor(oid: string) {
+  constructor(oid: string, release: string) {
     super(`commit ${oid} on ${LEDGER_BRANCH} is not signed by GitHub, so it tampers its story`);
     this.name = "StateWriteUnsigned";
     this.oid = oid;
+    this.release = release;
   }
 }
 
@@ -493,7 +500,7 @@ async function storyCommits(reader: GitHubClient, repo: string, issue: number, h
   const graphqlOids = history.map(({ oid }) => oid);
   const restOids = authors.map(({ sha }) => sha);
   if (!isDeepStrictEqual(graphqlOids, restOids)) {
-    throw new Error(
+    throw new GitHubMisanswered(
       `GitHub lists different commits touching ${dir} at ${head}: GraphQL [${graphqlOids.join(", ")}], REST [${restOids.join(", ")}]`,
     );
   }
@@ -511,8 +518,8 @@ const BlobAnswer = z.union([
 function blobText(answer: z.infer<typeof BlobAnswer> | null, blob: string, where: string): string | null {
   if (answer === null) throw new GitHubUnanswered(`GitHub has no object ${blob} in ${where}`);
   if (!("text" in answer) || answer.isBinary === true) return null;
-  if (answer.isTruncated) throw new GitHubUnanswered(`GitHub truncated the text of blob ${blob} in ${where}`);
-  if (answer.text === null) throw new GitHubUnanswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
+  if (answer.isTruncated) throw new GitHubPartlyAnswered(`GitHub truncated the text of blob ${blob} in ${where}`);
+  if (answer.text === null) throw new GitHubPartlyAnswered(`GitHub gave no text for blob ${blob} in ${where}, which it does not call binary`);
   return answer.text;
 }
 
@@ -551,7 +558,7 @@ async function successorsOf(reader: GitHubClient, repo: string, head: string, oi
   return new Map(
     oids.map((oid) => {
       const at = branch.findIndex((commit) => commit.oid === oid);
-      if (at === -1) throw new Error(`the history of ${LEDGER_BRANCH} at ${head} lacks ${oid}, which its story's history holds`);
+      if (at === -1) throw new GitHubMisanswered(`the history of ${LEDGER_BRANCH} at ${head} lacks ${oid}, which its story's history holds`);
       const first = branch.slice(0, at).findLast((commit) => isSigned(commit.signature));
       return [oid, first?.committedDate ?? null];
     }),
@@ -663,17 +670,18 @@ function contracted<Schema extends z.ZodType>(schema: Schema, value: unknown, wh
 
 // A release names its steps in order: an admin's deletion of the files the tamper left, when it left any, then the
 // release rule.
+function releaseSteps({ at, remaining }: Pick<Tamper, "at" | "remaining">, shared: Shared): string {
+  const answered = `a Ready move on ${shared.board} and an admin's comment, both after ${at}, then the claim`;
+  return remaining.length === 0 ? answered : `a repository admin's deletion on ${LEDGER_BRANCH} of ${remaining.join(", ")}, then ${answered}`;
+}
+
 function refuseTampers(tampers: readonly Tamper[], shared: Shared): void {
   if (tampers.length === 0) return;
   const held = tampers.map(({ id, commit, at, remaining }) => {
     const left = remaining.length === 0 ? "no file" : remaining.join(", ");
     return `${id}, invalid commit ${commit} at ${at}, leaves ${left} on ${LEDGER_BRANCH}`;
   });
-  const releases = tampers.map(({ at, remaining }) => {
-    const answered = `a Ready move on ${shared.board} and an admin's comment, both after ${at}, then the claim`;
-    return remaining.length === 0 ? answered : `a repository admin's deletion on ${LEDGER_BRANCH} of ${remaining.join(", ")}, then ${answered}`;
-  });
-  throw new StateWriteRefused(`the story is held for ${held.join("; ")}`, releases.join("; "));
+  throw new StateWriteRefused(`the story is held for ${held.join("; ")}`, tampers.map((tamper) => releaseSteps(tamper, shared)).join("; "));
 }
 
 function unreleased(tampers: readonly Tamper[]): Tamper[] {
@@ -761,12 +769,11 @@ async function commitEvents(
     throw error;
   }
   const { commit } = answerOf(CommitAnswer, answer, `the commit to ${dir} on ${LEDGER_BRANCH}`).createCommitOnBranch;
-  if (!isSigned(commit.signature)) throw new StateWriteUnsigned(commit.oid);
-
+  const signed = isSigned(commit.signature);
   const own: StoryCommit = {
     oid: commit.oid,
     committedDate: commit.committedDate,
-    signed: true,
+    signed,
     author: reviewer,
     added: files.map(({ name, text }) => ({ name, blob: blobOid(text) })).toSorted(byName),
     changed: [],
@@ -776,10 +783,16 @@ async function commitEvents(
     ...folded,
     commits: [...folded.commits, own],
     texts: new Map([...folded.texts, ...files.map(({ text }) => [blobOid(text), text] as const)]),
-    // The commit is GitHub-signed, so it is the first after every tamper that had none.
-    successors: new Map([...folded.successors].map(([oid, after]) => [oid, after ?? commit.committedDate])),
+    // A GitHub-signed commit is the first after every tamper that had none; an unsigned one is a tamper with none yet.
+    successors: signed
+      ? new Map([...folded.successors].map(([oid, after]) => [oid, after ?? commit.committedDate]))
+      : new Map<string, string | null>([...folded.successors, [commit.oid, null]]),
   };
-  return readingOf(commit.oid, issue, advanced, foldStory(advanced.commits, advanced.texts, advanced.roles, reviewer), shared);
+  const next = readingOf(commit.oid, issue, advanced, foldStory(advanced.commits, advanced.texts, advanced.roles, reviewer), shared);
+  if (signed) return next;
+  const tamper = next.tamper.find((each) => each.commit === commit.oid);
+  if (tamper === undefined) throw new Error(`the fold did not read unsigned commit ${commit.oid} as a tamper`);
+  throw new StateWriteUnsigned(commit.oid, releaseSteps(tamper, shared));
 }
 
 /** A hold a round's report places; `since` is core's to stamp. */

@@ -1,0 +1,10 @@
+{
+  "session_id": "315ad922-f2f9-4e13-8101-acdad2093cfc",
+  "transcript_path": "/home/agent/.claude/projects/-home-agent-work-repo/315ad922-f2f9-4e13-8101-acdad2093cfc.jsonl",
+  "cwd": "/home/agent/work/repo",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": { "command": "git commit -F msg.txt", "description": "Commit the staged change" },
+  "tool_use_id": "toolu_01AbCdEfGhIjKlMnOpQrStUv"
+}

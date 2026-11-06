@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
-import { GitHubUnanswered } from "../plugin/core/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubUnanswered } from "../plugin/core/github.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { main } from "../plugin/scripts/preflight.ts";
 import { BOARD, fakeMint, output, scratchCheckout, storedToken, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
@@ -92,11 +92,17 @@ describe("preflight.ts <issue>", () => {
     assert.equal(run.stderr.length, 2);
   });
 
-  it("exits 2 when GitHub does not answer", async (t) => {
-    const run = await preflight(t, githubOf(new GitHubUnanswered("dummy: no answer"), []));
-    assert.equal(run.code, 2, run.stderr.join("\n"));
-    assert.match(run.stderr.join("\n"), /dummy: no answer/);
-  });
+  for (const failure of [
+    new GitHubUnanswered("dummy: no answer"),
+    new GitHubMisanswered("dummy: not the shape asked"),
+    new GitHubPartlyAnswered("dummy: answered in part"),
+  ]) {
+    it(`exits 2 on a ${failure.name}, printing its message`, async (t) => {
+      const run = await preflight(t, githubOf(failure, []));
+      assert.equal(run.code, 2, run.stderr.join("\n"));
+      assert.ok(run.stderr.join("\n").includes(failure.message), run.stderr.join("\n"));
+    });
+  }
 
   for (const [what, minutesLeft] of [["no token is stored", null], ["the stored token has 9 minutes left", 9]] as const) {
     it(`mints the planner App's token once when ${what}, and checks the issue with it`, async (t) => {

@@ -13,6 +13,25 @@ export class GitHubUnanswered extends Error {
   }
 }
 
+/**
+ * An answer not of the shape asked, or one another read disagrees with, is no answer either: every caller takes it as
+ * one and reads none of it.
+ */
+export class GitHubMisanswered extends GitHubUnanswered {
+  constructor(reason: string, options?: ErrorOptions) {
+    super(reason, options);
+    this.name = "GitHubMisanswered";
+  }
+}
+
+/** GitHub answered only part of what was asked, the same part on every run, so no retry alone reads the rest. */
+export class GitHubPartlyAnswered extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "GitHubPartlyAnswered";
+  }
+}
+
 export class GitHubRefused extends Error {
   readonly status: number;
 
@@ -77,7 +96,7 @@ export function assertIssueNumber(n: number): void {
 export function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {
   const parsed = schema.safeParse(answer);
   if (!parsed.success) {
-    throw new Error(`GitHub's answer for ${what} is not the shape asked for: ${z.prettifyError(parsed.error)}`);
+    throw new GitHubMisanswered(`GitHub's answer for ${what} is not the shape asked for: ${z.prettifyError(parsed.error)}`);
   }
   return parsed.data;
 }
@@ -126,7 +145,7 @@ export async function connectionNodes(
     );
     const connection = Connection.safeParse(found);
     if (!connection.success) {
-      throw new Error(`POST /graphql: ${connectionPath.join(".")} is not a connection: ${z.prettifyError(connection.error)}`);
+      throw new GitHubMisanswered(`POST /graphql: ${connectionPath.join(".")} is not a connection: ${z.prettifyError(connection.error)}`);
     }
     nodes.push(...connection.data.nodes);
     cursor = connection.data.pageInfo.hasNextPage ? connection.data.pageInfo.endCursor : null;
@@ -170,12 +189,20 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
     const what = `${method} ${pathname}${search}`;
     const answer = await exchange(what, method, url, body);
     if (answer.status < 200 || answer.status > 299) throw failure(what, answer);
-    return { status: answer.status, headers: answer.headers, body: JSON.parse(answer.text) };
+    // No call core makes is answered with 204, so a 2xx body that is not JSON is never an empty answer.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(answer.text);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      throw new GitHubMisanswered(`${what}: the answer is not JSON: ${error.message}`, { cause: error });
+    }
+    return { status: answer.status, headers: answer.headers, body: parsed };
   }
 
   async function graphql(query: string, vars: Record<string, unknown>): Promise<unknown> {
     const { status, body } = await request("POST", `${api}/graphql`, { query, variables: vars });
-    const answer = GraphQLAnswer.parse(body);
+    const answer = answerOf(GraphQLAnswer, body, "POST /graphql");
     const errors = answer.errors ?? [];
     if (errors.length === 0) return answer.data;
     const message = `POST /graphql: ${errors.map((error) => error.message).join("; ")}`;
@@ -194,11 +221,11 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
       let url: string | null = `${api}${path}`;
       while (url !== null) {
         const page = await request("GET", url);
-        if (!Array.isArray(page.body)) throw new Error(`GET ${path}: a page is not a list, so it has no pages to read`);
+        if (!Array.isArray(page.body)) throw new GitHubMisanswered(`GET ${path}: a page is not a list, so it has no pages to read`);
         items.push(...page.body);
         url = nextPage(page.headers.get("link"));
         if (url !== null && new URL(url).origin !== apiOrigin) {
-          throw new Error(`GET ${path}: the next page is on another host (${url}); the token goes only to ${apiOrigin}`);
+          throw new GitHubPartlyAnswered(`GET ${path}: the next page is on another host (${url}); the token goes only to ${apiOrigin}`);
         }
       }
       return items;
@@ -221,10 +248,10 @@ export function gitHub(token: string, api = "https://api.github.com", timeoutMs 
 // Only IMF-fixdate is taken: it names GMT, while `Date` reads a zoneless form, such as asctime's, in the machine's
 // zone, which would stamp a time that is not GitHub's.
 function gitHubTime(date: string | null): string {
-  if (date === null) throw new Error("GET /rate_limit: the answer has no Date header");
+  if (date === null) throw new GitHubMisanswered("GET /rate_limit: the answer has no Date header");
   const time = Date.parse(date);
   if (Number.isNaN(time) || new Date(time).toUTCString() !== date) {
-    throw new Error(`GET /rate_limit: the Date header ${JSON.stringify(date)} is not an HTTP date in GMT`);
+    throw new GitHubMisanswered(`GET /rate_limit: the Date header ${JSON.stringify(date)} is not an HTTP date in GMT`);
   }
   return `${new Date(time).toISOString().slice(0, 19)}Z`;
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Finding, TrustedComment } from "../contracts/finding.ts";
 import { Actor, answerOf, assertIssueNumber, ownerAndName, restLogin, type GitHubClient } from "../github.ts";
-import { couldNotRunIfUnanswered, type CouldNotRun } from "../outcomes.ts";
+import { couldNotRunIfUnread, type CouldNotRun } from "../outcomes.ts";
 import { SettingsError, SHARED_SECTION, type Shared } from "../settings.ts";
 import { CoreSource } from "../values.ts";
 
@@ -173,7 +173,7 @@ export function threadsModule(shared: Shared, reader: GitHubClient, validators: 
         threads = await reviewThreads(reader, repo, pr);
       } catch (error) {
         // Findings are a check, so no answer is its outcome.
-        return couldNotRunIfUnanswered(CoreSource.enum.threads, error);
+        return couldNotRunIfUnread(CoreSource.enum.threads, error);
       }
       const trust = trustOf(shared, validators);
       return threads.flatMap((thread) =>

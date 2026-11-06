@@ -21,13 +21,13 @@ export class CommitPassesRefused extends Error {
 
 const FILE = "commit-passes.json";
 
-function folderOf({ home, id }: Session): string {
+export function sessionFolder({ home, id }: Session): string {
   checkSessionId(id);
   return join(home, HOME_FOLDERS["<S>"], "sessions", id);
 }
 
 function fileOf(session: Session): string {
-  return join(folderOf(session), FILE);
+  return join(sessionFolder(session), FILE);
 }
 
 export function readCommitPasses(session: Session): CommitPasses | null {
@@ -68,5 +68,5 @@ function recordFor(session: Session, repository: string): CommitPasses {
 }
 
 function write(session: Session, record: CommitPasses): void {
-  writePrivate(folderOf(session), FILE, `${JSON.stringify(CommitPasses.parse(record))}\n`);
+  writePrivate(sessionFolder(session), FILE, `${JSON.stringify(CommitPasses.parse(record))}\n`);
 }

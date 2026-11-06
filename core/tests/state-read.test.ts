@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import { eventText, tamperId, type LedgerEvent } from "../src/contracts/ledger.ts";
 import type { Snapshot } from "../src/contracts/snapshot.ts";
-import { GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
 import { BoardNotVisible, issueComments, LedgerMissing, readState, storyTouched, type Releasable, type StateReading, type Tamper } from "../src/state.ts";
 import {
   ADMIN,
@@ -414,9 +414,31 @@ describe("readState: the reads it makes", () => {
     const oid = eventCommit(ledger, [event.round(round(2))], { date: at("09:30") });
     ledger.restOmits = [oid];
     await assert.rejects(read(ledger), (error: unknown) => {
-      assert.ok(error instanceof Error);
+      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
       assert.match(error.message, /GraphQL/);
       assert.match(error.message, /REST/);
+      return true;
+    });
+  });
+
+  it("refuses the read as GitHubMisanswered when the branch's history lacks a tamper its story's history holds, naming it", async () => {
+    const ledger = fakeLedger();
+    eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
+    const tamper = invalidCommit(ledger, { remove: [], put: files(ROUND_2), date: at("09:30") });
+    const base = reader({}, ledger);
+    const client: GitHubClient = {
+      ...base,
+      async graphql(query, vars) {
+        const answer = await base.graphql(query, vars);
+        if (!/\bhistory\(first: \d+, after: \$cursor\)/.test(query)) return answer;
+        const page = answer as { repository: { object: { history: { nodes: { oid: string }[] } } } };
+        const { history } = page.repository.object;
+        return { repository: { object: { history: { ...history, nodes: history.nodes.filter(({ oid }) => oid !== tamper) } } } };
+      },
+    };
+    await assert.rejects(readState(client, REPO, ISSUE, SHARED), (error: unknown) => {
+      assert.ok(error instanceof GitHubMisanswered, `expected GitHubMisanswered, got ${String(error)}`);
+      assert.ok(error.message.includes(tamper), error.message);
       return true;
     });
   });
@@ -461,21 +483,22 @@ describe("readState: the reads it makes", () => {
     }
   });
 
-  const UNREAD: Array<[string, (text: string) => unknown]> = [
-    ["no object for the blob", () => null],
-    ["no text for a blob it does not call binary", () => ({ text: null, isTruncated: false, isBinary: false })],
-    ["no text for a blob whose encoding it cannot tell", () => ({ text: null, isTruncated: false, isBinary: null })],
-    ["a truncated text", (text) => ({ text: text.slice(0, 20), isTruncated: true, isBinary: false })],
+  // No object is no answer; a text given only in part is given so on every run, which no retry gets past.
+  const UNREAD: Array<[string, (text: string) => unknown, typeof GitHubUnanswered | typeof GitHubPartlyAnswered]> = [
+    ["no object for the blob", () => null, GitHubUnanswered],
+    ["no text for a blob it does not call binary", () => ({ text: null, isTruncated: false, isBinary: false }), GitHubPartlyAnswered],
+    ["no text for a blob whose encoding it cannot tell", () => ({ text: null, isTruncated: false, isBinary: null }), GitHubPartlyAnswered],
+    ["a truncated text", (text) => ({ text: text.slice(0, 20), isTruncated: true, isBinary: false }), GitHubPartlyAnswered],
   ];
-  for (const [what, answer] of UNREAD) {
-    it(`fails the read with GitHubUnanswered naming the blob, deriving no tamper, when GitHub answers ${what} for an event commit's file`, async () => {
+  for (const [what, answer, failure] of UNREAD) {
+    it(`fails the read with ${failure.name} naming the blob, deriving no tamper, when GitHub answers ${what} for an event commit's file`, async () => {
       const ledger = fakeLedger();
       eventCommit(ledger, [event.round(ROUND_1)], { date: at("09:00") });
       const text = eventText(event.round(round(2)));
       eventCommit(ledger, [event.round(round(2))], { date: at("09:30") });
       ledger.blobAnswers.set(blobOid(text), answer(text));
       await assert.rejects(read(ledger), (error: unknown) => {
-        assert.ok(error instanceof GitHubUnanswered, `expected GitHubUnanswered, got ${String(error)}`);
+        assert.ok(error instanceof failure, `expected ${failure.name}, got ${String(error)}`);
         assert.match(error.message, new RegExp(blobOid(text)));
         return true;
       });

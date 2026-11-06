@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { GitHubUnanswered } from "./github.ts";
+import { GitHubMisanswered, GitHubPartlyAnswered, GitHubUnanswered } from "./github.ts";
 import { CheckOutcome } from "./values.ts";
 
 type Outcome = z.infer<typeof CheckOutcome.schema>;
@@ -18,10 +18,10 @@ export function couldNotRun(source: string, why: string): CouldNotRun {
   return { outcome: COULD_NOT_RUN, reason: `${source}: ${why}` };
 }
 
-/** GitHub's no-answer as `source`'s COULD_NOT_RUN, the outcome of a check that could not read. */
-export function couldNotRunIfUnanswered(source: string, error: unknown): CouldNotRun {
+/** GitHub's no answer, or its answer in part, as `source`'s COULD_NOT_RUN, the outcome of a check that could not read. */
+export function couldNotRunIfUnread(source: string, error: unknown): CouldNotRun {
   // Any other error is core's own, not the check's outcome.
-  if (!(error instanceof GitHubUnanswered)) throw error;
+  if (!(error instanceof GitHubUnanswered || error instanceof GitHubPartlyAnswered)) throw error;
   return couldNotRun(source, error.message);
 }
 
@@ -57,6 +57,6 @@ export function outcomeOf(checkRunOrStatus: CheckRun | CommitStatus | undefined)
   else return PENDING;
   const outcome = state === null ? undefined : OUTCOME_OF_STATE.get(state);
   // Read as any outcome, a state GitHub has added could pass or fail a head nobody graded.
-  if (outcome === undefined) throw new Error(`GitHub's check state ${JSON.stringify(state)} has no check outcome`);
+  if (outcome === undefined) throw new GitHubMisanswered(`GitHub's check state ${JSON.stringify(state)} has no check outcome`);
   return outcome;
 }

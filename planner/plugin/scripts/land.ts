@@ -12,7 +12,7 @@ const { z } = await import("zod");
 const { isPhaseHeading, readTaskBlockLabels, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
-const { answerOf, gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
 const { specBranch, specFolderAnswer, specPr } = await import("../core/identity.ts");
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
@@ -316,7 +316,7 @@ async function storyLink(github: GitHubClient, path: string, body: object, missi
   try {
     await github.rest("POST", path, body);
   } catch (error) {
-    if (!(error instanceof GitHubUnanswered || error instanceof GitHubRefused)) throw error;
+    if (!(error instanceof GitHubUnanswered || error instanceof GitHubPartlyAnswered || error instanceof GitHubRefused)) throw error;
     throw new LandingIncomplete(missing, error);
   }
 }
@@ -403,6 +403,7 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
     if (
       !(
         error instanceof GitHubUnanswered ||
+        error instanceof GitHubPartlyAnswered ||
         error instanceof GitHubRefused ||
         error instanceof LandingIncomplete ||
         error instanceof SettingsError ||

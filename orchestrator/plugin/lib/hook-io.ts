@@ -6,7 +6,7 @@ import { z } from "zod";
 import { LaneRefused } from "../core/board.ts";
 import { GhFolderRefused } from "../core/gh-config.ts";
 import { GitFailed } from "../core/git.ts";
-import { gitHub, GitHubRefused, GitHubUnanswered, RemoteRefused, type GitHubClient } from "../core/github.ts";
+import { gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused, type GitHubClient } from "../core/github.ts";
 import { DerivationError } from "../core/identity.ts";
 import { KeyReadRefused } from "../core/keys.ts";
 import { SessionRecordRefused } from "../core/session-record.ts";
@@ -73,6 +73,7 @@ const NAMED_FAILURES = [
   GhFolderRefused,
   GitHubRefused,
   GitHubUnanswered,
+  GitHubPartlyAnswered,
   SettingsError,
   RemoteRefused,
   GitFailed,

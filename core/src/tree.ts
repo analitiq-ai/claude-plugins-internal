@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 
 import { runGit } from "./git.ts";
-import { GitHubRefused, ownerAndName, type GitHubClient } from "./github.ts";
+import { answerOf, GitHubPartlyAnswered, GitHubRefused, ownerAndName, type GitHubClient } from "./github.ts";
 
 export type TreeEntry = { name: string; isDir: boolean };
 
@@ -127,9 +127,9 @@ export function gitHubTree(client: GitHubClient, repo: string, ref: string): Tre
     async listDir(path) {
       const answer = await contentsAt(path, "directory");
       if (!Array.isArray(answer)) throw new NotInTree(path, ref, "directory");
-      const entries = ContentsListing.parse(answer);
+      const entries = answerOf(ContentsListing, answer, `the contents of ${repo} ${path} at ${ref}`);
       if (entries.length >= CONTENTS_LISTING_CAP) {
-        throw new Error(
+        throw new GitHubPartlyAnswered(
           `${repo} ${path} at ${ref}: the contents API lists at most ${CONTENTS_LISTING_CAP} entries, so this listing may be cut short`,
         );
       }
@@ -138,11 +138,12 @@ export function gitHubTree(client: GitHubClient, repo: string, ref: string): Tre
 
     async readText(path) {
       const answer = await contentsAt(path, "file");
-      if (Array.isArray(answer) || ContentsItem.parse(answer).type !== "file") throw new NotInTree(path, ref, "file");
-      const file = ContentsFile.parse(answer);
+      const what = `the contents of ${repo} ${path} at ${ref}`;
+      if (Array.isArray(answer) || answerOf(ContentsItem, answer, what).type !== "file") throw new NotInTree(path, ref, "file");
+      const file = answerOf(ContentsFile, answer, what);
       // Over 1 MB the contents API answers with encoding `none` and an empty content.
       if (file.encoding !== "base64") {
-        throw new Error(`${repo} ${path} at ${ref}: the contents API gave it without its content (encoding ${file.encoding})`);
+        throw new GitHubPartlyAnswered(`${repo} ${path} at ${ref}: the contents API gave it without its content (encoding ${file.encoding})`);
       }
       return Buffer.from(file.content, "base64").toString("utf8");
     },
