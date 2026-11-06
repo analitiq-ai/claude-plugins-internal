@@ -183,16 +183,11 @@ const PullRequestHeadAnswer = z.object({
 });
 export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
 
-const PullRequestStateAnswer = z
-  .object({
-    number: IssueNumber,
-    headRefName: z.string(),
-    isCrossRepository: z.boolean(),
-    closed: z.boolean(),
-    merged: z.boolean(),
-    mergeCommit: z.object({ oid: GitSha }).nullable(),
-  })
-  .refine((pr) => (pr.mergeCommit !== null) === pr.merged, { path: ["mergeCommit"], message: "a PR holds a merge commit once merged, and only then" });
+const PullRequestStateFields = { number: IssueNumber, headRefName: z.string(), isCrossRepository: z.boolean(), closed: z.boolean() };
+const PullRequestStateAnswer = z.discriminatedUnion("merged", [
+  z.object({ ...PullRequestStateFields, merged: z.literal(false), mergeCommit: z.null() }),
+  z.object({ ...PullRequestStateFields, merged: z.literal(true), mergeCommit: z.object({ oid: GitSha }) }),
+]);
 export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 
 // Bodies and closing references are not asked for: any writer can edit them, and the branch names the story
@@ -258,9 +253,10 @@ export async function issueStory(reader: GitHubClient, repo: string, s: number):
 }
 
 export function pickSpecPrs(prs: readonly PullRequestState[], p: number): SpecPr[] {
-  // The answer's refine ties mergeCommit to merged.
-  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, mergeCommit }) =>
-    mergeCommit === null ? { number, state: closed ? "closed" : "open", mergeCommit } : { number, state: "merged", mergeCommit },
+  return sameRepoNewestFirst(prs, specBranch(p)).map((pr) =>
+    pr.merged
+      ? { number: pr.number, state: "merged", mergeCommit: pr.mergeCommit }
+      : { number: pr.number, state: pr.closed ? "closed" : "open", mergeCommit: null },
   );
 }
 

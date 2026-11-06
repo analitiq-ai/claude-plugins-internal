@@ -1,24 +1,38 @@
 import type { Finding } from "../contracts/finding.ts";
 import { ownerAndName, repositoryPath, type GitHubClient } from "../github.ts";
-import { couldNotRun, type CouldNotRun } from "../outcomes.ts";
+import { couldNotRun, couldNotRunIfUnread, type CouldNotRun } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome } from "../values.ts";
 import { assertAsked } from "./contract.ts";
-import { checkRuns, findingOf, moduleCheckName, newestRunBy, requiredChecks, runReading } from "./required-checks.ts";
+import { checkRuns, findingOf, moduleCheckName, newestRunBy, requiredChecks, runReading, type CheckRun } from "./required-checks.ts";
 import { threadsModule, type ProviderLogins } from "./threads.ts";
 
 const { FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 
-/** COULD_NOT_RUN throws its reason: returned as an empty list, it would read as nothing found. */
+/** A read the head's findings depend on could not run; the message is its COULD_NOT_RUN reason, naming the read first. */
+export class FindingsCouldNotRun extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "FindingsCouldNotRun";
+  }
+}
+
+// Returned as an empty list, a COULD_NOT_RUN would read as nothing found.
 function findingsOrThrow(answer: Finding[] | CouldNotRun): Finding[] {
-  if ("outcome" in answer) throw new Error(answer.reason);
+  if ("outcome" in answer) throw new FindingsCouldNotRun(answer.reason);
   return answer;
 }
 
 // A run that could not run is never a pass (root ADR-0004 d1).
 async function moduleFindings(reader: GitHubClient, at: string, head: string, module: string, orchestratorLogin: string): Promise<Finding[] | CouldNotRun> {
   const name = moduleCheckName(module);
-  const run = newestRunBy(await checkRuns(reader, at, head, name), orchestratorLogin);
+  let runs: CheckRun[];
+  try {
+    runs = await checkRuns(reader, at, head, name);
+  } catch (error) {
+    return couldNotRunIfUnread(module, error);
+  }
+  const run = newestRunBy(runs, orchestratorLogin);
   if (run === undefined) return [];
   const reading = runReading(run);
   if (reading.outcome === COULD_NOT_RUN) return couldNotRun(module, `${name} concluded ${reading.state}`);
@@ -28,7 +42,7 @@ async function moduleFindings(reader: GitHubClient, at: string, head: string, mo
 /**
  * The head's findings: the required checks' and the threads', and only when both are empty, one for each
  * `[shared] validators` module whose `<module>-review` run by the orchestrator's App failed. A COULD_NOT_RUN of any
- * of them throws.
+ * of them throws FindingsCouldNotRun.
  */
 export async function prFindings(
   reader: GitHubClient,
