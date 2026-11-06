@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 
 import { runGit } from "./git.ts";
-import { answerOf, GitHubPartlyAnswered, GitHubRefused, ownerAndName, type GitHubClient } from "./github.ts";
+import { answerOf, GitHubPartlyAnswered, GitHubRefused, ownerAndName, repositoryPath, type GitHubClient } from "./github.ts";
 
 export type TreeEntry = { name: string; isDir: boolean };
 
@@ -106,8 +106,7 @@ const ContentsFile = z.object({ encoding: z.string(), content: z.string() });
 
 export function gitHubTree(client: GitHubClient, repo: string, ref: string): Tree {
   assertRef(ref);
-  const { owner, name } = ownerAndName(repo);
-  const root = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/contents`;
+  const root = `${repositoryPath(ownerAndName(repo))}/contents`;
   const atRef = `?ref=${encodeURIComponent(ref)}`;
 
   async function contentsAt(path: string, wanted: Wanted): Promise<unknown> {

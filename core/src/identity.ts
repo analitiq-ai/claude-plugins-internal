@@ -1,19 +1,35 @@
 import { z } from "zod";
 
+import { GitSha } from "./contracts/scalars.ts";
 import { readSpecFacts, SpecKind, type SpecFacts } from "./contracts/spec-facts.ts";
-import { answerOf, assertIssueNumber, isWriterRole, ownerAndName, roleOf, USER_TYPE, type GitHubClient, type Repository } from "./github.ts";
+import {
+  answerOf,
+  assertIssueNumber,
+  assertPositiveInteger,
+  isWriterRole,
+  ownerAndName,
+  repositoryPath,
+  roleOf,
+  USER_TYPE,
+  type GitHubClient,
+  type Repository,
+} from "./github.ts";
 import { NotInTree, type Tree, type TreeEntry } from "./tree.ts";
 
 export type StoryBranch = { story: number; k: number; slug: string };
 export type SpecBranch = { spec: number };
 
 /** A same-repository PR on `<p>-spec`; a merged PR is closed too, and reads `merged`. */
-export type SpecPr = { number: number; state: "open" | "closed" | "merged" };
+export type SpecPr = { number: number; state: "open" | "closed"; mergeCommit: null } | MergedSpecPr;
+export type MergedSpecPr = { number: number; state: "merged"; mergeCommit: { oid: string } };
 
 export type SpecFolderAnswer = { one: string } | { none: true } | { several: readonly string[] };
 
-/** The story's PR: `head` is its head commit. */
-export type StoryPr = { number: number; head: string; merged: boolean };
+/** A spec folder answer that tells a ref with no `specs/` apart from one with no folder for `p`. */
+export type SpecFolderRead = SpecFolderAnswer | { noSpecs: true };
+
+/** The story's PR: `head` is its head commit; a merged PR is closed too. */
+export type StoryPr = { number: number; head: string; closed: boolean; merged: boolean };
 
 /** The text a story is built and graded against; `source` says where it was read. */
 export type Requirement = { kind: SpecKind; text: string; source: string };
@@ -38,9 +54,14 @@ export class DerivationError extends Error {
   }
 }
 
+const SLUG_RUN = "[a-z0-9]+";
 // Issue numbers have no leading zero, so `0212-…` is no story.
-const STORY_BRANCH = /^([1-9][0-9]*)-us([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const STORY_BRANCH = new RegExp(`^([1-9][0-9]*)-us([1-9][0-9]*)-(${SLUG_RUN}(?:-${SLUG_RUN})*)$`);
 const SPEC_BRANCH = /^([1-9][0-9]*)-spec$/;
+// Matched after lowering, never with `iu`: under `iu` `ſ` matches `[a-z]`, and lowering leaves it `ſ`.
+const SLUG_RUNS = new RegExp(SLUG_RUN, "g");
+const SLUG_MAX = 40;
+const EMPTY_SLUG = "story";
 
 export function parseBranch(name: string): StoryBranch | SpecBranch | null {
   const story = STORY_BRANCH.exec(name);
@@ -48,6 +69,16 @@ export function parseBranch(name: string): StoryBranch | SpecBranch | null {
   const spec = SPEC_BRANCH.exec(name);
   if (spec !== null) return { spec: Number(spec[1]) };
   return null;
+}
+
+/** The title is untrusted, and the name becomes a ref and a worktree path. */
+export function storyBranchName(s: number, k: number, title: string): string {
+  assertIssueNumber(s);
+  assertPositiveInteger(k, "a US<k> story index");
+  const runs = title.toLowerCase().match(SLUG_RUNS) ?? [];
+  // Runs are joined by single `-`, so a cut can end on one `-` at most.
+  const slug = runs.join("-").slice(0, SLUG_MAX).replace(/-$/, "");
+  return `${s}-us${k}-${slug || EMPTY_SLUG}`;
 }
 
 export function specBranch(p: number): string {
@@ -116,37 +147,52 @@ export function pickSpecFolder(names: readonly string[], p: number): string {
   throw new DerivationError(`the spec folder of #${p}`, found);
 }
 
-export async function specFolder(tree: Tree, p: number): Promise<string> {
+// The folders under specs/, or the NotInTree that says the ref has no specs/.
+async function specsFolders(tree: Tree): Promise<string[] | NotInTree> {
   let entries: TreeEntry[];
   try {
     entries = await tree.listDir("specs");
   } catch (error) {
-    // A ref with no specs/ holds no spec folder: the same answer as a specs/ with none for `p`.
     if (!(error instanceof NotInTree)) throw error;
-    throw new DerivationError(`the spec folder of #${p}`, `no specs/ folder (${error.message})`, { cause: error });
+    return error;
   }
-  return pickSpecFolder(
-    entries.filter((entry) => entry.isDir).map((entry) => entry.name),
-    p,
-  );
+  return entries.filter((entry) => entry.isDir).map((entry) => entry.name);
+}
+
+export async function readSpecFolder(tree: Tree, p: number): Promise<SpecFolderRead> {
+  const names = await specsFolders(tree);
+  return names instanceof NotInTree ? { noSpecs: true } : specFolderAnswer(names, p);
+}
+
+export async function specFolder(tree: Tree, p: number): Promise<string> {
+  const names = await specsFolders(tree);
+  // A ref with no specs/ holds no spec folder, so it is a DerivationError, as pickSpecFolder's for a specs/ with none.
+  if (names instanceof NotInTree) {
+    throw new DerivationError(`the spec folder of #${p}`, `no specs/ folder (${names.message})`, { cause: names });
+  }
+  return pickSpecFolder(names, p);
 }
 
 const PullRequestHeadAnswer = z.object({
   number: IssueNumber,
   headRefName: z.string(),
-  headRefOid: z.string().regex(/^[0-9a-f]{40}$/),
-  isCrossRepository: z.boolean(),
-  merged: z.boolean(),
-});
-export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
-
-const PullRequestStateAnswer = z.object({
-  number: IssueNumber,
-  headRefName: z.string(),
+  headRefOid: GitSha,
   isCrossRepository: z.boolean(),
   closed: z.boolean(),
   merged: z.boolean(),
 });
+export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
+
+const PullRequestStateAnswer = z
+  .object({
+    number: IssueNumber,
+    headRefName: z.string(),
+    isCrossRepository: z.boolean(),
+    closed: z.boolean(),
+    merged: z.boolean(),
+    mergeCommit: z.object({ oid: GitSha }).nullable(),
+  })
+  .refine((pr) => (pr.mergeCommit !== null) === pr.merged, { path: ["mergeCommit"], message: "a PR holds a merge commit once merged, and only then" });
 export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 
 // Bodies and closing references are not asked for: any writer can edit them, and the branch names the story
@@ -154,7 +200,7 @@ export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 const PRS_ON_BRANCH_QUERY = `query($owner: String!, $name: String!, $branch: String!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequests(headRefName: $branch, first: 100, after: $cursor) {
-      nodes { number headRefName headRefOid isCrossRepository closed merged }
+      nodes { number headRefName headRefOid isCrossRepository closed merged mergeCommit { oid } }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -175,7 +221,7 @@ function sameRepoNewestFirst<Pr extends { number: number; headRefName: string; i
 export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
   if (storyOf(branch) === null) return null;
   const [newest] = sameRepoNewestFirst(prs, branch);
-  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, merged: newest.merged };
+  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, closed: newest.closed, merged: newest.merged };
 }
 
 export async function storyPr(reader: GitHubClient, repo: string, branch: string): Promise<StoryPr | null> {
@@ -204,20 +250,18 @@ const BranchRef = z.object({ ref: z.string().startsWith(HEADS) }).transform(({ r
 /** Null when GitHub holds no branch of the story: before its first push, or once its merge deleted it. */
 export async function issueStory(reader: GitHubClient, repo: string, s: number): Promise<IssueStory | null> {
   assertIssueNumber(s);
-  const where = ownerAndName(repo);
-  const at = [where.owner, where.name].map(encodeURIComponent).join("/");
   // Every branch the grammar gives `s` starts `<s>-us`, so a prefix read misses none; the grammar picks among them.
-  const refs = await reader.restPages(`/repos/${at}/git/matching-refs/heads/${s}-us`);
+  const refs = await reader.restPages(`${repositoryPath(ownerAndName(repo))}/git/matching-refs/heads/${s}-us`);
   const branch = pickStoryBranch(answerOf(z.array(BranchRef), refs, `the branches of ${repo} starting ${s}-us`), s);
   if (branch === null) return null;
   return { branch, pr: await storyPr(reader, repo, branch) };
 }
 
 export function pickSpecPrs(prs: readonly PullRequestState[], p: number): SpecPr[] {
-  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, merged }) => ({
-    number,
-    state: merged ? "merged" : closed ? "closed" : "open",
-  }));
+  // The answer's refine ties mergeCommit to merged.
+  return sameRepoNewestFirst(prs, specBranch(p)).map(({ number, closed, mergeCommit }) =>
+    mergeCommit === null ? { number, state: closed ? "closed" : "open", mergeCommit } : { number, state: "merged", mergeCommit },
+  );
 }
 
 /** Every spec PR of `p`, newest first. */
@@ -263,6 +307,13 @@ const RepositoryIdAnswer = z.object({ repository: z.object({ id: z.string() }) }
 export async function repositoryId(reader: GitHubClient, repo: string): Promise<string> {
   const answer = await reader.graphql(REPOSITORY_ID_QUERY, ownerAndName(repo));
   return answerOf(RepositoryIdAnswer, answer, `the id of ${repo}`).repository.id;
+}
+
+const RepositoryAnswer = z.object({ default_branch: z.string().min(1) });
+
+export async function defaultBranch(reader: GitHubClient, repo: string): Promise<string> {
+  const answer = await reader.rest("GET", repositoryPath(ownerAndName(repo)));
+  return answerOf(RepositoryAnswer, answer, `the default branch of ${repo}`).default_branch;
 }
 
 // The head branch is deleted on merge (orchestrator ADR-0009 d6), so a story's PRs are found from the issue's

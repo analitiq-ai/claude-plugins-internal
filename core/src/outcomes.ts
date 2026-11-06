@@ -44,7 +44,7 @@ const OUTCOME_OF_STATE: ReadonlyMap<string, Outcome> = new Map([
   ["pending", PENDING],
 ]);
 
-const COMPLETED = "completed";
+export const COMPLETED = "completed";
 
 /** A required check at the head, `undefined` when GitHub has neither a check run nor a status for it. */
 export function outcomeOf(checkRunOrStatus: CheckRun | CommitStatus | undefined): Outcome {

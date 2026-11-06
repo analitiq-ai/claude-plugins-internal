@@ -53,6 +53,10 @@ export function ownerAndName(repo: string): Repository {
   return { owner: parts[0], name: parts[1] };
 }
 
+export function repositoryPath({ owner, name }: Repository): string {
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+}
+
 /** A git remote that is not a repository on github.com, so no planner token is minted for it or pushed to it. */
 export class RemoteRefused extends Error {
   constructor(url: string, why: string) {
@@ -89,8 +93,12 @@ export function httpsUrl(repo: Repository): string {
   return `https://github.com/${owner}/${name}.git`;
 }
 
+export function assertPositiveInteger(n: number, what: string): void {
+  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not ${what}: ${n}`);
+}
+
 export function assertIssueNumber(n: number): void {
-  if (!Number.isSafeInteger(n) || n < 1) throw new TypeError(`not an issue number: ${n}`);
+  assertPositiveInteger(n, "an issue number");
 }
 
 export function answerOf<Schema extends z.ZodType>(schema: Schema, answer: unknown, what: string): z.output<Schema> {
@@ -290,7 +298,12 @@ export type Actor = z.infer<typeof Actor>;
  */
 export function restLogin(actor: Actor | null): string | null {
   if (actor === null) return null;
-  return actor.__typename === BOT_TYPE ? `${actor.login}[bot]` : actor.login;
+  return actor.__typename === BOT_TYPE ? appRestLogin(actor.login) : actor.login;
+}
+
+/** The REST login of the App whose slug, or GraphQL's bare `Bot` login, is `slug`. */
+export function appRestLogin(slug: string): string {
+  return `${slug}[bot]`;
 }
 
 // `role_name`, not the legacy `permission`, which folds maintain into write and names no custom role.
@@ -311,7 +324,6 @@ const PermissionAnswer = z.object({ role_name: z.string() });
 
 /** `login`'s role on `repo`; a non-collaborator's is `read` on a public repo and empty on a private one. */
 export async function roleOf(reader: GitHubClient, repo: Repository, login: string): Promise<string> {
-  const collaborator = [repo.owner, repo.name, "collaborators", login].map(encodeURIComponent).join("/");
-  const answer = await reader.rest("GET", `/repos/${collaborator}/permission`);
+  const answer = await reader.rest("GET", `${repositoryPath(repo)}/collaborators/${encodeURIComponent(login)}/permission`);
   return answerOf(PermissionAnswer, answer, `${login}'s role on ${repo.owner}/${repo.name}`).role_name;
 }

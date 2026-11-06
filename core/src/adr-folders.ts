@@ -1,8 +1,8 @@
 import { constants } from "node:fs";
 import { access, realpath, stat } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { runGit } from "./git.ts";
+import { mainCheckout, runGit } from "./git.ts";
 import { SettingsError, SHARED_SECTION, type Shared } from "./settings.ts";
 
 export type ResolvedAdrFolder = { entry: string; path: string; inside: boolean; readable: boolean };
@@ -50,24 +50,23 @@ async function isReadableFolder(path: string): Promise<boolean> {
   }
 }
 
-function located(entry: string, mainCheckout: string, checkoutRoot: string): string {
+function located(entry: string, main: string, checkoutRoot: string): string {
   if (isAbsolute(entry)) return resolve(entry);
   // Relative to the main checkout, so a folder beside the repo is one folder from every worktree.
-  const fromMain = resolve(mainCheckout, entry);
+  const fromMain = resolve(main, entry);
   // An in-repo folder is the calling checkout's own, so a record its branch adds is seen.
-  return liesUnder(mainCheckout, fromMain) ? resolve(checkoutRoot, relative(mainCheckout, fromMain)) : fromMain;
+  return liesUnder(main, fromMain) ? resolve(checkoutRoot, relative(main, fromMain)) : fromMain;
 }
 
 /** Each `[shared] adr_folders` entry resolved from `checkout`, in list order. Throws SettingsError (SHARED_SECTION)
  *  when two entries are one folder, naming both; GitFailed when `checkout` is not in a git repository.
  *  Reads no env var, makes no network call. */
 export async function adrFolders(checkout: string, shared: Shared): Promise<ResolvedAdrFolder[]> {
-  const [commonDir, checkoutRoot] = await Promise.all([gitPath(checkout, "--git-common-dir"), checkoutToplevel(checkout)]);
-  const mainCheckout = dirname(commonDir);
+  const [main, checkoutRoot] = await Promise.all([mainCheckout(checkout), checkoutToplevel(checkout)]);
 
   const resolved = await Promise.all(
     shared.adr_folders.map(async (entry): Promise<ResolvedAdrFolder> => {
-      const path = await realPathIfPresent(located(entry, mainCheckout, checkoutRoot));
+      const path = await realPathIfPresent(located(entry, main, checkoutRoot));
       return { entry, path, inside: liesUnder(checkoutRoot, path), readable: await isReadableFolder(path) };
     }),
   );

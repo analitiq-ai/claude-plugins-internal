@@ -5,17 +5,18 @@ import "../lib/guarded.ts";
 
 const { spawnSync } = await import("node:child_process");
 const { GH_TOKEN_VARIABLES, GhFolderRefused } = await import("../core/gh-config.ts");
-const { GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { GitFailed, originRepository } = await import("../core/git.ts");
+const { GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, ownerAndName, RemoteRefused } = await import("../core/github.ts");
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
-const { mintPlannerToken, NoOrigin, originRepository, plannerToken } = await import("../lib/github.ts");
+const { mintPlannerToken, plannerToken } = await import("../lib/github.ts");
 const { ghFolder, readPlannerSettings } = await import("../lib/settings.ts");
 
 const checkout = process.cwd();
 let folder: string;
 try {
-  const repo = await originRepository(checkout);
+  const repo = ownerAndName(await originRepository(checkout));
   await plannerToken(repo, await readPlannerSettings(checkout), new Date(), mintPlannerToken);
   folder = ghFolder(repo);
 } catch (error) {
@@ -26,7 +27,7 @@ try {
       error instanceof GitHubRefused ||
       error instanceof SettingsError ||
       error instanceof RemoteRefused ||
-      error instanceof NoOrigin ||
+      error instanceof GitFailed ||
       error instanceof GhFolderRefused ||
       error instanceof KeyReadRefused ||
       error instanceof MintError

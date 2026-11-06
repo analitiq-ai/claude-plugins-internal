@@ -1,5 +1,5 @@
 import type { Hold, Round, Snapshot } from "./contracts/snapshot.ts";
-import { runGit } from "./git.ts";
+import { commitOf, runGit } from "./git.ts";
 import { secondOf, type StateCause, type StateReading } from "./state.ts";
 import { isPlainPath, lsTreeRecords, type LsTreeRecord } from "./tree.ts";
 import { RoundResult, RoundStage, RoundVerdict } from "./values.ts";
@@ -30,8 +30,8 @@ function assertSpecFolder(specFolder: string): void {
 }
 
 // With `--full-tree -r`, a record's name is its path from the root.
-function governs(listed: LsTreeRecord, specFolder: string): boolean {
-  if (listed.name === `${specFolder}/spec.md` || listed.name === CONSTITUTION_TREE) return true;
+function governs(listed: LsTreeRecord, specs: ReadonlySet<string>): boolean {
+  if (specs.has(listed.name) || listed.name === CONSTITUTION_TREE) return true;
   return listed.type === TREE_TYPE && (listed.name === ADR_TREE || listed.name.endsWith(`/${ADR_TREE}`));
 }
 
@@ -39,12 +39,13 @@ function governs(listed: LsTreeRecord, specFolder: string): boolean {
  * The governing paths whose object differs between two `ls-tree -r -t -z` listings, or that only one holds, in
  * path order. A tree's object id covers everything under it, so one entry per folder compares it whole.
  */
-export function governingDiff(atBase: string, atRound: string, specFolder: string): string[] {
-  assertSpecFolder(specFolder);
+export function governingDiff(atBase: string, atRound: string, specFolders: readonly string[]): string[] {
+  for (const folder of specFolders) assertSpecFolder(folder);
+  const specs = new Set(specFolders.map((folder) => `${folder}/spec.md`));
   const governing = (listing: string): Map<string, string> =>
     new Map(
       lsTreeRecords(listing)
-        .filter((listed) => governs(listed, specFolder))
+        .filter((listed) => governs(listed, specs))
         .map((listed) => [listed.name, listed.object]),
     );
   const base = governing(atBase);
@@ -73,12 +74,6 @@ function causeText(cause: StateCause): string {
   return `${named}, leaving ${cause.remaining.length === 0 ? "no file" : cause.remaining.join(", ")}`;
 }
 
-// Resolved once, so a revision the clone lacks throws here, not as "not in history" from `merge-base`, and no
-// later git call reads a caller's string as an option.
-async function commitOf(checkout: string, revision: string): Promise<string> {
-  return (await runGit(checkout, ["rev-parse", "--verify", "--end-of-options", `${revision}^{commit}`])).stdout.trim();
-}
-
 // Exit 1 is "not an ancestor"; 128 is a round commit the clone does not hold, which is not in the head's history
 // either.
 async function newestInHistory(checkout: string, rounds: readonly Round[], head: string): Promise<Round | null> {
@@ -89,7 +84,8 @@ async function newestInHistory(checkout: string, rounds: readonly Round[], head:
   return null;
 }
 
-async function listing(checkout: string, commit: string): Promise<string> {
+/** The `ls-tree -r -t -z` listing of `commit`, which `governingDiff` compares. */
+export async function treeListing(checkout: string, commit: string): Promise<string> {
   return (await runGit(checkout, ["ls-tree", "-r", "-t", "-z", "--full-tree", commit])).stdout;
 }
 
@@ -100,8 +96,8 @@ async function governingLapse(
   baseCommit: string,
   specFolder: string,
 ): Promise<string | null> {
-  const [atBase, atRound] = await Promise.all([listing(checkout, baseCommit), listing(checkout, round.head)]);
-  const changed = governingDiff(atBase, atRound, specFolder);
+  const [atBase, atRound] = await Promise.all([treeListing(checkout, baseCommit), treeListing(checkout, round.head)]);
+  const changed = governingDiff(atBase, atRound, [specFolder]);
   if (changed.length === 0) return null;
   return `governing documents differ between ${base} and ${roundName(round)}: ${changed.join(", ")}`;
 }

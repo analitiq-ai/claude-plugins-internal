@@ -48,6 +48,9 @@ export const Shared = z.strictObject({
   adr_folders: listedOnce(z.string().min(1)),
   // Absent, not empty, is what makes the threads module refuse to run.
   trusted_reviewers: z.array(z.string().regex(new RegExp(`^${LOGIN}(?:\\[bot\\])?$`))).optional(),
+  // For a repo whose GitHub plan offers no rulesets: set, it stands in for the base branch's rules, which are then
+  // not read (#174 R22).
+  required_checks: listedOnce(z.string().min(1)).min(1).optional(),
   board: z.string().regex(BOARD),
   session_app_login: AppLogin,
   orchestrator_app_login: AppLogin,

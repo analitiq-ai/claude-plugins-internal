@@ -1,4 +1,4 @@
-import { ownerAndName, restLogin, type GitHubClient } from "../core/github.ts";
+import { ownerAndName, repositoryPath, restLogin, type GitHubClient } from "../core/github.ts";
 import { issueComments } from "../core/state.ts";
 
 // Keys are grammar (plan P7): a key can never close the HTML comment or break its line.
@@ -27,6 +27,5 @@ export async function postKeyed(
     (comment) => restLogin(comment.author) === orchestratorLogin && comment.body.split(/\r?\n/, 1)[0] === line,
   );
   if (handled) return;
-  const { owner, name } = ownerAndName(repo);
-  await writer.rest("POST", `/repos/${owner}/${name}/issues/${issue}/comments`, { body: `${line}\n${text}` });
+  await writer.rest("POST", `${repositoryPath(ownerAndName(repo))}/issues/${issue}/comments`, { body: `${line}\n${text}` });
 }

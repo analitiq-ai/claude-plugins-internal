@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { answerOf, ownerAndName, type GitHubClient } from "../core/github.ts";
+import type { GitHubClient } from "../core/github.ts";
+import { defaultBranch } from "../core/identity.ts";
 import { readSection, readSettings, SETTINGS_FILE, SettingsError, type Shared } from "../core/settings.ts";
 import { gitHubTree, gitTree } from "../core/tree.ts";
 import { orchestratorClient, type AppTokenDeps } from "./app-token.ts";
@@ -44,15 +45,6 @@ export async function settleSettings(client: GitHubClient, repo: string, ref: st
     }
   }
   return { shared: settings.shared, orchestrator };
-}
-
-const RepositoryAnswer = z.object({ default_branch: z.string().min(1) });
-
-/** The ref of work with no PR, a claim's among it (root ADR-0002 d4). */
-export async function defaultBranch(reader: GitHubClient, repo: string): Promise<string> {
-  const { owner, name } = ownerAndName(repo);
-  const answer = await reader.rest("GET", `/repos/${owner}/${name}`);
-  return answerOf(RepositoryAnswer, answer, `the default branch of ${repo}`).default_branch;
 }
 
 export type OnGitHub = { client: GitHubClient; settled: Settled };

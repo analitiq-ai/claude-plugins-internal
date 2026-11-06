@@ -1,16 +1,7 @@
 import { needsMint, readGhToken, writeGhToken } from "../core/gh-config.ts";
-import { runGit } from "../core/git.ts";
-import { repositoryOfRemote } from "../core/github.ts";
 import { ghFolder } from "../core/orchestrator-paths.ts";
 import type { mintToken } from "../core/tokens.ts";
 import type { OnGitHub } from "./settings.ts";
-
-/** The GitHub repository the checkout's origin names, the one repository the session's token is for. */
-export async function originRepository(checkout: string): Promise<string> {
-  const { stdout } = await runGit(checkout, ["remote", "get-url", "origin"]);
-  const { owner, name } = repositoryOfRemote(stdout.trim());
-  return `${owner}/${name}`;
-}
 
 export type SessionTokenDeps = {
   home: string;

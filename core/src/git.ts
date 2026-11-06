@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
+import { dirname } from "node:path";
 
 import { GH_TOKEN_VARIABLES } from "./gh-config.ts";
-import { httpsUrl, withoutUserinfo, type Repository } from "./github.ts";
+import { httpsUrl, repositoryOfRemote, withoutUserinfo, type Repository } from "./github.ts";
 
 export type GitAnswer = { code: number; stdout: string };
 
@@ -59,6 +60,34 @@ export function runGit(
       },
     );
   });
+}
+
+// Resolved once, so a revision the clone lacks throws here, not as "not in history" from `merge-base`, and no
+// later git call reads a caller's string as an option.
+export async function commitOf(checkout: string, revision: string): Promise<string> {
+  return (await runGit(checkout, ["rev-parse", "--verify", "--end-of-options", `${revision}^{commit}`])).stdout.trim();
+}
+
+export async function mainCheckout(checkout: string): Promise<string> {
+  // Every worktree of a repository answers the same common dir, absolute and canonical with `--path-format=absolute`.
+  const { stdout } = await runGit(checkout, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  return dirname(stdout.replace(/\n$/, ""));
+}
+
+export function trackingRef(branch: string): string {
+  return `refs/remotes/origin/${branch}`;
+}
+
+/** Forced, as a branch on GitHub may be rewritten; a fetch from a URL updates no remote-tracking ref by itself. */
+export function trackingRefspec(branch: string): string {
+  return `+refs/heads/${branch}:${trackingRef(branch)}`;
+}
+
+/** The GitHub repository the checkout's origin names, as `owner/name`. */
+export async function originRepository(checkout: string): Promise<string> {
+  const { stdout } = await runGit(checkout, ["remote", "get-url", "origin"]);
+  const { owner, name } = repositoryOfRemote(stdout.trim());
+  return `${owner}/${name}`;
 }
 
 /** The checkout's git config would let a credential other than gh's token reach GitHub. */

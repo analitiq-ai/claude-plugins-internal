@@ -1,24 +1,7 @@
 import { needsMint, readGhToken, writeGhToken } from "../core/gh-config.ts";
-import { runGit } from "../core/git.ts";
-import { repositoryOfRemote, type GitHubClient, type Repository } from "../core/github.ts";
+import type { GitHubClient, Repository } from "../core/github.ts";
 import { mintToken, type MintedToken } from "../core/tokens.ts";
 import { ghFolder, type CheckoutSettings } from "./settings.ts";
-
-/** The checkout has no `origin`, so it names no repository for planner to act on. */
-export class NoOrigin extends Error {
-  constructor(checkout: string) {
-    super(`${checkout} has no remote origin, so it names no GitHub repository for planner`);
-    this.name = "NoOrigin";
-  }
-}
-
-/** The GitHub repository the checkout's origin names; every script acts on this one. */
-export async function originRepository(checkout: string): Promise<Repository> {
-  // git exits 2 for a remote the checkout does not have.
-  const { code, stdout } = await runGit(checkout, ["remote", "get-url", "origin"], [2]);
-  if (code === 2) throw new NoOrigin(checkout);
-  return repositoryOfRemote(stdout.trim());
-}
 
 export type Mint = (appId: number, repo: string) => Promise<MintedToken>;
 

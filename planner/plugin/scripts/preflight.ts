@@ -8,12 +8,15 @@ import type { Mint } from "../lib/github.ts";
 const { z } = await import("zod");
 const { laneOf, LaneRefused } = await import("../core/board.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
-const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { GitFailed, originRepository } = await import("../core/git.ts");
+const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, ownerAndName, RemoteRefused, repositoryPath } = await import(
+  "../core/github.ts"
+);
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
 const { Lane } = await import("../core/values.ts");
-const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub } = await import("../lib/github.ts");
+const { mintPlannerToken, plannerGitHub } = await import("../lib/github.ts");
 const { readPlannerSettings } = await import("../lib/settings.ts");
 
 export type PreflightIo = {
@@ -37,13 +40,12 @@ export async function main(args: readonly string[], io: PreflightIo): Promise<nu
   }
   const issue = Number(args[0]);
   try {
-    const repo = await originRepository(io.checkout);
+    const repo = ownerAndName(await originRepository(io.checkout));
     const settings = await readPlannerSettings(io.checkout);
     const { shared } = settings;
     const github = await plannerGitHub(repo, settings, io.connect, new Date(), io.mint);
     const name = `${repo.owner}/${repo.name}`;
-    const path = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/issues/${issue}`;
-    const { state } = answerOf(IssueState, await github.rest("GET", path), `${name}#${issue}`);
+    const { state } = answerOf(IssueState, await github.rest("GET", `${repositoryPath(repo)}/issues/${issue}`), `${name}#${issue}`);
     const lane = await laneOf(github, name, issue, shared.board);
 
     const stops: string[] = [];
@@ -63,7 +65,7 @@ export async function main(args: readonly string[], io: PreflightIo): Promise<nu
         error instanceof GitHubRefused ||
         error instanceof SettingsError ||
         error instanceof RemoteRefused ||
-        error instanceof NoOrigin ||
+        error instanceof GitFailed ||
         error instanceof GhFolderRefused ||
         error instanceof KeyReadRefused ||
         error instanceof MintError ||
