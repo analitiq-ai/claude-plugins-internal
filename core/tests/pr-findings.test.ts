@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Finding } from "../src/contracts/finding.ts";
 import { GitHubUnanswered } from "../src/github.ts";
 import type { Shared } from "../src/settings.ts";
-import { prFindings } from "../src/validation/pr-findings.ts";
+import { FindingsCouldNotRun, prFindings } from "../src/validation/pr-findings.ts";
 import { threadsModule, type ProviderLogins } from "../src/validation/threads.ts";
 import { importSpecifiers } from "./source-scan.ts";
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "./support/fake-github.ts";
@@ -155,6 +155,10 @@ const CI_PASSED = run("ci", "success", { app: ACTIONS });
 const CI_FAILED = run("ci", "failure", { app: ACTIONS });
 const CI_FINDING = requiredCheckFinding("ci", `${ACTIONS.slug}[bot]`);
 
+function findingsCouldNotRun(reason: RegExp): (thrown: unknown) => boolean {
+  return (thrown) => thrown instanceof FindingsCouldNotRun && reason.test(thrown.message);
+}
+
 describe("prFindings: the required checks' and the threads' findings first", () => {
   it("returns a red required check's finding and a trusted thread's, reading no <module>-review", async () => {
     const client = reader({ ci: [CI_FAILED] }, [ALICE_THREAD]);
@@ -238,18 +242,17 @@ describe("prFindings: with no required-check or thread finding, each [shared] va
   });
 });
 
-describe("prFindings: throws a COULD_NOT_RUN reason, never returning []", () => {
+describe("prFindings: throws FindingsCouldNotRun naming the read, never returning []", () => {
   for (const conclusion of ["cancelled", "timed_out", "stale"]) {
     it(`throws a module's reason when its <module>-review run concluded ${conclusion}, never reading it as a pass`, async () => {
       const runs = { ci: [CI_PASSED], "codex-review": [run("codex-review", conclusion)], "coderabbit-review": [] };
-      await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), new RegExp(`^Error: codex: codex-review concluded ${conclusion}$`));
+      await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(new RegExp(`^codex: codex-review concluded ${conclusion}$`)));
     });
   }
 
-  it("rejects with GitHub's no-answer for a module's check runs, never reading it as no finding", async () => {
-    const unanswered = new GitHubUnanswered("the check runs");
-    const runs = { ci: [CI_PASSED], "codex-review": unanswered, "coderabbit-review": [] };
-    await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), (thrown: unknown) => thrown === unanswered);
+  it("throws a module's reason when GitHub gives no answer for its check runs, never reading it as no finding", async () => {
+    const runs = { ci: [CI_PASSED], "codex-review": new GitHubUnanswered("the check runs"), "coderabbit-review": [] };
+    await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^codex: the check runs$/));
   });
 
   it("throws required-checks' reason when the rules require no check but its own", async () => {
@@ -263,12 +266,12 @@ describe("prFindings: throws a COULD_NOT_RUN reason, never returning []", () => 
       graphqlPages: [{ when: (query) => query.includes("reviewThreads"), answer: [] }],
       restPages: { [RULES_PATH]: [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "internal-review" }] } }] },
     });
-    await assert.rejects(prFindings(onlyOwn, REPO, PR, HEAD, SETTINGS, LOGINS), /^Error: required-checks: the rules of main require no check but internal-review/);
+    await assert.rejects(prFindings(onlyOwn, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^required-checks: the rules of main require no check but internal-review/));
   });
 
   it("throws threads' reason when GitHub gives no answer for the threads", async () => {
     const client = reader({ ci: [CI_PASSED] }, new GitHubUnanswered("the review threads"));
-    await assert.rejects(prFindings(client, REPO, PR, HEAD, SETTINGS, LOGINS), /^Error: threads: the review threads$/);
+    await assert.rejects(prFindings(client, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun(/^threads: the review threads$/));
   });
 });
 

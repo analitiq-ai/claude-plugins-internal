@@ -534,6 +534,18 @@ describe("land.ts could not run, exiting 2", () => {
     });
   }
 
+  it("for a checkout with no origin, naming origin, minting nothing and calling no GitHub", async (t) => {
+    const w = world(t);
+    git(w.checkout, "remote", "remove", "origin");
+    storeToken(9);
+    const run = await land(w, gitHubState());
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.match(run.stderr.join("\n"), /remote get-url origin/);
+    assert.deepEqual(run.mints, []);
+    assert.deepEqual(run.calls, []);
+    assert.deepEqual(run.pushes, []);
+  });
+
   it("when GitHub gives #p's sub-issues only in part, creating no issue", async (t) => {
     const w = world(t);
     const failure = new GitHubPartlyAnswered("dummy: answered in part");

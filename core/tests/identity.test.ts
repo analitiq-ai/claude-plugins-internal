@@ -193,13 +193,16 @@ describe("specBranch", () => {
 });
 
 describe("pickSpecPrs", () => {
-  function pr(number: number, headRefName: string, over: Partial<PullRequestState> = {}): PullRequestState {
-    return { number, headRefName, isCrossRepository: false, closed: false, merged: false, mergeCommit: null, ...over };
+  function pr(number: number, headRefName: string, { isCrossRepository = false, closed = false } = {}): PullRequestState {
+    return { number, headRefName, isCrossRepository, closed, merged: false, mergeCommit: null };
+  }
+  function mergedPr(number: number, headRefName: string): PullRequestState {
+    return { number, headRefName, isCrossRepository: false, closed: true, merged: true, mergeCommit: { oid: sha(number) } };
   }
 
   it("is every same-repository PR headed <p>-spec, newest first; a fork's or another head's is not the spec's", () => {
     const prs = [
-      pr(150, "145-spec", { closed: true, merged: true, mergeCommit: { oid: sha(150) } }),
+      mergedPr(150, "145-spec"),
       pr(170, "145-spec"),
       pr(160, "145-spec", { closed: true }),
       pr(180, "145-spec", { isCrossRepository: true }),
@@ -213,15 +216,22 @@ describe("pickSpecPrs", () => {
     ]);
   });
 
-  for (const [state, over, mergeCommit] of [
-    ["open", {}, null],
-    ["closed", { closed: true }, null],
-    ["merged", { closed: true, merged: true, mergeCommit: { oid: sha(170) } }, { oid: sha(170) }],
+  for (const [state, given, mergeCommit] of [
+    ["open", pr(170, "145-spec"), null],
+    ["closed", pr(170, "145-spec", { closed: true }), null],
+    ["merged", mergedPr(170, "145-spec"), { oid: sha(170) }],
   ] as const) {
     it(`maps a PR that is ${state} to ${state}`, () => {
-      assert.deepEqual(pickSpecPrs([pr(170, "145-spec", over)], 145), [{ number: 170, state, mergeCommit }]);
+      assert.deepEqual(pickSpecPrs([given], 145), [{ number: 170, state, mergeCommit }]);
     });
   }
+
+  it("takes no PullRequestState merged without a merge commit, or unmerged with one: tsc refuses both", () => {
+    // @ts-expect-error merged without a merge commit
+    const mergedWithout: PullRequestState = { number: 170, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: true, mergeCommit: null };
+    // @ts-expect-error a merge commit on an unmerged PR
+    const unmergedWith: PullRequestState = { number: 170, headRefName: "145-spec", isCrossRepository: false, closed: true, merged: false, mergeCommit: { oid: sha(170) } };
+  });
 
   it("is empty when no same-repository PR is headed <p>-spec", () => {
     assert.deepEqual(pickSpecPrs([], 145), []);
