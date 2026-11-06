@@ -309,6 +309,7 @@ describe("recordCheck: refusals (contracts/refusals.md)", () => {
 
 const TAKEN = "the section is carried to the head";
 const MISSING = "AnchorMissing";
+const RAW = "its TypeError, not a could-not-run";
 const ANCHOR = sha(4096);
 const UNABLE = `fatal: unable to access 'https://github.com/${REPO}/': `;
 const NOT_ASKED = async (): Promise<boolean> => assert.fail("GitHub was asked");
@@ -380,28 +381,38 @@ const ANCHOR_ROWS: { what: string; outcome: string; arrange: (t: TestContext, r:
     },
   },
   { what: "GitHub does not answer the read of the commit", outcome: RETRY, arrange: (_t, r) => onGitHub(r, new GitHubUnanswered("timed out")) },
-  { what: "GitHub refuses the read of the commit", outcome: FIX_THEN_RETRY, arrange: (_t, r) => onGitHub(r, new GitHubRefused(403, "Forbidden")) },
-  {
-    what: "the fetch from GitHub reaches no host",
-    outcome: RETRY,
-    arrange: (_t, r) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GitFailed(["fetch"], 128, `${UNABLE}Could not resolve host: github.com`))),
-  },
+  ...[403, 404].map((status) => ({
+    what: `GitHub answers the read of the commit ${status}`,
+    outcome: FIX_THEN_RETRY,
+    arrange: (_t: TestContext, r: Repo) => onGitHub(r, new GitHubRefused(status, "refused")),
+  })),
+  // Each fails as git words it under LC_ALL=C.
   ...(
     [
-      [503, RETRY],
-      [429, RETRY],
-      [403, FIX_THEN_RETRY],
+      ["reaches no host", `${UNABLE}Could not resolve host: github.com`, RETRY],
+      ["is answered 503", `${UNABLE}The requested URL returned error: 503`, RETRY],
+      ["is answered 429", `${UNABLE}The requested URL returned error: 429`, RETRY],
+      ["is answered 403", `${UNABLE}The requested URL returned error: 403`, FIX_THEN_RETRY],
+      ["is answered 401", `fatal: Authentication failed for 'https://github.com/${REPO}/'`, FIX_THEN_RETRY],
+      ["is answered 401 with no credential to send", "fatal: could not read Username for 'https://github.com': terminal prompts disabled", FIX_THEN_RETRY],
+      ["is answered 404", `remote: Repository not found.\nfatal: repository 'https://github.com/${REPO}/' not found`, FIX_THEN_RETRY],
     ] as const
-  ).map(([status, outcome]) => ({
-    what: `GitHub answers the fetch ${status}`,
+  ).map(([answered, stderr, outcome]) => ({
+    what: `the fetch from GitHub ${answered}`,
     outcome,
-    arrange: (_t: TestContext, r: Repo) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GitFailed(["fetch"], 128, `${UNABLE}The requested URL returned error: ${status}`))),
+    arrange: (_t: TestContext, r: Repo) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GitFailed(["fetch"], 128, stderr))),
   })),
   {
     what: "the fetch from GitHub throws GhCredentialRefused",
     outcome: FIX_THEN_RETRY,
     // GhCredentialRefused reaches the could-not-run as core words it.
     arrange: (_t, r) => ({ ...onGitHub(r, { sha: ANCHOR }, failingFetch(new GhCredentialRefused("sets http.extraheader, a header sent beside gh's token"))), named: [] }),
+  },
+  { what: "the fetch from GitHub throws a TypeError", outcome: RAW, arrange: (_t, r) => onGitHub(r, { sha: ANCHOR }, failingFetch(new TypeError("a bug in the fetch"))) },
+  {
+    what: "the model's clone is no absolute path, and GitHub is not asked",
+    outcome: RAW,
+    arrange: (_t, r) => ({ anchor: ANCHOR, sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, "relative/clone", anchor), github: NOT_ASKED } }),
   },
 ];
 
@@ -421,6 +432,11 @@ describe("recordCheck: where the anchor is found, and the refusal when it is not
       await assert.rejects(recorded, (error: unknown) => {
         if (outcome === MISSING) {
           assert.ok(error instanceof AnchorMissing, String(error));
+          return true;
+        }
+        if (outcome === RAW) {
+          assert.ok(error instanceof TypeError, String(error));
+          assert.equal(git(r.copy, "for-each-ref", "refs/anchors/"), "");
           return true;
         }
         assert.ok(error instanceof CouldNotRun, String(error));
