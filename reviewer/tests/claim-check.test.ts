@@ -325,6 +325,11 @@ describe("acceptContest", () => {
     assert.equal(fetchAllowed("http://docs.example/a", hosts), false);
     assert.equal(fetchAllowed("not a url", hosts), false);
   });
+
+  it("reads a cited page's host without the sentence punctuation that follows its URL", () => {
+    const hosts = citedHosts([{ claim: "c", evidence: "see https://docs.example. Also https://docs.example/a, and https://spec.example/b;" }]);
+    assert.deepEqual(hosts, ["docs.example", "spec.example"]);
+  });
 });
 
 describe("the CORRECT memo", () => {
