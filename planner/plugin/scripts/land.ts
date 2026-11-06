@@ -5,11 +5,12 @@ import "../lib/guarded.ts";
 import type { GitHubClient, Repository } from "../core/github.ts";
 import type { SpecPr } from "../core/identity.ts";
 import type { Mint } from "../lib/github.ts";
+import type { Story, StoryIssue as StoryIssueType } from "../lib/story-plan.ts";
 
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const { join, posix } = await import("node:path");
 const { z } = await import("zod");
-const { isPhaseHeading, readTaskBlockLabels, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
+const { readTaskBlockLabels, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
 const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
 const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
@@ -18,8 +19,9 @@ const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
 const { gitTree, isPlainPath, NotInTree } = await import("../core/tree.ts");
-const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub } = await import("../lib/github.ts");
+const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub, readRepository, readSubIssues, repositoryPath } = await import("../lib/github.ts");
 const { ghFolder, readPlannerSettings } = await import("../lib/settings.ts");
+const { phasesOf, StoryIssue, storyPlan, subIssueProblem, TasksRefused } = await import("../lib/story-plan.ts");
 
 export type LandIo = {
   /** The checkout's top folder; the spec folder is relative to it. */
@@ -32,14 +34,6 @@ export type LandIo = {
   stdout: (line: string) => void;
   stderr: (line: string) => void;
 };
-
-/** tasks.md is not in the shape the story plan is read from. */
-class TasksRefused extends Error {
-  constructor(reason: string) {
-    super(`tasks.md: ${reason}`);
-    this.name = "TasksRefused";
-  }
-}
 
 /** The run stops before its first write; each line names the next step. */
 class Stopped extends Error {
@@ -54,56 +48,6 @@ class Stopped extends Error {
 
 function stop(...lines: string[]): never {
   throw new Stopped(lines);
-}
-
-const TASK_LINE = /^\s*- \[[ xX]\] /;
-const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
-const PHASE_TITLE = /^## Phase [^:]*: (.+)$/;
-
-type Phase = { line: number; heading: string; story: number | null };
-
-// A story's phases are told apart by their tasks' tags, never by heading words. A section that is no phase
-// ends the one before it, so its lines are no phase's.
-function phasesOf(lines: readonly string[]): Phase[] {
-  const phases: Phase[] = [];
-  let current: Phase | null = null;
-  for (const [i, line] of lines.entries()) {
-    if (isPhaseHeading(line)) {
-      // Labels are read back by heading, so two phases under one heading could not be told apart.
-      if (phases.some((phase) => phase.heading === line)) throw new TasksRefused(`two phases are headed "${line}"`);
-      current = { line: i, heading: line, story: null };
-      phases.push(current);
-    } else if (line.startsWith("## ")) {
-      current = null;
-    } else if (TASK_LINE.test(line)) {
-      for (const [, k] of line.matchAll(STORY_TAG)) {
-        if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${k} outside any phase`);
-        if (current.story !== null && current.story !== Number(k)) {
-          throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${k}`);
-        }
-        current.story = Number(k);
-      }
-    }
-  }
-  const order = phases.flatMap((phase) => (phase.story === null ? [] : [phase.story]));
-  const outOfOrder = order.findIndex((k, i) => i > 0 && k < order[i - 1]);
-  if (outOfOrder !== -1) throw new TasksRefused(`a US${order[outOfOrder]} phase comes after a US${order[outOfOrder - 1]} one`);
-  return phases;
-}
-
-export type Story = { k: number; title: string; heading: string };
-
-/** The stories of tasks.md, US1 first, each named by the heading of its first phase. */
-export function storyPlan(text: string): Story[] {
-  const phases = phasesOf(text.split("\n"));
-  const stories: Story[] = [];
-  for (const phase of phases) {
-    if (phase.story === null || stories.some((story) => story.k === phase.story)) continue;
-    if (phase.story !== stories.length + 1) throw new TasksRefused(`US${phase.story} has tasks, but US${stories.length + 1} has none`);
-    stories.push({ k: phase.story, title: PHASE_TITLE.exec(phase.heading)?.[1] ?? phase.heading.slice("## ".length), heading: phase.heading });
-  }
-  if (stories.length === 0) throw new TasksRefused("no task is tagged [US<k>]");
-  return stories;
 }
 
 /**
@@ -139,21 +83,6 @@ export function landsWith(specFolder: string): (path: string) => boolean {
   return (path) => path.startsWith(`${specFolder}/`) || DECISION_RECORDS.test(path);
 }
 
-const StoryIssue = z.object({ id: z.number().int().positive(), number: z.number().int().positive() });
-type StoryIssue = ReturnType<typeof StoryIssue.parse>;
-// GitHub lets a sub-issue come from another repository, whose number would name a different issue in tasks.md.
-const SubIssue = StoryIssue.extend({ repository_url: z.string() });
-
-/** Each sub-issue at position i whose number is not the one tasks.md labels US<i+1> with, as the line naming both. */
-export function misplacedSubIssues(subIssues: readonly StoryIssue[], stories: readonly Story[], labels: ReadonlyMap<string, number>): string[] {
-  return subIssues.flatMap((sub, i) => {
-    const story = stories[i];
-    const label = story === undefined ? undefined : labels.get(story.heading);
-    if (label === undefined || label === sub.number) return [];
-    return [`sub-issue ${i + 1} is #${sub.number}, but tasks.md labels US${i + 1} with #${label}`];
-  });
-}
-
 const ISSUE_ARGUMENT = /^[1-9][0-9]*$/;
 const KINDS: readonly string[] = ["new", "rescope"];
 const RESCOPE = "rescope";
@@ -177,7 +106,6 @@ async function landing(args: readonly string[], checkout: string): Promise<Landi
   return { p: Number(issue), specDir, kind };
 }
 
-const RepositoryAnswer = z.object({ url: z.string(), default_branch: z.string().min(1) });
 const UserAnswer = z.object({ id: z.number().int().positive() });
 const OpenedPr = z.object({ html_url: z.string() });
 
@@ -211,7 +139,7 @@ type Read = {
   open: SpecPr | null;
   tasks: string;
   stories: Story[];
-  subIssues: StoryIssue[];
+  subIssues: StoryIssueType[];
   email: string;
   login: string;
 };
@@ -224,8 +152,8 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   const settings = await readPlannerSettings(checkout);
   const github = await plannerGitHub(repo, settings, io.connect, new Date(), io.mint);
   const name = `${repo.owner}/${repo.name}`;
-  const api = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
-  const { url, default_branch: base } = answerOf(RepositoryAnswer, await github.rest("GET", api), name);
+  const api = repositoryPath(repo);
+  const { url, default_branch: base } = await readRepository(github, repo);
   const tracking = `refs/remotes/origin/${base}`;
   await io.fetch(repo, [`+refs/heads/${base}:${tracking}`]);
 
@@ -273,28 +201,35 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   }
 
   const tasks = readFileSync(join(checkout, specDir, "tasks.md"), "utf8");
-  const stories = storyPlan(tasks);
-  const labels = readTaskBlockLabels(tasks);
-  const subIssues = answerOf(z.array(SubIssue), await github.restPages(`${api}/issues/${p}/sub_issues`), `the sub-issues of ${name}#${p}`);
-  // A one-story spec's story is #p itself, so none of its sub-issues is a story issue.
-  const extra = subIssues.slice(stories.length > 1 ? stories.length : 0);
-  if (extra.length > 0) {
+  let stories: Story[];
+  let labels: ReadonlyMap<string, number>;
+  try {
+    stories = storyPlan(tasks);
+    labels = readTaskBlockLabels(tasks);
+  } catch (error) {
+    if (!(error instanceof TasksRefused || error instanceof TaskBlockLabelRefused)) throw error;
+    // tasks.md is derived (planner ADR-0009 d4) and nothing has landed, so the run is started again, never edited.
+    stop(`${error.message}; tasks.md is not a story plan. Next step: remove \`${specDir}\`, then run \`/planner:issue-spec #${p} [<dir>]\` again.`);
+  }
+  const subIssues = await readSubIssues(github, repo, p);
+  const problem = subIssueProblem(subIssues, stories, labels, url);
+  if (problem?.kind === "extra") {
     stop(
-      `#${p} has ${subIssues.length} sub-issues for ${stories.length} stories; the extra: ${extra.map((one) => `#${one.number}`).join(", ")}. ` +
-        `Next step: remove them from #${p}'s sub-issues, or add their stories to tasks.md.`,
+      `#${p} has ${subIssues.length} sub-issues for ${stories.length} stories; the extra: ${problem.extra.map((n) => `#${n}`).join(", ")}. ` +
+        `Next step: remove them from #${p}'s sub-issues.`,
     );
   }
-  const foreign = subIssues.filter((one) => one.repository_url !== url);
-  if (foreign.length > 0) {
+  if (problem?.kind === "foreign") {
+    stop(...problem.foreign.map((sub) => `#${p}'s sub-issue ${sub} is in another repository. Next step: remove it from #${p}'s sub-issues.`));
+  }
+  if (problem?.kind === "misplaced") {
     stop(
-      ...foreign.map(
-        (one) => `#${p}'s sub-issue ${one.repository_url.split("/repos/").at(-1)}#${one.number} is in another repository. Next step: remove it from #${p}'s sub-issues.`,
+      ...problem.misplaced.map(
+        ({ position, sub, label }) =>
+          `#${p}'s sub-issue ${position} is #${sub}, but tasks.md labels US${position} with #${label}. ` +
+          `Next step: order #${p}'s sub-issues so sub-issue ${position} is US${position}'s issue.`,
       ),
     );
-  }
-  const misplaced = misplacedSubIssues(subIssues, stories, labels);
-  if (misplaced.length > 0) {
-    stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: make tasks.md's label and #${p}'s sub-issue name the same issue.`));
   }
 
   const login = settings.shared.planner_app_login;
@@ -323,7 +258,7 @@ async function storyLink(github: GitHubClient, path: string, body: object, missi
 
 async function storyIssues({ p, specDir }: Landing, { api, github, stories, subIssues }: Read): Promise<number[]> {
   if (stories.length === 1) return [p];
-  const known = [...subIssues];
+  const known: StoryIssueType[] = [...subIssues];
   for (const story of stories.slice(known.length)) {
     const body = { title: `US${story.k}: ${story.title}`, body: `Story ${story.k} of #${p}; its tasks are in ${specDir}/tasks.md.` };
     const created = answerOf(StoryIssue, await github.rest("POST", `${api}/issues`, body), `the issue of US${story.k}`);
@@ -394,10 +329,6 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
   } catch (error) {
     if (error instanceof Stopped) {
       for (const line of error.lines) io.stderr(line);
-      return 1;
-    }
-    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused) {
-      io.stderr(`${error.message}. Next step: correct the spec folder's tasks.md, then land again.`);
       return 1;
     }
     if (

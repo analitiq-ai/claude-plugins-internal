@@ -61,8 +61,8 @@ folder that the default branch lacks.
    repository: `specify init --here --integration claude`.
 
    Planning uses three third-party Spec Kit community extensions, part of neither Spec Kit nor planner: grill
-   and critique in the `issue-spec` workflow's steps of those names, and ADR Kit for the plan's ADR check, after
-   plan and before critique (planner ADR-0009, #177). Spec Kit's catalog lists all three as discovery-only, not
+   and critique in the `issue-spec` workflow's steps of those names, and ADR Kit, whose `/speckit-adrkit-draft`
+   drafts a superseding record when the plan departs from one. Spec Kit's catalog lists all three as discovery-only, not
    vetted, so `specify` will not install them from it. Vet each yourself, then install it with
    `specify extension add <id> --from <archive-url>`, or `--dev <folder>` from a local copy:
 
@@ -72,8 +72,9 @@ folder that the default branch lacks.
    | `critique` | [arunt14/spec-kit-critique](https://github.com/arunt14/spec-kit-critique) | `speckit-critique-run` |
    | `adrkit` | [mbeacom/adrkit](https://github.com/mbeacom/adrkit) | `speckit-adrkit-check`, `speckit-adrkit-context`, `speckit-adrkit-draft` |
 
-   ADR Kit also needs the `adr` CLI 0.3.0 or later (`npm install -g @adrkit/cli`) and the repository's ADR
-   folder, `docs/adr` by default.
+   The plan check is planner's own: the workflow's `adr-*` steps run after critique, over the paths the plan and
+   `tasks.md` name, against each folder `codeworks.toml` lists in `[shared] adr_folders` (planner ADR-0009, #177).
+   It runs the `adr` CLI 0.20.0: `npm install -g @adrkit/cli@0.20.0`.
 
    The workflow's other steps, `speckit.specify`, `speckit.plan` and `speckit.tasks`, come with
    `specify init`, and planner installs its own preset (`settled-design`) and workflow (`issue-spec`) at each

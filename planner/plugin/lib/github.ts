@@ -1,8 +1,11 @@
+import { z } from "zod";
+
 import { needsMint, readGhToken, writeGhToken } from "../core/gh-config.ts";
 import { runGit } from "../core/git.ts";
-import { repositoryOfRemote, type GitHubClient, type Repository } from "../core/github.ts";
+import { answerOf, repositoryOfRemote, type GitHubClient, type Repository } from "../core/github.ts";
 import { mintToken, type MintedToken } from "../core/tokens.ts";
 import { ghFolder, type CheckoutSettings } from "./settings.ts";
+import { SubIssue } from "./story-plan.ts";
 
 /** The checkout has no `origin`, so it names no repository for planner to act on. */
 export class NoOrigin extends Error {
@@ -44,4 +47,23 @@ export async function plannerGitHub(
   mint: Mint,
 ): Promise<GitHubClient> {
   return connect(await plannerToken(repo, settings, now, mint));
+}
+
+/** `repo`'s REST path. */
+export function repositoryPath(repo: Repository): string {
+  return `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
+}
+
+// `url` is what each of the repository's issues gives as its `repository_url`.
+const RepositoryAnswer = z.object({ url: z.string(), default_branch: z.string().min(1) });
+
+/** `repo`'s API url and default branch, as GitHub answers them. */
+export async function readRepository(github: GitHubClient, repo: Repository): Promise<z.output<typeof RepositoryAnswer>> {
+  return answerOf(RepositoryAnswer, await github.rest("GET", repositoryPath(repo)), `${repo.owner}/${repo.name}`);
+}
+
+/** The sub-issues of `repo`'s issue `issue`, in GitHub's order. */
+export async function readSubIssues(github: GitHubClient, repo: Repository, issue: number): Promise<SubIssue[]> {
+  const answer = await github.restPages(`${repositoryPath(repo)}/issues/${issue}/sub_issues`);
+  return answerOf(z.array(SubIssue), answer, `the sub-issues of ${repo.owner}/${repo.name}#${issue}`);
 }

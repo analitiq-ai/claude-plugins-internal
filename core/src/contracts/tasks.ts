@@ -10,9 +10,12 @@ const PHASE_HEADING = /^## Phase \S/;
 
 /** A line under a phase heading that opens as a label but is not one: read as no label, it would be written twice. */
 export class TaskBlockLabelRefused extends Error {
+  readonly why: string;
   constructor(heading: string, line: string) {
-    super(`tasks.md: ${JSON.stringify(line)} under "${heading}" is no task-block label, which reads "${LABEL_PREFIX} #<n>"`);
+    const why = `${JSON.stringify(line)} under "${heading}" is no task-block label, which reads "${LABEL_PREFIX} #<n>"`;
+    super(`tasks.md: ${why}`);
     this.name = "TaskBlockLabelRefused";
+    this.why = why;
   }
 }
 
@@ -42,9 +45,13 @@ export function readTaskBlockLabels(text: string): ReadonlyMap<string, number> {
 
 /** A task line the check cannot place under a story. */
 export class TaskLineRefused extends Error {
+  readonly where: string;
+  readonly why: string;
   constructor(line: number, why: string) {
     super(`tasks.md:${line}: ${why}`);
     this.name = "TaskLineRefused";
+    this.where = `tasks.md:${line}`;
+    this.why = why;
   }
 }
 

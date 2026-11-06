@@ -2,12 +2,12 @@ schema_version: "1.0"
 workflow:
   id: "issue-spec"
   name: "Spec Cycle"
-  version: "1.6.0"
+  version: "1.7.0"
   author: "Analitiq"
-  description: "Settles design decisions in a spec folder before a design document is drafted: premise → specify → grill → plan → critique → tasks"
+  description: "Driven by planner's issue-spec skill, whose SKILL.md describes it"
 
 requires:
-  speckit_version: ">=1.0.7"
+  speckit_version: ">=1.1.3,<1.2.0"
   integrations:
     any: ["claude"]
 
@@ -107,8 +107,8 @@ steps:
             type: shell
             run: node "$PLANNER_ROOT/scripts/spec_facts.ts" write "$SPECIFY_FEATURE_DIRECTORY"
 
-  # A resume re-runs the top-level step the run stopped in, with everything nested in it. So each step below is
-  # top-level and skips itself on a stop pick, instead of all of them sharing one block.
+  # A resume re-runs from the step the run stopped at; an `if` it re-enters is not evaluated again; each step
+  # below is top-level and skips itself on a stop pick, so no condition is read from a block the run left.
 
   # specify writes spec.md from the template, over a no-spec one, so a rescope of a spec skips it and grill amends the
   # spec in place.
@@ -273,10 +273,90 @@ steps:
         verdict_input: critique_verdict
         on_reject: abort
 
-  - id: to-tasks
+  # tasks.md is written inside the check loop, whose first round finds no tasks-sources.json.
+  - id: to-adr-check
     type: if
     condition: *spec-is-written
     then:
-      - id: tasks
-        command: speckit.tasks
-        integration: "{{ inputs.integration }}"
+      - id: adr-check
+        type: do-while
+        max_iterations: 100
+        condition: "{{ steps.adr-report.output.data.again }}"
+        steps:
+          - id: adr-settled-design
+            type: shell
+            run: |
+              set -eu
+              python3 "$PLANNER_ROOT/scripts/settled_design.py" "$SPECIFY_FEATURE_DIRECTORY"
+          - id: adr-clear
+            type: shell
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" clear "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+          - id: adr-touches
+            type: prompt
+            integration: "{{ inputs.integration }}"
+            timeout: 1800
+            continue_on_error: true
+            prompt: "Follow .specify/workflows/issue-spec/adr-touches.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-tasks-due
+            type: shell
+            output_format: json
+            timeout: 60
+            continue_on_error: true
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" tasks-due "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+          - id: adr-tasks-writing
+            type: if
+            condition: "{{ steps.adr-tasks-due.output.data.due }}"
+            then:
+              - id: adr-tasks
+                command: speckit.tasks
+                integration: "{{ inputs.integration }}"
+                continue_on_error: true
+              - id: adr-tasks-written
+                type: shell
+                timeout: 60
+                continue_on_error: true
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" tasks-written ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-tasks.output.exit_code }}"
+          - id: adr-stories
+            type: shell
+            timeout: 300
+            continue_on_error: true
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stories "$ISSUE" "{{ inputs.kind }}" "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+          - id: adr-ask
+            type: shell
+            output_format: json
+            timeout: 1800
+            continue_on_error: true
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" ask "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-touches.output.exit_code }}"
+          - id: adr-judging
+            type: if
+            condition: "{{ steps.adr-ask.output.data.judge }}"
+            then:
+              - id: adr-judge
+                type: prompt
+                integration: "{{ inputs.integration }}"
+                timeout: 1800
+                continue_on_error: true
+                prompt: "Follow .specify/workflows/issue-spec/adr-judge.md for spec folder {{ inputs.spec_dir }}, run folder .specify/workflows/runs/{{ context.run_id }}."
+          - id: adr-deciding
+            type: if
+            condition: "{{ steps.adr-ask.output.data.decide }}"
+            then:
+              - id: adr-decide
+                type: shell
+                timeout: 1800
+                continue_on_error: true
+                run: node "$PLANNER_ROOT/scripts/adr_check.ts" decide "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}" "{{ steps.adr-ask.output.data.asked }}" "{{ steps.adr-judge.output.exit_code }}"
+          - id: adr-report
+            type: shell
+            output_format: json
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" report "$SPECIFY_FEATURE_DIRECTORY" ".specify/workflows/runs/{{ context.run_id }}"
+      - id: adr-out-of-rounds        # the loop ended at max_iterations still wanting another
+        type: if
+        condition: "{{ steps.adr-report.output.data.again }}"
+        then:
+          - id: adr-rounds
+            type: shell
+            timeout: 60
+            run: node "$PLANNER_ROOT/scripts/adr_check.ts" stop rounds "{{ inputs.kind }}" "$ISSUE" "$SPECIFY_FEATURE_DIRECTORY"

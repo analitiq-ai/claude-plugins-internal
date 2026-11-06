@@ -448,10 +448,10 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assertStops(w, run, [`check out ${BRANCH}`]);
   });
 
-  it("for more sub-issues than stories, naming the extra ones", async (t) => {
+  it("for more sub-issues than stories, naming the extra ones and sending the admin to #p's sub-issues", async (t) => {
     const w = world(t);
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102), issue(103), issue(104), issue(105)] }));
-    assertStops(w, run, ["#104", "#105"]);
+    assertStops(w, run, ["#104", "#105", "Next step: remove them from #7's sub-issues"]);
   });
 
   it("for a one-story spec whose #p has sub-issues, naming them", async (t) => {
@@ -470,7 +470,41 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
   it("for a sub-issue at position i other than the issue tasks.md labels US<i+1> with, naming both", async (t) => {
     const w = world(t, tasksMd(3, [101, 101, 101, 102, 103, 103]));
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(120), issue(103)] }));
-    assertStops(w, run, ["#120", "#102", "US2"]);
+    assertStops(w, run, ["#120", "#102", "US2", "Next step: order #7's sub-issues so sub-issue 2 is US2's issue"]);
+  });
+
+  for (const [what, tasks] of [
+    ["a story with no tasks before a later one's", tasksMd(3).replace(/\[US1\]/g, "[US2]").replace(/\[US3\]/g, "[US2]")],
+    ["two task-block labels that do not read", tasksMd(3).replace("## Phase 1: Setup\n", "## Phase 1: Setup\nStory issue: seven\n")],
+  ] as const) {
+    it(`for a tasks.md it refuses (${what}), sending the admin to remove the spec folder and run issue-spec again`, async (t) => {
+      const w = world(t, tasks);
+      const run = await land(w, gitHubState());
+      assertStops(w, run, ["tasks.md is not a story plan", `Next step: remove \`${SPEC}\`, then run \`/planner:issue-spec #7 [<dir>]\` again`]);
+    });
+  }
+
+  it("names no edit to tasks.md in the next step of a sub-issue or a story-plan stop", async (t) => {
+    const runs = [
+      await land(world(t), gitHubState({ subIssues: [issue(101), issue(102), issue(103), issue(104)] })),
+      await land(world(t, tasksMd(3, [101, 101, 101, 102, 103, 103])), gitHubState({ subIssues: [issue(101), issue(120), issue(103)] })),
+      await land(world(t, tasksMd(3).replace(/\[US1\]/g, "[US2]")), gitHubState()),
+    ];
+    for (const run of runs) assert.ok(run.code === 1 && run.stderr.length > 0, run.stderr.join("\n"));
+    for (const line of runs.flatMap((run) => run.stderr)) {
+      const next = line.split("Next step: ")[1];
+      assert.ok(next !== undefined && !next.includes("tasks.md"), line);
+    }
+  });
+});
+
+describe("land.ts's story checks", () => {
+  it("land.ts imports story-plan.ts and defines none of storyPlan, phasesOf, misplacedSubIssues and TasksRefused", () => {
+    const source = readFileSync(join(import.meta.dirname, "..", "plugin", "scripts", "land.ts"), "utf8");
+    assert.match(source, /await import\("\.\.\/lib\/story-plan\.ts"\)/);
+    for (const name of ["storyPlan", "phasesOf", "misplacedSubIssues", "TasksRefused"]) {
+      assert.doesNotMatch(source, new RegExp(`(function|class|const|let|var) ${name}\\b`), `land.ts defines ${name}`);
+    }
   });
 });
 

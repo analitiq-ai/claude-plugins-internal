@@ -32,25 +32,32 @@ export type ArtifactPath = { path: string; artifact: CheckedArtifactName; line: 
 export class PathRefused extends Error {
   readonly span: string;
   readonly why: string;
-  constructor(span: string, why: string, where?: string) {
-    super(`${where === undefined ? "" : `${where}: `}${JSON.stringify(span)} ${why}`);
+  /** `tasks.md:<line>` for a task line's span; null under `"any"`, whose caller names the file. */
+  readonly where: string | null;
+  constructor(span: string, why: string, where: string | null = null) {
+    super(`${where === null ? "" : `${where}: `}${JSON.stringify(span)} ${why}`);
     this.name = "PathRefused";
     this.span = span;
     this.why = why;
+    this.where = where;
   }
 }
 
 export class TouchesRefused extends Error {
+  readonly why: string;
   constructor(why: string) {
     super(`${TOUCHES_FILE}: ${why}`);
     this.name = "TouchesRefused";
+    this.why = why;
   }
 }
 
 export class RulingsRefused extends Error {
+  readonly why: string;
   constructor(file: string, why: string) {
     super(`${file}: ${why}`);
     this.name = "RulingsRefused";
+    this.why = why;
   }
 }
 
@@ -82,7 +89,12 @@ export function artifactPath(span: string, rootFiles: ReadonlySet<string> | "any
 }
 
 const Path = z.string().superRefine((span, ctx) => {
-  if (!isPath(span)) ctx.addIssue({ code: "custom", message: `${JSON.stringify(span)} ${NO_PATH}` });
+  try {
+    artifactPath(span, "any");
+  } catch (error) {
+    if (!(error instanceof PathRefused)) throw error;
+    ctx.addIssue({ code: "custom", message: error.message });
+  }
 });
 
 const NonEmpty = z.string().min(1);

@@ -9,7 +9,9 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from paths import PLUGIN
+import yaml  # Spec Kit's own dependency
+
+from paths import PLUGIN, REPO
 
 DRIVER = PLUGIN / "skills" / "issue-spec" / "scripts"
 sys.path.insert(0, str(DRIVER))
@@ -21,6 +23,8 @@ import rootcause  # noqa: E402
 import settled_design  # noqa: E402
 
 PRESET = drive_workflow.PRESET[0]
+WORKFLOW = drive_workflow.WORKFLOW[0]
+SPECKIT_RANGE = ">=1.1.3,<1.2.0"
 
 
 def setUpModule():
@@ -116,6 +120,118 @@ class PlanTemplate(unittest.TestCase):
 
     def test_the_installed_plan_command_carries_the_presets_research_format(self):
         self.assertTrue(installed_skill_carries("speckit.plan"), "speckit-plan SKILL.md lacks the settled-design preset")
+
+
+def workflow() -> dict:
+    return yaml.safe_load((WORKFLOW / "workflow.yml").read_text())
+
+
+def nested(steps: list) -> list:
+    """Every step of `steps`, each followed by the steps its `then`, `else` or `steps` hold."""
+    return [one for step in steps
+            for one in [step, *nested(step.get("then", []) + step.get("else", []) + step.get("steps", []))]]
+
+
+def top_level(step_id: str) -> dict:
+    [step] = [step for step in workflow()["steps"] if step["id"] == step_id]
+    return step
+
+
+class CheckLoop(unittest.TestCase):
+    """The plan check runs after critique as one do-while loop of planner's own steps (contracts/workflow-steps.md)."""
+
+    def test_the_tasks_command_runs_only_inside_the_check_loop(self):
+        ids = [step["id"] for step in workflow()["steps"]]
+        self.assertEqual(ids[ids.index("to-review-critique") + 1:], ["to-adr-check"])
+        tasks = [step["id"] for step in nested(workflow()["steps"]) if step.get("command") == "speckit.tasks"]
+        self.assertEqual(tasks, ["adr-tasks"])
+        loop = top_level("to-adr-check")["then"][0]
+        self.assertIn("adr-tasks", [step["id"] for step in nested(loop["steps"])])
+
+    def test_the_check_block_holds_the_loop_then_the_rounds_stop(self):
+        block = top_level("to-adr-check")
+        self.assertEqual(block["type"], "if")
+        self.assertEqual(block["condition"], top_level("to-plan")["condition"])
+        loop, out = block["then"]
+        self.assertEqual((loop["id"], loop["type"], loop["max_iterations"]), ("adr-check", "do-while", 100))
+        self.assertEqual(loop["condition"], "{{ steps.adr-report.output.data.again }}")
+        self.assertEqual((out["id"], out["condition"]), ("adr-out-of-rounds", "{{ steps.adr-report.output.data.again }}"))
+        [rounds] = out["then"]
+        self.assertEqual(rounds["id"], "adr-rounds")
+        self.assertIn('adr_check.ts" stop rounds', rounds["run"])
+
+    def test_the_loops_steps_run_in_order_each_continuing_on_error_but_settled_design_clear_and_report(self):
+        steps = top_level("to-adr-check")["then"][0]["steps"]
+        self.assertEqual([step["id"] for step in steps], [
+            "adr-settled-design", "adr-clear", "adr-touches", "adr-tasks-due", "adr-tasks-writing", "adr-stories",
+            "adr-ask", "adr-judging", "adr-deciding", "adr-report"])
+        flat = []
+        for step in steps:
+            flat.extend(step["then"] if step["type"] == "if" else [step])
+        continuing = [step["id"] for step in flat if step.get("continue_on_error")]
+        self.assertEqual(continuing, ["adr-touches", "adr-tasks-due", "adr-tasks", "adr-tasks-written", "adr-stories",
+                                      "adr-ask", "adr-judge", "adr-decide"])
+        writing = steps[4]
+        self.assertEqual(writing["condition"], "{{ steps.adr-tasks-due.output.data.due }}")
+        self.assertEqual([step["id"] for step in writing["then"]], ["adr-tasks", "adr-tasks-written"])
+        self.assertEqual(writing["then"][0]["command"], "speckit.tasks")
+        self.assertEqual(steps[-1]["output_format"], "json")
+
+    def test_the_driver_reports_as_the_checks_every_step_that_fails_the_run_but_settled_design(self):
+        steps = nested(top_level("to-adr-check")["then"][0]["steps"])
+        stopping = [step["id"] for step in steps if step.get("type") != "if" and not step.get("continue_on_error")]
+        [rounds] = top_level("to-adr-check")["then"][1]["then"]
+        self.assertEqual(stopping[0], "adr-settled-design")
+        self.assertEqual(drive_workflow.ADR_STOP_STEPS, (*stopping[1:], rounds["id"]))
+
+    def test_the_workflow_and_the_preset_require_spec_kit_from_1_1_3_below_1_2(self):
+        self.assertEqual(workflow()["requires"]["speckit_version"], SPECKIT_RANGE)
+        self.assertEqual(yaml.safe_load((PRESET / "preset.yml").read_text())["requires"]["speckit_version"], SPECKIT_RANGE)
+
+
+class Touches(unittest.TestCase):
+    """The touches step lists the plan's paths; the plan step and its template know nothing of it (R4)."""
+
+    def test_the_touches_prompt_writes_touches_json_from_the_plan_and_nothing_else(self):
+        text = (WORKFLOW / "adr-touches.md").read_text().casefold()
+        for said in ("plan.md", "touches.json", '{"v": 1, "paths": [', "one literal path per file",
+                     "created, changed or deleted", "no glob", "no brace group", "no trailing `/`", "no `..`",
+                     "write no other file"):
+            with self.subTest(said=said):
+                self.assertIn(said, text)
+
+    def test_the_plan_step_its_command_and_its_template_say_nothing_of_touches_json(self):
+        [plan] = top_level("to-plan")["then"]
+        self.assertNotIn("touches", plan["input"]["args"])
+        self.assertNotIn("touches", (PRESET / "commands" / "speckit.plan.md").read_text())
+        self.assertNotIn("touches", composed_plan().casefold())
+
+
+class Judge(unittest.TestCase):
+    """The judge reads a departure as reviewer's decision reviewer does (R7); the copy is pinned here, not maintained."""
+
+    def test_the_judge_defines_a_departure_in_the_decision_reviewers_words(self):
+        reviewer = (REPO / "reviewer" / "plugin" / "agents" / "decision-reviewer.md").read_text()
+        [definition] = [part for part in reviewer.split("\n\n") if part.startswith("A decision record settles a question")]
+        self.assertIn(definition, (WORKFLOW / "adr-judge.md").read_text())
+
+
+class TasksCommand(unittest.TestCase):
+    """The tasks command names each file a task touches as a path the check can read (R5)."""
+
+    def test_the_preset_appends_to_the_tasks_command(self):
+        provided = yaml.safe_load((PRESET / "preset.yml").read_text())["provides"]["templates"]
+        [tasks] = [one for one in provided if one["name"] == "speckit.tasks"]
+        self.assertEqual((tasks["type"], tasks["file"], tasks["strategy"]), ("command", "commands/speckit.tasks.md", "append"))
+
+    def test_the_tasks_command_asks_for_one_literal_path_per_backtick_span(self):
+        text = (PRESET / "commands" / "speckit.tasks.md").read_text().casefold()
+        for said in ("one literal path", "its own backtick span", "no glob", "no brace group"):
+            with self.subTest(said=said):
+                self.assertIn(said, text)
+
+    def test_the_installed_tasks_command_carries_the_presets_path_rule(self):
+        self.assertTrue(installed_skill_carries("speckit.tasks"), "speckit-tasks SKILL.md lacks the settled-design preset")
 
 
 if __name__ == "__main__":

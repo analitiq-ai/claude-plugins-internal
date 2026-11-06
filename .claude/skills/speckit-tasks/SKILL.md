@@ -1,15 +1,17 @@
 ---
-name: "speckit-tasks"
-description: "Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts."
+name: speckit-tasks
+description: Generate an actionable, dependency-ordered tasks.md for the feature based
+  on available design artifacts.
 argument-hint: "Optional task generation constraints"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: "github-spec-kit"
-  source: "templates/commands/tasks.md"
+  author: github-spec-kit
+  source: preset:settled-design
 user-invocable: true
 disable-model-invocation: false
 ---
 
+# Speckit Tasks Skill
 
 ## User Input
 
@@ -216,3 +218,13 @@ Every task MUST strictly follow this format:
 - [ ] tasks.md generated with all phases, task IDs, and file paths
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with task count, story breakdown, and MVP scope
+
+
+
+## File paths in task lines
+
+> **This section adds to the task format above.**
+
+Name each file a task creates, changes or deletes as one literal path relative to the repository root,
+in its own backtick span: `` `core/src/x.ts` ``, never `` `core/src/{x,y}.ts` `` or `` `core/src/*.ts` ``.
+No glob, no brace group, no folder standing for its files.

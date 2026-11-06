@@ -3,14 +3,14 @@ schema_version: "1.0"
 preset:
   id: "settled-design"
   name: "Settled Design"
-  version: "1.1.0"
+  version: "1.2.0"
   description: "spec.md has a section for the premise answers and one for the root cause (planner's rootcause.py checks that the root cause section is there and labelled); plan.md lists its mechanisms, each citing a research.md decision that has an Existing tools field (checked by planner's settled_design.py)."
   author: "Analitiq"
   repository: "https://github.com/analitiq-ai/claude-plugins-internal"
   license: "Proprietary"
 
 requires:
-  speckit_version: ">=1.0.7"
+  speckit_version: ">=1.1.3,<1.2.0"
 
 provides:
   templates:
@@ -33,4 +33,9 @@ provides:
       name: "speckit.plan"
       file: "commands/speckit.plan.md"
       description: "Research decisions follow the plan template's format"
+      strategy: "append"
+    - type: "command"
+      name: "speckit.tasks"
+      file: "commands/speckit.tasks.md"
+      description: "Each file a task touches is one literal path in its own backtick span"
       strategy: "append"

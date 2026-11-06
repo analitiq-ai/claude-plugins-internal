@@ -1,6 +1,6 @@
 ---
 name: issue-spec
-description: Scope or re-scope a change in a spec folder before it is built, by running the issue-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/planner:issue-spec #<issue>`), a spec folder that needs re-scoping (`/planner:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/planner:issue-spec untracked "<what changes>"`).
+description: Scope or re-scope a change in a spec folder before it is built, by running the issue-spec Spec Kit workflow (premise → specify → grill → plan → critique → tasks and the plan check; a re-scope of a spec starts at grill). For an issue, the workflow first asks whether it is worth a spec at all. Use for a GitHub issue that needs scoping (`/planner:issue-spec #<issue>`), a spec folder that needs re-scoping (`/planner:issue-spec rescope <spec folder> #<issue>`), or a change that has no issue yet (`/planner:issue-spec untracked "<what changes>"`).
 argument-hint: '#<issue> [<dir>] | rescope <spec folder> #<issue> | untracked "<what changes>" [<dir>]'
 ---
 
@@ -51,7 +51,12 @@ Anything else, a folder whose parent is not named `specs` included: tell the use
 `DRIVE` is `scripts/drive_workflow.py` in this skill's base directory. It passes the inputs to
 `specify workflow`, and prints one JSON report: `run_id`, `status`, `step`; on a failed step also `stderr`
 and `open_markers`; paused at `review-critique` also `critique`; completed after `not worth doing` also `close`,
-the close to do and its reason. `specify` takes the directory it runs in as its
+the close to do and its reason. A stop at `adr-clear`, `adr-report` or `adr-rounds` also carries `adr: true`, and, when its lines name a
+step that did not answer or did not finish, `step_errors`: that step's own error, by step id. A resume that
+carried a ruling also carries `ruling_unapplied` when a ruling it carried is not held after it and no round refused
+the rulings: one line per such ruling: show the lines, and
+after a stop carry that ruling again on the next resume beside what the stop's lines say. `specify` takes the
+directory it runs in as its
 project (it must hold `.specify/`; a parent's does not count), so the spec folder lands in its `specs/`. Run every `DRIVE` call from `PROJECT` with
 `run_in_background: true` (headless steps take up to ~10 min each).
 
@@ -78,7 +83,8 @@ project (it must hold `.specify/`; a parent's does not count), so the spec folde
 6. **Critique review.** Read the report's `critique` file and show the user its findings. Apply to
    spec.md/plan.md only the findings the user accepts.
 7. **Resume past critique.** Only when the user approves: `python3 DRIVE resume <run_id> critique_verdict=approve`
-   (or `reject`). Expect `completed`.
+   (or `reject`). Expect `completed`. A report with `adr: true` may come back in its place: handle it by its rule
+   under Stops, then resume, until the report says `completed`.
 8. When the report says `completed`, run `node LAND <ISSUE> <SPEC_PATH> <KIND>` from `CHECKOUT`. `SPEC_PATH` is
    `SPEC_DIR` relative to `CHECKOUT` (`<p>/specs/<feature>` when `PROJECT` is `<p>`); `KIND` is `rescope` on a
    rescope and `new` otherwise. It creates the story issues, labels tasks.md, commits the spec folder and its
@@ -105,8 +111,17 @@ report (`stderr` included) and stop. The exceptions, each resumed with `python3 
   path to clear or make writable, the user does that, not you; resume only once they say it is done. When it
   names `premise_report.py check`, complete the report as it says.
 - `open_markers: true` goes back to step 4 first.
-- `step: settled-design`: settle each `stderr` line with the user as its Next step says; do not fill in a
-  decision for them.
+- `step: settled-design`, or `adr-settled-design` (alone or as the middle of `adr-check:adr-settled-design:<n>`):
+  settle each `stderr` line with the user as its Next step says; do not fill in a decision for them.
+- `adr: true`, the plan check: show the user every `stderr` line and `step_errors`, then act on each line by its
+  outcome. `FAIL` on a departure: the user picks one of the ways its line offers: change `plan.md`, supersede the
+  record (with `/speckit-adrkit-draft` into the spec PR when the line says so, or in the repo that holds the
+  folder), or rule. To rule, write the user's ruling as a JSON list of `{"folder", "record", "path", "reason"}`,
+  the reason in their words, to a new file in the session scratchpad with the Write tool, and resume with
+  `python3 DRIVE resume <run_id> adr_ruling=@<file>`. `FAIL` on a broken record: fix that record, then resume.
+  Any other `FAIL`: do what its Next step says, then resume. `COULD_NOT_RUN`: the user fixes what the line names
+  (a verdict, touches or guard line needs nothing), then resume. `tasks.md` is never edited by hand: a round
+  writes it again whenever the plan or what else it is written from changed.
 
 ## Undo a rejected rescope that created a parent
 
