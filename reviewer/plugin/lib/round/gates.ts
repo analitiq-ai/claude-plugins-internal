@@ -1,7 +1,7 @@
 import type { Gates, Lineage } from "../../core/contracts/gates.ts";
 import type { Hold } from "../../core/contracts/snapshot.ts";
 import type { GitHubClient } from "../../core/github.ts";
-import { recordGates, type Opening, type StateReading } from "../../core/state.ts";
+import { gatesRecorded, recordGates, type Opening, type StateReading } from "../../core/state.ts";
 import { ClaimVerdict, HoldKind } from "../../core/values.ts";
 import { anchoredSection, fileAt, type AnchorSources } from "../check/bare-copy.ts";
 import { succeed, Words, type Budget } from "../check/lineage.ts";
@@ -99,11 +99,11 @@ function carriedLineages(lineages: readonly Lineage[], claims: readonly Claim[],
   return { lineages: carried, inherited };
 }
 
-function wrongRuling({ failing_case, assertions }: Verdict): WrongRuling {
+function wrongRuling({ quote, line }: Claim, { failing_case, assertions }: Verdict): WrongRuling {
   const broken = assertions.find((assertion) => !assertion.confirmed);
   // validateVerdict accepts a WRONG only with both.
   if (failing_case === undefined || broken === undefined) throw new TypeError("a WRONG verdict lacks its failing case or the assertion it breaks");
-  return { failing_case, evidence: broken.evidence };
+  return { words: quote, line, failing_case, evidence: broken.evidence };
 }
 
 /**
@@ -134,7 +134,7 @@ function ruled(
     }
     if (lineage === null) continue;
     byId.set(lineage.id, enterRuling(lineage, ref, read, verdict, at));
-    if (verdict.verdict === WRONG) wrongs.set(lineage.id, wrongRuling(verdict));
+    if (verdict.verdict === WRONG) wrongs.set(lineage.id, wrongRuling(read, verdict));
   }
   return { lineages: [...byId.values()], wrongs };
 }
@@ -146,8 +146,10 @@ const rowOf = (reading: StateReading, id: string): Hold | undefined => reading.s
 /** What a check records: the section carried to its head, and the holds its counts place. */
 type Recording = { gates: Gates; openings: Opening[] };
 
-async function decide({ state, settings, sources }: GatesRecorder, check: CompletedCheck, reading: StateReading): Promise<(at: string) => Recording> {
-  const { repo } = state.source;
+/** Null for a run already recorded; otherwise the recording, given the check's time. */
+async function decide({ state, settings, sources }: GatesRecorder, check: CompletedCheck, reading: StateReading): Promise<((at: string) => Recording) | null> {
+  const { repo, issue, shared } = state.source;
+  if (gatesRecorded(issue, shared, reading, check.run)) return null;
   const section = await checkSection(sources, reading, check.branch, check.head);
   const reset = resetOf(reading);
   const lineageFiles = section.lineages.map(({ file }) => file);
@@ -192,6 +194,7 @@ export async function recordCheck(recorder: GatesRecorder, check: CompletedCheck
   await recorder.state.step(
     (reading) => decide(recorder, check, reading),
     async (reading, recording) => {
+      if (recording === null) return reading;
       const w = await recorder.writer();
       // Core stamps its own clock over every new time; the writer is minted only once there is a write.
       const { gates, openings } = recording(await w.now());

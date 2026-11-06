@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { sessionFolder, type Session } from "../../core/commit-pass.ts";
 import type { Gates } from "../../core/contracts/gates.ts";
 import { makePrivateFolder } from "../../core/files.ts";
-import { GitFailed, runGit } from "../../core/git.ts";
+import { runGit } from "../../core/git.ts";
 import { GitHubRefused, type GitHubClient, type Repository } from "../../core/github.ts";
 import { sectionWithoutAnchor } from "../rules/anchor.ts";
 
@@ -30,11 +30,16 @@ export async function holdsCommit(copy: string, sha: string): Promise<boolean> {
   return code === 0;
 }
 
-/** Takes commit `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone (ADR-0021 d6). */
-export async function fetchFromClone(copy: string, clone: string, sha: string): Promise<void> {
+/**
+ * Takes commit `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone
+ * (ADR-0021 d6). False for a commit the clone lacks.
+ */
+export async function fetchFromClone(copy: string, clone: string, sha: string): Promise<boolean> {
   // git reads a relative path with a colon in it as an ssh host.
   if (!isAbsolute(clone)) throw new TypeError(`the model's clone is not an absolute path: ${JSON.stringify(clone)}`);
+  if (!(await holdsCommit(clone, sha))) return false;
   await runGit(copy, ["fetch", "--quiet", "--no-tags", "--end-of-options", clone, anchorRefspec(sha)]);
+  return true;
 }
 
 /**
@@ -69,25 +74,14 @@ export function fromGitHub(reader: GitHubClient, repo: Repository, fetchRefspecs
   };
 }
 
-/**
- * Where a check looks for the gates' anchor, in this order. `clone` takes the commit into the copy or fails with
- * GitFailed; `github` is true once it took the commit into the copy.
- */
-export type AnchorSources = { copy: string; clone: (sha: string) => Promise<void>; github: (sha: string) => Promise<boolean> };
+/** Where a check looks for the gates' anchor, in this order. `clone` and `github` are true once they took the commit into the copy. */
+export type AnchorSources = { copy: string; clone: (sha: string) => Promise<boolean>; github: (sha: string) => Promise<boolean> };
 
 /**
  * `gates`, once the copy holds its anchor: from the copy, else fetched by its sha from the model's clone, else from
  * GitHub (contracts/gates-snapshot.md §Anchor). When none has it, the section the anchor rule leaves, or AnchorMissing.
  */
 export async function anchoredSection({ copy, clone, github }: AnchorSources, gates: Gates, head: string, reset: string | null): Promise<Gates> {
-  if (await holdsCommit(copy, gates.anchor)) return gates;
-  const cloneFailure = await clone(gates.anchor).then(
-    () => null,
-    (error: unknown) => {
-      if (error instanceof GitFailed) return error;
-      throw error;
-    },
-  );
-  if (cloneFailure === null || (await github(gates.anchor))) return gates;
-  return sectionWithoutAnchor(gates, head, reset, cloneFailure);
+  if ((await holdsCommit(copy, gates.anchor)) || (await clone(gates.anchor)) || (await github(gates.anchor))) return gates;
+  return sectionWithoutAnchor(gates, head, reset);
 }

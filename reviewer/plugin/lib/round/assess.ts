@@ -69,7 +69,7 @@ function assessmentShape(roundRef: string, admissible: readonly AssessorVerdict[
     duplicate_of: z.string().optional().describe("kind duplicate only: the id of the finding of this round it repeats"),
     spec_ref: z.string().describe("the spec decision this touches, 'spec silent', or 'n/a'"),
     mechanism: z.string().trim().min(1).describe("what produces the problem, not where it shows: what a FIX changes"),
-    reason: z.string(),
+    reason: z.string().trim().min(1),
     issue: z.string().regex(ISSUE).optional().describe("DEFER only: the issue the finding moves to, #<n> or <owner>/<repo>#<n>"),
   });
   return z.strictObject({

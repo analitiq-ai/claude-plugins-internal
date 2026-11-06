@@ -6,12 +6,11 @@ export class AnchorMissing extends Error {
   readonly branch: string;
   readonly anchor: string;
 
-  constructor(branch: string, anchor: string, options?: ErrorOptions) {
+  constructor(branch: string, anchor: string) {
     super(
       `the gates anchor ${anchor} of branch ${branch} is in none of the hooks' bare copy, the model's clone and GitHub, ` +
         "so nothing was graded; after an admin's `/codeworks reset` on the story issue, the next check starts the branch's " +
         "lineages and bugs over",
-      options,
     );
     this.name = "AnchorMissing";
     this.branch = branch;
@@ -28,10 +27,9 @@ function timesOf(gates: Gates): string[] {
 
 /**
  * The section a check whose anchor is nowhere goes on with: none of its items, anchored on `head`, once the newest
- * reset is later than every time in it (contracts/gates-snapshot.md §Anchor); before that, AnchorMissing, `why` the
- * model's clone did not give the anchor.
+ * reset is later than every time in it (contracts/gates-snapshot.md §Anchor); before that, AnchorMissing.
  */
-export function sectionWithoutAnchor(gates: Gates, head: string, reset: string | null, why: Error): Gates {
+export function sectionWithoutAnchor(gates: Gates, head: string, reset: string | null): Gates {
   if (reset !== null && isAfter(reset, newest(timesOf(gates)))) return { branch: gates.branch, anchor: head, lineages: [], bugs: [] };
-  throw new AnchorMissing(gates.branch, gates.anchor, { cause: why });
+  throw new AnchorMissing(gates.branch, gates.anchor);
 }

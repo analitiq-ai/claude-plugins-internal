@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
 import { chainEntryKey, Gates } from "./contracts/gates.ts";
-import { byFileName, EVENT_KIND, eventFile, eventText, inApplyOrder, LedgerEvent } from "./contracts/ledger.ts";
+import { byFileName, EVENT_KIND, eventFile, eventText, gatesFile, inApplyOrder, LedgerEvent } from "./contracts/ledger.ts";
 import { GitSha, NameSegment, Time } from "./contracts/scalars.ts";
 import { HoldRequest, type Hold, type Round, type RoundId, type Ruling, type Snapshot } from "./contracts/snapshot.ts";
 import {
@@ -699,6 +699,12 @@ function writable(issue: number, reading: StateReading): Folded {
   assertIssueNumber(issue);
   if (reading.folded === undefined) throw new TypeError("the reading carries no fold: a write takes readState's or a write's reading");
   return reading.folded;
+}
+
+/** Whether the reading's fold holds the gates check `ref` recorded, so a retry of that check records nothing (FR-016). */
+export function gatesRecorded(issue: number, shared: Shared, reading: StateReading, ref: string): boolean {
+  const { commits, texts, roles } = writable(issue, reading);
+  return foldStory(commits, texts, roles, shared.reviewer_app_login).eventBlobs.has(gatesFile(ref));
 }
 
 function isOpen(reading: StateReading, id: string): boolean {

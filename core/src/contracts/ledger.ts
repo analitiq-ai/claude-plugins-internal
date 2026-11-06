@@ -74,6 +74,11 @@ function timeSegment(time: string): string {
   return time.replaceAll(/[-:]/g, "");
 }
 
+/** The file of the gates event check `ref` records. */
+export function gatesFile(ref: string): string {
+  return `gates.${ref}.json`;
+}
+
 /** The event's file name in its story's directory: it keys the event, so a retry of one event is one file. */
 export function eventFile(event: LedgerEvent): string {
   switch (event.kind) {
@@ -92,7 +97,7 @@ export function eventFile(event: LedgerEvent): string {
       return since === null ? `release.${id}.json` : `release.${id}.${timeSegment(since)}.json`;
     }
     case EVENT_KIND.gates:
-      return `gates.${event.ref}.json`;
+      return gatesFile(event.ref);
   }
 }
 

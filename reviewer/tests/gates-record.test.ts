@@ -8,7 +8,6 @@ import { event, eventCommit, fakeLedger, fileOf, storyDir, storyOf, type FakeLed
 import type { FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import type { Bug, Lineage } from "../plugin/core/contracts/gates.ts";
 import type { Hold, Snapshot } from "../plugin/core/contracts/snapshot.ts";
-import { GitFailed } from "../plugin/core/git.ts";
 import { readState, type StateReading } from "../plugin/core/state.ts";
 import { HoldKind, HoldState, RoundStage } from "../plugin/core/values.ts";
 import type { AnchorSources } from "../plugin/lib/check/bare-copy.ts";
@@ -76,9 +75,7 @@ function repo(t: TestContext): Repo {
 function sources(copy: string): AnchorSources {
   return {
     copy,
-    clone: async (anchor) => {
-      throw new GitFailed(["fetch", anchor], 128, `fatal: couldn't find remote ref ${anchor}`);
-    },
+    clone: async () => false,
     github: async () => false,
   };
 }

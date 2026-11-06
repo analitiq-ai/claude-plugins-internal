@@ -40,8 +40,10 @@ export class RunState {
     write: (reading: StateReading, decision: D) => Promise<StateReading>,
   ): Promise<StateReading> {
     const { reader, repo, issue, attempts } = this.#source;
+    // An async wrapper turns a decide that throws as it is called into a rejection orCouldNotRun converts.
+    const decided = async (at: StateReading): Promise<D> => decide(at);
     let reading = await this.reading();
-    let decision = await decide(reading);
+    let decision = await orCouldNotRun(decided(reading));
     for (let attempt = 1; ; attempt += 1) {
       try {
         const advanced = await orCouldNotRun(write(reading, decision));
@@ -53,7 +55,7 @@ export class RunState {
         if (await orCouldNotRun(storyTouched(reader, repo, issue, reading.head, error.head))) {
           this.#reading = this.#read();
           reading = await this.#reading;
-          decision = await decide(reading);
+          decision = await orCouldNotRun(decided(reading));
         } else {
           reading = { ...reading, head: error.head };
           this.#reading = Promise.resolve(reading);

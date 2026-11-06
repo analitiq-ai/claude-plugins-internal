@@ -9,8 +9,8 @@ const { WRONG } = ClaimVerdict.schema.enum;
 const { claim, shim } = HoldKind.schema.enum;
 const { OPEN, RELEASED } = HoldState.schema.enum;
 
-/** What the claim check said of the newest WRONG ruling: the hold's question carries it (ADR-0013 d4). */
-export type WrongRuling = { failing_case: string; evidence: string };
+/** A check's WRONG ruling on one claim, which the hold's question carries whole (ADR-0013 d4). */
+export type WrongRuling = { words: string; line: number; failing_case: string; evidence: string };
 
 function wrongs(lineage: Lineage, after: string | null): Lineage["chain"] {
   return lineage.chain.filter((entry) => entry.ruling === WRONG && isAfter(entry.at, after));
@@ -54,12 +54,10 @@ export function claimOpening(
 ): Opening | null {
   const count = lineageCount(lineage, reset);
   if (!reaches(row, count, settings.claim_hold_at, (released) => wrongs(lineage, released).length > 0)) return null;
-  // Reaching takes a WRONG ruling, so the lineage has one.
-  const newest = wrongs(lineage, null).reduce((found, entry) => (isAfter(entry.at, found.at) ? entry : found));
   return {
     id: `${claim}-${lineage.id}`,
     question: [
-      `The claim "${newest.words}" (${lineage.file}:${newest.line}) was ruled ${WRONG} by ${count} checks since the count began.`,
+      `The claim "${last.words}" (${lineage.file}:${last.line}) was ruled ${WRONG} by ${count} checks since the count began.`,
       `Failing case: ${last.failing_case}`,
       `Evidence: ${last.evidence}`,
       "To decide: does the claim or the code it describes change?",
