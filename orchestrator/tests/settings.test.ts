@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { GitHubUnanswered } from "../plugin/core/github.ts";
 import { SettingsError } from "../plugin/core/settings.ts";
-import { bootstrapAppIds, defaultBranch, orchestratorOnGitHub, settleSettings } from "../plugin/lib/settings.ts";
+import { bootstrapAppIds, orchestratorOnGitHub, settleSettings } from "../plugin/lib/settings.ts";
 import {
   APP_ID,
   BOARD,
@@ -105,19 +105,6 @@ describe("settleSettings", () => {
   it("lets a GitHub no-answer through, never reading it as no file", async () => {
     const client = fakeGitHub({ rest: { "GET /repos/acme/widgets/contents/codeworks.toml?ref=main": new GitHubUnanswered("dummy: no answer") } });
     await assert.rejects(settleSettings(client, REPO, "main", IDS), GitHubUnanswered);
-  });
-});
-
-describe("defaultBranch", () => {
-  // Root ADR-0002 d4: work with no PR, a claim's among it, reads the file from the default branch.
-  it("is the repository's default branch as GitHub names it", async () => {
-    const client = fakeGitHub({ rest: { "GET /repos/acme/widgets": { default_branch: "trunk" } } });
-    assert.equal(await defaultBranch(client, REPO), "trunk");
-  });
-
-  it("refuses an answer without one", async () => {
-    const client = fakeGitHub({ rest: { "GET /repos/acme/widgets": {} } });
-    await assert.rejects(defaultBranch(client, REPO), /not the shape asked for/);
   });
 });
 

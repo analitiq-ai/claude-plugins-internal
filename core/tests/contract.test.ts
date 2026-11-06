@@ -15,6 +15,7 @@ import {
   loadValidators,
   status,
   trigger,
+  validatorLogins,
   ValidatorLoadError,
   type Module,
   type Validators,
@@ -155,6 +156,26 @@ function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | stri
 
 beforeEach(() => {
   reset();
+});
+
+describe("validatorLogins", () => {
+  it("is every listed package's logins, the set loadValidators gives", async () => {
+    const { logins } = await validatorLogins({ ...SHARED, validators: ["fixture", "second"] }, DIR);
+    assert.deepEqual(logins, new Set(["fixture-bot[bot]", "second-bot[bot]"]));
+    assert.deepEqual((await load(["fixture", "second"])).logins, logins);
+  });
+
+  it("does not call the listed package's open", async () => {
+    await validatorLogins({ ...SHARED, validators: ["fixture"] }, DIR);
+    assert.equal(script.opened.length, 0);
+  });
+
+  it("refuses a package whose logins is not a list, naming it and the export", async () => {
+    await assert.rejects(
+      validatorLogins({ ...SHARED, validators: ["bad-logins"] }, DIR),
+      (error: unknown) => error instanceof ValidatorLoadError && error.entry === "bad-logins" && /logins/.test(error.why),
+    );
+  });
 });
 
 describe("loading the packages [shared] validators lists", () => {

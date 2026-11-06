@@ -122,17 +122,17 @@ function without(path: string): Listed[] {
 
 describe("governingDiff", () => {
   it("names nothing when the governing objects are the same", () => {
-    assert.deepEqual(governingDiff(listing(...BASE), listing(...BASE), SPEC), []);
+    assert.deepEqual(governingDiff(listing(...BASE), listing(...BASE), [SPEC]), []);
   });
 
   for (const path of [`${SPEC}/spec.md`, "docs/adr", "plugin/docs/adr", ".specify/memory"]) {
     it(`names ${path} when its object differs`, () => {
-      assert.deepEqual(governingDiff(listing(...BASE), listing(...changed(path)), SPEC), [path]);
+      assert.deepEqual(governingDiff(listing(...BASE), listing(...changed(path)), [SPEC]), [path]);
     });
 
     it(`names ${path} when it is at only one of the two`, () => {
-      assert.deepEqual(governingDiff(listing(...BASE), listing(...without(path)), SPEC), [path]);
-      assert.deepEqual(governingDiff(listing(...without(path)), listing(...BASE), SPEC), [path]);
+      assert.deepEqual(governingDiff(listing(...BASE), listing(...without(path)), [SPEC]), [path]);
+      assert.deepEqual(governingDiff(listing(...without(path)), listing(...BASE), [SPEC]), [path]);
     });
   }
 
@@ -144,7 +144,7 @@ describe("governingDiff", () => {
       path === `${SPEC}/spec.md` ? sha(98) : object,
       path,
     ]);
-    assert.deepEqual(governingDiff(listing(...atBase), listing(...atRound), SPEC), [
+    assert.deepEqual(governingDiff(listing(...atBase), listing(...atRound), [SPEC]), [
       ".specify/memory",
       "docs/adr",
       `${SPEC}/spec.md`,
@@ -164,19 +164,26 @@ describe("governingDiff", () => {
     "README.md",
   ]) {
     it(`names nothing for ${path}, changed or one-sided`, () => {
-      assert.deepEqual(governingDiff(listing(...BASE), listing(...changed(path)), SPEC), []);
-      assert.deepEqual(governingDiff(listing(...BASE), listing(...without(path)), SPEC), []);
+      assert.deepEqual(governingDiff(listing(...BASE), listing(...changed(path)), [SPEC]), []);
+      assert.deepEqual(governingDiff(listing(...BASE), listing(...without(path)), [SPEC]), []);
     });
   }
 
+  it("names the spec.md of every folder listed, and of none when none is", () => {
+    const other = "specs/212-widgets-v2";
+    const atRound = [...changed(`${SPEC}/spec.md`), ["blob", sha(97), `${other}/spec.md`] as Listed];
+    assert.deepEqual(governingDiff(listing(...BASE), listing(...atRound), [SPEC, other]), [`${other}/spec.md`, `${SPEC}/spec.md`]);
+    assert.deepEqual(governingDiff(listing(...BASE), listing(...atRound), []), []);
+  });
+
   it("refuses a spec folder that is not a plain path inside the tree", () => {
     for (const folder of ["", `${SPEC}/`, `/${SPEC}`, "specs//212-widgets", "specs/../212-widgets", "./specs"]) {
-      assert.throws(() => governingDiff(listing(...BASE), listing(...BASE), folder), TypeError, JSON.stringify(folder));
+      assert.throws(() => governingDiff(listing(...BASE), listing(...BASE), [SPEC, folder]), TypeError, JSON.stringify(folder));
     }
   });
 
   it("refuses a listing record ls-tree does not document", () => {
-    assert.throws(() => governingDiff("not a record\0", listing(...BASE), SPEC), /ls-tree/);
+    assert.throws(() => governingDiff("not a record\0", listing(...BASE), [SPEC]), /ls-tree/);
   });
 });
 

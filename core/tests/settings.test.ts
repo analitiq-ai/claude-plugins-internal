@@ -182,6 +182,25 @@ describe("readSettings", () => {
     });
   }
 
+  it("reads required_checks as the check names it lists, in their order, and its absence as no list", async () => {
+    const { shared } = await settingsOf(sharedWith({ required_checks: '["ci", "lint"]' }));
+    assert.deepEqual(shared.required_checks, ["ci", "lint"]);
+    assert.equal(Object.hasOwn((await settingsOf(EXAMPLE)).shared, "required_checks"), false);
+  });
+
+  for (const [what, value, named] of [
+    ["empty", "[]", []],
+    ["with a name written twice", '["ci", "lint", "ci"]', [/"ci"/]],
+    ["holding an empty name", '["ci", ""]', []],
+    ["not a list", '"ci"', []],
+  ] as const) {
+    it(`refuses required_checks ${what}, on [shared], naming required_checks`, async () => {
+      // A [shared] that does not know the key refuses it too, naming it, so a refusal alone would grade nothing.
+      assert.deepEqual((await settingsOf(sharedWith({ required_checks: '["ci"]' }))).shared.required_checks, ["ci"]);
+      await assert.rejects(settingsOf(sharedWith({ required_checks: value })), sharedSectionError(word("required_checks"), ...named));
+    });
+  }
+
   it("reads an empty adr_folders as no folder", async () => {
     assert.deepEqual((await settingsOf(sharedWith({ adr_folders: "[]" }))).shared.adr_folders, []);
   });

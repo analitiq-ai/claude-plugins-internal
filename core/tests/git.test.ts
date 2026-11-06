@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type AddressInfo, type Server } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { after, before, describe, it } from "node:test";
 
 import { writeGhToken } from "../src/gh-config.ts";
-import { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } from "../src/git.ts";
+import {
+  fetchWithGhCredential,
+  GhCredentialRefused,
+  GitFailed,
+  mainCheckout,
+  originRepository,
+  pushWithGhCredential,
+  runGit,
+  trackingRefspec,
+} from "../src/git.ts";
+import { RemoteRefused } from "../src/github.ts";
 
 const COMMITTER = ["-c", "user.name=Dummy Author", "-c", "user.email=dummy@example.invalid"];
 
@@ -59,6 +69,46 @@ before(async () => {
 after(() => {
   for (const name of Object.keys(savedEnv) as (keyof typeof savedEnv)[]) restoreEnv(name);
   rmSync(scratch, { recursive: true, force: true });
+});
+
+describe("originRepository", () => {
+  async function withOrigin(url: string | null): Promise<string> {
+    const checkout = mkdtempSync(join(scratch, "origin-"));
+    await runGit(checkout, ["init", "-q"]);
+    if (url !== null) await runGit(checkout, ["remote", "add", "origin", url]);
+    return checkout;
+  }
+
+  it("is the owner/name of the GitHub repository the checkout's origin names", async () => {
+    assert.equal(await originRepository(await withOrigin("https://github.com/acme/widgets.git")), "acme/widgets");
+  });
+
+  it("refuses a checkout with no origin, naming it", async () => {
+    await assert.rejects(originRepository(await withOrigin(null)), (error: unknown) => error instanceof GitFailed && /origin/.test(error.message));
+  });
+
+  it("refuses an origin that is not a github.com repository", async () => {
+    await assert.rejects(originRepository(await withOrigin("https://example.invalid/acme/widgets.git")), RemoteRefused);
+  });
+});
+
+describe("mainCheckout", () => {
+  it("is the main checkout, asked from it or from any of its worktrees", async () => {
+    const main = realpathSync(mkdtempSync(join(scratch, "main-")));
+    await runGit(main, ["init", "-q", "-b", "main"]);
+    await runGit(main, [...COMMITTER, "commit", "-q", "--allow-empty", "-m", "base"]);
+    const worktree = join(dirname(main), `${basename(main)}.worktrees`, "245-us1-story");
+    await runGit(main, ["worktree", "add", "-q", "-b", "245-us1-story", worktree]);
+    mkdirSync(join(worktree, "deep"));
+    for (const at of [main, worktree, join(worktree, "deep")]) assert.equal(await mainCheckout(at), main, at);
+  });
+});
+
+describe("trackingRefspec", () => {
+  it("fetches the branch into origin's remote-tracking ref, forced", () => {
+    assert.equal(trackingRefspec("main"), "+refs/heads/main:refs/remotes/origin/main");
+    assert.equal(trackingRefspec("245-us1-retry"), "+refs/heads/245-us1-retry:refs/remotes/origin/245-us1-retry");
+  });
 });
 
 describe("runGit", () => {

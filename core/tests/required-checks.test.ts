@@ -3,11 +3,11 @@ import { before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { Finding } from "../src/contracts/finding.ts";
-import { GitHubRefused } from "../src/github.ts";
+import { GitHubRefused, GitHubUnanswered } from "../src/github.ts";
 import type { CouldNotRun, StatusAnswer } from "../src/outcomes.ts";
 import type { Shared } from "../src/settings.ts";
 import { loadValidators, type Validators } from "../src/validation/contract.ts";
-import { requiredChecks } from "../src/validation/required-checks.ts";
+import { internalReviewAt, requiredChecks } from "../src/validation/required-checks.ts";
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "./support/fake-github.ts";
 
 const DIR = fileURLToPath(new URL("./fixtures/validators/", import.meta.url));
@@ -30,6 +30,8 @@ const SHARED: Shared = {
 type App = { id: number; slug: string };
 const ACTIONS: App = { id: 15368, slug: "github-actions" };
 const IMPOSTOR: App = { id: 999, slug: "impostor" };
+// An App's login is its slug and `[bot]`, so this is SHARED.orchestrator_app_login's App.
+const ORCHESTRATOR: App = { id: 2201, slug: "codeworks-orchestrator" };
 
 type RequiredCheck = { context: string; integration_id?: number };
 
@@ -93,9 +95,12 @@ before(async () => {
   validators = await loadValidators(SHARED, DIR, { reader: fakeGitHub({}), writer: fakeGitHub({}), plugin: "reviewer" });
 });
 
-async function answers(recorded: Recorded): Promise<{ status: StatusAnswer; findings: Finding[] | CouldNotRun; client: FakeGitHub }> {
+async function answers(
+  recorded: Recorded,
+  shared: Shared = SHARED,
+): Promise<{ status: StatusAnswer; findings: Finding[] | CouldNotRun; client: FakeGitHub }> {
   const client = reader(recorded);
-  const checks = requiredChecks(SHARED, client, validators);
+  const checks = requiredChecks(shared, client, validators);
   return { status: await checks.status(REPO, PR, HEAD), findings: await checks.findings(REPO, PR, HEAD), client };
 }
 
@@ -166,6 +171,35 @@ describe("the required checks come from the rules of the PR's base branch", () =
   }
 });
 
+describe("with [shared] required_checks set, the checks it lists are the required checks, and no rules are read", () => {
+  it("grades each listed check at the head, from any App, and makes no rules request", async () => {
+    const shared = { ...SHARED, required_checks: ["ci", "lint"] };
+    const { status, findings, client } = await answers(
+      { rules: [requiring({ context: "other" })], runs: { ci: [run("ci", "failure", { app: IMPOSTOR })], lint: [run("lint", "failure")] } },
+      shared,
+    );
+    assert.equal(status.outcome, "FAIL");
+    assert.ok(Array.isArray(findings));
+    assert.deepEqual(findings.map((finding) => finding.key), ["required-check:ci", "required-check:lint"]);
+    assert.deepEqual(readPaths(client), new Set([runsPath("ci"), runsPath("lint"), STATUSES_PATH]));
+  });
+
+  it("leaves out a listed internal-review and a loaded module's <module>-review, reading neither", async () => {
+    const shared = { ...SHARED, required_checks: ["internal-review", "fixture-review", "ci"] };
+    const { status, client } = await answers({ rules: [], runs: { ci: [run("ci", "success")] } }, shared);
+    assert.deepEqual(status, { outcome: "PASS", reason: null });
+    assert.deepEqual(readPaths(client), new Set([runsPath("ci"), STATUSES_PATH]));
+  });
+
+  it("with only internal-review and fixture-review listed, status and findings are COULD_NOT_RUN naming required_checks, and nothing is read", async () => {
+    const shared = { ...SHARED, required_checks: ["internal-review", "fixture-review"] };
+    const { status, findings, client } = await answers({ rules: [] }, shared);
+    assertCouldNotRun(status, /required_checks/);
+    assertCouldNotRun(findings, /required_checks/);
+    assert.deepEqual(client.calls, []);
+  });
+});
+
 describe("a required check is matched at the head asked", () => {
   it("among check runs by its exact name", async () => {
     const { status } = await answers({
@@ -232,7 +266,7 @@ describe("a failed required check is one finding naming the check and its conclu
     assert.deepEqual({ ...finding, text: undefined }, {
       source: "required-checks",
       key: "required-check:ci",
-      author: "github-actions",
+      author: "github-actions[bot]",
       file: null,
       line: null,
       text: undefined,
@@ -395,6 +429,93 @@ describe("what is not a check outcome propagates", () => {
       const checks = requiredChecks(SHARED, client, validators);
       await assert.rejects(checks.status(repo, pr, head), TypeError);
       await assert.rejects(checks.findings(repo, pr, head), TypeError);
+      assert.deepEqual(client.calls, []);
+    });
+  }
+});
+
+describe("internalReviewAt: true only when the newest internal-review check run at the head by appLogin's App concluded success", () => {
+  const INTERNAL_REVIEW = "internal-review";
+
+  // The internal-review check runs at HEAD are the fake's one route, so any other read throws.
+  function attested(runs: ReturnType<typeof run>[], appLogin = SHARED.orchestrator_app_login): Promise<boolean> {
+    const client = fakeGitHub({ rest: { [`GET ${runsPath(INTERNAL_REVIEW)}`]: { total_count: runs.length, check_runs: runs } } });
+    return internalReviewAt(client, REPO, HEAD, appLogin);
+  }
+
+  it("a success by appLogin's App is true", async () => {
+    assert.equal(await attested([run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR })]), true);
+  });
+
+  // run() numbers each run above the one before it, so the later run is the newer.
+  it("the newest of appLogin's App's runs decides, wherever GitHub lists it", async () => {
+    const failed = run(INTERNAL_REVIEW, "failure", { app: ORCHESTRATOR });
+    const passed = run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR });
+    assert.equal(await attested([failed, passed]), true);
+    assert.equal(await attested([passed, failed]), true);
+    const failedAgain = run(INTERNAL_REVIEW, "failure", { app: ORCHESTRATOR });
+    assert.equal(await attested([passed, failedAgain]), false);
+    assert.equal(await attested([failedAgain, passed]), false);
+  });
+
+  for (const conclusion of ["action_required", "cancelled", "failure", "neutral", "skipped", "stale", "timed_out"]) {
+    it(`a run by appLogin's App concluded ${conclusion} is false`, async () => {
+      assert.equal(await attested([run(INTERNAL_REVIEW, conclusion, { app: ORCHESTRATOR })]), false);
+    });
+  }
+
+  it("a success by another App does not count, nor one whose App is gone", async () => {
+    assert.equal(await attested([run(INTERNAL_REVIEW, "success", { app: IMPOSTOR })]), false);
+    assert.equal(await attested([run(INTERNAL_REVIEW, "success", { app: null })]), false);
+    assert.equal(await attested([run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR })], SHARED.reviewer_app_login), false);
+    const own = run(INTERNAL_REVIEW, "failure", { app: ORCHESTRATOR });
+    assert.equal(await attested([own, run(INTERNAL_REVIEW, "success", { app: IMPOSTOR })]), false);
+  });
+
+  it("a newer run by another App, or by one whose App is gone, leaves appLogin's App's success standing", async () => {
+    const passed = run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR });
+    for (const newer of [
+      run(INTERNAL_REVIEW, "failure", { app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, "success", { app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, null, { status: "in_progress", app: IMPOSTOR }),
+      run(INTERNAL_REVIEW, "failure", { app: null }),
+    ]) {
+      assert.equal(await attested([passed, newer]), true, JSON.stringify(newer));
+      assert.equal(await attested([newer, passed]), true, JSON.stringify(newer));
+    }
+  });
+
+  it("no run is false", async () => {
+    assert.equal(await attested([]), false);
+  });
+
+  for (const status of ["queued", "in_progress"]) {
+    it(`a run by appLogin's App still ${status} is false, even after an older success`, async () => {
+      assert.equal(await attested([run(INTERNAL_REVIEW, null, { status, app: ORCHESTRATOR })]), false);
+      const passed = run(INTERNAL_REVIEW, "success", { app: ORCHESTRATOR });
+      assert.equal(await attested([passed, run(INTERNAL_REVIEW, null, { status, app: ORCHESTRATOR })]), false);
+    });
+  }
+
+  const noAnswers: [typeof GitHubUnanswered | typeof GitHubRefused, Error][] = [
+    [GitHubUnanswered, new GitHubUnanswered(`GET ${runsPath(INTERNAL_REVIEW)}: 502 Bad Gateway`)],
+    [GitHubRefused, new GitHubRefused(403, `GET ${runsPath(INTERNAL_REVIEW)}: 403 Resource not accessible by integration`)],
+  ];
+  for (const [thrown, answer] of noAnswers) {
+    it(`GitHub's ${thrown.name} throws, never false`, async () => {
+      const client = fakeGitHub({ rest: { [`GET ${runsPath(INTERNAL_REVIEW)}`]: answer } });
+      await assert.rejects(internalReviewAt(client, REPO, HEAD, SHARED.orchestrator_app_login), thrown);
+    });
+  }
+
+  const asks: [string, string, string][] = [
+    ["a head that is no commit sha", REPO, "../../pulls"],
+    ["a repository that is no owner/name", "widgets", HEAD],
+  ];
+  for (const [what, repo, head] of asks) {
+    it(`${what} throws TypeError before any read`, async () => {
+      const client = fakeGitHub({});
+      await assert.rejects(internalReviewAt(client, repo, head, SHARED.orchestrator_app_login), TypeError);
       assert.deepEqual(client.calls, []);
     });
   }
