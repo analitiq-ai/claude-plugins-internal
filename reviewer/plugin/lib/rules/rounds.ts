@@ -25,7 +25,17 @@ function isFixing(verdict: AssessorVerdict): verdict is FixingVerdict {
   return FIXING.includes(verdict);
 }
 
-export type AssessedFinding = { id: string; verdict: Ruling["ruling"]; reason: string };
+/** What the assessor finds a finding to be. */
+export const FINDING_KINDS = ["defect", "fix_induced", "class_sibling", "duplicate", "spec_gap", "bikeshed", "gold_plating", "not_real"] as const;
+
+export type AssessedFinding = {
+  id: string;
+  verdict: Ruling["ruling"];
+  reason: string;
+  kind: (typeof FINDING_KINDS)[number];
+  spec_ref: string;
+  mechanism: string;
+};
 
 /** The assessor's answer, as far as the round's verdict and question read it. */
 export type Assessment = {
@@ -74,7 +84,8 @@ export function roundVerdict(assessment: Assessment, departures: ReadonlySet<str
   const why = escalations(assessment, departures, deadlocked);
   if (why.length > 0) return { verdict: ESCALATE, question: questionOf("escalated", why, assessment.user_decision) };
   if (assessment.round_verdict === RESHAPE_SPEC) {
-    return { verdict: RESCOPE, question: questionOf("rescoped", [assessment.rationale], assessment.user_decision) };
+    const gaps = assessment.findings.filter(({ kind }) => kind === "spec_gap").map(({ mechanism, spec_ref }) => `spec gap: ${mechanism} (${spec_ref})`);
+    return { verdict: RESCOPE, question: questionOf("rescoped", [assessment.rationale, ...gaps], assessment.user_decision) };
   }
   if (!assessment.findings.some(({ verdict }) => verdict === FIX)) return { verdict: CONVERGED_PUSHBACK, question: null };
   if (!isFixing(assessment.round_verdict)) {
