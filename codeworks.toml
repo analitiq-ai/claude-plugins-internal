@@ -31,3 +31,4 @@ claim_hold_at = 3
 shim_deep_at = 3
 shim_hold_at = 4
 state_write_attempts = 3
+char_diff_budget = 50000000

@@ -5,6 +5,7 @@
     "test": "tsc -p . && node --test 'tests/**/*.test.ts'"
   },
   "devDependencies": {
+    "@types/diff-match-patch": "1.0.36",
     "@types/node": "22.20.5",
     "typescript": "7.0.2"
   }
