@@ -85,16 +85,14 @@ describe("fromGitHub", () => {
     assert.deepEqual(fetched, [[`${ABSENT}:refs/anchors/${ABSENT}`]]);
   });
 
-  for (const status of [404, 422]) {
-    it(`answers no, fetching nothing, when GitHub answers ${status}`, async () => {
-      const fetched: string[][] = [];
-      const reader = fakeGitHub({ rest: { [path]: new GitHubRefused(status, "No commit found") } });
-      assert.equal(await fromGitHub(reader, REPO, async (refspecs) => void fetched.push([...refspecs]))(ABSENT), false);
-      assert.deepEqual(fetched, []);
-    });
-  }
+  it("answers no, fetching nothing, when GitHub answers 422, as it does for a sha no commit of the repository has", async () => {
+    const fetched: string[][] = [];
+    const reader = fakeGitHub({ rest: { [path]: new GitHubRefused(422, `No commit found for SHA: ${ABSENT}`) } });
+    assert.equal(await fromGitHub(reader, REPO, async (refspecs) => void fetched.push([...refspecs]))(ABSENT), false);
+    assert.deepEqual(fetched, []);
+  });
 
-  for (const failure of [new GitHubRefused(403, "Forbidden"), new GitHubUnanswered("timed out")]) {
+  for (const failure of [new GitHubRefused(404, "Not Found"), new GitHubRefused(403, "Forbidden"), new GitHubUnanswered("timed out")]) {
     it(`throws ${failure.name} ${failure.message}: no answer is not an absent commit`, async () => {
       const reader = fakeGitHub({ rest: { [path]: failure } });
       await assert.rejects(fromGitHub(reader, REPO, async () => undefined)(ABSENT), failure);
