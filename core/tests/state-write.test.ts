@@ -373,6 +373,15 @@ describe("writeState", () => {
     await assert.rejects(writeState(reader({}, ledger), out, REPO, ISSUE, SHARED, reading, next, []), refusal(new RegExp(file)));
     assert.deepEqual(commitsAsked(out), []);
   });
+
+  it("refuses a ruling on a key not among its round's findings in the fold, committing nothing", async () => {
+    const ledger = ledgerOf(state);
+    const reading = await readingOf(ledger);
+    const out = writer(ledger);
+    const next = { ...state, rulings: [pushbackRuling("PRRC_9", 1)] };
+    await assert.rejects(writeState(reader({}, ledger), out, REPO, ISSUE, SHARED, reading, next, []), refusal(/PRRC_9 is not a finding/));
+    assert.deepEqual(commitsAsked(out), []);
+  });
 });
 
 describe("checkTransition", () => {

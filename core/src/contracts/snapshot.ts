@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FindingRuling, HoldKind, HoldState, RootCause, RoundResult, RoundStage, RoundVerdict } from "../values.ts";
 import { Gates } from "./gates.ts";
-import { setExactlyWhen } from "./refinements.ts";
+import { setExactlyWhen, uniqueBy } from "./refinements.ts";
 import { GitSha, NameSegment, Time } from "./scalars.ts";
 
 // The pair that names a round, so a pushback names its round by the same fields the round carries.
@@ -27,18 +27,11 @@ export const Round = z
     verdict: RoundVerdict.schema.nullable(),
     root_cause: RootCause.schema.nullable(),
     at: Time,
-    findings: z.array(RoundFinding),
+    findings: z.array(RoundFinding).superRefine(uniqueBy((finding) => finding.key, "key")),
   })
   .superRefine((round, ctx) => {
     const dirty = RoundResult.schema.enum.DIRTY;
     setExactlyWhen(ctx, "verdict", round.verdict, round.result === dirty, `result is ${dirty}`);
-    const keys = new Set<string>();
-    round.findings.forEach((finding, i) => {
-      if (keys.has(finding.key)) {
-        ctx.addIssue({ code: "custom", path: ["findings", i, "key"], message: `${finding.key} is already a finding of this round` });
-      }
-      keys.add(finding.key);
-    });
     const listed = round.findings.length > 0;
     if (listed !== (round.result === dirty)) {
       ctx.addIssue({ code: "custom", path: ["findings"], message: `findings is non-empty exactly when result is ${dirty}` });
@@ -133,7 +126,8 @@ export const Snapshot = z
   .strictObject({
     v: z.literal(1),
     rounds: z.array(Round),
-    holds: z.array(Hold),
+    // One row per id: placing a released hold again reopens its own row (reviewer ADR-0013 d1).
+    holds: z.array(Hold).superRefine(uniqueBy((hold) => hold.id, "id")),
     pushbacks: z.array(Pushback),
     rulings: z.array(Ruling),
     gates: Gates.nullable(),
@@ -148,14 +142,6 @@ export const Snapshot = z
         return;
       }
       rounds.set(name, new Set(round.findings.map((finding) => finding.key)));
-    });
-    // One row per id: placing a released hold again reopens its own row (reviewer ADR-0013 d1).
-    const holds = new Set<string>();
-    snapshot.holds.forEach((hold, i) => {
-      if (holds.has(hold.id)) {
-        ctx.addIssue({ code: "custom", path: ["holds", i, "id"], message: `hold ${hold.id} already has a row` });
-      }
-      holds.add(hold.id);
     });
     // A round not in rounds has no findings to name, so the item is refused once, at its round.
     const namesFinding = (path: Array<string | number>, { key, round }: Pushback): void => {
