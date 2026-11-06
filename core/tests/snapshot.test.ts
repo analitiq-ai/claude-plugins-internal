@@ -14,6 +14,25 @@ function round(fields: Fields = {}): Fields {
   return { stage: "INTERNAL", n: 1, run: "18342197301", head: HEAD, result: "CLEAN", verdict: null, root_cause: null, at: AT, ...fields };
 }
 
+function finding(fields: Fields = {}): Fields {
+  return { key: "thread:PRRT_1", file: "src/parse.ts", line: 42, ...fields };
+}
+
+// A DIRTY round listing every key the rulings and pushbacks below name.
+function dirtyRound(fields: Fields = {}): Fields {
+  return round({
+    result: "DIRTY",
+    verdict: "PATCH",
+    findings: [
+      finding(),
+      finding({ key: "thread:PRRT_2", line: 57 }),
+      finding({ key: "thread:PRRT_3", file: "src/read.ts", line: 9 }),
+      finding({ key: "required-check:ci", file: null, line: null }),
+    ],
+    ...fields,
+  });
+}
+
 function hold(fields: Fields = {}): Fields {
   return {
     id: "pushback-212",
@@ -166,6 +185,29 @@ test("root_cause is a root cause or null", () => {
   refusedAt(snapshot({ rounds: [round({ root_cause: "at_cause" })] }), ["rounds", 0, "root_cause"]);
 });
 
+test("a round's findings are required", () => {
+  const { findings: _, ...unlisted } = dirtyRound();
+  refusedAt(snapshot({ rounds: [unlisted] }), ["rounds", 0, "findings"]);
+});
+
+test("a finding is its key, file and line and no text; file and line are null on one with no position", () => {
+  accepted(snapshot({ rounds: [dirtyRound()] }));
+  accepted(snapshot({ rounds: [dirtyRound({ findings: [finding({ file: null, line: null })] })] }));
+  refusedAt(snapshot({ rounds: [dirtyRound({ findings: [finding({ key: "" })] })] }), ["rounds", 0, "findings", 0, "key"]);
+  refusedAt(snapshot({ rounds: [dirtyRound({ findings: [finding({ line: 0 })] })] }), ["rounds", 0, "findings", 0, "line"]);
+  refusedAt(snapshot({ rounds: [dirtyRound({ findings: [finding({ text: "Null is not refused." })] })] }), ["rounds", 0, "findings", 0]);
+});
+
+test("findings is non-empty exactly when the round is DIRTY", () => {
+  refusedAt(snapshot({ rounds: [round({ findings: [finding()] })] }), ["rounds", 0, "findings"]);
+  refusedAt(snapshot({ rounds: [round({ result: "INCOMPLETE", findings: [finding()] })] }), ["rounds", 0, "findings"]);
+  refusedAt(snapshot({ rounds: [dirtyRound({ findings: [] })] }), ["rounds", 0, "findings"]);
+});
+
+test("a round lists each finding's key once", () => {
+  refusedAt(snapshot({ rounds: [dirtyRound({ findings: [finding(), finding({ line: 57 })] })] }), ["rounds", 0, "findings", 1, "key"]);
+});
+
 test("a value field takes only its set's values", () => {
   refusedAt(snapshot({ rounds: [round({ stage: "internal" })] }), ["rounds", 0, "stage"]);
   refusedAt(snapshot({ rounds: [round({ result: "PASS" })] }), ["rounds", 0, "result"]);
@@ -300,6 +342,22 @@ test("each ruling's round exists", () => {
   refusedAt(snapshot({ rulings: [ruled("INTERNAL", 2)] }), ["rulings", 0, "round"]);
   refusedAt(snapshot({ rulings: [ruled("AUDIT", 1)] }), ["rulings", 0, "round"]);
   refusedAt(snapshot({ rounds: [], rulings: [ruled("INTERNAL", 1)] }), ["rulings", 0, "round"]);
+});
+
+test("each ruling's key is one of its round's findings", () => {
+  const rounds = [dirtyRound()];
+  accepted(snapshot({ rounds, rulings: [ruling(), ruling({ ...THREADLESS, ruling: "FIX" })] }));
+  refusedAt(snapshot({ rounds, rulings: [ruling({ key: "thread:PRRT_9" })] }), ["rulings", 0, "key"]);
+  // A round not in rounds has no findings to name, so its ruling is refused once, at the round.
+  refusedAt(snapshot({ rounds, rulings: [ruling({ key: "thread:PRRT_9", round: { stage: "INTERNAL", n: 2 } })] }), ["rulings", 0, "round"]);
+});
+
+test("each pushback's key is one of its round's findings", () => {
+  const rounds = [dirtyRound()];
+  const pushback = (key: string, n: number) => ({ key, round: { stage: "INTERNAL", n } });
+  accepted(snapshot({ rounds, pushbacks: [pushback("thread:PRRT_2", 1)] }));
+  refusedAt(snapshot({ rounds, pushbacks: [pushback("thread:PRRT_9", 1)] }), ["pushbacks", 0, "key"]);
+  refusedAt(snapshot({ rounds, pushbacks: [pushback("thread:PRRT_9", 2)] }), ["pushbacks", 0, "round"]);
 });
 
 test("a finding is ruled once per round, and again in a later round", () => {

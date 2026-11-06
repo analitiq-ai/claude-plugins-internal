@@ -292,6 +292,8 @@ const BREACHES: Breach[] = [
   breachOf("a ruling-commit with no ruling", files(event.rulingCommit(ROUND_1_ID, "PRRC_1", sha(5)))),
   breachOf("a ruling-commit of a ruling that is not FIX", files(event.rulingCommit(ROUND_1_ID, "PRRC_1", sha(5))), [event.round(ROUND_1), PUSHED_BACK]),
   breachOf("a pushback whose round is not in rounds", files(event.pushback({ key: "PRRC_1", round: { stage: "INTERNAL", n: 4 } }))),
+  breachOf("a ruling whose key is not among its round's findings", files(event.ruling(pushbackRuling("PRRC_9", 1)))),
+  breachOf("a pushback whose key is not among its round's findings", files(event.pushback({ key: "PRRC_9", round: ROUND_1_ID }))),
   breachOf("a release naming a since its OPEN row does not have", files(event.release("pushback-212", at("08:59"), at("09:30"), 201)), [
     event.round(ROUND_1),
     PUSHBACK_HOLD,

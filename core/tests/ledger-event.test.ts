@@ -107,6 +107,16 @@ for (const [name, value] of Object.entries(EVENTS)) {
   });
 }
 
+test("a round event carries its round's findings, its file still named by the run", () => {
+  const findings = [
+    { key: "thread:PRRT_1", file: "src/parse.ts", line: 42 },
+    { key: "required-check:ci", file: null, line: null },
+  ];
+  const value = { kind: "round", v: 1, round: { ...round, result: "DIRTY", verdict: "PATCH", findings } };
+  assert.deepEqual(parsed(value), value);
+  assert.equal(eventFile(parsed(value)), FILES.round);
+});
+
 test("a key is hashed as its UTF-8, so a key outside ASCII names one file", () => {
   const key = "required-check:ci ✓ é";
   const pushback = { kind: "pushback", v: 1, pushback: { key, round: { stage: "INTERNAL", n: 3 } } };
