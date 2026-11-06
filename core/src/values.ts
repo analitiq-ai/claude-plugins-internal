@@ -75,6 +75,18 @@ export const ShimRuling = valueSet({
   DEFERRED: "the site shares the bug's defect, and an open issue tracks its fix",
 });
 
+// Owned by planner ADR-0009 d5: the judge's answer per governing record (root ADR-0010).
+export const AdrJudgment = valueSet({
+  WITHIN: "the artifact sits inside the record: it does nothing the record rejected or contradicts",
+  DEPARTS: "the artifact does what the record rejected, contradicts what it chose, or breaks a consequence it commits to",
+});
+
+// Owned by planner ADR-0009 d5: which artifact named a path the check asks about (root ADR-0010).
+export const CheckedArtifact = valueSet({
+  plan: "a path the touches step's touches.json lists",
+  tasks: "a path a task line of tasks.md names",
+});
+
 // reviewer ADR-0011, ADR-0013.
 export const HoldState = valueSet({
   OPEN: "the hold refuses what its kind refuses",

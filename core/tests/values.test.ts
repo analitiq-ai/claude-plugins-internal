@@ -5,6 +5,8 @@ import {test} from "node:test";
 import {fileURLToPath, pathToFileURL} from "node:url";
 import * as z from "zod";
 import {
+  AdrJudgment,
+  CheckedArtifact,
   CheckOutcome,
   ClaimVerdict,
   CoreSource,
@@ -53,6 +55,8 @@ const sets: {name: string; set: ValueSet; values: string[]}[] = [
   {name: "taken", set: Taken, values: ["claim", "resume"]},
   {name: "claim verdict", set: ClaimVerdict, values: ["CORRECT", "WRONG", "UNSURE"]},
   {name: "shim ruling", set: ShimRuling, values: ["SHARES", "NOT_SHARED", "DEFERRED"]},
+  {name: "adr judgment", set: AdrJudgment, values: ["WITHIN", "DEPARTS"]},
+  {name: "checked artifact", set: CheckedArtifact, values: ["plan", "tasks"]},
 ];
 
 for (const {name, set, values} of sets) {
