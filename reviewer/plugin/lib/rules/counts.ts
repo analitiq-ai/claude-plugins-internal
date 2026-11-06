@@ -81,7 +81,19 @@ export function shimOpening(bug: Bug, row: Hold | undefined, reset: string | nul
   return placed ? { id: `${shim}-${bug.id}`, question: null } : null;
 }
 
-const rangeKey = (range: Bug["ranges"][number]): string => JSON.stringify([range.file, range.old_start, range.old_count]);
+type Range = Bug["ranges"][number];
+
+const rangeKey = (range: Range): string => JSON.stringify([range.file, range.old_start, range.old_count]);
+
+/** Each range of `ranges` then of `more`, once, kept as its file and old-side lines alone. */
+export function withRanges(ranges: readonly Range[], more: readonly Range[]): Range[] {
+  const kept = new Map<string, Range>();
+  for (const { file, old_start, old_count } of [...ranges, ...more]) {
+    const range = { file, old_start, old_count };
+    if (!kept.has(rangeKey(range))) kept.set(rangeKey(range), range);
+  }
+  return [...kept.values()];
+}
 
 /**
  * Bugs that converged, as one (ADR-0008 d2): the bug with the higher count after the reset, the smaller id on a tie,
@@ -91,16 +103,12 @@ const rangeKey = (range: Bug["ranges"][number]): string => JSON.stringify([range
 export function mergeBugs(bugs: readonly Bug[], reset: string | null): Bug {
   const [survivor, ...others] = bugs.toSorted((a, b) => bugCount(b, reset) - bugCount(a, reset) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (survivor === undefined) throw new RangeError("mergeBugs needs at least one bug");
-  const ranges = new Map(survivor.ranges.map((range) => [rangeKey(range), range]));
   const rulings = new Map(survivor.rulings.map((ruling) => [ruling.site, ruling]));
-  for (const other of others) {
-    for (const range of other.ranges) if (!ranges.has(rangeKey(range))) ranges.set(rangeKey(range), range);
-    for (const ruling of other.rulings) if (!rulings.has(ruling.site)) rulings.set(ruling.site, ruling);
-  }
+  for (const other of others) for (const ruling of other.rulings) if (!rulings.has(ruling.site)) rulings.set(ruling.site, ruling);
   return {
     ...survivor,
     absorbed: [...survivor.absorbed, ...others.flatMap((other) => [...other.members, ...other.absorbed])],
-    ranges: [...ranges.values()],
+    ranges: withRanges(survivor.ranges, others.flatMap((other) => other.ranges)),
     rulings: [...rulings.values()],
   };
 }

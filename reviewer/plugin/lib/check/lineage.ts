@@ -1,6 +1,7 @@
 import diff_match_patch from "diff-match-patch";
 
 import type { Lineage } from "../../core/contracts/gates.ts";
+import { known } from "../known.ts";
 import { plain, words } from "../rules/words.ts";
 import type { ReviewerSettings } from "../settings.ts";
 import type { LineHunk } from "../worktree.ts";
@@ -11,7 +12,7 @@ export type Span = readonly [start: number, end: number];
 /** A claim the check read in a file's new text: its id, the 1-based line its words start on, and its words. */
 export type ReadClaim = { id: string; line: number; quote: string };
 
-type Budget = Pick<ReviewerSettings, "char_diff_budget">;
+export type Budget = Pick<ReviewerSettings, "char_diff_budget">;
 
 /**
  * A claim's quote has no words, or they are not in its file from the line it was read on: a defect of the check, not
@@ -275,12 +276,6 @@ export type Succession = {
  * where they are now, if anywhere.
  */
 type Carried = { claim: string; span: Span | null };
-
-function known<V>(map: ReadonlyMap<string, V>, key: string): V {
-  const value = map.get(key);
-  if (value === undefined) throw new TypeError(`no entry for ${JSON.stringify(key)}`);
-  return value;
-}
 
 function overlaps(a: Span, b: Span): boolean {
   return Math.max(a[0], b[0]) < Math.min(a[1], b[1]);
