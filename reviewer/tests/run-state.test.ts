@@ -149,6 +149,19 @@ describe("RunState (R3, data-model State write step)", () => {
     assert.deepEqual(advanced.snapshot?.rounds.map(({ n }) => n), [1, 2]);
   });
 
+  it("awaits an async decide, and on StateStale with the story touched awaits it again on what landed", async () => {
+    const h = harness();
+    const decide = nextRound(h);
+    const moved: string[] = [];
+    const advanced = await h.state.step(
+      async (reading) => (moved.length === 0 && moved.push(eventCommit(h.ledger, [event.round(round(1))])), decide(reading)),
+      writeRound(h),
+    );
+    assert.equal(h.decided.length, 2);
+    assert.equal(h.decided[1].head, moved[0]);
+    assert.deepEqual(advanced.snapshot?.rounds.map(({ n }) => n), [1, 2]);
+  });
+
   for (const attempts of [2, 4]) {
     it(`refuses as could not run when ledger moved on each of state_write_attempts = ${attempts} attempts`, async () => {
       const h = harness({ attempts });
