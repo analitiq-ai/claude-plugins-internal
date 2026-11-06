@@ -79,8 +79,16 @@ function decided(fields: Partial<DecidedRun> = {}): DecidedRun {
   return { launched: { stage: INTERNAL, run: RUN, head: sha(700) }, expected: EXPECTED, reports: reportsOf(), assessment: null, findings: [], ...fields };
 }
 
-function assessment(findings: AssessedFinding[], round_verdict: AssessorVerdict): Assessment {
-  return { findings, round_verdict, user_decision: null, rationale: "the spec names two owners for the header" };
+type Ruled = Pick<AssessedFinding, "id" | "verdict" | "reason">;
+
+/** An assessment ruling `findings`, each of kind defect with its reason as its mechanism. */
+function assessment(findings: Ruled[], round_verdict: AssessorVerdict): Assessment {
+  return {
+    findings: findings.map((each) => ({ ...each, kind: "defect", spec_ref: "n/a", mechanism: each.reason })),
+    round_verdict,
+    user_decision: null,
+    rationale: "the spec names two owners for the header",
+  };
 }
 
 /** An agents' round whose code reviewer found what `assessed` rules. */
@@ -427,7 +435,7 @@ describe("recordRound: an assessment that does not rule exactly the round's find
   const T1 = thread("PRRT_1", "IC_1");
   const CI = failingCheck("ci");
   const github = decided({ launched: { stage: GITHUB, run: RUN, head: sha(700) }, expected: [], reports: new Map(), findings: [T1, CI] });
-  const ruling = (id: string): AssessedFinding => ({ id, verdict: FIX, reason: "fixed" });
+  const ruling = (id: string): Ruled => ({ id, verdict: FIX, reason: "fixed" });
   const cases: [string, DecidedRun][] = [
     ["a github round's ruling of a finding it does not hold", { ...github, assessment: assessment([ruling(T1.key), ruling(CI.key), ruling("thread:PRRT_9")], PATCH) }],
     ["a github round's finding left unruled", { ...github, assessment: assessment([ruling(T1.key)], PATCH) }],

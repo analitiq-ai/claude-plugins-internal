@@ -28,8 +28,9 @@ const K_TOPIC = 2;
 const MAX_AUDITS = 3;
 const NOW = at("11:00");
 
-function finding(id: string, verdict: AssessedFinding["verdict"], reason = `why ${id}`): AssessedFinding {
-  return { id, verdict, reason };
+/** A finding of kind defect, unless `fields` says otherwise. */
+function finding(id: string, verdict: AssessedFinding["verdict"], reason = `why ${id}`, fields: Partial<AssessedFinding> = {}): AssessedFinding {
+  return { id, verdict, reason, kind: "defect", spec_ref: "n/a", mechanism: `the mechanism of ${id}`, ...fields };
 }
 
 function assessment(fields: Partial<Assessment> & Pick<Assessment, "findings" | "round_verdict">): Assessment {
@@ -123,6 +124,33 @@ describe("roundVerdict, the first clause of ADR-0017 d2 that matches", () => {
     assert.equal(raised.verdict, RESCOPE);
     assert.match(raised.question ?? "", /the spec is silent on retries/);
     assert.match(raised.question ?? "", /How many retries does FR-9 allow\?/);
+  });
+
+  it("asks in a RESCOPE's question for the open decision, after the rationale and each spec gap's mechanism with the spec decision it touches", () => {
+    const raised = roundVerdict(
+      assessment({
+        findings: [
+          finding("cr-1", FIX, "two rounds picked two roots", { kind: "spec_gap", mechanism: "the canonical root is chosen round by round", spec_ref: "FR-3" }),
+          finding("cr-2", FIX, "no fallback root", { kind: "spec_gap", mechanism: "the fallback root is unnamed", spec_ref: "spec silent" }),
+          finding("cr-3", FIX, "a null is dereferenced", { mechanism: "an unchecked null", spec_ref: "n/a" }),
+        ],
+        round_verdict: "RESHAPE_SPEC",
+        rationale: "two rounds chose different roots",
+        user_decision: "Which root is canonical?",
+      }),
+      NO_DEPARTURES,
+      [],
+    );
+    assert.deepEqual(raised, {
+      verdict: RESCOPE,
+      question: [
+        "The round rescoped because:",
+        "- two rounds chose different roots",
+        "- spec gap: the canonical root is chosen round by round (FR-3)",
+        "- spec gap: the fallback root is unnamed (spec silent)",
+        "To decide: Which root is canonical?",
+      ].join("\n"),
+    });
   });
 
   for (const verdict of [PATCH, CLASS_FIX, REDESIGN]) {
