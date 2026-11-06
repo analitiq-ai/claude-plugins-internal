@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { sessionFolder, type Session } from "../../core/commit-pass.ts";
 import type { Gates } from "../../core/contracts/gates.ts";
 import { makePrivateFolder } from "../../core/files.ts";
-import { GhCredentialRefused, GitFailed, runGit } from "../../core/git.ts";
+import { GitFailed, runGit } from "../../core/git.ts";
 import { failureOfStatus, GitHubRefused, GitHubUnanswered, type GitHubClient, type Repository } from "../../core/github.ts";
 import { sectionWithoutAnchor } from "../rules/anchor.ts";
 
@@ -16,8 +16,11 @@ const NO_SUCH_COMMIT = 422;
 // upload-pack's refusal of a want of an object its repository lacks; git does not translate it.
 const CLONE_LACKS = "upload-pack: not our ref";
 
-// How git names the HTTP status of an answer it does not take, in words it prints untranslated.
+// curl's words, untranslated, for an HTTP status of 400 or more; git words some itself instead, such as 401 and 404.
 const HTTP_STATUS = /The requested URL returned error: (\d{3})/;
+
+// git's words, under LC_ALL=C, before curl's reason a request failed; with no HTTP_STATUS in that reason, GitHub sent none.
+const NO_ANSWER = "unable to access";
 
 const reasonOf = (failure: unknown): string => (failure instanceof GitFailed ? failure.stderr.trim() : String(failure));
 
@@ -78,16 +81,26 @@ export async function fileAt(copy: string, sha: string, file: string): Promise<s
   return (await runGit(copy, ["cat-file", "blob", blob])).stdout;
 }
 
+/** The fetch of an object from GitHub failed in git's words that name neither an HTTP status nor NO_ANSWER. */
+export class GitHubFetchFailed extends Error {
+  constructor(message: string, failure: GitFailed) {
+    super(message, { cause: failure });
+    this.name = "GitHubFetchFailed";
+  }
+}
+
 /**
- * The failure of the fetch of `sha` from GitHub's `repo`: `failureOfStatus` of the HTTP status git names, without the
- * headers git does not print, so a 403 that limits the rate refuses; GitHubUnanswered when git names no status.
- * GhCredentialRefused is the checkout's, not GitHub's, and stays as it is.
+ * The failure of the fetch of `sha` from GitHub's `repo`. One that is not git's, GhCredentialRefused among them, stays
+ * as it was. Of git's: one naming an HTTP status is as `failureOfStatus` rules it, without the headers git does not
+ * print, so a 403 that limits the rate refuses; one with no answer is GitHubUnanswered; any other is GitHubFetchFailed.
  */
 function gitHubFetchFailure(repo: Repository, sha: string, failure: unknown): unknown {
-  if (failure instanceof GhCredentialRefused) return failure;
+  if (!(failure instanceof GitFailed)) return failure;
   const message = `the fetch of commit ${sha} from GitHub ${repo.owner}/${repo.name} failed: ${reasonOf(failure)}`;
-  const status = failure instanceof GitFailed ? HTTP_STATUS.exec(failure.stderr)?.[1] : undefined;
-  return status === undefined ? new GitHubUnanswered(message, { cause: failure }) : failureOfStatus(Number(status), message);
+  const status = HTTP_STATUS.exec(failure.stderr)?.[1];
+  if (status !== undefined) return failureOfStatus(Number(status), message);
+  if (failure.stderr.includes(NO_ANSWER)) return new GitHubUnanswered(message, { cause: failure });
+  return new GitHubFetchFailed(message, failure);
 }
 
 /**

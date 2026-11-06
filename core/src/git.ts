@@ -95,6 +95,8 @@ async function withGhCredential(checkout: string, ghConfigDir: string, url: stri
   const env = {
     GH_CONFIG_DIR: ghConfigDir,
     GIT_TERMINAL_PROMPT: "0",
+    // Callers tell git's failures apart by their words, which C leaves untranslated.
+    LC_ALL: "C",
     GIT_ASKPASS: undefined,
     SSH_ASKPASS: undefined,
     ...Object.fromEntries(GH_TOKEN_VARIABLES.map((name) => [name, undefined])),
