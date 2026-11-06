@@ -8,12 +8,13 @@ import { event, eventCommit, fakeLedger, fileOf, storyDir, storyOf, type FakeLed
 import { fakeGitHub, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import type { Bug, Lineage } from "../plugin/core/contracts/gates.ts";
 import type { Hold, Snapshot } from "../plugin/core/contracts/snapshot.ts";
-import { GitFailed } from "../plugin/core/git.ts";
+import { GhCredentialRefused, GitFailed } from "../plugin/core/git.ts";
+import { GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
 import { readState, type StateReading } from "../plugin/core/state.ts";
 import { HoldKind, HoldState, RoundStage } from "../plugin/core/values.ts";
-import { bareCopy, fetchFromClone, fromGitHub, type AnchorSources } from "../plugin/lib/check/bare-copy.ts";
+import { fetchFromClone, fromGitHub, type AnchorSources } from "../plugin/lib/check/bare-copy.ts";
 import { Words } from "../plugin/lib/check/lineage.ts";
-import { CouldNotRun, FIX_THEN_RETRY } from "../plugin/lib/hook-io.ts";
+import { CouldNotRun, FIX_THEN_RETRY, RETRY } from "../plugin/lib/hook-io.ts";
 import { GatesBranchMismatch, recordCheck, type CompletedCheck, type GatesRecorder } from "../plugin/lib/round/gates.ts";
 import { recordRound } from "../plugin/lib/round/record.ts";
 import { AnchorMissing } from "../plugin/lib/rules/anchor.ts";
@@ -22,7 +23,7 @@ import { lineageCount } from "../plugin/lib/rules/counts.ts";
 import type { ShimCheck } from "../plugin/lib/rules/shim.ts";
 import { RunState } from "../plugin/lib/run-state.ts";
 import { cloneWith, git } from "./support/git.ts";
-import { tempHome, tempSession } from "./support/session.ts";
+import { tempHome } from "./support/session.ts";
 
 const { claim, shim } = HoldKind.schema.enum;
 const { OPEN } = HoldState.schema.enum;
@@ -220,27 +221,32 @@ describe("recordCheck: a completed check's counts and the holds they reach, in o
     assert.equal(commitsAsked(retry.out).length, 0);
   });
 
-  it("asks a split lineage's claim-<id> question with one claim's words, failing case and evidence: of two claims on one line, the one with the larger id", async (t) => {
+  it("asks a split lineage's claim-<id> question with one claim's line, words, failing case and evidence: of two claims, the one on the later line, though its id is the smaller", async (t) => {
     const r = repo(t);
     const ledger = seeded(snapshot({ gates: gates({ anchor: r.a, lineages: [wrongLineage(sha(11))] }) }));
-    const halves = ["The parser refuses", "a null header."].map((quote, i): [Claim, Verdict] => [
-      { id: claimId(FILE, quote), hunk: "h1", file: FILE, line: QUOTE_LINE_H, quote, category: "K1" },
+    const wrongClaim = (quote: string, line: number, i: number): [Claim, Verdict] => [
+      { id: claimId(FILE, quote), hunk: "h1", file: FILE, line, quote, category: "K1" },
       { ...WRONG_VERDICT, failing_case: `failing case ${i}`, assertions: [{ text: "it refuses", confirmed: false, evidence: `src/parse.ts:${10 + i}` }] },
-    ]);
+    ];
+    const [smaller, larger] = ["The parser refuses", "a null header."].toSorted((p, q) => (claimId(FILE, p) < claimId(FILE, q) ? -1 : 1));
+    // Both halves stand on QUOTE_LINE_H; a claim's words are looked for from its line on, so one line above still finds them.
+    const later = wrongClaim(smaller, QUOTE_LINE_H, 0);
+    const earlier = wrongClaim(larger, QUOTE_LINE_H - 1, 1);
     const check = claimCheck(r, {
-      claim: { claims: Object.fromEntries(halves.map(([read]) => [read.id, read])), verdicts: Object.fromEntries(halves.map(([read, verdict]) => [read.id, verdict])) },
+      claim: { claims: { [later[0].id]: later[0], [earlier[0].id]: earlier[0] }, verdicts: { [later[0].id]: later[1], [earlier[0].id]: earlier[1] } },
     });
     await recordCheck(harness(r, ledger).recorder, check);
 
     const [row, ...rows] = (await readStory(ledger)).snapshot?.holds ?? [];
     assert.equal(rows.length, 0);
     assert.equal(row.id, `${claim}-${CLAIM_ID}`);
-    const [[first, firstVerdict], [last, lastVerdict]] = halves.toSorted(([a], [b]) => (a.id < b.id ? -1 : 1));
     const question = row.question ?? "";
-    for (const part of [`"${last.quote}"`, `Failing case: ${lastVerdict.failing_case}`, `Evidence: ${lastVerdict.assertions[0].evidence}`]) {
+    for (const part of [`"${later[0].quote}" (${FILE}:${QUOTE_LINE_H})`, `Failing case: ${later[1].failing_case}`, `Evidence: ${later[1].assertions[0].evidence}`]) {
       assert.ok(question.includes(part), question);
     }
-    for (const part of [`"${first.quote}"`, firstVerdict.failing_case ?? "", firstVerdict.assertions[0].evidence]) assert.ok(!question.includes(part), question);
+    for (const part of [`"${earlier[0].quote}"`, `${FILE}:${QUOTE_LINE_H - 1}`, earlier[1].failing_case ?? "", earlier[1].assertions[0].evidence]) {
+      assert.ok(!question.includes(part), question);
+    }
   });
 
   it("places a released shim-<id> again with the bug's new member, both in one commit", async (t) => {
@@ -299,43 +305,131 @@ describe("recordCheck: refusals (contracts/refusals.md)", () => {
     assert.equal(commitsAsked(h.out).length, 0);
   });
 
-  it("refuses with AnchorMissing when no source has the anchor and no reset came after the section's times; nothing committed", async (t) => {
-    const r = repo(t);
-    const h = harness(r, seeded(snapshot({ gates: gates({ anchor: sha(4096), lineages: [wrongLineage(sha(11))] }) })));
-    await assert.rejects(recordCheck(h.recorder, claimCheck(r)), AnchorMissing);
-    assert.equal(commitsAsked(h.out).length, 0);
-  });
+});
 
-  it("refuses as could not run naming the clone, the branch and the anchor when the fetch from the clone fails; nothing committed", async (t) => {
-    const r = repo(t);
-    const h = harness(r, seeded(snapshot({ gates: gates({ anchor: sha(4096), lineages: [wrongLineage(sha(11))] }) })));
-    const copy = await bareCopy(tempSession(t));
-    const noRepository = tempHome(t);
-    const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, noRepository, anchor), github: async () => false };
-    await assert.rejects(recordCheck({ ...h.recorder, sources }, claimCheck(r)), (error: unknown) => {
-      assert.ok(error instanceof CouldNotRun, String(error));
-      for (const named of [noRepository, BRANCH, sha(4096), FIX_THEN_RETRY]) assert.ok(error.message.includes(named), error.message);
-      return true;
-    });
-    assert.equal(commitsAsked(h.out).length, 0);
-  });
+const TAKEN = "the section is carried to the head";
+const MISSING = "AnchorMissing";
+const ANCHOR = sha(4096);
+const UNABLE = `fatal: unable to access 'https://github.com/${REPO}/': `;
+const NOT_ASKED = async (): Promise<boolean> => assert.fail("GitHub was asked");
+const GITHUB_LACKS = new GitHubRefused(422, "No commit found for SHA");
 
-  it("refuses as could not run naming GitHub's repository, the branch and the anchor when the fetch of a commit GitHub has fails; nothing committed", async (t) => {
-    const r = repo(t);
-    const anchor = sha(4096);
-    const h = harness(r, seeded(snapshot({ gates: gates({ anchor, lineages: [wrongLineage(sha(11))] }) })));
-    const [owner, name] = REPO.split("/");
-    const answering = fakeGitHub({ rest: { [`GET /repos/${REPO}/commits/${anchor}`]: { sha: anchor } } });
-    const github = fromGitHub(answering, { owner, name }, async () => {
-      throw new GitFailed(["fetch"], 128, "fatal: unable to access the repository");
+/** A clone with FILE as commit `a` has it, in a commit of its own the copy lacks. */
+const elsewhere = (t: TestContext) => cloneWith(t, { [FILE]: TEXT_A, "elsewhere.md": "elsewhere\n" });
+
+/** `fromGitHub` over a GitHub answering the read of commit `anchor` with `answer`, its git fetch made by `fetch`. */
+function gitHubOf(anchor: string, answer: unknown, fetch: (refspecs: readonly string[]) => Promise<void> = async () => assert.fail("GitHub fetched")) {
+  const [owner, name] = REPO.split("/");
+  return fromGitHub(fakeGitHub({ rest: { [`GET /repos/${REPO}/commits/${anchor}`]: answer } }), { owner, name }, fetch);
+}
+
+const failingFetch = (failure: Error) => async (): Promise<void> => {
+  throw failure;
+};
+
+type Arranged = { anchor: string; sources: AnchorSources; named?: string[] };
+
+/** The anchor only GitHub is asked for, the clone lacking it. */
+function onGitHub(r: Repo, answer: unknown, fetch?: (refspecs: readonly string[]) => Promise<void>): Arranged {
+  return { anchor: ANCHOR, named: fetch === undefined ? [] : [REPO, ANCHOR], sources: { copy: r.copy, clone: async () => false, github: gitHubOf(ANCHOR, answer, fetch) } };
+}
+
+/** Per source and what it answers: the check recorded, AnchorMissing, or the could-not-run's next step (contracts/refusals.md). */
+const ANCHOR_ROWS: { what: string; outcome: string; arrange: (t: TestContext, r: Repo) => Arranged }[] = [
+  {
+    what: "the model's clone has the anchor",
+    outcome: TAKEN,
+    arrange: (t, r) => {
+      const { clone, head } = elsewhere(t);
+      return { anchor: head, sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, clone, anchor), github: NOT_ASKED } };
+    },
+  },
+  {
+    what: "the clone lacks the anchor and GitHub has it",
+    outcome: TAKEN,
+    arrange: (t, r) => {
+      const { clone, head } = elsewhere(t);
+      const lacking = cloneWith(t, { "a.md": "a\n" }).clone;
+      const fetch = async (refspecs: readonly string[]) => void git(r.copy, "fetch", "-q", clone, ...refspecs);
+      return { anchor: head, sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, lacking, anchor), github: gitHubOf(head, { sha: head }, fetch) } };
+    },
+  },
+  {
+    what: "the clone and GitHub lack the anchor",
+    outcome: MISSING,
+    arrange: (t, r) => {
+      const lacking = cloneWith(t, { "a.md": "a\n" }).clone;
+      return { anchor: ANCHOR, sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, lacking, anchor), github: gitHubOf(ANCHOR, GITHUB_LACKS) } };
+    },
+  },
+  {
+    what: "the clone holds the anchor's sha as a file's blob and GitHub lacks it",
+    outcome: MISSING,
+    arrange: (t, r) => {
+      const { clone, head } = elsewhere(t);
+      const blob = git(clone, "rev-parse", `${head}:elsewhere.md`);
+      return { anchor: blob, sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, clone, anchor), github: gitHubOf(blob, GITHUB_LACKS) } };
+    },
+  },
+  {
+    what: "the clone is no repository, and GitHub is not asked",
+    outcome: FIX_THEN_RETRY,
+    arrange: (t, r) => {
+      const noRepository = tempHome(t);
+      return { anchor: ANCHOR, named: [noRepository, ANCHOR], sources: { copy: r.copy, clone: (anchor) => fetchFromClone(r.copy, noRepository, anchor), github: NOT_ASKED } };
+    },
+  },
+  { what: "GitHub does not answer the read of the commit", outcome: RETRY, arrange: (_t, r) => onGitHub(r, new GitHubUnanswered("timed out")) },
+  { what: "GitHub refuses the read of the commit", outcome: FIX_THEN_RETRY, arrange: (_t, r) => onGitHub(r, new GitHubRefused(403, "Forbidden")) },
+  {
+    what: "the fetch from GitHub reaches no host",
+    outcome: RETRY,
+    arrange: (_t, r) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GitFailed(["fetch"], 128, `${UNABLE}Could not resolve host: github.com`))),
+  },
+  ...(
+    [
+      [503, RETRY],
+      [429, RETRY],
+      [403, FIX_THEN_RETRY],
+    ] as const
+  ).map(([status, outcome]) => ({
+    what: `GitHub answers the fetch ${status}`,
+    outcome,
+    arrange: (_t: TestContext, r: Repo) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GitFailed(["fetch"], 128, `${UNABLE}The requested URL returned error: ${status}`))),
+  })),
+  {
+    what: "the fetch from GitHub throws GhCredentialRefused",
+    outcome: FIX_THEN_RETRY,
+    arrange: (_t, r) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GhCredentialRefused("sets http.extraheader, a header sent beside gh's token"))),
+  },
+];
+
+describe("recordCheck: where the anchor is found, and the refusal when it is not (contracts/gates-snapshot.md §Anchor); a refusal commits nothing", () => {
+  for (const { what, outcome, arrange } of ANCHOR_ROWS) {
+    it(`${what}: ${outcome}`, async (t) => {
+      const r = repo(t);
+      const { anchor, sources, named = [] } = arrange(t, r);
+      const ledger = seeded(snapshot({ gates: gates({ anchor, lineages: [wrongLineage(sha(11))] }) }));
+      const h = harness(r, ledger);
+      const recorded = recordCheck({ ...h.recorder, sources }, claimCheck(r));
+      if (outcome === TAKEN) {
+        await recorded;
+        assert.equal((await readStory(ledger)).snapshot?.gates?.anchor, r.h);
+        return;
+      }
+      await assert.rejects(recorded, (error: unknown) => {
+        if (outcome === MISSING) {
+          assert.ok(error instanceof AnchorMissing, String(error));
+          return true;
+        }
+        assert.ok(error instanceof CouldNotRun, String(error));
+        assert.ok(error.message.endsWith(`; ${outcome}`), error.message);
+        for (const part of [BRANCH, ...named]) assert.ok(error.message.includes(part), error.message);
+        return true;
+      });
+      assert.equal(commitsAsked(h.out).length, 0);
     });
-    await assert.rejects(recordCheck({ ...h.recorder, sources: { copy: r.copy, clone: async () => false, github } }, claimCheck(r)), (error: unknown) => {
-      assert.ok(error instanceof CouldNotRun, String(error));
-      for (const named of [REPO, BRANCH, anchor, FIX_THEN_RETRY]) assert.ok(error.message.includes(named), error.message);
-      return true;
-    });
-    assert.equal(commitsAsked(h.out).length, 0);
-  });
+  }
 });
 
 describe("recordCheck: two writers from one reading (qs #6, FR-020)", () => {

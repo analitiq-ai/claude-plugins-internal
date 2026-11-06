@@ -6,7 +6,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { sessionFolder } from "../plugin/core/commit-pass.ts";
-import { GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
+import { GitHubRefused } from "../plugin/core/github.ts";
 import { bareCopy, fetchFromClone, fileAt, fromGitHub, holdsCommit } from "../plugin/lib/check/bare-copy.ts";
 import { cloneWith, git } from "./support/git.ts";
 import { tempHome, tempSession } from "./support/session.ts";
@@ -72,16 +72,10 @@ describe("fetchFromClone and holdsCommit", () => {
     assert.equal(await holdsCommit(copy, later), true);
   });
 
-  it("answers false for a sha the clone lacks, and throws AnchorFetchFailed naming the clone and the sha for a clone that is no repository", async (t) => {
+  it("answers false for a sha the clone lacks", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const { clone } = cloneWith(t, { "a.md": "a\n" });
     assert.equal(await fetchFromClone(copy, clone, ABSENT), false);
-    const noRepository = tempHome(t);
-    await assert.rejects(fetchFromClone(copy, noRepository, ABSENT), (error: unknown) => {
-      assert.ok(error instanceof Error && error.name === "AnchorFetchFailed", String(error));
-      assert.ok(error.message.includes(noRepository) && error.message.includes(ABSENT), error.message);
-      return true;
-    });
     assert.equal(await holdsCommit(copy, ABSENT), false);
   });
 
@@ -134,11 +128,4 @@ describe("fromGitHub", () => {
     assert.equal(await fromGitHub(reader, REPO, async (refspecs) => void fetched.push([...refspecs]))(ABSENT), false);
     assert.deepEqual(fetched, []);
   });
-
-  for (const failure of [new GitHubRefused(404, "Not Found"), new GitHubRefused(403, "Forbidden"), new GitHubUnanswered("timed out")]) {
-    it(`throws ${failure.name} ${failure.message}: no answer is not an absent commit`, async () => {
-      const reader = fakeGitHub({ rest: { [path]: failure } });
-      await assert.rejects(fromGitHub(reader, REPO, async () => undefined)(ABSENT), failure);
-    });
-  }
 });

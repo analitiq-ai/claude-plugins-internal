@@ -11,7 +11,7 @@ import { lineageCount } from "../plugin/lib/rules/counts.ts";
 import { plain } from "../plugin/lib/rules/words.ts";
 import { textHunks, type LineHunk } from "../plugin/lib/worktree.ts";
 import { cloneWith } from "./support/git.ts";
-import { tempHome, tempSession } from "./support/session.ts";
+import { tempSession } from "./support/session.ts";
 
 const { WRONG } = ClaimVerdict.schema.enum;
 
@@ -505,15 +505,6 @@ describe("anchoredSection (contracts/gates-snapshot.md §Anchor)", () => {
     assert.deepEqual(await anchoredSection({ copy, clone: fromClone.ask, github: fromGitHub.ask }, section, HEAD, null), section);
     assert.deepEqual([fromClone.asks, fromGitHub.asks], [[pushed.head], [pushed.head]]);
     assert.equal(await holdsCommit(copy, pushed.head), true);
-  });
-
-  it("throws AnchorFetchFailed, asking GitHub nothing, when the clone is no repository", async (t) => {
-    const copy = await bareCopy(tempSession(t));
-    const section = gates({ branch: BRANCH, anchor: sha(4096), lineages: [lineageFixture("L1")] });
-    const fromGitHub = recorded(noGitHub);
-    const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, tempHome(t), anchor), github: fromGitHub.ask };
-    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), { name: "AnchorFetchFailed" });
-    assert.deepEqual(fromGitHub.asks, []);
   });
 
   it("stops naming the branch, the anchor and `/codeworks reset` when none has it", async (t) => {
