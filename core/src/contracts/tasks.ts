@@ -57,9 +57,21 @@ export class TaskLineRefused extends Error {
 
 // `- [ ] T012 [P] [US1] …`: the tags follow the task id, so a `[US2]` in the description names no story.
 const TASK_LINE = /^- \[[ xX]\] T[0-9]+((?: \[[^\]]+\])*)/;
-const STORY_TAG = /\[(US[0-9]+)\]/;
+const TAG = /\[([^\]]+)\]/g;
+const STORY_TAG = /^US([1-9][0-9]*)$/;
 const BACKTICK_SPAN = /`([^`]+)`/g;
 const HEADING = "## ";
+
+/** The story plan and the plan check read task lines here alone, so the two count the same lines as tasks. */
+export function readTaskLine(text: string): { stories: number[] } | null {
+  const task = TASK_LINE.exec(text);
+  if (task === null) return null;
+  const stories = [...task[1].matchAll(TAG)].flatMap(([, tag]) => {
+    const story = STORY_TAG.exec(tag);
+    return story === null ? [] : [Number(story[1])];
+  });
+  return { stories: [...new Set(stories)] };
+}
 
 /** Each task line's paths, one per backticked span `artifactPath` reads as a path; its story is its `[US<k>]` tag,
  *  else the `## ` heading above it. */
@@ -69,10 +81,11 @@ export function readTaskPaths(tasksText: string, rootFiles: ReadonlySet<string>)
   tasksText.split("\n").forEach((text, i) => {
     const line = i + 1;
     if (text.startsWith(HEADING)) heading = text.slice(HEADING.length);
-    const task = TASK_LINE.exec(text);
+    const task = readTaskLine(text);
     if (task === null) return;
     if (heading === null) throw new TaskLineRefused(line, `a task line above every "${HEADING}" heading belongs to no story`);
-    const story = STORY_TAG.exec(task[1])?.[1] ?? heading;
+    if (task.stories.length > 1) throw new TaskLineRefused(line, `a task line is tagged ${task.stories.map((k) => `US${k}`).join(" and ")}`);
+    const story = task.stories.length === 1 ? `US${task.stories[0]}` : heading;
     for (const [, span] of text.matchAll(BACKTICK_SPAN)) {
       let path: string | null;
       try {

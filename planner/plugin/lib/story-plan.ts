@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isPhaseHeading } from "../core/contracts/tasks.ts";
+import { isPhaseHeading, readTaskLine } from "../core/contracts/tasks.ts";
 
 // The checks landing makes of tasks.md, which the plan check's stories step makes too (R15): one set of functions,
 // so the two cannot disagree on what a story plan is.
@@ -15,8 +15,6 @@ export class TasksRefused extends Error {
   }
 }
 
-const TASK_LINE = /^\s*- \[[ xX]\] /;
-const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
 const PHASE_TITLE = /^## Phase [^:]*: (.+)$/;
 
 export type Phase = { line: number; heading: string; story: number | null };
@@ -34,13 +32,13 @@ export function phasesOf(lines: readonly string[]): Phase[] {
       phases.push(current);
     } else if (line.startsWith("## ")) {
       current = null;
-    } else if (TASK_LINE.test(line)) {
-      for (const [, k] of line.matchAll(STORY_TAG)) {
+    } else {
+      for (const k of readTaskLine(line)?.stories ?? []) {
         if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${k} outside any phase`);
-        if (current.story !== null && current.story !== Number(k)) {
+        if (current.story !== null && current.story !== k) {
           throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${k}`);
         }
-        current.story = Number(k);
+        current.story = k;
       }
     }
   }

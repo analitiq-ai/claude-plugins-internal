@@ -1,5 +1,17 @@
 import { sortedJsonText } from "../core/contracts/json-text.ts";
-import { type AdrAsked, type AdrRuling, type AdrVerdict, type ArtifactPath, rulingKey } from "../core/contracts/decision-check.ts";
+import {
+  ADR_RULINGS_FILE,
+  type AdrAsked,
+  type AdrRuling,
+  type AdrVerdict,
+  type ArtifactPath,
+  ASKED_FILE,
+  REVIEW_QUESTIONS_FILE,
+  rulingKey,
+  STOP_FILE,
+  TOUCHES_FILE,
+  VERDICT_FILE,
+} from "../core/contracts/decision-check.ts";
 import type { CouldNotRun } from "../core/outcomes.ts";
 import { AdrJudgment, CheckOutcome } from "../core/values.ts";
 
@@ -73,16 +85,16 @@ export const ADR_STOPS: Readonly<Record<StopKind, StopRow>> = {
   broken: row(FAIL, "{entry}", "{file}: {rule}: {message}", "fix that record (in the spec PR, or in the repo that holds {entry})"),
   // Core's reason is the whole line after the outcome, its Next step included; adrStop prints it as it is.
   folder: row(COULD_NOT_RUN, "{entry}", "{what}", null),
-  "verdict-unread": row(COULD_NOT_RUN, "adr-verdict.json", "{what}", RESUME, "adr-judge"),
+  "verdict-unread": row(COULD_NOT_RUN, VERDICT_FILE, "{what}", RESUME, "adr-judge"),
   "verdict-mismatch": row(COULD_NOT_RUN, "{entry}", "{what}", RESUME),
   rounds: row(COULD_NOT_RUN, "adr-check", "the check ran 100 rounds in one run", "discard the run's changes to {spec}, then start again: {again}"),
-  "stop-unread": row(COULD_NOT_RUN, "adr-stop.json", "does not parse", RESUME),
+  "stop-unread": row(COULD_NOT_RUN, STOP_FILE, "does not parse", RESUME),
   "step-unfinished": row(COULD_NOT_RUN, "adr-check", "step {steps} did not finish this round (no done record)", "fix what the step's error names, then resume"),
   "tasks-unfinished": row(COULD_NOT_RUN, "tasks.md", "the tasks command did not answer (its exit code is not 0)", RESUME, "adr-tasks"),
-  "touches-refused": row(COULD_NOT_RUN, "touches.json", "{what}", RESUME),
-  "touches-missing": row(COULD_NOT_RUN, "touches.json", "{what}", RESUME, "adr-touches"),
-  "touches-stale": row(COULD_NOT_RUN, "touches.json", "plan.md or spec.md changed after this round listed the plan's paths", RESUME),
-  "questions-refused": row(FAIL, "review-questions.json", "{what}", "rerun the rescope from `/planner:issue-spec rescope`"),
+  "touches-refused": row(COULD_NOT_RUN, TOUCHES_FILE, "{what}", RESUME),
+  "touches-missing": row(COULD_NOT_RUN, TOUCHES_FILE, "{what}", RESUME, "adr-touches"),
+  "touches-stale": row(COULD_NOT_RUN, TOUCHES_FILE, "plan.md or spec.md changed after this round listed the plan's paths", RESUME),
+  "questions-refused": row(FAIL, REVIEW_QUESTIONS_FILE, "{what}", "rerun the rescope from `/planner:issue-spec rescope`"),
   "tasks-refused": row(FAIL, "{where}", "{what}", `${AS_WRITTEN_AGAIN}; if the line comes back, change spec.md or plan.md first`),
   "tasks-empty": row(COULD_NOT_RUN, "tasks.md", "no task line names a path", AS_WRITTEN_AGAIN),
   "sub-issues-extra": row(
@@ -99,16 +111,16 @@ export const ADR_STOPS: Readonly<Record<StopKind, StopRow>> = {
     "order #{issue}'s sub-issues so sub-issue {position} is US{position}'s issue, then resume",
   ),
   github: row(COULD_NOT_RUN, "GitHub", "{what}", RESUME),
-  "rulings-refused": row(FAIL, "adr-rulings.json", "{what}", "correct {spec}/adr-rulings.json, then resume"),
+  "rulings-refused": row(FAIL, ADR_RULINGS_FILE, "{what}", `correct {spec}/${ADR_RULINGS_FILE}, then resume`),
   "ruling-refused": row(FAIL, "adr_ruling", "{what}", "resume with a corrected adr_ruling, or without one"),
   "guard-rulings": row(
     COULD_NOT_RUN,
-    "adr-rulings.json",
+    ADR_RULINGS_FILE,
     "entry {folder} {record} {path} was not written by the check",
     "remove the entry; only a resume with adr_ruling adds one",
   ),
   "guard-paths": row(COULD_NOT_RUN, "{file}", "changed after ask: {changed}", RESUME),
-  "guard-asked": row(COULD_NOT_RUN, "adr-asked.json", "changed after ask", RESUME),
+  "guard-asked": row(COULD_NOT_RUN, ASKED_FILE, "changed after ask", RESUME),
   settings: row(COULD_NOT_RUN, "codeworks.toml", "{what}", "fix codeworks.toml at HEAD, then resume"),
   git: row(COULD_NOT_RUN, "git", "{what}", "run from a git checkout of the repo, then resume"),
 };

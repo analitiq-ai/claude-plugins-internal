@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { PathRefused } from "../src/contracts/decision-check.ts";
-import { readTaskBlockLabels, readTaskPaths, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused } from "../src/contracts/tasks.ts";
+import { readTaskBlockLabels, readTaskLine, readTaskPaths, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused } from "../src/contracts/tasks.ts";
 
 describe("taskBlockLabel", () => {
   it("is the line Story issue: #<n>", () => {
@@ -81,6 +81,25 @@ describe("readTaskBlockLabels", () => {
   });
 });
 
+describe("readTaskLine", () => {
+  it("reads the k of each [US<k>] among the tags after the task id, once, not one in the description", () => {
+    assert.deepEqual(readTaskLine("- [ ] T012 [P] [US1] Retry, as [US2] asked"), { stories: [1] });
+    assert.deepEqual(readTaskLine("- [x] T013 [US2] [P] Cap"), { stories: [2] });
+    assert.deepEqual(readTaskLine("- [X] T014 Tidy"), { stories: [] });
+    assert.deepEqual(readTaskLine("- [ ] T015 [US1] [P] [US2] [US1] Both"), { stories: [1, 2] });
+  });
+
+  for (const line of ["  - [ ] T004 [US1] indented", "- [ ] [US1] no task id", "- [] T001 [US1] no checkbox", "T001 [US1] no checkbox"]) {
+    it(`is null for ${JSON.stringify(line)}, which is no task line`, () => {
+      assert.equal(readTaskLine(line), null);
+    });
+  }
+
+  it("reads [US0] as no story tag", () => {
+    assert.deepEqual(readTaskLine("- [ ] T001 [US0] Seed"), { stories: [] });
+  });
+});
+
 describe("readTaskPaths", () => {
   const rootFiles = new Set(["codeworks.toml", "new.toml"]);
   const tasks = [
@@ -132,6 +151,17 @@ describe("readTaskPaths", () => {
       );
     });
   }
+
+  it("refuses a task line tagged with two stories, naming tasks.md:<line> and both", () => {
+    assert.throws(
+      () => readTaskPaths("## Phase 3: Retry\n\n- [ ] T001 [US1] [US2] Create `core/src/a.ts`\n", rootFiles),
+      (error: unknown) => {
+        assert.ok(error instanceof TaskLineRefused, String(error));
+        assert.ok(error.message.startsWith("tasks.md:3: ") && error.message.includes("US1 and US2"), error.message);
+        return true;
+      },
+    );
+  });
 
   it("refuses a task line above every ## heading, naming tasks.md:<line>", () => {
     assert.throws(

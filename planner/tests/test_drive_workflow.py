@@ -1103,5 +1103,37 @@ class Report(unittest.TestCase):
                          "specs/7-demo/critiques/critique-2.md")
 
 
+class StopLine(unittest.TestCase):
+    """stop_line against lines as adrStop (planner/plugin/lib/adr-check.ts) writes them."""
+
+    LINES = {
+        "ruling-refused": "FAIL: adr_ruling: 0004 does not govern core/src/x.ts. Next step: resume with a corrected "
+                          "adr_ruling, or without one.",
+        "step-unfinished": "COULD_NOT_RUN: adr-check: step adr-touches, adr-judge did not finish this round (no done "
+                           "record). Next step: fix what the step's error names, then resume.",
+        "departure-inside": "FAIL: docs/adr: 0004 on core/src/x.ts: departs. Next step: change plan.md (the next round "
+                            "writes tasks.md again from it); draft a superseding record into the spec PR (planner "
+                            "ADR-0009 d3); or resume with adr_ruling naming docs/adr, 0004, core/src/x.ts and your reason.",
+        "rulings-refused": "FAIL: adr-rulings.json: x. Next step: correct s/adr-rulings.json, then resume.",
+    }
+
+    def test_captures_a_fill_that_ends_the_said_part_whole(self):
+        found = drive_workflow.RULING_REFUSED.search(self.LINES["ruling-refused"])
+        self.assertEqual(found["what"], "0004 does not govern core/src/x.ts")
+
+    def test_captures_the_steps_a_line_names(self):
+        found = drive_workflow.STEP_UNFINISHED.search(self.LINES["step-unfinished"])
+        self.assertEqual(found["steps"], "adr-touches, adr-judge")
+
+    def test_captures_an_empty_fill(self):
+        found = drive_workflow.stop_line("departure-inside").search(self.LINES["departure-inside"])
+        self.assertEqual((found["entry"], found["stories"], found["why"]), ("docs/adr", "", "departs"))
+
+    def test_each_rows_pattern_matches_its_own_line_and_none_of_the_other_rows_lines(self):
+        for kind in self.LINES:
+            for of, line in self.LINES.items():
+                with self.subTest(pattern=kind, line=of):
+                    self.assertEqual(drive_workflow.stop_line(kind).search(line) is not None, kind == of)
+
 if __name__ == "__main__":
     unittest.main()

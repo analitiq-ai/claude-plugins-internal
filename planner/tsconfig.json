@@ -9,5 +9,5 @@
     "moduleResolution": "nodenext",
     "types": ["node"]
   },
-  "include": ["plugin", "tests"]
+  "include": ["plugin", "scripts", "tests"]
 }

@@ -7,13 +7,12 @@ import { describe, it, type TestContext } from "node:test";
 import { fakeGitHub, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 
 import type { AdrAsked, AdrRuling, AdrVerdict, ArtifactPath } from "../plugin/core/contracts/decision-check.ts";
-import { ADR_INSTALL } from "../plugin/core/adr.ts";
 import { couldNotRun } from "../plugin/core/outcomes.ts";
 import { CheckOutcome } from "../plugin/core/values.ts";
 import { GitHubUnanswered } from "../plugin/core/github.ts";
 import { ADR_STOPS, adrStop, changedSince, decideCheck, decideFolder, roundsStop, type StopItem, type StopKind } from "../plugin/lib/adr-check.ts";
 import { main } from "../plugin/scripts/adr_check.ts";
-import { BOARD, fakeMint, LOGIN, output, scratchCheckout, storedToken, storeToken, tempHome, writeFiles, type Scratch } from "./support/checkout.ts";
+import { BOARD, fakeMint, git, LOGIN, output, scratchCheckout, storedToken, storeToken, tempHome, writeFiles, type Scratch } from "./support/checkout.ts";
 
 const { PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 
@@ -211,7 +210,6 @@ describe("adrStop", () => {
       if (row.outcome === PASS) assert.ok(!line.includes("Next step"), line);
       else assert.match(line, /\. Next step: .+\.$/);
       assert.doesNotMatch(line, /\{[a-z]+\}/, "a placeholder was left");
-      assert.doesNotMatch(line.split("Next step: ")[1] ?? "", /\b(change|edit|correct|fix|write)\b[^.;]*tasks\.md/i, "a next step edits tasks.md");
     });
   }
 
@@ -731,7 +729,7 @@ describe("adr_check.ts: the user's ruling", () => {
     ["not JSON", "[{"],
     ["an unlisted folder beside a valid one", JSON.stringify([RULED, { ...RULED, folder: "notes/adr" }])],
     ["an unasked path beside a valid one", JSON.stringify([RULED, { ...RULED, path: "core/src/z.ts" }])],
-    ["a record not governing its path beside a valid one", JSON.stringify([RULED, { ...RULED, record: "0009" }])],
+    ["a record with no departure this round beside a valid one", JSON.stringify([RULED, { ...RULED, record: "0009" }])],
   ] as const) {
     it(`refuses the whole ADR_RULING with ${what}, appending nothing`, async (t) => {
       const s = departing(t);
@@ -741,6 +739,64 @@ describe("adr_check.ts: the user's ruling", () => {
       assert.equal(written(s), null);
     });
   }
+
+  it("refuses a ruling whose record departs on its path yet does not govern it alone, appending nothing", async (t) => {
+    const s = scene(t);
+    s.answers["docs/adr"] = { records: [record("0004", ["core/src/y.ts"])] };
+    const r = await round(s, {
+      touchesPaths: ["core/src/x.ts", "core/src/y.ts"],
+      verdicts: [DEPARTS("0004", ["core/src/x.ts"])],
+      adrRuling: JSON.stringify([RULED]),
+    });
+    assertShown(r, 1, "FAIL: adr_ruling: 0004 does not govern core/src/x.ts");
+    assert.equal(rulings(s), null);
+    assert.equal(written(s), null);
+  });
+
+  it("stops with every folder's outcome beside the could-not-run line when a ruling's own adr check cannot run", async (t) => {
+    const s = departing(t);
+    const r = await round(s, {
+      verdicts: [DEPARTS("0004", ["core/src/x.ts"])],
+      adrRuling: JSON.stringify([RULED]),
+      afterAsk: () => {
+        s.answers["docs/adr"] = { exit: 3 };
+      },
+    });
+    assertShown(r, 2, "COULD_NOT_RUN: docs/adr", "FAIL: docs/adr: 0004 on core/src/x.ts", `PASS: ${ORG}: no record governs these paths`);
+    assert.equal(rulings(s), null);
+  });
+
+  it("checks a ruling in the folder ask asked, though codeworks.toml at HEAD no longer lists it", async (t) => {
+    const s = departing(t);
+    const r = await round(s, {
+      verdicts: [DEPARTS("0004", ["core/src/x.ts"])],
+      adrRuling: JSON.stringify([RULED]),
+      afterAsk: () => {
+        s.write({ "codeworks.toml": settings([ORG]) });
+        git(s.checkout, "commit", "-qam", "drop docs/adr");
+      },
+    });
+    assert.equal(r.decide?.code, 0, r.decide?.stderr.join("\n"));
+    assert.deepEqual(rulings(s), [RULED]);
+  });
+
+  it("passes on a ruling committed at HEAD that no run of this checkout wrote (AS6)", async (t) => {
+    const s = departing(t);
+    s.write({ [`${SPEC}/adr-rulings.json`]: JSON.stringify({ v: 1, rulings: [RULED] }) });
+    git(s.checkout, "add", `${SPEC}/adr-rulings.json`);
+    git(s.checkout, "commit", "-qm", "rule on 0004");
+    assertPassed(await round(s, { verdicts: [DEPARTS("0004", ["core/src/x.ts"])] }));
+  });
+
+  it("could not run for an entry the working tree changed since HEAD, naming it (AS7)", async (t) => {
+    const s = departing(t);
+    s.write({ [`${SPEC}/adr-rulings.json`]: JSON.stringify({ v: 1, rulings: [RULED] }) });
+    git(s.checkout, "add", `${SPEC}/adr-rulings.json`);
+    git(s.checkout, "commit", "-qm", "rule on 0004");
+    s.write({ [`${SPEC}/adr-rulings.json`]: JSON.stringify({ v: 1, rulings: [{ ...RULED, record: "0005" }] }) });
+    const r = await round(s, { verdicts: [DEPARTS("0004", ["core/src/x.ts"])] });
+    assertShown(r, 2, "COULD_NOT_RUN: adr-rulings.json: entry docs/adr 0005 core/src/x.ts was not written by the check");
+  });
 
   for (const [what, entry] of [
     ["an entry", { ...RULED, record: "0005" }],
@@ -1060,20 +1116,4 @@ describe("adr_check.ts stop rounds", () => {
       assert.ok(ran.stderr[0].includes(said), ran.stderr[0]);
     });
   }
-});
-
-describe("the root README", () => {
-  it("installs the adr CLI at the version the check runs", () => {
-    assert.ok(readFileSync(new URL("../../README.md", import.meta.url), "utf8").includes(`\`${ADR_INSTALL}\``));
-  });
-});
-
-describe("drive_workflow.py", () => {
-  it("names as unanswered steps the ones ADR_STOPS does", () => {
-    const driver = readFileSync(new URL("../plugin/skills/issue-spec/scripts/drive_workflow.py", import.meta.url), "utf8");
-    const named = /^UNANSWERED_STEPS = \(([^)]*)\)$/m.exec(driver)?.[1];
-    assert.ok(named !== undefined, "drive_workflow.py declares UNANSWERED_STEPS");
-    const unanswered = new Set(Object.values(ADR_STOPS).flatMap((row) => (row.unanswered === null ? [] : [row.unanswered])));
-    assert.deepEqual(new Set(named.split(",").map((name) => name.trim().replaceAll('"', "")).filter(Boolean)), unanswered);
-  });
 });

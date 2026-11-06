@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import { Finding } from "../src/contracts/finding.ts";
+import { AdrVerdict, TouchedPaths } from "../src/contracts/decision-check.ts";
 import { sortedJsonText } from "../src/contracts/json-text.ts";
 import { LedgerEvent } from "../src/contracts/ledger.ts";
 import { PremisePick, REPORTS_WRONG_BEHAVIOUR, ROOT_CAUSE } from "../src/contracts/premise.ts";
@@ -32,9 +33,12 @@ function premiseJsonText(): string {
   });
 }
 
-// The drift test regenerates from this list too.
+// The drift test regenerates from this list too. The two answer schemas are the model's in planner's plan check
+// (root ADR-0010: an agent's answer schema is generated); its prompts read them installed beside them.
 export const generatedFiles: ReadonlyArray<{ file: string; text: () => string }> = [
   { file: "premise.json", text: premiseJsonText },
+  { file: "adr-verdict.schema.json", text: () => jsonSchemaText(AdrVerdict) },
+  { file: "touched-paths.schema.json", text: () => jsonSchemaText(TouchedPaths) },
 ];
 
 if (import.meta.main) {

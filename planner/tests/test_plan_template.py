@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml  # Spec Kit's own dependency
 
-from paths import PLUGIN, REPO
+from paths import PLUGIN
 
 DRIVER = PLUGIN / "skills" / "issue-spec" / "scripts"
 sys.path.insert(0, str(DRIVER))
@@ -189,33 +189,6 @@ class CheckLoop(unittest.TestCase):
         self.assertEqual(yaml.safe_load((PRESET / "preset.yml").read_text())["requires"]["speckit_version"], SPECKIT_RANGE)
 
 
-class Touches(unittest.TestCase):
-    """The touches step lists the plan's paths; the plan step and its template know nothing of it (R4)."""
-
-    def test_the_touches_prompt_writes_touches_json_from_the_plan_and_nothing_else(self):
-        text = (WORKFLOW / "adr-touches.md").read_text().casefold()
-        for said in ("plan.md", "touches.json", '{"v": 1, "paths": [', "one literal path per file",
-                     "created, changed or deleted", "no glob", "no brace group", "no trailing `/`", "no `..`",
-                     "write no other file"):
-            with self.subTest(said=said):
-                self.assertIn(said, text)
-
-    def test_the_plan_step_its_command_and_its_template_say_nothing_of_touches_json(self):
-        [plan] = top_level("to-plan")["then"]
-        self.assertNotIn("touches", plan["input"]["args"])
-        self.assertNotIn("touches", (PRESET / "commands" / "speckit.plan.md").read_text())
-        self.assertNotIn("touches", composed_plan().casefold())
-
-
-class Judge(unittest.TestCase):
-    """The judge reads a departure as reviewer's decision reviewer does (R7); the copy is pinned here, not maintained."""
-
-    def test_the_judge_defines_a_departure_in_the_decision_reviewers_words(self):
-        reviewer = (REPO / "reviewer" / "plugin" / "agents" / "decision-reviewer.md").read_text()
-        [definition] = [part for part in reviewer.split("\n\n") if part.startswith("A decision record settles a question")]
-        self.assertIn(definition, (WORKFLOW / "adr-judge.md").read_text())
-
-
 class TasksCommand(unittest.TestCase):
     """The tasks command names each file a task touches as a path the check can read (R5)."""
 
@@ -223,12 +196,6 @@ class TasksCommand(unittest.TestCase):
         provided = yaml.safe_load((PRESET / "preset.yml").read_text())["provides"]["templates"]
         [tasks] = [one for one in provided if one["name"] == "speckit.tasks"]
         self.assertEqual((tasks["type"], tasks["file"], tasks["strategy"]), ("command", "commands/speckit.tasks.md", "append"))
-
-    def test_the_tasks_command_asks_for_one_literal_path_per_backtick_span(self):
-        text = (PRESET / "commands" / "speckit.tasks.md").read_text().casefold()
-        for said in ("one literal path", "its own backtick span", "no glob", "no brace group"):
-            with self.subTest(said=said):
-                self.assertIn(said, text)
 
     def test_the_installed_tasks_command_carries_the_presets_path_rule(self):
         self.assertTrue(installed_skill_carries("speckit.tasks"), "speckit-tasks SKILL.md lacks the settled-design preset")

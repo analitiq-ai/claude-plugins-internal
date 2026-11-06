@@ -1,7 +1,8 @@
 # List the plan's paths
 
 Your prompt names a spec folder and a run folder. Read `<spec folder>/plan.md` and write
-`<run folder>/touches.json`, listing every file the plan says is created, changed or deleted:
+`<run folder>/touches.json`, valid against `.specify/workflows/issue-spec/touched-paths.schema.json`, listing every
+file the plan says is created, changed or deleted:
 
 ```json
 {"v": 1, "paths": ["core/src/x.ts", "README.md"]}

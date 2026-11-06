@@ -6,8 +6,9 @@
     drive_workflow.py resume <run id> [<input>=<value>]
     drive_workflow.py resume <run id> adr_ruling=@<file>    a resume carrying the user's ruling on a departure
 
-Values reach specify as argv, never through a shell: issue and ruling text routinely carry backticks. A ruling is
-no workflow input: it reaches the plan check's rounds of that one resume as ADR_RULING, so no later resume sees it.
+The driver starts specify from an argv list, not a shell command line: spec and issue text routinely carry
+backticks. A ruling is no workflow input: it reaches the plan check's rounds of that one resume as ADR_RULING, so no
+later resume sees it.
 The report is read from the run's state.json because the specify CLI prints only a generic error for a
 failed step; the step's own stderr is recorded nowhere else.
 """
@@ -35,10 +36,37 @@ RULING_KEY = ("folder", "record", "path")
 # The plan check's steps with no continue_on_error, adr-settled-design aside, which stops as settled-design does
 # (planner ADR-0009).
 ADR_STOP_STEPS = ("adr-clear", "adr-report", "adr-rounds")
-# The model steps whose not answering is a stop of its own (`unanswered` in ADR_STOPS, planner/plugin/lib/adr-check.ts).
-UNANSWERED_STEPS = ("adr-touches", "adr-tasks", "adr-judge")
-STEP_UNFINISHED = re.compile(r"^COULD_NOT_RUN: adr-check: step (.+) did not finish this round", re.M)
-RULING_REFUSED = re.compile(r"^FAIL: adr_ruling: ", re.M)
+# The plan check's run files (core) and stop table (ADR_STOPS, planner/plugin/lib/adr-check.ts), as planner
+# generates them.
+CHECK = json.loads((PLUGIN / "generated" / "adr-check.json").read_text())
+STOPS = CHECK["stops"]
+ASKED_FILE, RULINGS_FILE, STOP_FILE, TASKS_DUE_FILE = (
+    CHECK["files"][key] for key in ("asked", "rulings", "stop", "tasksDue"))
+
+
+def stop_line(kind):
+    """A whole line of the stop table's row `kind`: `<outcome>: <label>: <what>.`, then ` Next step: <next>.` when the
+    row has a next step. Each `{name}` it fills in is captured as the group `name`."""
+    row = STOPS[kind]
+    said = f"{row['outcome']}: {row['label']}: {row['what']}."
+    if row["next"] is not None:
+        said += f" Next step: {row['next']}."
+    named = set()
+
+    def group(placeholder):
+        name = placeholder[1]
+        if name in named:
+            return f"(?P={name})"
+        named.add(name)
+        return f"(?P<{name}>.*?)"
+
+    return re.compile("^" + re.sub(r"\\\{([a-z]+)\\\}", group, re.escape(said)) + "$", re.M)
+
+
+# The model steps whose not answering is a stop of its own.
+UNANSWERED_STEPS = tuple(dict.fromkeys(row["unanswered"] for row in STOPS.values() if row["unanswered"]))
+STEP_UNFINISHED = stop_line("step-unfinished")
+RULING_REFUSED = stop_line("ruling-refused")
 
 
 def own_id(step):
@@ -57,10 +85,10 @@ def _ran_this_round(state, step):
     """Whether `step`'s record is this round's: specify keeps a step nested in an `if` under its bare id only, so a
     round that skips it leaves an earlier round's record there."""
     if step == "adr-judge":
-        asked = _round_file(state, "adr-asked.json")
+        asked = _round_file(state, ASKED_FILE)
         return asked is not None and any(folder.get("governing") for folder in asked["folders"])
     if step == "adr-tasks":
-        due = _round_file(state, "adr-steps/tasks-due.json")
+        due = _round_file(state, TASKS_DUE_FILE)
         return due is not None and due["due"]
     return True
 
@@ -68,8 +96,8 @@ def _ran_this_round(state, step):
 def _step_errors(state, stderr):
     """The own error of each step the round's stop names as having failed: an unanswered model step, or a step
     that did not finish."""
-    unfinished = [name for line in STEP_UNFINISHED.findall(stderr) for name in line.split(", ")]
-    stop = _round_file(state, "adr-stop.json")
+    unfinished = [name for line in STEP_UNFINISHED.finditer(stderr) for name in line["steps"].split(", ")]
+    stop = _round_file(state, STOP_FILE)
     unanswered = [name for name in UNANSWERED_STEPS if stop is not None and stop["unanswered"]
                   and _ran_this_round(state, name)]
     errors = {}
@@ -189,7 +217,7 @@ def _held_rulings(spec_dir):
     whole, so one that does not parse was edited by hand, and the round stopped on it (`rulings-refused`) before
     any decide could apply a ruling."""
     try:
-        rulings = json.loads((Path(spec_dir) / "adr-rulings.json").read_text())["rulings"]
+        rulings = json.loads((Path(spec_dir) / RULINGS_FILE).read_text())["rulings"]
         return {tuple(ruling[name] for name in RULING_KEY) for ruling in rulings}
     except (FileNotFoundError, ValueError, TypeError, KeyError):
         return set()

@@ -25,7 +25,8 @@ and path a ruling names is ruled on already: do not name that path.
 
 ## Write
 
-Write `<run folder>/adr-verdict.json`, one verdict per governing record per folder, no other:
+Write `<run folder>/adr-verdict.json`, valid against `.specify/workflows/issue-spec/adr-verdict.schema.json`, one
+verdict per governing record per folder, no other:
 
 ```json
 {"v": 1, "verdicts": [

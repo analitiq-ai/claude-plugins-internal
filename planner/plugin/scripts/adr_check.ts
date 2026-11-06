@@ -65,7 +65,7 @@ const {
   rulingKey,
   SourceHashes,
   sourceHashes,
-  STEPS_DIR,
+  stepDoneFile,
   STOP_FILE,
   TASKS_SOURCES_FILE,
   TASKS_SOURCES_NEXT_FILE,
@@ -194,7 +194,7 @@ async function checked(round: Round, checks: () => Promise<void>): Promise<boole
 
 // Each step's last act, after every other file it writes, whatever its answer.
 function done(round: Round, record: AdrStepDone): void {
-  writeRecord(inRun(round, `${STEPS_DIR}/${record.step}.json`), record);
+  writeRecord(inRun(round, stepDoneFile(record.step)), record);
 }
 
 function hashesOf(text: string | null): SourceHashesType | null {
@@ -533,7 +533,6 @@ function verdictOf(round: Round, asked: AdrAsked, judgeCode: string): AdrVerdict
  *  that refuses them all. */
 async function newRulings(
   round: Round,
-  settings: CheckoutSettings,
   asked: AdrAsked,
   verdict: AdrVerdict,
   rulings: readonly AdrRuling[],
@@ -556,24 +555,20 @@ async function newRulings(
   const held = new Set(rulings.map(rulingKey));
   const fresh = parsed.data.filter((ruling, i) => !held.has(rulingKey(ruling)) && parsed.data.findIndex((one) => rulingKey(one) === rulingKey(ruling)) === i);
   const askedPaths = new Set(asked.paths.map((one) => one.path));
-  const whys = fresh.flatMap(({ folder, record, path }) => {
+  const judged = fresh.map(({ folder, record, path }): ResolvedAdrFolder | string => {
     const listed = asked.folders.find((one) => one.entry === folder);
-    if (listed === undefined) return [`folder ${folder} is not listed in [shared] adr_folders`];
-    if (!askedPaths.has(path)) return [`path ${path} was not asked`];
+    if (listed === undefined) return `folder ${folder} is not listed in [shared] adr_folders`;
+    if (!askedPaths.has(path)) return `path ${path} was not asked`;
     const departures = decideFolder(listed, verdict.verdicts, asked.paths, []).departures;
-    if (!departures.some((one) => one.record === record && one.path === path)) return [`no departure this round on ${folder} ${record} ${path}`];
-    return [];
+    if (!departures.some((one) => one.record === record && one.path === path)) return `no departure this round on ${folder} ${record} ${path}`;
+    // A folder ask could not read has no departure, so this one was readable.
+    return { entry: listed.entry, path: listed.path, inside: listed.inside, readable: true };
   });
+  const whys = judged.filter((one): one is string => typeof one === "string");
   if (whys.length > 0) return refused(whys);
 
-  const folders = await listedFolders(round, settings);
-  const answers = await Promise.all(
-    fresh.map(({ folder, path }) => {
-      const resolved = folders.find((one) => one.entry === folder);
-      if (resolved === undefined) throw new TypeError(`${folder} was listed when ask ran and is not now`);
-      return checkAdrFolder(round.io.checkout, resolved, [path], ADR_DEADLINE_MS);
-    }),
-  );
+  const folders = judged.filter((one): one is ResolvedAdrFolder => typeof one !== "string");
+  const answers = await Promise.all(folders.map((folder, i) => checkAdrFolder(round.io.checkout, folder, [fresh[i].path], ADR_DEADLINE_MS)));
   const notRun = answers.filter((answer): answer is CouldNotRun => "outcome" in answer);
   if (notRun.length > 0) return { rulings: [], items: notRun.map((couldNotRun): StopItem => ({ kind: "folder", couldNotRun })) };
   const notGoverning = fresh.flatMap(({ record, path }, i) => {
@@ -611,14 +606,13 @@ async function decideChecks(round: Round, digest: string, judgeCode: string): Pr
   if (guard.length > 0) found(...guard);
 
   const verdict = verdictOf(round, asked, judgeCode);
-  let refusal: StopItem[] = [];
+  let rulingItems: StopItem[] = [];
   if (round.io.adrRuling !== undefined) {
-    const given = await newRulings(round, settings, asked, verdict, rulings, round.io.adrRuling);
-    if (given.items.some((item) => item.kind === "folder")) found(...given.items);
-    refusal = given.items;
+    const given = await newRulings(round, asked, verdict, rulings, round.io.adrRuling);
+    rulingItems = given.items;
     if (given.rulings.length > 0) rulings = appendRulings(round, rulings, given.rulings);
   }
-  const items = [...refusal, ...decideCheck(asked, verdict, rulings)];
+  const items = [...rulingItems, ...decideCheck(asked, verdict, rulings)];
   const { lines, exit } = adrStop(items);
   if (exit !== 0) found(...items);
   return lines;
@@ -642,7 +636,7 @@ function show(round: Round, record: AdrStopRecord): number {
 }
 
 function stepDone(round: Round, step: AdrStepDone["step"]): AdrStepDone | null {
-  const text = textIfPresent(inRun(round, `${STEPS_DIR}/${step}.json`));
+  const text = textIfPresent(inRun(round, stepDoneFile(step)));
   return text === null ? null : jsonOf(text, AdrStepDoneSchema, () => null);
 }
 

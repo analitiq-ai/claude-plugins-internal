@@ -1,0 +1,220 @@
+{
+  "files": {
+    "asked": "adr-asked.json",
+    "rulings": "adr-rulings.json",
+    "stop": "adr-stop.json",
+    "tasksDue": "adr-steps/tasks-due.json"
+  },
+  "stops": {
+    "broken": {
+      "label": "{entry}",
+      "next": "fix that record (in the spec PR, or in the repo that holds {entry})",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{file}: {rule}: {message}"
+    },
+    "departure-inside": {
+      "label": "{entry}",
+      "next": "change plan.md (the next round writes tasks.md again from it); draft a superseding record into the spec PR (planner ADR-0009 d3); or resume with adr_ruling naming {entry}, {record}, {path} and your reason",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{record} on {path}{stories}: {why}"
+    },
+    "departure-outside": {
+      "label": "{entry}",
+      "next": "change plan.md (the next round writes tasks.md again from it); change record {record} in the repo that holds {entry}; or resume with adr_ruling naming {entry}, {record}, {path} and your reason",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{record} on {path}{stories}: {why}"
+    },
+    "empty": {
+      "label": "codeworks.toml",
+      "next": null,
+      "outcome": "PASS",
+      "unanswered": null,
+      "what": "No ADR folder is listed in [shared] adr_folders"
+    },
+    "folder": {
+      "label": "{entry}",
+      "next": null,
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "git": {
+      "label": "git",
+      "next": "run from a git checkout of the repo, then resume",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "github": {
+      "label": "GitHub",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "governed": {
+      "label": "{entry}",
+      "next": null,
+      "outcome": "PASS",
+      "unanswered": null,
+      "what": "governing: {records}"
+    },
+    "guard-asked": {
+      "label": "adr-asked.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "changed after ask"
+    },
+    "guard-paths": {
+      "label": "{file}",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "changed after ask: {changed}"
+    },
+    "guard-rulings": {
+      "label": "adr-rulings.json",
+      "next": "remove the entry; only a resume with adr_ruling adds one",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "entry {folder} {record} {path} was not written by the check"
+    },
+    "questions-refused": {
+      "label": "review-questions.json",
+      "next": "rerun the rescope from `/planner:issue-spec rescope`",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "rounds": {
+      "label": "adr-check",
+      "next": "discard the run's changes to {spec}, then start again: {again}",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "the check ran 100 rounds in one run"
+    },
+    "ruling-refused": {
+      "label": "adr_ruling",
+      "next": "resume with a corrected adr_ruling, or without one",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "rulings-refused": {
+      "label": "adr-rulings.json",
+      "next": "correct {spec}/adr-rulings.json, then resume",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "settings": {
+      "label": "codeworks.toml",
+      "next": "fix codeworks.toml at HEAD, then resume",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "step-unfinished": {
+      "label": "adr-check",
+      "next": "fix what the step's error names, then resume",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "step {steps} did not finish this round (no done record)"
+    },
+    "stop-unread": {
+      "label": "adr-stop.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "does not parse"
+    },
+    "sub-issues-extra": {
+      "label": "#{issue}",
+      "next": "remove them from #{issue}'s sub-issues, or add their stories to spec.md, then resume",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{count} sub-issues for {stories} stories; the extra: {extra}"
+    },
+    "sub-issues-foreign": {
+      "label": "#{issue}",
+      "next": "remove it from #{issue}'s sub-issues, then resume",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "sub-issue {sub} is in another repository"
+    },
+    "sub-issues-misplaced": {
+      "label": "#{issue}",
+      "next": "order #{issue}'s sub-issues so sub-issue {position} is US{position}'s issue, then resume",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "sub-issue {position} is #{sub}, but tasks.md labels US{position} with {label}"
+    },
+    "tasks-empty": {
+      "label": "tasks.md",
+      "next": "delete tasks.md, then resume: the next round writes it again from the plan",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "no task line names a path"
+    },
+    "tasks-refused": {
+      "label": "{where}",
+      "next": "delete tasks.md, then resume: the next round writes it again from the plan; if the line comes back, change spec.md or plan.md first",
+      "outcome": "FAIL",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "tasks-unfinished": {
+      "label": "tasks.md",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": "adr-tasks",
+      "what": "the tasks command did not answer (its exit code is not 0)"
+    },
+    "touches-missing": {
+      "label": "touches.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": "adr-touches",
+      "what": "{what}"
+    },
+    "touches-refused": {
+      "label": "touches.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "touches-stale": {
+      "label": "touches.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "plan.md or spec.md changed after this round listed the plan's paths"
+    },
+    "ungoverned": {
+      "label": "{entry}",
+      "next": null,
+      "outcome": "PASS",
+      "unanswered": null,
+      "what": "no record governs these paths"
+    },
+    "verdict-mismatch": {
+      "label": "{entry}",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": null,
+      "what": "{what}"
+    },
+    "verdict-unread": {
+      "label": "adr-verdict.json",
+      "next": "resume to run the check again",
+      "outcome": "COULD_NOT_RUN",
+      "unanswered": "adr-judge",
+      "what": "{what}"
+    }
+  }
+}

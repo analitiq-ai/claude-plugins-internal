@@ -39,9 +39,9 @@ test("the schema files are spec facts, the snapshot, a finding and a ledger even
   );
 });
 
-test("the generated files include premise.json", () => {
+test("the generated files are premise.json and the plan check's two answer schemas", () => {
   assert.deepEqual(
     generatedFiles.map(({ file }) => file),
-    ["premise.json"],
+    ["premise.json", "adr-verdict.schema.json", "touched-paths.schema.json"],
   );
 });

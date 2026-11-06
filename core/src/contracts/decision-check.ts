@@ -22,7 +22,7 @@ export const TASKS_SOURCES_NEXT_FILE = "tasks-sources-next.json";
 export const STEPS_DIR = "adr-steps";
 export const INPUTS_FILE = "adr-inputs.json";
 export const REVIEW_QUESTIONS_FILE = "review-questions.json";
-/** The run-folder files one round writes; `adr-clear` deletes them all before the round. */
+/** `adr-clear` deletes these before each round. */
 export const ROUND_FILES = [STEPS_DIR, TOUCHES_FILE, INPUTS_FILE, ASKED_FILE, VERDICT_FILE, STOP_FILE] as const;
 
 type CheckedArtifactName = z.infer<typeof CheckedArtifact.schema>;
@@ -196,6 +196,10 @@ export const AdrStepDone = z.discriminatedUnion("step", [
   z.object({ v: z.literal(1), step: z.literal("decide") }).strict(),
 ]);
 export type AdrStepDone = z.infer<typeof AdrStepDone>;
+
+export function stepDoneFile(step: AdrStepDone["step"]): string {
+  return `${STEPS_DIR}/${step}.json`;
+}
 
 export const SourceHashes = z
   .object({ v: z.literal(1), files: z.record(NonEmpty, z.string().regex(/^[0-9a-f]{64}$/)) })
