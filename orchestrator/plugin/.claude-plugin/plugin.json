@@ -1,5 +1,5 @@
 {
   "name": "orchestrator",
   "description": "Drive a story issue from Ready to merge from hooks inside the agent session: mint the session's read-only token, and claim or resume the issue /codeworks <issue> names.",
-  "version": "0.1.5"
+  "version": "0.1.6"
 }
