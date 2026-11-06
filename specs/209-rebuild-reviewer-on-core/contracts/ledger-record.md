@@ -22,7 +22,7 @@ refs match `[A-Za-z0-9._-]+`.
 
 | kind | content | file | applies when (else the commit is invalid) |
 |---|---|---|---|
-| `round` | `{kind, v, round: Round}` (`Round` gains `run`) | `round.<run>.json` | no round with its `(stage, n)` or `run` |
+| `round` | `{kind, v, round: Round}` (`Round` gains `run` and `findings`, R4) | `round.<run>.json` | no round with its `(stage, n)` or `run` |
 | `ruling` | `{kind, v, ruling: Ruling}` with `commits: []` | `ruling.<r>.<h(key)>.json` | its round is in `rounds`; `(round, key)` not ruled |
 | `ruling-commit` | `{kind, v, round: RoundId, key, commit: sha40}` | `ruling-commit.<r>.<h(key)>.<commit>.json` | its ruling is in `rulings`, is FIX, and its `commits` lacks `commit` |
 | `pushback` | `{kind, v, pushback: Pushback}` | `pushback.<r>.<h(key)>.json` | its round is in `rounds` |
@@ -33,6 +33,12 @@ refs match `[A-Za-z0-9._-]+`.
 
 `Hold` rules beyond today's (R8): `question` set on `escalation`, `claim` and a verdict-placed `rescope` (its
 `spec_pr` null), null otherwise. `tamper-` is no `HoldKind` row: the fold derives it.
+
+`Round` rules (R4): `findings` is one `RoundFinding {key, file, line}` per finding the round's reviewers reported,
+`key` as `Ruling.key`, `file` and `line` as `Finding`'s, no text (ADR-0016 d2); keys unique within the round;
+non-empty exactly when `result` is DIRTY. A `ruling`'s and a `pushback`'s `key` names one of its round's `findings`.
+The assessor's facts read earlier rounds' finding counts and positions from them, since no round report outlives
+its run (FR-004, FR-026). Added within `v: 1`: no round event was on any `ledger` before it.
 
 ## Fold
 

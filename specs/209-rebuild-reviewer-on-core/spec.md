@@ -36,6 +36,10 @@ ADR-0013 d2); record each commit that passed its check (reviewer ADR-0002 d2)."
 
 - Q: Where does the record live now that reviewer ADR-0011 is merged (#290)? → A: On the served repo's `ledger` branch, as the reviewer App's GitHub-signed, add-only commits under `issues/<n>/`, each naming the head the hook read, read as a fold through core; `gates` lands with the holds it places in one commit; an invalid commit places `tamper-<oid>`; the reviewer App holds `contents: write` and no `issues` permission, so reviewer posts no comment; the branch and its rulesets are created at setup; nothing migrates at cutover.
 
+### Session 2026-11-06
+
+- Q: Where do the assessor's facts read earlier rounds' finding counts and positions, with no copy between runs (FR-004) and no finding in core's `Round`? → A: From the round event: core's `Round` gains `findings`, each reported finding's key, file and line and no text; the fold is their only source (FR-026).
+
 ## User Scenarios & Testing *(mandatory)*
 
 The actors are the orchestrator's hooks, which attest, push and merge a story from GitHub state alone
@@ -298,6 +302,11 @@ made, on the first run only. Repeat with the record faked as a resume; check non
 - **FR-025**: When the served repo has no `ledger` branch, every state read or write MUST refuse as a check
   that could not run, naming setup step 6 of the orchestrator README; reviewer MUST create neither the branch
   nor a ruleset (derived from the orchestrator README step 6 and constitution P4).
+- **FR-026**: A round's record MUST carry each finding its reviewers reported as its key, file and line and no
+  text (ADR-0016 d2): keys unique within the round, none on a CLEAN or INCOMPLETE round, at least one on a
+  DIRTY round; every ruling and pushback MUST name one of its round's findings. The assessor's facts (finding
+  counts of earlier rounds, positions reviewed before, ADR-0018 d2's reset point) MUST read them from the fold
+  and nowhere else (FR-004).
 
 ### Key Entities
 
@@ -310,6 +319,8 @@ made, on the first run only. Repeat with the record faked as a resume; check non
 - **Event file**: one file per event under the story's directory, named by kind and key: a round by its
   workflow run, a hold by its id and `since`. Its shape and the snapshot's are core contracts this spec
   folder's data model defines (root ADR-0003 d3).
+- **Round finding**: a finding as its round records it: key, file and line, no text; what a ruling and a
+  pushback name (FR-026).
 - **Hold**: a row keyed `<kind>-<id>`, OPEN or RELEASED; once placed, its row stays. `tamper-<oid>` has no
   row: the fold derives it from the invalid commit it names.
 - **Session's issue record**: what the orchestrator writes when it claims or resumes a story: the issue

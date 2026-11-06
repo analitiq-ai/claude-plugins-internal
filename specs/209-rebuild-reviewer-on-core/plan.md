@@ -81,7 +81,7 @@ Post-design re-check: unchanged, all pass.
 - Hook path in TypeScript, Python retired, carrier link to core: R1
 - Reader from the session token, writer minted as the reviewer App with `contents: write`, `[reviewer]` settings: R2
 - One reading per run, advanced by each write; expected head serialises writers; `StateStale` retry: R3
-- Round results, verdicts and hold kinds mapped onto core's value sets; `Round.run`: R4
+- Round results, verdicts and hold kinds mapped onto core's value sets; `Round.run`, `Round.findings`: R4
 - Ledger events and file names as core contracts, JSON Schemas generated: R5
 - State read as the fold of `issues/<n>/`, commits classed, `tamper-<oid>` derived, `LedgerMissing`: R6
 - Add-only writes through `createCommitOnBranch`, signature asserted, events derived from transitions: R7
@@ -121,7 +121,7 @@ specs/209-rebuild-reviewer-on-core/
 core/src/
 ├── contracts/ledger.ts            # PR B: LedgerEvent, eventFile
 ├── contracts/gates.ts             # PR B
-├── contracts/snapshot.ts          # PR B: Round.run, Hold.question kinds, gates
+├── contracts/snapshot.ts          # PR B: Round.run, Hold.question kinds, gates; PR B2: Round.findings
 ├── state.ts                       # PR B: fold reader, commitEvents, writes take the reading; state-comment parsing deleted, issueComments and the issue reads kept
 ├── tokens.ts                      # PR B: APP_PERMISSIONS.reviewer = {contents: write}
 ├── contracts/commit-pass.ts       # PR C
