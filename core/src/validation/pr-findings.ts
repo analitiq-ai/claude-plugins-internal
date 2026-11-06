@@ -4,39 +4,50 @@ import { couldNotRun, couldNotRunIfUnread, type CouldNotRun } from "../outcomes.
 import type { Shared } from "../settings.ts";
 import { CheckOutcome } from "../values.ts";
 import { assertAsked } from "./contract.ts";
-import { checkRuns, findingOf, moduleCheckName, newestRunBy, requiredChecks, runReading, type CheckRun } from "./required-checks.ts";
+import { checkRuns, findingOf, moduleCheckName, newestRunBy, requiredChecks, runReading } from "./required-checks.ts";
 import { threadsModule, type ProviderLogins } from "./threads.ts";
 
 const { FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 
-/** A read the head's findings depend on could not run; the message is its COULD_NOT_RUN reason, naming the read first. */
+/**
+ * The COULD_NOT_RUN of a source prFindings reads (required-checks, threads or a module), whatever made it: GitHub not
+ * answering, a run concluding cancelled, settings that leave no check to read. The message is its reason; `cause` is
+ * GitHub's error when that is why. A refused read is no COULD_NOT_RUN: GitHubRefused passes through.
+ */
 export class FindingsCouldNotRun extends Error {
-  constructor(reason: string) {
-    super(reason);
+  readonly source: string;
+
+  constructor({ source, reason, cause }: CouldNotRun) {
+    super(reason, cause === undefined ? undefined : { cause });
     this.name = "FindingsCouldNotRun";
+    this.source = source;
   }
 }
 
 // Returned as an empty list, a COULD_NOT_RUN would read as nothing found.
 function findingsOrThrow(answer: Finding[] | CouldNotRun): Finding[] {
-  if ("outcome" in answer) throw new FindingsCouldNotRun(answer.reason);
+  if ("outcome" in answer) throw new FindingsCouldNotRun(answer);
   return answer;
 }
 
 // A run that could not run is never a pass (root ADR-0004 d1).
-async function moduleFindings(reader: GitHubClient, at: string, head: string, module: string, orchestratorLogin: string): Promise<Finding[] | CouldNotRun> {
+async function readModule(reader: GitHubClient, at: string, head: string, module: string, orchestratorLogin: string): Promise<Finding[] | CouldNotRun> {
   const name = moduleCheckName(module);
-  let runs: CheckRun[];
-  try {
-    runs = await checkRuns(reader, at, head, name);
-  } catch (error) {
-    return couldNotRunIfUnread(module, error);
-  }
-  const run = newestRunBy(runs, orchestratorLogin);
+  const run = newestRunBy(await checkRuns(reader, at, head, name), orchestratorLogin);
   if (run === undefined) return [];
   const reading = runReading(run);
   if (reading.outcome === COULD_NOT_RUN) return couldNotRun(module, `${name} concluded ${reading.state}`);
   return reading.outcome === FAIL ? [findingOf({ name, ...reading }, module, `module-review:${module}`)] : [];
+}
+
+// GitHub's no answer, or its answer in part, is the module's outcome at its own boundary, as it is required-checks'
+// and threads'.
+async function moduleFindings(reader: GitHubClient, at: string, head: string, module: string, orchestratorLogin: string): Promise<Finding[] | CouldNotRun> {
+  try {
+    return await readModule(reader, at, head, module, orchestratorLogin);
+  } catch (error) {
+    return couldNotRunIfUnread(module, error);
+  }
 }
 
 /**

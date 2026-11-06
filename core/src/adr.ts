@@ -149,7 +149,7 @@ export async function checkAdrFolder(
   if (folder.inside !== liesUnder(root, folder.path)) {
     throw new TypeError(`${folder.entry} was not resolved from ${root}: inside is ${folder.inside} for ${folder.path}`);
   }
-  const notRun = (why: string): CouldNotRun => couldNotRun(folder.entry, why);
+  const notRun = (why: string, cause?: unknown): CouldNotRun => couldNotRun(folder.entry, why, cause);
   if (!folder.readable) {
     return notRun(
       `not a readable folder, so adr was not called. Next step: make ${folder.path} a readable folder, ` +
@@ -175,8 +175,8 @@ export async function checkAdrFolder(
   };
   const unstarted = (what: string, error: Error & { code?: unknown }): CouldNotRun =>
     error.code === "ENOENT"
-      ? notRun(`the adr command was not found (adrkit needs node 22 or later). Next step: ${ADR_INSTALL}.`)
-      : notRun(`${what} could not be started (${error.message}). Next step: ${ADR_INSTALL}.`);
+      ? notRun(`the adr command was not found (adrkit needs node 22 or later). Next step: ${ADR_INSTALL}.`, error)
+      : notRun(`${what} could not be started (${error.message}). Next step: ${ADR_INSTALL}.`, error);
 
   const version = await step("adr --version", ["--version"]);
   if (version.kind === "late") return late();
@@ -199,8 +199,8 @@ export async function checkAdrFolder(
     const ended = check.code === null ? `was ended by ${check.signal}` : `exited ${check.code}`;
     return notRun(`adr check ${ended}: ${check.stderr.trim()} Next step: fix what adr says.`);
   };
-  const unread = (what: string): CouldNotRun =>
-    notRun(`adr check answered in a shape core does not read (${what}). Next step: ${ADR_INSTALL}.`);
+  const unread = (what: string, refusal: Error): CouldNotRun =>
+    notRun(`adr check answered in a shape core does not read (${what}). Next step: ${ADR_INSTALL}.`, refusal);
 
   if (check.code !== 0 && check.code !== 1) return failed();
   let raw: unknown;
@@ -210,14 +210,14 @@ export async function checkAdrFolder(
     if (!(error instanceof SyntaxError)) throw error;
     // Exit 1 is a check that failed on a changed record, answered on stdout like exit 0, or adrkit's own failure,
     // answered on stderr alone.
-    return check.code === 1 ? failed() : unread(`its answer is not valid JSON: ${error.message}`);
+    return check.code === 1 ? failed() : unread(`its answer is not valid JSON: ${error.message}`, error);
   }
   let answer: AdrAnswer | AdrScanCapped;
   try {
     answer = readAdrAnswer(raw);
   } catch (error) {
     if (!(error instanceof AdrAnswerUnread)) throw error;
-    return unread(error.message);
+    return unread(error.message, error);
   }
   if ("capped" in answer) {
     const what = answer.capped.map(({ rule, message }) => `${message} (${rule})`).join("; ");

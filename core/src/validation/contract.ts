@@ -180,7 +180,7 @@ export async function trigger(module: Module, repo: string, pr: number, head: st
   try {
     answered = await module.opened.trigger(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   const parsed = Time.nullable().safeParse(answered);
   if (!parsed.success) return couldNotRun(module.name, `its trigger answer is refused: ${z.prettifyError(parsed.error)}`);
@@ -208,7 +208,7 @@ export async function status(
   try {
     answered = await module.opened.status(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   const parsed = PackageStatus.safeParse(answered);
   if (!parsed.success) return couldNotRun(module.name, `its status answer is refused: ${z.prettifyError(parsed.error)}`);
@@ -228,7 +228,7 @@ export async function status(
     now = await module.deps.reader.now();
   } catch (error) {
     // Without GitHub's clock, PENDING and SILENT cannot be told apart.
-    return couldNotRunIfUnread(`${module.name}: GitHub's time`, error);
+    return couldNotRunIfUnread(module.name, error);
   }
   const elapsed = (Date.parse(now) - Date.parse(since)) / 1000;
   if (elapsed >= timeoutSeconds) {
@@ -247,7 +247,7 @@ export async function findings(module: Module, repo: string, pr: number, head: s
   try {
     answered = await module.opened.findings(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   if (!Array.isArray(answered)) return couldNotRun(module.name, `its findings answer is not a list: ${JSON.stringify(answered)}`);
   const parsed = z.array(Finding).safeParse(answered);
