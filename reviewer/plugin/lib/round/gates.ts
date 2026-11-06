@@ -5,6 +5,7 @@ import { gatesRecorded, recordGates, type Opening, type StateReading } from "../
 import { ClaimVerdict, HoldKind } from "../../core/values.ts";
 import { anchoredSection, fileAt, type AnchorSources } from "../check/bare-copy.ts";
 import { succeed, Words, type Budget } from "../check/lineage.ts";
+import { orCouldNotRun } from "../hook-io.ts";
 import { known } from "../known.ts";
 import { checkRef, enterRuling, mintLineage, type Claim, type ClaimCheck, type Verdict } from "../rules/claim.ts";
 import { claimOpening, lineageCount, openItems, shimOpening, type WrongRuling } from "../rules/counts.ts";
@@ -52,7 +53,7 @@ export async function checkSection(sources: AnchorSources, reading: StateReading
   const gates = reading.snapshot?.gates ?? null;
   if (gates === null) return { branch, anchor: head, lineages: [], bugs: [] };
   if (gates.branch !== branch) throw new GatesBranchMismatch(gates.branch, branch);
-  return anchoredSection(sources, gates, head, resetOf(reading));
+  return orCouldNotRun(anchoredSection(sources, gates, head, resetOf(reading)), `the gates anchor of branch ${branch}`);
 }
 
 /**
@@ -108,7 +109,8 @@ function wrongRuling({ quote, line }: Claim, { failing_case, assertions }: Verdi
 
 /**
  * `lineages` with each verdict of `claims` entered under `ref` in the lineage its claim inherits, a WRONG claim that
- * inherits none opening its own; with the WRONG each lineage was given.
+ * inherits none opening its own; with the WRONG each lineage was given, the last in `claims`' order when a split lineage
+ * was given several.
  */
 function ruled(
   lineages: readonly Lineage[],

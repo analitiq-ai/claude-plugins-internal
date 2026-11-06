@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { sessionFolder, type Session } from "../../core/commit-pass.ts";
 import type { Gates } from "../../core/contracts/gates.ts";
 import { makePrivateFolder } from "../../core/files.ts";
-import { runGit } from "../../core/git.ts";
+import { GitFailed, runGit } from "../../core/git.ts";
 import { GitHubRefused, type GitHubClient, type Repository } from "../../core/github.ts";
 import { sectionWithoutAnchor } from "../rules/anchor.ts";
 
@@ -12,6 +12,17 @@ const COPY = "repo.git";
 // GitHub answers 422 for a sha no commit of the repository has; its 404 is for a repository the token cannot see, so
 // it says nothing of the commit.
 const NO_SUCH_COMMIT = 422;
+
+// upload-pack's refusal of a want of an object its repository lacks; git does not translate it.
+const CLONE_LACKS = "upload-pack: not our ref";
+
+/** The fetch of the anchor from a source failed, and not because the source lacks it. */
+export class AnchorFetchFailed extends Error {
+  constructor(source: string, sha: string, failure: GitFailed) {
+    super(`the fetch of commit ${sha} from ${source} failed: ${failure.stderr.trim()}`, { cause: failure });
+    this.name = "AnchorFetchFailed";
+  }
+}
 
 function anchorRefspec(sha: string): string {
   return `${sha}:refs/anchors/${sha}`;
@@ -31,15 +42,21 @@ export async function holdsCommit(copy: string, sha: string): Promise<boolean> {
 }
 
 /**
- * Takes commit `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone
- * (ADR-0021 d6). False for a commit the clone lacks.
+ * Takes commit `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone and is
+ * the only git command run in it (ADR-0021 d6). False when the fetch answers that the clone lacks the commit;
+ * AnchorFetchFailed when git exits non-zero for any other reason.
  */
 export async function fetchFromClone(copy: string, clone: string, sha: string): Promise<boolean> {
   // git reads a relative path with a colon in it as an ssh host.
   if (!isAbsolute(clone)) throw new TypeError(`the model's clone is not an absolute path: ${JSON.stringify(clone)}`);
-  if (!(await holdsCommit(clone, sha))) return false;
-  await runGit(copy, ["fetch", "--quiet", "--no-tags", "--end-of-options", clone, anchorRefspec(sha)]);
-  return true;
+  try {
+    await runGit(copy, ["fetch", "--quiet", "--no-tags", "--end-of-options", clone, anchorRefspec(sha)]);
+    return true;
+  } catch (error) {
+    if (!(error instanceof GitFailed)) throw error;
+    if (error.stderr.includes(`${CLONE_LACKS} ${sha}`)) return false;
+    throw new AnchorFetchFailed(`the model's clone ${clone}`, sha, error);
+  }
 }
 
 /**
@@ -59,7 +76,8 @@ export async function fileAt(copy: string, sha: string, file: string): Promise<s
 
 /**
  * Asks GitHub for commit `sha` of `repo` and, when it has it, takes it into the copy's own ref through `fetchRefspecs`.
- * False for a commit GitHub lacks; any other refusal is no answer and is thrown.
+ * False for a commit GitHub lacks; any other refusal is no answer and is thrown. AnchorFetchFailed when git exits non-zero
+ * fetching a commit GitHub has.
  */
 export function fromGitHub(reader: GitHubClient, repo: Repository, fetchRefspecs: (refspecs: readonly string[]) => Promise<void>): (sha: string) => Promise<boolean> {
   return async (sha) => {
@@ -69,12 +87,21 @@ export function fromGitHub(reader: GitHubClient, repo: Repository, fetchRefspecs
       if (error instanceof GitHubRefused && error.status === NO_SUCH_COMMIT) return false;
       throw error;
     }
-    await fetchRefspecs([anchorRefspec(sha)]);
+    try {
+      await fetchRefspecs([anchorRefspec(sha)]);
+    } catch (error) {
+      if (!(error instanceof GitFailed)) throw error;
+      throw new AnchorFetchFailed(`GitHub ${repo.owner}/${repo.name}`, sha, error);
+    }
     return true;
   };
 }
 
-/** Where a check looks for the gates' anchor, in this order. `clone` and `github` are true once they took the commit into the copy. */
+/**
+ * Where a check looks for the gates' anchor, in this order. `clone` and `github` answer true once they took the commit
+ * into the copy, and false only when they lack it: a false from every source is taken as the anchor being gone, so a
+ * source that cannot tell throws.
+ */
 export type AnchorSources = { copy: string; clone: (sha: string) => Promise<boolean>; github: (sha: string) => Promise<boolean> };
 
 /**
