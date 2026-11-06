@@ -116,7 +116,7 @@ describe("the decision check's refusals", () => {
 
   it("a broken record refuses the round with a fix that works where its folder lies", () => {
     const inRepo = brokenRefusal([{ folder: IN_REPO, answer: ANSWER }]);
-    assert.match(inRepo ?? "", /^The decision check failed, not the change: adr fails on decision records this change touches\.\n/);
+    assert.match(inRepo ?? "", /^The decision check failed, not the change: adr reports these decision records broken\.\n/);
     assert.match(
       inRepo ?? "",
       /- docs\/adr docs\/adr\/0006-same-id\.md \(id 0006\): ADR id "0006" is used by multiple records \(unique-id\)\. Next step: correct the record in this repo, commit and launch again\./,
