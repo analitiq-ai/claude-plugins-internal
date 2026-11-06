@@ -35,10 +35,13 @@ export class RunState {
    * Writes what `decide` concludes from the reading. When `ledger` moved, the same write is made again at the new
    * head if no commit since touched the story; otherwise the story is read and decided again.
    */
-  async step<D>(decide: (reading: StateReading) => D, write: (reading: StateReading, decision: D) => Promise<StateReading>): Promise<StateReading> {
+  async step<D>(
+    decide: (reading: StateReading) => D | Promise<D>,
+    write: (reading: StateReading, decision: D) => Promise<StateReading>,
+  ): Promise<StateReading> {
     const { reader, repo, issue, attempts } = this.#source;
     let reading = await this.reading();
-    let decision = decide(reading);
+    let decision = await decide(reading);
     for (let attempt = 1; ; attempt += 1) {
       try {
         const advanced = await orCouldNotRun(write(reading, decision));
@@ -50,7 +53,7 @@ export class RunState {
         if (await orCouldNotRun(storyTouched(reader, repo, issue, reading.head, error.head))) {
           this.#reading = this.#read();
           reading = await this.#reading;
-          decision = decide(reading);
+          decision = await decide(reading);
         } else {
           reading = { ...reading, head: error.head };
           this.#reading = Promise.resolve(reading);

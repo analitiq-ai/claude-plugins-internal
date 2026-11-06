@@ -81,6 +81,11 @@ export function claimRef(id: string): string {
   return `claim-${id}`;
 }
 
+/** The ref a claim check of `tree` enters its rulings under: a tree checked again has the same ref. */
+export function checkRef(repo: string, tree: string): string {
+  return `${repo}#tree:${tree}`;
+}
+
 export function parseClaimRef(ref: unknown): string | null {
   return typeof ref === "string" ? (CLAIM_REF.exec(ref)?.groups?.claim ?? null) : null;
 }
