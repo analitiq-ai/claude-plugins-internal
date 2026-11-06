@@ -72,13 +72,13 @@ describe("fetchFromClone and holdsCommit", () => {
     assert.equal(await holdsCommit(copy, later), true);
   });
 
-  it("answers false for a sha the clone lacks, and throws CloneFetchFailed naming the clone and the sha for a clone that is no repository", async (t) => {
+  it("answers false for a sha the clone lacks, and throws AnchorFetchFailed naming the clone and the sha for a clone that is no repository", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const { clone } = cloneWith(t, { "a.md": "a\n" });
     assert.equal(await fetchFromClone(copy, clone, ABSENT), false);
     const noRepository = tempHome(t);
     await assert.rejects(fetchFromClone(copy, noRepository, ABSENT), (error: unknown) => {
-      assert.ok(error instanceof Error && error.name === "CloneFetchFailed", String(error));
+      assert.ok(error instanceof Error && error.name === "AnchorFetchFailed", String(error));
       assert.ok(error.message.includes(noRepository) && error.message.includes(ABSENT), error.message);
       return true;
     });

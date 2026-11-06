@@ -507,12 +507,12 @@ describe("anchoredSection (contracts/gates-snapshot.md §Anchor)", () => {
     assert.equal(await holdsCommit(copy, pushed.head), true);
   });
 
-  it("throws CloneFetchFailed, asking GitHub nothing, when the clone is no repository", async (t) => {
+  it("throws AnchorFetchFailed, asking GitHub nothing, when the clone is no repository", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const section = gates({ branch: BRANCH, anchor: sha(4096), lineages: [lineageFixture("L1")] });
     const fromGitHub = recorded(noGitHub);
     const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, tempHome(t), anchor), github: fromGitHub.ask };
-    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), { name: "CloneFetchFailed" });
+    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), { name: "AnchorFetchFailed" });
     assert.deepEqual(fromGitHub.asks, []);
   });
 

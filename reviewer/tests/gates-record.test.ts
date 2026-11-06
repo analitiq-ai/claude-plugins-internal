@@ -5,12 +5,13 @@ import { describe, it, type TestContext } from "node:test";
 
 import { addedFiles, at, commitsAsked, gates, ISSUE, lineage, NOW, reader, releasedHold, REPO, round, SHARED, sha, snapshot, writer } from "../../core/tests/fixtures/state/issue.ts";
 import { event, eventCommit, fakeLedger, fileOf, storyDir, storyOf, type FakeLedger } from "../../core/tests/fixtures/state/ledger.ts";
-import type { FakeGitHub } from "../../core/tests/support/fake-github.ts";
+import { fakeGitHub, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import type { Bug, Lineage } from "../plugin/core/contracts/gates.ts";
 import type { Hold, Snapshot } from "../plugin/core/contracts/snapshot.ts";
+import { GitFailed } from "../plugin/core/git.ts";
 import { readState, type StateReading } from "../plugin/core/state.ts";
 import { HoldKind, HoldState, RoundStage } from "../plugin/core/values.ts";
-import { bareCopy, fetchFromClone, type AnchorSources } from "../plugin/lib/check/bare-copy.ts";
+import { bareCopy, fetchFromClone, fromGitHub, type AnchorSources } from "../plugin/lib/check/bare-copy.ts";
 import { Words } from "../plugin/lib/check/lineage.ts";
 import { CouldNotRun, FIX_THEN_RETRY } from "../plugin/lib/hook-io.ts";
 import { GatesBranchMismatch, recordCheck, type CompletedCheck, type GatesRecorder } from "../plugin/lib/round/gates.ts";
@@ -314,6 +315,23 @@ describe("recordCheck: refusals (contracts/refusals.md)", () => {
     await assert.rejects(recordCheck({ ...h.recorder, sources }, claimCheck(r)), (error: unknown) => {
       assert.ok(error instanceof CouldNotRun, String(error));
       for (const named of [noRepository, BRANCH, sha(4096), FIX_THEN_RETRY]) assert.ok(error.message.includes(named), error.message);
+      return true;
+    });
+    assert.equal(commitsAsked(h.out).length, 0);
+  });
+
+  it("refuses as could not run naming GitHub's repository, the branch and the anchor when the fetch of a commit GitHub has fails; nothing committed", async (t) => {
+    const r = repo(t);
+    const anchor = sha(4096);
+    const h = harness(r, seeded(snapshot({ gates: gates({ anchor, lineages: [wrongLineage(sha(11))] }) })));
+    const [owner, name] = REPO.split("/");
+    const answering = fakeGitHub({ rest: { [`GET /repos/${REPO}/commits/${anchor}`]: { sha: anchor } } });
+    const github = fromGitHub(answering, { owner, name }, async () => {
+      throw new GitFailed(["fetch"], 128, "fatal: unable to access the repository");
+    });
+    await assert.rejects(recordCheck({ ...h.recorder, sources: { copy: r.copy, clone: async () => false, github } }, claimCheck(r)), (error: unknown) => {
+      assert.ok(error instanceof CouldNotRun, String(error));
+      for (const named of [REPO, BRANCH, anchor, FIX_THEN_RETRY]) assert.ok(error.message.includes(named), error.message);
       return true;
     });
     assert.equal(commitsAsked(h.out).length, 0);
