@@ -1,16 +1,12 @@
 import assert from "node:assert/strict";
-import { before, describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import { describe, it } from "node:test";
 
 import { Finding } from "../src/contracts/finding.ts";
 import { GitHubRefused, GitHubUnanswered } from "../src/github.ts";
 import type { CouldNotRun, StatusAnswer } from "../src/outcomes.ts";
 import type { Shared } from "../src/settings.ts";
-import { loadValidators, type Validators } from "../src/validation/contract.ts";
 import { internalReviewAt, requiredChecks } from "../src/validation/required-checks.ts";
 import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "./support/fake-github.ts";
-
-const DIR = fileURLToPath(new URL("./fixtures/validators/", import.meta.url));
 
 const REPO = "acme/widgets";
 const PR = 31;
@@ -89,18 +85,12 @@ function reader({ base = "main", mergeable, headRefOid, rules, runs = {}, status
   });
 }
 
-let validators: Validators;
-
-before(async () => {
-  validators = await loadValidators(SHARED, DIR, { reader: fakeGitHub({}), writer: fakeGitHub({}), plugin: "reviewer" });
-});
-
 async function answers(
   recorded: Recorded,
   shared: Shared = SHARED,
 ): Promise<{ status: StatusAnswer; findings: Finding[] | CouldNotRun; client: FakeGitHub }> {
   const client = reader(recorded);
-  const checks = requiredChecks(shared, client, validators);
+  const checks = requiredChecks(shared, client);
   return { status: await checks.status(REPO, PR, HEAD), findings: await checks.findings(REPO, PR, HEAD), client };
 }
 
@@ -142,7 +132,7 @@ describe("the required checks come from the rules of the PR's base branch", () =
     assert.deepEqual(findings.map((finding) => finding.key), ["required-check:lint"]);
   });
 
-  it("leaves out internal-review and a loaded module's <module>-review, reading neither", async () => {
+  it("leaves out internal-review and a [shared] validators module's <module>-review, reading neither", async () => {
     const { status, client } = await answers({
       rules: [requiring({ context: "internal-review" }, { context: "fixture-review" }, { context: "ci" })],
       runs: { ci: [run("ci", "success")] },
@@ -151,7 +141,7 @@ describe("the required checks come from the rules of the PR's base branch", () =
     assert.deepEqual(readPaths(client), new Set([rulesPath("main"), runsPath("ci"), STATUSES_PATH]));
   });
 
-  it("keeps the <module>-review of a module that is not loaded", async () => {
+  it("keeps the <module>-review of a module [shared] validators does not list", async () => {
     const { status } = await answers({ rules: [requiring({ context: "second-review" })], runs: { "second-review": [] } });
     assert.equal(status.outcome, "PENDING");
   });
@@ -184,7 +174,7 @@ describe("with [shared] required_checks set, the checks it lists are the require
     assert.deepEqual(readPaths(client), new Set([runsPath("ci"), runsPath("lint"), STATUSES_PATH]));
   });
 
-  it("leaves out a listed internal-review and a loaded module's <module>-review, reading neither", async () => {
+  it("leaves out a listed internal-review and a [shared] validators module's <module>-review, reading neither", async () => {
     const shared = { ...SHARED, required_checks: ["internal-review", "fixture-review", "ci"] };
     const { status, client } = await answers({ rules: [], runs: { ci: [run("ci", "success")] } }, shared);
     assert.deepEqual(status, { outcome: "PASS", reason: null });
@@ -252,7 +242,7 @@ describe("a required check is matched at the head asked", () => {
       restPages: { [rulesPath("main")]: [requiring({ context: "ci" })], [STATUSES_PATH]: [] },
       rest: { [`GET ${runsPath("ci")}`]: { total_count: 101, check_runs: [run("ci", "success")] } },
     });
-    assertCouldNotRun(await requiredChecks(SHARED, client, validators).status(REPO, PR, HEAD), /101 check runs/);
+    assertCouldNotRun(await requiredChecks(SHARED, client).status(REPO, PR, HEAD), /101 check runs/);
   });
 });
 
@@ -378,7 +368,7 @@ describe("a conflict with the PR's base branch is one finding, read from GitHub 
 
   it("is COULD_NOT_RUN on a mergeability GitHub has added, read as neither a conflict nor none", async () => {
     const client = reader({ mergeable: "MAYBE", rules: [requiring({ context: "ci" })], runs: { ci: [run("ci", "success")] } });
-    assertCouldNotRun(await requiredChecks(SHARED, client, validators).findings(REPO, PR, HEAD), /mergeable/);
+    assertCouldNotRun(await requiredChecks(SHARED, client).findings(REPO, PR, HEAD), /mergeable/);
   });
 });
 
@@ -407,15 +397,15 @@ describe("status: any FAIL, else any COULD_NOT_RUN, all PASS, else PENDING", () 
   });
 
   it("has no trigger", () => {
-    assert.deepEqual(Object.keys(requiredChecks(SHARED, fakeGitHub({}), validators)).sort(), ["findings", "status"]);
+    assert.deepEqual(Object.keys(requiredChecks(SHARED, fakeGitHub({}))).sort(), ["findings", "status"]);
   });
 });
 
 describe("what is not a check outcome propagates", () => {
   it("a refusal from GitHub, such as no PR, throws", async () => {
     const client = fakeGitHub({ graphql: [{ when: () => true, answer: new GitHubRefused(200, "POST /graphql: Could not resolve to a PullRequest") }] });
-    await assert.rejects(requiredChecks(SHARED, client, validators).status(REPO, PR, HEAD), GitHubRefused);
-    await assert.rejects(requiredChecks(SHARED, client, validators).findings(REPO, PR, HEAD), GitHubRefused);
+    await assert.rejects(requiredChecks(SHARED, client).status(REPO, PR, HEAD), GitHubRefused);
+    await assert.rejects(requiredChecks(SHARED, client).findings(REPO, PR, HEAD), GitHubRefused);
   });
 
   const asks: [string, string, number, string][] = [
@@ -426,7 +416,7 @@ describe("what is not a check outcome propagates", () => {
   for (const [what, repo, pr, head] of asks) {
     it(`${what} throws before any read`, async () => {
       const client = reader({ rules: [requiring({ context: "ci" })], runs: { ci: [] } });
-      const checks = requiredChecks(SHARED, client, validators);
+      const checks = requiredChecks(SHARED, client);
       await assert.rejects(checks.status(repo, pr, head), TypeError);
       await assert.rejects(checks.findings(repo, pr, head), TypeError);
       assert.deepEqual(client.calls, []);

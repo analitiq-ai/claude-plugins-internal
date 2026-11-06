@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import type { StoryPr } from "../src/identity.ts";
 import type { Shared } from "../src/settings.ts";
 import { StopState, storyStop, type StoryStopFacts } from "../src/story-stop.ts";
 import { importSpecifiers } from "./source-scan.ts";
@@ -14,7 +15,7 @@ const GITHUB = fileURLToPath(new URL("../src/github.ts", import.meta.url));
 const BOARD = "https://github.com/orgs/acme/projects/1";
 const BRANCH = "245-us1-retry-an-upload";
 const WORKTREE = "/work/widgets.worktrees/245-us1-retry-an-upload";
-const PR = { number: 31, head: "b".repeat(40), closed: false, merged: false };
+const PR: StoryPr = { number: 31, head: "b".repeat(40), closed: false, merged: false };
 const LOCAL_HEAD = "a".repeat(40);
 const SHARED: Shared = {
   validators: [],

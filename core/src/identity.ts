@@ -28,8 +28,12 @@ export type SpecFolderAnswer = { one: string } | { none: true } | { several: rea
 /** A spec folder answer that tells a ref with no `specs/` apart from one with no folder for `p`. */
 export type SpecFolderRead = SpecFolderAnswer | { noSpecs: true };
 
-/** The story's PR: `head` is its head commit; a merged PR is closed too. */
-export type StoryPr = { number: number; head: string; closed: boolean; merged: boolean };
+// GitHub answers closed and merged apart; read as one state, a merged PR is closed too.
+const Unmerged = z.object({ closed: z.boolean(), merged: z.literal(false) });
+const Merged = z.object({ closed: z.literal(true), merged: z.literal(true) });
+
+/** The story's PR: `head` is its head commit. */
+export type StoryPr = { number: number; head: string } & (z.infer<typeof Unmerged> | z.infer<typeof Merged>);
 
 /** The text a story is built and graded against; `source` says where it was read. */
 export type Requirement = { kind: SpecKind; text: string; source: string };
@@ -173,20 +177,14 @@ export async function specFolder(tree: Tree, p: number): Promise<string> {
   return pickSpecFolder(names, p);
 }
 
-const PullRequestHeadAnswer = z.object({
-  number: IssueNumber,
-  headRefName: z.string(),
-  headRefOid: GitSha,
-  isCrossRepository: z.boolean(),
-  closed: z.boolean(),
-  merged: z.boolean(),
-});
+const PullRequestHeadFields = { number: IssueNumber, headRefName: z.string(), headRefOid: GitSha, isCrossRepository: z.boolean() };
+const PullRequestHeadAnswer = z.discriminatedUnion("merged", [Unmerged.extend(PullRequestHeadFields), Merged.extend(PullRequestHeadFields)]);
 export type PullRequestHead = z.infer<typeof PullRequestHeadAnswer>;
 
-const PullRequestStateFields = { number: IssueNumber, headRefName: z.string(), isCrossRepository: z.boolean(), closed: z.boolean() };
+const PullRequestStateFields = { number: IssueNumber, headRefName: z.string(), isCrossRepository: z.boolean() };
 const PullRequestStateAnswer = z.discriminatedUnion("merged", [
-  z.object({ ...PullRequestStateFields, merged: z.literal(false), mergeCommit: z.null() }),
-  z.object({ ...PullRequestStateFields, merged: z.literal(true), mergeCommit: z.object({ oid: GitSha }) }),
+  Unmerged.extend({ ...PullRequestStateFields, mergeCommit: z.null() }),
+  Merged.extend({ ...PullRequestStateFields, mergeCommit: z.object({ oid: GitSha }) }),
 ]);
 export type PullRequestState = z.infer<typeof PullRequestStateAnswer>;
 
@@ -216,7 +214,9 @@ function sameRepoNewestFirst<Pr extends { number: number; headRefName: string; i
 export function pickStoryPr(prs: readonly PullRequestHead[], branch: string): StoryPr | null {
   if (storyOf(branch) === null) return null;
   const [newest] = sameRepoNewestFirst(prs, branch);
-  return newest === undefined ? null : { number: newest.number, head: newest.headRefOid, closed: newest.closed, merged: newest.merged };
+  if (newest === undefined) return null;
+  const { number, headRefOid: head } = newest;
+  return newest.merged ? { number, head, closed: true, merged: true } : { number, head, closed: newest.closed, merged: false };
 }
 
 export async function storyPr(reader: GitHubClient, repo: string, branch: string): Promise<StoryPr | null> {

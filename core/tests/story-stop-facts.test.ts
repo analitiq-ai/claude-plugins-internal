@@ -130,12 +130,13 @@ type GitHubSide = {
   branches?: string[];
   pr?: { head: string; closed?: boolean } | null;
   specPrs?: SpecPrNode[];
+  defaultBranch?: string;
   /** A read that throws `error` in place of its answer. */
   failing?: { read: "parent" | "branches"; error: Error };
 };
 
 function gitHub(side: GitHubSide = {}) {
-  const { issue = { state: "open" }, timeline = [], lane = "In progress", branches = [BRANCH], pr = null, specPrs = [] } = side;
+  const { issue = { state: "open" }, timeline = [], lane = "In progress", branches = [BRANCH], pr = null, specPrs = [], defaultBranch = "main" } = side;
   const parent = side.parent === undefined ? { number: 217, repository: { id: REPO_ID, nameWithOwner: REPO } } : side.parent;
   const failed = (read: "parent" | "branches", answer: unknown): unknown => (side.failing?.read === read ? side.failing.error : answer);
   const prs =
@@ -145,7 +146,7 @@ function gitHub(side: GitHubSide = {}) {
   const routes: FakeRoutes = {
     rest: {
       "GET /repos/acme/widgets/issues/245": { ...issue, title: "Retry an upload", body: null },
-      "GET /repos/acme/widgets": { default_branch: "main" },
+      "GET /repos/acme/widgets": { default_branch: defaultBranch },
       // Answered, so a read of GitHub's copy would show as OTHER_BOARD in the facts, not as a refused call (R7).
       "GET /repos/acme/widgets/contents/codeworks.toml?ref=main": {
         type: "file",
@@ -242,6 +243,15 @@ describe("readStoryStopFacts: the facts of a story that stops nowhere", () => {
       `pullRequests ${BRANCH}`,
     ]);
     assert.deepEqual(at.fetched, [MAIN_FETCH, BRANCH_FETCH]);
+  });
+
+  it("fetches the default branch GitHub names, whatever its name", async (t) => {
+    const at = await scratch(t);
+    await git(at.checkout, "push", "-q", at.remote, "main:trunk");
+    const head = await withWorktree(at);
+    await git(at.worktree, "push", "-q", at.remote, BRANCH);
+    await read(at, gitHub({ pr: { head }, defaultBranch: "trunk" }));
+    assert.deepEqual(at.fetched, [[trackingRefspec("trunk")], BRANCH_FETCH]);
   });
 
   it("gives the same branch, worktree and merge facts, and the main checkout, from the main checkout and from the story's worktree", async (t) => {
@@ -461,11 +471,15 @@ describe("readStoryStopFacts: the head the work is on against the PR head", () =
         await commit(at.checkout, { "local.md": "here\n" }, "local");
         await git(at.checkout, "checkout", "-q", "main");
       }
-      const { facts } = await read(at, gitHub({ pr: { head: prHead } }));
+      const github = gitHub({ pr: { head: prHead } });
+      const { facts } = await read(at, github);
       assert.equal(facts.worktree, null);
       assert.equal(facts.head, await git(at.checkout, "rev-parse", BRANCH));
       assert.equal(facts.headVsPr, relation);
       assert.equal(storyStop(facts)?.state, "HEAD_BEHIND_PR");
+      assert.equal(facts.merge, undefined);
+      assert.equal(facts.folder, undefined);
+      assert.ok(!asked(github.calls).includes("pullRequests 217-spec"));
     });
   }
 });

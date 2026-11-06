@@ -63,15 +63,10 @@ export async function prFindings(
   settings: Shared,
   logins: ProviderLogins,
 ): Promise<Finding[]> {
-  // Before either reader starts, so neither reads for a head the other refuses.
+  // The head is checked and both readers made before any read starts, so a refusal leaves no read running.
   assertAsked(repo, pr, head);
-  // requiredChecks reads the modules' names alone, to leave their check runs to this read.
-  const modules = { modules: new Map(settings.validators.map((module) => [module, module] as const)) };
-  const [checks, threads] = await Promise.all([
-    requiredChecks(settings, reader, modules).findings(repo, pr, head),
-    threadsModule(settings, reader, logins).findings(repo, pr, head),
-  ]);
-  const found = [...findingsOrThrow(checks), ...findingsOrThrow(threads)];
+  const sources = [requiredChecks(settings, reader), threadsModule(settings, reader, logins)];
+  const found = (await Promise.all(sources.map((source) => source.findings(repo, pr, head)))).flatMap(findingsOrThrow);
   if (found.length > 0) return found;
   const at = repositoryPath(ownerAndName(repo));
   const fromModules = await Promise.all(

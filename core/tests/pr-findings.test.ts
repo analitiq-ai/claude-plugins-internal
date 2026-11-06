@@ -5,8 +5,8 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { Finding } from "../src/contracts/finding.ts";
-import { GitHubUnanswered } from "../src/github.ts";
-import type { Shared } from "../src/settings.ts";
+import { GitHubRefused, GitHubUnanswered } from "../src/github.ts";
+import { SettingsError, type Shared } from "../src/settings.ts";
 import { FindingsCouldNotRun, prFindings } from "../src/validation/pr-findings.ts";
 import { threadsModule, type ProviderLogins } from "../src/validation/threads.ts";
 import { importSpecifiers } from "./source-scan.ts";
@@ -128,7 +128,7 @@ const runsPath = (name: string): string =>
 /** Check runs by the name asked, or the error their read throws; a name with no entry is never read, so a read of it throws. */
 type Runs = Record<string, ReturnType<typeof run>[] | Error>;
 
-function reader(runs: Runs, threads: FakeAnswer = []): FakeGitHub {
+function reader(runs: Runs, threads: FakeAnswer = [], rules: FakeAnswer = RULES): FakeGitHub {
   return fakeGitHub({
     graphql: [
       {
@@ -137,7 +137,7 @@ function reader(runs: Runs, threads: FakeAnswer = []): FakeGitHub {
       },
     ],
     graphqlPages: [{ when: (query) => query.includes("reviewThreads"), answer: threads }],
-    restPages: { [RULES_PATH]: RULES, [STATUSES_PATH]: [] },
+    restPages: { [RULES_PATH]: rules, [STATUSES_PATH]: [] },
     rest: Object.fromEntries(
       Object.entries(runs).map(([name, list]) => [
         `GET ${runsPath(name)}`,
@@ -263,31 +263,32 @@ describe("prFindings: throws FindingsCouldNotRun naming its source, never return
     );
   });
 
-  it("throws a module's reason, GitHub's error its cause, when GitHub gives no answer for its check runs, never reading it as no finding", async () => {
-    const unanswered = new GitHubUnanswered("the check runs");
-    const runs = { ci: [CI_PASSED], "codex-review": unanswered, "coderabbit-review": [] };
-    await assert.rejects(prFindings(reader(runs), REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("codex", /^codex: the check runs$/, unanswered));
-  });
-
   it("throws required-checks' reason when the rules require no check but its own", async () => {
-    const onlyOwn = fakeGitHub({
-      graphql: [
-        {
-          when: (query) => query.includes("baseRefName"),
-          answer: { repository: { pullRequest: { baseRefName: "main", headRefOid: HEAD, mergeable: "MERGEABLE" } } },
-        },
-      ],
-      graphqlPages: [{ when: (query) => query.includes("reviewThreads"), answer: [] }],
-      restPages: { [RULES_PATH]: [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "internal-review" }] } }] },
-    });
+    const onlyOwn = reader({}, [], [{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "internal-review" }] } }]);
     await assert.rejects(prFindings(onlyOwn, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("required-checks", /^required-checks: the rules of main require no check but internal-review/));
   });
 
-  it("throws threads' reason, GitHub's error its cause, when GitHub gives no answer for the threads", async () => {
-    const unanswered = new GitHubUnanswered("the review threads");
-    const client = reader({ ci: [CI_PASSED] }, unanswered);
-    await assert.rejects(prFindings(client, REPO, PR, HEAD, SETTINGS, LOGINS), findingsCouldNotRun("threads", /^threads: the review threads$/, unanswered));
-  });
+
+  // Each source's read failing with `error`, every read before it answered.
+  const failing: [source: string, failed: (error: Error) => FakeGitHub][] = [
+    ["required-checks", (error) => reader({}, [], error)],
+    ["threads", (error) => reader({ ci: [CI_PASSED] }, error)],
+    ["codex", (error) => reader({ ci: [CI_PASSED], "codex-review": error, "coderabbit-review": [] })],
+  ];
+  for (const [source, failed] of failing) {
+    it(`throws ${source}'s reason, GitHub's error its cause, when GitHub gives no answer for its read, never reading it as no finding`, async () => {
+      const unanswered = new GitHubUnanswered("no answer");
+      await assert.rejects(
+        prFindings(failed(unanswered), REPO, PR, HEAD, SETTINGS, LOGINS),
+        findingsCouldNotRun(source, new RegExp(`^${source}: no answer$`), unanswered),
+      );
+    });
+
+    it(`rejects with GitHub's own refusal when GitHub refuses ${source}'s read: a refused read is no COULD_NOT_RUN`, async () => {
+      const refused = new GitHubRefused(403, "Forbidden");
+      await assert.rejects(prFindings(failed(refused), REPO, PR, HEAD, SETTINGS, LOGINS), (thrown) => thrown === refused);
+    });
+  }
 });
 
 describe("prFindings: the threads as threadsModule reads them given the same logins", () => {
@@ -322,6 +323,13 @@ describe("prFindings: what it is asked", () => {
   it("refuses a head that is not a commit sha before any GitHub read", async () => {
     const client = reader({});
     await assert.rejects(prFindings(client, REPO, PR, "main", SETTINGS, LOGINS), TypeError);
+    assert.deepEqual(client.calls, []);
+  });
+
+  it("refuses settings with no trusted_reviewers before any GitHub read", async () => {
+    const client = reader({});
+    const { trusted_reviewers: _absent, ...untrusted } = SETTINGS;
+    await assert.rejects(prFindings(client, REPO, PR, HEAD, untrusted, LOGINS), SettingsError);
     assert.deepEqual(client.calls, []);
   });
 });

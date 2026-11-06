@@ -27,6 +27,7 @@ import {
   type IssueClose,
   type PullRequestHead,
   type PullRequestState,
+  type StoryPr,
 } from "../src/identity.ts";
 import { gitTree, NotInTree, type Tree, type TreeEntry } from "../src/tree.ts";
 import { fakeGitHub, type FakeCall, type FakeRoutes } from "./support/fake-github.ts";
@@ -292,6 +293,10 @@ describe("specPr's merge commit", () => {
     await assert.rejects(specPr(onSpecBranch({ ...MERGED, mergeCommit: null }), REPO, 145), /not the shape asked for/);
   });
 
+  it("refuses a merged PR that is not closed", async () => {
+    await assert.rejects(specPr(onSpecBranch({ ...MERGED, closed: false }), REPO, 145), /not the shape asked for/);
+  });
+
   for (const [state, over] of [
     ["open", {}],
     ["closed", { closed: true }],
@@ -382,7 +387,7 @@ describe("specFolder", () => {
 });
 
 describe("pickStoryPr", () => {
-  function head(number: number, headRefName: string, over: Partial<PullRequestHead> = {}): PullRequestHead {
+  function head(number: number, headRefName: string, over: { isCrossRepository?: boolean } | { closed: true; merged: true } = {}): PullRequestHead {
     return { number, headRefName, headRefOid: sha(number), isCrossRepository: false, closed: false, merged: false, ...over };
   }
 
@@ -539,6 +544,13 @@ describe("the story PR's closed", () => {
       assert.deepEqual(await issueStory(fakeGitHub(routes(prNode(closed, merged))), REPO, 212), { branch: BRANCH, pr });
     });
   }
+
+  it("refuses a PR answer that is merged yet not closed, which no StoryPr holds", async () => {
+    await assert.rejects(storyPr(fakeGitHub(routes(prNode(false, true))), REPO, BRANCH), /not the shape asked for/);
+    await assert.rejects(issueStory(fakeGitHub(routes(prNode(false, true))), REPO, 212), /not the shape asked for/);
+    // @ts-expect-error merged yet open
+    const mergedOpen: StoryPr = { number: 251, head: sha(251), closed: false, merged: true };
+  });
 
   it("refuses a PR answer that holds no closed", async () => {
     const node = { number: 251, headRefName: BRANCH, headRefOid: sha(251), isCrossRepository: false, merged: false };

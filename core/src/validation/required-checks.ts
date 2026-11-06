@@ -65,9 +65,6 @@ export type RequiredChecks = {
   findings(repo: string, pr: number, head: string): Promise<Finding[] | CouldNotRun>;
 };
 
-/** The loaded modules, by name; `Validators` from `loadValidators` is one. */
-export type LoadedModules = { modules: ReadonlyMap<string, unknown> };
-
 // One order, for one check's readings and for the reader's checks alike: any FAIL, else any COULD_NOT_RUN, else
 // any PENDING; PASS only when every one passed.
 const PRECEDENCE: readonly Outcome[] = [FAIL, COULD_NOT_RUN, PENDING];
@@ -165,8 +162,8 @@ export async function internalReviewAt(reader: GitHubClient, repo: string, head:
  * The required-checks reader: no `trigger`, never SILENT; the orchestrator times a missing or pending check. The
  * required checks are `[shared] required_checks` when set, else the rules of the PR's base branch (#174 FR-020c).
  */
-export function requiredChecks(shared: Shared, reader: GitHubClient, validators: LoadedModules): RequiredChecks {
-  const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...[...validators.modules.keys()].map(moduleCheckName)]);
+export function requiredChecks(shared: Shared, reader: GitHubClient): RequiredChecks {
+  const ownChecks: ReadonlySet<string> = new Set([INTERNAL_REVIEW, ...shared.validators.map(moduleCheckName)]);
   const own = [...ownChecks].join(", ");
   const listed = shared.required_checks?.filter((name) => !ownChecks.has(name)).map((context): RequiredCheck => ({ context }));
 
