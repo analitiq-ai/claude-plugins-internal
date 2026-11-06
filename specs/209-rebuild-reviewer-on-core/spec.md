@@ -305,8 +305,8 @@ made, on the first run only. Repeat with the record faked as a resume; check non
 - **FR-026**: A round's record MUST carry each finding its reviewers reported as its key, file and line and no
   text (ADR-0016 d2): keys unique within the round, none on a CLEAN or INCOMPLETE round, at least one on a
   DIRTY round; every ruling and pushback MUST name one of its round's findings. The assessor's facts (finding
-  counts of earlier rounds, positions reviewed before, ADR-0018 d2's reset point) MUST read them from the fold
-  and nowhere else (FR-004).
+  counts of earlier rounds, positions reviewed before, the file ADR-0018 d2's reset point names) MUST read them
+  from the fold and nowhere else (FR-004).
 
 ### Key Entities
 

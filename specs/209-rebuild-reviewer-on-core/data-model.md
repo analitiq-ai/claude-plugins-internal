@@ -15,9 +15,10 @@ Commit classes (ADR-0011 d2): event commit → applies its events; clearance →
 
 `core/src/contracts/snapshot.ts` `Snapshot {v, rounds, holds, pushbacks, rulings, gates}`, the fold's answer, never
 stored. Changes: `Round` gains `run`, and `findings`: one `RoundFinding {key, file, line}` per finding its reviewers
-reported (`key` as `Ruling.key`, `file` and `line` as `Finding`'s, which takes them from it; no text), keys unique
-within the round, non-empty exactly when `result` is DIRTY, every `ruling` and `pushback` naming one of its round's
-findings (FR-026); `Hold.question` also on `claim` and verdict-placed `rescope`; `gates: Gates | null` added.
+reported once every expected reviewer answered (`key` as `Ruling.key`, `file` and `line` as `Finding`'s, which takes
+them from it; no text), keys unique within the round, non-empty exactly when `result` is DIRTY, every `ruling` and
+`pushback` naming one of its round's findings (FR-026); `Hold.question` also on `claim` and verdict-placed `rescope`;
+`gates: Gates | null` added.
 
 Hold lifecycle (fold-enforced): `absent → OPEN (hold event, since = GitHub's now) → RELEASED (release event:
 released, released_by) → OPEN again (a new hold event, new since)`; rows are never removed. `tamper-<oid>`: derived

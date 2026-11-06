@@ -15,7 +15,7 @@ that is run and seen failing for the expected reason before the code is written.
 issue builders (`core/tests/fixtures/state/issue.ts`) and real temp git repositories (R17). "qs #n" is quickstart.md's
 scenario n.
 
-**Organization**: Delivery order is the plan's: B → C → S → US1 → US2 → US3 → US4 → CUT. All four stories are P1;
+**Organization**: Delivery order is the plan's: B → C → S → B2 → US1 → US2 → US3 → US4 → CUT. All four stories are P1;
 US2 precedes US3 because the fence is the first step of US2's after-commit check (R11). Until CUT, every TS hook
 entry is unregistered: `reviewer/plugin/hooks/hooks.json` and every `reviewer/plugin/scripts/*.py` stay untouched, so
 one runtime decides each hook run at every merge (plan, Delivery order).
@@ -45,7 +45,7 @@ one runtime decides each hook run at every merge (plan, Delivery order).
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**⚠️ CRITICAL**: No user story work starts until this phase is complete. PR B, PR C and PR S are separate PRs, merged in that order (Principle VI, FR-016).
+**⚠️ CRITICAL**: No user story work starts until this phase is complete. PR B, PR C, PR S and PR B2 are separate PRs, merged in that order (Principle VI, FR-016).
 
 ### PR B — core: the ledger record (R5–R8, FR-016, FR-022, FR-023, FR-025)
 
@@ -67,12 +67,6 @@ one runtime decides each hook run at every merge (plan, Delivery order).
 - [ ] T019 Add `ledger-event.schema.json` to `core/scripts/write-schemas.ts` and regenerate `core/schemas/` (`snapshot.schema.json` now with `gates` and `Round.run`; `Gates` a sub-schema, no file of its own); `core/tests/schemas.test.ts` drift test red first
 - [ ] T020 Move `causeOf` in `orchestrator/plugin/lib/start.ts` to the new `StateCause` (a tamper names its commit, its `remaining` files and the release) and its fixtures in `orchestrator/tests/start.test.ts`, `orchestrator/tests/start-writes.test.ts` and `orchestrator/tests/support/story.ts` onto T004's fake `ledger`; red first in `orchestrator/tests/start.test.ts`
 - [ ] T021 Bump the version of every plugin carrying core (`planner`, `orchestrator`; root ADR-0001) so `node core/scripts/check-carriers.ts --base origin/main` is green; `npm --prefix core test` and `npm --prefix orchestrator test` green; open and merge PR B
-
-### PR B2 — core: a round records its findings (R4, FR-026)
-
-- [ ] T085 [P] Red tests in `core/tests/snapshot.test.ts`: `Round` requires `findings`, each a `RoundFinding {key, file, line}` (`key` as `Ruling.key`, `file` and `line` as `Finding`'s), keys unique within the round, non-empty exactly when `result` is DIRTY; `Snapshot` refuses a `ruling` or `pushback` whose `key` is not among its round's `findings`; in `core/tests/ledger-event.test.ts` a `round` event carries them
-- [ ] T086 Add `RoundFinding` to `core/src/contracts/snapshot.ts` and `findings` to `Round`, `Finding` taking `key`, `file` and `line` from it (T085 green); regenerate `core/schemas/` (`snapshot`, `ledger-event`, `finding`); every test `Round` gains `findings`, the frozen `v: 1` histories in `core/tests/fixtures/state/v1/` included (no round event is on any `ledger` yet, so `v: 1` is amended, not succeeded)
-- [ ] T087 Bump the version of every plugin carrying core (`planner`, `orchestrator`, `reviewer`) so `node core/scripts/check-carriers.ts --base origin/main` is green; `npm --prefix core test`, `npm --prefix orchestrator test` and `npm --prefix reviewer test` green; open and merge PR B2
 
 ### PR C — core: commit-check pass record (R14, FR-014, FR-019)
 
@@ -102,6 +96,12 @@ one runtime decides each hook run at every merge (plan, Delivery order).
 
 ---
 
+### PR B2 — core: a round records its findings (R4, FR-026)
+
+- [ ] T085 [P] Red tests in `core/tests/snapshot.test.ts`: `Round` requires `findings`, each a `RoundFinding {key, file, line}` (`key` as `Ruling.key`, `file` and `line` as `Finding`'s), keys unique within the round, non-empty exactly when `result` is DIRTY; `Snapshot` refuses a `ruling` or `pushback` whose `key` is not among its round's `findings`; in `core/tests/ledger-event.test.ts` a `round` event carries them; in `core/tests/state-read.test.ts` an event commit holding a `ruling` or `pushback` whose `key` is not among its round's `findings` is invalid (fold unchanged, `tamper-<oid>` derived) through the fold's per-commit `Snapshot` check in `core/src/ledger-fold.ts`, which changes nothing
+- [ ] T086 Add `RoundFinding` to `core/src/contracts/snapshot.ts` and `findings` to `Round`, `Finding` taking `key`, `file` and `line` from it (T085 green); regenerate `core/schemas/` (`snapshot`, `ledger-event`, `finding`); every test `Round` gains `findings`, the frozen `v: 1` histories in `core/tests/fixtures/state/v1/` included (no round event is on any `ledger` yet, so `v: 1` is amended, not succeeded)
+- [ ] T087 Bump the version of every plugin carrying core (`planner`, `orchestrator`, `reviewer`) so `node core/scripts/check-carriers.ts --base origin/main` is green; `npm --prefix core test`, `npm --prefix orchestrator test` and `npm --prefix reviewer test` green; open and merge PR B2
+
 ## Phase 3: User Story 1 — A story's rounds and holds are on the ledger branch (P1) 🎯 MVP
 
 Story issue: #235
@@ -125,7 +125,7 @@ Story issue: #235
 - [ ] T047 [P] [US1] Create `reviewer/plugin/lib/rules/counts.ts`, porting the count rules from `reviewer/plugin/scripts/claimgate.py`, `shimgate.py`, `claimcheck.py`, `shimcheck.py` over core's `Gates`; thresholds from `ReviewerSettings`, none in code (T041 green)
 - [ ] T048 [P] [US1] Port `reviewer/plugin/scripts/lineage.py` to `reviewer/plugin/lib/check/lineage.ts` on npm `diff-match-patch`; re-pin `reviewer/tests/test_lineage.py` behaviour red first in `reviewer/tests/lineage.test.ts`, plus: a lineage read back from the gates section (anchor, places, chain) is inherited by a reworded claim across a session boundary; the anchor is read from the bare copy, else fetched by sha from the model's clone, then GitHub; in none → the check stops naming the branch, the anchor and `/codeworks reset`, unless the newest reset is later than every `at` in the section, when it starts the section over anchored on its own head (contracts/gates-snapshot.md §Anchor)
 - [ ] T049 [P] [US1] Port `reviewer/plugin/scripts/claimcheck.py` and `shimcheck.py` to `reviewer/plugin/lib/check/claim.ts` and `lib/check/shim.ts` (pure parts under `lib/rules/`), reading and producing core's `Gates`; running state and memos in `<session>/check.json` and `<session>/memos/*.json` (FR-017); re-pin `test_claimcheck.py`, `test_shimcheck.py` behaviour red first in `reviewer/tests/claim-check.test.ts`, `reviewer/tests/shim-check.test.ts`
-- [ ] T050 [P] [US1] Port `reviewer/plugin/scripts/reshape.py`, `decisions.py`, `adrkit.py`, `assessment.py`, `facts.py` to `reviewer/plugin/lib/round/{assess,decisions}.ts` and `lib/rules/reshape.ts`, each `ledger.py` read replaced by the `RunState` reading, `facts.py`'s earlier rounds' finding counts and positions and ADR-0018 d2's reset point read from `Round.findings` (FR-026); re-pin `test_reshape.py`, `test_decisions.py`, `test_adrkit.py`, `test_assessment.py`, `test_worktree_facts.py` red first in matching `reviewer/tests/*.test.ts`; `specbinding.py` is not ported (ADR-0014 d1): `lib/rules/spec-source.ts` derives story issue, spec issue and spec folder from the branch through core `parseBranch`, red first in `reviewer/tests/spec-source.test.ts` (a `<p>-spec` branch or one outside the grammar is refused a round), re-pinning only what of `test_spec_source.py` agrees with ADR-0014 d1
+- [ ] T050 [P] [US1] Port `reviewer/plugin/scripts/reshape.py`, `decisions.py`, `adrkit.py`, `assessment.py`, `facts.py` to `reviewer/plugin/lib/round/{assess,decisions}.ts` and `lib/rules/reshape.ts`, each `ledger.py` read replaced by the `RunState` reading, `facts.py`'s earlier rounds' finding counts and positions and the file ADR-0018 d2's reset point names read from `Round.findings` (FR-026); re-pin `test_reshape.py`, `test_decisions.py`, `test_adrkit.py`, `test_assessment.py`, `test_worktree_facts.py` red first in matching `reviewer/tests/*.test.ts`; `specbinding.py` is not ported (ADR-0014 d1): `lib/rules/spec-source.ts` derives story issue, spec issue and spec folder from the branch through core `parseBranch`, red first in `reviewer/tests/spec-source.test.ts` (a `<p>-spec` branch or one outside the grammar is refused a round), re-pinning only what of `test_spec_source.py` agrees with ADR-0014 d1
 - [ ] T051 [P] [US1] Port `reviewer/plugin/scripts/jev.py`, `briefs.py`, `worktree.py`, `shell.py`, `snapshot.py`, `sweeper_read.py` to `reviewer/plugin/lib/{jev,briefs,worktree,shell}.ts`, `lib/check/snapshot.ts` (exporting from the bare copy) and `lib/rules/sweeper-read.ts`; `briefs.ts` reads state through `RunState` and runs as `node ${CLAUDE_PLUGIN_ROOT}/lib/briefs.ts --ref '<round_ref>'` with the same `brief_token` output; `reviewer/plugin/agents/assessor.md` keeps running `briefs.py` until CUT (T077), since the live `gate.py` checks the assessor's `brief_token` against the SQLite round until then; re-pin `test_jev.py`, `test_worktree.py`, `test_shell.py`, `test_shim_snapshot.py`, `test_sweeper_read.py`, `test_agents.py` red first in matching `reviewer/tests/*.test.ts`
 - [ ] T052 [US1] Create `reviewer/plugin/lib/rules/launch.ts` from ADR-0013 d4 and ADR-0019 d5 over core's `StateReading`, `max_rounds` and `max_audits` from `ReviewerSettings`; `policy.py`'s cap lock, its reset at a settled round, `spec_held` and separate `assess-round` launch are not ported (ADR-0019 d1, d5; ADR-0014 d1) (T044 green)
 - [ ] T053 [US1] Create `reviewer/plugin/lib/round/record.ts`: round report / assessment → one `writeState` (round named by its recorded workflow run, the holds T040's rules place as its `placements`, one commit), and `placeRescopeHold` for a spec PR seen open, with the minted writer, each through `RunState.step`; the github round's merge blockers and trusted threads read only through core's validator modules (`required-checks`, `threads`; ADR-0016); a rescope's open spec PR found per ADR-0013 d5; refusals per refusals.md (T042 green)
@@ -236,9 +236,9 @@ Story issue: #238
 ## Dependencies & Execution Order
 
 - **Phase 1**: T001, T002 done; T003 external, gates T065's protected-path step only.
-- **PR B (T004–T021)** → **PR C (T022–T025)** → **PR S (T026–T039)** → **US1** → **US2** → **US3** → **US4** → **CUT** → **Polish**.
+- **PR B (T004–T021)** → **PR C (T022–T025)** → **PR S (T026–T039)** → **PR B2 (T085–T087)** → **US1** → **US2** → **US3** → **US4** → **CUT** → **Polish**.
 - T004 (fake `ledger`) precedes every PR B test task except T005–T008, T012.
-- US1 depends on PR B and PR S. US2 depends on PR C and US1 (claim/shim ports T049, `RunState` holds). US3 depends on US2 (`after-commit.ts` fence pass-through). US4 depends on PR B and PR S only, shipped after US3 per plan. CUT depends on US1–US4.
+- US1 depends on PR B, PR S and PR B2 (T040's `Round.findings`, T050's facts). US2 depends on PR C and US1 (claim/shim ports T049, `RunState` holds). US3 depends on US2 (`after-commit.ts` fence pass-through). US4 depends on PR B and PR S only, shipped after US3 per plan. CUT depends on US1–US4.
 - Within each story: red tests → pure rules (`lib/rules/`) → I/O (`lib/check/`, `lib/round/`) → hook wiring.
 
 ## Parallel Opportunities
@@ -262,7 +262,7 @@ Task: "Port claimcheck.py / shimcheck.py to reviewer/plugin/lib/check/{claim,shi
 
 ### MVP (US1)
 
-1. PR B, PR C, PR S.
+1. PR B, PR C, PR S, PR B2.
 2. US1: rounds, holds and gates on `ledger` through core. Validate qs #1–#8, #23, #27.
 3. Live only after CUT; until then the Python hooks run unchanged.
 
