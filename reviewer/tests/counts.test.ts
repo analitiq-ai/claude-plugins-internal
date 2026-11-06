@@ -12,7 +12,7 @@ const { claim, shim } = HoldKind.schema.enum;
 
 // None is the repository's own value, so a constant in code shows.
 const SETTINGS = { claim_hold_at: 2, shim_deep_at: 2, shim_hold_at: 5 };
-const LAST_WRONG = { failing_case: "a header of two nulls", evidence: "src/parse.ts:41" };
+const LAST_WRONG = { words: "refuses a null header", line: 4, failing_case: "a header of two nulls", evidence: "src/parse.ts:41" };
 
 type Entry = Lineage["chain"][number];
 
@@ -57,6 +57,15 @@ describe("claimOpening", () => {
     assert.match(opening?.question ?? "", /a header of two nulls/);
     assert.match(opening?.question ?? "", /src\/parse\.ts:41/);
     assert.match(opening?.question ?? "", /refuses a null header/);
+  });
+
+  it("quotes the words and line of the ruling whose failing case and evidence it gives", () => {
+    const split = lineage("L1", {
+      chain: [entry("check-1", "09:00"), entry("check-2", "10:00", { words: "first words", line: 3 }), entry("check-2", "10:00", { claim: "c2", words: "second words", line: 9 })],
+    });
+    const question = claimOpening(split, undefined, null, { ...LAST_WRONG, words: "second words", line: 9 }, SETTINGS)?.question ?? "";
+    assert.ok(question.includes('"second words"') && question.includes(":9)"), question);
+    assert.ok(!question.includes("first words"), question);
   });
 
   it("places nothing below claim_hold_at, or while the hold is OPEN", () => {

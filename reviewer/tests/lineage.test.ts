@@ -12,7 +12,7 @@ import { lineageCount } from "../plugin/lib/rules/counts.ts";
 import { plain } from "../plugin/lib/rules/words.ts";
 import { textHunks, type LineHunk } from "../plugin/lib/worktree.ts";
 import { cloneWith } from "./support/git.ts";
-import { tempSession } from "./support/session.ts";
+import { tempHome, tempSession } from "./support/session.ts";
 
 const { WRONG } = ClaimVerdict.schema.enum;
 
@@ -508,7 +508,16 @@ describe("anchoredSection (contracts/gates-snapshot.md §Anchor)", () => {
     assert.equal(await holdsCommit(copy, pushed.head), true);
   });
 
-  it("stops naming the branch, the anchor and `/codeworks reset` when none has it, with the clone's failure as its cause", async (t) => {
+  it("throws the clone's own git failure, asking GitHub nothing, when the clone is no repository", async (t) => {
+    const copy = await bareCopy(tempSession(t));
+    const section = gates({ branch: BRANCH, anchor: sha(4096), lineages: [lineageFixture("L1")] });
+    const fromGitHub = recorded(noGitHub);
+    const sources = { copy, clone: (anchor: string) => fetchFromClone(copy, tempHome(t), anchor), github: fromGitHub.ask };
+    await assert.rejects(anchoredSection(sources, section, HEAD, at("11:30")), GitFailed);
+    assert.deepEqual(fromGitHub.asks, []);
+  });
+
+  it("stops naming the branch, the anchor and `/codeworks reset` when none has it", async (t) => {
     const { clone } = cloneWith(t, { "a.md": "a\n" });
     const copy = await bareCopy(tempSession(t));
     const section = gates({ branch: BRANCH, anchor: sha(4096), lineages: [lineageFixture("L1")] });
@@ -519,7 +528,6 @@ describe("anchoredSection (contracts/gates-snapshot.md §Anchor)", () => {
       assert.ok(error.message.includes(BRANCH), error.message);
       assert.ok(error.message.includes(sha(4096)), error.message);
       assert.ok(error.message.includes("/codeworks reset"), error.message);
-      assert.ok(error.cause instanceof GitFailed, String(error.cause));
       return true;
     });
     assert.deepEqual(fromGitHub.asks, [sha(4096)]);

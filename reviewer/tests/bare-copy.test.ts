@@ -8,7 +8,7 @@ import { GitFailed } from "../plugin/core/git.ts";
 import { GitHubRefused, GitHubUnanswered } from "../plugin/core/github.ts";
 import { bareCopy, fetchFromClone, fileAt, fromGitHub, holdsCommit } from "../plugin/lib/check/bare-copy.ts";
 import { cloneWith, git } from "./support/git.ts";
-import { tempSession } from "./support/session.ts";
+import { tempHome, tempSession } from "./support/session.ts";
 
 const REPO = { owner: "acme", name: "widgets" };
 const ABSENT = "1234567890123456789012345678901234567890";
@@ -46,10 +46,11 @@ describe("fetchFromClone and holdsCommit", () => {
     assert.equal(await holdsCommit(copy, later), true);
   });
 
-  it("fails as git fails for a sha the clone lacks", async (t) => {
+  it("answers false for a sha the clone lacks, and fails as git fails for a clone that is no repository", async (t) => {
     const copy = await bareCopy(tempSession(t));
     const { clone } = cloneWith(t, { "a.md": "a\n" });
-    await assert.rejects(fetchFromClone(copy, clone, ABSENT), GitFailed);
+    assert.equal(await fetchFromClone(copy, clone, ABSENT), false);
+    await assert.rejects(fetchFromClone(copy, tempHome(t), ABSENT), GitFailed);
     assert.equal(await holdsCommit(copy, ABSENT), false);
   });
 

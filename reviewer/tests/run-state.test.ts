@@ -174,6 +174,17 @@ describe("RunState (R3, data-model State write step)", () => {
     });
   }
 
+  for (const [how, decide] of [
+    ["throws", () => { throw new GitHubUnanswered("the anchor read went unanswered"); }],
+    ["rejects", async () => { throw new GitHubUnanswered("the anchor read went unanswered"); }],
+  ] as const) {
+    it(`refuses as could not run, asking no commit, when decide ${how} GitHub's failure`, async () => {
+      const h = harness();
+      await assert.rejects(h.state.step(decide, writeRound(h)), couldNotRunThen(RETRY, "the anchor read went unanswered"));
+      assert.equal(commitsAsked(h.out).length, 0);
+    });
+  }
+
   it("refuses as could not run when the served repo has no ledger branch, naming orchestrator README.md step 6", async () => {
     const h = harness({ ledger: fakeLedger({ exists: false }) });
     await assert.rejects(h.state.reading(), couldNotRunNaming("orchestrator README.md step 6"));

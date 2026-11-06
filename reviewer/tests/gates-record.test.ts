@@ -98,8 +98,8 @@ function stateOver(ledger: FakeLedger): RunState {
 type Harness = { out: FakeGitHub; recorder: GatesRecorder };
 
 /** A hook run over `ledger`: a new session's, since nothing is kept past a run. */
-function harness(r: Repo, ledger: FakeLedger): Harness {
-  const out = writer(ledger);
+function harness(r: Repo, ledger: FakeLedger, now = NOW): Harness {
+  const out = writer(ledger, now);
   return { out, recorder: { state: stateOver(ledger), writer: async () => out, settings: SETTINGS, sources: sources(r.copy) } };
 }
 
@@ -191,6 +191,33 @@ describe("recordCheck: a completed check's counts and the holds they reach, in o
     const [carried] = (await readStory(ledger)).snapshot?.gates?.lineages ?? [];
     assert.equal(lineageCount(carried, null), 2);
     assert.equal(carried.chain.length, 2);
+  });
+
+  it("records a run once: the first run asks one commit, its retry in a new session, later, asks none", async (t) => {
+    const doc = "docs/parse.md";
+    const docQuote = "The parser trims the header.";
+    const docText = `# Parse\n\n${docQuote}\n`;
+    const { clone, head: a } = cloneWith(t, { [FILE]: TEXT_A, [doc]: docText });
+    writeFileSync(join(clone, FILE), `${TEXT_H}// ${docQuote}\n`);
+    git(clone, "commit", "-q", "-am", "header");
+    const r: Repo = { copy: clone, a, h: git(clone, "rev-parse", "HEAD"), treeH: git(clone, "rev-parse", "HEAD^{tree}") };
+    const docClaim = claimId(doc, docQuote);
+    const [start, end] = new Words(docText).span(3, docQuote);
+    const docLineage = lineage(docClaim, {
+      file: doc,
+      places: [{ start, end, claim: docClaim }],
+      chain: [{ ref: checkRef(REPO, sha(12)), claim: docClaim, line: 3, words: docQuote, ruling: "CORRECT", at: at("09:00") }],
+    });
+    const ledger = seeded(snapshot({ gates: gates({ anchor: a, lineages: [wrongLineage(sha(11)), docLineage] }) }));
+    const minted: Claim = { id: claimId(FILE, docQuote), hunk: "h2", file: FILE, line: 8, quote: docQuote, category: "K1" };
+    const check = claimCheck(r, { claim: { claims: { [CLAIM_ID]: CLAIM, [minted.id]: minted }, verdicts: { [CLAIM_ID]: WRONG_VERDICT, [minted.id]: WRONG_VERDICT } } });
+    const first = harness(r, ledger);
+    await recordCheck(first.recorder, check);
+    assert.equal(commitsAsked(first.out).length, 1);
+
+    const retry = harness(r, ledger, at("12:30"));
+    await recordCheck(retry.recorder, check);
+    assert.equal(commitsAsked(retry.out).length, 0);
   });
 
   it("places a released shim-<id> again with the bug's new member, both in one commit", async (t) => {

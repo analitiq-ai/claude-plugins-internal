@@ -127,15 +127,17 @@ describe("readAssessment", () => {
     assert.deepEqual(errorsOf(check({ round_verdict: ESCALATE, findings, user_decision: "Which reading of FR-3 holds?" })), []);
   });
 
-  it("needs every finding to name its mechanism (ADR-0017 d3)", () => {
-    IDS.forEach((id, index) => {
-      const { mechanism: _, ...unnamed } = entry(id);
-      for (const lacking of [unnamed, entry(id, FIX, "defect", { mechanism: "" }), entry(id, FIX, "defect", { mechanism: " " })]) {
-        const findings = IDS.map((each) => (each === id ? lacking : entry(each)));
-        refused(check({ findings }), new RegExp(`^findings\\.${index}\\.mechanism: `));
-      }
+  for (const field of ["mechanism", "reason"]) {
+    it(`needs every finding to state its ${field}`, () => {
+      IDS.forEach((id, index) => {
+        const { [field]: _, ...unnamed } = entry(id);
+        for (const lacking of [unnamed, entry(id, FIX, "defect", { [field]: "" }), entry(id, FIX, "defect", { [field]: " " })]) {
+          const findings = IDS.map((each) => (each === id ? lacking : entry(each)));
+          refused(check({ findings }), new RegExp(`^findings\\.${index}\\.${field}: `));
+        }
+      });
     });
-  });
+  }
 
   it("refuses a next_step, which the ruling now gives (ADR-0017 d3), and any other field the schema does not name", () => {
     for (const field of ["next_step", "notes"]) {
