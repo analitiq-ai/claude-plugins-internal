@@ -3,8 +3,8 @@ import { isAbsolute, join } from "node:path";
 import { sessionFolder, type Session } from "../../core/commit-pass.ts";
 import type { Gates } from "../../core/contracts/gates.ts";
 import { makePrivateFolder } from "../../core/files.ts";
-import { GitFailed, runGit } from "../../core/git.ts";
-import { GitHubRefused, type GitHubClient, type Repository } from "../../core/github.ts";
+import { GhCredentialRefused, GitFailed, runGit } from "../../core/git.ts";
+import { failureOfStatus, GitHubRefused, GitHubUnanswered, type GitHubClient, type Repository } from "../../core/github.ts";
 import { sectionWithoutAnchor } from "../rules/anchor.ts";
 
 const COPY = "repo.git";
@@ -16,11 +16,16 @@ const NO_SUCH_COMMIT = 422;
 // upload-pack's refusal of a want of an object its repository lacks; git does not translate it.
 const CLONE_LACKS = "upload-pack: not our ref";
 
-/** The fetch of the anchor from a source failed, and not because the source lacks it. */
-export class AnchorFetchFailed extends Error {
-  constructor(source: string, sha: string, failure: GitFailed) {
-    super(`the fetch of commit ${sha} from ${source} failed: ${failure.stderr.trim()}`, { cause: failure });
-    this.name = "AnchorFetchFailed";
+// How git names the HTTP status of an answer it does not take, in words it prints untranslated.
+const HTTP_STATUS = /The requested URL returned error: (\d{3})/;
+
+const reasonOf = (failure: unknown): string => (failure instanceof GitFailed ? failure.stderr.trim() : String(failure));
+
+/** The fetch of an object from the model's clone failed, and not because the clone lacks it. */
+export class CloneFetchFailed extends Error {
+  constructor(clone: string, sha: string, failure: unknown) {
+    super(`the fetch of ${sha} from the model's clone ${clone} failed: ${reasonOf(failure)}`, { cause: failure });
+    this.name = "CloneFetchFailed";
   }
 }
 
@@ -42,9 +47,9 @@ export async function holdsCommit(copy: string, sha: string): Promise<boolean> {
 }
 
 /**
- * Takes commit `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone and is
- * the only git command run in it (ADR-0021 d6). False when the fetch answers that the clone lacks the commit;
- * AnchorFetchFailed when git exits non-zero for any other reason.
+ * Fetches object `sha` from the model's clone into the copy's own refs, by a fetch that writes nothing in the clone and
+ * is the only git command run in it (ADR-0021 d6). False when the clone answers that it lacks the object;
+ * CloneFetchFailed for every other failure of the fetch. TypeError, before any fetch, for a `clone` that is no absolute path.
  */
 export async function fetchFromClone(copy: string, clone: string, sha: string): Promise<boolean> {
   // git reads a relative path with a colon in it as an ssh host.
@@ -53,9 +58,8 @@ export async function fetchFromClone(copy: string, clone: string, sha: string): 
     await runGit(copy, ["fetch", "--quiet", "--no-tags", "--end-of-options", clone, anchorRefspec(sha)]);
     return true;
   } catch (error) {
-    if (!(error instanceof GitFailed)) throw error;
-    if (error.stderr.includes(`${CLONE_LACKS} ${sha}`)) return false;
-    throw new AnchorFetchFailed(`the model's clone ${clone}`, sha, error);
+    if (error instanceof GitFailed && error.stderr.includes(`${CLONE_LACKS} ${sha}`)) return false;
+    throw new CloneFetchFailed(clone, sha, error);
   }
 }
 
@@ -75,9 +79,21 @@ export async function fileAt(copy: string, sha: string, file: string): Promise<s
 }
 
 /**
- * Asks GitHub for commit `sha` of `repo` and, when it has it, takes it into the copy's own ref through `fetchRefspecs`.
- * False for a commit GitHub lacks; any other refusal is no answer and is thrown. AnchorFetchFailed when git exits non-zero
- * fetching a commit GitHub has.
+ * The failure of the fetch of `sha` from GitHub's `repo`: `failureOfStatus` of the HTTP status git names, without the
+ * headers git does not print, so a 403 that limits the rate refuses; GitHubUnanswered when git names no status.
+ * GhCredentialRefused is the checkout's, not GitHub's, and stays as it is.
+ */
+function gitHubFetchFailure(repo: Repository, sha: string, failure: unknown): unknown {
+  if (failure instanceof GhCredentialRefused) return failure;
+  const message = `the fetch of commit ${sha} from GitHub ${repo.owner}/${repo.name} failed: ${reasonOf(failure)}`;
+  const status = failure instanceof GitFailed ? HTTP_STATUS.exec(failure.stderr)?.[1] : undefined;
+  return status === undefined ? new GitHubUnanswered(message, { cause: failure }) : failureOfStatus(Number(status), message);
+}
+
+/**
+ * Asks GitHub for commit `sha` of `repo` and, when it has it, fetches it into the copy's own ref through `fetchRefspecs`.
+ * False when GitHub answers that no commit of the repository has the sha; the read's other failures are thrown as the
+ * client throws them, the fetch's as `gitHubFetchFailure` makes them.
  */
 export function fromGitHub(reader: GitHubClient, repo: Repository, fetchRefspecs: (refspecs: readonly string[]) => Promise<void>): (sha: string) => Promise<boolean> {
   return async (sha) => {
@@ -90,25 +106,26 @@ export function fromGitHub(reader: GitHubClient, repo: Repository, fetchRefspecs
     try {
       await fetchRefspecs([anchorRefspec(sha)]);
     } catch (error) {
-      if (!(error instanceof GitFailed)) throw error;
-      throw new AnchorFetchFailed(`GitHub ${repo.owner}/${repo.name}`, sha, error);
+      throw gitHubFetchFailure(repo, sha, error);
     }
     return true;
   };
 }
 
 /**
- * Where a check looks for the gates' anchor, in this order. `clone` and `github` answer true once they took the commit
- * into the copy, and false only when they lack it: a false from every source is taken as the anchor being gone, so a
- * source that cannot tell throws.
+ * Where a check looks for the gates' anchor, in this order. `clone` and `github` fetch an object by its sha into the
+ * copy: true once git took it, false only on the source's word that it lacks it, and thrown for anything else, since a
+ * false from both is taken as the anchor being gone.
  */
 export type AnchorSources = { copy: string; clone: (sha: string) => Promise<boolean>; github: (sha: string) => Promise<boolean> };
 
 /**
- * `gates`, once the copy holds its anchor: from the copy, else fetched by its sha from the model's clone, else from
+ * `gates`, once the copy holds its anchor as a commit: already, else fetched by its sha from the model's clone, else from
  * GitHub (contracts/gates-snapshot.md §Anchor). When none has it, the section the anchor rule leaves, or AnchorMissing.
  */
 export async function anchoredSection({ copy, clone, github }: AnchorSources, gates: Gates, head: string, reset: string | null): Promise<Gates> {
-  if ((await holdsCommit(copy, gates.anchor)) || (await clone(gates.anchor)) || (await github(gates.anchor))) return gates;
+  const { anchor } = gates;
+  if (await holdsCommit(copy, anchor)) return gates;
+  for (const source of [clone, github]) if ((await source(anchor)) && (await holdsCommit(copy, anchor))) return gates;
   return sectionWithoutAnchor(gates, head, reset);
 }

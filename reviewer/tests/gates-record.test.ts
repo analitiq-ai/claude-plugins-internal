@@ -400,7 +400,8 @@ const ANCHOR_ROWS: { what: string; outcome: string; arrange: (t: TestContext, r:
   {
     what: "the fetch from GitHub throws GhCredentialRefused",
     outcome: FIX_THEN_RETRY,
-    arrange: (_t, r) => onGitHub(r, { sha: ANCHOR }, failingFetch(new GhCredentialRefused("sets http.extraheader, a header sent beside gh's token"))),
+    // GhCredentialRefused reaches the could-not-run as core words it.
+    arrange: (_t, r) => ({ ...onGitHub(r, { sha: ANCHOR }, failingFetch(new GhCredentialRefused("sets http.extraheader, a header sent beside gh's token"))), named: [] }),
   },
 ];
 
