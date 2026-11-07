@@ -22,7 +22,8 @@ import { checkRef, claimId, type Claim, type Verdict } from "../plugin/lib/rules
 import { lineageCount } from "../plugin/lib/rules/counts.ts";
 import type { ShimCheck } from "../plugin/lib/rules/shim.ts";
 import { RunState } from "../plugin/lib/run-state.ts";
-import { cloneWith, git } from "./support/git.ts";
+import { git } from "../../core/tests/support/git.ts";
+import { cloneWith } from "./support/git.ts";
 import { tempHome } from "./support/session.ts";
 
 const { claim, shim } = HoldKind.schema.enum;

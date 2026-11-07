@@ -8,7 +8,8 @@ import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { sessionFolder } from "../plugin/core/commit-pass.ts";
 import { GitHubRefused } from "../plugin/core/github.ts";
 import { bareCopy, fetchFromClone, fileAt, fromGitHub, holdsCommit } from "../plugin/lib/check/bare-copy.ts";
-import { cloneWith, git } from "./support/git.ts";
+import { git } from "../../core/tests/support/git.ts";
+import { cloneWith } from "./support/git.ts";
 import { tempHome, tempSession } from "./support/session.ts";
 
 const REPO = { owner: "acme", name: "widgets" };

@@ -15,7 +15,8 @@ import {
 } from "../plugin/lib/rules/facts.ts";
 import { admissibleVerdicts } from "../plugin/lib/rules/rounds.ts";
 import { fixHistory, type CommitChanges, type FixHistory, type LineRange } from "../plugin/lib/worktree.ts";
-import { featureRepo, git, numbered, type FeatureRepo } from "./support/git.ts";
+import { git } from "../../core/tests/support/git.ts";
+import { featureRepo, numbered, type FeatureRepo } from "./support/git.ts";
 
 const { INTERNAL, GITHUB } = RoundStage.schema.enum;
 const { CLEAN, DIRTY, INCOMPLETE } = RoundResult.schema.enum;

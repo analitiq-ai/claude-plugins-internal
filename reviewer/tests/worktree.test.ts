@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
 import { addedLines, additions, commitsBetween, fixHistory, mergedTree, textHunks } from "../plugin/lib/worktree.ts";
-import { featureRepo, git, numbered } from "./support/git.ts";
+import { git } from "../../core/tests/support/git.ts";
+import { featureRepo, numbered } from "./support/git.ts";
 
 const OLD = "one\ntwo\nthree\nfour\n";
 const NEW = "one\n2\nthree\nfour\nfive\n";
