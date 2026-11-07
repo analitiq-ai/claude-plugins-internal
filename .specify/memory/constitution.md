@@ -173,12 +173,12 @@ state it owns and refuse, from the model's tool calls, every write it does not o
 Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`
 (decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
 (decision 1); `reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`
-(decisions 1–2). planner: `docs/adr/0012-freeze-the-spec-s-intent-tier-to-its-human-and-let-a-story-change-its-design-tie.md`
-(decisions 1–3, 6); `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
+(decisions 1–2). planner: `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
 (decisions 1, 2). orchestrator: `orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md`
-(decision 1).
+(decision 1). All: `docs/adr/0012-freeze-the-spec-s-intent-tier-to-its-human-and-let-a-story-change-its-design-tie.md`
+(decisions 1–3, 5).
 
 ### P7. Facts Are Read as Data, Never Parsed from Prose
 

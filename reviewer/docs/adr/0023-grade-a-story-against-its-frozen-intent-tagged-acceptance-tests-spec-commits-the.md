@@ -51,7 +51,9 @@ story made to its spec. Each is a rule code can decide or a ruling policy can fi
 
 1. We will fence the intent tier on a story branch (INTENT_FROZEN). A commit is refused when it changes
    `adr-rulings.json` or the `codeworks` front matter of `spec.md`, when the diff of `spec.md` has a `-` line inside
-   an intent section (root ADR-0012 d1), or when it changes any line of `## Clarifications`, `## Non-goals` or
+   an intent section (root ADR-0012 d1), when a `+` line inside `## User Scenarios & Testing` or
+   `## Success Criteria` is neither an added acceptance scenario, edge case or success criterion opening with its id
+   nor an indented continuation of one, or when it changes any line of `## Clarifications`, `## Non-goals` or
    `## Why this is worth doing`; the refusal names the section and the next legal step: ask the admin, who has
    planner change the intent by a spec PR (planner ADR-0010). The section a line belongs to comes from core's one
    `spec.md` splitter over the template's fixed `## ` headings (root ADR-0012 d1; amends ADR-0014 d2), an item
@@ -63,8 +65,8 @@ story made to its spec. Each is a rule code can decide or a ruling policy can fi
    session's issue number (planner ADR-0008 d2): a tick (`[ ]` to `[x]`) in it lands in any commit, an edit in it
    only in a `spec:` commit (d2); a change outside it is refused, a merged story's block as ADR-0015 d4 already
    refuses.
-2. We will admit every design-tier change but a tick (d1), and every addition to `## User Scenarios & Testing` or
-   `## Success Criteria`, only in a **`spec:` commit** (SPEC_COMMIT): its subject starts with `spec:`; it changes
+2. We will admit every design-tier change but a tick (d1), and every addition of an acceptance scenario, an edge
+   case or a success criterion (d1), only in a **`spec:` commit** (SPEC_COMMIT): its subject starts with `spec:`; it changes
    only paths in the spec folder and in a folder inside the repo that `[shared] adr_folders` lists (ADR-0022 d1),
    never code or tests; its body carries the trailers `Motivated-by: <id>` and `Unaffected: <ids>` (`none`
    allowed), ids as root ADR-0012 d1 spells them, read by git's trailer parser from the message the `git commit`
