@@ -56,9 +56,10 @@ can decide or a ruling policy can fix, so each is reviewer's (constitution P1).
    reviewed commit with those at the branch's merge base, the ratification (root ADR-0012 d2): a removed or edited
    line refuses the launch with the diff, as a commit made outside the hooks is caught (ADR-0002 d4). OWN_BLOCK
    replaces TICK_ONLY (ADR-0010 d1): a `tasks.md` change on a story branch stays inside the task block labelled with
-   the session's issue number (planner ADR-0008), ticks and edits alike; a change outside it is refused, a merged
-   story's block as ADR-0015 d4 already refuses.
-2. We will admit every design-tier change, and every addition to an intent section, only in a **`spec:` commit**
+   the session's issue number (planner ADR-0008): a tick (`[ ]` to `[x]`) in it lands in any commit, an edit in it
+   only in a `spec:` commit (d2); a change outside it is refused, a merged story's block as ADR-0015 d4 already
+   refuses.
+2. We will admit every design-tier change but a tick (d1), and every addition to an intent section, only in a **`spec:` commit**
    (SPEC_COMMIT): its subject starts with `spec:`; it changes only paths in the spec folder and in a folder
    `[shared] adr_folders` lists (ADR-0022 d1), never code or tests; its body carries the trailers `Motivated-by:
    <id>` and `Unaffected: <ids>` (`none` allowed), read by git's trailer parser (constitution P7). A design-tier

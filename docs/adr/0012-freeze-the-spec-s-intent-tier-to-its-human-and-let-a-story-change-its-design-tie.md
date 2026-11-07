@@ -76,9 +76,10 @@ solution.
    is worth doing`, which only narrow or re-argue the ask. No component writes the issue body.
 3. We will let the story change the design tier on its own branch, in **`spec:` commits** (reviewer ADR-0023 d2): a
    commit that changes only spec-folder paths and decision records, whose body names the intent item that motivates
-   it and the items it claims unaffected, and that the claim check judges at the next round. In `tasks.md` a story
+   it and the items it claims unaffected, and that the claim check judges before it lands. In `tasks.md` a story
    writes only the task block labelled with its issue number (OWN_BLOCK, which replaces TICK_ONLY of ADR-0011 d1 and
-   reviewer ADR-0010 d1): ticks and edits inside its block, nothing outside it. planner ADR-0009 d4 keeps `tasks.md`
+   reviewer ADR-0010 d1): a tick (`[ ]` to `[x]`) inside its block lands in any commit, as before; an edit inside its
+   block lands in a `spec:` commit; nothing outside it. planner ADR-0009 d4 keeps `tasks.md`
    derived in planning; on a story branch the story's block is the story's. A record a story adds or supersedes
    keeps ADR-0002's form, and an admin's merge of the story PR ratifies it as the spec PR's merge ratifies
    planner's.
