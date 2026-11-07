@@ -5,6 +5,7 @@ import type { Gates } from "../../core/contracts/gates.ts";
 import { makePrivateFolder } from "../../core/files.ts";
 import { GitFailed, runGit } from "../../core/git.ts";
 import { failureOfStatus, GitHubRefused, GitHubUnanswered, type GitHubClient, type Repository } from "../../core/github.ts";
+import { treeEntry } from "../../core/tree.ts";
 import { sectionWithoutAnchor } from "../rules/anchor.ts";
 
 const COPY = "repo.git";
@@ -68,17 +69,13 @@ export async function fetchFromClone(copy: string, clone: string, sha: string): 
 
 /**
  * The text of the blob at path `file` in commit `sha` of the copy, as git diffs it: a symlink's is its target. Null when
- * the commit has no blob there (no entry, a folder, a submodule); GitFailed when the copy lacks the commit.
+ * the commit has no blob there (no entry, a folder, a submodule); GitFailed when the copy lacks the commit; TypeError
+ * for a path with an empty, `.` or `..` segment.
  */
 export async function fileAt(copy: string, sha: string, file: string): Promise<string | null> {
-  const { stdout } = await runGit(copy, ["ls-tree", "-z", "--end-of-options", sha, "--", file]);
-  const entry = stdout
-    .split("\0")
-    .map((line) => line.split("\t"))
-    .find(([, path]) => path === file);
-  const [, type, blob] = entry?.[0].split(" ") ?? [];
-  if (type !== "blob") return null;
-  return (await runGit(copy, ["cat-file", "blob", blob])).stdout;
+  const entry = await treeEntry(copy, sha, file);
+  if (entry?.type !== "blob") return null;
+  return (await runGit(copy, ["cat-file", "blob", entry.object])).stdout;
 }
 
 /** The fetch of an object from GitHub failed in git's words that name neither an HTTP status nor NO_ANSWER. */
