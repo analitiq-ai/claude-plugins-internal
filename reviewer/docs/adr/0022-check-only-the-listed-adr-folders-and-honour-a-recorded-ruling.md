@@ -54,6 +54,7 @@ at review.
 4. We will have a departure the check reports ruled FIX or ESCALATE alone (ADR-0017 d2); an ESCALATE names
    it in the `escalation-<issue>` hold's question by its departure line (ADR-0013 d4), which planner's rescope
    reads (planner ADR-0009 d9).
+   *Amended by ADR-0023 d4 (#342): or FIX by a `spec:` commit superseding the record on the story branch.*
 
 ## Options considered
 

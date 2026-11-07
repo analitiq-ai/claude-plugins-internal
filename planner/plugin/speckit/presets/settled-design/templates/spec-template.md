@@ -8,6 +8,25 @@ codeworks:
 ---
 {CORE_TEMPLATE}
 
+<!--
+  Tiers (root ADR-0012). `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals` and
+  `## Why this is worth doing` are the intent tier: the human's, changed only by a spec PR. A story may add a
+  scenario, an edge case or a success criterion in a `spec:` commit, never remove or edit one. Every other
+  section, plan.md, research.md, the story's own block of tasks.md and the decision records are the design
+  tier, which a story changes in `spec:` commits. An item is cited by id, its ordinal in its list:
+  `US<k>-S<n>` (acceptance scenario n of user story k), `EC<n>` (edge case n), `SC-<n>` (success criterion n).
+  A test carries the id of the scenario it checks in its name.
+-->
+
+## Non-goals
+
+<!--
+  ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to, with the
+  reason. When there is none, the one line `None.` Keep the heading either way. A story never adds here.
+-->
+
+- [what is out, and why]
+
 ## Why this is worth doing
 
 <!--

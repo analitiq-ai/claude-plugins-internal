@@ -94,6 +94,7 @@ clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011
    rescope row already records places nothing again, released or not; a new spec PR places the hold
    again. It refuses every code commit but a merge of the default branch, and releases as every hold
    does (d2).
+   *Amended by ADR-0023 d4 (#342): RESCOPE is ruled for an intent-tier gap alone; a design-tier `spec_gap` is a FIX by a `spec:` commit and places no hold.*
 
 ## Options considered
 
