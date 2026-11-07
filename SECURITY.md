@@ -115,8 +115,8 @@ orchestrator's hooks push its commits and open the draft PR.
 and story issues, writes no lane and writes no reviewer state: reviewer's hook on the agent machine
 places a rescope hold when it sees the rescope's PR open.
 
-**Auditor.** Agents dispatched inside reviewer's rounds. They hold no key and write nothing to GitHub;
-their answers count only through the gate rule.
+**Auditor.** It holds no key and writes nothing to GitHub; its answers count only through the gate
+rule.
 
 ## 5. Managed settings
 
@@ -215,7 +215,7 @@ App's key where planner runs, which has no managed settings (§2).
 
 ## 6. The review gate rule
 
-It covers every reviewer workflow: `review-round`, `claim-check`, `shim-check`.
+It covers every reviewer workflow.
 
 1. reviewer's PreToolUse hook rewrites any Workflow launch naming a reviewer workflow to that name and the
    gate's args, dropping `script`, `scriptPath` and `resumeFromRunId`, and records the launch.

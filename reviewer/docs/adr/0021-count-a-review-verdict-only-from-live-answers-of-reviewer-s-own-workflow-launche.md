@@ -42,7 +42,7 @@ read from. A verdict read from any of those can be forged.
 ## Decision
 
 1. We will have reviewer's `PreToolUse` hook rewrite every `Workflow` launch that names a reviewer
-   workflow (`review-round`, `claim-check`, `shim-check`) to that name and the args the gate supplies,
+   workflow to that name and the args the gate supplies,
    dropping `script`, `scriptPath` and `resumeFromRunId`, and record the launch.
 2. We will have its `PostToolUse` hook record the run ID only for a recorded launch. The run is invalid
    when its run ID was seen before, or when the executed script copy (`tool_response.scriptPath`)

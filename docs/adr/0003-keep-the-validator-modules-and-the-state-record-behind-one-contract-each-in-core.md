@@ -60,8 +60,7 @@ reviewer's github stage, their findings. reviewer's state, rounds and holds, liv
    reviewer started (orchestrator ADR-0007).
 6. We will keep each validator module in a package of its own (ADR-0001), which
    owns how it reaches its provider and reads and interprets the provider's results, its token if it
-   needs one included; `core/` holds only the contract, the threads module and the read of required
-   checks. A module whose provider publishes its verdict only in review text reads it there, in that
+   needs one included; `core/` holds no provider's code. A module whose provider publishes its verdict only in review text reads it there, in that
    module alone. A provider out of credits with no verdict is WAIVED, which counts as a pass: the one
    exception to ADR-0004's fail-closed rule.
 7. We will have a module return items its provider publishes outside any thread as findings with no

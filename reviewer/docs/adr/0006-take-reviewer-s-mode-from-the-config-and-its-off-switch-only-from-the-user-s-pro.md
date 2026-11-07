@@ -48,7 +48,7 @@ cannot type the user's prompt.
    `reviewer on`. The switch covers that session, its subagents and workflows included, and ends with it.
 3. We will lift only the commit gates and the round-launch gate while reviewer is off; every refusal of
    ADR-0012 stays. Off releases nothing: holds, counts and locks stay recorded and apply again when it is on.
-4. We will refuse to launch `review-round`, `claim-check` or `shim-check` while reviewer is off.
+4. We will refuse to launch any reviewer workflow while reviewer is off.
 
 ## Options considered
 

@@ -48,8 +48,8 @@ ADR-0009 decides that private source may be sent to the classifier.
 1. We will judge a fix with an outside one-shot classifier, called from the hook.
 2. We will ask it narrow choice questions, each with a fixed set of answers, and never the overall verdict.
 3. We will compose the verdict in code.
-4. We will store an answer as the classifier gave it, so the check's session-scoped memos (`memos/*.json`,
-   ADR-0003 d1) and the log report what it said.
+4. We will store an answer as the classifier gave it, so the check's session-scoped files (ADR-0003 d1)
+   and the log report what it said.
    Code may leave an answer unread; it does not rewrite one.
 
 ## Options considered
