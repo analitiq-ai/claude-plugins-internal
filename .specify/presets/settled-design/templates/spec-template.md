@@ -9,13 +9,15 @@ codeworks:
 {CORE_TEMPLATE}
 
 <!--
-  Tiers (root ADR-0012). `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals` and
-  `## Why this is worth doing` are the intent tier: the human's, changed only by a spec PR. A story may add a
-  scenario, an edge case or a success criterion in a `spec:` commit, never remove or edit one. Every other
-  section, plan.md, research.md, the story's own block of tasks.md and the decision records are the design
-  tier, which a story changes in `spec:` commits. An item is cited by id, its ordinal in its list:
-  `US<k>-S<n>` (acceptance scenario n of user story k), `EC<n>` (edge case n), `SC-<n>` (success criterion n).
-  A test carries the id of the scenario it checks in its name.
+  Tiers (root ADR-0012). The intent tier is the human's: the `codeworks` block above, `## Clarifications`,
+  `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals`, `## Why this is worth doing` and the
+  folder's `adr-rulings.json`; it changes by a spec PR. A story may add an acceptance scenario, an edge case
+  or a success criterion in a `spec:` commit, never remove or edit one. The other sections, the other files
+  of the folder, the story's own block of `tasks.md` and the decision records are the design tier, which a
+  story changes in `spec:` commits. Every acceptance scenario, edge case and success criterion opens with a
+  bold id that is never renumbered or reused: `**US<k>-S<n>**` on scenario n of user story k, `**EC-<nnn>**`
+  on an edge case, `**SC-<nnn>**` on a success criterion. A test carries the id of the scenario it checks in
+  its name.
 -->
 
 ## Non-goals

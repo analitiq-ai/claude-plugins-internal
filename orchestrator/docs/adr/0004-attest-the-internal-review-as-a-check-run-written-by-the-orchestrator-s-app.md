@@ -51,6 +51,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    lapse for the default branch's files, that round runs after builder merges the default branch (builder
    ADR-0004). A `/codeworks reset` lapses nothing. At every hook run the orchestrator rewrites each open PR's
    `internal-review` and `<module>-review` (ADR-0008) whose value changed.
+   *Amended by root ADR-0012 d5 (#342): the attestation lapses on what the default branch's `spec.md`, `adr-rulings.json`, adr folders or `.specify/memory/` changed between the story's merge base and the default branch's head, never on the story's own `spec:` commits.*
 2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
    its key (root ADR-0008).
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a check from

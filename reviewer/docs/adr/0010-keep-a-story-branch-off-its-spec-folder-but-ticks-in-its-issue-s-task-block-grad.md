@@ -51,7 +51,7 @@ know which of its tasks are done.
    ADR-0004), and governs the story from the round after that merge; a rescope hold waits for that merge
    (ADR-0013). The round after any merge of the default branch into a story branch reviews that merge's
    conflict resolution, diffed against the merge base.
-   *Amended by ADR-0023 d1 (#342): the intent tier reaches a story branch only by a merge of the default branch; the design tier also by the story's own `spec:` commits, graded from the round that reviews them.*
+   *Amended by ADR-0023 d1–d2 (#342): the intent tier reaches a story branch only by a merge of the default branch; the design tier also by the story's own `spec:` commits, graded from the round that reviews them.*
 
 ## Options considered
 

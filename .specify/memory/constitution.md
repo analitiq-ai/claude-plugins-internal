@@ -1,12 +1,16 @@
 <!--
 Sync Impact Report
 - Version: 1.2.4 -> 1.3.0 (MINOR: the Delivery Workflow gains the spec's two tiers, #342)
-- Changed: Delivery Workflow names the intent tier, frozen to its human and changed only by a spec PR, and
-  the design tier, which a story changes on its branch in `spec:` commits graded against the intent
-  (root ADR-0012, reviewer ADR-0023); P6's Source lines add both records.
+- Changed: Delivery Workflow names the intent tier (issue body, `adr-rulings.json`, the `codeworks` front
+  matter, `## Clarifications`, the scenarios, success criteria, non-goals and premise answers), frozen to its
+  human and changed only by a spec PR, and the design tier, which a story changes on its branch in `spec:`
+  commits graded against the intent (root ADR-0012, reviewer ADR-0023); P6's Source lines add both records.
 - Removed: none.
-- Templates: .specify/presets/settled-design/templates/spec-template.md gains `## Non-goals` and the tier note.
-- Follow-up: reviewer's gates and the orchestrator's protected set follow the records (ADR-0023 action items).
+- Templates: .specify/presets/settled-design/templates/spec-template.md gains `## Non-goals`, the tier note and
+  the id labels; commands/speckit.specify.md gains `## Ids and non-goals`.
+- Follow-up: P7 names the spec template's fixed headings, read by core's splitter, as its second exception in
+  its own PR (Governance; root ADR-0012 action item 5); reviewer's gates and the orchestrator's protected set
+  follow the records (ADR-0023 action items).
 -->
 # Codeworks Constitution
 
@@ -170,7 +174,7 @@ Source: reviewer: `reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewe
 (decision 1); `reviewer/docs/adr/0012-refuse-from-the-model-s-tool-calls-every-github-write-the-orchestrator-or-an-adm.md`
 (decision 1); `reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`
 (decisions 1–2). planner: `docs/adr/0012-freeze-the-spec-s-intent-tier-to-its-human-and-let-a-story-change-its-design-tie.md`
-(decisions 1–3); `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
+(decisions 1–3, 6); `planner/docs/adr/0010-create-one-issue-per-story-chain-them-by-blockedby-and-open-the-spec-pr-as-a-dra.md`
 (decision 3); `planner/docs/adr/0006-close-an-issue-not-worth-doing-and-post-nothing-for-one-that-needs-no-spec.md`
 (decisions 1–2). builder: `builder/docs/adr/0003-open-a-draft-pr-after-the-first-push-and-end-the-turn-at-an-attested-draft.md`
 (decisions 1, 2). orchestrator: `orchestrator/docs/adr/0002-the-orchestrator-alone-writes-the-working-lanes-derived-from-the-pr.md`
@@ -270,12 +274,13 @@ pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.
 `.claude/rules/pr-review-loop.md`. A story is done when its PR merged or an admin closed its issue
 (`docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`, decision 5). The spec lands
 first by a spec PR on `<p>-spec`, in `specs/<p>-<slug>/`, `<p>` being the spec's issue. Its intent tier
-— the issue body and, in `spec.md`, `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals`
-and `## Why this is worth doing` — is the human's and changes only by a later spec PR; its design tier —
-the other sections, `plan.md`, `research.md`, the story's own block of `tasks.md`, and the decision
-records — a story changes on its branch in `spec:` commits, graded against the intent
+— the issue body, `adr-rulings.json` and, in `spec.md`, the `codeworks` front matter, `## Clarifications`,
+`## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals` and `## Why this is worth doing` — is
+the human's and changes only by a later spec PR; its design tier — the other sections and files of the
+folder, the story's own block of `tasks.md`, and the decision records — a story changes on its branch in
+`spec:` commits, graded against the intent
 (`docs/adr/0012-freeze-the-spec-s-intent-tier-to-its-human-and-let-a-story-change-its-design-tie.md`,
-decisions 1–5; `reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`).
+decisions 1–6; `reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`).
 Decision records go in the component's `docs/adr/`, or in `docs/adr/` at the root for the repo as a
 whole. The adrkit `after_plan` hook is optional: it offers to check a plan against them.
 

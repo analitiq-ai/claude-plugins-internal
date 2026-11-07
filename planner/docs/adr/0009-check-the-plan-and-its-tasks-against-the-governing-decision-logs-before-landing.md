@@ -112,7 +112,7 @@ after critique and after a check stops, and a check that skips what it judges un
    the plan says, so changing the plan does not clear it. A FAIL caused by a record's own `adr check` error names
    the record file and adrkit's rule and message, and its next step is "fix that record". A `tasks.md` the
    story checks refuse: delete it, then resume.
-   *Amended by root ADR-0012 (#342): a departure found at review (d9) also names a `spec:` commit superseding the record on the story branch (reviewer ADR-0023 d4).*
+   *Amended by root ADR-0012 d3–d4 (#342): a departure found at review (d9) also names a `spec:` commit superseding the record on the story branch (reviewer ADR-0023 d4).*
 9. We will have a rescope take its open decision from the questions of every open `escalation-<issue>` hold,
    and every open `rescope-<issue>` hold a verdict placed, on every open story issue under the spec's issue, the spec's
    issue itself when it has no sub-issues (reviewer ADR-0013 d4, d5), and from the admin's words when there
