@@ -1,5 +1,5 @@
-// Anything this script needs past the guard is loaded with `await import(...)`: a static import would be evaluated
-// before the guard runs. Type imports are erased, so they load nothing.
+// Anything this script needs past the guard is loaded with `await import(...)`: a static import that reaches a
+// package fails to load when the package is missing, before the guard could name it.
 import "../lib/guarded.ts";
 
 export type StepIo = { stderr: (line: string) => void };
