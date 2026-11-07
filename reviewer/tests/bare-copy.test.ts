@@ -99,12 +99,13 @@ describe("fetchFromClone and holdsCommit", () => {
 });
 
 describe("fileAt", () => {
-  it("reads a file's text at a commit the copy holds, and null for a path that is no file there", async (t) => {
+  it("reads a file's text at a commit the copy holds, a name git would read as magic taken as a name, and null for a path that is no file there", async (t) => {
     const copy = await bareCopy(tempSession(t));
-    const { clone, head } = cloneWith(t, { "a*b.md": "glob\n", "aXb.md": "plain\n", "docs/guide.md": "guide\n" });
+    const { clone, head } = cloneWith(t, { "a*b.md": "glob\n", "aXb.md": "plain\n", "docs/guide.md": "guide\n", ":(top)a.md": "magic\n" });
     await fetchFromClone(copy, clone, head);
     assert.equal(await fileAt(copy, head, "a*b.md"), "glob\n");
     assert.equal(await fileAt(copy, head, "docs/guide.md"), "guide\n");
+    assert.equal(await fileAt(copy, head, ":(top)a.md"), "magic\n");
     assert.equal(await fileAt(copy, head, "a?b.md"), null);
     assert.equal(await fileAt(copy, head, "docs"), null);
     assert.equal(await fileAt(copy, head, "missing.md"), null);
