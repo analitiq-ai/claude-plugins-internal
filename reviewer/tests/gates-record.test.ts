@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
-import { addedFiles, at, commitsAsked, gates, ISSUE, lineage, NOW, reader, releasedHold, REPO, round, SHARED, sha, snapshot, writer } from "../../core/tests/fixtures/state/issue.ts";
+import { addedFiles, at, commitsAsked, gates, hold, ISSUE, lineage, NOW, reader, releasedHold, REPO, round, SHARED, sha, snapshot, writer } from "../../core/tests/fixtures/state/issue.ts";
 import { event, eventCommit, fakeLedger, fileOf, storyDir, storyOf, type FakeLedger } from "../../core/tests/fixtures/state/ledger.ts";
 import { fakeGitHub, type FakeGitHub } from "../../core/tests/support/fake-github.ts";
 import type { Bug, Lineage } from "../plugin/core/contracts/gates.ts";
@@ -269,6 +269,35 @@ describe("recordCheck: a completed check's counts and the holds they reach, in o
       [sha(21), sha(22), r.treeH],
     );
   });
+
+  // The check's one claim spans the words of both lineages: `held` has the hold, `larger` the larger count.
+  for (const [what, row, since] of [
+    ["an open claim-<id> stays as placed", hold(`${claim}-held`), at("10:00")],
+    ["a claim-<id> released by an admin's comment is placed again by the WRONG", releasedHold(`${claim}-held`, 902, { since: at("09:30") }), NOW],
+  ] as const) {
+    it(`${what} when its lineage merges into one with a larger count, and no hold is placed for that one`, async (t) => {
+      const r = repo(t);
+      const half = (id: string, words: string, trees: string[]): Lineage => {
+        const [start, end] = new Words(TEXT_A).span(QUOTE_LINE_A, words);
+        return lineage(id, { file: FILE, places: [{ start, end, claim: id }], chain: trees.map((tree, i) => ({ ...wrongEntry(tree, `09:1${i}`), claim: id, words })) });
+      };
+      const held = half("held", "The parser refuses", [sha(31), sha(32)]);
+      const larger = half("larger", "a null header.", [sha(41), sha(42), sha(43)]);
+      const ledger = seeded(snapshot({ gates: gates({ anchor: r.a, lineages: [held, larger] }), holds: [row] }));
+      await recordCheck(harness(r, ledger).recorder, claimCheck(r));
+
+      const reading = await readStory(ledger);
+      assert.deepEqual(
+        reading.snapshot?.holds.map(({ id, state: now, since: placed }) => [id, now, placed]),
+        [[`${claim}-held`, OPEN, since]],
+      );
+      const [merged, ...others] = reading.snapshot?.gates?.lineages ?? [];
+      assert.equal(others.length, 0);
+      assert.equal(merged.id, held.id);
+      assert.deepEqual(merged.chain.slice(0, -1), larger.chain);
+      assert.deepEqual(merged.places, [placeOf(TEXT_H, QUOTE_LINE_H)]);
+    });
+  }
 });
 
 describe("recordCheck: every check carries the whole section to its head, the new anchor", () => {
