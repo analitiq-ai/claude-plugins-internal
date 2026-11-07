@@ -2,7 +2,7 @@
 Sync Impact Report
 - Version: 1.2.3 -> 1.2.4 (PATCH: Platform Constraints state each component's limits, not its layout, #337)
 - Changed: the reviewer, planner and builder lines drop what each plugin holds (agents, hooks, skills,
-  scripts) and keep what it may depend on, hold and read.
+  scripts) and keep what it may depend on, run, hold and read.
 - Removed: none.
 - Templates: .specify/templates/* need no change.
 - Follow-up: none.
@@ -245,13 +245,13 @@ Facts a plan can get wrong. Each is owned by the file named; consult it rather t
 - reviewer: each check's `log` / `enforce` setting sits beside the plugin's mode
   (`reviewer/plugin/README.md`: Mode). Where it keeps its state: GitHub-signed commits on the served
   repo's `ledger` branch (`reviewer/docs/adr/0011-record-rounds-and-holds-as-the-reviewer-app-s-github-signed-commits-on-a-ledger.md`).
-  Its plugin dependencies are `pr-review-toolkit` and `auditor`, each pinned in `[reviewer]`
-  (`reviewer/docs/adr/0019-run-every-reviewer-and-the-assessment-inside-one-review-round-workflow.md`, decision 4).
+  Its reviewer agents come only from `pr-review-toolkit`, `auditor` and its own `agents/`
+  (`reviewer/docs/adr/0019-run-every-reviewer-and-the-assessment-inside-one-review-round-workflow.md`, decisions 3, 4).
 - planner runs as the Spec Kit workflow its skill starts (`planner/plugin/skills/issue-spec/`,
   `planner/plugin/speckit/`), its own scripts minting its App token (root ADR-0007 d4); it runs outside
   the agent machine, with no other codeworks plugin beside it, and writes no reviewer state.
-- builder runs only on the agent machine, with no GitHub App and no key of its own (root ADR-0007,
-  ADR-0008 d1, d4); its review step is reviewer's internal round, which no install requires: its manifest
+- builder runs only on the agent machine, with no hooks and no GitHub App or key of its own (root
+  ADR-0007, ADR-0008 d1, d4); its review step is reviewer's internal round, which no install requires: its manifest
   declares no plugin dependency (`builder/plugin/skills/issue-tackle/SKILL.md`;
   `builder/docs/adr/0002-have-the-build-skills-derive-the-spec-folder-from-the-issue-number-never-from-an.md`,
   decisions 1, 5).
