@@ -9,6 +9,12 @@ const { WRONG } = ClaimVerdict.schema.enum;
 const { claim, shim } = HoldKind.schema.enum;
 const { OPEN, RELEASED } = HoldState.schema.enum;
 
+/** The id of the claim hold placed on lineage `id`. */
+export const claimHoldId = (id: string): string => `${claim}-${id}`;
+
+/** The id of the shim hold placed on bug `id`. */
+export const shimHoldId = (id: string): string => `${shim}-${id}`;
+
 /** A check's WRONG ruling on one claim, which the hold's question carries whole (ADR-0013 d4). */
 export type WrongRuling = { words: string; line: number; failing_case: string; evidence: string };
 
@@ -55,7 +61,7 @@ export function claimOpening(
   const count = lineageCount(lineage, reset);
   if (!reaches(row, count, settings.claim_hold_at, (released) => wrongs(lineage, released).length > 0)) return null;
   return {
-    id: `${claim}-${lineage.id}`,
+    id: claimHoldId(lineage.id),
     question: [
       `The claim "${last.words}" (${lineage.file}:${last.line}) was ruled ${WRONG} by ${count} checks since the count began.`,
       `Failing case: ${last.failing_case}`,
@@ -76,7 +82,7 @@ export function deepDue(bug: Bug, reset: string | null, settings: Pick<ReviewerS
  */
 export function shimOpening(bug: Bug, row: Hold | undefined, reset: string | null, settings: Pick<ReviewerSettings, "shim_hold_at">): Opening | null {
   const placed = reaches(row, bugCount(bug, reset), settings.shim_hold_at, (released) => membersAfter(bug, released).length > 0);
-  return placed ? { id: `${shim}-${bug.id}`, question: null } : null;
+  return placed ? { id: shimHoldId(bug.id), question: null } : null;
 }
 
 type Range = Bug["ranges"][number];

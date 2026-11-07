@@ -207,7 +207,7 @@ function lineage(id: string, text: string, quote: string): Lineage {
 
 async function succeeded(lineages: Lineage[], before: string, after: string, claims: ReadClaim[], counts: Record<string, number> = {}, settings = SETTINGS) {
   const hunks = await textHunks(before, after);
-  return succeed({ lineages, before, after, hunks, claims, count: (found) => counts[found.id] ?? 1 }, settings);
+  return succeed({ lineages, before, after, hunks, claims, count: (found) => counts[found.id] ?? 1, held: () => null }, settings);
 }
 
 function byId(lineages: readonly Lineage[]): Map<string, Lineage> {
@@ -562,7 +562,7 @@ describe("a lineage read back from the gates section", () => {
     const after = "# Guide\n\nThe validator refuses an empty list.\n";
     const reworded = claim(after, "The validator refuses an empty list.");
     const { lineages, inherited } = succeed(
-      { lineages: anchored.lineages, before: read, after, hunks: await textHunks(read, after), claims: [reworded], count: (found) => lineageCount(found, null) },
+      { lineages: anchored.lineages, before: read, after, hunks: await textHunks(read, after), claims: [reworded], count: (found) => lineageCount(found, null), held: () => null },
       SETTINGS,
     );
     assert.deepEqual(inherited, new Map([[reworded.id, idOf(quote)]]));

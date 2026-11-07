@@ -2,20 +2,19 @@ import type { Gates, Lineage } from "../../core/contracts/gates.ts";
 import type { Hold } from "../../core/contracts/snapshot.ts";
 import type { GitHubClient } from "../../core/github.ts";
 import { gatesRecorded, recordGates, type Opening, type StateReading } from "../../core/state.ts";
-import { ClaimVerdict, HoldKind } from "../../core/values.ts";
+import { ClaimVerdict } from "../../core/values.ts";
 import { anchoredSection, fileAt, type AnchorSources } from "../check/bare-copy.ts";
-import { succeed, Words, type Budget } from "../check/lineage.ts";
+import { succeed, Words, type Budget, type Successors } from "../check/lineage.ts";
 import { orCouldNotRun } from "../hook-io.ts";
 import { known } from "../known.ts";
 import { checkRef, enterRuling, mintLineage, type Claim, type ClaimCheck, type Verdict } from "../rules/claim.ts";
-import { claimOpening, lineageCount, openItems, shimOpening, type WrongRuling } from "../rules/counts.ts";
+import { claimHoldId, claimOpening, lineageCount, openItems, shimHoldId, shimOpening, type WrongRuling } from "../rules/counts.ts";
 import { carriedBugs, settleBugs, type ShimCheck } from "../rules/shim.ts";
 import type { RunState } from "../run-state.ts";
 import type { ReviewerSettings } from "../settings.ts";
 import { textHunks, type LineHunk } from "../worktree.ts";
 
 const { WRONG } = ClaimVerdict.schema.enum;
-const { claim, shim } = HoldKind.schema.enum;
 
 /**
  * A check of commit `head`, whose tree is `tree`, on `branch`, completed under workflow run `run`: a claim check's
@@ -78,7 +77,14 @@ async function hop(copy: string, from: string, to: string, files: Iterable<strin
 }
 
 /** The lineages carried over `hop`, with `claims` read in its new text, and the lineage each claim that belongs to one belongs to. */
-function carriedLineages(lineages: readonly Lineage[], claims: readonly Claim[], { olds, news, hunks, gone }: Hop, reset: string | null, settings: Budget) {
+function carriedLineages(
+  lineages: readonly Lineage[],
+  claims: readonly Claim[],
+  { olds, news, hunks, gone }: Hop,
+  reset: string | null,
+  held: Successors["held"],
+  settings: Budget,
+) {
   const carried: Lineage[] = [];
   const inherited = new Map<string, string>();
   for (const file of new Set(lineages.map((lineage) => lineage.file))) {
@@ -91,6 +97,7 @@ function carriedLineages(lineages: readonly Lineage[], claims: readonly Claim[],
         hunks: known(hunks, file),
         claims: claims.filter((each) => each.file === file),
         count: (lineage) => lineageCount(lineage, reset),
+        held,
       },
       settings,
     );
@@ -154,6 +161,7 @@ async function decide({ state, settings, sources }: GatesRecorder, check: Comple
   if (gatesRecorded(issue, shared, reading, check.run)) return null;
   const section = await checkSection(sources, reading, check.branch, check.head);
   const reset = resetOf(reading);
+  const held = (id: string): Hold["state"] | null => rowOf(reading, claimHoldId(id))?.state ?? null;
   const lineageFiles = section.lineages.map(({ file }) => file);
   const bugFiles = section.bugs.flatMap(({ ranges }) => ranges.map(({ file }) => file));
   const anchored = (fields: Pick<Gates, "lineages" | "bugs">, gone: ReadonlySet<string>): Gates => openItems({ ...section, anchor: check.head, ...fields }, gone);
@@ -162,12 +170,12 @@ async function decide({ state, settings, sources }: GatesRecorder, check: Comple
     const claims = Object.values(check.claim.claims).toSorted(byPlace);
     const toHead = await hop(sources.copy, section.anchor, check.head, [...lineageFiles, ...bugFiles, ...claims.map(({ file }) => file)]);
     return (at) => {
-      const carried = carriedLineages(section.lineages, claims, toHead, reset, settings);
+      const carried = carriedLineages(section.lineages, claims, toHead, reset, held, settings);
       const { lineages, wrongs } = ruled(carried.lineages, carried.inherited, claims, check.claim.verdicts, toHead.news, checkRef(repo, check.tree), at);
       const gates = anchored({ lineages, bugs: carriedBugs(section.bugs, toHead.olds, toHead.news, toHead.gone, toHead.hunks, settings) }, toHead.gone);
       const openings = gates.lineages.flatMap((lineage) => {
         const last = wrongs.get(lineage.id);
-        return (last && claimOpening(lineage, rowOf(reading, `${claim}-${lineage.id}`), reset, last, settings)) || [];
+        return (last && claimOpening(lineage, rowOf(reading, claimHoldId(lineage.id)), reset, last, settings)) || [];
       });
       return { gates, openings };
     };
@@ -181,8 +189,8 @@ async function decide({ state, settings, sources }: GatesRecorder, check: Comple
     const atBase = carriedBugs(section.bugs, toBase.olds, toBase.news, toBase.gone, toBase.hunks, settings);
     const settled = settleBugs(atBase, check.shim, { repo, branch: check.branch, tree: check.tree, at, reset });
     const bugs = carriedBugs(settled, baseToHead.olds, baseToHead.news, baseToHead.gone, baseToHead.hunks, settings);
-    const gates = anchored({ lineages: carriedLineages(section.lineages, [], toHead, reset, settings).lineages, bugs }, new Set([...toHead.gone, ...baseToHead.gone]));
-    const openings = gates.bugs.flatMap((bug) => shimOpening(bug, rowOf(reading, `${shim}-${bug.id}`), reset, settings) ?? []);
+    const gates = anchored({ lineages: carriedLineages(section.lineages, [], toHead, reset, held, settings).lineages, bugs }, new Set([...toHead.gone, ...baseToHead.gone]));
+    const openings = gates.bugs.flatMap((bug) => shimOpening(bug, rowOf(reading, shimHoldId(bug.id)), reset, settings) ?? []);
     return { gates, openings };
   };
 }

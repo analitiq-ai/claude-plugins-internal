@@ -1,6 +1,8 @@
 import diff_match_patch from "diff-match-patch";
 
 import type { Lineage } from "../../core/contracts/gates.ts";
+import type { Hold } from "../../core/contracts/snapshot.ts";
+import { HoldState } from "../../core/values.ts";
 import { known } from "../known.ts";
 import { plain, words } from "../rules/words.ts";
 import type { ReviewerSettings } from "../settings.ts";
@@ -13,6 +15,8 @@ export type Span = readonly [start: number, end: number];
 export type ReadClaim = { id: string; line: number; quote: string };
 
 export type Budget = Pick<ReviewerSettings, "char_diff_budget">;
+
+const { OPEN } = HoldState.schema.enum;
 
 /**
  * A claim's quote has no words, or they are not in its file from the line it was read on: a defect of the check, not
@@ -257,8 +261,10 @@ export type Successors = {
   hunks: readonly LineHunk[];
   /** The claims read in `after`. */
   claims: readonly ReadClaim[];
-  /** The lineage's count, which decides the lineage a merge goes on as. */
+  /** The lineage's count, which decides whose chain a merge goes on with. */
   count: (lineage: Lineage) => number;
+  /** The state of the hold placed on the lineage of an id, null for none, which decides the id a merge goes on under. */
+  held: (id: string) => Hold["state"] | null;
 };
 
 export type Succession = {
@@ -287,12 +293,13 @@ function overlaps(a: Span, b: Span): boolean {
  * when none of its places was carried or found, are looked for in `after`, so a lineage whose words are still in the
  * file is not ended for want of a claim read there. A claim inherits each lineage one of whose places it overlaps, else
  * each whose id is the claim's id or that held words of that id. Claims that inherit one lineage split it: each holds
- * it. A claim that inherits several lineages merges them: the one with the higher count goes on (the smaller id on a
- * tie) with the places of all of them, the others end into it. A place in text no claim was read in stays. A lineage
- * with no place left ends. A place in a range replaced past the budget is carried as `carry` carries it. Changes
- * nothing it is given.
+ * it. A claim that inherits several lineages merges them: one lineage goes on, with the chain of the one with the
+ * higher count (the smaller id on a tie) and the places of all of them, under the id of the first of them, that one
+ * first, whose hold is OPEN, else the first with a hold, so a hold stays on the lines its lineage merged into; the
+ * others end into it. A place in text no claim was read in stays. A lineage with no place left ends. A place in a
+ * range replaced past the budget is carried as `carry` carries it. Changes nothing it is given.
  */
-export function succeed({ lineages, before, after, hunks, claims, count }: Successors, settings: Budget): Succession {
+export function succeed({ lineages, before, after, hunks, claims, count, held }: Successors, settings: Budget): Succession {
   const index = new Words(after);
   const spans = new Map(claims.map((claim) => [claim.id, index.span(claim.line, claim.quote)]));
   const mapped = new Ground(before, after, hunks, settings).carry(lineages.flatMap(({ places }) => places.map(({ start, end }): Span => [start, end])));
@@ -330,22 +337,34 @@ export function succeed({ lineages, before, after, hunks, claims, count }: Succe
     for (const id of owners) if (id !== winner) survivor.set(id, winner);
     won.set(claim.id, winner);
   }
-  const inherited = new Map([...won].map(([claim, id]) => [claim, live(id)]));
+  const named = new Map(
+    lineages.flatMap(({ id }) => {
+      if (survivor.has(id)) return [];
+      const merged = [id, ...lineages.flatMap((member) => (member.id !== id && live(member.id) === id ? [member.id] : []))];
+      return [[id, merged.find((each) => held(each) === OPEN) ?? merged.find((each) => held(each) !== null) ?? id]];
+    }),
+  );
+  const goesOnAs = (id: string): string => known(named, live(id));
+  const inherited = new Map([...won].map(([claim, id]) => [claim, goesOnAs(id)]));
   const open: Lineage[] = [];
   const ended: Succession["ended"] = [];
   for (const lineage of lineages) {
+    const as = goesOnAs(lineage.id);
     if (survivor.has(lineage.id)) {
-      ended.push({ id: lineage.id, into: live(lineage.id) });
+      if (lineage.id !== as) ended.push({ id: lineage.id, into: as });
       continue;
     }
-    const read = [...inherited].filter(([, id]) => id === lineage.id).map(([claim]) => ({ start: known(spans, claim)[0], end: known(spans, claim)[1], claim }));
+    const read = [...inherited].filter(([, id]) => id === as).map(([claim]) => ({ start: known(spans, claim)[0], end: known(spans, claim)[1], claim }));
     const unread = lineages
       .filter((member) => live(member.id) === lineage.id)
       .flatMap((member) => known(carried, member.id))
       .flatMap(({ claim, span }) => (span !== null && ![...spans.values()].some((each) => overlaps(span, each)) ? [{ start: span[0], end: span[1], claim }] : []));
     const places = [...read, ...unread].toSorted((a, b) => a.start - b.start);
     if (places.length === 0) ended.push({ id: lineage.id, into: null });
-    else open.push({ ...lineage, places });
+    else {
+      if (lineage.id !== as) ended.push({ id: lineage.id, into: as });
+      open.push({ ...lineage, id: as, places });
+    }
   }
   return { lineages: open, ended, inherited };
 }
