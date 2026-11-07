@@ -262,8 +262,8 @@ Each decision below settles one mechanism `plan.md` lists. Core additions are na
 
 ## R15: The constitution's builder line changes first, in its own PR
 
-- **Decision**: Platform Constraints' "builder is two skills, with no scripts and no hooks" becomes "builder is
-  one skill and its step script, a core carrier with no hooks", in a PATCH amendment merged before builder's
-  carrier PR.
+- **Decision**: Platform Constraints' builder line states builder's limits, not its layout (no GitHub App or
+  key of its own, the agent machine only, no plugin dependency), in a PATCH amendment (#337) merged before
+  builder's carrier PR, so the step script and any later script or skill need no amendment.
 - **Rationale**: spec Assumptions; Principle VI; constitution Governance.
 - **Existing tools**: `/speckit-constitution` (fits).

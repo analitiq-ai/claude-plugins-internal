@@ -376,8 +376,8 @@ the new head.
   rewritten either way, so root ADR-0009 Option D's objection, rewriting working code that gains nothing, does not
   apply; one toolchain then covers builder.
 - The constitution's Platform Constraints line "builder is two skills, with no scripts and no hooks" changes to
-  describe builder as a carrier with one skill and its step script; that amendment ships in its own PR before this
-  change (constitution Governance; Principle VI).
+  state builder's limits (no GitHub App or key), not its layout, so a carrier with a step script needs no further amendment; that
+  amendment (#337) ships in its own PR before this change (constitution Governance; Principle VI).
 - Not in scope: a hook refusing `git rebase` or `git push --force` from the model's tool calls. Writes from the
   model's tool calls are refused by reviewer's hook (constitution P6); whether that hook refuses a rebase is
   reviewer's.
