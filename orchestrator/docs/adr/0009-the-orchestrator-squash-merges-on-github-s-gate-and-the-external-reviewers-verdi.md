@@ -42,8 +42,8 @@ model's token is read-only (root ADR-0007): only the orchestrator's App and the 
    `<module>-review`, pinned to the orchestrator's App (ADR-0004, ADR-0008), every other required check, pinned to the App that posts
    it, and every conversation resolved, so GitHub refuses a merge without them. Their bypass list names
    admins only, the only override. A repo whose GitHub plan offers no rulesets names its required checks in
-   `required_checks` under `[orchestrator]` instead; the orchestrator then reads no rules, and its own merge
-   condition (d1) is the only gate.
+   `required_checks` under `[shared]` instead, since builder reads the required checks too (root ADR-0002 d2);
+   the orchestrator then reads no rules, and its own merge condition (d1) is the only gate.
 3. We will never update a branch only because it is behind main: a conflict stays a finding, and builder
    merges main only to resolve one or once main's spec, ADRs or constitution changed (builder ADR-0004).
 4. We will leave Done to GitHub (ADR-0002): each story PR carries `Closes #s` from its creation by the

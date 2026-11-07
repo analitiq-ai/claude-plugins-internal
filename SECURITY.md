@@ -11,7 +11,7 @@ Only code that passed review merges. Five things hold that:
 1. Each served repo's ruleset requires CI, `internal-review` and each external reviewer module's
    `<module>-review` (for example `codex-review`) as check runs from the orchestrator App. No App is on
    its bypass list (orchestrator ADR-0009). A repo whose GitHub plan offers no rulesets lists its required
-   checks in `required_checks` under `[orchestrator]` instead; there GitHub enforces nothing, and only the
+   checks in `required_checks` under `[shared]` instead; there GitHub enforces nothing, and only the
    orchestrator's merge condition holds this (ADR-0009 d2).
 2. The model's GitHub token is read-only: it cannot push, comment, label, move a card or merge (root
    ADR-0007).
