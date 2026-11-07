@@ -5,7 +5,8 @@ import "../lib/guarded.ts";
 import type { HookAnswer, HookDeps } from "../lib/hook-io.ts";
 
 const { PASS, readInput, refusing, runHook } = await import("../lib/hook-io.ts");
-const { ensureSessionToken, originRepository } = await import("../lib/session-token.ts");
+const { originRepository } = await import("../core/git.ts");
+const { ensureSessionToken } = await import("../lib/session-token.ts");
 const { orchestratorOnGitHub } = await import("../lib/settings.ts");
 
 /** PreToolUse on Bash, the one tool that reaches GitHub with the session token: mints it first when due (FR-011). */

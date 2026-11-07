@@ -10,19 +10,23 @@ const { PENDING, PASS, FAIL, COULD_NOT_RUN } = CheckOutcome.schema.enum;
 /** Every `status` answer; `reason` is set for SILENT, WAIVED and COULD_NOT_RUN. */
 export type StatusAnswer = { outcome: Outcome; reason: string | null };
 
-/** What a `findings` returns in place of its list: never an empty list, which would read as nothing found. */
-export type CouldNotRun = { outcome: typeof CheckOutcome.schema.enum.COULD_NOT_RUN; reason: string };
+/**
+ * What a `findings` returns in place of its list: never an empty list, which would read as nothing found. `cause` is
+ * the error it was made from, when one was.
+ */
+export type CouldNotRun = { outcome: typeof CheckOutcome.schema.enum.COULD_NOT_RUN; source: string; reason: string; cause?: unknown };
 
 /** The reason names `source` first, so a caller reading several checks can tell whose it is. */
-export function couldNotRun(source: string, why: string): CouldNotRun {
-  return { outcome: COULD_NOT_RUN, reason: `${source}: ${why}` };
+export function couldNotRun(source: string, why: string, cause?: unknown): CouldNotRun {
+  const made: CouldNotRun = { outcome: COULD_NOT_RUN, source, reason: `${source}: ${why}` };
+  return cause === undefined ? made : { ...made, cause };
 }
 
 /** GitHub's no answer, or its answer in part, as `source`'s COULD_NOT_RUN, the outcome of a check that could not read. */
 export function couldNotRunIfUnread(source: string, error: unknown): CouldNotRun {
   // Any other error is core's own, not the check's outcome.
   if (!(error instanceof GitHubUnanswered || error instanceof GitHubPartlyAnswered)) throw error;
-  return couldNotRun(source, error.message);
+  return couldNotRun(source, error.message, error);
 }
 
 type CheckRun = { status: string; conclusion: string | null };
@@ -44,7 +48,7 @@ const OUTCOME_OF_STATE: ReadonlyMap<string, Outcome> = new Map([
   ["pending", PENDING],
 ]);
 
-const COMPLETED = "completed";
+export const COMPLETED = "completed";
 
 /** A required check at the head, `undefined` when GitHub has neither a check run nor a status for it. */
 export function outcomeOf(checkRunOrStatus: CheckRun | CommitStatus | undefined): Outcome {

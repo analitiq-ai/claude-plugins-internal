@@ -12,7 +12,7 @@ import { type Machine, readKey } from "../keys.ts";
 import { couldNotRun, couldNotRunIfUnread, type CouldNotRun, type StatusAnswer } from "../outcomes.ts";
 import type { Shared } from "../settings.ts";
 import { CheckOutcome, ModuleName } from "../values.ts";
-import { appLogins, providerThreadFindings, reviewThreads } from "./threads.ts";
+import { appLogins, providerThreadFindings, reviewThreads, type ProviderLogins } from "./threads.ts";
 
 const { PENDING, PASS, FAIL, SILENT, WAIVED } = CheckOutcome.schema.enum;
 
@@ -121,11 +121,17 @@ function openPackage(name: string, validatorPackage: ValidatorPackage, deps: Dep
   return opened as OpenedPackage;
 }
 
+/** Every `shared.validators` package's provider logins, read from its exports: no package's `open` is called. */
+export async function validatorLogins(shared: Shared, dir: string): Promise<ProviderLogins> {
+  const logins = new Set<string>();
+  for (const name of shared.validators) for (const login of (await importPackage(dir, name)).logins) logins.add(login);
+  return { logins };
+}
+
 /** Imports `<dir>/<name>/index.ts` for each `shared.validators` entry, in order, and opens it. */
 export async function loadValidators(shared: Shared, dir: string, { reader, writer, plugin, machine }: LoadDeps): Promise<Validators> {
   const modules = new Map<string, Module>();
-  const logins = new Set<string>();
-  const validators: Validators = { modules, logins };
+  const validators: Validators = { modules, logins: (await validatorLogins(shared, dir)).logins };
   for (const name of shared.validators) {
     const validatorPackage = await importPackage(dir, name);
     const own: ReadonlySet<string> = new Set(validatorPackage.logins);
@@ -133,24 +139,27 @@ export async function loadValidators(shared: Shared, dir: string, { reader, writ
       reader,
       writer,
       readKey: (file) => readKey(file, plugin, machine),
-      // Read when called, `validators.logins` is every package's by then: another provider's reply in this
-      // provider's thread is trusted too.
+      // `validators.logins` is every package's, so another provider's reply in this provider's thread is trusted too.
       providerThreads: async (repo, pr) =>
         providerThreadFindings(await reviewThreads(reader, repo, pr), name, own, shared, validators),
     };
     modules.set(name, { name, opened: openPackage(name, validatorPackage, deps), deps, shared });
-    for (const login of own) logins.add(login);
   }
   return validators;
 }
 
 /**
- * What every check is asked, checked before anything is called or read: a package would turn a caller's mistake
- * into its check's COULD_NOT_RUN, and a head put in a REST path as anything but a sha could name another endpoint.
+ * Refuses, as TypeError, a repo, PR or head that names nothing a check could read: the caller's mistake, which a
+ * package would turn into its check's COULD_NOT_RUN.
  */
 export function assertAsked(repo: string, pr: number, head: string): void {
   ownerAndName(repo);
   assertIssueNumber(pr);
+  assertHead(head);
+}
+
+/** A head put in a REST path as anything but a sha could name another endpoint. */
+export function assertHead(head: string): void {
   if (!Head.safeParse(head).success) throw new TypeError(`not a commit sha: ${JSON.stringify(head)}`);
 }
 
@@ -171,7 +180,7 @@ export async function trigger(module: Module, repo: string, pr: number, head: st
   try {
     answered = await module.opened.trigger(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   const parsed = Time.nullable().safeParse(answered);
   if (!parsed.success) return couldNotRun(module.name, `its trigger answer is refused: ${z.prettifyError(parsed.error)}`);
@@ -199,7 +208,7 @@ export async function status(
   try {
     answered = await module.opened.status(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   const parsed = PackageStatus.safeParse(answered);
   if (!parsed.success) return couldNotRun(module.name, `its status answer is refused: ${z.prettifyError(parsed.error)}`);
@@ -219,7 +228,7 @@ export async function status(
     now = await module.deps.reader.now();
   } catch (error) {
     // Without GitHub's clock, PENDING and SILENT cannot be told apart.
-    return couldNotRunIfUnread(`${module.name}: GitHub's time`, error);
+    return couldNotRunIfUnread(module.name, error);
   }
   const elapsed = (Date.parse(now) - Date.parse(since)) / 1000;
   if (elapsed >= timeoutSeconds) {
@@ -238,7 +247,7 @@ export async function findings(module: Module, repo: string, pr: number, head: s
   try {
     answered = await module.opened.findings(repo, pr, head);
   } catch (error) {
-    return couldNotRun(module.name, messageOf(error));
+    return couldNotRun(module.name, messageOf(error), error);
   }
   if (!Array.isArray(answered)) return couldNotRun(module.name, `its findings answer is not a list: ${JSON.stringify(answered)}`);
   const parsed = z.array(Finding).safeParse(answered);

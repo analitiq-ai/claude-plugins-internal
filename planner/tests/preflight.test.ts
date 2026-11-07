@@ -5,7 +5,7 @@ import { fakeGitHub, type FakeAnswer, type FakeGitHub } from "../../core/tests/s
 import { GitHubMisanswered, GitHubPartlyAnswered, GitHubUnanswered } from "../plugin/core/github.ts";
 import { MintError } from "../plugin/core/tokens.ts";
 import { main } from "../plugin/scripts/preflight.ts";
-import { BOARD, fakeMint, output, scratchCheckout, storedToken, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
+import { BOARD, fakeMint, git, output, scratchCheckout, storedToken, storeToken, tempHome, writeCalls } from "./support/checkout.ts";
 
 const OTHER_BOARD = "https://github.com/orgs/acme/projects/2";
 
@@ -29,12 +29,14 @@ function answered({ state, cards }: Issue): FakeGitHub {
 
 type Run = { code: number; stderr: string[]; github: FakeGitHub; connected: boolean; mints: string[] };
 
-type Options = { minutesLeft?: number | null; args?: string[]; mint?: (appId: number, repo: string) => never };
+/** `alter` changes the scratch checkout before the run. */
+type Options = { minutesLeft?: number | null; args?: string[]; mint?: (appId: number, repo: string) => never; alter?: (checkout: string) => void };
 
 /** `minutesLeft` null stores no token. */
 async function preflight(t: TestContext, github: FakeGitHub, options: Options = {}): Promise<Run> {
   tempHome(t);
   const { checkout } = scratchCheckout(t);
+  options.alter?.(checkout);
   if (options.minutesLeft !== null) storeToken(options.minutesLeft ?? 60);
   const minting = fakeMint();
   const stderr = output();
@@ -103,6 +105,15 @@ describe("preflight.ts <issue>", () => {
       assert.ok(run.stderr.join("\n").includes(failure.message), run.stderr.join("\n"));
     });
   }
+
+  it("exits 2 naming origin for a checkout with no origin, minting nothing and calling no GitHub", async (t) => {
+    const alter = (checkout: string) => git(checkout, "remote", "remove", "origin");
+    const run = await preflight(t, answered({ state: "open", cards: [{ url: BOARD, status: "Backlog" }] }), { alter, minutesLeft: null });
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.match(run.stderr.join("\n"), /remote get-url origin/);
+    assert.deepEqual(run.mints, []);
+    assert.deepEqual(run.github.calls, []);
+  });
 
   for (const [what, minutesLeft] of [["no token is stored", null], ["the stored token has 9 minutes left", 9]] as const) {
     it(`mints the planner App's token once when ${what}, and checks the issue with it`, async (t) => {

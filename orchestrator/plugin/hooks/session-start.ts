@@ -6,7 +6,8 @@ import type { HookAnswer, HookDeps } from "../lib/hook-io.ts";
 
 const { PASS, readInput, refusalOf, refusing, runHook } = await import("../lib/hook-io.ts");
 const { keyOf, postKeyed } = await import("../lib/keyed.ts");
-const { ensureSessionToken, originRepository } = await import("../lib/session-token.ts");
+const { originRepository } = await import("../core/git.ts");
+const { ensureSessionToken } = await import("../lib/session-token.ts");
 const { orchestratorOnGitHub } = await import("../lib/settings.ts");
 
 /** SessionStart: mints the session token (FR-010). */

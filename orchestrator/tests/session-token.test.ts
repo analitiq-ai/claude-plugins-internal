@@ -5,19 +5,15 @@ import { describe, it, type TestContext } from "node:test";
 
 import { fakeGitHub } from "../../core/tests/support/fake-github.ts";
 import { GhFolderRefused, readGhToken } from "../plugin/core/gh-config.ts";
-import { GitFailed } from "../plugin/core/git.ts";
-import { RemoteRefused } from "../plugin/core/github.ts";
 import { ghFolder } from "../plugin/core/orchestrator-paths.ts";
 import { MintError } from "../plugin/core/tokens.ts";
-import { ensureSessionToken, originRepository } from "../plugin/lib/session-token.ts";
+import { ensureSessionToken } from "../plugin/lib/session-token.ts";
 import { settleSettings, type OnGitHub } from "../plugin/lib/settings.ts";
 import {
   APP_ID,
   contentsAnswer,
   fakeMintToken,
-  git,
   REPO,
-  scratchCheckout,
   SESSION_APP_ID,
   SESSION_LOGIN,
   SETTINGS,
@@ -42,24 +38,6 @@ function harness(t: TestContext, failure?: Error) {
   };
   return { home, folder: ghFolder(home), mint, deps, asked: () => asked };
 }
-
-describe("originRepository", () => {
-  it("is the GitHub repository the checkout's origin names", async (t) => {
-    assert.equal(await originRepository(scratchCheckout(t)), REPO);
-  });
-
-  it("refuses a checkout with no origin, naming it", async (t) => {
-    const checkout = scratchCheckout(t);
-    git(checkout, "remote", "remove", "origin");
-    await assert.rejects(originRepository(checkout), (error: unknown) => error instanceof GitFailed && /origin/.test(error.message));
-  });
-
-  it("refuses an origin that is not a github.com repository", async (t) => {
-    const checkout = scratchCheckout(t);
-    git(checkout, "remote", "set-url", "origin", "https://example.invalid/acme/widgets.git");
-    await assert.rejects(originRepository(checkout), RemoteRefused);
-  });
-});
 
 describe("ensureSessionToken", () => {
   it("mints the session App's token for the one repository into an empty gh folder", async (t) => {

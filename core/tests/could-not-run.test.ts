@@ -8,7 +8,7 @@ import type { Finding } from "../src/contracts/finding.ts";
 import { gitHub, GitHubUnanswered, type GitHubClient } from "../src/github.ts";
 import type { CouldNotRun, StatusAnswer } from "../src/outcomes.ts";
 import type { Shared } from "../src/settings.ts";
-import { findings, loadValidators, status, type Validators } from "../src/validation/contract.ts";
+import { findings, loadValidators, status } from "../src/validation/contract.ts";
 import { requiredChecks } from "../src/validation/required-checks.ts";
 import { reset, script } from "./fixtures/validators/fixture/index.ts";
 import { fakeGitHub, type FakeAnswer } from "./support/fake-github.ts";
@@ -67,15 +67,8 @@ function concluded(conclusion: string) {
 
 type Answers = { status: StatusAnswer; findings: Finding[] | CouldNotRun };
 
-let validators: Validators;
-
-async function loaded(): Promise<Validators> {
-  validators ??= await loadValidators(SHARED, DIR, { reader: fakeGitHub({}), writer: fakeGitHub({}), plugin: "reviewer" });
-  return validators;
-}
-
 async function fromRequiredChecks(client: GitHubClient): Promise<Answers> {
-  const checks = requiredChecks(SHARED, client, await loaded());
+  const checks = requiredChecks(SHARED, client);
   return { status: await checks.status(REPO, PR, HEAD), findings: await checks.findings(REPO, PR, HEAD) };
 }
 

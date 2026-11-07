@@ -18,6 +18,7 @@ import {
   GitHubUnanswered,
   isWriterRole,
   ownerAndName,
+  repositoryPath,
   restLogin,
   roleOf,
   USER_TYPE,
@@ -493,7 +494,7 @@ async function storyCommits(reader: GitHubClient, repo: string, issue: number, h
   const query = new URLSearchParams({ sha: head, path: dir, per_page: "100" });
   const [nodes, listed] = await Promise.all([
     reader.graphqlPages(STORY_HISTORY_QUERY, { ...repository, head, path: dir }, HISTORY_PATH),
-    reader.restPages(`/repos/${repository.owner}/${repository.name}/commits?${query}`),
+    reader.restPages(`${repositoryPath(repository)}/commits?${query}`),
   ]);
   const history = answerOf(z.array(StoryHistoryNode), nodes, `GraphQL's history of ${dir} on ${LEDGER_BRANCH} at ${head}`);
   const authors = answerOf(z.array(RestCommit), listed, `REST's commit list of ${dir} on ${LEDGER_BRANCH} at ${head}`);

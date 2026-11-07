@@ -7,7 +7,8 @@ import type { HookAnswer, HookDeps } from "../lib/hook-io.ts";
 const { readSessionRecord } = await import("../core/session-record.ts");
 const { context, PASS, readInput, refuse, refusing, runHook } = await import("../lib/hook-io.ts");
 const { sessionsFolder } = await import("../core/orchestrator-paths.ts");
-const { ensureSessionToken, originRepository } = await import("../lib/session-token.ts");
+const { originRepository } = await import("../core/git.ts");
+const { ensureSessionToken } = await import("../lib/session-token.ts");
 const { orchestratorOnGitHub } = await import("../lib/settings.ts");
 const { applyStart, decideStart, gatherStartFacts } = await import("../lib/start.ts");
 

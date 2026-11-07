@@ -10,7 +10,7 @@ import { run } from "../plugin/hooks/prompt.ts";
 import { context, PASS, type HookAnswer } from "../plugin/lib/hook-io.ts";
 import { REPO, scratchCheckout } from "./support/checkout.ts";
 import { hookDeps, hookInput, storeSessionToken } from "./support/hook-run.ts";
-import { GITHUB_NOW, READY_STORY, missingLedger, storyGitHub, tamperedLedger, writes, type Story } from "./support/story.ts";
+import { GITHUB_NOW, READY_STORY, SPEC_MERGE_COMMIT, missingLedger, storyGitHub, tamperedLedger, writes, type Story } from "./support/story.ts";
 
 const { session_id: SESSION_ID } = JSON.parse(readFileSync(new URL("./fixtures/hooks/user-prompt-submit.json", import.meta.url), "utf8")) as {
   session_id: string;
@@ -40,7 +40,7 @@ describe("the UserPromptSubmit hook", () => {
   });
 
   it("claims a story whose newest spec PR is closed unmerged over an older merged one", async (t) => {
-    const story = { ...READY_STORY, specPrs: [{ number: 31, closed: true, merged: true }, { number: 35, closed: true, merged: false }] };
+    const story = { ...READY_STORY, specPrs: [{ number: 31, closed: true, merged: true, mergeCommit: SPEC_MERGE_COMMIT }, { number: 35, closed: true, merged: false, mergeCommit: null }] };
     const { github, answer } = prompt(t, "/codeworks 212", story, { tokenMinutes: 30 });
     assert.deepEqual(await answer(), started("claimed"));
     assert.deepEqual(writes(github.calls), ["lane In progress"]);
@@ -104,7 +104,7 @@ describe("the UserPromptSubmit hook", () => {
     ["sub-issues", { ...READY_STORY, subIssues: [213] }, ["comment <!-- codeworks:orchestrator-reason parent-212 -->", "lane Blocked"], /#213/],
     [
       "an open spec PR",
-      { ...READY_STORY, specPrs: [{ number: 33, closed: false, merged: false }] },
+      { ...READY_STORY, specPrs: [{ number: 33, closed: false, merged: false, mergeCommit: null }] },
       ["comment <!-- codeworks:orchestrator-reason spec-pr-open-200 -->", "lane Blocked"],
       /#33/,
     ],

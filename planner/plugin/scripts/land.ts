@@ -9,16 +9,20 @@ import type { Mint } from "../lib/github.ts";
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const { join, posix } = await import("node:path");
 const { z } = await import("zod");
-const { isPhaseHeading, readTaskBlockLabels, taskBlockLabel, TaskBlockLabelRefused } = await import("../core/contracts/tasks.ts");
+const { isPhaseHeading, readTaskBlockLabels, readTaskLine, taskBlockLabel, TaskBlockLabelRefused, TaskLineRefused } = await import("../core/contracts/tasks.ts");
 const { GhFolderRefused } = await import("../core/gh-config.ts");
-const { fetchWithGhCredential, GhCredentialRefused, GitFailed, pushWithGhCredential, runGit } = await import("../core/git.ts");
-const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, RemoteRefused } = await import("../core/github.ts");
+const { fetchWithGhCredential, GhCredentialRefused, GitFailed, originRepository, pushWithGhCredential, runGit, trackingRef, trackingRefspec } = await import(
+  "../core/git.ts"
+);
+const { answerOf, gitHub, GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered, ownerAndName, RemoteRefused, repositoryPath } = await import(
+  "../core/github.ts"
+);
 const { specBranch, specFolderAnswer, specPr } = await import("../core/identity.ts");
 const { KeyReadRefused } = await import("../core/keys.ts");
 const { SettingsError } = await import("../core/settings.ts");
 const { MintError } = await import("../core/tokens.ts");
 const { gitTree, isPlainPath, NotInTree } = await import("../core/tree.ts");
-const { mintPlannerToken, NoOrigin, originRepository, plannerGitHub } = await import("../lib/github.ts");
+const { mintPlannerToken, plannerGitHub } = await import("../lib/github.ts");
 const { ghFolder, readPlannerSettings } = await import("../lib/settings.ts");
 
 export type LandIo = {
@@ -56,8 +60,9 @@ function stop(...lines: string[]): never {
   throw new Stopped(lines);
 }
 
-const TASK_LINE = /^\s*- \[[ xX]\] /;
-const STORY_TAG = /\[US([1-9][0-9]*)\]/g;
+// Nobody edits tasks.md by hand: the next round writes it again (ADR-0009 d4, d8).
+const REWRITE_TASKS = "delete the spec folder's tasks.md, then resume";
+
 const PHASE_TITLE = /^## Phase [^:]*: (.+)$/;
 
 type Phase = { line: number; heading: string; story: number | null };
@@ -75,14 +80,14 @@ function phasesOf(lines: readonly string[]): Phase[] {
       phases.push(current);
     } else if (line.startsWith("## ")) {
       current = null;
-    } else if (TASK_LINE.test(line)) {
-      for (const [, k] of line.matchAll(STORY_TAG)) {
-        if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${k} outside any phase`);
-        if (current.story !== null && current.story !== Number(k)) {
-          throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${k}`);
-        }
-        current.story = Number(k);
+    } else {
+      const story = readTaskLine(line)?.story ?? null;
+      if (story === null) continue;
+      if (current === null) throw new TasksRefused(`${JSON.stringify(line)} is tagged US${story} outside any phase`);
+      if (current.story !== null && current.story !== story) {
+        throw new TasksRefused(`"${current.heading}" holds tasks of US${current.story} and US${story}`);
       }
+      current.story = story;
     }
   }
   const order = phases.flatMap((phase) => (phase.story === null ? [] : [phase.story]));
@@ -220,14 +225,14 @@ type Read = {
 async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   if (kind === RESCOPE) stop(`#${p} is a rescope, which land.ts does not land. Next step: land it by hand; ${LANDING_A_RESCOPE}.`);
   const { checkout } = io;
-  const repo = await originRepository(checkout);
+  const repo = ownerAndName(await originRepository(checkout));
   const settings = await readPlannerSettings(checkout);
   const github = await plannerGitHub(repo, settings, io.connect, new Date(), io.mint);
   const name = `${repo.owner}/${repo.name}`;
-  const api = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
+  const api = repositoryPath(repo);
   const { url, default_branch: base } = answerOf(RepositoryAnswer, await github.rest("GET", api), name);
-  const tracking = `refs/remotes/origin/${base}`;
-  await io.fetch(repo, [`+refs/heads/${base}:${tracking}`]);
+  const tracking = trackingRef(base);
+  await io.fetch(repo, [trackingRefspec(base)]);
 
   const specs = posix.dirname(specDir);
   const project = posix.dirname(specs);
@@ -267,8 +272,8 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   const open = pr?.state === "open" ? pr : null;
   if (open !== null) {
     // Fetched only now: a branch with no open PR may not exist, and a fetch of it would fail.
-    await io.fetch(repo, [`+refs/heads/${branch}:refs/remotes/origin/${branch}`]);
-    const behind = await runGit(checkout, ["merge-base", "--is-ancestor", `refs/remotes/origin/${branch}`, "HEAD"], [1]);
+    await io.fetch(repo, [trackingRefspec(branch)]);
+    const behind = await runGit(checkout, ["merge-base", "--is-ancestor", trackingRef(branch), "HEAD"], [1]);
     if (behind.code === 1) stop(`origin/${branch} holds commits HEAD does not. Next step: check out ${branch}, then land again.`);
   }
 
@@ -281,7 +286,7 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   if (extra.length > 0) {
     stop(
       `#${p} has ${subIssues.length} sub-issues for ${stories.length} stories; the extra: ${extra.map((one) => `#${one.number}`).join(", ")}. ` +
-        `Next step: remove them from #${p}'s sub-issues, or add their stories to tasks.md.`,
+        `Next step: remove them from #${p}'s sub-issues, or ${REWRITE_TASKS}.`,
     );
   }
   const foreign = subIssues.filter((one) => one.repository_url !== url);
@@ -294,7 +299,7 @@ async function read({ p, specDir, kind }: Landing, io: LandIo): Promise<Read> {
   }
   const misplaced = misplacedSubIssues(subIssues, stories, labels);
   if (misplaced.length > 0) {
-    stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: make tasks.md's label and #${p}'s sub-issue name the same issue.`));
+    stop(...misplaced.map((line) => `#${p}'s ${line}. Next step: correct #${p}'s sub-issues, or ${REWRITE_TASKS}.`));
   }
 
   const login = settings.shared.planner_app_login;
@@ -396,8 +401,8 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
       for (const line of error.lines) io.stderr(line);
       return 1;
     }
-    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused) {
-      io.stderr(`${error.message}. Next step: correct the spec folder's tasks.md, then land again.`);
+    if (error instanceof TasksRefused || error instanceof TaskBlockLabelRefused || error instanceof TaskLineRefused) {
+      io.stderr(`${error.message}. Next step: ${REWRITE_TASKS}.`);
       return 1;
     }
     if (
@@ -408,7 +413,6 @@ export async function main(args: readonly string[], io: LandIo): Promise<number>
         error instanceof LandingIncomplete ||
         error instanceof SettingsError ||
         error instanceof RemoteRefused ||
-        error instanceof NoOrigin ||
         error instanceof GhFolderRefused ||
         error instanceof KeyReadRefused ||
         error instanceof MintError ||

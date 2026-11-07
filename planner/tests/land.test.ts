@@ -26,6 +26,8 @@ import {
 const P = 7;
 const SPEC = "specs/7-retry-budget";
 const BRANCH = "7-spec";
+// The next step of every stop on tasks.md (planner ADR-0009 d8).
+const REWRITE_TASKS = "delete the spec folder's tasks.md, then resume";
 const BOT_ID = 4242;
 const EMAIL = `${BOT_ID}+${LOGIN}@users.noreply.github.com`;
 const API_REPO = "/repos/acme/widgets";
@@ -72,10 +74,35 @@ describe("labelTasks", () => {
     const labelled = tasksMd(3, [101, 101, 101, 102, 103, 103]);
     assert.equal(labelTasks(labelled, [101, 102, 103]), labelled);
   });
+
+  it("labels each story phase with its own issue when a phase's tags touch, as [P][US2]", () => {
+    const touching = (text: string) => text.replace("T004 [P] [US2]", "T004 [P][US2]").replace("T014 [US2]", "T014 [P][US2]");
+    assert.equal(labelTasks(touching(tasksMd(3)), [101, 102, 103]), touching(tasksMd(3, [101, 101, 101, 102, 103, 103])));
+  });
+
+  it("labels a tasks.md that keeps Spec Kit's stock Notes bullets, reading them as no task", () => {
+    const notes = "\n## Notes\n\n- [P] tasks = different files, no dependencies\n- [Story] label maps task to specific user story for traceability\n";
+    assert.equal(labelTasks(tasksMd(3) + notes, [101, 102, 103]), tasksMd(3, [101, 101, 101, 102, 103, 103]) + notes);
+  });
+
+  it("refuses a phase holding tasks of two stories, as TasksRefused naming the phase and both stories", () => {
+    assert.throws(() => labelTasks(tasksMd(3).replace("- [x] T013 [US1]", "- [x] T013 [US2]"), [101, 102, 103]), {
+      name: "TasksRefused",
+      message: `tasks.md: "## Phase 3: ${STORIES[0]}" holds tasks of US1 and US2`,
+    });
+  });
+
+  it("refuses a task line tagged with a story outside any phase, as TasksRefused naming the line", () => {
+    const line = "- [ ] T000 [US1] Retry before any phase";
+    assert.throws(() => labelTasks(tasksMd(3).replace("# Tasks: retry budget\n", `# Tasks: retry budget\n${line}\n`), [101, 102, 103]), {
+      name: "TasksRefused",
+      message: `tasks.md: ${JSON.stringify(line)} is tagged US1 outside any phase`,
+    });
+  });
 });
 
 type Issue = { id: number; number: number; title: string; repository_url: string };
-type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean };
+type Pr = { number: number; headRefName: string; isCrossRepository: boolean; closed: boolean; merged: boolean; mergeCommit: { oid: string } | null };
 
 /** What GitHub holds across runs: each run gets a fresh fake recording its own calls over this one state. */
 type GitHubState = {
@@ -97,7 +124,7 @@ function issue(number: number, title = `US: #${number}`, repositoryUrl = REPO_UR
 }
 
 function pr(number: number, over: Partial<Pr> = {}): Pr {
-  return { number, headRefName: BRANCH, isCrossRepository: false, closed: false, merged: false, ...over };
+  return { number, headRefName: BRANCH, isCrossRepository: false, closed: false, merged: false, mergeCommit: null, ...over };
 }
 
 function bodyOf(call: FakeCall): Record<string, unknown> {
@@ -395,6 +422,18 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
     assert.equal(tasksIn(w), w.tasks, "tasks.md was written");
   }
 
+  // Planner ADR-0009 d8: a tasks.md the story checks refuse is deleted, and the run resumed, which writes it again.
+  for (const [what, tasks, named] of [
+    ["a tasks.md line tagged with two different stories", tasksMd(3).replace("- [x] T013 [US1]", "- [x] T013 [US1] [US2]"), JSON.stringify("- [x] T013 [US1] [US2] Test story 1")],
+    ["a phase holding tasks of two stories", tasksMd(3).replace("- [x] T013 [US1]", "- [x] T013 [US2]"), "US1 and US2"],
+  ] as const) {
+    it(`for ${what}, naming it, its next step to delete tasks.md and resume`, async (t) => {
+      const w = world(t, tasks);
+      const run = await land(w, gitHubState());
+      assertStops(w, run, [named, REWRITE_TASKS]);
+    });
+  }
+
   it("for kind rescope, naming #178", async (t) => {
     const w = world(t);
     const run = await land(w, gitHubState(), [String(P), SPEC, "rescope"]);
@@ -437,7 +476,7 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
 
   it("for a spec PR merged, saying the spec is on the default branch and naming #178", async (t) => {
     const w = world(t);
-    const run = await land(w, gitHubState({ prs: [pr(40, { closed: true, merged: true })] }));
+    const run = await land(w, gitHubState({ prs: [pr(40, { closed: true, merged: true, mergeCommit: { oid: "b".repeat(40) } })] }));
     assertStops(w, run, ["default branch", "#178"]);
   });
 
@@ -451,13 +490,13 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
   it("for more sub-issues than stories, naming the extra ones", async (t) => {
     const w = world(t);
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102), issue(103), issue(104), issue(105)] }));
-    assertStops(w, run, ["#104", "#105"]);
+    assertStops(w, run, ["#104", "#105", REWRITE_TASKS]);
   });
 
   it("for a one-story spec whose #p has sub-issues, naming them", async (t) => {
     const w = world(t, tasksMd(1));
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(102)] }));
-    assertStops(w, run, ["#101", "#102"]);
+    assertStops(w, run, ["#101", "#102", REWRITE_TASKS]);
   });
 
   it("for a sub-issue in another repository, naming it", async (t) => {
@@ -470,7 +509,7 @@ describe("land.ts stops before its first write, exiting 1 and naming the next st
   it("for a sub-issue at position i other than the issue tasks.md labels US<i+1> with, naming both", async (t) => {
     const w = world(t, tasksMd(3, [101, 101, 101, 102, 103, 103]));
     const run = await land(w, gitHubState({ subIssues: [issue(101), issue(120), issue(103)] }));
-    assertStops(w, run, ["#120", "#102", "US2"]);
+    assertStops(w, run, ["#120", "#102", "US2", REWRITE_TASKS]);
   });
 });
 
@@ -494,6 +533,18 @@ describe("land.ts could not run, exiting 2", () => {
       assert.deepEqual(run.pushes, []);
     });
   }
+
+  it("for a checkout with no origin, naming origin, minting nothing and calling no GitHub", async (t) => {
+    const w = world(t);
+    git(w.checkout, "remote", "remove", "origin");
+    storeToken(9);
+    const run = await land(w, gitHubState());
+    assert.equal(run.code, 2, run.stderr.join("\n"));
+    assert.match(run.stderr.join("\n"), /remote get-url origin/);
+    assert.deepEqual(run.mints, []);
+    assert.deepEqual(run.calls, []);
+    assert.deepEqual(run.pushes, []);
+  });
 
   it("when GitHub gives #p's sub-issues only in part, creating no issue", async (t) => {
     const w = world(t);

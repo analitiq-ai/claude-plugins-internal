@@ -15,6 +15,7 @@ import {
   loadValidators,
   status,
   trigger,
+  validatorLogins,
   ValidatorLoadError,
   type Module,
   type Validators,
@@ -142,7 +143,8 @@ async function refusal(validators: string[]): Promise<ValidatorLoadError> {
   assert.fail(`loading ${JSON.stringify(validators)} did not throw`);
 }
 
-function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | string | null, why: RegExp): void {
+/** With `cause`, it also asserts the answer carries that very value as its cause. */
+function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | string | null, why: RegExp, cause?: unknown): void {
   assert.ok(
     typeof answer === "object" && answer !== null && !Array.isArray(answer),
     `expected COULD_NOT_RUN, got ${JSON.stringify(answer)}`,
@@ -151,10 +153,31 @@ function assertCouldNotRun(answer: StatusAnswer | Finding[] | CouldNotRun | stri
   assert.ok(answer.reason !== null);
   assert.match(answer.reason, /^fixture: /, "the reason names the module");
   assert.match(answer.reason, why);
+  if (cause !== undefined) assert.equal((answer as CouldNotRun).cause, cause, "its cause is the error it was made from");
 }
 
 beforeEach(() => {
   reset();
+});
+
+describe("validatorLogins", () => {
+  it("is every listed package's logins, the set loadValidators gives", async () => {
+    const { logins } = await validatorLogins({ ...SHARED, validators: ["fixture", "second"] }, DIR);
+    assert.deepEqual(logins, new Set(["fixture-bot[bot]", "second-bot[bot]"]));
+    assert.deepEqual((await load(["fixture", "second"])).logins, logins);
+  });
+
+  it("does not call the listed package's open", async () => {
+    await validatorLogins({ ...SHARED, validators: ["fixture"] }, DIR);
+    assert.equal(script.opened.length, 0);
+  });
+
+  it("refuses a package whose logins is not a list, naming it and the export", async () => {
+    await assert.rejects(
+      validatorLogins({ ...SHARED, validators: ["bad-logins"] }, DIR),
+      (error: unknown) => error instanceof ValidatorLoadError && error.entry === "bad-logins" && /logins/.test(error.why),
+    );
+  });
 });
 
 describe("loading the packages [shared] validators lists", () => {
@@ -361,7 +384,7 @@ describe("a PENDING module is SILENT once the timeout has run from the caller's 
   });
 });
 
-describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the module and the error", () => {
+describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the module and the error, a throw its cause", () => {
   const throws: [string, unknown, RegExp][] = [
     ["an Error", new Error("the provider is down"), /the provider is down/],
     ["GitHubUnanswered", new GitHubUnanswered("GET /repos/acme/widgets: no answer"), /no answer/],
@@ -369,19 +392,19 @@ describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the mo
   ];
 
   for (const [what, thrown, why] of throws) {
-    it(`is COULD_NOT_RUN from trigger when it throws ${what}`, async () => {
+    it(`is COULD_NOT_RUN from trigger when it throws ${what}, carrying it as its cause`, async () => {
       script.trigger = { throws: thrown };
-      assertCouldNotRun(await trigger(await fixtureModule(), REPO, PR, HEAD), why);
+      assertCouldNotRun(await trigger(await fixtureModule(), REPO, PR, HEAD), why, thrown);
     });
 
-    it(`is COULD_NOT_RUN from status when it throws ${what}`, async () => {
+    it(`is COULD_NOT_RUN from status when it throws ${what}, carrying it as its cause`, async () => {
       script.status = { throws: thrown };
-      assertCouldNotRun(await status(await fixtureModule(), REPO, PR, HEAD, WINDOW), why);
+      assertCouldNotRun(await status(await fixtureModule(), REPO, PR, HEAD, WINDOW), why, thrown);
     });
 
-    it(`is COULD_NOT_RUN from findings when it throws ${what}`, async () => {
+    it(`is COULD_NOT_RUN from findings when it throws ${what}, carrying it as its cause`, async () => {
       script.findings = { throws: thrown };
-      assertCouldNotRun(await findings(await fixtureModule(), REPO, PR, HEAD), why);
+      assertCouldNotRun(await findings(await fixtureModule(), REPO, PR, HEAD), why, thrown);
     });
   }
 
@@ -413,10 +436,15 @@ describe("no answer, a throw or a refused answer is COULD_NOT_RUN, naming the mo
     assertCouldNotRun(await status(await fixtureModule(), REPO, PR, HEAD, WINDOW), /head/);
   });
 
-  it("is COULD_NOT_RUN from a PENDING status when GitHub's clock gives no answer", async () => {
+  it("is COULD_NOT_RUN from a PENDING status when GitHub's clock gives no answer, naming the module and GitHub's error alone, GitHub's error its cause", async () => {
     script.status = { answer: { outcome: "PENDING", head: null, reason: null } };
-    const silentClock = reader({ now: new GitHubUnanswered("GET /rate_limit: no answer") });
-    assertCouldNotRun(await status(await fixtureModule({ reader: silentClock }), REPO, PR, HEAD, WINDOW), /no answer/);
+    const unanswered = new GitHubUnanswered("GET /rate_limit: no answer");
+    const silentClock = reader({ now: unanswered });
+    assertCouldNotRun(
+      await status(await fixtureModule({ reader: silentClock }), REPO, PR, HEAD, WINDOW),
+      /^fixture: GET \/rate_limit: no answer$/,
+      unanswered,
+    );
   });
 
   it("is COULD_NOT_RUN from findings when GitHub gives no answer to its provider's threads", async () => {
