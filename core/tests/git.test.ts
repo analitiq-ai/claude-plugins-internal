@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type AddressInfo, type Server } from "node:net";
@@ -36,6 +36,9 @@ const savedEnv = {
   GH_TOKEN: process.env.GH_TOKEN,
   GIT_ASKPASS: process.env.GIT_ASKPASS,
   SSH_ASKPASS: process.env.SSH_ASKPASS,
+  LANG: process.env.LANG,
+  LANGUAGE: process.env.LANGUAGE,
+  LC_ALL: process.env.LC_ALL,
 };
 
 function restoreEnv(name: keyof typeof savedEnv): void {
@@ -302,6 +305,23 @@ for (const transport of transports) {
         assert.equal(existsSync(ran), false, "the askpass ran");
       });
     }
+
+    it("fails in git's untranslated words when the caller's LANGUAGE asks for German", async () => {
+      const dir = await checkout();
+      process.env.LANG = "en_US.UTF-8";
+      process.env.LANGUAGE = "de";
+      delete process.env.LC_ALL;
+      try {
+        const plain = spawnSync("git", ["-C", dir, "cat-file", "-t", "dummy"], { encoding: "utf8" });
+        assert.ok(plain.stderr !== "" && !plain.stderr.startsWith("fatal: "), `fixture: plain git translates its words: ${plain.stderr}`);
+        await assert.rejects(transport.run(dir), (error: unknown) => {
+          assert.ok(error instanceof GitFailed && error.stderr.startsWith("fatal: "), String(error));
+          return true;
+        });
+      } finally {
+        for (const name of ["LANG", "LANGUAGE", "LC_ALL"] as const) restoreEnv(name);
+      }
+    });
   });
 }
 

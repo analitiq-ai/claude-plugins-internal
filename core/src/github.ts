@@ -264,12 +264,18 @@ function gitHubTime(date: string | null): string {
   return `${new Date(time).toISOString().slice(0, 19)}Z`;
 }
 
-function failure(what: string, answer: Exchange): GitHubUnanswered | GitHubRefused {
-  const { status, headers } = answer;
+/**
+ * The failure GitHub's answer `status` is: a 4xx refuses, unless it limits the rate; any other is no answer. `headers`
+ * tell a 403 that limits the rate from one that refuses; without them a 403 refuses.
+ */
+export function failureOfStatus(status: number, message: string, headers: Headers = new Headers()): GitHubUnanswered | GitHubRefused {
   const rateLimited = status === 429 || (status === 403 && (headers.get("x-ratelimit-remaining") === "0" || headers.has("retry-after")));
-  const message = `${what}: ${status} ${messageOf(answer.text)}`;
   if (status >= 400 && status < 500 && !rateLimited) return new GitHubRefused(status, message);
   return new GitHubUnanswered(message);
+}
+
+function failure(what: string, answer: Exchange): GitHubUnanswered | GitHubRefused {
+  return failureOfStatus(answer.status, `${what}: ${answer.status} ${messageOf(answer.text)}`, answer.headers);
 }
 
 // A body that is not GitHub's message, such as a proxy's error page, is reported as it came.

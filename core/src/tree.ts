@@ -71,15 +71,17 @@ export function lsTreeRecords(stdout: string): LsTreeRecord[] {
     });
 }
 
+/** The entry at `path` in the tree of `ref` in the repository at `checkout`, undefined when it has none. */
+export async function treeEntry(checkout: string, ref: string, path: string): Promise<LsTreeRecord | undefined> {
+  assertTreePath(path);
+  // A path is a name, never a pattern or magic such as `:/`, and a ref is never read as an option.
+  const args = ["--literal-pathspecs", "ls-tree", "-z", "--full-tree", "--end-of-options", ref, "--", path];
+  return lsTreeRecords((await runGit(checkout, args)).stdout).find((record) => record.name === path);
+}
+
 export function gitTree(checkout: string, ref: string): Tree {
   assertRef(ref);
-
-  async function entryAt(path: string): Promise<LsTreeRecord | undefined> {
-    assertTreePath(path);
-    // A path is a name, never a pattern or magic such as `:/`, and a ref is never read as an option.
-    const args = ["--literal-pathspecs", "ls-tree", "-z", "--full-tree", "--end-of-options", ref, "--", path];
-    return lsTreeRecords((await runGit(checkout, args)).stdout).find((record) => record.name === path);
-  }
+  const entryAt = (path: string): Promise<LsTreeRecord | undefined> => treeEntry(checkout, ref, path);
 
   return {
     async listDir(path) {

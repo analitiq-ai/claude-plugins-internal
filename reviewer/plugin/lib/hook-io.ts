@@ -5,10 +5,12 @@ import { z } from "zod";
 
 import type { Session } from "../core/commit-pass.ts";
 import { tamperId } from "../core/contracts/ledger.ts";
+import { GhCredentialRefused } from "../core/git.ts";
 import { GitHubPartlyAnswered, GitHubRefused, GitHubUnanswered } from "../core/github.ts";
 import { KeyReadRefused } from "../core/keys.ts";
 import { BoardNotVisible, LedgerMissing, StateWriteUnsigned } from "../core/state.ts";
 import { MintError } from "../core/tokens.ts";
+import { CloneFetchFailed, GitHubFetchFailed } from "./check/bare-copy.ts";
 import { appendGateLog, type GateLogEntry } from "./session.ts";
 import type { ReviewerSettings } from "./settings.ts";
 
@@ -26,7 +28,7 @@ export const RETRY = "retry the step";
 /** The next step of a could-not-run that holds until what it names is fixed. */
 export const FIX_THEN_RETRY = "fix what it names, then retry the step";
 
-const HELD_UNTIL_FIXED = [GitHubPartlyAnswered, GitHubRefused, MintError, KeyReadRefused, BoardNotVisible];
+const HELD_UNTIL_FIXED = [GitHubPartlyAnswered, GitHubRefused, GhCredentialRefused, MintError, KeyReadRefused, BoardNotVisible, CloneFetchFailed, GitHubFetchFailed];
 
 /** The next step of the could-not-run `failure` makes, or null when it makes none. */
 export function nextStepOf(failure: unknown): string | null {
@@ -42,6 +44,15 @@ export function couldNotRunOf(failure: unknown, what?: string): unknown {
   if (next === null) return failure;
   const { message } = failure as Error;
   return new CouldNotRun(what === undefined ? message : `${what}: ${message}`, next, { cause: failure });
+}
+
+/** `call`'s value; its failure as `couldNotRunOf` makes it. */
+export async function orCouldNotRun<T>(call: Promise<T>, what?: string): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    throw couldNotRunOf(error, what);
+  }
 }
 
 /** The hook input is not one this hook can read. */

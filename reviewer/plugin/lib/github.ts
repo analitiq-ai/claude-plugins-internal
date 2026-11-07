@@ -2,7 +2,7 @@ import { GhFolderRefused, needsMint, readGhToken } from "../core/gh-config.ts";
 import type { GitHubClient } from "../core/github.ts";
 import { ghFolder } from "../core/orchestrator-paths.ts";
 import type { mintToken } from "../core/tokens.ts";
-import { CouldNotRun, couldNotRunOf } from "./hook-io.ts";
+import { CouldNotRun, orCouldNotRun } from "./hook-io.ts";
 
 export type Connect = (token: string) => GitHubClient;
 
@@ -38,13 +38,9 @@ export type WriterDeps = { mintToken: typeof mintToken; connect: Connect };
  */
 export function reviewerWriter(repo: string, appId: number, deps: WriterDeps): () => Promise<GitHubClient> {
   let minting: Promise<GitHubClient> | null = null;
-  async function mint(): Promise<GitHubClient> {
-    try {
-      const token = await deps.mintToken("reviewer", appId, "reviewer-app.pem", "reviewer", repo);
-      return deps.connect(token.value);
-    } catch (error) {
-      throw couldNotRunOf(error, `the reviewer App's token for ${repo} was not minted`);
-    }
+  function mint(): Promise<GitHubClient> {
+    const minted = deps.mintToken("reviewer", appId, "reviewer-app.pem", "reviewer", repo).then((token) => deps.connect(token.value));
+    return orCouldNotRun(minted, `the reviewer App's token for ${repo} was not minted`);
   }
   return () => (minting ??= mint());
 }
