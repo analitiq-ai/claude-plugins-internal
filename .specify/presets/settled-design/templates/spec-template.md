@@ -11,8 +11,7 @@ codeworks:
 <!--
   Tiers (root ADR-0012). The intent tier is the human's: the `codeworks` block above, `## Clarifications`,
   `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals`, `## Why this is worth doing` and the
-  folder's `adr-rulings.json`; it changes by a spec PR. A story may add an acceptance scenario, an edge case
-  or a success criterion in a `spec:` commit, never remove or edit one. The other sections, the other files
+  folder's `adr-rulings.json`; it changes by a spec PR, never on a story branch. The other sections, the other files
   of the folder, the story's own block of `tasks.md` and the decision records are the design tier, which a
   story changes in `spec:` commits. Every acceptance scenario, edge case and success criterion opens with a
   bold id that is never renumbered or reused: `**US<k>-S<n>**` on scenario n of user story k, `**EC-<nnn>**`

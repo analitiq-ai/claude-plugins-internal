@@ -57,50 +57,50 @@ solution.
 
 ## Decision
 
-1. We will split a spec folder into two tiers. The **intent tier** is: the spec's issue body; `adr-rulings.json`;
-   and, in `spec.md`, the `codeworks` front matter (planner ADR-0008 d1) and the sections `## Clarifications`,
-   `## User Scenarios & Testing` (user stories, acceptance scenarios, edge cases), `## Success Criteria`,
-   `## Non-goals` and `## Why this is worth doing`. The **design tier** is everything else the folder holds: the
-   other sections of `spec.md` (`## Requirements`, `## Assumptions`, `## Root cause` among them), every other
-   file of the folder (`plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`), the story's own
-   task block of `tasks.md`, and the decision records in every folder inside the repo that `[shared] adr_folders`
-   lists (reviewer ADR-0022 d1). The section a `spec.md` line belongs to is read by one splitter in `core/` (ADR-0003)
-   over the `## ` headings the spec template and `/speckit-clarify` fix, a trailing `*(…)*` note ignored; planner's checks and reviewer's
-   gate call the same function, and no fact is read from a heading's wording (amends reviewer ADR-0014 d2 and
-   planner ADR-0008 d1; constitution P7 names the exception in its own PR, action item 5). An item of the intent tier carries an explicit id in its line, never renumbered and never reused:
-   `**US<k>-S<n>**` on acceptance scenario `<n>` of `### User Story <k>`, `**EC-<nnn>**` on an edge case,
-   `**SC-<nnn>**` on a success criterion as the template already writes it. A new item takes the next unused
-   number; a removed item's id retires.
+1. We will split a spec folder into two tiers. The **intent tier** is: the spec's issue body; `adr-rulings.json`; and,
+   in `spec.md`, the `codeworks` front matter (planner ADR-0008 d1) and the sections `## Clarifications`, `## User
+   Scenarios & Testing` (user stories, acceptance scenarios, edge cases), `## Success Criteria`, `## Non-goals` and
+   `## Why this is worth doing`. The **design tier** is everything else the folder holds: the other sections of
+   `spec.md` (`## Requirements`, `## Assumptions`, `## Root cause` among them), every other file of the folder
+   (`plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`), the story's own task block of
+   `tasks.md`, and the decision records in every folder inside the repo that `[shared] adr_folders` lists (reviewer
+   ADR-0022 d1). The section a `spec.md` line belongs to is read by one splitter in `core/` (ADR-0003) over the `## `
+   headings the spec template and `/speckit-clarify` fix, a trailing `*(…)*` note ignored; planner's checks and
+   reviewer's gate call the same function, and no fact is read from a heading's wording (amends reviewer ADR-0014 d2
+   and planner ADR-0008 d1; constitution P7 names the exception in its own PR, action item 5). An item of the intent
+   tier carries an explicit id in its line, never renumbered and never reused: `**US<k>-S<n>**` on acceptance scenario
+   `<n>` of `### User Story <k>`, `**EC-<nnn>**` on an edge case, `**SC-<nnn>**` on a success criterion as the
+   template already writes it. A new item takes the next unused number; a removed item's id retires.
 2. We will freeze the intent tier to its human. planner lands its first version, and every later change to it,
    by a spec PR on `<p>-spec` that an admin merges (org ADR-0002 d2; planner ADR-0010), from the admin's words:
    the path an entry of `adr-rulings.json` takes (planner ADR-0009 d6). The squash commit of that spec PR on the
    default branch is the intent's **ratification**; a story branch reads it at its merge base. On a story branch,
-   reviewer refuses every commit that removes or edits an intent line, or changes `adr-rulings.json` or the
-   `codeworks` front matter (reviewer ADR-0023 d1); a story may **add** an acceptance scenario, an edge case or
-   a success criterion, in a `spec:` commit (d3), and may not add to `## Clarifications`, `## Non-goals` or
-   `## Why this is worth doing`, which record the human's answers or narrow the ask. No component edits the
-   issue body.
+   reviewer refuses every commit that changes an intent line, `adr-rulings.json` or the `codeworks` front matter
+   (reviewer ADR-0023 d1): a story writes nothing in the intent tier, not an added scenario either; what it finds
+   missing it asks of the admin, as a departure from a record is asked today. No component edits the issue body.
 3. We will let the story change the design tier on its own branch, in **`spec:` commits** (reviewer ADR-0023 d2): a
-   commit that changes only spec-folder paths and decision records, whose body names the intent item that motivates
-   it and the items it claims unaffected, and that the claim check judges before it lands. In `tasks.md` a story
-   writes only the task block labelled with its issue number (OWN_BLOCK, which replaces TICK_ONLY of ADR-0011 d1 and
-   reviewer ADR-0010 d1): a tick (`[ ]` to `[x]`) inside its block lands in any commit, as before; an edit inside its
-   block lands in a `spec:` commit; nothing outside it. planner ADR-0009 d4 keeps `tasks.md` derived in planning; on
-   a story branch the story's block is the story's. A record a story adds or supersedes keeps the form `adr check`
-   validates (planner ADR-0009 d8) and sits in a folder inside the repo; the orchestrator's squash merge of the
-   story PR (orchestrator ADR-0009 d1) ratifies it, as the spec PR's merge ratifies planner's. A record outside the repo is never changed from a story branch (planner ADR-0009 d8).
-4. We will grade the code and the design tier against the intent tier, never the other way round (reviewer
-   ADR-0023 d3–d4): every acceptance scenario of the story's own user story has a test tagged with its id, written
-   red first (constitution Principle IV; the gate lets it land before its code, org ADR-0001 d1), and no story
-   commit may delete, untag, skip or mark expected-fail a tagged test while its item stands; the decision-reviewer is briefed with the intent at ratification and the design delta since it,
-   and a delta that leaves an intent item unmet, or narrows what meets it, is an INTENT_DRIFT finding ruled ESCALATE
-   and never FIX. A RESCOPE verdict (reviewer ADR-0017 d2, ADR-0013 d5) is for the intent tier alone: the ask does
-   not settle a decision the code must take. A gap in the design tier is a SPEC_GAP finding ruled FIX, whose fix is
-   a `spec:` commit.
-5. We will show the human every design change before the story merges: reviewer's round record carries the spec
-   delta since ratification (reviewer ADR-0023 d5), and the orchestrator posts it as a keyed comment on the PR with
-   its App (orchestrator ADR-0003 d3–d4), never in the PR body, which becomes the squash message (orchestrator
-   ADR-0009 d6); the admin who moves the card to Ready reads it there. The orchestrator attests a story PR that
+   commit that changes only spec-folder paths and decision records, whose body names the intent item that motivates it
+   and the items it claims unaffected, and that the claim check judges before it lands. In `tasks.md` a story writes
+   only the task block labelled with its issue number (OWN_BLOCK, which replaces TICK_ONLY of ADR-0011 d1 and reviewer
+   ADR-0010 d1): a tick (`[ ]` to `[x]`) inside its block lands in any commit, as before; an edit inside its block
+   lands in a `spec:` commit; nothing outside it. planner ADR-0009 d4 keeps `tasks.md` derived in planning; on a story
+   branch the story's block is the story's. A record a story adds or supersedes keeps the form `adr check` validates
+   (planner ADR-0009 d8) and sits in a folder inside the repo; the orchestrator's squash merge of the story PR
+   (orchestrator ADR-0009 d1) ratifies it, as the spec PR's merge ratifies planner's. A record outside the repo is
+   never changed from a story branch (planner ADR-0009 d8).
+4. We will grade the code and the design tier against the intent tier, never the other way round (reviewer ADR-0023
+   d3–d4): every acceptance scenario of the story's own user story has a test tagged with its id, written red first
+   (constitution Principle IV; the gate lets it land before its code, org ADR-0001 d1), and no story commit may
+   delete, untag, skip or mark expected-fail a tagged test while its item stands; the decision-reviewer is briefed
+   with the intent at ratification and the design delta since it, and a delta that leaves an intent item unmet, or
+   narrows what meets it, is an INTENT_DRIFT finding ruled ESCALATE and never FIX. A RESCOPE verdict (reviewer
+   ADR-0017 d2, ADR-0013 d5) is for the intent tier alone: the ask does not settle a decision the code must take. A
+   gap in the design tier is a SPEC_GAP finding ruled FIX, whose fix is a `spec:` commit.
+5. We will keep every design change where the human can read it: reviewer's round record carries the spec delta
+   since ratification (reviewer ADR-0023 d5), and the orchestrator posts it as a keyed comment on the PR with its App
+   (orchestrator ADR-0003 d3–d4), never in the PR body, which becomes the squash message (orchestrator ADR-0009
+   d6). The delta is the record of what the round graded (d4), not a gate: the one human gate on a story's design
+   is the INTENT_DRIFT escalation. The orchestrator attests a story PR that
    changes a `docs/adr/` folder or the design tier of `specs/` (orchestrator ADR-0004 d4 keeps `codeworks.toml`,
    `.github/`, `.claude/`, `.specify/memory/`, `AGENTS.md` and `CLAUDE.md`), and its attestation lapses on what the
    default branch changed since the merge base, not on the story's own `spec:` commits (orchestrator ADR-0004 d1);
@@ -118,7 +118,7 @@ solution.
 ### Option A: Intent frozen to its human; design changed by the story in `spec:` commits, graded against the intent (chosen)
 
 The review has a fixed target and the story has room to design. Every design change is a named, claimed commit
-the admin reads before Ready.
+the admin can read on the PR.
 
 ### Option B: Keep ADR-0011: planner alone writes the folder and the records
 
@@ -142,8 +142,10 @@ added line under `## Non-goals` narrows the ask with nothing to refuse it.
 
 ## Trade-offs
 
-- The admin reads design deltas in the story PR, from the spec delta comment, instead of in a spec PR of their own.
-- A story may widen its intent by adding scenarios; every addition is in the delta and needs a tagged test.
+- The admin reads design deltas in the story PR, from the spec delta comment, instead of in a spec PR of their own;
+  nothing makes them read it before the merge, so drift the round misses is found after it.
+- A story that finds its intent incomplete stops and asks, as it does for a record today; the intent gains nothing
+  from a story branch.
 - reviewer's gate reads `spec.md` by its fixed headings through core's splitter, and `tasks.md` by its task blocks.
 - A tagged test's body can still be weakened in place; the gate refuses what code can decide (delete, untag, skip,
   expected-fail) and the round rules the rest ESCALATE, for the human.

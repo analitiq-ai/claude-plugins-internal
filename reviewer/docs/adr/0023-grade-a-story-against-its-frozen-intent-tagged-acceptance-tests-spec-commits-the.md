@@ -50,33 +50,29 @@ story made to its spec. Each is a rule code can decide or a ruling policy can fi
 ## Decision
 
 1. We will fence the intent tier on a story branch (INTENT_FROZEN). A commit is refused when it changes
-   `adr-rulings.json` or the `codeworks` front matter of `spec.md`, when the diff of `spec.md` has a `-` line inside
-   an intent section (root ADR-0012 d1), when a `+` line inside `## User Scenarios & Testing` or
-   `## Success Criteria` is neither an added acceptance scenario, edge case or success criterion opening with its id
-   nor an indented continuation of one, or when it changes any line of `## Clarifications`, `## Non-goals` or
-   `## Why this is worth doing`; the refusal names the section and the next legal step: ask the admin, who has
-   planner change the intent by a spec PR (planner ADR-0010). The section a line belongs to comes from core's one
-   `spec.md` splitter over the template's fixed `## ` headings (root ADR-0012 d1; amends ADR-0014 d2), an item
-   from the id label in its line. A review-round or assess-round launch
-   compares the intent tier at the reviewed commit with the branch's merge base, the ratification (root ADR-0012
-   d2): a removed or edited line, or a changed front matter or rulings file, refuses the launch with the diff, as a
+   `adr-rulings.json` or the `codeworks` front matter of `spec.md`, or when the diff of `spec.md` has a `+` or `-`
+   line inside an intent section (root ADR-0012 d1); the refusal names the section and the next legal step: ask the
+   admin, who has planner change the intent by a spec PR (planner ADR-0010). The section a line belongs to comes
+   from core's one `spec.md` splitter over the template's fixed `## ` headings (root ADR-0012 d1; amends ADR-0014
+   d2), an item from the id label in its line. A review-round or assess-round launch compares the intent tier at
+   the reviewed commit with the branch's merge base, the ratification (root ADR-0012 d2): any difference in an
+   intent section, the front matter or the rulings file refuses the launch with the diff, as a
    commit made outside the hooks is caught (ADR-0002 d4); this replaces README 5's blob binding. OWN_BLOCK replaces
    TICK_ONLY (ADR-0010 d1): a `tasks.md` change on a story branch stays inside the task block labelled with the
    session's issue number (planner ADR-0008 d2): a tick (`[ ]` to `[x]`) in it lands in any commit, an edit in it
    only in a `spec:` commit (d2); a change outside it is refused, a merged story's block as ADR-0015 d4 already
    refuses.
-2. We will admit every design-tier change but a tick (d1), and every addition of an acceptance scenario, an edge
-   case or a success criterion (d1), only in a **`spec:` commit** (SPEC_COMMIT): its subject starts with `spec:`; it changes
-   only paths in the spec folder and in a folder inside the repo that `[shared] adr_folders` lists (ADR-0022 d1),
-   never code or tests; its body carries the trailers `Motivated-by: <id>` and `Unaffected: <ids>` (`none`
-   allowed), ids as root ADR-0012 d1 spells them, read by git's trailer parser from the message the `git commit`
-   command gives (`-m`, `-F`; README 6's closed rule on commit commands), a message the gate cannot read refused. A
-   design-tier change in any other commit, and a `spec:` commit missing a trailer, naming an id the spec does not
-   hold or touching another path, is refused naming the rule. The claim check (README 6; ADR-0001) reads each id of
-   `Unaffected:` as one claim of a judged category: the commit leaves what meets that item as it was, judged against
-   the spec folder in the staged tree; `WRONG` refuses the commit and counts on the claim's lineage as any `WRONG`
-   does. A record a `spec:` commit adds or supersedes is one `adr check` must pass (README 8); the merge of the
-   story PR ratifies it (root ADR-0012 d3).
+2. We will admit every design-tier change but a tick (d1) only in a **`spec:` commit** (SPEC_COMMIT): its subject
+   starts with `spec:`; it changes only paths in the spec folder and in a folder inside the repo that `[shared]
+   adr_folders` lists (ADR-0022 d1), never code or tests; its body carries the trailers `Motivated-by: <id>` and
+   `Unaffected: <ids>` (`none` allowed), ids as root ADR-0012 d1 spells them, read by git's trailer parser from the
+   message the `git commit` command gives (`-m`, `-F`; README 6's closed rule on commit commands), a message the gate
+   cannot read refused. A design-tier change in any other commit, and a `spec:` commit missing a trailer, naming an id
+   the spec does not hold or touching another path, is refused naming the rule. The claim check (README 6; ADR-0001)
+   reads each id of `Unaffected:` as one claim of a judged category: the commit leaves what meets that item as it was,
+   judged against the spec folder in the staged tree; `WRONG` refuses the commit and counts on the claim's lineage as
+   any `WRONG` does. A record a `spec:` commit adds or supersedes is one `adr check` must pass (README 8); the merge
+   of the story PR ratifies it (root ADR-0012 d3).
 3. We will tie acceptance scenarios to tests (TAGGED_TEST). A test whose name carries an intent id (`US<k>-S<n>`,
    `EC-<nnn>`; `-` written `_` where the language forbids it in a name) is tagged with that item. The commit gate
    refuses a story-branch commit that deletes a tagged test, removes the id from its name, or marks it skipped or
@@ -99,12 +95,12 @@ story made to its spec. Each is a rule code can decide or a ruling policy can fi
    design tier is ruled FIX and its next step is a `spec:` commit.
 5. We will record on every round (ADR-0011 d1; root ADR-0003's `Round` contract) a `spec_delta` since ratification:
    the merge base's `spec.md` blob; each `spec:` commit on the branch with its oid, subject, `Motivated-by`,
-   `Unaffected` ids and their claim verdicts; each intent item added, by id; each record added or superseded, by
-   corpus and id. The orchestrator posts it as a comment on the PR with its App, keyed by the round that recorded it
-   and posted only when no comment with that key exists (orchestrator ADR-0003 d3–d4), never in the PR body, which
-   is the squash message (orchestrator ADR-0009 d6); the admin reads it before Ready. The orchestrator attests a PR
-   that changes a `docs/adr/` folder or the design tier (orchestrator ADR-0004 d4); the check of ADR-0002 d4 fails
-   a commit d1, d2 or d3 would refuse, however it was made.
+   `Unaffected` ids and their claim verdicts; each record added or superseded, by corpus and id. The orchestrator
+   posts it as a comment on the PR with its App, keyed by the round that recorded it and posted only when no comment
+   with that key exists (orchestrator ADR-0003 d3–d4), never in the PR body, which is the squash message (orchestrator
+   ADR-0009 d6); it is the human's record of what d4 graded, not a gate. The orchestrator attests a PR that changes a
+   `docs/adr/` folder or the design tier (orchestrator ADR-0004 d4); the check of ADR-0002 d4 fails a commit d1, d2 or
+   d3 would refuse, however it was made.
 
 ## Options considered
 
@@ -154,7 +150,7 @@ model wrote.
 - Harder: the gate's spec-folder rule is three predicates where it was one; the brief carries a delta.
 - **How we would know this was wrong:** an intent line removed or edited on a merged story branch; a design-tier
   change merged outside a `spec:` commit; a scenario whose tagged test was dropped while it stood; a drifted
-  design ruled FIX; an admin learning of a design change only after merge.
+  design ruled FIX; a design delta an admin reverts after merge that no round escalated.
 - Revisit if: the claim check cannot judge an `Unaffected` claim from the spec folder alone, or INTENT_DRIFT
   findings are mostly ruled wrong by the admin.
 
