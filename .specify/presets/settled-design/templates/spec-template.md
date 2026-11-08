@@ -9,21 +9,16 @@ codeworks:
 {CORE_TEMPLATE}
 
 <!--
-  Tiers (root ADR-0012). The intent tier is the human's: the `codeworks` block above, `## Clarifications`,
-  `## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals`, `## Why this is worth doing` and the
-  folder's `adr-rulings.json`; it changes by a spec PR, never on a story branch. The other sections, the other files
-  of the folder, the story's own block of `tasks.md` and the decision records are the design tier, which a
-  story changes in `spec:` commits. Every acceptance scenario, edge case and success criterion opens with a
-  bold id that is never renumbered or reused: `**US<k>-S<n>**` on scenario n of user story k, `**EC-<nnn>**`
-  on an edge case, `**SC-<nnn>**` on a success criterion. A test carries the id of the scenario it checks in
-  its name.
+  Root ADR-0012 d1 names the sections of this file a story branch may not change and the sections it may; the
+  headings themselves are fixed. The id each scenario, edge case and success criterion opens with: the specify
+  command's "Ids and non-goals".
 -->
 
 ## Non-goals
 
 <!--
   ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to, with the
-  reason. When there is none, the one line `None.` Keep the heading either way. A story never adds here.
+  reason. When there is none, the one line `None.` Keep the heading either way.
 -->
 
 - [what is out, and why]

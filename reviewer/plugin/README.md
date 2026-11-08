@@ -141,7 +141,8 @@ that is under review.
    editable, so a story PR ticks its tasks.
    Decided otherwise by root ADR-0012 and reviewer ADR-0023 (#342): `spec.md`'s intent sections, `adr-rulings.json` and
    the `codeworks` front matter admit no change on a story branch; its design sections, the other spec files and the
-   records change on the story branch in `spec:` commits; this
+   records change on the story branch in `spec:` commits, `tasks.md` only inside the story's own block, a tick in any
+   commit; this
    refusal, the spec binding of (5) and the decision check of (8) follow those records once their gates land
    (`reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`, action items).
 

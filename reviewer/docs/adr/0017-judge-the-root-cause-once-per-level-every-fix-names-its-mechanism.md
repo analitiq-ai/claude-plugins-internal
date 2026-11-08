@@ -61,7 +61,7 @@ a root-cause verdict is due.
    when a finding shows the spec does not settle a decision; PATCH, CLASS_FIX or REDESIGN, when at least one
    finding is ruled FIX, the assessor choosing among them by this record and ADR-0018; CONVERGED_PUSHBACK,
    when every finding is ruled PUSH_BACK or DEFER.
-   *Amended by ADR-0023 d4 (#342): a departure also admits a FIX by a `spec:` commit superseding the record; RESCOPE is ruled when the intent tier does not settle the decision, and a design-tier SPEC_GAP is a FIX by a `spec:` commit; INTENT_DRIFT admits ESCALATE alone.*
+   *Amended by ADR-0023 d4 (#342): a departure also admits a FIX by a `spec:` commit superseding the record, so a story, not planner alone, may overrule a record inside the repo; RESCOPE is ruled when the intent tier does not settle the decision, and a design-tier SPEC_GAP is a FIX by a `spec:` commit; INTENT_DRIFT admits ESCALATE alone.*
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.

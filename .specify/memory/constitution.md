@@ -1,13 +1,14 @@
 <!--
 Sync Impact Report
 - Version: 1.2.4 -> 1.3.0 (MINOR: the Delivery Workflow gains the spec's two tiers, #342)
-- Changed: Delivery Workflow names the intent tier (issue body, `adr-rulings.json`, the `codeworks` front
-  matter, `## Clarifications`, the scenarios, success criteria, non-goals and premise answers), frozen to its
-  human and changed only by a spec PR, and the design tier, which a story changes on its branch in `spec:`
-  commits graded against the intent (root ADR-0012, reviewer ADR-0023); P6's Source lines add both records.
+- Changed: Delivery Workflow names the intent tier (the issue body, the admin's; and in the folder
+  `adr-rulings.json`, the `codeworks` front matter, `## Clarifications`, the scenarios, success criteria, non-goals,
+  premise answers and root cause, changed only by a spec PR), and the design tier, which a story changes on its
+  branch in `spec:` commits graded against the intent (root ADR-0012, reviewer ADR-0023); P6's Source lines add
+  both records.
 - Removed: none.
-- Templates: .specify/presets/settled-design/templates/spec-template.md gains `## Non-goals`, the tier note and
-  the id labels; commands/speckit.specify.md gains `## Ids and non-goals`.
+- Templates: .specify/presets/settled-design/templates/spec-template.md gains `## Non-goals` and the tier note;
+  commands/speckit.specify.md gains `## Ids and non-goals`, the id labels.
 - Follow-up: P7 names the spec template's fixed headings, read by core's splitter, as its second exception in
   its own PR (Governance; root ADR-0012 action item 5); reviewer's gates and the orchestrator's protected set
   follow the records (ADR-0023 action items).
@@ -274,11 +275,12 @@ pre-merge checklist. Owned by the organisation's `.claude/rules/github-workflow.
 `.claude/rules/pr-review-loop.md`. A story is done when its PR merged or an admin closed its issue
 (`docs/adr/0005-parse-a-story-s-identity-from-its-branch-in-core-alone.md`, decision 5). The spec lands
 first by a spec PR on `<p>-spec`, in `specs/<p>-<slug>/`, `<p>` being the spec's issue. Its intent tier
-— the issue body, `adr-rulings.json` and, in `spec.md`, the `codeworks` front matter, `## Clarifications`,
-`## User Scenarios & Testing`, `## Success Criteria`, `## Non-goals` and `## Why this is worth doing` — is
-the human's and changes only by a later spec PR; its design tier — the other sections and files of the
-folder, the story's own block of `tasks.md`, and the decision records — a story changes on its branch in
-`spec:` commits, graded against the intent
+is the human's: the issue body, which the admin edits on GitHub, and in the folder `adr-rulings.json` and, in
+`spec.md`, the `codeworks` front matter, `## Clarifications`, `## User Scenarios & Testing`, `## Success Criteria`,
+`## Non-goals`, `## Why this is worth doing` and `## Root cause`, which change only by a later spec PR; its design
+tier — the other sections and files of the folder, the story's own block of `tasks.md`, and the decision records in
+the in-repo folders `[shared] adr_folders` lists — a story changes on its branch in `spec:` commits, graded against
+the intent
 (`docs/adr/0012-freeze-the-spec-s-intent-tier-to-its-human-and-let-a-story-change-its-design-tie.md`,
 decisions 1–6; `reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`).
 Decision records go in the component's `docs/adr/`, or in `docs/adr/` at the root for the repo as a
