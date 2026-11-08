@@ -6,13 +6,9 @@ codeworks:
   root_cause:
     observed: "[set by planner]"
 ---
+<!-- Keep every `## ` heading as spelt: a story branch may not add, remove or rename one, and root ADR-0012 d1 names
+  the sections it may not change. -->
 {CORE_TEMPLATE}
-
-<!--
-  Root ADR-0012 d1 names the sections of this file a story branch may not change and the sections it may; the
-  headings themselves are fixed. The id each scenario, edge case and success criterion opens with: the specify
-  command's "Ids and non-goals".
--->
 
 ## Non-goals
 

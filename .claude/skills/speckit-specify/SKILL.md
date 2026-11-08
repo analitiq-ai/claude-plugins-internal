@@ -367,5 +367,4 @@ The last line of the arguments names a premise report. Read it before writing th
   every edge case with `**EC-<nnn>**` and every success criterion with `**SC-<nnn>**`, numbered from 1 in
   writing order. When updating a spec, keep every id as it is, give a new item the next unused number and
   never reuse a removed item's number.
-- Write `## Non-goals` as the template directs: one line per thing the change will not do that a reader
-  might expect, with the reason, or the one line `None.`
+- Write `## Non-goals` as the template directs.

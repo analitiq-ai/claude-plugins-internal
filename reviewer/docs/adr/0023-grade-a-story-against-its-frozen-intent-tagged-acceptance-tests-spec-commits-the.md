@@ -40,7 +40,8 @@ externalRefs:
 Root ADR-0012 splits a spec folder into an intent tier the human owns and a design tier the story may change on
 its branch. ADR-0010 d1 decided to refuse every spec-folder change but a tick; it never landed, and the gate today
 refuses only an edit tool on `spec.md` (README 9). The launch of README 5 binds a PR to one `spec.md` blob
-(`specbinding.py`), which ADR-0014 d1 already decides against; both read the whole folder as the target. Once the
+(`specbinding.py`), which ADR-0014 d1 already decides against; ADR-0010 d1 takes the whole folder as the target,
+README 5 the whole `spec.md`. Once the
 story may change its design, four things must hold or the risk root ADR-0011 named returns: no story commit may add
 to, remove or edit what the human asked for; every design change must be a commit the story names and claims, not a
 drift inside a code commit; a design change that leaves part of the ask unmet must reach the human, not be ruled a
@@ -51,7 +52,8 @@ spec. Each is a rule code can decide or a ruling policy can fix, so each is revi
 
 1. We will fence the intent tier on a story branch (INTENT_FROZEN). A commit is refused when it changes
    `adr-rulings.json` or the `codeworks` front matter of `spec.md`; when the diff of `spec.md` has a `+` or `-` line
-   inside an intent section (root ADR-0012 d1) or adds or removes a `## ` line, the headings being the template's; or
+   inside an intent section or before the first `## ` heading (root ADR-0012 d1), or adds or removes a `## ` line,
+   the headings being the template's; or
    when it changes a path in another spec's folder, a story changing only its own. A merge commit is judged on its
    conflict resolution (ADR-0002 d3). The refusal names the section and the next legal step: ask the admin, who has
    planner change the intent by a spec PR (planner ADR-0010). The section a line belongs to comes from core's one
@@ -70,15 +72,19 @@ spec. Each is a rule code can decide or a ruling policy can fix, so each is revi
    and `Unaffected: <ids>` (`none` allowed), ids as root ADR-0012 d1 spells them, read by git's trailer parser from the
    message the `git commit` command gives (`-m`, `-F`; README 6's closed rule on commit commands), a message the gate
    cannot read refused. A design-tier change in any other commit, and a `spec:` commit missing a trailer, naming an id
-   the spec does not hold or touching another path, is refused naming the rule. The claim check (README 6; ADR-0001)
-   reads each id of `Unaffected:` as one claim of a judged category: the commit leaves what meets that item as it was,
-   judged against the spec folder in the staged tree; `WRONG` refuses the commit and counts on the claim's lineage as
-   any `WRONG` does. A record a `spec:` commit adds or supersedes is one `adr check` must pass (README 8); the merge
-   of the story PR ratifies it (root ADR-0012 d3). This gate opens when org ADR-0002 d2 and d4 name the intent tier
-   (root ADR-0012 d3, action item 6); before that every `spec:` commit departs from a record outside the repo.
+   the spec does not hold or touching another path, is refused naming the rule. The gate hands the trailers with the
+   staged tree to the claim check (README 6; ADR-0001), whose record is keyed by both, so a check that saw other
+   trailers passes no commit; the check reads each id of `Unaffected:` as one claim of a judged category, the commit
+   leaves what meets that item as it was, judged against the spec folder in the staged tree, its lineage keyed by the
+   spec folder and the id; `WRONG` refuses the commit and counts on that lineage as any `WRONG` does. A `spec:` commit
+   adds a record, or supersedes one by its `status` and `supersededBy` fields and an amendment note naming a record the
+   commit adds; any other edit of an accepted record is refused. A record it adds or supersedes is one `adr check` must
+   pass (README 8); the merge of the story PR ratifies it (root ADR-0012 d3). This gate opens when org ADR-0002 d2 and
+   d4 name the intent tier (root ADR-0012 d3, action item 6); before that every `spec:` commit departs from a record
+   outside the repo.
 3. We will tie acceptance scenarios to tests (TAGGED_TEST). A test whose name carries an intent id (`US<k>-S<n>`,
-   `EC-<nnn>`; `-` written `_` where the language forbids it in a name) as a whole token, `US1-S2` not matched inside
-   `US1-S20`, is tagged with that item. The commit gate refuses a story-branch commit that leaves an item with fewer
+   `EC-<nnn>`; `-` written `_` where the language forbids it in a name) as a whole token, no letter or digit on either
+   side, so `US1-S2` is not matched inside `US1-S20`, is tagged with that item. The commit gate refuses a story-branch commit that leaves an item with fewer
    tagged tests than its parent had, by deleting one, removing the id from its name, or marking it skipped or
    expected-fail, while `spec.md` at the commit still has the item; a merged spec PR that removes the item frees its
    tests from the story's next merge of the default branch. A scenario of the story's own user story (the `[US<k>]`
@@ -87,20 +93,22 @@ spec. Each is a rule code can decide or a ruling policy can fix, so each is revi
    d1); an edge case's test is protected once tagged and asked of no story. A change to a tagged test's body is
    reviewed by the round; a finding that the test no longer checks its item admits ESCALATE alone (d4).
 4. We will brief the decision-reviewer with the intent tier at ratification, the design delta from the merge base to
-   the reviewed commit, and the records the branch added or superseded, beside the governing records it already
+   the reviewed commit, and the records the branch added, superseded or amended, beside the governing records it already
    reads; it joins every internal round, as ADR-0019 d3 decided, where `briefs.waves` today adds it only when a record
    governs (README 8), since a round with no governing record must still see drift. A finding that the delta leaves an
-   intent item with no functional requirement, task or tagged test meeting it, or narrows what meets it, is of kind
-   INTENT_DRIFT (the finding-kind set, root ADR-0010; `intent_drift` in `assessment.KINDS` while that set is Python)
-   and admits ESCALATE alone: the `escalation-<issue>` hold's question names the item's id and the commit (ADR-0013
-   d4), for the admin. A departure from a record admits FIX by changing the code; FIX by a `spec:` commit superseding
+   intent item with no functional requirement or task meeting it, or narrows what meets it, is of kind INTENT_DRIFT
+   (the finding-kind set, root ADR-0010; `intent_drift` in `assessment.KINDS` while that set is Python) and admits
+   ESCALATE alone: the `escalation-<issue>` hold's question names the item's id and the commit (ADR-0013 d4), for the
+   admin; a scenario without its tagged test is d3's FIX, not drift. A departure from a record admits FIX by changing the code; FIX by a `spec:` commit superseding
    the record (adrkit `supersedes`), when its folder is inside the repo; or ESCALATE; never PUSH_BACK or DEFER (amends
-   ADR-0017 d2, ADR-0022 d4). RESCOPE (ADR-0017 d2, ADR-0013 d5) is ruled when a finding shows the intent tier does
-   not settle a decision the code must take: two items contradict, or a case no item covers; a SPEC_GAP in the
-   design tier is ruled FIX and its next step is a `spec:` commit.
+   ADR-0017 d2, ADR-0022 d4). RESCOPE (ADR-0017 d2, ADR-0013 d5) is ruled when settling a finding needs an intent
+   line added or changed: two items contradict, or a case no item covers and the design tier cannot settle; a gap the
+   design tier can settle is a SPEC_GAP ruled FIX, its next step a `spec:` commit. SPEC_WRONG (ADR-0017 d2) admits
+   RESCOPE or a PUSH_BACK citing a spec line, `## Root cause` being intent (root ADR-0012 d1); the spec-gap FIX it
+   admitted goes.
 5. We will record on every round (ADR-0011 d1; root ADR-0003's `Round` contract) a `spec_delta` since ratification:
    the merge base's `spec.md` blob; each `spec:` commit on the branch with its oid, subject, `Motivated-by`,
-   `Unaffected` ids and their claim verdicts; each record added or superseded, by corpus and id. The orchestrator
+   `Unaffected` ids and their claim verdicts; each record added, superseded or amended, by corpus and id. The orchestrator
    posts it as a comment on the PR with its App, keyed by the round that recorded it and posted only when no comment
    with that key exists, in the manner of orchestrator ADR-0003 d3–d4, never in the PR body, which is the squash
    message (orchestrator ADR-0009 d6); it is the human's record of what d4 graded, not a gate. A `spec:` commit after
@@ -181,4 +189,4 @@ round, would not show it.
 5. [ ] core: `spec_delta` on `Round`, the `spec.md` splitter and the id grammar; orchestrator: the delta comment,
    ADR-0004 d4's set as root ADR-0012 d5 states it, d1's lapse from the default branch's own change and from a late
    `spec:` commit.
-6. [ ] README: What it enforces 5, 8 and 9 rewritten from this record once the code lands.
+6. [ ] README: What it enforces 5, 6, 8 and 9 rewritten from this record once the code lands.
