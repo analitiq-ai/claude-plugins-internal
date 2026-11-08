@@ -100,10 +100,11 @@ solution.
    since ratification (reviewer ADR-0023 d5), and the orchestrator posts it as a keyed comment on the PR with its App
    (orchestrator ADR-0003 d3–d4), never in the PR body, which becomes the squash message (orchestrator ADR-0009
    d6). The delta is the record of what the round graded (d4), not a gate: the one human gate on a story's design
-   is the INTENT_DRIFT escalation. The orchestrator attests a story PR that
-   changes a `docs/adr/` folder or the design tier of `specs/` (orchestrator ADR-0004 d4 keeps `codeworks.toml`,
-   `.github/`, `.claude/`, `.specify/memory/`, `AGENTS.md` and `CLAUDE.md`), and its attestation lapses on what the
-   default branch changed since the merge base, not on the story's own `spec:` commits (orchestrator ADR-0004 d1);
+   is the INTENT_DRIFT escalation. The orchestrator attests a story PR that changes the design tier: three paths
+   leave orchestrator ADR-0004 d4's protected set, `docs/adr/` folders, the folders `[shared] adr_folders` lists and
+   `specs/`, and the set keeps `codeworks.toml`, `.github/`, `.claude/`, `.specify/memory/`, `AGENTS.md` and
+   `CLAUDE.md`; this sentence is the set's one statement. Its attestation lapses on what the default branch changed
+   since the merge base, not on the story's own `spec:` commits (orchestrator ADR-0004 d1);
    reviewer's check fails a commit that removes or edits an intent line, changes the design tier outside a `spec:`
    commit or deletes, untags, skips or marks expected-fail a tagged test, however the commit was made (reviewer
    ADR-0002 d4).
@@ -167,11 +168,11 @@ added line under `## Non-goals` narrows the ask with nothing to refuse it.
    ADR-0004 d1, d4; builder ADR-0004 d2); ADR-0010's finding-kind row; constitution 1.3.0 (Delivery Workflow, P6); the
    settled-design preset's `## Non-goals`, tier note and id labels (#342).
 2. [ ] core: the `spec.md` splitter (planner's `premise_report.section` moves there) and the tier and id grammar;
-   `spec_delta` on `Round`; the protected-path matcher without `docs/adr/`.
+   `spec_delta` on `Round`; the protected-path matcher reduced to the set d5 states.
 3. [ ] reviewer's gates: intent fence, `spec:` commits, OWN_BLOCK, tagged tests, the intent brief, the delta
    (reviewer ADR-0023 action items). planner: the landing check refuses an unlabelled scenario or edge case.
-4. [ ] orchestrator: ADR-0004 d4's set without `docs/adr/`, the listed adr folders and `specs/`; d1's lapse from the
-   default branch's own change; the spec delta comment.
+4. [ ] orchestrator: ADR-0004 d4's set as d5 states it; d1's lapse from the default branch's own change; the spec
+   delta comment.
 5. [ ] Constitution P7, in its own PR after this one (Governance): the spec template's fixed headings, read by
    core's splitter, as its second exception.
 6. [ ] `analitiq-ai/engineering`: org ADR-0002 d2 and d4 name the intent tier; the Scope discipline rule names

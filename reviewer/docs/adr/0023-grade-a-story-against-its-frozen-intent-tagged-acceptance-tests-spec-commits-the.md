@@ -98,8 +98,8 @@ story made to its spec. Each is a rule code can decide or a ruling policy can fi
    `Unaffected` ids and their claim verdicts; each record added or superseded, by corpus and id. The orchestrator
    posts it as a comment on the PR with its App, keyed by the round that recorded it and posted only when no comment
    with that key exists (orchestrator ADR-0003 d3–d4), never in the PR body, which is the squash message (orchestrator
-   ADR-0009 d6); it is the human's record of what d4 graded, not a gate. The orchestrator attests a PR that changes a
-   `docs/adr/` folder or the design tier (orchestrator ADR-0004 d4); the check of ADR-0002 d4 fails a commit d1, d2 or
+   ADR-0009 d6); it is the human's record of what d4 graded, not a gate. The orchestrator attests a PR that changes the
+   design tier (root ADR-0012 d5; orchestrator ADR-0004 d4); the check of ADR-0002 d4 fails a commit d1, d2 or
    d3 would refuse, however it was made.
 
 ## Options considered
