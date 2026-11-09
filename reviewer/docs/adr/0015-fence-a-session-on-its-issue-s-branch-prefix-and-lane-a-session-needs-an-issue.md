@@ -45,7 +45,7 @@ hook is the only line before the default branch. Each story issue has one branch
 4. We will gate every new commit on the branch, however made (ADR-0002), and refuse a change to a merged
    story's task block. After a merge of the default branch, the spec folder must equal
    the default branch's but the story's own ticks (ADR-0010).
-   *Amended by ADR-0023 d1, d5 (#342): the intent tier must equal the default branch's; the design tier, the story's own task block among it, may differ by the story's `spec:` commits, and its resolution is graded by the round.*
+   *Amended by ADR-0023 d1, d5 (#342): the intent tier must equal the default branch's; the design tier, the story's own task block among it, may differ by the story's `spec:` commits, and its resolution is graded by the round; in force from root ADR-0012 action item 6.*
 5. We will enforce the branch grammar at three sites only, each parsing the branch through `core/` (root
    ADR-0005): the review-round launch (ADR-0014), this fence, and the refusal of a reviewer type
    dispatched from the main thread (ADR-0019).

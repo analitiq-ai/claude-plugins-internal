@@ -6,8 +6,7 @@ codeworks:
   root_cause:
     observed: "[set by planner]"
 ---
-<!-- Keep every `## ` heading as spelt: a story branch may not add, remove or rename one, and root ADR-0012 d1 names
-  the sections it may not change. -->
+<!-- Keep every `## ` heading: a story branch may not add, remove or rename one (root ADR-0012 d1). -->
 {CORE_TEMPLATE}
 
 ## Non-goals

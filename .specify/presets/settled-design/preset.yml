@@ -22,7 +22,7 @@ provides:
     - type: "template"
       name: "spec-template"
       file: "templates/spec-template.md"
-      description: "Open with the codeworks front matter planner sets; append the tier note, the Non-goals section, the premise answers and the root cause section"
+      description: "Open with the codeworks front matter planner sets and the heading note; append the Non-goals section, the premise answers and the root cause section"
       strategy: "wrap"
     - type: "command"
       name: "speckit.specify"
