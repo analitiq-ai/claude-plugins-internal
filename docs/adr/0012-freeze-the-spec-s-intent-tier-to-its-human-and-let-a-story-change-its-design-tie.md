@@ -124,10 +124,10 @@ from the files and the commit is reviewer ADR-0023's, and the stories under both
    the gate lets it land before its code, org ADR-0001 d1), and protects every tagged test while its item
    stands; reviewer ADR-0023 d4 briefs the decision-reviewer with the intent at ratification and the design
    delta since it, in every internal round, and defines the two findings over the intent tier: INTENT_DRIFT,
-   ruled ESCALATE and never FIX, the one human gate on a story's design; and SPEC_GAP, which standing makes the
-   round's verdict RESCOPE and the next step a spec PR (d2), never a story commit. A decision the design tier
-   leaves open is no finding of its own: the story settles it in the `spec:` commit of the fix that exposed it,
-   and the round grades that commit.
+   ruled ESCALATE and never FIX, the one human gate on a story's design; and SPEC_GAP, whose FIX is the spec PR
+   (d2) a RESCOPE round asks for and never a story commit. A decision the design tier leaves open is no finding
+   of its own: the story settles it in the `spec:` commit of the fix that exposed it, and the round grades that
+   commit.
 5. We will keep every design change where the human can read it, and give it a round. reviewer's round record
    carries the spec delta since ratification, and the orchestrator posts it as a keyed comment on the PR
    (reviewer ADR-0023 d5; orchestrator ADR-0003 d3–d4), never in the PR body, which becomes the squash message

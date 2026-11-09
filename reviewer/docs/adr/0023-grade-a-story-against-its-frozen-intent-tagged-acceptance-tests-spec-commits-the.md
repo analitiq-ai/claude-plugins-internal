@@ -115,14 +115,15 @@ action items.
    scenario without its tagged test is d3's FIX, not drift, and a gap the design already had at ratification is
    not drift. SPEC_GAP keeps its kind and is one of three things: two intent items contradict, an intent item
    cannot be met as written, or the root-cause reviewer's verdict is SPEC_WRONG; the spec ADR-0017 d2's RESCOPE
-   clause names is the intent tier, so a SPEC_GAP finding admits PUSH_BACK, citing the intent line that settles
-   it, and no other ruling; one standing, not pushed back, makes the round's verdict RESCOPE unless a finding is
-   ruled ESCALATE (ADR-0017 d2's order; ADR-0013 d5), and its next step the spec PR, never a story commit. A
-   decision the design tier leaves open is no finding kind: the finding that exposed it is ruled on its own
-   kind, and the story settles the decision in that fix's `spec:` commit (root ADR-0012 d4). SPEC_WRONG
-   (ADR-0017 d2) yields a SPEC_GAP finding, `## Root cause` being intent (root ADR-0012 d1), ruled as above, or
-   a PUSH_BACK citing a spec line; its spec-gap FIX, a story's change to the spec, goes. A departure from a
-   record keeps ADR-0017 d2's rulings: FIX by changing the code, or ESCALATE.
+   clause names is the intent tier, so a SPEC_GAP finding is ruled PUSH_BACK, citing the intent line that
+   settles it, or FIX, whose fix is the spec PR a RESCOPE round asks for and never a story commit, and nothing
+   else (one ruling per finding, as `assessment.py` has it); a SPEC_GAP ruled FIX makes the round's verdict
+   RESCOPE unless a finding is ruled ESCALATE (ADR-0017 d2's order; ADR-0013 d5). A decision the design tier
+   leaves open is no finding kind: the finding that exposed it is ruled on its own kind, and the story settles
+   the decision in that fix's `spec:` commit (root ADR-0012 d4). SPEC_WRONG (ADR-0017 d2) yields a SPEC_GAP
+   finding, `## Root cause` being intent (root ADR-0012 d1), ruled as above, or a PUSH_BACK citing a spec line;
+   no story commit fixes it. A departure from a record keeps ADR-0017 d2's rulings: FIX by changing the code, or
+   ESCALATE.
 5. We will record on every round (ADR-0011 d1; root ADR-0003's `Round` contract) a `spec_delta` since
    ratification: the merge base's `spec.md` blob; each `spec:` commit on the branch with its oid, subject,
    `Motivated-by` and `Unaffected` ids and their claim verdicts; and each merge commit whose conflict resolution
@@ -227,9 +228,9 @@ lost tag as one fewer.
    d2, its lower-case values renamed with it), admitting ESCALATE alone, with the ESCALATE finding ruling
    ADR-0017 d2 decided and `FINDING_VERDICTS` lacks today; SPEC_WRONG and RESCOPE's clause per d4;
    `validate_assessment` refuses a `round_verdict` that is not the first match of ADR-0017 d2's order (ESCALATE
-   when a finding is ruled ESCALATE, else RESCOPE when a SPEC_GAP finding is not ruled PUSH_BACK), where today
-   it checks admissibility and that `RESHAPE_SPEC` has a `spec_gap` finding, not the order; one verdict name
-   across `policy.VERDICTS` (`RESHAPE_SPEC`) and core's `RoundVerdict` (`RESCOPE`), as root ADR-0010 decides.
+   when a finding is ruled ESCALATE, else RESCOPE when a SPEC_GAP finding is ruled FIX), where today it checks
+   admissibility and that `RESHAPE_SPEC` has a `spec_gap` finding, not the order; one verdict name across
+   `policy.VERDICTS` (`RESHAPE_SPEC`) and core's `RoundVerdict` (`RESCOPE`), as root ADR-0010 decides.
 4. [ ] decision-reviewer: joins every internal round (`briefs.waves`); its brief carries the intent at
    ratification, the design delta and, per intent item, the tagged tests at the reviewed commit.
 5. [ ] core: `spec_delta` on `Round`, the `spec.md` splitter and the id grammar; orchestrator: the delta
