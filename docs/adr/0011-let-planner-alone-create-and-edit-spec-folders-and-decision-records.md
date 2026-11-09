@@ -32,8 +32,8 @@ review:
 
 # ADR-0011: Let planner alone create and edit spec folders and decision records
 
-> Superseded by ADR-0012 (#342): the intent tier of a spec folder stays planner's and its human's; the design
-> tier, decision records included, is changed by the story in `spec:` commits (reviewer ADR-0023).
+> Superseded by ADR-0012 (#342): the intent tier, decision records among it, stays planner's and its human's; the
+> spec folder's design tier is changed by the story in `spec:` commits (reviewer ADR-0023).
 
 ## Context
 

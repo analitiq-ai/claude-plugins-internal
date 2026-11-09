@@ -72,7 +72,6 @@ after critique and after a check stops, and a check that skips what it judges un
    current is the admin's.
 3. We will commit a record the plan needs into the spec PR beside the spec it governs (ADR-0010), and a
    record found late into the rescope's spec PR; it governs a story in flight as reviewer ADR-0010 decides.
-   *Amended by root ADR-0012 d3 (#342): a record a story needs may also land in the story's PR by a `spec:` commit, in a folder inside the repo (reviewer ADR-0023 d2); in force from root ADR-0012 action item 6.*
 4. We will treat `tasks.md` as derived from the plan: a round writes it again with the tasks command when it is
    missing, when a file that command reads changed since it last finished, or when its last run did not finish,
    and never otherwise.
@@ -112,7 +111,6 @@ after critique and after a check stops, and a check that skips what it judges un
    the plan says, so changing the plan does not clear it. A FAIL caused by a record's own `adr check` error names
    the record file and adrkit's rule and message, and its next step is "fix that record". A `tasks.md` the
    story checks refuse: delete it, then resume.
-   *Amended by root ADR-0012 d3 (#342): a departure found at review (d9) also names a `spec:` commit superseding the record on the story branch, when its folder is inside the repo (reviewer ADR-0023 d4); in force from root ADR-0012 action item 6.*
 9. We will have a rescope take its open decision from the questions of every open `escalation-<issue>` hold,
    and every open `rescope-<issue>` hold a verdict placed, on every open story issue under the spec's issue, the spec's
    issue itself when it has no sub-issues (reviewer ADR-0013 d4, d5), and from the admin's words when there

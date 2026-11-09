@@ -63,7 +63,7 @@ on `HEAD`, it restarts when other work moves it; kept per hunk, the hunk's claim
    lineages and bugs and anchors on its own head (ADR-0013 d3). No count or
    release floor is stored: each is derived from the chain's rulings and their times, a check counting once
    (ADR-0013 d3, d4).
-   *Amended by ADR-0023 d2 (#342): an `Unaffected` claim of a `spec:` commit has no file; its lineage is keyed by the spec folder and the intent id, and carries no places; in force from root ADR-0012 action item 6.*
+   *Amended by ADR-0023 d2 (#342): an `Unaffected` claim of a `spec:` commit has no file; its lineage is keyed by the spec folder and the intent id; in force from root ADR-0012 action item 6.*
 3. We will give the count to the lineage: the checks that ruled it WRONG in its chain of versions, each once.
 4. We will let no model and no similarity threshold decide whether two texts are the same claim.
 
