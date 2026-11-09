@@ -63,7 +63,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    Bot-authored or not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005)
    attests it. A validator's own config, `.deepsource.toml` for one, belongs to its package in
    `validators/` (root ADR-0003) and is not on this list.
-   *Amended by root ADR-0012 d5 (#342): `specs/` leaves this set, reviewer's intent fence (reviewer ADR-0023 d1) guarding the spec folder's intent tier instead, and a PR that changes only `specs/` is attested; the rest of the set stands; in force from root ADR-0012 action item 6.*
+   *Amended by root ADR-0012 d5 (#342): `specs/` leaves this set for a story PR, reviewer's gate and check (reviewer ADR-0023 d1–d2; reviewer ADR-0002 d4) fencing it instead, and stays in it for ADR-0005 d1's bot-author exemption; the rest of the set stands; in force from root ADR-0012 action item 6.*
 5. We will never attest a fork PR (head repo ≠ base repo) from reviewer's state; the exempt label still
    applies (ADR-0005).
 

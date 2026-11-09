@@ -31,6 +31,9 @@ externalRefs:
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0001-let-a-red-test-land-before-its-code-in-every-gate.md"
     label: "org ADR-0001: Let a red test land before its code in every gate"
+  - type: doc
+    url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
+    label: "org ADR-0002: Keep one spec per spec's issue, landed by a spec PR before any story"
 ---
 
 # ADR-0023: Grade a story against its frozen intent: tagged acceptance tests, spec commits, the intent brief and the spec delta
@@ -56,12 +59,12 @@ action items.
    `adr-rulings.json` or the `codeworks` front matter of `spec.md`; when the diff of `spec.md` has a `+` or `-`
    line inside an intent section or before the first `## ` heading (root ADR-0012 d1), or adds, removes or
    renames a `## ` line; or when it changes a path in another spec's folder, a story changing only its own. A
-   decision record is fenced as today, by the protected set (orchestrator ADR-0004 d4) through the check of
-   ADR-0002 d4; this gate adds nothing for it. A merge commit is judged on its conflict resolution (ADR-0002
-   d3). The refusal names the section and the spec PR as the next step (planner ADR-0010). The section a line
-   belongs to comes from core's one `spec.md` splitter over the fixed `## ` headings (root ADR-0012 d1; amends
-   ADR-0014 d2), an item from the id label in its line. A review-round or assess-round launch compares the
-   intent tier at the reviewed commit with the branch's merge base, the ratification (root ADR-0012 d2): any
+   decision record is fenced by the protected set through the check of ADR-0002 d4, as orchestrator ADR-0004 d4
+   and ADR-0002 d4 decide; this gate adds nothing for it. A merge commit is judged on its conflict resolution
+   (ADR-0002 d3). The refusal names the section and the spec PR as the next step (planner ADR-0010). The section
+   a line belongs to comes from core's one `spec.md` splitter over the fixed `## ` headings (root ADR-0012 d1;
+   amends ADR-0014 d2), an item from the id label in its line. A review-round or assess-round launch compares
+   the intent tier at the reviewed commit with the branch's merge base, the ratification (root ADR-0012 d2): any
    difference refuses the launch with the diff, as a commit made outside the hooks is caught (ADR-0002 d4); this
    replaces README 5's blob binding. The issue body is outside this fence: it is the admin's, read live, and no
    component writes it. OWN_BLOCK replaces TICK_ONLY (ADR-0010 d1): a `tasks.md` change on a story branch stays
@@ -83,20 +86,21 @@ action items.
    folder in the staged tree before the commit lands; its lineage is keyed by the spec folder and the id, where
    a code claim's is keyed by its file (amends ADR-0001 d2); `WRONG` refuses the commit and counts on that
    lineage as any `WRONG` does, and the `claim-<id>` hold it places refuses the story's `spec:` commits naming
-   that id (amends ADR-0013 d4). This gate opens when root ADR-0012's action item 6 has landed (root ADR-0012
-   d3); before that every `spec:` commit departs from a record outside the repo.
+   that id in either trailer (amends ADR-0013 d4). This gate opens when root ADR-0012's action item 6 has landed
+   (root ADR-0012 d3); before that every `spec:` commit departs from a record outside the repo.
 3. We will tie acceptance scenarios to tests (TAGGED_TEST). A test whose name carries the tag `p<p>-US<k>-S<n>`
    or `p<p>-EC-<nnn>`, `<p>` the spec's issue number (its folder is `specs/<p>-<slug>/`, org ADR-0002 d1) and
    `-` written `_` where the language forbids it in a name, is tagged with that item of that spec; the tag is
    read whole, `p342-US1-S2` not inside `p342-US1-S20` (its boundaries, action item 1), and the issue number
    keeps one spec's `US1-S1` apart from another's. The commit gate refuses a story-branch commit after which,
-   for an item `spec.md` at the commit still holds, the tagged tests are fewer than at the parent, or one of
-   them is skipped or marked expected-fail; a merged spec PR that removes the item frees its tests from the
-   story's next merge of the default branch. A scenario of the story's own user story (the `[US<k>]` tag of its
-   task block, planner ADR-0008 d2) with no tagged test at the reviewed commit is a finding ruled FIX: write the
-   test, red first (constitution Principle IV), which the gate lets land before its code (org ADR-0001 d1); an
-   edge case's test is protected once tagged and asked of no story. A change to a tagged test's body is reviewed
-   by the round; one that leaves the test not checking its item is INTENT_DRIFT (d4).
+   for an item its spec's `spec.md` at the commit holds and has not retired (root ADR-0012 d1), whichever story
+   commits, the tagged tests are fewer than at the parent, or one of them is skipped or marked expected-fail; a
+   merge commit is compared with its first parent; a merged spec PR that retires the item frees its tests from
+   the story's next merge of the default branch. A scenario of the story's own user story (the `[US<k>]` tag of
+   its task block, planner ADR-0008 d2) with no tagged test at the reviewed commit is a finding ruled FIX: write
+   the test, red first (constitution Principle IV), which the gate lets land before its code (org ADR-0001 d1);
+   an edge case's test is protected once tagged and asked of no story. A change to a tagged test's body is
+   reviewed by the round; one that leaves the test not checking its item is INTENT_DRIFT (d4).
 4. We will brief the decision-reviewer with the intent tier at ratification and the design delta from the merge
    base to the reviewed commit, beside the governing records it already reads; it joins every internal round, as
    ADR-0019 d3 decided, where `briefs.waves` today adds it only when a record governs (README 8), since a round
@@ -106,25 +110,25 @@ action items.
    changed so it no longer checks its item (d3); it admits ESCALATE alone, the ruling ADR-0017 d2 gives a
    finding the assessor cannot rule, and the `escalation-<issue>` hold's question names the item's id and the
    commit (ADR-0013 d4), for the admin. A scenario without its tagged test is d3's FIX, not drift, and a gap the
-   design already had at ratification is not drift. SPEC_GAP keeps its kind: a decision the intent tier does not
-   settle, two items contradicting or a case no item covers that no design settles; the spec ADR-0017 d2's
-   RESCOPE clause names is the intent tier, so by its order the round's verdict is RESCOPE (ADR-0013 d5) and the
-   answer a spec PR. A decision the design tier leaves open is no finding kind: the finding that exposed it is
-   ruled on its own kind, and the story settles the decision in that fix's `spec:` commit (root ADR-0012 d4).
-   SPEC_WRONG (ADR-0017 d2) admits a SPEC_GAP finding ruled FIX, `## Root cause` being intent (root ADR-0012 d1)
-   and the fix the spec PR a RESCOPE round asks for, or a PUSH_BACK citing a spec line. A departure from a
-   record keeps ADR-0017 d2's rulings: FIX by changing the code, or ESCALATE.
+   design already had at ratification is not drift. SPEC_GAP keeps its kind and is one of three things: two
+   intent items contradict, an intent item cannot be met as written, or the root-cause reviewer's verdict is
+   SPEC_WRONG; the spec ADR-0017 d2's RESCOPE clause names is the intent tier, so a SPEC_GAP finding makes the
+   round's verdict RESCOPE (ADR-0013 d5) and its next step the spec PR, never a story commit. A decision the
+   design tier leaves open is no finding kind: the finding that exposed it is ruled on its own kind, and the
+   story settles the decision in that fix's `spec:` commit (root ADR-0012 d4). SPEC_WRONG (ADR-0017 d2) admits a
+   SPEC_GAP finding, `## Root cause` being intent (root ADR-0012 d1), or a PUSH_BACK citing a spec line; its
+   spec-gap FIX, a story's change to the spec, goes. A departure from a record keeps ADR-0017 d2's rulings: FIX
+   by changing the code, or ESCALATE.
 5. We will record on every round (ADR-0011 d1; root ADR-0003's `Round` contract) a `spec_delta` since
-   ratification: the merge base's `spec.md` blob, and each `spec:` commit on the branch with its oid, subject,
-   `Motivated-by` and `Unaffected` ids and their claim verdicts. The orchestrator posts it as a comment on the
-   PR with its App, keyed by the round that recorded it and posted only when no comment with that key exists, in
-   the manner of orchestrator ADR-0003 d3–d4, never in the PR body, which is the squash message (orchestrator
-   ADR-0009 d6); it is the human's record of what d4 graded, not a gate. A `spec:` commit after the attested
-   round's commit lapses the attestation so that a new round grades it (root ADR-0012 d5; orchestrator ADR-0004
-   d1). After a merge of the default branch the intent tier equals the default branch's, and the design tier's
-   resolution is graded by the round (amends ADR-0015 d4). The orchestrator attests a PR that changes `specs/`
-   (root ADR-0012 d5; orchestrator ADR-0004 d4); the check of ADR-0002 d4 fails a commit d1, d2 or d3 would
-   refuse, however it was made.
+   ratification: the merge base's `spec.md` blob; each `spec:` commit on the branch with its oid, subject,
+   `Motivated-by` and `Unaffected` ids and their claim verdicts; and each merge commit whose conflict resolution
+   changes the design tier, with its oid and paths. The orchestrator posts it as a comment on the PR with its
+   App, keyed by the round that recorded it and posted only when no comment with that key exists, in the manner
+   of orchestrator ADR-0003 d3–d4, never in the PR body, which is the squash message (orchestrator ADR-0009 d6);
+   it is the human's record of what d4 graded, not a gate. After a merge of the default branch the intent tier
+   equals the default branch's, and the design tier's resolution is graded by the round (amends ADR-0015 d4).
+   The lapse a late `spec:` commit causes, the protected set and builder's merge need are root ADR-0012 d5's;
+   the check of ADR-0002 d4 fails a commit d1, d2 or d3 would refuse, however it was made.
 
 ## Options considered
 
@@ -172,8 +176,8 @@ settle it" no assessor can apply, and sat beside SPEC_GAP in ADR-0017 d2's RESCO
 
 ### Option I: Tags without the spec's issue number
 
-Rejected: every spec has a `US1-S1`. A tag read repo-wide would protect one spec's test from another spec's
-story, and let one spec's test stand for another's missing one.
+Rejected: every spec has a `US1-S1`. Without the issue number a tag cannot say whose item it checks: one spec's
+test would stand for another's missing one, and retiring an item would free the wrong tests.
 
 ### Option J: Protect a tagged test by its name
 
@@ -210,13 +214,17 @@ lost tag as one fewer.
    commit whose message comes from an editor, `-c`, `-C`, `-t`, `--fixup`, `--squash` or `--trailer`),
    TAGGED_TEST (the tag's token boundaries; the skip and expected-fail markers of each framework the repo tests
    in) and OWN_BLOCK on the commit path; the launch's intent comparison replaces the `spec.md` blob binding
-   (`specbinding.py`; ADR-0014 d1).
+   (`specbinding.py`; ADR-0014 d1), and the launch lists the scenarios of the story's `[US<k>]` with no tagged
+   test at the reviewed commit, each a finding whose ruling is FIX in code.
 2. [ ] claim check: `Unaffected` ids as a judged claim category (`briefs.py`, `claimcheck.py`); a lineage keyed
    by spec folder and id, and the hold that refuses by it (`lineage.py`, `claimgate.py`); the check record keyed
    by the staged tree and the trailers, so a check that saw other trailers passes no commit (`claimgate.py`).
 3. [ ] policy: INTENT_DRIFT in the finding-kind set (`assessment.KINDS`), admitting ESCALATE alone, with the
    ESCALATE finding ruling ADR-0017 d2 decided and `FINDING_VERDICTS` lacks today; SPEC_WRONG and RESCOPE's
-   clause per d4.
+   clause per d4; `validate_assessment` refuses a `round_verdict` that is not the first match of ADR-0017 d2's
+   order (ESCALATE when a finding is ruled ESCALATE, else RESCOPE when a SPEC_GAP finding stands), where today
+   it checks admissibility alone; one verdict name across `policy.VERDICTS` (`RESHAPE_SPEC`) and core's
+   `RoundVerdict` (`RESCOPE`), as root ADR-0010 decides.
 4. [ ] decision-reviewer: joins every internal round (`briefs.waves`); its brief carries the intent at
    ratification, the design delta and, per intent item, the tagged tests at the reviewed commit.
 5. [ ] core: `spec_delta` on `Round`, the `spec.md` splitter and the id grammar; orchestrator: the delta

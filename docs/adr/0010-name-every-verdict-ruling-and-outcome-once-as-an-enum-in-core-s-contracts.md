@@ -62,7 +62,7 @@ string, and the orchestrator attests from one (orchestrator ADR-0004), so a miss
 | Hold state | OPEN, RELEASED | core; reviewer ADR-0011, ADR-0013 |
 | Round stage | INTERNAL, AUDIT, GITHUB | core; reviewer ADR-0019 |
 | Finding source | threads, required-checks, or a validator module's name | core; ADR-0003 |
-| Finding kind | DEFECT, FIX_INDUCED, CLASS_SIBLING, DUPLICATE, SPEC_GAP, INTENT_DRIFT, BIKESHED, GOLD_PLATING, NOT_REAL | reviewer; ADR-0023 d4 |
+| Finding kind | DEFECT, FIX_INDUCED, CLASS_SIBLING, DUPLICATE, SPEC_GAP, INTENT_DRIFT, BIKESHED, GOLD_PLATING, NOT_REAL | reviewer; reviewer ADR-0023 d4 |
 | Claim verdict | CORRECT, WRONG, UNSURE | core; reviewer |
 | Shim ruling | SHARES, NOT_SHARED, DEFERRED | core; reviewer |
 

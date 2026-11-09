@@ -6,17 +6,7 @@ codeworks:
   root_cause:
     observed: "[set by planner]"
 ---
-<!-- Keep every `## ` heading: a story branch may not add, remove or rename one (root ADR-0012 d1). -->
 {CORE_TEMPLATE}
-
-## Non-goals
-
-<!--
-  ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to, with the
-  reason. When there is none, the one line `None.` Keep the heading either way.
--->
-
-- [what is out, and why]
 
 ## Why this is worth doing
 
