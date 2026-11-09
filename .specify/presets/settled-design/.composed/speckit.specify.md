@@ -353,10 +353,11 @@ The last line of the arguments names a premise report. Read it before writing th
 ## Headings, ids and non-goals
 
 - Every `## ` heading of the template stays, a section that does not apply too, holding the one line its
-  comment gives for that case; this overrides "remove it entirely" under Section Requirements above.
-- Open every acceptance scenario with its id, `1. **US<k>-S<n>**: **Given** …` (user story k, scenario n),
-  every edge case with `**EC-<nnn>**` and every success criterion with `**SC-<nnn>**`, numbered from 1 in
-  writing order. When updating a spec, keep every id as it is and give a new item the next unused number;
-  a removed item's line stays as its id and the word `retired` (`- **EC-003**: retired`,
-  `2. **US1-S2**: retired`), so no number is ever reused.
-- Write `## Non-goals` as the template directs; every scope exclusion goes there, none under `## Assumptions`.
+  comment gives for that case or `None.` where the comment gives none; this overrides "remove it entirely"
+  under Section Requirements above for `## ` sections, a `### ` section that does not apply still going.
+- The ids are the template's opening note's. Open every acceptance scenario `1. **US<k>-S<n>**: **Given** …`
+  (user story k, scenario n), number each kind from 1 in writing order and, when updating a spec, keep every
+  id and give a new item the next unused number; a retired line reads `- **EC-003**: retired` or
+  `2. **US1-S2**: retired`.
+- Write `## Non-goals` as the template directs; every scope exclusion goes there, none under `## Assumptions`,
+  the template's Assumptions example notwithstanding.
