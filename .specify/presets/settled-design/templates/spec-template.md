@@ -6,7 +6,22 @@ codeworks:
   root_cause:
     observed: "[set by planner]"
 ---
+<!--
+  Every `## ` heading below is fixed: no writer adds, removes or renames one, clarify's `## Clarifications` and a
+  `*(…)*` note aside (root ADR-0012 d1). Acceptance scenarios, edge cases and success criteria carry the ids
+  `**US<k>-S<n>**`, `**EC-<nnn>**` and `**SC-<nnn>**`; a removed item's line stays as its id and `retired`; a
+  number is never reused.
+-->
 {CORE_TEMPLATE}
+
+## Non-goals
+
+<!--
+  ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to. When there is
+  none, the one line `None.`, no bullet.
+-->
+
+- [what is out, and why]
 
 ## Why this is worth doing
 
@@ -44,7 +59,7 @@ Source: [the report's source]
 
 <!--
   ACTION REQUIRED: For an issue that reports no wrong behaviour, this section is the one line
-  `Not a defect report.` and nothing else. Keep the heading either way.
+  `Not a defect report.` and nothing else.
 
   For an issue that reports wrong behaviour, read the code before writing anything here, then:
 
