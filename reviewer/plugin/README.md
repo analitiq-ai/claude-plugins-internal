@@ -139,10 +139,6 @@ that is under review.
    a PR. The next step: stop and raise the spec problem to the user, who lands it in a spec-only PR on
    `<issue>-spec`; once it merges, the story branch merges the default branch. The folder's other files stay
    editable, so a story PR ticks its tasks.
-   Decided otherwise by root ADR-0012 d1–d3 and reviewer ADR-0023 d1–d2, d4 (#342): the spec folder's intent tier admits
-   no change on a story branch and its design tier changes in `spec:` commits; this refusal, the spec binding of (5),
-   the claim check of (6) and the decision check of (8) follow those records once their gates land
-   (`reviewer/docs/adr/0023-grade-a-story-against-its-frozen-intent-tagged-acceptance-tests-spec-commits-the.md`, action items).
 
 ## How an agent uses it
 

@@ -4,7 +4,7 @@ id: "0012"
 title: "Freeze the spec's intent tier to its human and let a story change its design tier in the PR it builds"
 status: accepted
 supersedes: ["0011"]
-date: 2026-11-07
+date: 2026-11-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec-folder, decision-log, ownership, intent, planner, reviewer, builder, orchestrator]
 scope: component
@@ -21,7 +21,11 @@ affects:
   - type: path
     pattern: "planner/plugin/speckit/presets/settled-design/**"
   - type: path
-    pattern: "core/src/{attest,story-stop-facts}.ts"
+    pattern: "core/src/{attest,story-stop-facts,protected-paths}.ts"
+  - type: path
+    pattern: "planner/plugin/scripts/{spec_facts.ts,premise_report.py}"
+  - type: path
+    pattern: ".claude/skills/speckit-specify/**"
 provenance:
   authoredBy: agent-drafted
   agent:
@@ -31,7 +35,7 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/342"
 review:
   tier: async
-  decidedAt: 2026-11-07T18:00:00Z
+  decidedAt: 2026-11-09T08:13:27Z
 externalRefs:
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0002-one-spec-per-issue.md"
@@ -70,76 +74,78 @@ from the files and the commit is reviewer ADR-0023's, and the stories under both
    `adr-rulings.json`; in `spec.md`, the lines before its first `## ` heading (the title and the user's
    description), the `codeworks` front matter (planner ADR-0008 d1) and the sections `## Clarifications`, `##
    User Scenarios & Testing` (user stories, acceptance scenarios, edge cases), `## Success Criteria`, `##
-   Non-goals`, `## Why this is worth doing` and `## Root cause`, the premise and its investigation both:
-   planner's `spec_facts.ts` derives the frozen `root_cause.observed` from its opening line, and a frozen fact
-   has a frozen source; and every decision record in every folder `[shared] adr_folders` lists (reviewer
-   ADR-0022 d1); a record in a folder outside the repo is read live, as the issue body is, and fenced by its own
-   repo. The **design tier** is the story's: the other sections of `spec.md` (`## Requirements` and `##
-   Assumptions` among them), every other file of the folder but `tasks.md`, and of `tasks.md` the story's own
-   task block. Another spec's folder is in neither tier: a story commit changes nothing there. The `## `
-   headings of `spec.md` are fixed, the template's and the `## Clarifications` the clarify command adds, their
-   `*(…)*` notes aside: a story commit adds, removes or renames none, and one splitter in `core/` (ADR-0003)
-   reads the section a line belongs to from them, for planner's checks and reviewer's gate alike; no fact is
-   read from a heading's wording (amends reviewer ADR-0014 d2 and planner ADR-0008 d1; constitution P7 names the
-   exception in its own PR, action item 5). An acceptance scenario, an edge case and a success criterion carry
-   an explicit id in the line, never renumbered and never reused: `**US<k>-S<n>**` on acceptance scenario `<n>`
-   of `### User Story <k>`, `**EC-<nnn>**` on an edge case, `**SC-<nnn>**` on a success criterion as the
-   template already writes it. A new item takes the next unused number; a removed item's line stays, its id and
-   the word `retired`, so the number is never reused and the item frees its tagged tests (reviewer ADR-0023 d3).
+   Non-goals` (action item 7), `## Why this is worth doing` and `## Root cause`, the premise and its
+   investigation both: planner's `spec_facts.ts` derives the frozen `root_cause.observed` from its opening line,
+   and a frozen fact has a frozen source; and every decision record in every folder `[shared] adr_folders` lists
+   (reviewer ADR-0022 d1); a record in a folder outside the repo is read live, as the issue body is, and fenced
+   by its own repo. The **design tier** is the story's: the other sections of `spec.md` (`## Requirements` and
+   `## Assumptions` among them), every other file of the folder but `tasks.md`, and of `tasks.md` the story's
+   own task block. Another spec's folder is in neither tier: a story commit changes nothing there. The `## `
+   headings of `spec.md` are fixed, the template's and the `## Clarifications` the clarify and grill commands
+   add, their `*(…)*` notes aside: a story commit adds, removes or renames none, and one splitter in `core/`
+   (ADR-0003) reads the section a line belongs to from them, for planner's checks and reviewer's gate alike; no
+   fact is read from a heading's wording (amends reviewer ADR-0014 d2 and planner ADR-0008 d1; constitution P7
+   names the exception in its own PR, action item 5). An acceptance scenario, an edge case and a success
+   criterion carry an explicit id in the line, never renumbered and never reused: `**US<k>-S<n>**` on an
+   acceptance scenario of `### User Story <k>`, `<n>` its number as written, not its place in the list,
+   `**EC-<nnn>**` on an edge case, `**SC-<nnn>**` on a success criterion as the template already writes it. A
+   new item takes the next unused number; a removed item's line stays, its id and the word `retired`, so the
+   number is never reused and the item frees its tagged tests (reviewer ADR-0023 d3).
 2. We will freeze the intent tier to its human. The folder's intent tier lands, and every later change to it
    lands, by a spec PR on `<p>-spec` that planner opens (planner ADR-0010 d3) and a human's exempt label
    approves (org ADR-0002 d2; orchestrator ADR-0005 d4), from the admin's words: the path an entry of
-   `adr-rulings.json` takes (planner ADR-0009 d6). A decision record lands the same way, as org ADR-0002 d2,
-   ADR-0011 d1 and planner ADR-0009 d3 already have it; nothing here changes who writes a record. The squash
+   `adr-rulings.json` takes (planner ADR-0009 d6). A decision record is written by planner alone, in a planning
+   run, and lands as org ADR-0002 d2 and planner ADR-0009 d3 have it (ADR-0011 d1's rule, kept here). The squash
    commit of that spec PR on the default branch is the intent's **ratification**; a story branch reads it at its
    merge base. A record outside the repo stands at no merge base: it governs from the round after it changes,
-   and lapses nothing (d5). The issue body is the admin's, edited on GitHub and read live where a brief needs
-   it; it stands at no merge base, no gate fences it and no component writes it. On a story branch reviewer
-   refuses every commit that changes the intent tier, a merge commit judged on its conflict resolution (reviewer
-   ADR-0023 d1; reviewer ADR-0002 d3); a record stays under the protected set and reviewer's check, as
-   orchestrator ADR-0004 d4 and reviewer ADR-0002 d4 decide. A story writes nothing in the intent tier, not an
-   added scenario either: what it finds missing it asks of the admin by a RESCOPE verdict (d4), and a record it
-   finds wrong is a departure, ruled FIX by changing the code or ESCALATE (reviewer ADR-0017 d2), which the
-   admin answers with a spec PR.
+   and lapses nothing. The issue body is the admin's, edited on GitHub and read live where a brief needs it; it
+   stands at no merge base, no gate fences it and no component writes it. On a story branch reviewer refuses
+   every commit that changes the intent tier, a merge commit judged on its conflict resolution (reviewer
+   ADR-0023 d1; reviewer ADR-0002 d3), a record excepted: it stays under the protected set and reviewer's check,
+   which fails its change after the commit, as orchestrator ADR-0004 d4 and reviewer ADR-0002 d4 decide. A story
+   writes nothing in the intent tier, not an added scenario either: what it finds missing it asks of the admin
+   by a RESCOPE verdict (d4), and a record it finds wrong is a departure, ruled FIX by changing the code or
+   ESCALATE (reviewer ADR-0017 d2), which the admin answers with a spec PR.
 3. We will let the story change the design tier on its own branch, in **`spec:` commits** (reviewer ADR-0023
    d2): a commit of the story branch that changes only its spec folder's design tier, names the intent items
    that motivate it and the items it claims unaffected, and lands only once the claim check has judged that
    claim. In `tasks.md` a story writes only the task block labelled with its issue number (OWN_BLOCK, which
    replaces TICK_ONLY of ADR-0011 d1 and reviewer ADR-0010 d1): a tick (`[ ]` to `[x]`) inside its block lands
    in any commit, as before; an edit inside its block lands in a `spec:` commit; nothing outside it. planner
-   ADR-0009 d4 keeps `tasks.md` derived in planning; on a story branch the story's block is the story's.
-   Decisions 3 to 5 and the amendment notes resting on them take effect when action item 6 has landed, before
-   action items 2–4: until then every `spec:` commit is a departure from org ADR-0002 d4 that no story-side fix
-   clears, since a ruling lands only by a spec PR (d2).
-4. We will grade the code and the design tier against the intent tier, never the other way round (reviewer
-   ADR-0023 d3–d4). Every acceptance scenario of the story's own user story has a test tagged with the spec's
-   issue number and the scenario's id, written red first (constitution Principle IV; the gate lets it land
-   before its code, org ADR-0001 d1); per id, no story commit leaves fewer tagged tests than its parent had, or
-   one skipped or marked expected-fail, while the item stands; a scenario with no tagged test is a finding ruled
-   FIX. The decision-reviewer is briefed with the intent at ratification and the design delta since it, in every
-   round. An INTENT_DRIFT finding, as reviewer ADR-0023 d4 defines it, is ruled ESCALATE and never FIX. A
-   SPEC_GAP finding, as reviewer ADR-0023 d4 defines it, makes the round's verdict RESCOPE (reviewer ADR-0017
-   d2; reviewer ADR-0013 d5) and the next step a spec PR (d2), never a story commit. A decision the design tier
+   ADR-0009 d4 keeps `tasks.md` derived in planning, where the tasks command keeps a merged story's block as the
+   default branch holds it (planner ADR-0010 d5 stops a rescope that changes one) and an open story's edits stay
+   on its branch, resolved at its next merge of the default branch (d5); on a story branch the story's block is
+   the story's. Decisions 3 to 5 and the amendment notes resting on them take effect when action item 6 has
+   landed, before action items 2–4: until then every `spec:` commit is a departure from org ADR-0002 d4 that no
+   story-side fix clears, since a ruling lands only by a spec PR (d2).
+4. We will grade the code and the design tier against the intent tier, never the other way round, and give every
+   design change a round. reviewer ADR-0023 d3 ties each acceptance scenario of the story's own user story to a
+   test tagged with the spec's issue number and the scenario's id, written red first (constitution Principle IV;
+   the gate lets it land before its code, org ADR-0001 d1), and protects every tagged test while its item
+   stands; reviewer ADR-0023 d4 briefs the decision-reviewer with the intent at ratification and the design
+   delta since it, in every internal round, and defines the two findings over the intent tier: INTENT_DRIFT,
+   ruled ESCALATE and never FIX, the one human gate on a story's design; and SPEC_GAP, which standing makes the
+   round's verdict RESCOPE and the next step a spec PR (d2), never a story commit. A decision the design tier
    leaves open is no finding of its own: the story settles it in the `spec:` commit of the fix that exposed it,
    and the round grades that commit.
 5. We will keep every design change where the human can read it, and give it a round. reviewer's round record
-   carries the spec delta since ratification (reviewer ADR-0023 d5), and the orchestrator posts it as a keyed
-   comment on the PR with its App, in the manner of orchestrator ADR-0003 d3–d4, never in the PR body, which
-   becomes the squash message (orchestrator ADR-0009 d6). The delta is the record of what the round graded (d4),
-   not a gate: the one human gate on a story's design is the INTENT_DRIFT escalation. The orchestrator attests a
-   story PR that changes `specs/`, whose changes reviewer's gate and check fence (d2, d3; reviewer ADR-0002 d4):
-   `specs/` leaves the protected set of orchestrator ADR-0004 d4 for a story PR, and stays in it for the
-   bot-author exemption of orchestrator ADR-0005 d1, which no gate of reviewer's backs; the rest of that set
-   stands, every `docs/adr/` folder among it. The attestation lapses when the default branch's head differs, in
-   the files orchestrator ADR-0004 d1 names (the story's spec's `spec.md` and `adr-rulings.json` among them),
-   from the default branch at the merge base of the attested round's commit, so the story merges it and a new
-   round grades the story against what landed; and on a `spec:` commit of the story after the attested round's
-   commit, so a late design change is graded by a new round. No other commit of the story lapses it, and the
-   other lapses of orchestrator ADR-0004 d1 stand. builder's merge need (builder ADR-0004 d2) compares the same
-   files, `adr-rulings.json` among them, the same way, at the story head's merge base. After a merge of the
-   default branch the intent tier equals the default branch's and the design tier's resolution is graded by the
-   round (reviewer ADR-0015 d4, as reviewer ADR-0023 d5 amends it). reviewer's check fails a commit reviewer
-   ADR-0023 d1–d3 would refuse, however the commit was made (reviewer ADR-0002 d4).
+   carries the spec delta since ratification, and the orchestrator posts it as a keyed comment on the PR
+   (reviewer ADR-0023 d5; orchestrator ADR-0003 d3–d4), never in the PR body, which becomes the squash message
+   (orchestrator ADR-0009 d6). The delta is the record of what the round graded (d4), not a gate. The
+   orchestrator attests a story PR that changes `specs/`, whose changes reviewer's gate and check fence (d2, d3;
+   reviewer ADR-0002 d4): `specs/` leaves the protected set of orchestrator ADR-0004 d4 for a story PR, and
+   stays in it for the bot-author exemption of orchestrator ADR-0005 d1, which no gate of reviewer's backs; the
+   rest of that set stands, every `docs/adr/` folder among it. The attestation lapses when the default branch's
+   head differs, in the files orchestrator ADR-0004 d1 names (the story's spec's `spec.md` and
+   `adr-rulings.json` among them), from the default branch at the merge base of the attested round's commit, so
+   the story merges it and a new round grades the story against what landed; and on a `spec:` commit of the
+   story after the attested round's commit, so a late design change is graded by a new round. No other commit of
+   the story lapses it, and the other lapses of orchestrator ADR-0004 d1 stand. builder's merge need (builder
+   ADR-0004 d2) compares the same files, `adr-rulings.json` among them, the same way, at the story head's merge
+   base, so no commit of the story's own triggers it. After a merge of the default branch the intent tier equals
+   the default branch's and the design tier's resolution is graded by the round (reviewer ADR-0015 d4, as
+   reviewer ADR-0023 d5 amends it). reviewer's check fails a commit reviewer ADR-0023 d1–d3 would refuse,
+   however the commit was made (reviewer ADR-0002 d4).
 6. We will read Principle VI this way: the intent tier, decision records among it, and this repo's gates,
    constitution and config are the governing rules and the fixed target, and ship apart from the code they
    grade; the design tier is the story's account of its solution, graded against the intent as the code is, and
@@ -185,9 +191,9 @@ wrong is a SPEC_GAP finding and a RESCOPE round (reviewer ADR-0023 d4). `researc
 Rejected; an earlier draft of this record chose it. A record is what the decision check grades a story by
 (reviewer ADR-0022), the constitution's Source lines name records, and org ADR-0002 d2 lands every record by a
 spec PR: a story that supersedes a record in its own PR rewrites a rule it is graded by, and the orchestrator
-merges it with no human (orchestrator ADR-0009 d1), against Principle VI. It also needed a ratifier for a record
-no human approved, an intent id to motivate a record change, a rule for two stories minting one record id, and
-an exemption in the protected set.
+merges it with no human (orchestrator ADR-0009 d1), against Principle VI. It also needed an approver for a
+record no human approved, an intent id to motivate a record change, a rule for two stories minting one record
+id, and an exemption in the protected set.
 
 ## Trade-offs
 
@@ -221,7 +227,7 @@ an exemption in the protected set.
 
 1. [x] This record; ADR-0011 superseded; amendment notes on the partially superseded items (reviewer ADR-0001
    d2, 0002 d4, 0010 d1–d2, 0013 d4–d5, 0014 d2, 0015 d4, 0017 d2; planner ADR-0008 d1, 0009 d4; orchestrator
-   ADR-0004 d1, d4, 0005 d1; builder ADR-0004 d2); ADR-0010's finding-kind row; reviewer README 9's note (#342).
+   ADR-0004 d1, d4, 0005 d1; builder ADR-0004 d2); ADR-0010's finding-kind row (#342).
 2. [ ] core, after 6: the `spec.md` splitter (planner's `premise_report.section` and the heading reader of
    `spec_facts.ts` move there) and the tier and id grammar; `spec_delta` on `Round`; `governingDiff`, shared by
    the attestation (`attest.ts`) and builder's merge need (`story-stop-facts.ts`), compares the default branch's
@@ -231,18 +237,20 @@ an exemption in the protected set.
    read from the template at run time.
 3. [ ] reviewer's gates, after 6: intent fence, `spec:` commits, OWN_BLOCK, tagged tests, the intent brief, the
    delta (reviewer ADR-0023 action items). planner: the landing check refuses an unlabelled scenario or edge
-   case, and a settled-design clarify command, new, labels what clarify adds as the specify command does.
+   case, and the tasks command keeps a merged story's block as the default branch holds it (d3).
 4. [ ] orchestrator, after 6: orchestrator ADR-0004 d4's set without `specs/` for a story PR and with it for
-   ADR-0005 d1, and d1's lapse, as d5 states them, a late `spec:` commit among the lapses; the spec delta
-   comment. Today `protected-paths.ts` holds no `specs/` and has no caller, TICK_ONLY never landed, and the
-   folder's files but `spec.md` are unfenced on a story branch; records are protected by the `docs/adr` segment
-   every listed folder ends in, so a listed folder named otherwise needs the matcher to read the list.
+   orchestrator ADR-0005 d1, and its d1's lapse, as d5 states them, a late `spec:` commit among the lapses; the
+   spec delta comment. Today `protected-paths.ts` holds no `specs/` and has no caller, TICK_ONLY never landed,
+   and the folder's files but `spec.md` are unfenced on a story branch; records are protected by the `docs/adr`
+   segment every listed folder ends in, so a listed folder named otherwise needs the matcher to read the list.
 5. [ ] The constitution, in its own PR after this one, its version as Governance decides: the Delivery Workflow
    names the two tiers, P6's Source lines add this record and reviewer ADR-0023, and P7 names the spec
    template's fixed headings, read by core's splitter, as its second exception.
 6. [ ] `analitiq-ai/engineering`, before 2–4: org ADR-0002 d2 and d4 name the intent tier as what a spec PR
-   lands and a story PR leaves unchanged, the folder's design tier changing on the story branch.
+   lands and a story PR leaves unchanged, the folder's design tier changing on the story branch, and say how a
+   record lands outside a run, as this one does by a docs PR.
 7. [ ] The settled-design preset, in its own PR after this one (Principle VI; this record's `affects`): `##
-   Non-goals` and the fixed-headings note in the spec template, the id labels and retired lines in the specify
-   command, in the source, installed, composed and skill copies.
+   Non-goals` and an opening note that fixes the headings and defines the ids in the spec template, the id
+   labels and retired lines in the specify command, in the source, installed, composed and skill copies; grill
+   and clarify, which use the project's template names and identifiers by their own rule, follow that note.
 

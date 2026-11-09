@@ -61,7 +61,7 @@ a root-cause verdict is due.
    when a finding shows the spec does not settle a decision; PATCH, CLASS_FIX or REDESIGN, when at least one
    finding is ruled FIX, the assessor choosing among them by this record and ADR-0018; CONVERGED_PUSHBACK,
    when every finding is ruled PUSH_BACK or DEFER.
-   *Amended by ADR-0023 d4 (#342): the spec RESCOPE's clause names is the intent tier (root ADR-0012 d1), a decision the design tier leaves open drawing no RESCOPE; SPEC_WRONG admits a SPEC_GAP finding, so a RESCOPE round whose next step is the spec PR, or the PUSH_BACK, its spec-gap FIX gone, `## Root cause` being intent tier; INTENT_DRIFT admits ESCALATE alone; in force from root ADR-0012 action item 6.*
+   *Amended by ADR-0023 d4 (#342): the spec RESCOPE's clause names is the intent tier (root ADR-0012 d1), a decision the design tier leaves open drawing no RESCOPE; a SPEC_GAP finding admits PUSH_BACK alone and, standing, makes the round RESCOPE by this order; SPEC_WRONG yields a SPEC_GAP finding, its spec-gap FIX gone, `## Root cause` being intent tier; INTENT_DRIFT admits ESCALATE alone; in force from root ADR-0012 action item 6.*
 3. At the finding level, we will have every FIX ruling name the mechanism the fix must change, per
    finding or CLASS_FIX class; "fix it" alone is inadmissible. The agent's next step is derived
    from the ruling; the assessor's free-text next-step field is removed. A DEFER names an issue.

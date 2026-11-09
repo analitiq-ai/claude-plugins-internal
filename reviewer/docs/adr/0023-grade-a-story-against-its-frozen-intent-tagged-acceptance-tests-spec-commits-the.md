@@ -3,7 +3,7 @@ schemaVersion: 0.2.0
 id: "0023"
 title: "Grade a story against its frozen intent: tagged acceptance tests, spec commits, the intent brief and the spec delta"
 status: accepted
-date: 2026-11-07
+date: 2026-11-09
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec, intent, review-round, claim-check, decision-review, ledger, tasks]
 scope: component
@@ -26,7 +26,7 @@ provenance:
   sourceArtifact: "https://github.com/analitiq-ai/claude-plugins-internal/issues/342"
 review:
   tier: async
-  decidedAt: 2026-11-07T18:00:00Z
+  decidedAt: 2026-11-09T08:13:27Z
 externalRefs:
   - type: doc
     url: "https://github.com/analitiq-ai/engineering/blob/main/docs/adr/0001-let-a-red-test-land-before-its-code-in-every-gate.md"
@@ -80,14 +80,15 @@ action items.
    of ADR-0002 d4 reads them from the commit object. A design-tier change in any other commit, and a `spec:`
    commit missing a trailer, naming an id the spec does not hold or touching another path, is refused naming the
    rule; a merge commit is judged on its conflict resolution (ADR-0002 d3), and a design-tier resolution in it
-   is admitted and graded by the round (d5). A hold that refuses the story's code commits refuses its `spec:`
-   commits too (ADR-0013 d4–d5). Each id of `Unaffected:` is one claim of a judged category, that the commit
-   leaves what meets that item as it was, which the claim check (README 6; ADR-0001) judges against the spec
-   folder in the staged tree before the commit lands; its lineage is keyed by the spec folder and the id, where
-   a code claim's is keyed by its file (amends ADR-0001 d2); `WRONG` refuses the commit and counts on that
-   lineage as any `WRONG` does, and the `claim-<id>` hold it places refuses the story's `spec:` commits naming
-   that id in either trailer (amends ADR-0013 d4). This gate opens when root ADR-0012's action item 6 has landed
-   (root ADR-0012 d3); before that every `spec:` commit departs from a record outside the repo.
+   is admitted and graded by the round (d5). A hold that refuses every code commit of the story (the escalation
+   and rescope holds, ADR-0013 d4–d5) refuses its `spec:` commits too. Each id of `Unaffected:` is one claim of
+   a judged category, that the commit leaves what meets that item as it was, which the claim check (README 6;
+   ADR-0001) judges against the spec folder in the staged tree before the commit lands; its lineage is keyed by
+   the spec folder and the id, where a code claim's is keyed by its file (amends ADR-0001 d2); `WRONG` refuses
+   the commit and counts on that lineage as any `WRONG` does, and the `claim-<id>` hold it places refuses the
+   story's `spec:` commits naming that id in either trailer (amends ADR-0013 d4). This gate opens when root
+   ADR-0012's action item 6 has landed (root ADR-0012 d3); before that every `spec:` commit departs from a
+   record outside the repo.
 3. We will tie acceptance scenarios to tests (TAGGED_TEST). A test whose name carries the tag `p<p>-US<k>-S<n>`
    or `p<p>-EC-<nnn>`, `<p>` the spec's issue number (its folder is `specs/<p>-<slug>/`, org ADR-0002 d1) and
    `-` written `_` where the language forbids it in a name, is tagged with that item of that spec; the tag is
@@ -100,25 +101,28 @@ action items.
    its task block, planner ADR-0008 d2) with no tagged test at the reviewed commit is a finding ruled FIX: write
    the test, red first (constitution Principle IV), which the gate lets land before its code (org ADR-0001 d1);
    an edge case's test is protected once tagged and asked of no story. A change to a tagged test's body is
-   reviewed by the round; one that leaves the test not checking its item is INTENT_DRIFT (d4).
+   reviewed by the round; one that leaves the test not checking its item is INTENT_DRIFT (d4). A rename of the
+   spec folder (planner ADR-0010 d2) leaves the story's `p<n>-` tags naming no spec at the commit: they protect
+   nothing, and the story's next round lists its untagged scenarios as FIX findings, the retag landing as code.
 4. We will brief the decision-reviewer with the intent tier at ratification and the design delta from the merge
    base to the reviewed commit, beside the governing records it already reads; it joins every internal round, as
    ADR-0019 d3 decided, where `briefs.waves` today adds it only when a record governs (README 8), since a round
-   with no governing record must still see drift. It reports one kind new to the finding-kind set (root
-   ADR-0010; lower case in `assessment.KINDS` while that set is Python): INTENT_DRIFT, the delta removes or
-   narrows the last functional requirement or task that met an intent item at ratification, or a tagged test is
-   changed so it no longer checks its item (d3); it admits ESCALATE alone, the ruling ADR-0017 d2 gives a
-   finding the assessor cannot rule, and the `escalation-<issue>` hold's question names the item's id and the
-   commit (ADR-0013 d4), for the admin. A scenario without its tagged test is d3's FIX, not drift, and a gap the
-   design already had at ratification is not drift. SPEC_GAP keeps its kind and is one of three things: two
-   intent items contradict, an intent item cannot be met as written, or the root-cause reviewer's verdict is
-   SPEC_WRONG; the spec ADR-0017 d2's RESCOPE clause names is the intent tier, so a SPEC_GAP finding makes the
-   round's verdict RESCOPE (ADR-0013 d5) and its next step the spec PR, never a story commit. A decision the
-   design tier leaves open is no finding kind: the finding that exposed it is ruled on its own kind, and the
-   story settles the decision in that fix's `spec:` commit (root ADR-0012 d4). SPEC_WRONG (ADR-0017 d2) admits a
-   SPEC_GAP finding, `## Root cause` being intent (root ADR-0012 d1), or a PUSH_BACK citing a spec line; its
-   spec-gap FIX, a story's change to the spec, goes. A departure from a record keeps ADR-0017 d2's rulings: FIX
-   by changing the code, or ESCALATE.
+   with no governing record must still see drift. It reports one kind new to the finding-kind set (root ADR-0010
+   d2, upper snake case): INTENT_DRIFT, the delta removes or narrows the last functional requirement or task
+   that met an intent item at ratification, or a tagged test is changed so it no longer checks its item (d3); it
+   admits ESCALATE alone, the ruling ADR-0017 d2 gives a finding the assessor cannot rule, and the
+   `escalation-<issue>` hold's question names the item's id and the commit (ADR-0013 d4), for the admin. A
+   scenario without its tagged test is d3's FIX, not drift, and a gap the design already had at ratification is
+   not drift. SPEC_GAP keeps its kind and is one of three things: two intent items contradict, an intent item
+   cannot be met as written, or the root-cause reviewer's verdict is SPEC_WRONG; the spec ADR-0017 d2's RESCOPE
+   clause names is the intent tier, so a SPEC_GAP finding admits PUSH_BACK, citing the intent line that settles
+   it, and no other ruling; one standing, not pushed back, makes the round's verdict RESCOPE unless a finding is
+   ruled ESCALATE (ADR-0017 d2's order; ADR-0013 d5), and its next step the spec PR, never a story commit. A
+   decision the design tier leaves open is no finding kind: the finding that exposed it is ruled on its own
+   kind, and the story settles the decision in that fix's `spec:` commit (root ADR-0012 d4). SPEC_WRONG
+   (ADR-0017 d2) yields a SPEC_GAP finding, `## Root cause` being intent (root ADR-0012 d1), ruled as above, or
+   a PUSH_BACK citing a spec line; its spec-gap FIX, a story's change to the spec, goes. A departure from a
+   record keeps ADR-0017 d2's rulings: FIX by changing the code, or ESCALATE.
 5. We will record on every round (ADR-0011 d1; root ADR-0003's `Round` contract) a `spec_delta` since
    ratification: the merge base's `spec.md` blob; each `spec:` commit on the branch with its oid, subject,
    `Motivated-by` and `Unaffected` ids and their claim verdicts; and each merge commit whose conflict resolution
@@ -219,15 +223,17 @@ lost tag as one fewer.
 2. [ ] claim check: `Unaffected` ids as a judged claim category (`briefs.py`, `claimcheck.py`); a lineage keyed
    by spec folder and id, and the hold that refuses by it (`lineage.py`, `claimgate.py`); the check record keyed
    by the staged tree and the trailers, so a check that saw other trailers passes no commit (`claimgate.py`).
-3. [ ] policy: INTENT_DRIFT in the finding-kind set (`assessment.KINDS`), admitting ESCALATE alone, with the
-   ESCALATE finding ruling ADR-0017 d2 decided and `FINDING_VERDICTS` lacks today; SPEC_WRONG and RESCOPE's
-   clause per d4; `validate_assessment` refuses a `round_verdict` that is not the first match of ADR-0017 d2's
-   order (ESCALATE when a finding is ruled ESCALATE, else RESCOPE when a SPEC_GAP finding stands), where today
-   it checks admissibility alone; one verdict name across `policy.VERDICTS` (`RESHAPE_SPEC`) and core's
-   `RoundVerdict` (`RESCOPE`), as root ADR-0010 decides.
+3. [ ] policy: INTENT_DRIFT in the finding-kind set (`assessment.KINDS`, in upper snake case per root ADR-0010
+   d2, its lower-case values renamed with it), admitting ESCALATE alone, with the ESCALATE finding ruling
+   ADR-0017 d2 decided and `FINDING_VERDICTS` lacks today; SPEC_WRONG and RESCOPE's clause per d4;
+   `validate_assessment` refuses a `round_verdict` that is not the first match of ADR-0017 d2's order (ESCALATE
+   when a finding is ruled ESCALATE, else RESCOPE when a SPEC_GAP finding is not ruled PUSH_BACK), where today
+   it checks admissibility and that `RESHAPE_SPEC` has a `spec_gap` finding, not the order; one verdict name
+   across `policy.VERDICTS` (`RESHAPE_SPEC`) and core's `RoundVerdict` (`RESCOPE`), as root ADR-0010 decides.
 4. [ ] decision-reviewer: joins every internal round (`briefs.waves`); its brief carries the intent at
    ratification, the design delta and, per intent item, the tagged tests at the reviewed commit.
 5. [ ] core: `spec_delta` on `Round`, the `spec.md` splitter and the id grammar; orchestrator: the delta
-   comment, ADR-0004 d4's set without `specs/` and d1's lapse as root ADR-0012 d5 states them.
+   comment, orchestrator ADR-0004 d4's set without `specs/` and its d1's lapse as root ADR-0012 d5 states them;
+   `RoundVerdict.RESCOPE`'s description in core reads as d4 defines SPEC_GAP (root ADR-0010 d3).
 6. [ ] README: What it enforces 5, 6, 8 and 9 rewritten from this record once the code lands.
 

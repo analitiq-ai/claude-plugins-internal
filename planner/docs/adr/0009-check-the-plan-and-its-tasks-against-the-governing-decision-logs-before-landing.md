@@ -81,7 +81,7 @@ after critique and after a check stops, and a check that skips what it judges un
    still resume; a rescope's existing stories are reconciled where a rescope lands (ADR-0010 d5);
    an edit to `tasks.md` after the run is checked only in spec-PR review, as an entry committed by hand to the
    rulings file is (d6).
-   *Amended by root ADR-0012 d3 (#342): on a story branch the story writes its own task block (OWN_BLOCK, reviewer ADR-0023 d1), reviewed in its PR's rounds; in force from root ADR-0012 action item 6.*
+   *Amended by root ADR-0012 d3 (#342): on a story branch the story writes its own task block (OWN_BLOCK, reviewer ADR-0023 d1), reviewed in its PR's rounds, and in planning the tasks command keeps a merged story's block as the default branch holds it; in force from root ADR-0012 action item 6.*
 5. We will have a headless model step judge the plan and the tasks against each record `adr check` names as
    governing, one answer per record, and decide each folder's outcome in code from those answers. This
    record owns the sets below, in core's contracts (root ADR-0010 d3).
