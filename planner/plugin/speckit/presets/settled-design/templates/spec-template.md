@@ -12,8 +12,8 @@ codeworks:
 ## Non-goals
 
 <!--
-  ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to, with the
-  reason. When there is none, the one line `None.`
+  ACTION REQUIRED: One line per thing this change will not do that a reader might expect it to. When there is
+  none, the one line `None.`
 -->
 
 - [what is out, and why]
@@ -54,7 +54,7 @@ Source: [the report's source]
 
 <!--
   ACTION REQUIRED: For an issue that reports no wrong behaviour, this section is the one line
-  `Not a defect report.` and nothing else. Keep the heading either way.
+  `Not a defect report.` and nothing else.
 
   For an issue that reports wrong behaviour, read the code before writing anything here, then:
 
