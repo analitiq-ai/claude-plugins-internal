@@ -42,6 +42,7 @@ decision.
    exempts. A push after
    the label voids it until it is labelled again. `exempt_labels` is a key of the orchestrator's
    section of `codeworks.toml` (root ADR-0002).
+   *Amended by root ADR-0012 d5 (#342): `specs/` stays among the paths this exemption counts as protected when it leaves ADR-0004 d4's set for a story PR; in force from root ADR-0012 action item 6.*
 2. We will have the orchestrator alone decide EXEMPT and write `internal-review` "exempt"; reviewer and
    every other component read that check, never the list.
 3. We will name no builder step on an exempt PR. An exempt story PR's card goes to Blocked, the reason

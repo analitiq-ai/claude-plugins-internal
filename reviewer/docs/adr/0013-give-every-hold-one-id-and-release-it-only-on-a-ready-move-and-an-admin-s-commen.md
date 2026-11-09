@@ -87,6 +87,7 @@ clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011
    `ADR departure: <folder> <record id> <file> — <what departs>` (ADR-0017 d2), written and read by one pair
    of functions in `core/`. The rulings and members live in the gates section of the state snapshot (ADR-0011
    d1), and a count and the hold it places land in one commit.
+   *Amended by ADR-0023 d2 (#342): a `claim-<id>` hold on an `Unaffected` lineage refuses the story's `spec:` commits naming that intent id; in force from root ADR-0012 action item 6.*
 5. We will place `rescope-<issue>` on a `RESCOPE` verdict, carrying as its question, as d4's escalation does,
    why the round rescoped and what must be decided; and, when reviewer's hook sees a rescope's spec PR open
    (planner ADR-0010), on every open story issue under that spec (root ADR-0006), recording that spec PR's
@@ -94,6 +95,7 @@ clears an invalid commit from the `ledger` branch by a deletion commit (ADR-0011
    rescope row already records places nothing again, released or not; a new spec PR places the hold
    again. It refuses every code commit but a merge of the default branch, and releases as every hold
    does (d2).
+   *Amended by ADR-0023 d2, d4 (#342): the RESCOPE verdict this hold follows is as ADR-0023 d4 defines it; this hold refuses the story's `spec:` commits too; in force from root ADR-0012 action item 6.*
 
 ## Options considered
 

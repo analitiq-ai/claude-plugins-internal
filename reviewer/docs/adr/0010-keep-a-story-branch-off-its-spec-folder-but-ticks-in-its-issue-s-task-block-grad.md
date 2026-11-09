@@ -45,11 +45,13 @@ know which of its tasks are done.
 1. We will refuse, on a story branch, every commit that changes a path in the spec folder, except a
    `tasks.md` change that only flips `[ ]` to `[x]` inside the task block labelled with the session's issue
    number (TICK_ONLY). planner labels each story's task block with its issue number (planner ADR-0008).
+   *Amended by ADR-0023 d1–d2 (#342): INTENT_FROZEN and OWN_BLOCK replace this refusal; a design-tier change is admitted in a `spec:` commit, in force from root ADR-0012 action item 6.*
 2. We will grade every round against `spec.md` at the reviewed commit, never a stored copy. A changed spec
    or a new decision record reaches a story branch only when it merges the default branch (builder
    ADR-0004), and governs the story from the round after that merge; a rescope hold waits for that merge
    (ADR-0013). The round after any merge of the default branch into a story branch reviews that merge's
    conflict resolution, diffed against the merge base.
+   *Amended by ADR-0023 d1–d2 (#342): the intent tier reaches a story branch only by a merge of the default branch; the design tier also by the story's own `spec:` commits, graded from the round that reviews them; in force from root ADR-0012 action item 6.*
 
 ## Options considered
 

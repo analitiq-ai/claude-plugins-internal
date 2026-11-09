@@ -43,6 +43,7 @@ never reaches the default branch. reviewer records each round's verdict at the h
    differ from the head's (orchestrator ADR-0004 d1), so the story is built and reviewed against the spec and
    records in force. The merge runs before the spec-folder check (ADR-0002), which then finds the folder the
    new spec names.
+   *Amended by root ADR-0012 d5 (#342): the merge is triggered by the default branch's change of these files since the story's merge base, measured as root ADR-0012 d5 measures the lapse, at the story head's merge base and with `adr-rulings.json` among the files, never by the story's own `spec:` commits; in force from root ADR-0012 action item 6.*
 
 ## Options considered
 

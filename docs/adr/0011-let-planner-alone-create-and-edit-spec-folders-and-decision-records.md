@@ -2,7 +2,8 @@
 schemaVersion: 0.2.0
 id: "0011"
 title: "Let planner alone create and edit spec folders and decision records"
-status: accepted
+status: superseded
+supersededBy: "0012"
 date: 2026-11-03
 deciders: ["@Analitiq-Bot-Wonka"]
 tags: [spec-folder, decision-log, ownership, planner, reviewer, orchestrator]
@@ -30,6 +31,9 @@ review:
 ---
 
 # ADR-0011: Let planner alone create and edit spec folders and decision records
+
+> Superseded by ADR-0012 (#342): the intent tier, decision records among it, stays planner's and its human's; the
+> spec folder's design tier is changed by the story in `spec:` commits (reviewer ADR-0023).
 
 ## Context
 

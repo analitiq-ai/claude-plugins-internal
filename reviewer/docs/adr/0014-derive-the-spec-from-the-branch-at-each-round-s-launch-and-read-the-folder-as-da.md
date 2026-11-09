@@ -50,6 +50,7 @@ names the story issue, and `core/` derives the spec's issue and its folder from 
 2. We will read the folder as data and validate none of it (planning checks its own output): `spec.md`
    whole for reviewers and assessor, or the issue body as the requirement when `codeworks.kind` is
    `no_spec` (root ADR-0005), and the `codeworks` keys for dispatch (planner ADR-0008); never headings.
+   *Amended by ADR-0023 d1 (#342): the section a `spec.md` line belongs to is read by core's one splitter over the template's fixed `## ` headings, a heading a marker and never the source of a fact; an intent item by the id label in its line; from root ADR-0012 action item 2.*
 
 ## Options considered
 

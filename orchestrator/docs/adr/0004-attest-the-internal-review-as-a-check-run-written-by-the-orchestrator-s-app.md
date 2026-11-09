@@ -51,6 +51,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    lapse for the default branch's files, that round runs after builder merges the default branch (builder
    ADR-0004). A `/codeworks reset` lapses nothing. At every hook run the orchestrator rewrites each open PR's
    `internal-review` and `<module>-review` (ADR-0008) whose value changed.
+   *Amended by root ADR-0012 d5 (#342): the lapse on the default branch's files compares the default branch's head with the default branch at the attested round's merge base, not with the round's commit, and a `spec:` commit of the story (reviewer ADR-0023 d2) after that round lapses it too; no other commit of the story does, and this item's other lapses stand; in force from root ADR-0012 action item 6.*
 2. We will write it with the orchestrator's App (ADR-0001), from GitHub state alone; only hooks read
    its key (root ADR-0008).
 3. We will rely on the ruleset's pin of `internal-review` to that App (ADR-0009): a check from
@@ -62,6 +63,7 @@ ruleset's trust root. A PR can also change the config, workflows and hooks that 
    Bot-authored or not: its card goes to Blocked naming the paths, and only an exempt label (ADR-0005)
    attests it. A validator's own config, `.deepsource.toml` for one, belongs to its package in
    `validators/` (root ADR-0003) and is not on this list.
+   *Amended by root ADR-0012 d5 (#342): `specs/` leaves this set for a story PR, reviewer's gate and check (reviewer ADR-0023 d1–d2; reviewer ADR-0002 d4) fencing it instead, and stays in it for ADR-0005 d1's bot-author exemption; the rest of the set stands; in force from root ADR-0012 action item 6.*
 5. We will never attest a fork PR (head repo ≠ base repo) from reviewer's state; the exempt label still
    applies (ADR-0005).
 

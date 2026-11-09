@@ -44,6 +44,7 @@ and leaves Setup, Foundational and Polish untagged by design, yet every task bel
    `codeworks: {v: 1, kind: no_spec | feature | defect, root_cause: {observed: anchored | hypothesis | none}}`,
    filled by planner's checks at commit; builder, reviewer and the root-cause reviewer read these
    keys through core's model (root ADR-0003), never a heading.
+   *Amended by root ADR-0012 d1 (#342): the section a `spec.md` line belongs to is read, too, by core's one splitter over the template's fixed `## ` headings, which planner's checks and reviewer's gate share; no fact is read from a heading's wording; from root ADR-0012 action item 2.*
 2. We will keep Spec Kit's stock tasks template, customised only through presets and overrides: story
    phases are tagged `[US<k>]`; Setup, Foundational and Polish are present and untagged. When planner
    creates the story issues (ADR-0010), it labels each task block in tasks.md with its story issue's

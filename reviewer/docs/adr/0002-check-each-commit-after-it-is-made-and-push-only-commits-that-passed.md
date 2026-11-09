@@ -51,6 +51,7 @@ the check reads (ADR-0021).
    protects, through core's one protected-path matcher: a workflow on the branch runs on the push, before
    any review, and a spec folder or a record a story changes moves the target it is graded against (root
    ADR-0011). Such a change is an admin's, merged under an exempt label (orchestrator ADR-0005).
+   *Amended by root ADR-0012 d5 and ADR-0023 d5 (#342): `specs/` leaves the protected set (root ADR-0012 d5); the check fails instead a commit ADR-0023 d1–d3 would refuse; in force from root ADR-0012 action item 6.*
 
 ## Options considered
 
