@@ -26,9 +26,10 @@ named, at main 49a3d8b (reviewer ADR-0011 and ADR-0013 as merged in #290).
   `diff-match-patch` has an npm package (same algorithm as the Python one `lineage.py` uses), so lineages port
   without a new algorithm. The four `workflows/*.js` and `agents/*.md` are already non-Python and stay, except the
   assessor's brief command: `agents/assessor.md` runs `briefs.py`, so it is repointed to the ported
-  `lib/briefs.ts` entry, same `--ref` argument and `brief_token` output, its facts from git and core's state, at
-  CUT with `hooks.json` (R16): until then the live `gate.py` grades the assessor's `brief_token` against the SQLite
-  round, which only `briefs.py` can produce.
+  `lib/briefs.ts` entry, same `--ref` argument and `brief_token` output, its facts from git and core's state
+  (earlier rounds' finding counts and positions from `Round.findings`, R4), at CUT with `hooks.json` (R16): until
+  then the live `gate.py` grades the assessor's `brief_token` against the SQLite round, which only `briefs.py` can
+  produce.
 
 ## R2: Reader is the session token; writer is the reviewer App, `contents: write`, minted per writing run
 
@@ -80,7 +81,10 @@ named, at main 49a3d8b (reviewer ADR-0011 and ADR-0013 as merged in #290).
   the round was raised and what must be decided (ADR-0013 d4–d5); spent audits (`max_audits`) place
   `audit-<issue>`; an open pushback the stage cap reaches places `pushback-<issue>`; claim and shim holds are
   `claim-<lineage>` and `shim-<bug>` (ADR-0013 d4 table). Rounds are keyed by `RoundId {stage, n}` on the story
-  issue, and core's `Round` gains `run`, the workflow run that produced it (ADR-0021 d2), which names its file (R5).
+  issue, and core's `Round` gains `run`, the workflow run that produced it (ADR-0021 d2), which names its file (R5),
+  and `findings`, each finding its reviewers reported as key, file and line and no text (ADR-0016 d2): the assessor's
+  facts (finding counts of earlier rounds, positions reviewed before, the file ADR-0018 d2's reset point names) read
+  them from the fold, since no round report outlives its run (FR-004, FR-026).
 - **Rationale**: FR-003, root ADR-0010. The PR-keyed `epoch` and `unlocked_at` disappear: a hold's release is
   a release event, written only by `releaseOnClaim` (FR-008).
 - **Existing tools**: `core/src/values.ts` value sets, `core/src/contracts/snapshot.ts`, `core/src/attest.ts`

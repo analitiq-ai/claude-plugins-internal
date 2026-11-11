@@ -16,16 +16,17 @@ is the event's JSON, keys sorted, two-space indent, trailing newline.
 
 `v: 1` on every event. The fold accepts every `v` ever written: a change that would reject an event already on
 `ledger` adds a new `v` and narrows no old one, since events are permanent and a rejected old event would tamper
-its story; frozen `v: 1` histories stay in core's tests. Payload types are `core/src/contracts/snapshot.ts`'s. `<since>` is a `Time` written
+its story; frozen `v: 1` histories stay in core's tests. A `v` is amended in place only while no event of the kind
+it changes is on any `ledger`; the frozen histories then change with it. Payload types are `core/src/contracts/snapshot.ts`'s. `<since>` is a `Time` written
 `YYYYMMDDTHHMMSSZ`; `<h(x)>` is the SHA-256 hex of `x`'s UTF-8; `<r>` is `<stage>-<n>` of a `RoundId`. Ids, runs and
 refs match `[A-Za-z0-9._-]+`.
 
 | kind | content | file | applies when (else the commit is invalid) |
 |---|---|---|---|
-| `round` | `{kind, v, round: Round}` (`Round` gains `run`) | `round.<run>.json` | no round with its `(stage, n)` or `run` |
-| `ruling` | `{kind, v, ruling: Ruling}` with `commits: []` | `ruling.<r>.<h(key)>.json` | its round is in `rounds`; `(round, key)` not ruled |
+| `round` | `{kind, v, round: Round}` (`Round` gains `run` and `findings`, R4) | `round.<run>.json` | no round with its `(stage, n)` or `run` |
+| `ruling` | `{kind, v, ruling: Ruling}` with `commits: []` | `ruling.<r>.<h(key)>.json` | its round is in `rounds` and its `key` among that round's `findings`; `(round, key)` not ruled |
 | `ruling-commit` | `{kind, v, round: RoundId, key, commit: sha40}` | `ruling-commit.<r>.<h(key)>.<commit>.json` | its ruling is in `rulings`, is FIX, and its `commits` lacks `commit` |
-| `pushback` | `{kind, v, pushback: Pushback}` | `pushback.<r>.<h(key)>.json` | its round is in `rounds` |
+| `pushback` | `{kind, v, pushback: Pushback}` | `pushback.<r>.<h(key)>.json` | its round is in `rounds` and its `key` among that round's `findings` |
 | `hold` | `{kind, v, hold: {id, kind, since, question, spec_pr}}` | `hold.<id>.<since>.json` | no row, or its row RELEASED (reopened in place); a `rescope` with `spec_pr` set also when its row records another `spec_pr` or none, OPEN or not (ADR-0013 d5) |
 | `release` | `{kind, v, release: {id, since, released, released_by}}` | `release.<id>.<since>.json` | the row `id` is OPEN with that `since` |
 | `release` of a tamper | `{kind, v, release: {id: "tamper-<oid>", since: null, released, released_by}}` | `release.tamper-<oid>.json` | `tamper-<oid>` is derived and unreleased |
@@ -33,6 +34,13 @@ refs match `[A-Za-z0-9._-]+`.
 
 `Hold` rules beyond today's (R8): `question` set on `escalation`, `claim` and a verdict-placed `rescope` (its
 `spec_pr` null), null otherwise. `tamper-` is no `HoldKind` row: the fold derives it.
+
+`Round` rules (R4): `findings` is one `RoundFinding {key, file, line}` per finding the round's reviewers reported
+once every expected reviewer answered, `key` as `Ruling.key`, `file` and `line` as `Finding`'s, no text (ADR-0016
+d2); keys unique within the round;
+non-empty exactly when `result` is DIRTY. A `ruling`'s and a `pushback`'s `key` names one of its round's `findings`.
+The assessor's facts read earlier rounds' finding counts and positions from them, since no round report outlives
+its run (FR-004, FR-026). Added within `v: 1`: no round event was on any `ledger` before it.
 
 ## Fold
 

@@ -81,7 +81,7 @@ Post-design re-check: unchanged, all pass.
 - Hook path in TypeScript, Python retired, carrier link to core: R1
 - Reader from the session token, writer minted as the reviewer App with `contents: write`, `[reviewer]` settings: R2
 - One reading per run, advanced by each write; expected head serialises writers; `StateStale` retry: R3
-- Round results, verdicts and hold kinds mapped onto core's value sets; `Round.run`: R4
+- Round results, verdicts and hold kinds mapped onto core's value sets; `Round.run`, `Round.findings`: R4
 - Ledger events and file names as core contracts, JSON Schemas generated: R5
 - State read as the fold of `issues/<n>/`, commits classed, `tamper-<oid>` derived, `LedgerMissing`: R6
 - Add-only writes through `createCommitOnBranch`, signature asserted, events derived from transitions: R7
@@ -121,7 +121,7 @@ specs/209-rebuild-reviewer-on-core/
 core/src/
 ├── contracts/ledger.ts            # PR B: LedgerEvent, eventFile
 ├── contracts/gates.ts             # PR B
-├── contracts/snapshot.ts          # PR B: Round.run, Hold.question kinds, gates
+├── contracts/snapshot.ts          # PR B: Round.run, Hold.question kinds, gates; PR B2: Round.findings
 ├── state.ts                       # PR B: fold reader, commitEvents, writes take the reading; state-comment parsing deleted, issueComments and the issue reads kept
 ├── tokens.ts                      # PR B: APP_PERMISSIONS.reviewer = {contents: write}
 ├── contracts/commit-pass.ts       # PR C
@@ -165,13 +165,14 @@ retry (R3).
 | C | core: commit-check pass record (R14) | US2, #174 Story 2 | unchanged |
 | — | #177 US5: `protectedPaths` `{tickOnly, adrFolders}` (external) | US2's protected-path step | — |
 | S | carrier, hook skeleton, session folder, run-state with `StateStale` retry | all stories | TS unregistered; Python hooks unchanged |
+| B2 | core: `Round.findings` (R4, FR-026), schemas, frozen `v: 1` histories | US1 | the orchestrator folds rounds that carry findings; Python hooks unchanged |
 | US1 | settings, round/hold/gates recording through core, no comment path | — | same |
 | US2 | bare copy, after-commit check, ancestry base (FR-021), per-branch pass record writes | US3 | same |
 | US3 | fence in the after-commit check | — | same |
 | US4 | release on claim, tamper release | — | same |
 | CUT | `hooks.json` flipped to the TS entries; `ledger.py`, `pre_merge_gate.py`, the hook-path Python modules and their tests deleted; version bumped (R16, FR-018) | — | TS hooks; Python gone |
 
-Order: B → C → S → US1 → US2 → US3 → US4 → CUT. Every merge before CUT leaves `hooks.json` and the Python
+Order: B → C → S → B2 → US1 → US2 → US3 → US4 → CUT. Every merge before CUT leaves `hooks.json` and the Python
 modules (`gate.py` imports `ledger.py`) untouched, so one runtime decides each hook run at every point; CUT is
 the cutover FR-018 names.
 
